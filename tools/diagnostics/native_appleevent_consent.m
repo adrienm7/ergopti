@@ -4,6 +4,7 @@
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <Security/Security.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
@@ -292,6 +293,92 @@ static BOOL owned_window_chrome(AXUIElementRef window, AXUIElementRef button) {
     return NO;
 }
 
+enum OwnedWindowScope {
+    OwnedWindowScopeRefused = 0,
+    OwnedWindowScopeUnrelated,
+    OwnedWindowScopeCandidate
+};
+
+static bool scope_before_deadline(void) {
+    NSTimeInterval remaining = identityDeadline - NSProcessInfo.processInfo.systemUptime;
+    return remaining > 0 && remaining <= 3;
+}
+
+static AXError scope_copy_attribute(AXUIElementRef element, CFStringRef key, CFTypeRef *value) {
+    *value = NULL;
+    if (!scope_before_deadline()) return kAXErrorCannotComplete;
+    AXError status = AXUIElementCopyAttributeValue(element, key, value);
+    return scope_before_deadline() ? status : kAXErrorCannotComplete;
+}
+
+static enum OwnedWindowScope discover_window_scope(AXUIElementRef window,
+    CFStringRef sender, CFStringRef receiver, pid_t agent) {
+    // This complete identity-text census selects a discovery scope only. It
+    // grants neither a signed identity nor any permission or button action.
+    // Preserve the original window/default descendant IPC timeout settings;
+    // the existing outer child owner still bounds a blocked native read.
+    AXUIElementRef pending[256];
+    size_t count = 0, examined = 0;
+    AXUIElementRef element = NULL;
+    CFTypeRef role = NULL, value = NULL, children = NULL;
+    bool sender_seen = false, receiver_seen = false;
+    enum OwnedWindowScope result = OwnedWindowScopeRefused;
+    if (agent <= 0 || window == NULL || sender == NULL || receiver == NULL ||
+        CFGetTypeID(window) != AXUIElementGetTypeID() ||
+        CFGetTypeID(sender) != CFStringGetTypeID() ||
+        CFGetTypeID(receiver) != CFStringGetTypeID() || !scope_before_deadline()) return result;
+    pending[count++] = (AXUIElementRef)CFRetain(window);
+    while (count > 0) {
+        element = pending[--count];
+        if (++examined > 256 || CFGetTypeID(element) != AXUIElementGetTypeID() ||
+            !scope_before_deadline()) goto done;
+        pid_t actual_agent = 0;
+        if (AXUIElementGetPid(element, &actual_agent) != kAXErrorSuccess ||
+            actual_agent != agent || !scope_before_deadline()) goto done;
+        if (scope_copy_attribute(element, kAXRoleAttribute, &role) != kAXErrorSuccess ||
+            role == NULL || CFGetTypeID(role) != CFStringGetTypeID() ||
+            CFStringGetLength((CFStringRef)role) > 4096 ||
+            (examined == 1 && !CFEqual(role, kAXWindowRole))) goto done;
+        if (CFEqual(role, kAXStaticTextRole)) {
+            if (scope_copy_attribute(element, kAXValueAttribute, &value) != kAXErrorSuccess ||
+                value == NULL || CFGetTypeID(value) != CFStringGetTypeID() ||
+                CFStringGetLength((CFStringRef)value) > 4096) goto done;
+            if (CFStringFind((CFStringRef)value, sender, 0).location != kCFNotFound) sender_seen = true;
+            if (CFStringFind((CFStringRef)value, receiver, 0).location != kCFNotFound) receiver_seen = true;
+        }
+        AXError status = scope_copy_attribute(element, kAXChildrenAttribute, &children);
+        if (children == NULL && (status == kAXErrorSuccess ||
+            status == kAXErrorAttributeUnsupported || status == kAXErrorNoValue)) goto next_element;
+        if (status != kAXErrorSuccess || children == NULL ||
+            CFGetTypeID(children) != CFArrayGetTypeID()) goto done;
+        CFIndex number = CFArrayGetCount((CFArrayRef)children);
+        if (number < 0 || number > 256 || count + (size_t)number > 256) goto done;
+        for (CFIndex index = 0; index < number; index++) {
+            CFTypeRef child = CFArrayGetValueAtIndex((CFArrayRef)children, index);
+            if (child == NULL || CFGetTypeID(child) != AXUIElementGetTypeID()) goto done;
+            pending[count++] = (AXUIElementRef)CFRetain(child);
+        }
+next_element:
+        if (children != NULL) CFRelease(children);
+        if (value != NULL) CFRelease(value);
+        CFRelease(role);
+        CFRelease(element);
+        children = value = role = NULL;
+        element = NULL;
+    }
+    if (scope_before_deadline()) {
+        if (!sender_seen && !receiver_seen) result = OwnedWindowScopeUnrelated;
+        else if (sender_seen && receiver_seen) result = OwnedWindowScopeCandidate;
+    }
+done:
+    if (children != NULL) CFRelease(children);
+    if (value != NULL) CFRelease(value);
+    if (role != NULL) CFRelease(role);
+    if (element != NULL) CFRelease(element);
+    while (count > 0) CFRelease(pending[--count]);
+    return result;
+}
+
 // Passive traversal of only the retained refused window. These booleans describe
 // observed static text, never signed identity, permission or a consent candidate.
 // The existing child timeout=min(3, remaining) also caps the original request.
@@ -468,6 +555,14 @@ int main(int argc, const char **argv) {
                 AXUIElementSetMessagingTimeout(window, 0.5);
                 NSMutableArray *buttons = [NSMutableArray array];
                 BOOL targetSeen = NO, senderSeen = NO, denySeen = NO;
+                enum OwnedWindowScope scope = discover_window_scope(window,
+                    (__bridge CFStringRef)sender, (__bridge CFStringRef)receiver,
+                    application.processIdentifier);
+                if (scope == OwnedWindowScopeUnrelated) continue;
+                if (scope != OwnedWindowScopeCandidate) {
+                    observationRefused = YES;
+                    continue;
+                }
                 if (!inspect_window(window, sender, receiver, buttons, &targetSeen, &senderSeen, &denySeen, agentIndex)) {
                     observationRefused = YES;
                     continue;

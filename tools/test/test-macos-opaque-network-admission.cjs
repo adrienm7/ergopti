@@ -332,14 +332,31 @@ const vectors = [
 		child: true
 	}
 ];
+function receivingNetworkSource(fixturePolicy) {
+	assert.ok(
+		fs.lstatSync(managedReceiver).isFile(),
+		'only the copied real native receiver is admitted'
+	);
+	const networkSource = fs.readFileSync(
+		path.join(root, 'static/ergopti_plus/macos/modules/llm/network_env.lua'),
+		'utf8'
+	);
+	return [
+		// This exact existence port also keeps Git Bash paths independent of
+		// the host Lua file-name convention. No NetworkEnv method is replaced.
+		`package.loaded["adapters.file_system"] = { exists = function(p) return p == ${JSON.stringify(shellPath(managedReceiver))} end }`,
+		`local Network = assert(load(${JSON.stringify(networkSource)}, ${JSON.stringify('@' + shellPath(managedRoot) + '/modules/llm/network_env.lua')}))()`,
+		`Network.policy_path = function() return ${JSON.stringify(shellPath(fixturePolicy))} end`,
+		`local receiver = { path = ${JSON.stringify(shellPath(managedReceiver))}, source = ${JSON.stringify(fs.readFileSync(managedReceiver, 'utf8'))} }`
+	];
+}
 function emittedOwners(fixturePolicy, python, binary) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		`local Network = assert(loadfile(${JSON.stringify(`${macos}/modules/llm/network_env.lua`)}))()`,
-		`Network.policy_path = function() return ${JSON.stringify(shellPath(fixturePolicy))} end`,
-		`local packet = require("tests.support.opaque_network_owner_fixture").capture(Network, ${JSON.stringify(shellPath(python))}, ${JSON.stringify(shellPath(binary))})`,
+		...receivingNetworkSource(fixturePolicy),
+		`local packet = require("tests.support.opaque_network_owner_fixture").capture(Network, ${JSON.stringify(shellPath(python))}, ${JSON.stringify(shellPath(binary))}, receiver)`,
 		'io.write(require("json").encode(packet))'
 	].join('; ');
 	const generated = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
@@ -347,15 +364,14 @@ function emittedOwners(fixturePolicy, python, binary) {
 	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 	return JSON.parse(generated.stdout);
 }
-function receiveOwners(fixturePolicy, bytes, code, mode) {
+function receiveOwners(fixturePolicy, bytes, code, mode, owner) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		`local Network = assert(loadfile(${JSON.stringify(`${macos}/modules/llm/network_env.lua`)}))()`,
-		`Network.policy_path = function() return ${JSON.stringify(shellPath(fixturePolicy))} end`,
+		...receivingNetworkSource(fixturePolicy),
 		`local bytes = require("json").decode(${JSON.stringify(JSON.stringify(bytes))})`,
-		`local result = require("tests.support.opaque_network_owner_fixture").receive(Network, bytes, ${code}, ${mode ? JSON.stringify(mode) : 'nil'})`,
+		`local result = require("tests.support.opaque_network_owner_fixture").receive(Network, bytes, ${code}, ${mode ? JSON.stringify(mode) : 'nil'}, receiver, ${owner ? JSON.stringify(owner) : 'nil'})`,
 		'io.write(require("json").encode(result))'
 	].join('; ');
 	const received = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
@@ -440,12 +456,52 @@ function emittedPrelude(fixturePolicy) {
 	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 	return generated.stdout;
 }
+function emittedManagedPrelude(fixturePolicy) {
+	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const source = [
+		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		...receivingNetworkSource(fixturePolicy),
+		'local prelude, detail = Network.managed_http_prelude("MLX")',
+		'assert(prelude, detail); io.write(prelude)'
+	].join('; ');
+	const generated = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	assert.ifError(generated.error);
+	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+	return generated.stdout;
+}
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-opaque-network-'));
 const actualPolicy = fs.readFileSync(policy, 'utf8');
 const fixturePolicy = path.join(temporary, 'policy.sh');
 const receiverPython = path.join(temporary, 'receiver-python');
 const receiverOllama = path.join(temporary, 'receiver-ollama');
-fs.writeFileSync(receiverPython, '#!/bin/bash\nprintf "__PYTHON_STARTED__\\n"\nexit 1\n');
+const managedRoot = path.join(
+	temporary,
+	'Managed.app/Contents/Resources/static/ergopti_plus/macos'
+);
+const managedReceiver = path.join(managedRoot, 'platform/network/native_http.py');
+fs.mkdirSync(path.dirname(managedReceiver), { recursive: true });
+fs.copyFileSync(
+	path.join(root, 'static/ergopti_plus/macos/platform/network/native_http.py'),
+	managedReceiver
+);
+const managedCalls = path.join(temporary, 'managed-receiver-calls');
+const managedEnvironment = path.join(temporary, 'managed-receiver-environment');
+const managedProbe =
+	"import importlib.util,sys; s=importlib.util.spec_from_file_location('ergopti_native_admission',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m._resolve_worker()";
+// This is a closed recording interpreter, never native authentication. The
+// dependency refusal stops the complete original launcher before nohup.
+fs.writeFileSync(
+	receiverPython,
+	'#!/bin/bash\n[ "$1" = -c ] || exit 64\n' +
+		`if [ "$2" = ${quote(managedProbe)} ]; then\n` +
+		`  [ "$#" -eq 3 ] && [ "$3" = ${quote(shellPath(managedReceiver))} ] && [ -f "$3" ] || exit 64\n` +
+		`  printf 'admission\\n' >> ${quote(shellPath(managedCalls))}\n` +
+		`  printf '%s\\n' "\${https_proxy-}" "\${HTTPS_PROXY-}" "\${all_proxy-}" "\${ALL_PROXY-}" "\${no_proxy-}" "\${NO_PROXY-}" "\${UV_SYSTEM_CERTS-}" "\${SSL_CERT_FILE-}" "\${REQUESTS_CA_BUNDLE-}" > ${quote(shellPath(managedEnvironment))}\n` +
+		'  exit "${MANAGED_RECEIVER_CODE:-1}"\nfi\n' +
+		'if [ "$#" -eq 2 ] && [ "$2" = "import huggingface_hub, truststore" ]; then\n' +
+		`  printf 'dependencies\\n' >> ${quote(shellPath(managedCalls))}\n  exit 1\nfi\nexit 64\n`
+);
 fs.writeFileSync(
 	receiverOllama,
 	'#!/bin/bash\n[ "$1" = pull ] && [ "$2" = org/model ] || exit 65\nprintf "__OLLAMA_FETCH_STARTED__\\n"\n'
@@ -561,6 +617,8 @@ exit "$received"`;
 				vector.child ? '__OLLAMA_FETCH_STARTED__\n' : '',
 				`${vector.id}: no outgoing CLI exec after refusal`
 			);
+			// The same literal receipt enters both classifiers; only Ollama's
+			// actual opaque wrapper produced it. MLX's own bytes are checked below.
 			const received = receiveOwners(fixturePolicy, actualPull.stderr, actualPull.status);
 			const messages = vector.child
 				? []
@@ -571,6 +629,8 @@ exit "$received"`;
 				`${vector.id}: original authorized owner message reception`
 			);
 			if (!vector.child) {
+				// These bytes exercise the two original callback classifiers only.
+				// Ollama's opaque receipt is not evidence of MLX's managed routing.
 				assert.deepEqual(
 					receiveOwners(fixturePolicy, actualPull.stderr, actualPull.status, 'terminal_only'),
 					received,
@@ -591,11 +651,12 @@ exit "$received"`;
 
 			if (!vector.child) {
 				assert.equal(typeof packet.mlx.path, 'string');
+				fs.writeFileSync(managedCalls, '');
 				const actualLauncher = spawnSync(
 					bash,
 					['-c', fixturePosixEnvironment(packet.mlx.source, vector.env)],
 					{
-						env,
+						env: { ...env, MANAGED_RECEIVER_CODE: '1' },
 						encoding: 'utf8',
 						timeout: 10000
 					}
@@ -603,22 +664,195 @@ exit "$received"`;
 				assert.ifError(actualLauncher.error);
 				assert.equal(
 					actualLauncher.status,
-					vector.code,
-					`${vector.id}: complete original HF launcher`
+					78,
+					`${vector.id}: independent managed receiver refusal, not snapshot refusal`
 				);
 				assert.equal(
 					actualLauncher.stdout,
 					`Python utilisé: ${shellPath(receiverPython)}\n`,
-					`${vector.id}: no Python execution before refusal`
+					`${vector.id}: no downloader execution after receiver refusal`
 				);
 				assert.ok(
 					!actualLauncher.stdout.includes('__DLPID__'),
 					`${vector.id}: no detached PID publication`
 				);
+				assert.equal(
+					fs.readFileSync(managedCalls, 'utf8'),
+					'admission\n',
+					`${vector.id}: exactly one managed probe, no opaque fallback or dependency probe`
+				);
+				assert.ok(
+					actualLauncher.stderr.includes(
+						'__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:unavailable:unavailable\n'
+					),
+					`${vector.id}: own managed refusal receipt`
+				);
+				assert.deepEqual(
+					receiveOwners(
+						fixturePolicy,
+						actualLauncher.stderr,
+						actualLauncher.status,
+						undefined,
+						'mlx'
+					),
+					{ ollama_messages: [], mlx_messages: ['network.failure.unknown'], report_calls: 1 },
+					`${vector.id}: MLX consumes its own unavailable receipt`
+				);
+				assert.deepEqual(
+					receiveOwners(fixturePolicy, actualLauncher.stderr, 78, 'terminal_only', 'mlx'),
+					{ ollama_messages: [], mlx_messages: ['network.failure.unknown'], report_calls: 1 },
+					`${vector.id}: actual managed refusal in buffered terminal stderr`
+				);
+				for (const mode of ['stale', 'start_refused']) {
+					assert.deepEqual(
+						receiveOwners(fixturePolicy, actualLauncher.stderr, 78, mode, 'mlx'),
+						{ ollama_messages: [], mlx_messages: [], report_calls: 0 },
+						`${vector.id}: actual managed refusal ${mode} cannot publish`
+					);
+				}
+				assert.deepEqual(
+					receiveOwners(fixturePolicy, actualLauncher.stderr, 78, 'stale_during_report', 'mlx'),
+					{ ollama_messages: [], mlx_messages: [], report_calls: 1 },
+					`${vector.id}: actual managed refusal cannot publish after reentrant report`
+				);
 			}
 		}
 		console.log(`ok - ${vector.id}`);
 	}
+	// Independent managed-receiver expectations. The recorder authenticates no
+	// native identity, performs no request and cannot reach the detached worker.
+	const managedCases = [
+		{
+			id: 'managed-receiver-admitted-explicit-inputs',
+			nativeCode: 0,
+			code: 0,
+			calls: 'admission\n',
+			child: true
+		},
+		{
+			id: 'managed-pac-receiver-admitted-empty-env',
+			nativeCode: 0,
+			code: 0,
+			calls: 'admission\n',
+			child: true,
+			empty: true
+		},
+		{ id: 'managed-native-refused', nativeCode: 1, code: 78, calls: 'admission\n', child: false },
+		{ id: 'managed-identity-refused', nativeCode: 64, code: 78, calls: 'admission\n', child: false }
+	];
+	const managedEnv = {
+		https_proxy: 'http://lower.invalid:3129',
+		HTTPS_PROXY: 'http://upper.invalid:3130',
+		all_proxy: 'http://all-lower.invalid:3131',
+		ALL_PROXY: 'http://all-upper.invalid:3132',
+		no_proxy: 'lower.local',
+		NO_PROXY: 'upper.local',
+		UV_SYSTEM_CERTS: 'original',
+		SSL_CERT_FILE: '/literal/original-ca',
+		REQUESTS_CA_BUNDLE: '/literal/original-bundle'
+	};
+	const expectedManagedEnvironment =
+		'http://lower.invalid:3129\nhttp://upper.invalid:3130\nhttp://all-lower.invalid:3131\nhttp://all-upper.invalid:3132\nlower.local\nupper.local\noriginal\n/literal/original-ca\n/literal/original-bundle\n';
+	const postManagedEnvironment = path.join(temporary, 'post-managed-environment');
+	fs.writeFileSync(
+		fixturePolicy,
+		actualPolicy +
+			"\nopaque_system_proxy_snapshot() { printf '%s\\n' '<dictionary> {' ' ProxyAutoConfigEnable : 1' '}'; }\n"
+	);
+	for (const vector of managedCases) {
+		fs.writeFileSync(managedCalls, '');
+		const prelude = emittedManagedPrelude(fixturePolicy);
+		const expectedEnvironment = vector.empty ? '\n\n\n\n\n\n\n\n\n' : expectedManagedEnvironment;
+		const received = spawnSync(
+			bash,
+			[
+				'-c',
+				fixturePosixEnvironment(
+					`PYTHON_BIN=${quote(shellPath(receiverPython))}; ` +
+						prelude +
+						`printf '%s\\n' "\${https_proxy-}" "\${HTTPS_PROXY-}" "\${all_proxy-}" "\${ALL_PROXY-}" "\${no_proxy-}" "\${NO_PROXY-}" "\${UV_SYSTEM_CERTS-}" "\${SSL_CERT_FILE-}" "\${REQUESTS_CA_BUNDLE-}" > ${quote(shellPath(postManagedEnvironment))}; ` +
+						"printf '__MANAGED_CHILD_STARTED__\\n'",
+					vector.empty ? {} : managedEnv
+				)
+			],
+			{
+				env: { ...fixtureHostEnvironment(), MANAGED_RECEIVER_CODE: String(vector.nativeCode) },
+				encoding: 'utf8',
+				timeout: 10000
+			}
+		);
+		assert.ifError(received.error);
+		assert.equal(received.status, vector.code, vector.id);
+		assert.equal(fs.readFileSync(managedCalls, 'utf8'), vector.calls, vector.id);
+		assert.equal(
+			fs.readFileSync(managedEnvironment, 'utf8'),
+			expectedEnvironment,
+			`${vector.id}: inherited selectors, bypass and trust inputs remain untouched`
+		);
+		if (vector.child)
+			assert.equal(
+				fs.readFileSync(postManagedEnvironment, 'utf8'),
+				expectedEnvironment,
+				`${vector.id}: managed prelude does not rewrite inherited inputs after admission`
+			);
+		assert.equal(received.stdout, vector.child ? '__MANAGED_CHILD_STARTED__\n' : '', vector.id);
+		assert.ok(
+			received.stderr.includes(
+				vector.child
+					? '__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted\n'
+					: '__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:unavailable:unavailable\n'
+			),
+			vector.id
+		);
+		assert.ok(!received.stderr.includes('refused:verified:'), `${vector.id}: no opaque fallback`);
+		console.log(`ok - ${vector.id}`);
+	}
+	const managedPacket = emittedOwners(fixturePolicy, receiverPython, receiverOllama);
+	fs.writeFileSync(managedCalls, '');
+	const admittedLauncher = spawnSync(
+		bash,
+		['-c', fixturePosixEnvironment(managedPacket.mlx.source, managedEnv)],
+		{
+			env: { ...fixtureHostEnvironment(), MANAGED_RECEIVER_CODE: '0' },
+			encoding: 'utf8',
+			timeout: 10000
+		}
+	);
+	assert.ifError(admittedLauncher.error);
+	assert.equal(
+		admittedLauncher.status,
+		1,
+		'original dependency refusal stops the admitted full MLX launcher'
+	);
+	assert.equal(
+		fs.readFileSync(managedCalls, 'utf8'),
+		'admission\ndependencies\n',
+		'actual full launcher admits native receiver before original dependency probe'
+	);
+	assert.ok(admittedLauncher.stderr.includes('__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted\n'));
+	assert.ok(
+		!admittedLauncher.stdout.includes('__DLPID__'),
+		'no detached downloader from recording interpreter'
+	);
+	assert.deepEqual(
+		receiveOwners(
+			fixturePolicy,
+			admittedLauncher.stderr,
+			admittedLauncher.status,
+			undefined,
+			'mlx'
+		),
+		{ ollama_messages: [], mlx_messages: [], report_calls: 0 },
+		'admitted actual MLX stderr does not publish a proxy cause'
+	);
+	for (const mode of ['terminal_only', 'stale', 'start_refused', 'stale_during_report']) {
+		assert.deepEqual(
+			receiveOwners(fixturePolicy, admittedLauncher.stderr, admittedLauncher.status, mode, 'mlx'),
+			{ ollama_messages: [], mlx_messages: [], report_calls: 0 },
+			`admitted actual MLX stderr: ${mode} cannot invent a proxy cause`
+		);
+	}
+	console.log('ok - managed full MLX launcher admission and original dependency refusal');
 	// Literal repeated-activation expectations: no duplicate bypass or trust export.
 	const activationSequences = [
 		{ id: 'default-default', modes: ['', ''] },
@@ -801,8 +1035,8 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'utf8'
 	);
 	assert.ok(
-		hfPull.includes('NetworkEnv.opaque_prelude("MLX")'),
-		'actual HF pull owns opaque admission'
+		hfPull.includes('NetworkEnv.managed_http_prelude("MLX")'),
+		'actual HF pull owns managed receiver admission'
 	);
 	const ollamaPull = fs.readFileSync(
 		path.join(root, 'static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_ollama.lua'),

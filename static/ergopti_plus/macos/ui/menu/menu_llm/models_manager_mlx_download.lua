@@ -1121,7 +1121,7 @@ function M.install(ctx)
 			end
 
 			local clean_repo = repo:gsub("[%c%s]", "")
-			local network_prelude, network_err = NetworkEnv.opaque_prelude("MLX")
+			local network_prelude, network_err = NetworkEnv.managed_http_prelude("MLX")
 			local native_directory_literal = _native_network_directory and JsonCodec.encode(_native_network_directory)
 			if not network_prelude or type(native_directory_literal) ~= "string" then
 				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err))
@@ -1255,9 +1255,9 @@ function M.install(ctx)
 			f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
 			f:write("export HF_HUB_DISABLE_SYMLINKS_WARNING=1\n")
 			f:write("export PYTHONUNBUFFERED=1\n")
-			-- The system relay and trust store (a company's inspection
-			-- certificate included, which truststore reads in the downloader);
-			-- no CA file overrides them.
+			-- Admit the bundled native receiver before the managed downloader.
+			-- It resolves each request and redirect through the system proxy;
+			-- truststore retains the system certificate authorities.
 			f:write(network_prelude .. "\n")
 			f:write("export HF_HUB_DISABLE_XET=1\n")
 			-- Dependencies are pinned in pyproject.toml and installed by uv pip

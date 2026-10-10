@@ -11,12 +11,22 @@ local helpers = require("tests.helpers")
 local json = require("json")
 local M = {}
 
+-- Admit only the captured real receiver file to the virtual MLX file system.
+-- The actual NetworkEnv module still decides and emits its managed prelude.
+local function seed_receiver(fixture, receiver)
+	helpers.assert_type(receiver, "table")
+	helpers.assert_type(receiver.path, "string")
+	helpers.assert_type(receiver.source, "string")
+	fixture.controls.files[receiver.path] = receiver.source
+end
+
 --- Captures actual outgoing-owner wrappers using independent receiver ports.
 --- @param network table Real NetworkEnv module with the receiver policy path.
 --- @param python string Receiver interpreter path inside the emitted launcher.
 --- @param binary string Receiver Ollama binary path.
+--- @param receiver table Exact receiver path and captured source bytes.
 --- @return table packet
-function M.capture(network, python, binary)
+function M.capture(network, python, binary, receiver)
 	local packet = {}
 	require("tests.support.ollama_pull_fixture").with_fixture({
 		network_env = network, binary_path = binary,
@@ -32,6 +42,7 @@ function M.capture(network, python, binary)
 	require("tests.support.mlx_download_fixture").with_fixture({
 		network_env = network, project_venv_python_escaped = python,
 	}, function(fixture)
+		seed_receiver(fixture, receiver)
 		helpers.assert_true(fixture.controls.pull())
 		local task = fixture.controls.latest("launcher")
 		helpers.assert_type(task.path, "string")
@@ -45,8 +56,11 @@ end
 --- @param bytes string Stderr from the actually executed emitted wrapper.
 --- @param code number Actual wrapper terminal code.
 --- @param mode string|nil "terminal_only", "stale" or "start_refused".
+--- @param receiver table Exact receiver path and captured source bytes.
+--- @param owner string|nil "mlx" for actual MLX stderr; nil receives both classifiers.
 --- @return table result Shared message publication and report-call inventory.
-function M.receive(network, bytes, code, mode)
+function M.receive(network, bytes, code, mode, receiver, owner)
+	assert(owner == nil or owner == "mlx", "only the explicit MLX receiver may omit Ollama")
 	local file = assert(io.open(helpers.shared("modules/network/managed_network.json"), "rb"))
 	local policy = json.decode(file:read("*a"))
 	assert(file:close())
@@ -71,33 +85,36 @@ function M.receive(network, bytes, code, mode)
 	print = function() end -- Keep the standalone receiving result machine-readable.
 	local ok, err = xpcall(function()
 		local fresh = true
-		require("tests.support.ollama_pull_fixture").with_fixture({
-			network_env = network, network_admission = port,
-			start_result = mode ~= "start_refused",
-			complete_during_start = mode == "start_refused" and code or nil,
-			complete_stderr = mode == "start_refused" and bytes or nil,
-		}, function(fixture)
-			revoke = function() fresh = false end
-			fixture.manager.pull_model("model-A", "org/model", nil, nil, {
-				is_current = function() return fresh end,
-			})
-			local task = assert(fixture.pulls[1])
-			if mode == "stale" then fresh = false end
-			if mode ~= "start_refused" then
-				if mode == "terminal_only" then task.on_done(code, "", bytes) else
-					local split = math.floor(#bytes / 2)
-					task.on_stream(task, "", bytes:sub(1, split))
-					task.on_stream(task, "", bytes:sub(split + 1))
-					task.on_done(code, "", "")
+		if owner ~= "mlx" then
+			require("tests.support.ollama_pull_fixture").with_fixture({
+				network_env = network, network_admission = port,
+				start_result = mode ~= "start_refused",
+				complete_during_start = mode == "start_refused" and code or nil,
+				complete_stderr = mode == "start_refused" and bytes or nil,
+			}, function(fixture)
+				revoke = function() fresh = false end
+				fixture.manager.pull_model("model-A", "org/model", nil, nil, {
+					is_current = function() return fresh end,
+				})
+				local task = assert(fixture.pulls[1])
+				if mode == "stale" then fresh = false end
+				if mode ~= "start_refused" then
+					if mode == "terminal_only" then task.on_done(code, "", bytes) else
+						local split = math.floor(#bytes / 2)
+						task.on_stream(task, "", bytes:sub(1, split))
+						task.on_stream(task, "", bytes:sub(split + 1))
+						task.on_done(code, "", "")
+					end
 				end
-			end
-			record(result.ollama_messages, fixture.notification_records)
-		end)
+				record(result.ollama_messages, fixture.notification_records)
+			end)
+		end
 		require("tests.support.mlx_download_fixture").with_fixture({
 			network_env = network, network_admission = port, requirement_lifecycle = true,
 			launcher = mode == "start_refused" and { start = "false", complete_on_start = true,
 				complete_code = code, complete_stderr = bytes } or nil,
 		}, function(fixture)
+			seed_receiver(fixture, receiver)
 			fixture.controls.pull()
 			revoke = function() fixture.controls.requirement_pause_join() end
 			local task = assert(fixture.controls.latest("launcher"))
