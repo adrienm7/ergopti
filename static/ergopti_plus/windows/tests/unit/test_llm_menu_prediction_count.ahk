@@ -187,9 +187,14 @@ _LLMPC_CompleteGenerationFrame(Section) {
 	}
 	Assert(_LLM_Menu_GenerationRows() is Array, "the repaired physical declaration is usable")
 }
-for Section in ["llm_generation_count_control", "llm_generation_context_controls", "llm_generation_word_controls",
-	"llm_generation_temperature_controls", "llm_native_numeric_reset"]
-	Test("complete generation frame: actual native numeric owner " . Section, _LLMPC_CompleteGenerationFrame.Bind(Section))
+/** Registers complete frames without publishing a global loop variable. */
+_LLMPC_RegisterCompleteGenerationFrames() {
+	local Section
+	for Section in ["llm_generation_count_control", "llm_generation_context_controls", "llm_generation_word_controls",
+		"llm_generation_temperature_controls", "llm_native_numeric_reset"]
+		Test("complete generation frame: actual native numeric owner " . Section, _LLMPC_CompleteGenerationFrame.Bind(Section))
+}
+_LLMPC_RegisterCompleteGenerationFrames()
 
 
 ; Exercise the exact new fixture scope through real declaration admission/refusal.
