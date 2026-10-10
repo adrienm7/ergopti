@@ -343,8 +343,8 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		['wrong-reader', 'managed_http_pac_xctest_evidence.cjs', 'swift_xctest_evidence.cjs'],
 		[
 			'changed-deadline',
-			'native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 10',
-			'native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 20'
+			'native-pac-verdict.json" ${pac_evidence_args[@]+"${pac_evidence_args[@]}"}\n        timeout-minutes: 10',
+			'native-pac-verdict.json" ${pac_evidence_args[@]+"${pac_evidence_args[@]}"}\n        timeout-minutes: 20'
 		]
 	])
 		check(label, () => {
@@ -403,6 +403,7 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}
+	stableV101PacCollectorControls(repository);
 	assert.equal(passed, 82);
 	console.log(
 		'PASS: native PAC/WPAD selected-cohort portable controls=82; actual Darwin/native14 execution UNRUN.'
@@ -411,3 +412,132 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 // A normal suite entry executes the complete owning source guard, which invokes
 // this module after defining its exact selector. There is no import-only waiver.
 if (require.main === module) require('./test-macos-dev-qualification-deferral.cjs');
+
+/** Independently discovered Worker12 remains mandatory under the exact v1.0.1 scope. */
+function stableV101PacCollectorControls(repository) {
+	const assert = require('node:assert/strict');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const reader = require('../diagnostics/managed_http_pac_xctest_evidence.cjs');
+	const full = require('../diagnostics/swift_xctest_evidence.cjs');
+	const q = require('../ci/dev-release-qualification.cjs');
+	const now = new Date('2026-10-10T20:00:00Z');
+	const sha = '0123456789abcdef0123456789abcdef01234567';
+	const env = {
+		GITHUB_ACTIONS: 'true',
+		GITHUB_REPOSITORY: 'adrienm7/ergopti',
+		GITHUB_EVENT_NAME: 'push',
+		GITHUB_REF: 'refs/heads/main',
+		GITHUB_SHA: sha,
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+	};
+	const profile = q.authorizeQualificationProfile(
+		q.STABLE_V101_PROFILE_ID,
+		q.environmentContext(env),
+		now
+	);
+	const receipt = q.qualificationReceipt(profile, 'macos-native-pac', { source_sha: sha });
+	const admission = full.pacQualification(receipt, env, now);
+	const suites = ['ManagedHTTPWorkerTests', 'ManagedHTTPWireTests', 'ManagedHTTPWPADWireTests'];
+	const definitions = {};
+	for (const suite of suites) {
+		const source = fs.readFileSync(
+			path.join(
+				repository,
+				'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests',
+				suite + '.swift'
+			),
+			'utf8'
+		);
+		definitions[suite] = [...source.matchAll(/\bfunc (test\w+)\(/g)].map((match) => match[1]);
+	}
+	assert.equal(definitions.ManagedHTTPWorkerTests.length, 12);
+	function transcript(groups) {
+		const lines = [
+			"Test Suite 'Selected tests' started at 2026-10-10 20:00:00.",
+			"Test Suite 'ErgoptiPlusPackageTests.xctest' started at 2026-10-10 20:00:00."
+		];
+		let count = 0;
+		for (const [suite, methods] of Object.entries(groups)) {
+			lines.push(`Test Suite '${suite}' started at 2026-10-10 20:00:00.`);
+			for (const method of methods) {
+				const name = `-[ErgoptiPlusTests.${suite} ${method}]`;
+				lines.push(`Test Case '${name}' started.`);
+				if (method === 'testActualCFNetworkHTTPPACArgumentShapeObservation')
+					lines.push('PAC_ARGUMENT_SHAPE purpose=http type=http port=20000');
+				if (method === 'testActualCFNetworkHTTPSPACArgumentShapeObservation')
+					lines.push('PAC_ARGUMENT_SHAPE purpose=https type=https port=20000');
+				lines.push(`Test Case '${name}' passed (0.001 seconds).`);
+				count++;
+			}
+			lines.push(
+				`Test Suite '${suite}' passed at 2026-10-10 20:00:01.`,
+				`Executed ${methods.length} tests, with 0 failures (0 unexpected) in 1 seconds`
+			);
+		}
+		for (const root of ['ErgoptiPlusPackageTests.xctest', 'Selected tests'])
+			lines.push(
+				`Test Suite '${root}' passed at 2026-10-10 20:00:01.`,
+				`Executed ${count} tests, with 0 failures (0 unexpected) in 1 seconds`
+			);
+		return lines.join('\n');
+	}
+	const workers = { ManagedHTTPWorkerTests: definitions.ManagedHTTPWorkerTests };
+	const valid = transcript(workers);
+	const result = reader.evaluate(valid, 0, 0, admission);
+	assert.equal(result.complete, true);
+	assert.equal(result.expected, 12);
+	assert.equal(result.observed, 12);
+	assert.equal(result.qualification.qualified, false);
+	assert.equal(result.qualification.source_sha, sha);
+	assert.deepEqual(result.qualification.classes, []);
+	assert.equal(reader.evaluate(valid, 0, 0).complete, false, 'default still requires all14');
+	assert.equal(reader.evaluate(transcript(definitions), 0, 0).complete, true);
+	assert.equal(reader.evaluate(transcript(definitions), 0, 0, admission).complete, false);
+	for (const method of definitions.ManagedHTTPWorkerTests) {
+		const missing = {
+			ManagedHTTPWorkerTests: definitions.ManagedHTTPWorkerTests.filter((name) => name !== method)
+		};
+		assert.equal(reader.evaluate(transcript(missing), 0, 0, admission).complete, false);
+		assert.equal(
+			reader.evaluate(valid.replace(`${method}]' passed`, `${method}]' failed`), 0, 0, admission)
+				.complete,
+			false
+		);
+		assert.equal(
+			reader.evaluate(valid.replace(`${method}]' passed`, `${method}]' skipped`), 0, 0, admission)
+				.complete,
+			false
+		);
+	}
+	for (const suite of ['ManagedHTTPWireTests', 'ManagedHTTPWPADWireTests'])
+		assert.equal(
+			reader.evaluate(transcript({ ...workers, [suite]: definitions[suite] }), 0, 0, admission)
+				.complete,
+			false
+		);
+	assert.equal(
+		reader.evaluate(
+			valid.replace('purpose=https type=https port=20000', 'purpose=https type=https port=99999'),
+			0,
+			0,
+			admission
+		).complete,
+		false
+	);
+	assert.equal(
+		reader.evaluate(valid.replace('Selected tests', 'All tests'), 0, 0, admission).complete,
+		false
+	);
+	assert.equal(reader.evaluate(valid, 73, 0, admission).exit_status, 73);
+	assert.equal(reader.evaluate(valid, 0, 9, admission).exit_status, 9);
+	assert.throws(() => reader.evaluate(valid, 0, 0, { mode: 'deferred' }));
+	assert.throws(() => full.pacQualification(receipt, env, new Date('2026-10-11T07:00:00Z')));
+	console.log(
+		'[OK] v1.0.1 PAC receiving requires every Worker12 method and both exact argument observations.'
+	);
+}

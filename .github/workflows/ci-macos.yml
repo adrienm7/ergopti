@@ -493,24 +493,36 @@ jobs:
           mkdir -p "$(dirname "$receipt")"
           node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"
           mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"
+          profile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt-profile "$receipt")"
+          native_pac_skip_args=()
+          pac_evidence_args=()
           if [ "$mode" = deferred ]; then
-              echo "[DEFERRED] macos-native-pac: qualified=false; original command not executed."
+              if [ "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes ]; then
+                  native_pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$receipt")")
+                  pac_evidence_args=(--pac-qualification-receipt "$receipt")
+                  echo "[DEFERRED] macos-native-pac: only exact native wire methods omitted; Worker controls remain mandatory; qualified=false."
+              elif [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then
+                  echo "[DEFERRED] macos-native-pac: legacy cohort not executed; qualified=false."
+                  exit 0
+              else
+                  exit 1
+              fi
           elif [ "$mode" = full ]; then
-              set -euo pipefail
-              test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
-              test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
-              transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"
-              set +e
-              swift test --package-path static/ergopti_plus/macos/launcher \
-                --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
-                --filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests' 2>&1 | tee "$transcript"
-              pac_statuses=("${PIPESTATUS[@]}")
-              set -e
-              node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"
+              test -z "$profile"
           else
-              echo "Invalid command qualification disposition" >&2
               exit 1
           fi
+          set -euo pipefail
+          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
+          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
+          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests' ${native_pac_skip_args[@]+"${native_pac_skip_args[@]}"} 2>&1 | tee "$transcript"
+          pac_statuses=("${PIPESTATUS[@]}")
+          set -e
+          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json" ${pac_evidence_args[@]+"${pac_evidence_args[@]}"}
         timeout-minutes: 10
 
       - name: Retain independent native PAC XCTest diagnostics
@@ -536,19 +548,24 @@ jobs:
           mkdir -p "$(dirname "$receipt")"
           node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"
           mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"
+          profile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile "$receipt")"
+          if [ "$mode" = deferred ] && [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then
+              echo "[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false."
+              exit 0
+          fi
+          status=0
+          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
+          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
           if [ "$mode" = deferred ]; then
-              echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."
+              test "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes
+              echo "[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false."
           elif [ "$mode" = full ]; then
-              set -euo pipefail
-              status=0
-              "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
-              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
               "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
-              exit "$status"
           else
               echo "Invalid command qualification disposition" >&2
               exit 1
           fi
+          exit "$status"
         timeout-minutes: 5
 
       - name: Qualify actual explicit curl stream ownership
@@ -960,6 +977,7 @@ jobs:
           node tools/ci/dev-release-qualification.cjs \
             --scope macos-brew-archive --github-env "$GITHUB_ENV" \
             --receipt "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json"
+          cp "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json" "$RUNNER_TEMP/stable-macos-brew-archive.json"
 
       - name: Run portable Brew ownership and refusal controls
         run: python3 -m unittest discover -s tools/diagnostics -p macos_brew_archive_acceptance_test.py -v
@@ -1062,16 +1080,33 @@ jobs:
           echo "tis_session_dir=$ERGOPTI_TIS_EVIDENCE_DIR" >> "$GITHUB_OUTPUT"
           export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
           pac_receipt="$RUNNER_TEMP/swift-launcher-evidence/native-pac-package-qualification.json"
+          brew_receipt="$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json"
           node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$pac_receipt"
           mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$pac_receipt")"
+          profile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt-profile "$pac_receipt")"
+          brew_mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-brew-archive --validate-scope-receipt "$brew_receipt")"
+          brew_profile="$(node tools/ci/dev-release-qualification.cjs --scope macos-brew-archive --validate-scope-receipt-profile "$brew_receipt")"
           pac_skip_args=()
+          brew_evidence_args=()
           swift_root_suite="All tests"
           if [ "$mode" = deferred ]; then
-              pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$pac_receipt")")
+              if [ "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes ]; then
+                  test "$brew_mode" = deferred
+                  test "$brew_profile" = "$profile"
+                  pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$pac_receipt" --brew-qualification-receipt "$brew_receipt")")
+                  brew_evidence_args=(--brew-qualification-receipt "$brew_receipt")
+              elif [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then
+                  pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$pac_receipt")")
+              else
+                  exit 1
+              fi
               swift_root_suite="Selected tests"
-              echo "[DEFERRED] macos-native-pac: duplicate package cohort not executed; still compiled; qualified=false."
+              echo "[DEFERRED] native PAC/Brew scope: exact admitted methods not executed; still compiled; qualified=false."
           elif [ "$mode" = full ]; then
               :
+              test -z "$profile"
+              test "$brew_mode" = full
+              test -z "$brew_profile"
           else
               echo "Invalid package PAC qualification disposition" >&2
               exit 1
@@ -1079,9 +1114,9 @@ jobs:
           set +e
           script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" ${pac_skip_args[@]+"${pac_skip_args[@]}"} 2>&1 | tee "$xctest_log"
           swift_pipeline_status=("${PIPESTATUS[@]}")
-          node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" --pac-qualification-receipt "$pac_receipt"
+          node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" --pac-qualification-receipt "$pac_receipt" ${brew_evidence_args[@]+"${brew_evidence_args[@]}"}
           xctest_evidence_status=$?
-          node tools/diagnostics/owned_program_xctest_notice.cjs "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" "$xctest_log" "$(git rev-parse HEAD)" --pac-qualification-receipt "$pac_receipt"
+          node tools/diagnostics/owned_program_xctest_notice.cjs "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" "$xctest_log" "$(git rev-parse HEAD)" --pac-qualification-receipt "$pac_receipt" ${brew_evidence_args[@]+"${brew_evidence_args[@]}"}
           owned_program_evidence_status=$?
           node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"
           tis_evidence_status=$?
@@ -1104,6 +1139,14 @@ jobs:
             ${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json
             ${{ runner.temp }}/stable-macos-native-http-package.json
             ${{ runner.temp }}/swift-launcher-evidence/native-pac-package-qualification.json
+          if-no-files-found: error
+
+      - name: Retain source-bound package native qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-package-macos
+          path: ${{ runner.temp }}/stable-macos-brew-archive.json
           if-no-files-found: error
 
       - name: Upload Swift launcher failure transcript

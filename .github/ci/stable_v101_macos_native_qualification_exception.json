@@ -1,0 +1,46 @@
+{
+	"schema": 1,
+	"id": "stable-v1-0-1-20261010-three-macos-native-scopes",
+	"authorized": true,
+	"authorization_quote": "oui",
+	"expires_at": "2026-10-11T07:00:00Z",
+	"repository": "adrienm7/ergopti",
+	"event_name": "push",
+	"ref": "refs/heads/main",
+	"release": true,
+	"prerelease": "false",
+	"channel": "main",
+	"tag": "v1.0.1",
+	"version": "1.0.1",
+	"authorization_note": "Explicit human answer \"oui\" on 2026-10-10 approved only these three exact stable v1.0.1 macOS scopes until October 11 07:00 UTC. Public DEFERRED/qualified:false is required. All other tests, builds, signatures, source/asset integrity and ordinary installation remain mandatory; native Homebrew ZIP/XZ acceptance remains unqualified. No permission/trust/sender workaround or extra scope is authorized.",
+	"scopes": {
+		"macos-native-pac": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["managed-ollama-native", "Qualify actual native PAC and WPAD XCTest controls"],
+			"methods": {
+				"ManagedHTTPWireTests": ["testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure"],
+				"ManagedHTTPWPADWireTests": [
+					"testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork"
+				],
+				"ManagedBootstrapDownloadTests": [
+					"testActualNativeBootstrapTLSFullURLPACAndArtifactPublication"
+				]
+			},
+			"reason": "The two native TLS/full-URL PAC and WPAD wire methods and exact bootstrap duplicate remain DEFERRED and qualified:false after certificate -1202; all twelve ManagedHTTPWorkerTests cases remain mandatory."
+		},
+		"macos-native-http": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["managed-ollama-native", "Receive actual independent managed HTTP native clients"],
+			"command": "static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py",
+			"reason": "Only independent native wire clients are DEFERRED and qualified:false after the original trust-install deadline; owned-process/client-only tests remain mandatory at both call sites."
+		},
+		"macos-brew-archive": {
+			"kind": "swift_test_file",
+			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
+			"name": "testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"reason": "The single native Homebrew ZIP installation/XZ upgrade/refusal-preservation acceptance method is DEFERRED and qualified:false after owned Automation consent exceeded its deadline; ordinary verified archive install/launch remains mandatory."
+		}
+	}
+}

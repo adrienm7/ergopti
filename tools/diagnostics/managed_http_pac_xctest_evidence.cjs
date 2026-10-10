@@ -33,7 +33,11 @@ const NAMES = Object.freeze(
 );
 
 /** Fixed serial XCTest envelope; totals never replace per-method completion. */
-function serialCohort(clean) {
+function serialCohort(clean, methods = METHODS) {
+	const names = Object.entries(methods).flatMap(([suite, values]) =>
+		values.map((method) => `-[ErgoptiPlusTests.${suite} ${method}]`)
+	);
+	const expectedCount = names.length;
 	let root = 'before',
 		bundle = 'before',
 		suite = null,
@@ -51,7 +55,8 @@ function serialCohort(clean) {
 			const count = /^\s*Executed (\d+) tests?, with (\d+) failures? \((\d+) unexpected\) in /.exec(
 				line
 			);
-			const expected = summary === 'root' || summary === 'bundle' ? 14 : METHODS[summary].length;
+			const expected =
+				summary === 'root' || summary === 'bundle' ? expectedCount : methods[summary].length;
 			require(count && count[1] === String(expected) && count[2] === '0' && count[3] === '0');
 			if (summary === 'root') root = 'after';
 			if (summary === 'bundle') bundle = 'after';
@@ -70,7 +75,7 @@ function serialCohort(clean) {
 			} else if (opening[1] === 'ErgoptiPlusPackageTests.xctest') {
 				require(root === 'running' && bundle === 'before' && suite === null && active === null);
 				bundle = 'running';
-			} else if (Object.hasOwn(METHODS, opening[1])) {
+			} else if (Object.hasOwn(methods, opening[1])) {
 				require(
 					root === 'running' &&
 						bundle === 'running' &&
@@ -91,7 +96,7 @@ function serialCohort(clean) {
 				require(root === 'running' && bundle === 'running' && suite === null);
 				bundle = 'summary';
 				summary = 'bundle';
-			} else if (Object.hasOwn(METHODS, closing[1]) && suite === closing[1]) {
+			} else if (Object.hasOwn(methods, closing[1]) && suite === closing[1]) {
 				summary = suite;
 				suite = null;
 			} else valid = false;
@@ -100,7 +105,7 @@ function serialCohort(clean) {
 				root === 'running' &&
 					bundle === 'running' &&
 					active === null &&
-					NAMES.includes(start[1]) &&
+					names.includes(start[1]) &&
 					!started.has(start[1]) &&
 					start[1].startsWith(`-[ErgoptiPlusTests.${suite} `)
 			);
@@ -118,8 +123,8 @@ function serialCohort(clean) {
 		summary === null &&
 		suite === null &&
 		active === null &&
-		opened.size === 3 &&
-		started.size === 14
+		opened.size === Object.keys(methods).length &&
+		started.size === expectedCount
 	);
 }
 
@@ -145,7 +150,17 @@ function argumentObservations(clean) {
 	return { complete: valid && ports.http !== null && ports.https !== null, ports, types, admitted };
 }
 
-function evaluate(text, swiftStatus, captureStatus) {
+function evaluate(text, swiftStatus, captureStatus, admission = null) {
+	const qualification = require('./swift_xctest_evidence.cjs').pacQualificationDetails(admission);
+	const narrow =
+		qualification !== null &&
+		qualification.profile_id ===
+			require('../ci/dev-release-qualification.cjs').STABLE_V101_PROFILE_ID;
+	const methods = narrow ? { ManagedHTTPWorkerTests: METHODS.ManagedHTTPWorkerTests } : METHODS;
+	const expectedNames = Object.entries(methods).flatMap(([suite, values]) =>
+		values.map((method) => `-[ErgoptiPlusTests.${suite} ${method}]`)
+	);
+	const expected = expectedNames.length;
 	const received = cleanTranscript(text);
 	const observations = argumentObservations(received);
 	// Validate the complete closed observation cohort first. Only those exact
@@ -169,26 +184,27 @@ function evaluate(text, swiftStatus, captureStatus) {
 	const base = fullEvaluate(normalized, swiftStatus, captureStatus);
 	const names = base.completed_tests.map((test) => test.name);
 	const inventory =
-		names.length === 14 &&
-		NAMES.length === 14 &&
-		NAMES.every((name) => names.filter((actual) => actual === name).length === 1);
-	const suites = Object.keys(METHODS).every(
+		names.length === expected &&
+		expectedNames.every((name) => names.filter((actual) => actual === name).length === 1);
+	const suites = Object.keys(methods).every(
 		(suite) =>
 			(clean.match(new RegExp(`^Test Suite '${suite}' passed at `, 'gm')) || []).length === 1
 	);
 	const errors = [];
 	if (!selected) errors.push('selected-root');
 	if (!base.complete || base.failures.length) errors.push('incomplete-failed-or-skipped');
-	if (!inventory) errors.push('exact-fourteen-inventory');
-	if (!suites) errors.push('three-complete-native-suites');
-	if (!serialCohort(clean)) errors.push('serial-native-cohort');
+	if (!inventory)
+		errors.push(narrow ? 'exact-twelve-worker-inventory' : 'exact-fourteen-inventory');
+	if (!suites) errors.push(narrow ? 'one-complete-worker-suite' : 'three-complete-native-suites');
+	if (!serialCohort(clean, methods)) errors.push('serial-native-cohort');
 	if (!observations.complete) errors.push('bounded-argument-observations');
 	if (base.script_status || base.tee_status) errors.push('pipeline-status');
 	const complete = errors.length === 0;
 	return {
 		schema: 1,
-		cohort: 'managed-http-pac-wpad',
-		expected: 14,
+		cohort: narrow ? 'managed-http-worker-native-pac-deferred' : 'managed-http-pac-wpad',
+		expected,
+		...(narrow ? { qualification } : {}),
 		argument_observations: observations.ports,
 		argument_proxy_types: observations.types,
 		observed: Math.min(names.length, 65535),
@@ -202,16 +218,22 @@ function evaluate(text, swiftStatus, captureStatus) {
 
 module.exports = { METHODS, NAMES, evaluate };
 if (require.main === module) {
-	if (process.argv.length !== 6)
+	if (
+		process.argv.length !== 6 &&
+		!(process.argv.length === 8 && process.argv[6] === '--pac-qualification-receipt')
+	)
 		throw new Error('Exact native PAC transcript and pipeline statuses required.');
 	const result = evaluate(
 		fs.readFileSync(process.argv[2], 'utf8'),
 		process.argv[3],
-		process.argv[4]
+		process.argv[4],
+		process.argv.length === 8
+			? require('./swift_xctest_evidence.cjs').readPacQualification(process.argv[7])
+			: null
 	);
 	fs.writeFileSync(process.argv[5], JSON.stringify(result, null, 2) + '\n');
 	console.log(
-		`PAC_XCTEST qualified=${result.complete} cases=${result.observed}/14 swift=${result.swift_status} capture=${result.capture_status}`
+		`PAC_XCTEST qualified=${result.qualification ? false : result.complete} cases=${result.observed}/${result.expected} swift=${result.swift_status} capture=${result.capture_status}`
 	);
 	process.exitCode = result.exit_status;
 }

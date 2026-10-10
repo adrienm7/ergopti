@@ -982,3 +982,239 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'Linux deferred suite envelopes: actual aggregate plus ten malformed/source/expiry/package/install refusals PASS.'
 	);
 }
+
+// The separately approved v1.0.1 profile cannot waive an unlisted test or installation.
+{
+	const approved = q.parseClosedJson(fs.readFileSync(q.STABLE_V101_POLICY_PATH, 'utf8'));
+	const context = {
+		github_actions: 'true',
+		repository: 'adrienm7/ergopti',
+		event_name: 'push',
+		ref: 'refs/heads/main',
+		release: true,
+		prerelease: 'false',
+		channel: 'main',
+		tag: 'v1.0.1',
+		version: '1.0.1'
+	};
+	const clock = '2026-10-10T18:00:00Z';
+	const scopes = ['macos-native-pac', 'macos-native-http', 'macos-brew-archive'];
+	const selected = q.authorizeQualificationProfile(q.STABLE_V101_PROFILE_ID, context, clock);
+	assert.deepEqual(q.deferredScopes(selected), scopes);
+	assert.equal(q.stablePublicationProfile(context, clock), selected);
+	for (const scope of scopes) {
+		assert.equal(q.resolveQualificationProfile(context, clock, scope), selected);
+		const receipt = q.qualificationReceipt(selected, scope, {
+			source_sha: sha
+		});
+		assert.equal(q.scopeDisposition(receipt, scope, sha, context, clock), 'deferred');
+		for (const patch of [
+			{ qualified: true },
+			{ source_sha: 'b'.repeat(40) },
+			{ version: '1.0.2' },
+			{ expires_at: '2026-10-12T07:00:00Z' },
+			{ extra: true }
+		])
+			assert.throws(() => q.scopeDisposition({ ...receipt, ...patch }, scope, sha, context, clock));
+		assert.throws(() => q.scopeDisposition(receipt, scope, sha, context, approved.expires_at));
+	}
+	for (const [key, value] of [
+		['github_actions', 'false'],
+		['repository', 'foreign/repo'],
+		['event_name', 'pull_request'],
+		['event_name', 'workflow_dispatch'],
+		['ref', 'refs/heads/dev'],
+		['release', false],
+		['prerelease', 'true'],
+		['channel', 'dev'],
+		['tag', 'v1.0.2'],
+		['version', '1.0.2']
+	]) {
+		const foreign = { ...context, [key]: value };
+		for (const scope of scopes)
+			assert.equal(q.resolveQualificationProfile(foreign, clock, scope), null);
+		assert.throws(() => q.authorizeQualificationProfile(approved.id, foreign, clock));
+	}
+	assert.equal(q.resolveQualificationProfile(context, approved.expires_at, scopes[0]), null);
+	for (const scope of [
+		'windows-pac-full-url',
+		'core-js-suite',
+		'linux-unit-suite',
+		'linux-e2e-suite',
+		'macos-native-model-receiving',
+		'macos-stubbed-unit',
+		'macos-stubbed-e2e',
+		'macos-launch-appleevents'
+	]) {
+		assert.equal(q.resolveQualificationProfile(context, clock, scope), null);
+		assert.throws(() => q.qualificationReceipt(selected, scope, { source_sha: sha }));
+	}
+	assert.throws(() =>
+		q.selectRegistry(
+			[{ name: 'native Windows PAC', callback() {} }],
+			selected,
+			'windows-pac-full-url'
+		)
+	);
+	const broad = structuredClone(approved);
+	broad.scopes['macos-native-pac'].methods.ManagedHTTPWorkerTests = [
+		'testWorkerMustRemainMandatory'
+	];
+	assert.throws(() => q.validateStableV101Policy(broad));
+	const sibling = structuredClone(approved);
+	sibling.scopes['macos-brew-archive'].name = 'testOrdinaryArchiveInstall';
+	assert.throws(() => q.validateStableV101Policy(sibling));
+	const extraScope = structuredClone(approved);
+	extraScope.scopes['core-js-suite'] = approved.scopes['macos-native-http'];
+	assert.throws(() => q.validateStableV101Policy(extraScope));
+	assert.deepEqual(q.STABLE_V101_PAC_METHODS, approved.scopes['macos-native-pac'].methods);
+	assert.deepEqual(q.STABLE_V101_BREW_METHODS, {
+		HomebrewArchiveAcceptanceTests: [approved.scopes['macos-brew-archive'].name]
+	});
+	assert(Object.isFrozen(q.STABLE_V101_PAC_METHODS.ManagedHTTPWireTests));
+	assert(Object.isFrozen(q.STABLE_V101_BREW_METHODS.HomebrewArchiveAcceptanceTests));
+	const notice = q.stablePublicationNotice(approved.id, context, sha, clock);
+	for (const literal of [
+		'DEFERRED / qualified:false',
+		'v1.0.1',
+		'Worker12',
+		'owned-process/client-only',
+		'ordinary verified archive installation/launch',
+		'Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified'
+	])
+		assert(notice.includes(literal));
+	assert(notice.includes(sha));
+	console.log(
+		'[OK] v1.0.1 exact three scopes, mandatory siblings, context/expiry/source/metadata refusals.'
+	);
+
+	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-v101-qualification-'));
+	try {
+		const files = [
+			['macos-native-pac', 'arm64'],
+			['macos-native-pac', 'amd64'],
+			['macos-native-http', 'arm64'],
+			['macos-native-http', 'amd64'],
+			['macos-brew-archive', '']
+		].map(([scope, architecture]) => {
+			const file = path.join(
+				owner,
+				'stable-' + scope + (architecture ? '-' + architecture : '') + '.json'
+			);
+			const raw = JSON.stringify(q.qualificationReceipt(selected, scope, { source_sha: sha }));
+			fs.writeFileSync(file, raw);
+			return { file, raw };
+		});
+		q.admitCommandReceipts(owner, context, sha, clock);
+		for (const entry of files) {
+			fs.unlinkSync(entry.file);
+			assert.throws(() => q.admitCommandReceipts(owner, context, sha, clock));
+			fs.writeFileSync(entry.file, entry.raw);
+			const forged = JSON.parse(entry.raw);
+			forged.source_sha = 'b'.repeat(40);
+			fs.writeFileSync(entry.file, JSON.stringify(forged));
+			assert.throws(() => q.admitCommandReceipts(owner, context, sha, clock));
+			fs.writeFileSync(entry.file, entry.raw);
+		}
+		q.admitCommandReceipts(owner, context, sha, clock);
+		assert.throws(() => q.admitCommandReceipts(owner, context, sha, approved.expires_at));
+		console.log(
+			'[OK] all five actual publication receipt filenames required; every missing/foreign source refuses.'
+		);
+
+		// Run the real CLI entry with a fixed test clock, retaining all source and file operations.
+		const vm = require('node:vm');
+		const helper = path.resolve(
+			path.dirname(q.STABLE_V101_POLICY_PATH),
+			'../../tools/ci/dev-release-qualification.cjs'
+		);
+		const source = fs.readFileSync(helper, 'utf8');
+		const env = {
+			GITHUB_ACTIONS: 'true',
+			GITHUB_REPOSITORY: context.repository,
+			GITHUB_EVENT_NAME: 'push',
+			GITHUB_REF: context.ref,
+			GITHUB_SHA: sha,
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+			ERGOPTI_DEV_RELEASE_TAG: context.tag,
+			ERGOPTI_DEV_RELEASE_VERSION: context.version
+		};
+		function invoke(args, policyOverride) {
+			const output = [];
+			const effects = Object.create(fs);
+			effects.readFileSync = (file, ...rest) =>
+				policyOverride && path.resolve(file) === q.STABLE_V101_POLICY_PATH
+					? JSON.stringify(policyOverride)
+					: fs.readFileSync(file, ...rest);
+			const sandbox = {
+				__dirname: path.dirname(helper),
+				module: { exports: {} },
+				require: (name) => (name === 'node:fs' ? effects : require(name)),
+				process: { argv: ['node', helper, ...args], env },
+				console: {
+					log: (value) => output.push(value),
+					error: (value) => output.push(value)
+				},
+				Date: class extends Date {
+					constructor(...args) {
+						super(...(args.length ? args : [clock]));
+					}
+				}
+			};
+			vm.runInNewContext(source + '\nmain(process.argv.slice(2));', sandbox, {
+				filename: helper
+			});
+			return output;
+		}
+		const receiptPath = path.join(owner, 'cli-brew.json');
+		const environmentPath = path.join(owner, 'github-env.txt');
+		invoke([
+			'--scope',
+			'macos-brew-archive',
+			'--receipt',
+			receiptPath,
+			'--github-env',
+			environmentPath
+		]);
+		assert.equal(fs.readFileSync(environmentPath, 'utf8'), 'ERGOPTI_DEV_QUALIFICATION_PROFILE=\n');
+		assert.equal(
+			q.scopeDisposition(
+				JSON.parse(fs.readFileSync(receiptPath, 'utf8')),
+				'macos-brew-archive',
+				sha,
+				context,
+				clock
+			),
+			'deferred'
+		);
+		assert.deepEqual(
+			invoke(['--scope', 'macos-brew-archive', '--validate-scope-receipt-profile', receiptPath]),
+			[approved.id]
+		);
+		const bad = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+		bad.qualified = true;
+		fs.writeFileSync(receiptPath, JSON.stringify(bad));
+		assert.throws(() =>
+			invoke(['--scope', 'macos-brew-archive', '--validate-scope-receipt-profile', receiptPath])
+		);
+		const inactive = structuredClone(approved);
+		inactive.authorized = false;
+		const fullPath = path.join(owner, 'inactive.json');
+		invoke(['--scope', 'macos-native-pac', '--receipt', fullPath], inactive);
+		assert.equal(JSON.parse(fs.readFileSync(fullPath, 'utf8')).status, 'full');
+		assert.deepEqual(
+			invoke(
+				['--scope', 'macos-native-pac', '--validate-scope-receipt-profile', fullPath],
+				inactive
+			),
+			['']
+		);
+		console.log(
+			'[OK] real CLI preserves empty Package.swift selector, fresh profile validation and inactive full behavior.'
+		);
+	} finally {
+		fs.rmSync(owner, { recursive: true, force: true });
+	}
+}
