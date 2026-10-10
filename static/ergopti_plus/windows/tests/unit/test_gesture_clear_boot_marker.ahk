@@ -8,8 +8,10 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
 	OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
-	Fixture := _HotstringsScopeFixture()
-	Original := '[gestures]`nenabled = true`ntap_4 = "open_url"`nauto_configure_on_next_start = true`nunknown_user = "keep"`n[private]`ncredential = "keep"`n'
+	; Supply queued intent before the real current-schema cohort boots.
+	QueuedGestureSource := '[gestures]`nenabled = true`ntap_4 = "open_url"`nauto_configure_on_next_start = true`nunknown_user = "keep"`n'
+	Fixture := _HotstringsScopeFixture(1, QueuedGestureSource)
+	Original := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Original))
 	TapPath := Fixture.directory . "\tap_hold.toml"
 	Assert(FSWriteDurable(TapPath, '[tap_hold.keys.space]`ntap_action = "open_url"`n'))
@@ -32,6 +34,7 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 		AssertEqual(-GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS, Delay)
 	}
 	try {
+		AssertContains(Original, QueuedGestureSource, "boot retains the exact original queued gesture bytes")
 		_PersonalShortcutsRegistry := Map("__Order", [])
 		KeyboardShortcutAssignments := Map(), GestureActionParameters := Map()
 		Receipt := Scope == "global" ? ConfigGlobalScopeApply(Mode, Fixture.options)

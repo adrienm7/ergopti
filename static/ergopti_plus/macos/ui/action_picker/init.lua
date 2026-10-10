@@ -27,6 +27,12 @@ local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
 local ProgramProviderPicker = require("program_provider_picker")
+local PresentationPrepareOwner = rawget(ui_builder, "prepare_app_presentation")
+local PresentationFieldsOwner = rawget(ui_builder, "presentation_fields")
+local PresentationCurrentOwner = rawget(ui_builder, "presentation_current")
+local PresentationShowOwner = rawget(ui_builder, "show_webview")
+local PresentationGeometryOwner = rawget(ui_builder, "get_app_geometry")
+local PresentationFrameOwner = rawget(ui_builder, "get_centered_frame")
 
 local LOG = "action_picker"
 
@@ -111,6 +117,41 @@ end
 --- @return boolean opened
 function M.open(opts, on_confirm)
 	opts = type(opts) == "table" and opts or {}
+	local presentation_id = rawget(opts, "presentation_id")
+	local presentation_receipt, presentation_title, presentation_label, presentation_live
+	local replacement_serial
+	if presentation_id ~= nil then
+		if getmetatable(opts) ~= nil or type(presentation_id) ~= "string"
+			or not presentation_id:match("^[a-z][a-z0-9_]*$")
+			or rawget(opts, "title") ~= nil or rawget(opts, "label") ~= nil then return false end
+		local function owners_live()
+			return getmetatable(opts) == nil and rawget(opts, "presentation_id") == presentation_id
+				and rawget(opts, "title") == nil and rawget(opts, "label") == nil
+				and getmetatable(ui_builder) == nil and rawget(package.loaded, "ui.ui_builder") == ui_builder
+				and rawget(ui_builder, "prepare_app_presentation") == PresentationPrepareOwner
+				and rawget(ui_builder, "presentation_fields") == PresentationFieldsOwner
+				and rawget(ui_builder, "presentation_current") == PresentationCurrentOwner
+				and rawget(ui_builder, "show_webview") == PresentationShowOwner
+				and rawget(ui_builder, "get_app_geometry") == PresentationGeometryOwner
+				and rawget(ui_builder, "get_centered_frame") == PresentationFrameOwner
+				and type(PresentationPrepareOwner) == "function" and type(PresentationFieldsOwner) == "function"
+				and type(PresentationCurrentOwner) == "function" and type(PresentationShowOwner) == "function"
+				and type(PresentationGeometryOwner) == "function" and type(PresentationFrameOwner) == "function"
+		end
+		if not owners_live() then return false end
+		local previous, serial = _active_session, _session_serial
+		presentation_receipt = PresentationPrepareOwner("action_picker", presentation_id)
+		if presentation_receipt == nil or not owners_live() or _active_session ~= previous
+			or _session_serial ~= serial then return false end
+		presentation_live = function()
+			return owners_live() and PresentationCurrentOwner(presentation_receipt) == true
+		end
+		if not presentation_live() then return false end
+		presentation_title, presentation_label = PresentationFieldsOwner(presentation_receipt)
+		if type(presentation_title) ~= "string" or type(presentation_label) ~= "string"
+			or not presentation_live() or _active_session ~= previous or _session_serial ~= serial then return false end
+		replacement_serial = serial
+	end
 
 	if _active_session then
 		Logger.debug(LOG, "Replacing the open action picker with the new target…")
@@ -120,11 +161,15 @@ function M.open(opts, on_confirm)
 		end
 	end
 
+	if presentation_live and (not presentation_live() or _active_session ~= nil
+		or _session_serial ~= replacement_serial) then return false end
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "action_picker_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
 		return false
 	end
+	if presentation_live and (not presentation_live() or _active_session ~= nil
+		or _session_serial ~= replacement_serial) then return false end
 	_session_serial = _session_serial + 1
 	local session = {
 		epoch = _session_serial,
@@ -144,9 +189,13 @@ function M.open(opts, on_confirm)
 		return false
 	end
 
+	if presentation_live and not presentation_live() then
+		close_session(session)
+		return false
+	end
 	local payload = {
-		title             = opts.title or "",
-		label             = opts.label or i18n.get("dialog.action_picker.label"),
+		title             = presentation_title or opts.title or "",
+		label             = presentation_label or opts.label or i18n.get("dialog.action_picker.label"),
 		current           = opts.current or "none",
 		allowNative       = opts.allow_native == true,
 		nativeLabel       = opts.native_label or "",
@@ -174,7 +223,17 @@ function M.open(opts, on_confirm)
 
 	local function push_init()
 		if _active_session ~= session or not session.webview then return end
+		if presentation_live and not presentation_live() then
+			close_session(session)
+			return
+		end
+		local target = session.webview
 		local ok_enc, js = pcall(hs.json.encode, payload)
+		if presentation_live and (not presentation_live() or _active_session ~= session
+			or session.webview ~= target) then
+			if _active_session == session then close_session(session) end
+			return
+		end
 		if ok_enc and js then
 			pcall(function() session.webview:evaluateJavaScript("init(" .. js .. ")") end)
 		end
@@ -229,9 +288,8 @@ function M.open(opts, on_confirm)
 		close_session(session)
 		return false
 	end
-	local webview = ui_builder.show_webview({
+	local native_options = {
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
-		title         = opts.title or i18n.get("dialog.action_picker.label"),
 		style_masks   = { "titled", "closable", "utility" },
 		usercontent   = uc,
 		assets_dir    = ASSETS_DIR,
@@ -252,7 +310,27 @@ function M.open(opts, on_confirm)
 				_usercontent = nil
 			end
 		end,
-	})
+	}
+	if presentation_live then
+		if not presentation_live() or _active_session ~= session then
+			if _active_session == session then close_session(session) end
+			return false
+		end
+		native_options.app_id = "action_picker"
+		native_options.presentation_id = presentation_id
+		native_options.presentation_receipt = presentation_receipt
+		native_options.is_current = function()
+			return _active_session == session and not session.closing and presentation_live()
+		end
+	else
+		native_options.title = opts.title or i18n.get("dialog.action_picker.label")
+	end
+	local webview
+	if presentation_live then
+		webview = PresentationShowOwner(native_options)
+	else
+		webview = ui_builder.show_webview(native_options)
+	end
 	if _active_session ~= session then
 		if webview and type(webview.delete) == "function" then
 			-- on_close may run synchronously while the factory is still returning.

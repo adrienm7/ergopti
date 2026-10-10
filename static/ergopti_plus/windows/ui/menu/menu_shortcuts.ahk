@@ -23,9 +23,11 @@
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
 ; script control, extensions, edit action) that cannot be described in JSON.
 _BuildShortcutsSubmenu() {
-	DynHandlers := Map(
-		"personal_shortcuts",         (M, C) => _SC_Personal(M, C),
-	)
+	DynHandlers := Map()
+	DeclaredFrames := Map("personal_shortcuts", Map(
+		"manifest_key", "personal_shortcuts_frame",
+		"children_id", "personal_shortcuts_registered",
+		"provider", _PersonalShortcutRows))
 
 	; The keyboard slots are a list, not a group: their rows are the user's own
 	; assignments, so the manifest can name the section but not enumerate it. The
@@ -52,7 +54,7 @@ _BuildShortcutsSubmenu() {
 		"key_combinations", () => _SC_KeyCombinationsSubmenu(),
 		"script_control",   () => _SC_ScriptControlSubmenu())
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters)
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters, , , DeclaredFrames)
 }
 
 ; The checked_when getters of the Shortcuts submenu: its switch, and the ticks
@@ -83,12 +85,6 @@ _SC_KeyCombinationCommands(Options := unset) {
 		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
 		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
-}
-
-; Dynamic handler: personal shortcuts submenu (if any registered).
-; Emits its own leading separator when items are present, matching pre-refactor behaviour.
-_SC_Personal(SubMenu, _Cat) {
-	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 }
 
 ; « Raccourcis de gestion du script », declared by script_control_group: its

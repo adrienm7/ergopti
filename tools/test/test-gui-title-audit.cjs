@@ -1158,3 +1158,85 @@ try {
 } finally {
 	fs.rmSync(root, { recursive: true, force: true });
 }
+
+// The fixed picker context uses the old independent captions, never a new oracle.
+{
+	const corpus = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				repository,
+				'static/ergopti_plus/macos/tests/fixtures/keyboard_slot_selection_original_presentation.json'
+			),
+			'utf8'
+		)
+	);
+	const projected = titles.projectPresentations(sharedManifest.apps);
+	assert.deepEqual(projected.action_picker.keyboard_slot_selection, {
+		title_key: corpus.original_title_key,
+		label_key: corpus.original_label_key,
+		platforms: ['hs']
+	});
+	assert.equal(Object.keys(corpus.locales).length, 21);
+	for (const [code, original] of Object.entries(corpus.locales)) {
+		const values = JSON.parse(fs.readFileSync(path.join(localeDirectory, code + '.json'), 'utf8'));
+		assert.equal(values[corpus.original_title_key], original.original_page_title);
+		assert.equal(values[corpus.original_label_key], original.original_page_label);
+	}
+	const unchanged = titles.render(sharedManifest.window_title, {});
+	const contextual = titles.render(sharedManifest.window_title, {}, projected);
+	assert.equal(
+		contextual.ahk,
+		unchanged.ahk,
+		'the Windows brand composer keeps its original output'
+	);
+	assert.equal(
+		contextual.swift,
+		unchanged.swift,
+		'the Swift brand composer keeps its original output'
+	);
+	for (const invalid of [
+		{ title_key: 'foreign key', label_key: corpus.original_label_key, platforms: ['hs'] },
+		{ title_key: corpus.original_title_key, label_key: '', platforms: ['hs'] },
+		{
+			title_key: corpus.original_title_key,
+			label_key: corpus.original_label_key,
+			platforms: ['hs', 'hs']
+		},
+		{
+			title_key: corpus.original_title_key,
+			label_key: corpus.original_label_key,
+			platforms: ['foreign']
+		},
+		{ title_key: corpus.original_title_key, label_key: corpus.original_label_key, platforms: [] },
+		{
+			title_key: corpus.original_title_key,
+			label_key: corpus.original_label_key,
+			platforms: ['hs'],
+			fallback: true
+		}
+	])
+		assert.throws(
+			() => titles.validatePresentations({ action_picker: { keyboard_slot_selection: invalid } }),
+			TypeError
+		);
+	const sparse = [];
+	sparse.length = 1;
+	sparse.named = 'hs';
+	assert.throws(
+		() =>
+			titles.validatePresentations({
+				action_picker: {
+					keyboard_slot_selection: {
+						title_key: corpus.original_title_key,
+						label_key: corpus.original_label_key,
+						platforms: sparse
+					}
+				}
+			}),
+		TypeError,
+		'a named array field cannot mask a missing platform'
+	);
+	console.log(
+		'Declared keyboard slot picker: original 21 locale title/prompt values and explicit projection guards.'
+	);
+}

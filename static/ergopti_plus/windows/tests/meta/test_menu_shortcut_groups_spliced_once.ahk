@@ -91,17 +91,25 @@ _MSG_InitMenuOnlyReadsSubMenus() {
 	Assert(Body != "", "the tray-root builders must exist in the driver source")
 
 	Reads := 0
-	for Line in StrSplit(Body, "`n", "`r") {
-		if !InStr(Line, "SubMenus[")
-			continue
-		Reads += 1
-		; TrayMenuStage_AddFeature is the head-row form of the same staging call
-		; (it only records the row as a feature for pause greying).
-		Assert(RegExMatch(Line, "^\s*TrayMenuStage_Add(Feature)?\("),
-			"initMenu() must only READ a SubMenus entry (hand it to TrayMenuStage_Add) and never call "
-			. "anything that MUTATES one. _Updater_RebuildMenu calls initMenu() alone, so a mutation "
-			. "here is replayed on every updater tray refresh and never undone by a rebuild of the "
-			. "submenu -- offending line: " . Trim(Line))
+	for Id, Builder in _MI_TopLevelBuilders() {
+		BuilderBody := _DriverFuncBody(Builder.Name)
+		Assert(BuilderBody != "", "the actual reached builder must be readable")
+		for Line in StrSplit(BuilderBody, "`n", "`r") {
+			if !InStr(Line, "SubMenus[")
+				continue
+			Reads += 1
+			; TrayMenuStage_AddFeature is the head-row form of the same staging call
+			; (it only records the row as a feature for pause greying).
+			DirectStage := RegExMatch(Line, "^\s*TrayMenuStage_Add(Feature)?\(")
+			DeclaredStage := false
+			if RegExMatch(Line, "^\s*_MI_StageDeclaredFeature\(Receiver, SubMenus\[")
+				DeclaredStage := _DG_DeclaredBuilderSourceValid(Id, BuilderBody, _DriverFuncBody("_MI_StageDeclaredFeature"))
+			Assert(DirectStage || DeclaredStage,
+				"initMenu() must only READ a SubMenus entry (hand it to TrayMenuStage_Add) and never call "
+				. "anything that MUTATES one. _Updater_RebuildMenu calls initMenu() alone, so a mutation "
+				. "here is replayed on every updater tray refresh and never undone by a rebuild of the "
+				. "submenu -- offending line: " . Trim(Line))
+		}
 	}
 	Assert(Reads >= 2,
 		"initMenu() must still consume the SubMenus entries (Shortcuts, TapHolds) -- an empty scan "
@@ -152,3 +160,63 @@ _MSG_GroupsComeFromTheManifest() {
 }
 Test("menu: the keyboard-shortcut groups come from the manifest, not a splice (menu-shortcut-groups-duplicated-on-updater-rebuild)",
 	_MSG_GroupsComeFromTheManifest)
+
+; This reaches the actual two root builders, rather than passing a probe child
+; directly to their coordinator. Every updater-style replay keeps the existing
+; SubMenus object and its native child generation unchanged.
+_MSG_ActualBuildersKeepBorrowedChildren() {
+	global SubMenus, CategoryEnabled, _TrayMenuStage, _TrayFeatureHeadLabels
+	HadSubMenus := IsSet(SubMenus), SavedSubMenus := HadSubMenus ? SubMenus : false
+	HadCategories := IsSet(CategoryEnabled), SavedCategories := HadCategories ? CategoryEnabled : false
+	SavedStage := _TrayMenuStage, SavedLabels := _TrayFeatureHeadLabels
+	Shortcuts := Menu(), TapHolds := Menu(), Calls := Map("callback", 0)
+	RegisterMenuItem(Shortcuts, "Shortcut sentinel", (*) => Calls["callback"] += 1)
+	RegisterMenuItem(TapHolds, "Tap-hold sentinel", (*) => Calls["callback"] += 1)
+	Shortcuts.Check("Shortcut sentinel"), TapHolds.Disable("Tap-hold sentinel")
+	AssertEqual(1, _MSG_MenuItemCount(Shortcuts)), AssertEqual(1, _MSG_MenuItemCount(TapHolds))
+	ShortcutsImage := _DG_ChildImage(Shortcuts), TapHoldsImage := _DG_ChildImage(TapHolds)
+	Owned := Map("Shortcuts", Shortcuts, "TapHolds", TapHolds)
+	try {
+		SubMenus := Owned
+		for Value in [false, true] {
+			CategoryEnabled := Map("Shortcuts", Value, "TapHolds", Value)
+			Loop 2 {
+				_TrayMenuStage := false
+				TrayMenuStage_Begin()
+				_MI_StageShortcuts()
+				_MI_StageTapHolds()
+				AssertTrue(SubMenus == Owned), AssertEqual(2, Owned.Count)
+				AssertTrue(Owned["Shortcuts"] == Shortcuts), AssertTrue(Owned["TapHolds"] == TapHolds)
+				AssertEqual(Value ? 4 : 2, _TrayMenuStage.Length)
+				First := _TrayMenuStage[1], Second := _TrayMenuStage[Value ? 3 : 2]
+				AssertEqual(GetCategoryTitle("Shortcuts"), First["label"])
+				AssertEqual(GetCategoryTitle("TapHolds"), Second["label"])
+				AssertTrue(First["target"] == Shortcuts), AssertTrue(Second["target"] == TapHolds)
+				AssertTrue(First["feature"] && Second["feature"])
+				if Value {
+					AssertEqual("check", _TrayMenuStage[2]["kind"]), AssertEqual(First["label"], _TrayMenuStage[2]["label"])
+					AssertEqual("check", _TrayMenuStage[4]["kind"]), AssertEqual(Second["label"], _TrayMenuStage[4]["label"])
+				}
+				AssertEqual(ShortcutsImage, _DG_ChildImage(Shortcuts), "real root replay cannot splice or mutate the shortcut child")
+				AssertEqual(TapHoldsImage, _DG_ChildImage(TapHolds), "real root replay cannot mutate the tap-hold child")
+				AssertEqual(0, Calls["callback"])
+			}
+		}
+	} finally {
+		if HadSubMenus
+			SubMenus := SavedSubMenus
+		else
+			SubMenus := unset
+		if HadCategories
+			CategoryEnabled := SavedCategories
+		else
+			CategoryEnabled := unset
+		_TrayMenuStage := SavedStage, _TrayFeatureHeadLabels := SavedLabels
+		try Shortcuts.Delete()
+		finally MenuDispatcher_PruneMenu(Shortcuts)
+		try TapHolds.Delete()
+		finally MenuDispatcher_PruneMenu(TapHolds)
+	}
+}
+Test("menu: actual root builders repeatedly stage persistent children without changing their native generation",
+	_MSG_ActualBuildersKeepBorrowedChildren)

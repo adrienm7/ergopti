@@ -5920,7 +5920,9 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { scriptTokens } = require('../lib/script-source.cjs');
-	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const {
+		personalFrameDataPublication: physicalPersonalFrameDataPublication
+	} = require('../lib/menu-native-personal-shortcuts-binding.cjs');
 	const expected = JSON.parse(
 		readFileSync(resolve(SHARED, 'tests/corpus/menus/personal_shortcuts_frame.json'), 'utf8')
 	);
@@ -5936,7 +5938,226 @@ console.log(
 	assert.equal(expected.absent_registry_count, 0);
 	assert.equal(expected.empty_registry_count, 0);
 	assert.equal(expected.populated_frame_count, 2);
-	const source = readFileSync(resolve(SHARED, '../windows/ui/menu/menu_init.ahk'), 'utf8');
+	const personalFiles = [
+		'ui/menu/menu_shortcuts.ahk',
+		'ui/menu/menu_init.ahk',
+		'infra/manifest_menu.ahk',
+		'adapters/tray_menu.ahk'
+	];
+	const physicalPersonalSources = Object.fromEntries(
+		personalFiles.map((file) => [
+			'windows/' + file,
+			readFileSync(resolve(SHARED, '../windows', file), 'utf8')
+		])
+	);
+	const source = personalFiles.map((file) => physicalPersonalSources['windows/' + file]).join('\n');
+	// Apply each genuine flat-source mutant only to its original physical file.
+	function personalFrameDataPublication(text, definition, owningEntry) {
+		if (typeof text !== 'string') return false;
+		if (text === source)
+			return physicalPersonalFrameDataPublication(physicalPersonalSources, definition, owningEntry);
+		let prefix = 0,
+			suffix = 0;
+		while (prefix < source.length && prefix < text.length && source[prefix] === text[prefix])
+			prefix++;
+		while (
+			suffix < source.length - prefix &&
+			suffix < text.length - prefix &&
+			source[source.length - 1 - suffix] === text[text.length - 1 - suffix]
+		)
+			suffix++;
+		const end = source.length - suffix;
+		let start = 0;
+		for (const file of personalFiles) {
+			const key = 'windows/' + file,
+				original = physicalPersonalSources[key];
+			const stop = start + original.length;
+			if (prefix >= start && end <= stop) {
+				const changed =
+					original.slice(0, prefix - start) +
+					text.slice(prefix, text.length - suffix) +
+					original.slice(end - start);
+				const candidate = { ...physicalPersonalSources, [key]: changed };
+				assert.equal(
+					personalFiles.map((name) => candidate['windows/' + name]).join('\n'),
+					text,
+					'actual physical source projection is byte exact'
+				);
+				return physicalPersonalFrameDataPublication(candidate, definition, owningEntry);
+			}
+			start = stop + 1;
+		}
+		return false;
+	}
+	const entry = menu.shortcuts_menu.find((row) => row.id === 'personal_shortcuts');
+	// Native port mutations preserve every original personal corpus assertion.
+	{
+		const nativeFile = 'windows/adapters/tray_menu.ahk';
+		const original = physicalPersonalSources[nativeFile];
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				physicalPersonalSources,
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			true
+		);
+		for (const [label, before, after] of [
+			[
+				'native bootstrap dead',
+				'if !TrayMenuFrameNative("current")',
+				'if false\nif !TrayMenuFrameNative("current")'
+			],
+			['native admission withdrawn', 'if NativeDll != DllCall', 'if false'],
+			[
+				'native own observer admitted',
+				'for Name in ObjOwnProps(Callable)\n\t\t\t\treturn false',
+				'for Name in []\n\t\t\t\treturn false'
+			],
+			[
+				'native reader descriptor lost',
+				'if !Object.Prototype.HasOwnProp.Call(Descriptor, "Get") || Descriptor.Get != Getter',
+				'if !Object.Prototype.HasOwnProp.Call(Descriptor, "Get") || false'
+			],
+			[
+				'native receipt from inert sibling',
+				'if Operation == "capture" {',
+				'if false && Operation == "capture" {'
+			],
+			['native state changed', '"uint", 0x400, "uint")', '"uint", 0, "uint")'],
+			[
+				'native command identity changed',
+				'Id := NativeDll.Call("GetMenuItemID"',
+				'Id := NativeDll.Call("GetSubMenu"'
+			],
+			[
+				'native child identity changed',
+				'Child := NativeDll.Call("GetSubMenu"',
+				'Child := NativeDll.Call("GetMenuItemID"'
+			],
+			['native caption observer', '\t\t\tif Read != Length', '\t\t\tif false'],
+			[
+				'native final coherence lost',
+				'|| HandleGetter.Call(Target) != Handle\n\t\t\treturn false',
+				'|| false\n\t\t\treturn false'
+			],
+			[
+				'native dispatch ID cohort lost',
+				'Ids.Push(NativeDll.Call("GetMenuItemID"',
+				'Ids.Push(NativeDll.Call("GetSubMenu"'
+			],
+			[
+				'native cleanup withheld',
+				'DeleteMethod.Call(Target)',
+				'if false\n\t\tDeleteMethod.Call(Target)'
+			],
+			['native cleanup foreign', 'DeleteMethod.Call(Target)', 'Target.Delete()'],
+			['native cleanup redirected', 'if Operation == "release" {', 'if Operation == "foreign" {'],
+			[
+				'native metadata result clobbered by the held guard',
+				'NativeDllName := NameGetter.Call(NativeDll)\n\t\treturn HeldLive() && NativeDllName == "DllCall" && NativeClass == Menu',
+				'Name := NameGetter.Call(NativeDll)\n\t\treturn HeldLive() && Name == "DllCall" && NativeClass == Menu'
+			],
+			[
+				'native reflective port assigned',
+				'throw ValueError("Unknown owned native menu operation")',
+				'throw ValueError("Unknown owned native menu operation")\n\tTrayMenuFrameNative := Foreign.Native'
+			]
+		]) {
+			assert.equal(original.split(before).length - 1, 1, label + ': actual native preimage');
+			const changed = original.replace(before, after);
+			assert.notEqual(changed, original, label + ': actual source changed');
+			assert.equal(
+				changed.split(after).length - 1,
+				1,
+				label + ': unique actual native inverse anchor'
+			);
+			assert.equal(
+				physicalPersonalFrameDataPublication(
+					{ ...physicalPersonalSources, [nativeFile]: changed },
+					menu.personal_shortcuts_frame,
+					entry
+				),
+				false,
+				label
+			);
+			const repaired = changed.replace(after, before);
+			assert.equal(repaired, original, label + ': exact native inverse');
+			assert.equal(
+				physicalPersonalFrameDataPublication(
+					{ ...physicalPersonalSources, [nativeFile]: repaired },
+					menu.personal_shortcuts_frame,
+					entry
+				),
+				true,
+				label + ': genuine repair'
+			);
+		}
+		const missing = { ...physicalPersonalSources };
+		delete missing[nativeFile];
+		assert.equal(
+			physicalPersonalFrameDataPublication(missing, menu.personal_shortcuts_frame, entry),
+			false,
+			'missing actual native adapter'
+		);
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: '; native adapter source is unavailable\n' },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			false,
+			'inert actual native adapter'
+		);
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: original + original },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			false,
+			'duplicate native adapter cannot borrow authority'
+		);
+		const foreign = { ...physicalPersonalSources, 'windows/adapters/foreign_native.ahk': original };
+		delete foreign[nativeFile];
+		assert.equal(
+			physicalPersonalFrameDataPublication(foreign, menu.personal_shortcuts_frame, entry),
+			false,
+			'foreign native path cannot borrow authority'
+		);
+	}
+	// The genuine constructor guard cannot overwrite its observed intrinsic name.
+	{
+		const nativeFile = 'windows/infra/manifest_menu.ahk';
+		const original = physicalPersonalSources[nativeFile];
+		const before = '\tSourceLive() {\n\t\tif Constructor != NativeClass';
+		const after =
+			'\tSourceLive() {\n\t\tNativeFactoryName := "foreign"\n\t\tif Constructor != NativeClass';
+		assert.equal(original.split(before).length - 1, 1, 'actual constructor closure preimage');
+		const changed = original.replace(before, after);
+		assert.notEqual(changed, original);
+		assert.equal(changed.split(after).length - 1, 1, 'unique genuine constructor clobber anchor');
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: changed },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			false,
+			'a genuine nested constructor write cannot replace the intrinsic name'
+		);
+		const repaired = changed.replace(after, before);
+		assert.equal(repaired, original, 'exact genuine constructor clobber inverse');
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: repaired },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			true,
+			'actual intrinsic constructor result custody repaired'
+		);
+	}
 	function publishedPersonalFrame(text) {
 		const tokens = scriptTokens(text, '.ahk');
 		let level = 0;
@@ -5945,44 +6166,52 @@ console.log(
 			const token = tokens[index];
 			if (
 				level === 0 &&
-				text.slice(text.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
-				!(
-					tokens[index - 1]?.kind === 'identifier' &&
-					['if', 'else', 'while', 'for', 'catch', 'try'].includes(tokens[index - 1]?.value)
-				) &&
 				token.kind === 'identifier' &&
-				token.value === '_AppendPersonalShortcutsSubmenuIfAny' &&
+				['_personalshortcutrows', 'menurenderer_appendframedata'].includes(
+					token.value.toLowerCase()
+				) &&
+				text.slice(text.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
 				tokens[index + 1]?.kind === 'symbol' &&
-				tokens[index + 1]?.value === '(' &&
-				tokens[index + 2]?.kind === 'identifier' &&
-				tokens[index + 2]?.value === 'ShortcutsMenu' &&
-				tokens[index + 3]?.kind === 'symbol' &&
-				tokens[index + 3]?.value === ')' &&
-				tokens[index + 4]?.kind === 'symbol' &&
-				tokens[index + 4]?.value === '{'
+				tokens[index + 1].value === '('
 			) {
-				let depth = 1,
-					end = index + 5;
-				for (; end < tokens.length && depth > 0; end += 1) {
-					if (tokens[end].kind === 'symbol' && tokens[end].value === '{') depth += 1;
-					if (tokens[end].kind === 'symbol' && tokens[end].value === '}') depth -= 1;
+				let parameters = 1,
+					opening = index + 2;
+				for (; opening < tokens.length && parameters; opening += 1) {
+					if (tokens[opening].kind !== 'symbol') continue;
+					if (tokens[opening].value === '(') parameters += 1;
+					if (tokens[opening].value === ')') parameters -= 1;
 				}
-				if (depth === 0) bodies.push(text.slice(tokens[index + 4].end, tokens[end - 1].start));
+				if (!parameters && tokens[opening]?.kind === 'symbol' && tokens[opening].value === '{') {
+					let depth = 1,
+						end = opening + 1;
+					for (; end < tokens.length && depth; end += 1) {
+						if (tokens[end].kind !== 'symbol') continue;
+						if (tokens[end].value === '{') depth += 1;
+						if (tokens[end].value === '}') depth -= 1;
+					}
+					if (!depth)
+						bodies.push({
+							name: token.value.toLowerCase(),
+							body: text.slice(tokens[opening].end, tokens[end - 1].start)
+						});
+				}
 			}
 			if (token.kind === 'symbol' && token.value === '{') level += 1;
 			if (token.kind === 'symbol' && token.value === '}') level -= 1;
 		}
-		assert.equal(bodies.length, 1, 'one actual top-level personal registry owner');
-		const body = bodies[0];
+		assert.equal(
+			bodies.filter((body) => body.name === '_personalshortcutrows').length,
+			1,
+			'one actual top-level personal registry owner'
+		);
+		const body = bodies.find((body) => body.name === 'menurenderer_appendframedata')?.body || '';
 		const actual = scriptTokens(body, '.ahk');
 		function exactSequence(fragment) {
 			const expected = scriptTokens(fragment, '.ahk');
 			return actual.some(
 				(token, start) =>
 					body.slice(body.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
-					!(
-						actual[start - 1]?.kind === 'symbol' && ['.', ':'].includes(actual[start - 1]?.value)
-					) &&
+					!(actual[start - 1]?.kind === 'symbol' && ['.', ':'].includes(actual[start - 1].value)) &&
 					expected.every(
 						(token, offset) =>
 							actual[start + offset]?.kind === token.kind &&
@@ -5991,20 +6220,17 @@ console.log(
 			);
 		}
 		assert.ok(
-			exactSequence(
-				'FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))'
-			),
+			exactSequence('Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data))'),
 			'actual native child lexical kinds'
 		);
 		assert.ok(
 			exactSequence(
-				'if !(FrameRows is Array) return 0 MenuRenderer_AppendTemplate(ShortcutsMenu, "personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))'
+				'if !RowsReceipt || !DestinationLive() return 0 for Leaf in Data LeafCallbacks.Push(Leaf["action"]) Child := NativeConstructor.Call()'
 			),
 			'actual refusal and publication lexical kinds'
 		);
-
 		assert.ok(
-			publishesMenuTemplate(body, '.ahk', expected.section),
+			personalFrameDataPublication(text, expected.rows, entry),
 			'actual personal frame publication'
 		);
 		const sequence = scriptTokens(body, '.ahk')
@@ -6012,21 +6238,33 @@ console.log(
 			.join('|');
 		assert.ok(
 			sequence.includes(
-				'FrameRows|:=|MenuRenderer_TemplateRows|(|personal_shortcuts_frame|,|Map|(|)|,|Map|(|)|,|Map|(|personal_shortcuts_registered|,|PersonalRows|)|)'
+				'Rows|:=|TemplateOwner|.|Call|(|FrameKey|,|Map|(|)|,|Map|(|)|,|Map|(|ChildId|,|Data|)|)'
 			),
 			'actual original native child array binding'
 		);
 		assert.ok(
 			sequence.includes(
-				'if|!|(|FrameRows|is|Array|)|return|0|MenuRenderer_AppendTemplate|(|ShortcutsMenu|,|personal_shortcuts_frame|,|Map|(|)|,|Map|(|)|,|Map|(|personal_shortcuts_registered|,|PersonalRows|)|)'
+				'if|!|RowsReceipt|||||!|DestinationLive|(|)|return|0|for|Leaf|in|Data|LeafCallbacks|.|Push|(|Leaf|[|action|]|)|Child|:=|NativeConstructor|.|Call|(|)'
 			),
 			'refusal precedes actual publication'
 		);
 	}
 	publishedPersonalFrame(source);
+	const actualBooleanCalls = [
+		'&& ImageOwner.Call(Destination, Now)',
+		'&& StageOwner.Call(NowStage, Data, Population is MenuPopulation)'
+	];
+	for (const actualBooleanCall of actualBooleanCalls) {
+		assert.equal(source.split(actualBooleanCall).length - 1, 1);
+		const spacedCall = actualBooleanCall.replace('&& ', '&&    ');
+		const spacedBooleanCall = source.replace(actualBooleanCall, spacedCall);
+		assert.notEqual(spacedBooleanCall, source);
+		publishedPersonalFrame(spacedBooleanCall);
+		assert.equal(spacedBooleanCall.replace(spacedCall, actualBooleanCall), source);
+	}
 	const foreignAssignment = source.replace(
-		'FrameRows := MenuRenderer_TemplateRows',
-		'Foreign.FrameRows := MenuRenderer_TemplateRows'
+		'Rows := TemplateOwner.Call',
+		'Foreign.Rows := TemplateOwner.Call'
 	);
 	assert.notEqual(foreignAssignment, source);
 	assert.throws(
@@ -6035,20 +6273,14 @@ console.log(
 		'a receiver property cannot own the local frame array'
 	);
 
-	const conditional = source.replace(
-		'_AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {',
-		'if _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {'
-	);
+	const conditional = source.replace('_PersonalShortcutRows() {', 'if _PersonalShortcutRows() {');
 	assert.notEqual(conditional, source);
 	assert.throws(
 		() => publishedPersonalFrame(conditional),
 		/actual/,
 		'a conditional call is not the owning definition'
 	);
-	const quotedChild = source.replace(
-		'Map("personal_shortcuts_registered", PersonalRows)',
-		'Map("personal_shortcuts_registered", "PersonalRows")'
-	);
+	const quotedChild = source.replace('Map(ChildId, Data)', 'Map(ChildId, "Data")');
 	assert.notEqual(quotedChild, source);
 	assert.throws(
 		() => publishedPersonalFrame(quotedChild),
@@ -6056,13 +6288,16 @@ console.log(
 		'a string cannot be the native child array'
 	);
 	const braceLiteral = source.replace(
-		'FrameRows := MenuRenderer_TemplateRows',
-		'BraceCaption := "{"\n\tFrameRows := MenuRenderer_TemplateRows'
+		'Rows := TemplateOwner.Call',
+		'BraceCaption := "{"\n\tRows := TemplateOwner.Call'
 	);
 	assert.notEqual(braceLiteral, source);
 	publishedPersonalFrame(braceLiteral);
 
-	const needle = 'MenuRenderer_TemplateRows("' + expected.section + '"';
+	const needle =
+		'DeclaredFrames := Map("personal_shortcuts", Map(\n\t\t"manifest_key", "' +
+		expected.section +
+		'"';
 	assert.equal(source.split(needle).length, 2);
 	for (const replacement of [
 		'Foreign.' + needle,
@@ -6075,6 +6310,408 @@ console.log(
 	}
 	const dataOnly = '; no actual owner\nValue := "\n(\n' + source + '\n)"';
 	assert.throws(() => publishedPersonalFrame(dataOnly), /actual/);
+	// Each mutation withdraws an actual live authority edge, then restores exact source.
+	function actualFrameMutation(before, after, reason) {
+		assert.equal(source.split(before).length - 1, 1, `${reason}: actual unique preimage`);
+		const withdrawn = source.replace(before, after);
+		assert.notEqual(withdrawn, source, `${reason}: genuine source changed`);
+		assert.equal(personalFrameDataPublication(withdrawn, expected.rows, entry), false, reason);
+		assert.equal(withdrawn.replace(after, before), source, `${reason}: exact inverse`);
+		assert.equal(
+			personalFrameDataPublication(withdrawn.replace(after, before), expected.rows, entry),
+			true,
+			`${reason}: real authority restored`
+		);
+	}
+	for (const [before, after, reason] of [
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error(',
+			'if false\n\tthrow Error(',
+			'constructor intrinsic ownership is established by the actual module bootstrap'
+		],
+		[
+			'if !ConstructorOwner.Call(NativeConstructor)',
+			'if false',
+			'the actual receiver validates the held native constructor authority'
+		],
+		[
+			'static NativeFactory := Object.Prototype.GetOwnPropDesc.Call(Menu, "Call").Call',
+			'static NativeFactory := ForeignFactory',
+			'the constructor owner captures the actual native class method descriptor'
+		],
+		[
+			'for Name, Getter in Map("Name", NameGetter, "IsBuiltIn", BuiltInGetter) {',
+			'for Name, Getter in Map("Name", ForeignGetter, "IsBuiltIn", BuiltInGetter) {',
+			'the admitted Map loop keeps the actual retained intrinsic metadata readers'
+		],
+		[
+			'_MR_FrameNativeConstructorCurrent(Constructor) {',
+			'Map(Name, Getter) {\n\treturn 0\n}\n\n_MR_FrameNativeConstructorCurrent(Constructor) {',
+			'the one admitted intrinsic reader loop cannot authorize a real top-level Map function rebinding'
+		],
+		[
+			'Descriptor.Call != NativeFactory',
+			'Descriptor.Call != ForeignFactory',
+			'late constructor replacement cannot borrow the original class identity'
+		],
+		[
+			'for Name in ObjOwnProps(NativeFactory)\n\t\t\treturn false',
+			'for Name in []\n\t\t\treturn false',
+			'constructor own observers cannot run as intrinsic metadata authority'
+		],
+		[
+			'ReaderDescriptor.Get != Getter',
+			'ReaderDescriptor.Get != ForeignGetter',
+			'constructor metadata readers retain their original intrinsic descriptor methods'
+		],
+		[
+			'BuiltIn := BuiltInGetter.Call(NativeFactory)',
+			'BuiltIn := true',
+			'the actual factory retains its interpreter-owned built-in status'
+		],
+		[
+			'Name := NameGetter.Call(NativeFactory)',
+			'Name := "Menu.Call"',
+			'a literal name cannot impersonate the original native constructor'
+		],
+		[
+			'if !SourceLive() || !BuiltIn',
+			'if !BuiltIn',
+			'native factory reads retain source identity immediately after intrinsic observations'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'if false\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'an unbraced dormant bootstrap cannot defer trusted metadata capture until first receiver use'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'return\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'a module-entry return cannot make constructor initialization a dead witness'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'throw Error("early constructor refusal")\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'an early module throw cannot borrow the later constructor bootstrap'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'try\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'a swallowed module bootstrap failure cannot claim constructor authority'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'try {\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")\n}',
+			'a nested exception-swallowing bootstrap cannot own module initialization'
+		],
+		[
+			'#Include menu_population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
+			'return\n\ufeff; infra/manifest_menu.ahk\n#Include menu_population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
+			'a moved documentary heading cannot hide a real pre-bootstrap module return'
+		],
+		...actualBooleanCalls.flatMap((call) =>
+			['& ', '& & ', '&&& ', '&& &'].map((operator) => [
+				call,
+				call.replace('&& ', operator),
+				`a standalone or malformed ampersand cannot borrow the retained callable: ${operator}${call}`
+			])
+		),
+		[
+			'|| Root[ManifestKey] != Definition || Root[FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'|| Root[ManifestKey] != Definition || Root[Foreign.FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'a foreign member cannot become the held frame key'
+		],
+		[
+			'|| Root[ManifestKey] != Definition || Root[FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'|| Root[ManifestKey] != Definition || ForeignRoot[FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'a foreign index cannot borrow the genuine held root key read'
+		],
+		[
+			'|| !Rows[Rows.Length].Has("items") || Rows[Rows.Length]["items"] != Data',
+			'|| !Rows[Foreign.Rows.Length].Has("items") || Rows[Rows.Length]["items"] != Data',
+			'a foreign Array bound cannot borrow the held rows self-index read'
+		],
+		[
+			'"manifest_key", "personal_shortcuts_frame"',
+			'"manifest_key", "unowned_frame"',
+			'actual registration names its owned frame'
+		],
+		[
+			'"children_id", "personal_shortcuts_registered"',
+			'"children_id", "foreign_children"',
+			'actual registration names its owned children'
+		],
+		[
+			'"provider", _PersonalShortcutRows',
+			'"provider", "_PersonalShortcutRows"',
+			'the retained DATA provider is a Func rather than a caption'
+		],
+		[
+			'"provider", _PersonalShortcutRows',
+			'"provider", Foreign._PersonalShortcutRows',
+			'a member cannot borrow the canonical DATA producer'
+		],
+		[
+			'"provider", _PersonalShortcutRows',
+			'"provider", _PersonalShortcutRows, "other", 0',
+			'the declared frame binding has closed fields'
+		],
+		[
+			'Getters, , , DeclaredFrames)',
+			'Getters, , , Map())',
+			'actual optional Build argument carries the genuine registration'
+		],
+		[
+			'_PersonalShortcutRows() {',
+			'_PersonalShortcutRows(TargetMenu) {',
+			'pure DATA producer receives no native destination'
+		],
+		[
+			'Row := MenuRowWithLabel("shortcuts.personal." . Name, Label, "Shortcuts")',
+			'Row := Foreign.MenuRowWithLabel("shortcuts.personal." . Name, Label, "Shortcuts")',
+			'the DATA collector uses the actual callback row constructor'
+		],
+		[
+			'PersonalRows := []\n\tfor _, Name in Names',
+			'PersonalRows := Menu()\n\tfor _, Name in Names',
+			'the pure producer returns DATA rather than a finished native Menu'
+		],
+		[
+			'\treturn PersonalRows\n}\n',
+			'\treturn "PersonalRows"\n}\n',
+			'the actual pure producer return retains its collected Array'
+		],
+		[
+			'FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [FrameBindings, HandlersReceipt, ProvidersReceipt])',
+			'FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [])',
+			'the actual receiving call retains all authentic Build registration receipts'
+		],
+		[
+			'if !FrameAdmitted\n\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
+			'if false\n\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
+			'declared DATA refusal cannot fall through to pending separator effects'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := Provider.Call(TargetMenu)',
+			'the native receiving call cannot give its destination to the pure producer'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := Foreign.Provider.Call()',
+			'a foreign member cannot become the held DATA producer'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := "Provider.Call()"',
+			'a caption cannot stand in for the actual DATA call'
+		],
+		[
+			'Data := Provider.Call()',
+			'if false {\n\t\tData := Provider.Call()\n\t\t}',
+			'a nested dormant producer is not the live DATA stage'
+		],
+		[
+			'Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data))',
+			'Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, ForeignData))',
+			'the actual frame projection retains the collected child DATA'
+		],
+		[
+			'RowsReceipt := SnapshotOwner.Call(Rows)',
+			'RowsReceipt := SnapshotOwner.Call(Data)',
+			'the actual completed parent projection retains its own receipt'
+		],
+		[
+			'if !RowsReceipt || !DestinationLive()\n\t\t\treturn 0\n\t\tfor Leaf in Data\n\t\t\tLeafCallbacks.Push(Leaf["action"])\n\t\tChild := NativeConstructor.Call()',
+			'if !RowsReceipt || false\n\t\t\treturn 0\n\t\tfor Leaf in Data\n\t\t\tLeafCallbacks.Push(Leaf["action"])\n\t\tChild := NativeConstructor.Call()',
+			'whole projected frame refusal precedes child allocation'
+		],
+		[
+			'Child := NativeConstructor.Call()',
+			'Child := Foreign.NativeConstructor.Call()',
+			'the staged child is received from the held genuine native constructor'
+		],
+		[
+			'FillOwner.Call(Population, Child, Data, FrameKey, 2)',
+			'FillOwner.Call(Population, Child, ForeignData, FrameKey, 2)',
+			'the population stage receives the actual collected DATA'
+		],
+		[
+			'Parent := Rows[Rows.Length], Label := StrReplace(Parent["label"], "&", "&&")',
+			'Parent := ForeignRows[ForeignRows.Length], Label := StrReplace(Parent["label"], "&", "&&")',
+			'the native parent is the actual returned projected group'
+		],
+		[
+			'NativeMethods["Add"].Call(Target, Label, Child)',
+			'NativeMethods["Add"].Call(Target, Label, ForeignChild)',
+			'actual target publication retains the completed child'
+		],
+		[
+			'if !CurrentOwner.Call(RegistrationsReceipt)\n\t\t\t\t\treturn false',
+			'if false\n\t\t\t\t\treturn false',
+			'late live-source admission retains genuine registration container custody'
+		],
+		[
+			'Frames[EntryId] != Binding',
+			'Frames[EntryId] != ForeignBinding',
+			'late source admission binds the original real Build frame registration'
+		],
+		[
+			'Data := Provider.Call()',
+			'Provider.Call := Foreign\n\t\tData := Provider.Call()',
+			'held provider callable cannot acquire an own Call override'
+		],
+		[
+			'Data := Provider.Call()',
+			'Provider := Foreign\n\t\tData := Provider.Call()',
+			'held provider cannot be reassigned before actual collection'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := Provider.Call()\n\t\tTemplateOwner := Foreign',
+			'held template owner cannot be rebound after actual collection'
+		],
+		[
+			'\n\tOriginalCritical := Critical("On")\n\tOwnersLive()',
+			'\n\tOriginalCritical := Critical("On")\n\treturn 0\n\tOwnersLive()',
+			'an entry return cannot make the native receiving stages dead witnesses'
+		],
+		[
+			'\n\t}\n\ttry {\n\t\tif !OwnersLive() || Type(ManifestKey)',
+			'\n\t}\n\treturn 0\n\ttry {\n\t\tif !OwnersLive() || Type(ManifestKey)',
+			'a receiver return before main admission cannot borrow later publication witnesses'
+		],
+		[
+			'\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'\n\treturn Result\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'a Build return before frame receipt capture cannot borrow later registration witnesses'
+		],
+		[
+			'\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'\n\tthrow Error("early refusal")\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'an unconditional Build refusal cannot make later frame witnesses live'
+		],
+		[
+			'\n\t\tFrameKey := Binding["manifest_key"]',
+			'\n\t\treturn 0\n\t\tFrameKey := Binding["manifest_key"]',
+			'a precollection return cannot borrow the later collected DATA witness'
+		],
+		[
+			'\n\t\tParent := Rows[Rows.Length]',
+			'\n\t\treturn 0\n\t\tParent := Rows[Rows.Length]',
+			'a post-stage return cannot borrow the later completed parent witness'
+		],
+		[
+			'\n\t\tPublicationLive() {',
+			'\n\t\treturn 0\n\t\tPublicationLive() {',
+			'a completed-parent return cannot borrow later native operation witnesses'
+		],
+		[
+			'\n\tStartCount := Before.Length\n\ttry {',
+			'\n\tStartCount := Before.Length\n\treturn 0\n\ttry {',
+			'an internal operation entry return cannot borrow later native Add witnesses'
+		],
+		[
+			'\n\t\tNativeMethods["Add"].Call(Target, Label, Child)',
+			'\n\t\treturn 0\n\t\tNativeMethods["Add"].Call(Target, Label, Child)',
+			'an internal operation return cannot borrow its later native child Add witness'
+		],
+		[
+			'Added := PublishOwner.Call(TargetMenu, Child, Rows, Label, Destination, NativeMethods,',
+			'Added := PublishOwner.Call(TargetMenu, ForeignChild, Rows, Label, Destination, NativeMethods,',
+			'the actual internal publication operation receives the retained completed child'
+		],
+		[
+			'[PublishOwner, _MR_FramePublish]',
+			'[PublishOwner, Foreign]',
+			'the held publication operation keeps its genuine current native owner'
+		],
+		[
+			'StageOwner.Call(StageReceipt, Data, Population is MenuPopulation)',
+			'StageOwner.Call(StageReceipt, ForeignData, Population is MenuPopulation)',
+			'actual staged native callback admission retains collected DATA identity'
+		],
+		[
+			'if Type(Child) != "Integer" || Child != 0 {\n\t\t\t\tif !(Child is Menu)',
+			'if false {\n\t\t\t\tif !(Child is Menu)',
+			'the actual staged native child cannot bypass own-handle and method admission'
+		],
+		[
+			'if Object.Prototype.HasOwnProp.Call(Child, Name)\n\t\t\t\t\t\treturn false',
+			'if false\n\t\t\t\t\t\treturn false',
+			'the actual staged child cannot borrow source authority after method withdrawal'
+		],
+		[
+			'PendingEntry := PendingOwner.Call(Pending, Child, ChildHandle)\n\t\t} else',
+			'PendingEntry := PendingOwner.Call(Pending, Child, ForeignHandle)\n\t\t} else',
+			'staging retains the captured genuine child handle for pending custody'
+		],
+		[
+			'!(Row[1] == Expected[Index][1]) || Row[4] != 0',
+			'Row[1] != Expected[Index][1] || Row[4] != 0',
+			'staged captions retain exact case under the actual native image admission'
+		]
+	])
+		actualFrameMutation(before, after, reason);
+	for (const appended of [
+		'\n_PersonalShortcutRows := Foreign\n',
+		'\nMenuRenderer_AppendFrameData := Foreign\n',
+		'\nAlias := _PersonalShortcutRows\n',
+		'\nMenu := Foreign\n',
+		'\nMap := Foreign\n',
+		'\nMenuRowWithLabel := Foreign\n',
+		'\nAlias := MenuRowWithLabel\n',
+		'\n_MR_FramePublish := Foreign\n'
+	]) {
+		assert.equal(
+			personalFrameDataPublication(source + appended, expected.rows, entry),
+			false,
+			'module assignment or alias cannot own the canonical personal DATA route'
+		);
+	}
+	const duplicateProvider = '\n_PersonalShortcutRows() { return 0 }\n';
+	assert.equal(
+		personalFrameDataPublication(source + duplicateProvider, expected.rows, entry),
+		false,
+		'duplicate module DATA owners refuse the frame route'
+	);
+	assert.equal(
+		personalFrameDataPublication(source, expected.rows, { ...entry, type: 'dynamic' }),
+		false,
+		'a dynamic parent cannot borrow the strict declared DATA mode'
+	);
+	assert.equal(
+		personalFrameDataPublication(source, expected.rows, { ...entry, platforms: ['hs'] }),
+		false,
+		'personal native DATA proof requires its actual Windows owner'
+	);
+	assert.equal(
+		personalFrameDataPublication(source, expected.rows, { ...entry, id: 'foreign_personal' }),
+		false,
+		'a foreign row cannot borrow the personal registration'
+	);
+	assert.equal(
+		personalFrameDataPublication(
+			source,
+			expected.rows.map((row) => ({ ...row, platforms: ['hs'] })),
+			entry
+		),
+		false,
+		'foreign frame platform declarations cannot receive Windows DATA'
+	);
+	const renamedProvider = source.replace(/_PersonalShortcutRows\(\) \{[\s\S]*?\n\}/, (body) =>
+		body.replace(/\b(Names|PersonalRows|Name|Desc|Label|Row)\b/g, (name) => 'PersonalData' + name)
+	);
+	assert.notEqual(renamedProvider, source);
+	publishedPersonalFrame(renamedProvider);
+	const renamedRegistration = source.replace(/_BuildShortcutsSubmenu\(\) \{[\s\S]*?\n\}/, (body) =>
+		body.replace(
+			/\b(DynHandlers|DeclaredFrames|ListProviders|Commands|Getters|GroupBuilders)\b/g,
+			(name) => 'PersonalFrame' + name
+		)
+	);
+	assert.notEqual(renamedRegistration, source);
+	publishedPersonalFrame(renamedRegistration);
 	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
 		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
 		assert.equal(typeof locale['menu.shortcuts.personal'], 'string');
@@ -12853,46 +13490,247 @@ console.log(
 			system + ': actual current backend caption binding'
 		);
 	}
-	const apps = 'agent_windows_disabled_apps_command';
-	assert.deepEqual(manifest[apps], [
+	const apps = 'agent_menu';
+	assert.equal(
+		Object.hasOwn(manifest, 'agent_windows_disabled_apps_command'),
+		false,
+		'the old singleton cannot compete with the actual main-menu authority'
+	);
+	const originalPrefix = [
 		{
-			type: 'command',
-			id: 'agent_disabled_apps',
-			i18n: 'menu.agent.disabled_apps',
-			caption_getter: 'agent_disabled_apps_count',
-			caption_format: 'numbered',
-			platforms: ['ahk'],
-			unavailable: 'hide'
-		}
-	]);
-	assert.equal(
-		nativeTemplateBinding(
-			source,
-			'.ahk',
-			apps,
-			'agent_disabled_apps',
+			type: 'choice',
+			id: 'agent_mode',
+			path: 'llm.agent_mode',
+			i18n: 'menu.agent.mode_title',
+			show_current_choice: true,
+			disabled_when: ['agent_mode_ready'],
+			choices: [
+				{ value: 'off', i18n: 'menu.agent.mode_off' },
+				{ value: 'action', i18n: 'menu.agent.mode_action' },
+				{ value: 'auto', i18n: 'menu.agent.mode_auto' }
+			]
+		},
+		{ type: '---' },
+		{ type: 'dynamic', id: 'agent_system1', i18n: 'menu.agent.system1' },
+		{ type: 'dynamic', id: 'agent_system2', i18n: 'menu.agent.system2' },
+		{ type: '---' }
+	];
+	const originalApps = {
+		type: 'dynamic',
+		id: 'agent_disabled_apps',
+		i18n: 'menu.agent.disabled_apps'
+	};
+	const appsCommand = {
+		type: 'command',
+		id: 'agent_disabled_apps',
+		i18n: 'menu.agent.disabled_apps',
+		caption_getter: 'agent_disabled_apps_count',
+		caption_format: 'numbered',
+		platforms: ['ahk'],
+		unavailable: 'hide'
+	};
+	assert.deepEqual(
+		manifest[apps],
+		[
+			...originalPrefix,
+			{ ...originalApps, platforms: ['hs', 'linux'], unavailable: 'hide' },
+			appsCommand
+		],
+		'all original siblings/order and the moved command metadata remain exact'
+	);
+	for (const platform of ['hs', 'linux'])
+		assert.deepEqual(
+			manifest[apps]
+				.filter((row) => !row.platforms || row.platforms.includes(platform))
+				.map(({ platforms, unavailable, ...row }) => row),
+			[...originalPrefix, originalApps],
+			platform + ': the original native-visible dynamic menu projection is preserved'
+		);
+	assert.deepEqual(
+		manifest[apps].filter((row) => !row.platforms || row.platforms.includes('ahk')),
+		[...originalPrefix, appsCommand],
+		'Windows receives one final command at the original apps position'
+	);
+	const renderer = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/infra/manifest_menu.ahk'),
+		'utf8'
+	);
+	const { nativeBuildCommandBinding } = require('../lib/menu-template-binding.cjs');
+	const commands =
+		'Map("agent_mode", _LLM_Agent_MenuSetMode, "agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker())';
+	const states =
+		'Map("llm.agent_mode", () => LLM_Agent_Setting("agent_mode"),\n' +
+		'\t\t\t"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount)';
+	for (const input of [commands, states])
+		assert.equal(
+			source.split(input).length - 1,
 			1,
-			nativeSources,
-			manifest,
-			'ahk'
-		),
-		true,
-		'actual picker callback binding'
-	);
-	assert.equal(
-		nativeTemplateBinding(
-			source,
-			'.ahk',
-			apps,
-			'agent_disabled_apps_count',
-			2,
-			nativeSources,
-			manifest,
-			'ahk'
-		),
-		true,
-		'actual native count binding'
-	);
+			'actual Build port has a unique executable preimage'
+		);
+	const swapped = source
+		.replace(commands, 'WITHDRAWN_BUILD_PORT')
+		.replace(states, commands)
+		.replace('WITHDRAWN_BUILD_PORT', states);
+	const receiverHeader =
+		'MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, ' +
+		'GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", ' +
+		'TargetMenu := unset, GroupDisabled := unset, DeclaredFrames := unset) {';
+	const builderHeader = 'LLM_Agent_MenuBuild() {';
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	function actualDefinition(text, header) {
+		assert.equal(text.split(header).length - 1, 1, 'actual definition has one exact preimage');
+		const start = text.indexOf(header);
+		const tokens = scriptTokens(text, '.ahk');
+		const open = tokens.findIndex(
+			(token) =>
+				token.start === start + header.length - 1 && token.kind === 'symbol' && token.value === '{'
+		);
+		assert.ok(open >= 0, 'the definition anchor is an actual lexical body');
+		let depth = 0;
+		for (let at = open; at < tokens.length; at++) {
+			if (tokens[at].kind !== 'symbol') continue;
+			if (tokens[at].value === '{') depth++;
+			if (tokens[at].value === '}' && --depth === 0) return text.slice(start, tokens[at].end);
+		}
+		assert.fail('the actual definition must have a complete body');
+	}
+	function sourceMutation(text, original, replacement) {
+		assert.equal(text.split(original).length - 1, 1, 'the actual mutation anchor is unique');
+		const at = text.indexOf(original);
+		const changed = text.slice(0, at) + replacement + text.slice(at + original.length);
+		const repaired = changed.slice(0, at) + original + changed.slice(at + replacement.length);
+		assert.notEqual(changed, text, 'the mutation is not vacuous');
+		assert.equal(repaired, text, 'the exact original source inverse is byte-equivalent');
+		return { changed, repaired };
+	}
+	const receiverDefinition = actualDefinition(renderer, receiverHeader);
+	const builderDefinition = actualDefinition(source, builderHeader);
+	const quotedReceiver =
+		'"' +
+		receiverDefinition.replaceAll('`', '``').replaceAll('"', '`"').replaceAll('\n', '`n') +
+		'"';
+	for (const [key, port] of [
+		['agent_disabled_apps', 1],
+		['agent_disabled_apps_count', 2]
+	]) {
+		const credits = (candidate, declarations = manifest, inputPort = port, receiving = renderer) =>
+			nativeBuildCommandBinding(
+				candidate,
+				'LLM_Agent_MenuBuild',
+				apps,
+				key,
+				inputPort,
+				[{ src: candidate }, { src: receiving }],
+				declarations
+			);
+		assert.equal(
+			credits(source),
+			true,
+			port === 1 ? 'actual picker callback binding' : 'actual native count binding'
+		);
+		for (const [candidate, reason] of [
+			[swapped, 'actual command/state Build arguments exchanged'],
+			[source.replaceAll(key, 'withdrawn_' + key), 'withdrawn actual registration'],
+			[
+				source.replaceAll('MenuRenderer_Build', 'Foreign.MenuRenderer_Build'),
+				'foreign receiving owner'
+			],
+			[
+				source
+					.replace('return MenuRenderer_Build', 'if false { return MenuRenderer_Build')
+					.replace(
+						'"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount))',
+						'"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount)) }'
+					),
+				'dead nested Build'
+			],
+			[source.replace('LLM_Agent_MenuBuild()', 'Unused_Agent_MenuBuild()'), 'unowned builder'],
+			[JSON.stringify(source), 'source as data'],
+			[
+				source
+					.split('\n')
+					.map((line) => '; ' + line)
+					.join('\n'),
+				'comment witness'
+			]
+		])
+			assert.equal(credits(candidate), false, reason + ': no actual main-menu port credit');
+		assert.equal(
+			credits(source, manifest, port === 1 ? 2 : 1),
+			false,
+			'command and state ports cannot exchange roles'
+		);
+		const withdrawn = structuredClone(manifest);
+		delete withdrawn[apps];
+		assert.equal(credits(source, withdrawn), false, 'withdrawn sole declaration refuses');
+		const duplicate = structuredClone(manifest);
+		duplicate[apps].push({ ...appsCommand });
+		assert.equal(credits(source, duplicate), false, 'duplicate visible command owner refuses');
+		for (const [replacement, reason] of [
+			[
+				receiverDefinition.replace(
+					receiverHeader,
+					receiverHeader.replace('MenuRenderer_Build(', 'WITHDRAWN_MenuRenderer_Build(')
+				),
+				'actual receiver definition withdrawn'
+			],
+			[receiverDefinition + '\n' + receiverDefinition, 'actual receiver definition duplicated'],
+			[
+				receiverDefinition
+					.split('\n')
+					.map((line) => '; ' + line)
+					.join('\n'),
+				'only a commented receiver declaration remains'
+			],
+			[quotedReceiver, 'only quoted receiver declaration data remains'],
+			[
+				'class Foreign {\n' + receiverDefinition + '\n}',
+				'only a foreign class member receiver remains'
+			]
+		]) {
+			const { changed, repaired } = sourceMutation(renderer, receiverDefinition, replacement);
+			assert.equal(
+				credits(source, manifest, port, changed),
+				false,
+				reason + ': no receiver credit'
+			);
+			assert.equal(
+				credits(source, manifest, port, repaired),
+				true,
+				reason + ': the same actual receiver definition repair restores credit'
+			);
+		}
+		for (const [original, replacement, reason] of [
+			[builderHeader, 'LLM_Agent_MenuBuild(ForeignContext) {', 'selected builder parameterized'],
+			[builderDefinition, 'if false {\n' + builderDefinition + '\n}', 'selected builder nested'],
+			[
+				builderDefinition,
+				builderDefinition + '\n' + builderDefinition,
+				'selected builder duplicated'
+			],
+			[port === 1 ? commands : states, '0', 'actual typed argument zeroed'],
+			[port === 1 ? commands : states, 'Map()', 'actual typed argument emptied'],
+			[port === 1 ? commands : states, 'UnownedRegistrationMap', 'actual typed argument unowned'],
+			[
+				port === 1 ? commands : states,
+				'Foreign.' + (port === 1 ? commands : states),
+				'actual typed Map constructor made foreign'
+			]
+		]) {
+			const { changed, repaired } = sourceMutation(source, original, replacement);
+			assert.equal(credits(changed), false, reason + ': no actual selected Build port credit');
+			assert.equal(
+				credits(repaired),
+				true,
+				reason + ': the same actual selected Build inverse restores credit'
+			);
+		}
+		assert.equal(
+			credits(source),
+			true,
+			'exact original source repair restores the same actual Build port'
+		);
+	}
 	console.log(
 		'Windows Agent: declared fixed provider captions retain 21 original locale projections and native ports.'
 	);

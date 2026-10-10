@@ -225,6 +225,128 @@ function ahkOwner(text, name) {
 	return match ? match[1].replace(/^\s*;.*$/gm, '') : '';
 }
 
+/** Finds one genuine top-level native definition, excluding data/member/nested decoys. */
+function ahkUniqueNativeOwner(text, name) {
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const tokens = scriptTokens(text, '.ahk');
+	const matches = [];
+	let depth = 0;
+	const symbol = (at, value) => tokens[at]?.kind === 'symbol' && tokens[at].value === value;
+	const close = (at, left, right) => {
+		let nested = 0;
+		for (let end = at; end < tokens.length; end++) {
+			if (symbol(end, left)) nested++;
+			if (symbol(end, right) && --nested === 0) return end;
+		}
+		return -1;
+	};
+	for (let at = 0; at < tokens.length; at++) {
+		const token = tokens[at];
+		if (symbol(at, '{')) depth++;
+		if (symbol(at, '}')) depth--;
+		if (
+			depth !== 0 ||
+			token.kind !== 'identifier' ||
+			token.value.toLowerCase() !== name.toLowerCase() ||
+			!symbol(at + 1, '(') ||
+			text.slice(text.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() !== ''
+		)
+			continue;
+		const parameters = close(at + 1, '(', ')');
+		if (parameters < 0 || !symbol(parameters + 1, '{')) continue;
+		const end = close(parameters + 1, '{', '}');
+		if (end < 0) continue;
+		matches.push({
+			all: tokens.slice(at, end + 1),
+			body: tokens.slice(parameters + 2, end),
+			header: tokens.slice(at, parameters + 2)
+		});
+	}
+	return matches.length === 1 ? matches[0] : false;
+}
+
+/** Compares typed executable tokens; AHK identifiers are case-insensitive, data is exact. */
+function ahkSameTokens(actual, expected) {
+	if (!actual || actual.length !== expected.length) return false;
+	return actual.every(
+		(token, index) =>
+			token.kind === expected[index].kind &&
+			(token.kind === 'identifier'
+				? token.value.toLowerCase() === expected[index].value.toLowerCase()
+				: token.value === expected[index].value)
+	);
+}
+
+const AHK_ORIGINAL_COMMAND_STATE_PREFIX = `
+	Row := _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters)
+	if !(Row is Map)
+		return 0
+`;
+const AHK_GUARDED_COMMAND_STATE_PREFIX = `
+	if !(Item is Map) || ObjGetBase(Item) != Map.Prototype
+		return 0
+	for Name in ObjOwnProps(Item)
+		return 0
+	Cohort := false, Getters := StateGetters
+	if Item.Has("caption_format") {
+		if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCohort, "Call")
+			return 0
+		Cohort := _MR_NumberedCommandCohort(Item, ManifestKey, Commands, StateGetters)
+		if !Cohort
+			return 0
+		Getters := Map()
+		for Key, Getter in StateGetters {
+			if !_MR_DeclaredParentCallable(Getter)
+				return 0
+			Getters[Key] := _MR_ReadNumberedCommandState.Bind(Cohort, Getter)
+		}
+	}
+	Row := _MR_CommandRowData(Item, ManifestKey, Commands, Getters)
+	if !(Row is Map)
+		return 0
+	if Cohort && (Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort))
+		return 0
+`;
+const AHK_GUARDED_COMMAND_STATE_READER = `
+_MR_ReadNumberedCommandState(Cohort, Getter) {
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner was withdrawn before its state read.")
+	Value := Getter.Call()
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner changed during its state read.")
+	return Value
+}
+`;
+
+/** Binds the actual command-data input to direct getters or the complete guarded wrapper route. */
+function ahkCommandStateRoute(text) {
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const render = ahkUniqueNativeOwner(text, '_MR_RenderCommand');
+	if (!render) return false;
+	const original = scriptTokens(AHK_ORIGINAL_COMMAND_STATE_PREFIX, '.ahk');
+	if (ahkSameTokens(render.body.slice(0, original.length), original)) return true;
+	const guarded = scriptTokens(AHK_GUARDED_COMMAND_STATE_PREFIX, '.ahk');
+	if (!ahkSameTokens(render.body.slice(0, guarded.length), guarded)) return false;
+	const reader = ahkUniqueNativeOwner(text, '_MR_ReadNumberedCommandState');
+	if (!reader || !ahkSameTokens(reader.all, scriptTokens(AHK_GUARDED_COMMAND_STATE_READER, '.ahk')))
+		return false;
+	for (const header of [
+		'_MR_NumberedCommandCohort(Item, ManifestKey, Commands, Getters) {',
+		'_MR_NumberedCommandCurrent(Cohort) {',
+		'_MR_DeclaredParentCallable(Owner) {'
+	]) {
+		const name = header.slice(0, header.indexOf('('));
+		const owner = ahkUniqueNativeOwner(text, name);
+		if (
+			!owner ||
+			owner.body.length === 0 ||
+			!ahkSameTokens(owner.header, scriptTokens(header, '.ahk'))
+		)
+			return false;
+	}
+	return true;
+}
+
 /**
  * The command-data owner passes the disabled reason to the original inert owner.
  * Provider data is not asserted to render reasons by itself: this checks only
@@ -242,7 +364,7 @@ function ahkDisabledReasonStandIn(text) {
 		/if Disabled && ReasonKey != ""\s+return Map\("label", t\(I18nKey\), "disabled", true, "disabled_reason_key", ReasonKey\)/.test(
 			data
 		) &&
-		/Row := _MR_CommandRowData\(Item, ManifestKey, Commands, StateGetters\)/.test(render) &&
+		ahkCommandStateRoute(text) &&
 		/if !\(Row is Map\)\s+return 0/.test(render) &&
 		/if Row\.Has\("disabled_reason_key"\)\s+return _MR_RenderGreyedStandIn\(ResultMenu,\s*Map\("id", _MR_Get\(Item, "id"\), "i18n", _MR_Get\(Item, "i18n"\),\s*"reason_key", Row\["disabled_reason_key"\]\), ManifestKey\)/.test(
 			render
@@ -296,6 +418,162 @@ for (const [before, after] of [
 	assert.equal(ahkDisabledReasonStandIn(AHK_STAND_IN_FIXTURE.replace(before, after)), false);
 }
 
+// The original subject remains exact; this additional literal subject exercises guarded forwarding.
+const AHK_GUARDED_COMMAND_STATE_OWNERS = `
+_MR_NumberedCommandCohort(Item, ManifestKey, Commands, Getters) {
+	Owners := [_MR_GetManifestRoot, _MR_GetMenuDef, _MR_FindItemById, _MR_ReasonedGroupSnapshot,
+		_MR_ReasonedGroupCurrent, _MR_FrameReceiptCallablesCurrent, _MR_DeclaredParentCallable,
+		_MR_CommandRowData, _MR_ReadNumberedCaption, _MR_RenderRows, _MR_NumberedCommandCurrent,
+		_MR_ReadNumberedCommandState, _MR_RenderCommand, _MR_NumberedCommandCohort,
+		_MM_GetManifestRoot, _MR_Get, _MR_IsForAhk, _MR_IsForPlatform]
+	for Owner in Owners
+		if !(Owner is Func || Owner is BoundFunc) || Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	if !(Item is Map) || !(Commands is Map) || !(Getters is Map)
+		return false
+	Root := _MR_GetManifestRoot()
+	if !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	Rows := _MR_GetMenuDef(ManifestKey)
+	Source := _MR_ReasonedGroupSnapshot(Rows), CommandPorts := _MR_ReasonedGroupSnapshot(Commands)
+	StatePorts := _MR_ReasonedGroupSnapshot(Getters)
+	if !Source || !CommandPorts || !StatePorts
+		return false
+	Cohort := Map("root", Root, "key", ManifestKey, "rows", Rows, "item", Item,
+		"id", _MR_Get(Item, "id"), "source", Source, "commands", CommandPorts,
+		"states", StatePorts, "owners", Owners, "getters", Getters)
+	return _MR_NumberedCommandCurrent(Cohort) ? Cohort : false
+}
+_MR_NumberedCommandCurrent(Cohort) {
+	CurrentOwners := [_MR_GetManifestRoot, _MR_GetMenuDef, _MR_FindItemById, _MR_ReasonedGroupSnapshot,
+		_MR_ReasonedGroupCurrent, _MR_FrameReceiptCallablesCurrent, _MR_DeclaredParentCallable,
+		_MR_CommandRowData, _MR_ReadNumberedCaption, _MR_RenderRows, _MR_NumberedCommandCurrent,
+		_MR_ReadNumberedCommandState, _MR_RenderCommand, _MR_NumberedCommandCohort,
+		_MM_GetManifestRoot, _MR_Get, _MR_IsForAhk, _MR_IsForPlatform]
+	for Index, Owner in Cohort["owners"]
+		if Owner != CurrentOwners[Index] || !(Owner is Func || Owner is BoundFunc)
+			|| Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	Root := Cohort["root"]
+	if ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	for Receipt in [Cohort["source"], Cohort["commands"], Cohort["states"]]
+		if !_MR_ReasonedGroupCurrent(Receipt) || !_MR_FrameReceiptCallablesCurrent(Receipt)
+			return false
+	if _MR_GetManifestRoot() != Root || !Root.Has(Cohort["key"]) || Root[Cohort["key"]] != Cohort["rows"]
+		|| _MR_FindItemById(Cohort["key"], Cohort["id"]) != Cohort["item"]
+		return false
+	return true
+}
+_MR_ReadNumberedCommandState(Cohort, Getter) {
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner was withdrawn before its state read.")
+	Value := Getter.Call()
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner changed during its state read.")
+	return Value
+}
+_MR_DeclaredParentCallable(Owner) {
+	return (Owner is Func || Owner is BoundFunc)
+		&& !Object.Prototype.HasOwnProp.Call(Owner, "Call")
+}
+`;
+const AHK_GUARDED_STAND_IN_FIXTURE =
+	AHK_STAND_IN_FIXTURE.replace(
+		AHK_ORIGINAL_COMMAND_STATE_PREFIX.trim(),
+		AHK_GUARDED_COMMAND_STATE_PREFIX.trim()
+	) + AHK_GUARDED_COMMAND_STATE_OWNERS;
+assert.notEqual(AHK_GUARDED_STAND_IN_FIXTURE, AHK_STAND_IN_FIXTURE);
+assert.equal(ahkDisabledReasonStandIn(AHK_GUARDED_STAND_IN_FIXTURE), true);
+for (const [before, after] of [
+	['Getters := StateGetters', 'Getters := ForeignGetters'],
+	[
+		'Cohort := _MR_NumberedCommandCohort(Item, ManifestKey, Commands, StateGetters)',
+		'Cohort := _MR_NumberedCommandCohort(Item, ManifestKey, ForeignCommands, StateGetters)'
+	],
+	['Getters := Map()', 'Getters := ForeignMap()'],
+	['if !_MR_DeclaredParentCallable(Getter)', 'if false'],
+	[
+		'if Cohort && (Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort))',
+		'if false'
+	],
+
+	['for Key, Getter in StateGetters', 'for Key, Getter in ForeignGetters'],
+	[
+		'Getters[Key] := _MR_ReadNumberedCommandState.Bind(Cohort, Getter)',
+		'Getters[Key] := _MR_ReadNumberedCommandState.Bind(Cohort, ForeignGetter)'
+	],
+	[
+		'Row := _MR_CommandRowData(Item, ManifestKey, Commands, Getters)',
+		'Row := _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters)'
+	],
+	['Value := Getter.Call()', 'Value := ForeignGetter.Call()'],
+	['Value := Getter.Call()', 'Value := false'],
+	[
+		'if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)\n\t\tthrow Error("The numbered command owner changed during its state read.")',
+		'if false\n\t\tthrow Error("The numbered command owner changed during its state read.")'
+	],
+	['return Value', 'return ForeignValue'],
+	[
+		'_MR_NumberedCommandCohort(Item, ManifestKey, Commands, Getters) {',
+		'WithdrawnCohort(Item, ManifestKey, Commands, Getters) {'
+	],
+	['_MR_NumberedCommandCurrent(Cohort) {', 'WithdrawnCurrent(Cohort) {'],
+	['ResultMenu.Add(Label, (*) => "")', 'ResultMenu.Add(Label, Action)'],
+	['ResultMenu.Disable(Label)', 'ResultMenu.Enable(Label)']
+]) {
+	assert.equal(
+		AHK_GUARDED_STAND_IN_FIXTURE.split(before).length - 1,
+		1,
+		'the guarded control has one genuine source preimage'
+	);
+	const at = AHK_GUARDED_STAND_IN_FIXTURE.indexOf(before);
+	const changed =
+		AHK_GUARDED_STAND_IN_FIXTURE.slice(0, at) +
+		after +
+		AHK_GUARDED_STAND_IN_FIXTURE.slice(at + before.length);
+	const repaired = changed.slice(0, at) + before + changed.slice(at + after.length);
+	assert.notEqual(changed, AHK_GUARDED_STAND_IN_FIXTURE);
+	assert.equal(ahkDisabledReasonStandIn(changed), false, 'withdrawn actual guarded route refuses');
+	assert.equal(
+		repaired,
+		AHK_GUARDED_STAND_IN_FIXTURE,
+		'the original guarded source inverse is exact'
+	);
+	assert.equal(ahkDisabledReasonStandIn(repaired), true, 'the same original guarded route repairs');
+}
+
+// A duplicate or a comment/data/nested substitute cannot supply the genuine reader.
+{
+	const reader = AHK_GUARDED_COMMAND_STATE_READER.trim();
+	assert.equal(AHK_GUARDED_STAND_IN_FIXTURE.split(reader).length - 1, 1);
+	const at = AHK_GUARDED_STAND_IN_FIXTURE.indexOf(reader);
+	for (const replacement of [
+		'',
+		reader + '\n' + reader,
+		reader
+			.split('\n')
+			.map((line) => '; ' + line)
+			.join('\n'),
+		'QuotedReader := "' + reader.replace(/`/g, '``').replace(/"/g, '`"').replace(/\n/g, '`n') + '"',
+		'UnrelatedOwner() {\n' + reader + '\n}'
+	]) {
+		const changed =
+			AHK_GUARDED_STAND_IN_FIXTURE.slice(0, at) +
+			replacement +
+			AHK_GUARDED_STAND_IN_FIXTURE.slice(at + reader.length);
+		const repaired = changed.slice(0, at) + reader + changed.slice(at + replacement.length);
+		assert.notEqual(changed, AHK_GUARDED_STAND_IN_FIXTURE);
+		assert.equal(ahkDisabledReasonStandIn(changed), false);
+		assert.equal(repaired, AHK_GUARDED_STAND_IN_FIXTURE);
+		assert.equal(ahkDisabledReasonStandIn(repaired), true);
+	}
+}
+
 // One stand-in for both conditions: each full renderer draws the row its
 // disabled_when greys through the same native stand-in as an unavailable row.
 const STAND_IN = {
@@ -305,6 +583,31 @@ const STAND_IN = {
 };
 for (const file of RENDERERS) {
 	const text = fs.readFileSync(file, 'utf8');
+	if (path.basename(file) === 'manifest_menu.ahk') {
+		const owner = ahkUniqueNativeOwner(text, '_MR_RenderGreyedStandIn');
+		assert.ok(owner, 'the actual native stand-in has one genuine owner');
+		const first = owner.all[0].start;
+		const last = owner.all[owner.all.length - 1].end;
+		const actual = text.slice(first, last);
+		const before = 'ResultMenu.Add(Label, (*) => "")';
+		const after = 'ResultMenu.Add(Label, Action)';
+		assert.equal(
+			actual.split(before).length - 1,
+			1,
+			'the real stand-in has one original inert callback boundary'
+		);
+		const at = first + actual.indexOf(before);
+		const changed = text.slice(0, at) + after + text.slice(at + before.length);
+		const repaired = changed.slice(0, at) + before + changed.slice(at + after.length);
+		assert.notEqual(changed, text);
+		assert.equal(
+			ahkDisabledReasonStandIn(changed),
+			false,
+			'an actual native stand-in callback regression still refuses'
+		);
+		assert.equal(repaired, text, 'the real stand-in callback inverse restores every byte');
+		assert.equal(ahkDisabledReasonStandIn(repaired), true);
+	}
 	if (!/unavailable/.test(text) || !/"grey"/.test(text))
 		errors.push(`${path.relative(ROOT, file)} does not draw a greyed stand-in.`);
 	if (!STAND_IN[path.basename(file)](text))
