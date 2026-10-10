@@ -3813,6 +3813,22 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-10 first Homebrew timeout diagnostic continuation. The helper retains
+the first typed command timeout in subsequent checkpoints, including after the
+256-record history cap and final cleanup. Fixed command/stage enums distinguish
+the requester, its owned consent observer and other commands; original wait
+budgets and proven request deadlines are observed without changing scheduling.
+Raw arguments, paths and exception payloads are excluded. The original timeout
+error and reservation retirement remain unchanged. All178 predecessor test
+bodies are preserved with twelve additional portable controls. The causal control
+fails on the predecessor at the missing final timeout observation and passes
+on the candidate. All190 portable controls and the owning Homebrew checks pass.
+The new missing-capability control proves the actual no-follow refusal before
+child acquisition; incapable-host positive publication remains explicitly
+UNEXECUTED. Selected formatting passes; JS402/406 retains the same four
+failures as the executed baseline. Native qualification remains pending;
+this diagnostic does not grant consent, qualify Brew6 or complete item36.
+
 2026-10-10 Homebrew unrelated-window scope continuation. The observer now
 excludes only a completely inspected, bounded window of the expected OS-agent
 PID with neither owned sender nor receiver identity. Partial identities,
