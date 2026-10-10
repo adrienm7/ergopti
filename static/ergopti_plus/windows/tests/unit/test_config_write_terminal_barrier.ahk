@@ -190,6 +190,145 @@ _CWTB_PublicTableReplacementCannotForgeIssuance() {
 }
 Test("config lease: replacing the public owner table cannot manufacture private issuance", _CWTB_PublicTableReplacementCannotForgeIssuance)
 
+_CWTB_GenuineOwnerGetter(Name, Terminal := false, BundleField := false) {
+	global ConfigurationFile
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Hits := { count: 0 }, Publication := { build: 0, publish: 0, runtime: "@" }
+	Issued := 0, Owner := 0
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Issued := Terminal ? _ConfigWriteTerminalTryAcquire([Path]) : _ConfigWriteLeaseTryAcquire(Path, "genuine getter subject")
+		AssertTrue(Issued is Object, "the actual native issuer creates the subject")
+		Token := Terminal ? Issued.tokens[1] : Issued
+		Owner := BundleField ? Issued : Token
+		Descriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
+		Original := Descriptor.Value
+		Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
+		AssertFalse(_ConfigWriteLeaseOwns(Token, Path), "an original issued object with a getter is no longer pure authority")
+		AssertFalse(FSNativeAcknowledge(() => _ConfigWriteLeaseOwns(Token, Path)),
+			"the actual native final noop invokes no public owner getter")
+		if Terminal
+			AssertFalse(_ConfigWriteTerminalOwnsExact(Issued, Path))
+		AssertFalse(_CMJ_PurityNativeGateway(Path, Publication, Issued),
+			"the actual borrowed gateway refuses before candidate construction/runtime publication")
+		AssertEqual(0, Hits.count, "no getter executes before exact private owner refusal")
+		AssertEqual(0, Publication.build), AssertEqual(0, Publication.publish), AssertEqual("@", Publication.runtime)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		Owner.DefineProp(Name, Descriptor)
+		AssertTrue(_ConfigWriteLeaseOwns(Token, Path), "exact original data-descriptor repair restores the genuine lease")
+		AssertTrue(FSNativeAcknowledge(() => _ConfigWriteLeaseOwns(Token, Path)))
+		AssertTrue(_CMJ_PurityNativeGateway(Path, Publication, Issued), "the same actual borrowed default native writer remains live after repair")
+		AssertEqual(1, Publication.build), AssertEqual(1, Publication.publish), AssertEqual("!", Publication.runtime)
+		AssertEqual("!", TOML_ParseDocument(FSReadUtf8Exact(Path))["hotstrings"]["trigger_char"])
+		AssertEqual(0, Hits.count)
+	} finally {
+		if Owner is Object
+			Owner.DefineProp(Name, Descriptor)
+		if Issued is Object {
+			if Terminal
+				AssertTrue(_ConfigWriteTerminalRelease(Issued))
+			else
+				AssertTrue(_ConfigWriteLeaseRelease(Issued))
+		}
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+for Name in ["key", "id", "kind"] {
+	Test("config lease: actual ordinary token data getter refuses without invocation " . Name,
+		_CWTB_GenuineOwnerGetter.Bind(Name))
+	Test("config lease: actual terminal token data getter refuses without invocation " . Name,
+		_CWTB_GenuineOwnerGetter.Bind(Name, true))
+}
+for Name in ["id", "kind", "tokens", "authorized", "shutdown_claimed"]
+	Test("config lease: actual terminal bundle data getter refuses without invocation " . Name,
+		_CWTB_GenuineOwnerGetter.Bind(Name, true, true))
+
+_CWTB_GenuineTokenArrayObserver(Name) {
+	Path := "C:\ergopti-tests\actual-array-observer\config.toml"
+	Bundle := _ConfigWriteTerminalTryAcquire([Path])
+	AssertTrue(Bundle is Object)
+	Tokens := Bundle.tokens, Hits := { count: 0 }
+	try {
+		if Name == "__Enum"
+			Tokens.DefineProp(Name, { Call: (This, Arity) =>
+				(Hits.count += 1, Array.Prototype.__Enum.Call(This, Arity)) })
+		else {
+			Length := Tokens.Length
+			Tokens.DefineProp(Name, { Get: (*) => (Hits.count += 1, Length) })
+		}
+		AssertFalse(_ConfigWriteTerminalOwnsExact(Bundle, Path))
+		AssertFalse(FSNativeAcknowledge(() => _ConfigWriteTerminalOwnsExact(Bundle, Path)))
+		AssertEqual(0, Hits.count, "the genuine issued token array cannot run public iterator/length observers")
+		Tokens.DeleteProp(Name)
+		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path), "the same original array remains usable after exact repair")
+		AssertTrue(FSNativeAcknowledge(() => _ConfigWriteTerminalOwnsExact(Bundle, Path)))
+		AssertEqual(0, Hits.count)
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(Tokens, Name)
+			Tokens.DeleteProp(Name)
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+	}
+}
+for Name in ["__Enum", "Length"]
+	Test("config lease: genuine token array observer cannot run inside final native guard " . Name,
+		_CWTB_GenuineTokenArrayObserver.Bind(Name))
+
+_CWTB_RetiredOriginalCannotResurrect(Terminal := false) {
+	global ConfigurationFile
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Publication := { build: 0, publish: 0, runtime: "@" }, Issued := 0
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Issued := Terminal ? _ConfigWriteTerminalTryAcquire([Path]) : _ConfigWriteLeaseTryAcquire(Path, "retirement subject")
+		AssertTrue(Issued is Object)
+		Token := Terminal ? Issued.tokens[1] : Issued, Key := Token.key
+		State := _ConfigWriteLeaseState()
+		AssertTrue(Terminal ? _ConfigWriteTerminalRelease(Issued) : _ConfigWriteLeaseRelease(Issued),
+			"actual native release must retire its private issuance")
+		State.owners[Key] := Token
+		if Terminal
+			State.terminal := Issued
+		AssertFalse(_ConfigWriteLeaseOwns(Token, Path), "reinserting the SAME retired original cannot resurrect private issuance")
+		AssertFalse(FSNativeAcknowledge(() => _ConfigWriteLeaseOwns(Token, Path)))
+		AssertFalse(_CMJ_PurityNativeGateway(Path, Publication, Issued), "retired originals refuse the actual borrowed native writer")
+		AssertEqual(0, Publication.build), AssertEqual(0, Publication.publish), AssertEqual("@", Publication.runtime)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		if Terminal {
+			AssertFalse(_ConfigWriteTerminalOwnsExact(Issued, Path))
+			AssertFalse(_ConfigWriteTerminalAuthorize(Issued)), AssertFalse(_ConfigWriteTerminalClaimShutdown(Issued))
+			State.terminal := false
+		}
+		State.owners.Delete(Key)
+		Fresh := _ConfigWriteLeaseTryAcquire(Path, "genuine successor after retired original")
+		AssertTrue(Fresh is Object), AssertFalse(Fresh == Token)
+		try {
+			AssertTrue(_ConfigWriteLeaseOwns(Fresh, Path))
+			AssertTrue(_CMJ_PurityNativeGateway(Path, Publication, Fresh), "a genuinely new issuance remains usable after exact cleanup")
+			AssertEqual(1, Publication.publish), AssertEqual("!", Publication.runtime)
+		} finally AssertTrue(_ConfigWriteLeaseRelease(Fresh))
+	} finally {
+		if IsSet(State) && IsSet(Key) {
+			if State.owners.Has(Key) && State.owners[Key] == Token
+				State.owners.Delete(Key)
+			if Terminal && State.terminal == Issued
+				State.terminal := false
+		}
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config lease: reinserting the same retired ordinary original never resurrects authority",
+	_CWTB_RetiredOriginalCannotResurrect)
+Test("config lease: reinserting the same retired terminal original never resurrects authority",
+	_CWTB_RetiredOriginalCannotResurrect.Bind(true))
+
 _CWTB_PublicWithdrawalDoesNotRetireActualIssuer(Terminal := false) {
 	Path := "C:\ergopti-tests\actual-retained-issuer\config.toml"
 	Sibling := "C:\ergopti-tests\actual-retained-issuer\sibling.toml"

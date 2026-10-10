@@ -1130,7 +1130,7 @@ _ConfigTransitionApplyPreflight(Record, Port) {
 ; @param Port {Map} Validated adapter map.
 ; @param Side {String} old or new.
 ; @return {Map} Typed result containing an ordered plan.
-_ConfigTransitionBuildRealizePlan(Record, Port, Side) {
+_ConfigTransitionBuildRealizePlan(Record, Port, Side, NoopFn := 0, PauseFn := 0) {
 	Plan := []
 	for Index, Target in Record["targets"] {
 		SnapshotResult := _ConfigTransitionReadSnapshot(Port, Target["path"])
@@ -1147,8 +1147,13 @@ _ConfigTransitionBuildRealizePlan(Record, Port, Side) {
 				Record)
 		}
 		DesiredMatch := (Side == "old") ? OldMatch : NewMatch
-		if DesiredMatch
+		if DesiredMatch {
+			if HasMethod(NoopFn, "Call")
+				_ConfigTransitionPause(PauseFn, "noop:" . Side . ":" . Index)
+			if !_ConfigTransitionAcknowledgeNoop(NoopFn, Target["path"], Snapshot["content"], Snapshot["present"])
+				return _ConfigTransitionResult("retry", "target_noop_admission_refused")
 			continue
+		}
 		DesiredPresent := Target[Side . "_present"]
 		Content := ""
 		if DesiredPresent {
@@ -1173,7 +1178,7 @@ _ConfigTransitionBuildRealizePlan(Record, Port, Side) {
 ; @param Plan {Array} Ordered plan from _ConfigTransitionBuildRealizePlan.
 ; @param PauseFn {Callable|0} Optional crash seam.
 ; @return {Map} Typed realization result.
-_ConfigTransitionExecuteRealizePlan(Record, Port, Side, Plan, PauseFn) {
+_ConfigTransitionExecuteRealizePlan(Record, Port, Side, Plan, PauseFn, NoopFn := 0) {
 	for Entry in Plan {
 		Index := Entry["index"]
 		Target := Record["targets"][Index]
@@ -1191,8 +1196,13 @@ _ConfigTransitionExecuteRealizePlan(Record, Port, Side, Plan, PauseFn) {
 				. Target["path"] . "'.", Record)
 		}
 		DesiredMatch := (Side == "old") ? OldMatch : NewMatch
-		if DesiredMatch
+		if DesiredMatch {
+			if HasMethod(NoopFn, "Call")
+				_ConfigTransitionPause(PauseFn, "noop:" . Side . ":" . Index)
+			if !_ConfigTransitionAcknowledgeNoop(NoopFn, Target["path"], Snapshot["content"], Snapshot["present"])
+				return _ConfigTransitionResult("retry", "target_noop_admission_refused")
 			continue
+		}
 		if Target[Side . "_present"] {
 			Result := _ConfigTransitionReplaceTarget(Port, Target, Record,
 				Side, Entry["content"])
@@ -1244,7 +1254,7 @@ _ConfigTransitionVerifySide(Record, Port, Side) {
 ; @param Port {Map} Injected filesystem and hash adapters.
 ; @param PauseFn {Callable|0} Optional crash seam.
 ; @return {Map} Typed committed-new result.
-ConfigTransitionApply(PathsFile, Port, PauseFn := 0) {
+ConfigTransitionApply(PathsFile, Port, PauseFn := 0, NoopFn := 0) {
 	Port := _ConfigTransitionResolvePort(Port)
 	if !(Port is Map)
 		return _ConfigTransitionResult("fatal", "invalid_arguments")
@@ -1274,11 +1284,11 @@ ConfigTransitionApply(PathsFile, Port, PauseFn := 0) {
 	if PhaseResult["status"] !== "ok"
 		return PhaseResult
 	_ConfigTransitionPause(PauseFn, "phase:applying")
-	PlanResult := _ConfigTransitionBuildRealizePlan(ApplyingRecord, Port, "new")
+	PlanResult := _ConfigTransitionBuildRealizePlan(ApplyingRecord, Port, "new", NoopFn, PauseFn)
 	if PlanResult["status"] !== "ok"
 		return PlanResult
 	RealizeResult := _ConfigTransitionExecuteRealizePlan(ApplyingRecord, Port,
-		"new", PlanResult["plan"], PauseFn)
+		"new", PlanResult["plan"], PauseFn, NoopFn)
 	if RealizeResult["status"] !== "ok"
 		return RealizeResult
 	VerifyResult := _ConfigTransitionVerifySide(ApplyingRecord, Port, "new")
@@ -1463,7 +1473,7 @@ _ConfigTransitionCleanup(PathsFile, Record, Port) {
 ; @param Port {Map} Injected filesystem and hash adapters.
 ; @param PauseFn {Callable|0} Optional crash seam.
 ; @return {Map} Typed absent, recovered, quarantine, retry, or fatal result.
-ConfigTransitionRecover(PathsFile, Port, PauseFn := 0) {
+ConfigTransitionRecover(PathsFile, Port, PauseFn := 0, NoopFn := 0) {
 	Port := _ConfigTransitionResolvePort(Port)
 	if !(Port is Map)
 		return _ConfigTransitionResult("fatal", "invalid_arguments")
@@ -1477,7 +1487,7 @@ ConfigTransitionRecover(PathsFile, Port, PauseFn := 0) {
 		Record, Port)
 	if NamespaceResult["status"] !== "ok"
 		return NamespaceResult
-	PlanResult := _ConfigTransitionBuildRealizePlan(Record, Port, Side)
+	PlanResult := _ConfigTransitionBuildRealizePlan(Record, Port, Side, NoopFn, PauseFn)
 	if PlanResult["status"] !== "ok"
 		return PlanResult
 	DiscardResult := _ConfigTransitionDiscardInterruptedTemps(
@@ -1485,7 +1495,7 @@ ConfigTransitionRecover(PathsFile, Port, PauseFn := 0) {
 	if DiscardResult["status"] !== "ok"
 		return DiscardResult
 	RealizeResult := _ConfigTransitionExecuteRealizePlan(Record, Port, Side,
-		PlanResult["plan"], PauseFn)
+		PlanResult["plan"], PauseFn, NoopFn)
 	if RealizeResult["status"] !== "ok"
 		return RealizeResult
 	VerifyResult := _ConfigTransitionVerifySide(Record, Port, Side)
@@ -1503,4 +1513,20 @@ ConfigTransitionRecover(PathsFile, Port, PauseFn := 0) {
 	if CleanupResult["status"] !== "ok"
 		return CleanupResult
 	return _ConfigTransitionResult("ok", "recovered_" . Side, "", Record)
+}
+
+
+; Generic portable callers keep their original contract. Production runtime
+; supplies its native source-bound acknowledgement; a truthy string is refused.
+_ConfigTransitionAcknowledgeNoop(NoopFn, Path, Content, Present) {
+	if (NoopFn is Integer) && NoopFn == 0
+		return true
+	if !HasMethod(NoopFn, "Call")
+		return false
+	try {
+		Result := NoopFn.Call(Path, Content, Present)
+		return (Result is Integer) && Result == 1
+	} catch {
+		return false
+	}
 }
