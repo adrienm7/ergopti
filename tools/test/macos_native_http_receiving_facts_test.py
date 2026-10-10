@@ -566,6 +566,28 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
         self.assertIs(refusal.exception, primary)
 
     def test07bRestorationProducerPreservesActualJSONResponseStream(self):
+        # A separate producer channel is ineffective if the native parent discards it.
+        swift = (
+            ROOT
+            / "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWireTests.swift"
+        ).read_text(encoding="utf-8")
+        active = re.sub(r"//[^\n]*|/\*[\s\S]*?\*/", "", swift)
+        startup = re.search(
+            r"final class ManagedWireFixture \{([\s\S]*?)try process\.run\(\)", active
+        )
+        self.assertIsNotNone(startup, "The actual Swift fixture startup must be inspected")
+        assignments = re.findall(
+            r"process\.(standard(?:Input|Output|Error))\s*=\s*([^\n]+)", startup.group(1)
+        )
+        self.assertEqual(
+            assignments,
+            [
+                ("standardInput", "input"),
+                ("standardOutput", "output"),
+                ("standardError", "FileHandle.standardError"),
+            ],
+            "The XCTest parent must retain diagnostics separately from fixture JSON replies",
+        )
         owner = WIRE.WireFixture.__new__(WIRE.WireFixture)
         for operation, fact, expected in (
             (
