@@ -4451,8 +4451,29 @@ const LINUX_SIMULTANEOUS_ENVELOPE = [
 	'CUSTODY=$?',
 	'fi',
 	'if [ "${CUSTODY}" = "0" ]; then',
+	'if [ "${GITHUB_ACTIONS:-}" = true ]; then',
+	'mode=full',
+	'if [ -z "${RUNNER_TEMP:-}" ]; then CUSTODY=2; fi',
+	'receipt="${RUNNER_TEMP:-}/stable-linux-simultaneous-native.json"',
+	'if [ "$CUSTODY" = "0" ]; then',
+	'node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt "$receipt" || CUSTODY=$?',
+	'fi',
+	'if [ "$CUSTODY" = "0" ]; then',
+	'mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --validate-scope-receipt "$receipt")" || CUSTODY=$?',
+	'fi',
+	'else',
+	'mode=full',
+	'fi',
+	'if [ "$CUSTODY" != "0" ]; then',
+	': # The existing owned-host failure enclosure below performs cleanup.',
+	'elif [ "$mode" = deferred ]; then',
+	"echo '[DEFERRED] linux-simultaneous-native: qualified=false; saved-configuration supplement not executed.'",
+	'elif [ "$mode" = full ]; then',
 	LINUX_SIMULTANEOUS_COMMAND,
 	'CUSTODY=$?',
+	'else',
+	'CUSTODY=2',
+	'fi',
 	'fi',
 	'if [ "${CUSTODY}" != "0" ]; then',
 	'kill ${PIDS} 2>/dev/null',
@@ -4461,7 +4482,25 @@ const LINUX_SIMULTANEOUS_ENVELOPE = [
 ];
 
 const LINUX_SIMULTANEOUS_STEP = 'The whole daemon, live — a trigger typed, a tray shown';
-const LINUX_SIMULTANEOUS_ENTRY = `sudo bash ${LINUX_SIMULTANEOUS_HARNESS}`;
+const LINUX_SIMULTANEOUS_ENTRY = `bash ${LINUX_SIMULTANEOUS_HARNESS}`;
+const LINUX_SIMULTANEOUS_NATIVE_WORKFLOW = [
+	'sudo modprobe uinput',
+	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\',
+	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv',
+	'sudo env \\',
+	'  GITHUB_ACTIONS="$GITHUB_ACTIONS" \\',
+	'  GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \\',
+	'  GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" \\',
+	'  GITHUB_REF="$GITHUB_REF" \\',
+	'  GITHUB_SHA="$GITHUB_SHA" \\',
+	'  RUNNER_TEMP="$RUNNER_TEMP" \\',
+	'  ERGOPTI_DEV_RELEASE_RELEASE="$ERGOPTI_DEV_RELEASE_RELEASE" \\',
+	'  ERGOPTI_DEV_RELEASE_PRERELEASE="$ERGOPTI_DEV_RELEASE_PRERELEASE" \\',
+	'  ERGOPTI_DEV_RELEASE_CHANNEL="$ERGOPTI_DEV_RELEASE_CHANNEL" \\',
+	'  ERGOPTI_DEV_RELEASE_TAG="$ERGOPTI_DEV_RELEASE_TAG" \\',
+	'  ERGOPTI_DEV_RELEASE_VERSION="$ERGOPTI_DEV_RELEASE_VERSION" \\',
+	`  ${LINUX_SIMULTANEOUS_ENTRY}`
+];
 
 /** Binds the inspected harness to its mandatory existing native workflow call. */
 function linuxSimultaneousWorkflowProblems(files) {
@@ -4473,18 +4512,20 @@ function linuxSimultaneousWorkflowProblems(files) {
 		.filter((step) => step.name === LINUX_SIMULTANEOUS_STEP);
 	if (steps.length !== 1) return ['Linux needs exactly one whole-daemon native step'];
 	const step = steps[0];
-	const commands = logicalLines(step.body).filter((line) => line !== '');
-	const aptPrefix =
-		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends ';
+	let wrapperFits = true;
+	try {
+		require('./ci-linux-qualified-run.cjs').assertLinuxQualifiedRun(
+			(pipeline.runOf(step.body) ?? []).filter((line) => !line.trimStart().startsWith('#')),
+			LINUX_SIMULTANEOUS_NATIVE_WORKFLOW
+		);
+	} catch {
+		wrapperFits = false;
+	}
 	if (
 		pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
 		pipeline.stepField(step.body, 'timeout-minutes') !== '6' ||
 		pipeline.stepField(step.body, 'continue-on-error') !== null ||
-		commands.length !== 3 ||
-		commands[0] !== 'sudo modprobe uinput' ||
-		!commands[1].startsWith(aptPrefix) ||
-		!/^[a-z0-9.+-]+(?:\s+[a-z0-9.+-]+)*$/.test(commands[1].slice(aptPrefix.length)) ||
-		commands[2] !== LINUX_SIMULTANEOUS_ENTRY
+		!wrapperFits
 	) {
 		return [
 			'Linux whole-daemon enrollment must retain its prerequisites, exact call and failure budget'
@@ -4495,6 +4536,7 @@ function linuxSimultaneousWorkflowProblems(files) {
 
 errors.push(...linuxSimultaneousWorkflowProblems(pipeline.files()));
 const linuxSimultaneousStepBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_SIMULTANEOUS_STEP);
+let linuxSimultaneousWorkflowRefusals = 0;
 for (const [what, from, to] of [
 	['omitted live harness', LINUX_SIMULTANEOUS_ENTRY, 'true'],
 	['redirected live harness', LINUX_SIMULTANEOUS_ENTRY, `${LINUX_SIMULTANEOUS_ENTRY} --skip`],
@@ -4505,9 +4547,38 @@ for (const [what, from, to] of [
 		'forgiven live step',
 		'timeout-minutes: 6',
 		'timeout-minutes: 6\n        continue-on-error: true'
-	]
+	],
+	['missing native uinput prerequisite', 'sudo modprobe uinput', 'true'],
+	[
+		'missing native dependencies',
+		'--no-install-recommends at-spi2-core',
+		'--no-install-recommends'
+	],
+	['missing strict wrapper status', 'set -euo pipefail', 'set +e'],
+	[
+		'wrong workflow selection scope',
+		'--scope linux-e2e-suite --receipt',
+		'--scope linux-simultaneous-native --receipt'
+	],
+	[
+		'fabricated workflow disposition',
+		'mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"',
+		'mode=deferred'
+	],
+	['false workflow native credit', 'qualified=false', 'qualified=true'],
+	['workflow full branch disabled', 'elif [ "$mode" = full ]; then', 'elif false; then'],
+	['unknown workflow mode forgiven', 'exit 1', 'exit 0'],
+	['sudo environment omitted', 'sudo env \\', 'sudo \\'],
+	['sudo current source omitted', 'GITHUB_SHA="$GITHUB_SHA"', 'GITHUB_SHA=unbound'],
+	[
+		'sudo policy context omitted',
+		'ERGOPTI_DEV_RELEASE_VERSION="$ERGOPTI_DEV_RELEASE_VERSION"',
+		'ERGOPTI_DEV_RELEASE_VERSION=unbound'
+	],
+	['sudo receipt root omitted', 'RUNNER_TEMP="$RUNNER_TEMP"', 'RUNNER_TEMP=/unrelated']
 ]) {
 	assert.ok(linuxSimultaneousStepBody.includes(from), `${what}: causal preimage must exist`);
+	assert.equal(linuxSimultaneousStepBody.split(from).length, 2, `${what}: one step-local target`);
 	const changed = pipeline.files().map((entry) => ({
 		...entry,
 		text:
@@ -4519,7 +4590,9 @@ for (const [what, from, to] of [
 		linuxSimultaneousWorkflowProblems(changed).length > 0,
 		`${what} must refuse enrollment`
 	);
+	linuxSimultaneousWorkflowRefusals++;
 }
+assert.equal(linuxSimultaneousWorkflowRefusals, 18);
 
 /** Retains exact ordered native calls, status admission and failing teardown. */
 function linuxSimultaneousEnrollmentProblems(source) {
@@ -4563,7 +4636,7 @@ const linuxSimultaneousHarness = fs.readFileSync(
 	'utf8'
 );
 errors.push(...linuxSimultaneousEnrollmentProblems(linuxSimultaneousHarness));
-const linuxSimultaneousBlock = LINUX_SIMULTANEOUS_ENVELOPE.slice(6, 10).join('\n');
+const linuxSimultaneousBlock = LINUX_SIMULTANEOUS_ENVELOPE.slice(6, -4).join('\n');
 const linuxSimultaneousNormalized = linuxSimultaneousHarness
 	.split('\n')
 	.map((line) => line.trim())
@@ -4575,6 +4648,7 @@ assert.equal(
 	0,
 	'additive owner work outside the executable native envelope must remain permitted'
 );
+let linuxSimultaneousEnvelopeRefusals = 0;
 for (const [what, from, to] of [
 	['old harness omits the supplement', linuxSimultaneousBlock, ''],
 	[
@@ -4593,7 +4667,10 @@ for (const [what, from, to] of [
 	[
 		'uncaptured supplement status',
 		linuxSimultaneousBlock,
-		linuxSimultaneousBlock.replace('CUSTODY=$?', 'CUSTODY=0')
+		linuxSimultaneousBlock.replace(
+			`${LINUX_SIMULTANEOUS_COMMAND}\nCUSTODY=$?`,
+			`${LINUX_SIMULTANEOUS_COMMAND}\nCUSTODY=0`
+		)
 	],
 	['missing old input owner', LINUX_SIMULTANEOUS_ENVELOPE[3], 'true'],
 	[
@@ -4612,14 +4689,44 @@ for (const [what, from, to] of [
 		LINUX_SIMULTANEOUS_ENVELOPE[0],
 		`if false; then\n${LINUX_SIMULTANEOUS_ENVELOPE[0]}`
 	],
-	['only a commented supplement', LINUX_SIMULTANEOUS_COMMAND, `# ${LINUX_SIMULTANEOUS_COMMAND}`]
+	['only a commented supplement', LINUX_SIMULTANEOUS_COMMAND, `# ${LINUX_SIMULTANEOUS_COMMAND}`],
+	['missing CI identity gate', '${GITHUB_ACTIONS:-}', '${UNBOUND_ACTIONS:-}'],
+	['missing receipt root refusal', 'if [ -z "${RUNNER_TEMP:-}" ]; then CUSTODY=2; fi', 'true'],
+	[
+		'wrong saved selection scope',
+		'--scope linux-simultaneous-native --receipt',
+		'--scope linux-e2e-suite --receipt'
+	],
+	[
+		'forgiven saved selection failure',
+		'--receipt "$receipt" || CUSTODY=$?',
+		'--receipt "$receipt" || true'
+	],
+	[
+		'fabricated saved disposition',
+		'mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --validate-scope-receipt "$receipt")" || CUSTODY=$?',
+		'mode=deferred'
+	],
+	[
+		'forgiven saved receipt failure',
+		'--validate-scope-receipt "$receipt")" || CUSTODY=$?',
+		'--validate-scope-receipt "$receipt")" || true'
+	],
+	['false saved native credit', 'qualified=false', 'qualified=true'],
+	['saved full branch disabled', 'elif [ "$mode" = full ]; then', 'elif false; then'],
+	['unknown saved mode forgiven', 'else\nCUSTODY=2\nfi', 'else\nCUSTODY=0\nfi']
 ]) {
 	assert.ok(linuxSimultaneousNormalized.includes(from), `${what}: causal preimage must exist`);
 	assert.ok(
 		linuxSimultaneousEnrollmentProblems(linuxSimultaneousNormalized.replace(from, to)).length > 0,
 		`${what} must refuse native qualification`
 	);
+	linuxSimultaneousEnvelopeRefusals++;
 }
+assert.equal(linuxSimultaneousEnvelopeRefusals, 23);
+console.log(
+	`PASS: Linux simultaneous wiring ${linuxSimultaneousWorkflowRefusals} workflow and ${linuxSimultaneousEnvelopeRefusals} custody-envelope refusals; native execution unqualified.`
+);
 
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');

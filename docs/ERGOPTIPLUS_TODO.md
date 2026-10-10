@@ -3204,7 +3204,7 @@ Windows PC acceptance, delegated to the maintainer:
   closed automatically on approval; not while Tap-Holds are off, where the
   banner stays). Integrated; verify on a Mac.
 
-  Current Dev receiving preserves its native SDK and full-runner policies while
+  Current G3 Dev receiving preserves its native SDK and full-runner policies while
   aligning the original observation guards with its fixed 10-minute Swift window.
   Both portable successor guards pass without removing any mutation or changing
   the workflow. The complete receiving gate remains failed, and native window
@@ -10304,6 +10304,15 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
   Device work: real held-alone-then-joined ordering and actual AltGr generation;
   injected Ctrl/RAlt priority does not prove physical hook ordering.
 
+  Current-Dev receiving binds the original Windows eleven-case desktop runner
+  to its source-bound qualification receipt and exact full/deferred/refusal
+  wrapper. All original fourteen causal refusals remain; sixteen additional
+  controls require selection/revalidation errors to fail, preserve the full
+  runner and 25-minute budget, and reject false qualification or missing evidence.
+  The pinned-Node source guard passes thirty refusals. Deferred execution grants
+  no native cohort proof; Windows PowerShell and actual desktop requalification
+  of this receiving successor remain unrun.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -10395,6 +10404,16 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
   This container lacks /dev/uinput and /dev/input: the real wrapper refuses
   with exit 2 and zero scenarios/resources. Native execution is UNRUN;
   hosted kernel CI and physical receiving remain required.
+
+  Current-Dev CI receiving preserves both original real-kernel prerequisites,
+  their exact status/retirement enclosure and the saved-configuration subreaper
+  inside the source-bound full/deferred/refusal protocol. Eleven explicit sudo
+  context bindings preserve the qualification source; the six-minute deadline
+  is unchanged. Eighteen workflow and twenty-three custody-envelope mutations
+  are refused, including every original inverse. These portable controls grant
+  no new kernel execution or physical proof. The broader incoming pipeline
+  still has separate qualification/upload contract failures; the original Linux
+  cancellation assertions remain intact pending workflow-owner resolution.
 
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
@@ -10988,6 +11007,18 @@ cases. Whole XCTest343 is341 passed/two failed (Brew/Sparkle), six assertions;
 installed package acceptance remains failed. Private diagnostic workflows,
 Census3 and G6 test-policy overlays are excluded from canonical product source.
 Final joined-source gates and remote Shortcut retirement remain required.
+
+Native SDK receiving on bc0400388/manual37981239358 observed the real
+no-prompt method passing (one test, zero failures; process/capture exits zero)
+and OSStatus -600. The sole marker arrived after the selected-suite terminal,
+so the unchanged strict collector refused it. The buffering or forwarding
+cause remains unknown; this is no catalogue, consent or other-caller proof.
+The prepared successor writes one newline-terminated UTF-8 observation through
+a synchronous throwing parent stderr write before the test returns. Source
+controls refuse buffered print, stdout, a missing newline and the original
+late-marker order; native Mac capture ordering remains unqualified. CI notices
+retain closed process/capture statuses and refusal codes without changing
+observation admission, worker retirement or deadlines.
 
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data

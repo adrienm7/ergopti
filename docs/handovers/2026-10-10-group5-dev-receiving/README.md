@@ -71,3 +71,26 @@ an inverse that could overwrite a same-byte successor inode. No unfinished
 recovery command or weaker publication guard is exposed in the product. Shared
 constructor/FS ownership coordination and the native menu/reload transaction
 remain necessary before adoption.
+
+## G3 successor receiving
+
+Dev `a81ded37a85b96e163a0775e46939220cb1dac35` joins without conflicts,
+retaining G3 commits `7bcd18335` and `b7ff79d21` without squash. The original
+G5 observation guard and all original pipeline additions remain present.
+
+The new whole JavaScript run exits 1: 404 pass/4 fail of 408. Complete original
+Linux-evidence, desktop-core and pipeline guards independently fail identically
+on genuine Dev `a81ded37a` and the composed candidate. The pipeline reports the same 19
+workflow contract findings in both contexts; passing its repaired isolated
+mutation block did not qualify the complete guard. No assertions were removed.
+
+The fourth failure is a local test-created ignored Python bytecode directory,
+not a new source component. Five exact files created during the completed
+receiving run were archived byte-for-byte, then removed after identity/content
+checks. The unchanged Convention P guard then passes. The whole suite was not
+rerun after that cache cleanup; the complete run remains recorded as failed.
+
+G3 native SDK run 38011048513 tests Dev `a81ded37a`, with one actual no-prompt SDK case
+passing and the whole CI failing. Its exact native source receipt does not
+qualify the larger G5 native source tree. Packaging and installation were
+skipped. All G5 native/physical obligations remain open.
