@@ -11,7 +11,7 @@ const browsers = require('../ci/install-playwright.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const scopes = new Map([
-	['ci-linux.yml', 36],
+	['ci-linux.yml', 37],
 	['ci-macos.yml', 2],
 	['ci.yml', 1],
 	['linux-layout.yml', 2],
@@ -176,6 +176,27 @@ for (const [file, floor] of scopes) {
 	const rel = '.github/workflows/' + file;
 	const text = fs.readFileSync(path.join(root, rel), 'utf8');
 	assert.deepEqual(problems(text, rel, floor), [], rel);
+	if (file === 'ci-linux.yml') {
+		const owned = pipeline
+			.jobsOfText(text, rel)
+			.filter((job) => job.id === 'e2e-linux')
+			.flatMap((job) => pipeline.steps(job.body))
+			.filter((step) => step.name === 'Qualify three actual XI2 property cookies');
+		assert.equal(owned.length, 1, 'the XI2 acquisition retains one genuine E2E owner');
+		const invocation = command + ' -y --no-install-recommends gcc libx11-dev libxi-dev xvfb';
+		assert.equal(
+			(pipeline.runOf(owned[0].body) || []).filter((line) => line.trim() === invocation).length,
+			1,
+			'the XI2 C and display prerequisites retain the signed acquisition owner'
+		);
+		assert.equal(text.split(invocation).length, 2, 'the XI2 acquisition mutation is unique');
+		const withoutXi2 = text.replace(invocation, 'echo "XI2 acquisition omitted"');
+		assert.notEqual(withoutXi2, text, 'the XI2 omission must change the actual workflow');
+		assert.ok(
+			problems(withoutXi2, rel, floor).includes('missing acquisition floor'),
+			'the new XI2 acquisition cannot compensate for an omitted mandatory invocation'
+		);
+	}
 	for (const [name, replacement] of [
 		['unscoped install', 'sudo apt-get install'],
 		['unscoped update', 'sudo apt-get update && sudo apt-get install'],
