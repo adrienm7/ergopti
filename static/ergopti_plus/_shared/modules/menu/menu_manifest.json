@@ -2373,7 +2373,15 @@
 		},
 		{
 			"type": "list",
-			"id": "hotstring_extensions"
+			"id": "hotstring_extensions",
+			"status_rows": {
+				"none_installed": [
+					{
+						"type": "label",
+						"i18n": "menu.extensions.none_installed"
+					}
+				]
+			}
 		},
 		{
 			"type": "---",

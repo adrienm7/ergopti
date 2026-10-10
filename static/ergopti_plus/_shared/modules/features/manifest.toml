@@ -5703,6 +5703,8 @@ i18n = "menu.extensions.header"
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_extensions"
+# Linux publishes this inert marker when no extension owns categories or sections.
+status_rows.none_installed = [{ type = "label", i18n = "menu.extensions.none_installed" }]
 
 
 # Reloading the catalogue from disk, and Linux's alone: it is the only driver
