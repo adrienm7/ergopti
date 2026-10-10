@@ -92,7 +92,13 @@ function M.assert_disabled_root(helpers, platform, source, top_level)
 					ctx = {paused = false}, type = type, ipairs = ipairs, table = table, tostring = tostring,
 					i18n = {get = function(key) return key end}, Logger = {debug = function() end, error = function() end}}))()
 		end
-		local loop = between(source, "\tlocal quit_row = nil\n", "\n\tif not separator_facade_current() or not receive_separator(\"current\") then")
+		-- The actor begins after the header. Its independent caption oracle stays
+		-- unchanged; only the exact native pre-render extraction boundary moved.
+		local terminal = "\n\tif not separator_facade_current() or not receive_separator(\"current\") then"
+		if not source:find(terminal, 1, true) then
+			terminal = "\n\tif not separator_facade_current() or not receive_separator(\"current\") or not header_current() then"
+		end
+		local loop = between(source, "\tlocal quit_row = nil\n", terminal)
 		local first = assert(source:find("local function _row_is_for_linux(row)", 1, true))
 		local last = assert(source:find("\nend\n", first, true)) + #"\nend\n" - 1
 		local native_platform = source:sub(first, last)

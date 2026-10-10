@@ -1529,6 +1529,24 @@ helpers.describe("fixed feature-parent family: actual Linux builder (fixed-featu
 					local child_reads = 0
 					ManifestMenu.template_rows = function(...) child_reads = child_reads + 1; return actual_template(...) end
 					ManifestMenu.build = function(...) child_reads = child_reads + 1; return actual_build(...) end
+					-- The actual new builder must capture its final observing collaborators.
+					-- Header projections delegate genuinely, while this counter keeps its
+					-- original feature-child meaning and exact zero-refusal assertion.
+					local feature_template, header_reads, header_label = ManifestMenu.template_rows, 0, nil
+					local oracle_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/linux_tray_header_original.json"), "rb"))
+					local oracle_bytes = assert(oracle_file:read("*a")); assert(oracle_file:close())
+					local header_oracle = assert(require("json").decode(oracle_bytes))
+					ManifestMenu.template_rows = function(key, ...)
+						if key == "linux_tray_active_header" or key == "linux_tray_paused_header" then
+							header_reads = header_reads + 1
+							local rows = actual_template(key, ...)
+							header_label = type(rows) == "table" and type(rows[1]) == "table" and rows[1].label or nil
+							return rows
+						end
+						return feature_template(key, ...)
+					end
+					builder = helpers.load_module("ui.menu.menu_builder")
+					helpers.assert_true(rawequal(builder, require("ui.menu.menu_builder")), "the actual native builder captures the final genuine delegation spies")
 					local source_file = assert(io.open(path, "rb")); local source = source_file:read("*a"); assert(source_file:close())
 					local function parent_at_tray()
 						return find_item(builder.build(absent_context()), i18n.get(contract.key))
@@ -1548,6 +1566,9 @@ helpers.describe("fixed feature-parent family: actual Linux builder (fixed-featu
 					local owner = actual_parent_builder()
 					local ok, detail = xpcall(function()
 						local before = assert(parent_at_tray())
+						helpers.assert_eq(header_reads, 1, "the genuine root delegates one actual header projection")
+						helpers.assert_eq(header_label, header_oracle.active_brand .. header_oracle.joiner .. "v9.9.9",
+							"the delegated header retains its independent original-source caption")
 						helpers.assert_eq(before.title, i18n.get(contract.key))
 						helpers.assert_nil(before.checked)
 						if contract.id == "tap_holds" then
@@ -1558,7 +1579,9 @@ helpers.describe("fixed feature-parent family: actual Linux builder (fixed-featu
 						helpers.assert_eq(child_reads, 0, "actual child template/build owners are not called after structural parent refusal")
 						helpers.assert_nil(parent_at_tray())
 						parent.type = original_type
+						local prior_header_reads = header_reads
 						local repaired = assert(parent_at_tray())
+						helpers.assert_eq(header_reads, prior_header_reads + 1, "explicit repair genuinely delegates the header again")
 						helpers.assert_eq(repaired.title, before.title)
 						helpers.assert_eq(repaired.checked, before.checked)
 						if contract.id == "tap_holds" then helpers.assert_nil(repaired.menu); helpers.assert_eq(repaired.disabled, true)

@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Dosya ve klasörleri şifrele",
 	"menu.apps.no_apps": "Uygulama bulunamadı",
 	"menu.apps.title": "🛠️ Uygulamalar",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsol",

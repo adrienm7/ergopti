@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "تشفير الملفات والمجلدات",
 	"menu.apps.no_apps": "لم يُعثر على تطبيقات",
 	"menu.apps.title": "🛠️ التطبيقات",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "وحدة التحكم",

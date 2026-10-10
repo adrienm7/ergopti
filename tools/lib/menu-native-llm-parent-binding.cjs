@@ -178,6 +178,74 @@ const DECLARED_NATIVE_FACADE_LOCALS = {
 	separator_root: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")'
 };
 
+const LINUX_HEADER_VERSION_SOURCE =
+	'local function _version_text(version)\n\tlocal v = tostring(version)\n\tif v:match("^%d") then return "v" .. v end\n\treturn v\nend';
+const LINUX_HEADER_LOCALS = {
+	header_template: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")',
+	header_command: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")'
+};
+const LINUX_HEADER_FACADE_SOURCE =
+	'local function header_facade_current()\n\treturn separator_facade_current()\n\t\tand type(header_template) == "function" and rawget(ManifestMenu, "template_rows") == header_template\n\t\tand type(header_command) == "function" and rawget(ManifestMenu, "command_row") == header_command\nend';
+const LINUX_HEADER_BUILDER_SOURCE =
+	'local function _build_header(ctx)\n\tif not header_facade_current() then return nil end\n\tlocal root = separator_root()\n\tif not header_facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil then return nil end\n\tlocal active = separator_array("linux_tray_active_header")\n\tif not header_facade_current() or getmetatable(root) ~= nil then return nil end\n\tlocal paused = separator_array("linux_tray_paused_header")\n\tif not header_facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil then return nil end\n\tlocal captured = {}\n\tlocal projected, projected_fields\n\tfor key, rows in next, { linux_tray_active_header = active, linux_tray_paused_header = paused } do\n\t\tif type(rows) ~= "table" or getmetatable(rows) ~= nil or rawget(root, key) ~= rows then return nil end\n\t\tfor index in next, rows do if index ~= 1 then return nil end end\n\t\tlocal record = rawget(rows, 1)\n\t\tif type(record) ~= "table" or getmetatable(record) ~= nil then return nil end\n\t\tlocal fields = {}\n\t\tfor name, value in next, record do\n\t\t\tif name ~= "type" and name ~= "id" and name ~= "i18n" and name ~= "caption_getter"\n\t\t\t\tand name ~= "caption_layout" and name ~= "caption_joiner" and name ~= "platforms"\n\t\t\t\tand name ~= "unavailable" then return nil end\n\t\t\tfields[name] = value\n\t\tend\n\t\tlocal expected_kind = key == "linux_tray_active_header" and "label" or "command"\n\t\tlocal expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or "linux_tray_resume"\n\t\tif rawget(record, "type") ~= expected_kind or rawget(record, "id") ~= expected_id\n\t\t\tor type(rawget(record, "i18n")) ~= "string" or rawget(record, "i18n") == ""\n\t\t\tor rawget(record, "caption_getter") ~= "linux_tray_version"\n\t\t\tor rawget(record, "caption_layout") ~= "prefix" or rawget(record, "caption_joiner") ~= " \u2014 "\n\t\t\tor rawget(record, "unavailable") ~= "hide" then return nil end\n\t\tlocal platforms = rawget(record, "platforms")\n\t\tif type(platforms) ~= "table" or getmetatable(platforms) ~= nil\n\t\t\tor rawget(platforms, 1) ~= "linux" then return nil end\n\t\tfor index in next, platforms do if index ~= 1 then return nil end end\n\t\tcaptured[key] = { rows = rows, record = record, fields = fields, platforms = platforms }\n\tend\n\tif captured.linux_tray_active_header == nil or captured.linux_tray_paused_header == nil then return nil end\n\n\tlocal function current()\n\t\tif not header_facade_current() or separator_root() ~= root or getmetatable(root) ~= nil then return false end\n\t\tfor key, snapshot in next, captured do\n\t\t\tlocal rows, record, platforms = snapshot.rows, snapshot.record, snapshot.platforms\n\t\t\tif not header_facade_current() or separator_array(key) ~= rows or rawget(root, key) ~= rows\n\t\t\t\tor getmetatable(rows) ~= nil or rawget(rows, 1) ~= record or getmetatable(record) ~= nil\n\t\t\t\tor rawget(record, "platforms") ~= platforms or getmetatable(platforms) ~= nil\n\t\t\t\tor rawget(platforms, 1) ~= "linux" then return false end\n\t\t\tfor index in next, rows do if index ~= 1 then return false end end\n\t\t\tfor index in next, platforms do if index ~= 1 then return false end end\n\t\t\tfor name, value in next, snapshot.fields do if rawget(record, name) ~= value then return false end end\n\t\t\tfor name in next, record do if snapshot.fields[name] == nil then return false end end\n\t\tend\n\t\tif projected ~= nil then\n\t\t\tif getmetatable(projected) ~= nil then return false end\n\t\t\tfor name, value in next, projected_fields do if rawget(projected, name) ~= value then return false end end\n\t\t\tfor name in next, projected do if projected_fields[name] == nil then return false end end\n\t\tend\n\t\treturn header_facade_current()\n\tend\n\n\tlocal version = _version_text(ctx._version or Version.VERSION)\n\tlocal is_paused = ctx.paused == true\n\tif not current() then return nil end\n\tlocal ok, rows = pcall(function()\n\t\tif is_paused then\n\t\t\treturn ManifestMenu.template_rows("linux_tray_paused_header", { ["linux_tray_resume"] = function()\n\t\t\t\tif type(ctx.on_toggle_pause) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent \u2014 the script stays paused.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_toggle_pause()\n\t\t\tend },\n\t\t\t\t{ ["linux_tray_version"] = function() return version end }, {})\n\t\tend\n\t\treturn ManifestMenu.template_rows("linux_tray_active_header", {},\n\t\t\t{ ["linux_tray_version"] = function() return version end }, {})\n\tend)\n\tif not ok or not current() or type(rows) ~= "table" or getmetatable(rows) ~= nil then return nil end\n\tfor index in next, rows do if index ~= 1 then return nil end end\n\tlocal row = rawget(rows, 1)\n\tif type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "label")) ~= "string"\n\t\tor rawget(row, "label") == "" then return nil end\n\tfor name in next, row do\n\t\tif name ~= "label" and (is_paused and name ~= "action" or not is_paused and name ~= "disabled") then return nil end\n\tend\n\tif is_paused then\n\t\tif type(rawget(row, "action")) ~= "function" then return nil end\n\telseif rawget(row, "disabled") ~= true then return nil end\n\tprojected, projected_fields = row, {}\n\tfor name, value in next, row do projected_fields[name] = value end\n\tif not current() then return nil end\n\treturn row, current\nend\n';
+
+/** The two genuine header templates retain their actual source and callback receiving chain. */
+function declaredLinuxHeaderOwner(unit) {
+	if (!unit) return false;
+	const { lex, positions, rootPositions, body } = luaPublicationParser();
+	const fragments = Object.entries(LINUX_HEADER_LOCALS).map(
+		([name, value]) => 'local ' + name + ' = ' + value
+	);
+	fragments.push(
+		LINUX_HEADER_VERSION_SOURCE,
+		LINUX_HEADER_FACADE_SOURCE,
+		LINUX_HEADER_BUILDER_SOURCE
+	);
+	const allowed = new Set();
+	for (const fragment of fragments) {
+		const found = positions(unit, fragment);
+		if (found.length !== 1) return false;
+		const wanted = scriptTokens(fragment, '.lua');
+		for (let offset = 0; offset < wanted.length; offset++) allowed.add(found[0] + offset);
+	}
+	for (const [signature, expected] of [
+		['local function _version_text(version)', LINUX_HEADER_VERSION_SOURCE],
+		['local function header_facade_current()', LINUX_HEADER_FACADE_SOURCE],
+		['local function _build_header(ctx)', LINUX_HEADER_BUILDER_SOURCE]
+	]) {
+		const actual = body(unit, signature),
+			pinned = body(lex(expected), signature);
+		if (
+			rootPositions(unit, signature).length !== 1 ||
+			!actual ||
+			!pinned ||
+			!isDeepStrictEqual(
+				actual.tokens.map((t) => [t.kind, t.value]),
+				pinned.tokens.map((t) => [t.kind, t.value])
+			)
+		)
+			return false;
+	}
+	const call = positions(unit, 'local header, header_current = _build_header(ctx)');
+	if (call.length !== 1) return false;
+	const callTokens = scriptTokens('local header, header_current = _build_header(ctx)', '.lua');
+	for (let offset = 0; offset < callTokens.length; offset++) allowed.add(call[0] + offset);
+	const protectedNames = new Set([
+		...Object.keys(LINUX_HEADER_LOCALS),
+		'header_facade_current',
+		'_build_header',
+		'_version_text'
+	]);
+	for (let index = 0; index < unit.tokens.length; index++)
+		if (
+			unit.tokens[index].kind === 'identifier' &&
+			protectedNames.has(unit.tokens[index].value) &&
+			!allowed.has(index)
+		)
+			return false;
+	return true;
+}
+
 /** The actual imported raw facade and its named functions retain custody of root projection. */
 function declaredFacadeOwner(builder, parser) {
 	const { lex, positions, rootPositions, body } = parser;
@@ -504,6 +572,12 @@ function closedModuleExport(unit, lex, rootPositions) {
 			if (name.value === 'ok_mm') {
 				at = take(at, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")');
 			} else {
+				if (Object.hasOwn(LINUX_HEADER_LOCALS, name.value)) {
+					if (!declaredLinuxHeaderOwner(unit)) return false;
+					at = take(at, 'local ' + name.value + ' = ' + LINUX_HEADER_LOCALS[name.value]);
+					if (at === null) return false;
+					continue;
+				}
 				if (Object.hasOwn(DECLARED_NATIVE_FACADE_LOCALS, name.value)) {
 					if (!declaredFacadeOwner(unit, luaPublicationParser())) return false;
 					at = take(at, 'local ' + name.value + ' = ' + DECLARED_NATIVE_FACADE_LOCALS[name.value]);
@@ -701,6 +775,20 @@ function closedSiblingRendererBindings(unit) {
 			for (const start of matches)
 				for (let offset = 0; offset < wanted.length; offset++)
 					if (wanted[offset].value === 'ManifestMenu') rawFacadePorts.add(start + offset);
+		}
+	}
+	if (declaredLinuxHeaderOwner(unit)) {
+		for (const fragment of [
+			...Object.entries(LINUX_HEADER_LOCALS).map(
+				([name, value]) => 'local ' + name + ' = ' + value
+			),
+			LINUX_HEADER_FACADE_SOURCE
+		]) {
+			const wanted = scriptTokens(fragment, '.lua'),
+				found = positions(unit, fragment);
+			if (found.length !== 1) return false;
+			for (let offset = 0; offset < wanted.length; offset++)
+				if (wanted[offset].value === 'ManifestMenu') rawFacadePorts.add(found[0] + offset);
 		}
 	}
 	const boot = positions(
@@ -1749,13 +1837,31 @@ function declaredLinuxNativeTray(unit, builder) {
 	local rendered = separator_render(rows, "top_level")
 	if not separator_facade_current() or not receive_separator("current") then return {} end
 	return rendered`;
+	const headerExpected = expected
+		.replace(
+			'rows[#rows + 1] = _build_header(ctx)',
+			'local header, header_current = _build_header(ctx) if not header or type(header_current) ~= "function" or not header_current() then return {} end rows[#rows + 1] = header'
+		)
+		.replace(
+			'if not separator_facade_current() or not receive_separator("current") then return {} end\n\tlocal rendered = separator_render(rows, "top_level")\n\tif not separator_facade_current() or not receive_separator("current") then return {} end',
+			'if not separator_facade_current() or not receive_separator("current") or not header_current() then return {} end\n\tlocal rendered = separator_render(rows, "top_level")\n\tif not separator_facade_current() or not receive_separator("current") or not header_current() then return {} end'
+		);
 	const shape = (value) => value?.tokens.map((t) => [t.kind, t.value]);
 	// The original historical inert-row absence remains an independent supported route.
 	const historical = expected.replace(
 		/elseif row\.disabled == true then\s+rows\[#rows \+ 1\] = \{ label = i18n_safe\(row\.i18n\), disabled = true,\s+disabled_reason_key = row\.reason_key \}/,
 		''
 	);
+	const headerHistorical = headerExpected.replace(
+		/elseif row\.disabled == true then\s+rows\[#rows \+ 1\] = \{ label = i18n_safe\(row\.i18n\), disabled = true,\s+disabled_reason_key = row\.reason_key \}/,
+		''
+	);
+	const headerProtocol =
+		isDeepStrictEqual(shape(unit), shape(lex(headerExpected))) ||
+		isDeepStrictEqual(shape(unit), shape(lex(headerHistorical)));
+	if (headerProtocol && !declaredLinuxHeaderOwner(builder)) return false;
 	if (
+		!headerProtocol &&
 		!isDeepStrictEqual(shape(unit), shape(lex(expected))) &&
 		!isDeepStrictEqual(shape(unit), shape(lex(historical)))
 	)
@@ -2455,13 +2561,151 @@ function nativeLinuxTapHoldAbsentPublication(builderSource, manifest) {
 /** Requires the actual exported Linux root and its closed captured-renderer protocol. */
 function declaredLinuxTopLevelPublication(builderSource) {
 	const { lex, body, rootPositions } = luaPublicationParser();
-	const whole = lex(builderSource);
+	let whole = lex(builderSource);
+	if (!whole) return false;
+	// A fresh, unused plain constructor only reads retained local values. It
+	// cannot invoke, mutate or escape a renderer owner. Keep the entire native
+	// publication protocol pinned after excluding this inert leading statement.
+	const signature = 'function M.build(ctx)',
+		build = rootPositions(whole, signature);
+	if (build.length === 1) {
+		const tokens = whole.tokens,
+			symbol = (at, value) => tokens[at]?.kind === 'symbol' && tokens[at].value === value,
+			start = build[0] + scriptTokens(signature, '.lua').length,
+			reads = new Set(['separator_render', 'ManifestMenu', 'ctx']),
+			keywords = new Set([
+				'and',
+				'break',
+				'do',
+				'else',
+				'elseif',
+				'end',
+				'false',
+				'for',
+				'function',
+				'goto',
+				'if',
+				'in',
+				'local',
+				'nil',
+				'not',
+				'or',
+				'repeat',
+				'return',
+				'then',
+				'true',
+				'until',
+				'while'
+			]),
+			name = tokens[start + 1];
+		if (
+			tokens[start]?.kind === 'identifier' &&
+			tokens[start].value === 'local' &&
+			name?.kind === 'identifier' &&
+			name.value !== '_ENV' &&
+			!keywords.has(name.value) &&
+			!reads.has(name.value) &&
+			symbol(start + 2, '=') &&
+			symbol(start + 3, '{') &&
+			tokens.filter((token) => token.kind === 'identifier' && token.value === name.value).length ===
+				1
+		) {
+			let at = start + 4,
+				fields = 0;
+			while (!symbol(at, '}')) {
+				if (tokens[at]?.kind === 'identifier' && symbol(at + 1, '=')) {
+					if (keywords.has(tokens[at].value)) break;
+					at += 2;
+				}
+				if (tokens[at]?.kind !== 'identifier' || !reads.has(tokens[at].value)) break;
+				at++;
+				fields++;
+				if (symbol(at, ',') || symbol(at, ';')) at++;
+				else if (!symbol(at, '}')) break;
+			}
+			if (fields > 0 && symbol(at, '}')) {
+				const end = symbol(at + 1, ';') ? at + 1 : at;
+				whole = lex(
+					builderSource.slice(0, tokens[start].start) + builderSource.slice(tokens[end].end)
+				);
+			}
+		}
+	}
 	return (
 		!!whole &&
 		closedModuleExport(whole, lex, rootPositions) &&
 		closedSiblingRendererBindings(whole) &&
-		declaredLinuxNativeTray(body(whole, 'function M.build(ctx)'), whole)
+		declaredLinuxNativeTray(body(whole, signature), whole)
 	);
+}
+
+/** The actual exported Linux root composes both guarded physical header frames. */
+function nativeLinuxHeaderPublication(builderSource, manifest, platform) {
+	if (platform !== 'linux' || typeof builderSource !== 'string') return false;
+	// Snapshot only ordinary own data descriptors; native rawget/plain custody
+	// cannot be supplied by getters, inherited fields or custom container methods.
+	const ordinary = (value, array = false) => {
+		if (!value || typeof value !== 'object' || Array.isArray(value) !== array) return null;
+		const prototype = Object.getPrototypeOf(value);
+		if (
+			array ? prototype !== Array.prototype : prototype !== Object.prototype && prototype !== null
+		)
+			return null;
+		const descriptors = Object.getOwnPropertyDescriptors(value),
+			data = Object.create(null);
+		for (const key of Reflect.ownKeys(descriptors)) {
+			if (typeof key !== 'string' || !Object.hasOwn(descriptors[key], 'value')) return null;
+			data[key] = descriptors[key].value;
+		}
+		if (array) {
+			if (!Number.isSafeInteger(data.length) || data.length < 0) return null;
+			if (Object.keys(data).length !== data.length + 1) return null;
+			for (let index = 0; index < data.length; index++)
+				if (!Object.hasOwn(data, String(index))) return null;
+		}
+		return data;
+	};
+	const root = ordinary(manifest);
+	if (!root) return false;
+	const topLevel = ordinary(root.top_level, true);
+	if (!topLevel || topLevel.length === 0) return false;
+	const records = new Set();
+	for (let index = 0; index < topLevel.length; index++) {
+		const record = ordinary(topLevel[index]);
+		if (!record || typeof record.id !== 'string' || records.has(topLevel[index])) return false;
+		records.add(topLevel[index]);
+	}
+	if (!declaredLinuxTopLevelPublication(builderSource)) return false;
+	const { lex } = luaPublicationParser();
+	if (!declaredLinuxHeaderOwner(lex(builderSource))) return false;
+	for (const [section, type, id] of [
+		['linux_tray_active_header', 'label', 'linux_tray_active_header'],
+		['linux_tray_paused_header', 'command', 'linux_tray_resume']
+	]) {
+		const rows = ordinary(root[section], true);
+		if (!rows || rows.length !== 1) return false;
+		const row = ordinary(rows[0]);
+		if (!row || typeof row.i18n !== 'string' || row.i18n === '') return false;
+		const platforms = ordinary(row.platforms, true);
+		if (!platforms || platforms.length !== 1 || platforms[0] !== 'linux') return false;
+		if (
+			!isDeepStrictEqual(
+				{ ...row, platforms: [platforms[0]] },
+				{
+					type,
+					id,
+					i18n: row.i18n,
+					caption_getter: 'linux_tray_version',
+					caption_layout: 'prefix',
+					caption_joiner: ' — ',
+					platforms: ['linux'],
+					unavailable: 'hide'
+				}
+			)
+		)
+			return false;
+	}
+	return true;
 }
 
 module.exports = {
@@ -2471,5 +2715,6 @@ module.exports = {
 	nativeLinuxTapHoldAbsentPublication,
 	nativeTopLevelProjection,
 	declaredMacTopLevelPublication,
-	declaredLinuxTopLevelPublication
+	declaredLinuxTopLevelPublication,
+	nativeLinuxHeaderPublication
 };

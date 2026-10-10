@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "加密文件和文件夹",
 	"menu.apps.no_apps": "未找到应用程序",
 	"menu.apps.title": "🛠️ 应用程序",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "控制台",

@@ -1034,6 +1034,16 @@ function luaDeclaredLinuxRoot(source, topGraph) {
 		local rendered = separator_render(rows, "top_level")
 		if not separator_facade_current() or not receive_separator("current") then return {} end
 		return rendered`;
+	const headerCapture = ranges(top, 'local header, header_current = _build_header(ctx)', '.lua');
+	const withHeader =
+		headerCapture.length === 1 &&
+		require('./menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication(source);
+	const terminal = withHeader
+		? finish.replaceAll(
+				'not receive_separator("current") then',
+				'not receive_separator("current") or not header_current() then'
+			)
+		: finish;
 	return (
 		['declared', 'receive_separator', 'source_rows', 'rendered'].every(
 			(name) => luaLocal(topGraph, name).writes.length === 0
@@ -1051,9 +1061,9 @@ function luaDeclaredLinuxRoot(source, topGraph) {
 				'if not separator_facade_current() or not receive_separator("current") then return {} end end if quit_row then',
 				1
 			],
-			[finish]
+			[terminal]
 		]) &&
-		isDeepStrictEqual(shape(top).slice(-shape(finish).length), shape(finish))
+		isDeepStrictEqual(shape(top).slice(-shape(terminal).length), shape(terminal))
 	);
 }
 

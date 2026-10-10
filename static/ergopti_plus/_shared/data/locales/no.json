@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Krypter filer og mapper",
 	"menu.apps.no_apps": "Ingen applikasjoner funnet",
 	"menu.apps.title": "🛠️ Programmer",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsoll",

@@ -4,10 +4,10 @@
 		"count": 22,
 		"sites": [
 			"windows/infra/tray_bootstrap.ahk:63 add",
-			"windows/ui/menu/menu_hotstrings.ahk:913 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1074 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1251 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1265 append",
+			"windows/ui/menu/menu_hotstrings.ahk:928 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1089 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1266 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1280 append",
 			"windows/ui/menu/menu_init.ahk:48 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
@@ -40,13 +40,12 @@
 		]
 	},
 	"linux": {
-		"count": 5,
+		"count": 4,
 		"sites": [
-			"linux/ui/menu/menu_builder.lua:387 static",
-			"linux/ui/menu/menu_builder.lua:543 static",
-			"linux/ui/menu/menu_builder.lua:2260 static",
-			"linux/ui/menu/menu_builder.lua:4010 static",
-			"linux/ui/menu/menu_builder.lua:4685 static"
+			"linux/ui/menu/menu_builder.lua:628 static",
+			"linux/ui/menu/menu_builder.lua:2345 static",
+			"linux/ui/menu/menu_builder.lua:4095 static",
+			"linux/ui/menu/menu_builder.lua:4770 static"
 		]
 	}
 }

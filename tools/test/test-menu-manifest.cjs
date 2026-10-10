@@ -11567,9 +11567,19 @@ console.log(
 			return rendered`;
 		const wanted = shape(terminal),
 			actual = shape(publicOwner);
-		return (
+		const legacyTerminal =
 			actual.length >= wanted.length &&
-			JSON.stringify(actual.slice(-wanted.length)) === JSON.stringify(wanted)
+			JSON.stringify(actual.slice(-wanted.length)) === JSON.stringify(wanted);
+		if (legacyTerminal) return true;
+		const guardedTerminal = terminal.replaceAll(
+			'or not receive_separator("current") then return {} end',
+			'or not receive_separator("current") or not header_current() then return {} end'
+		);
+		const guarded = shape(guardedTerminal);
+		return (
+			actual.length >= guarded.length &&
+			JSON.stringify(actual.slice(-guarded.length)) === JSON.stringify(guarded) &&
+			require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication(source)
 		);
 	}
 
@@ -11722,8 +11732,55 @@ console.log(
 			'disconnected terminal native result'
 		]
 	]) {
-		assert.equal(source.split(before).length - 1, 1, reason + ': exact genuine producer preimage');
-		assert.equal(admits(source.replace(before, after)), false, reason);
+		let liveBefore = before;
+		if (
+			reason === 'missing post-render source custody' &&
+			!source.includes(before) &&
+			require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication(source)
+		) {
+			liveBefore = before.replace(
+				'or not receive_separator("current") then return {} end',
+				'or not receive_separator("current") or not header_current() then return {} end'
+			);
+		}
+		assert.equal(
+			source.split(liveBefore).length - 1,
+			1,
+			reason + ': exact genuine producer preimage'
+		);
+		const candidate = source.replace(liveBefore, after);
+		assert.notEqual(candidate, source, reason + ': actual producer changed');
+		assert.equal(candidate.replace(after, liveBefore), source, reason + ': exact source inverse');
+		assert.equal(admits(candidate), false, reason);
+	}
+	for (const [before, after, reason] of [
+		[
+			'local header, header_current = _build_header(ctx)',
+			'local header, header_current = Foreign.header(ctx)',
+			'About root loses its actual guarded header producer'
+		],
+		[
+			'if not header or type(header_current) ~= "function" or not header_current() then return {} end',
+			'if false then return {} end',
+			'About root loses its initial header receipt'
+		],
+		[
+			'or not header_current() then return {} end\n\tlocal rendered',
+			'then return {} end\n\tlocal rendered',
+			'About root loses its pre-render header receipt'
+		],
+		[
+			'or not header_current() then return {} end\n\treturn rendered',
+			'then return {} end\n\treturn rendered',
+			'About root loses its post-render header receipt'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': exact current source coordinate');
+		const candidate = source.replace(before, after);
+		assert.notEqual(candidate, source, reason + ': actual source changed');
+		assert.equal(candidate.replace(after, before), source, reason + ': exact source inverse');
+		assert.equal(admits(candidate), false, reason);
+		assert.equal(admits(source), true, reason + ': genuine source inverse retained');
 	}
 	for (const [before, after, reason] of [
 		[
@@ -11849,6 +11906,63 @@ console.log(
 		true,
 		'genuine table value reads retain canonical imported owners'
 	);
+	// Only an unused plain table of existing local values is inert. Any real
+	// invocation, escape, shadow or callback remains under the native protocol.
+	assert.equal(
+		admits(
+			source.replace(
+				'function M.build(ctx)',
+				'function M.build(ctx)\n\tlocal unused_values = { context = ctx; ManifestMenu, renderer = separator_render }'
+			)
+		),
+		true,
+		'unused constructor reads do not depend on a fixture variable or field name'
+	);
+	for (const [insertion, reason] of [
+		[
+			'local observer = { manifest = ManifestMenu, value = Foreign() }',
+			'a constructor call is executable'
+		],
+		['local observer = { ctx "," }', 'a string comma argument invokes the context value'],
+		[
+			'local observer = { ManifestMenu ";" }',
+			'a string semicolon argument invokes the retained table value'
+		],
+		[
+			'local observer = { render = ManifestMenu.render_rows }',
+			'a constructor member lookup is executable'
+		],
+		[
+			'local observer = { manifest = ManifestMenu }; observer.manifest.render_rows = Foreign.render_rows',
+			'a retained constructor alias can mutate its owner'
+		],
+		[
+			'local observer = { separator_render }; observer[1]({}, "top_level")',
+			'a retained constructor alias can invoke its owner'
+		],
+		[
+			'local _ENV = { ManifestMenu }',
+			'a constructor cannot replace implicit Lua global resolution'
+		],
+		[
+			'local separator_render = { ManifestMenu }',
+			'a constructor cannot shadow its captured render owner'
+		],
+		[
+			'local observer = { manifest = ManifestMenu, mutate = function() separator_render = Foreign.render_rows end }',
+			'a nested constructor callback is executable'
+		],
+		[
+			'local observer = { "}" }; separator_render = Foreign.render_rows',
+			'a quoted closing brace cannot erase a real owner write'
+		]
+	]) {
+		assert.equal(
+			admits(source.replace('function M.build(ctx)', 'function M.build(ctx)\n\t' + insertion)),
+			false,
+			reason
+		);
+	}
 	for (const [insertion, reason] of [
 		[
 			'local observer = { callback = function() separator_render = Foreign.render_rows end }; observer.callback()',
@@ -12284,8 +12398,8 @@ console.log(
 				'actual platform custody withdrawn'
 			],
 			[
-				'if not current() then return nil end',
-				'if not current() then return nil or { foreign = true } end',
+				'if not current() then return nil end\n\treturn current, template',
+				'if not current() then return nil or { foreign = true } end\n\treturn current, template',
 				'successful alternative inside nil refusal'
 			],
 			[
@@ -12309,8 +12423,12 @@ console.log(
 				'actual command disconnected'
 			],
 			[
-				'rawget(row, "disabled")',
-				'rawget(row, "foreign_disabled")',
+				platform === 'hs'
+					? 'or rawget(row, "disabled") ~= nil then return items end'
+					: 'and type(rawget(row, "action")) == "function" and rawget(row, "disabled") == nil',
+				platform === 'hs'
+					? 'or rawget(row, "foreign_disabled") ~= nil then return items end'
+					: 'and type(rawget(row, "action")) == "function" and rawget(row, "foreign_disabled") == nil',
 				'actual output field refusal withdrawn'
 			],
 			[

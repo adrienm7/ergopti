@@ -4204,6 +4204,241 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 	}
 }
 
+// The physical Linux root composes both header branches before its captured final render.
+// These are actual native root frames, not fictitious clicked submenu parents.
+{
+	const assert = require('node:assert/strict');
+	const { nativeLinuxHeaderPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
+	const source = linuxAiSources['linux/ui/menu/menu_builder.lua'];
+	const admits = (candidate = source, declarations = manifest, platform = 'linux') =>
+		nativeLinuxHeaderPublication(candidate, declarations, platform);
+	assert.equal(admits(), true, 'actual physical Linux root retains both guarded header frames');
+	for (const platform of ['hs', 'ahk', 'Linux', undefined]) {
+		assert.equal(
+			nativeLinuxHeaderPublication(source, manifest, platform),
+			false,
+			'header publication belongs only to the actual Linux root'
+		);
+	}
+	for (const [reason, change] of [
+		[
+			'missing canonical top-level root',
+			(declarations) => {
+				delete declarations.top_level;
+			}
+		],
+		[
+			'empty canonical top-level root',
+			(declarations) => {
+				declarations.top_level = [];
+			}
+		],
+		[
+			'missing actual top-level record identity',
+			(declarations) => {
+				declarations.top_level = [{}];
+			}
+		],
+		[
+			'repeated actual top-level record',
+			(declarations) => {
+				declarations.top_level.push(declarations.top_level[0]);
+			}
+		],
+		[
+			'non-data root array getter',
+			(declarations) => {
+				Object.defineProperty(declarations.top_level, '0', {
+					get() {
+						throw new Error('root getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data root declaration getter',
+			(declarations) => {
+				Object.defineProperty(declarations, 'top_level', {
+					get() {
+						throw new Error('root getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data frame getter',
+			(declarations) => {
+				Object.defineProperty(declarations, 'linux_tray_active_header', {
+					get() {
+						throw new Error('frame getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data frame row getter',
+			(declarations) => {
+				Object.defineProperty(declarations.linux_tray_active_header, '0', {
+					get() {
+						throw new Error('row getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data caption getter',
+			(declarations) => {
+				Object.defineProperty(declarations.linux_tray_active_header[0], 'i18n', {
+					get() {
+						throw new Error('caption getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data platform getter',
+			(declarations) => {
+				Object.defineProperty(declarations.linux_tray_paused_header[0].platforms, '0', {
+					get() {
+						throw new Error('platform getter');
+					}
+				});
+			}
+		],
+		[
+			'custom frame record prototype',
+			(declarations) => {
+				Object.setPrototypeOf(declarations.linux_tray_paused_header[0], { foreign: true });
+			}
+		],
+		[
+			'extra frame array property',
+			(declarations) => {
+				declarations.linux_tray_active_header.foreign = true;
+			}
+		]
+	]) {
+		const declarations = structuredClone(manifest);
+		change(declarations);
+		assert.equal(admits(source, declarations), false, reason + ': native plain root refuses');
+		assert.equal(admits(), true, reason + ': genuine inverse retained');
+	}
+	for (const section of ['linux_tray_active_header', 'linux_tray_paused_header']) {
+		for (const [reason, change] of [
+			[
+				'missing frame',
+				(root) => {
+					delete root[section];
+				}
+			],
+			[
+				'empty frame',
+				(root) => {
+					root[section] = [];
+				}
+			],
+			[
+				'duplicate frame',
+				(root) => {
+					root[section].push({ ...root[section][0] });
+				}
+			],
+			[
+				'foreign kind',
+				(root) => {
+					root[section][0].type = 'group';
+				}
+			],
+			[
+				'foreign identity',
+				(root) => {
+					root[section][0].id = 'foreign_header';
+				}
+			],
+			[
+				'missing caption',
+				(root) => {
+					root[section][0].i18n = '';
+				}
+			],
+			[
+				'foreign reader',
+				(root) => {
+					root[section][0].caption_getter = 'foreign_version';
+				}
+			],
+			[
+				'foreign caption recipe',
+				(root) => {
+					root[section][0].caption_layout = 'suffix';
+				}
+			],
+			[
+				'foreign caption joiner',
+				(root) => {
+					root[section][0].caption_joiner = ':';
+				}
+			],
+			[
+				'foreign platform',
+				(root) => {
+					root[section][0].platforms = ['hs'];
+				}
+			],
+			[
+				'foreign availability',
+				(root) => {
+					root[section][0].unavailable = 'disable';
+				}
+			],
+			[
+				'invented submenu',
+				(root) => {
+					root[section][0].rows = [];
+				}
+			]
+		]) {
+			const declarations = structuredClone(manifest);
+			change(declarations);
+			assert.notDeepEqual(declarations, manifest, section + ': ' + reason + ' changed source');
+			assert.equal(admits(source, declarations), false, section + ': ' + reason + ' refuses');
+			assert.equal(admits(), true, section + ': ' + reason + ' genuine inverse retained');
+		}
+	}
+	for (const [before, after, reason] of [
+		['function M.build(ctx)', 'function M.foreign(ctx)', 'withdrawn genuine root export'],
+		[
+			'local header, header_current = _build_header(ctx)',
+			'local header, header_current = Foreign.header(ctx)',
+			'disconnected physical header consumer'
+		],
+		[
+			'local rendered = separator_render(rows, "top_level")',
+			'local rendered = rows',
+			'withdrawn captured native render'
+		],
+		[
+			'or not header_current() then return {} end\n\treturn rendered',
+			'then return {} end\n\treturn rendered',
+			'withdrawn final physical header receipt'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': actual unique coordinate');
+		const candidate = source.replace(before, after);
+		assert.notEqual(candidate, source, reason + ': actual source changed');
+		assert.equal(candidate.replace(after, before), source, reason + ': exact source inverse');
+		assert.equal(admits(candidate), false, reason + ': physical ownership refuses');
+		assert.equal(admits(), true, reason + ': genuine inverse retained');
+	}
+	if (admits()) {
+		for (const section of ['linux_tray_active_header', 'linux_tray_paused_header']) {
+			reachableOn[section] = combineMenuVisibility(PLATFORMS, reachableOn[section], ['linux']);
+			openedBy[section] = 'actual guarded Linux header branch in the exported native tray root';
+			reachedByKinds[section] = { linux: new Set(['compose']) };
+		}
+	}
+}
+
 // Physical withdrawal controls prevent graph entries from becoming decorative orphan exemptions.
 {
 	const assert = require('node:assert/strict');
@@ -5065,6 +5300,65 @@ for (const platform of PLATFORMS) {
 }
 
 // ==================================================
+// The actual Linux root retains both canonical header frames through final rendering.
+{
+	const assert = require('node:assert/strict');
+	const headerRoot =
+		require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication;
+	const headerSource = fs.readFileSync(path.join(SP, 'linux/ui/menu/menu_builder.lua'), 'utf8');
+	assert.equal(headerRoot(headerSource), true, 'actual complete shared header root is admitted');
+	for (const [before, after, reason] of [
+		[
+			'local header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")',
+			'local header_template = Foreign.template_rows',
+			'foreign header projection owner'
+		],
+		[
+			'local header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")',
+			'local header_command = Foreign.command_row',
+			'foreign header command owner'
+		],
+		[
+			'local header, header_current = _build_header(ctx)',
+			'local header, header_current = Foreign.header(ctx)',
+			'disconnected actual header consumer'
+		],
+		[
+			'if not header or type(header_current) ~= "function" or not header_current() then return {} end',
+			'if false then return {} end',
+			'withdrawn initial header receipt'
+		],
+		[
+			'or not header_current() then return {} end\n\treturn rendered',
+			'then return {} end\n\treturn rendered',
+			'withdrawn post-render header receipt'
+		],
+		[
+			'local function header_facade_current()',
+			'local function header_facade_current() local header_template = Foreign.template_rows',
+			'shadowed actual header function'
+		],
+		[
+			'local function _build_header(ctx)',
+			'local function _build_header(ctx) header_template, Foreign.slot = function() return {} end, nil',
+			'complex header-owner rebind'
+		],
+		[
+			'local function _build_header(ctx)',
+			'local function _build_header(ctx) local ignored, header_command',
+			'bare comma header-owner shadow'
+		]
+	]) {
+		assert.equal(headerSource.split(before).length - 1, 1, reason + ': unique actual coordinate');
+		assert.equal(
+			headerRoot(headerSource.replace(before, after)),
+			false,
+			reason + ': genuine source refuses'
+		);
+		assert.equal(headerRoot(headerSource), true, reason + ': genuine inverse remains admitted');
+	}
+}
+
 // ==================================================
 // ======= 8/ Report ================================
 // ==================================================
