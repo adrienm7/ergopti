@@ -1465,6 +1465,13 @@ OPENS_SUBMENU.agent_disabled_apps = [
 		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
 	}
 ];
+// The actual Windows dynamic slot publishes the declared picker command.
+OPENS_SUBMENU.agent_disabled_apps.push({
+	menu: 'agent_windows_disabled_apps_command',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_agent.ahk' }
+});
 OPENS_SUBMENU.agent_disabled_app_records = {
 	menu: 'agent_linux_disabled_app_remove',
 	platforms: ['linux'],
@@ -1479,9 +1486,12 @@ for (const system of ['system1', 'system2']) {
 		...(Array.isArray(OPENS_SUBMENU[key]) ? OPENS_SUBMENU[key] : [OPENS_SUBMENU[key]]),
 		{
 			menu: 'agent_linux_' + system + '_frame',
-			platforms: ['linux'],
+			platforms: ['linux', 'ahk'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+			native_sources: {
+				linux: 'linux/ui/menu/agent_rows.lua',
+				ahk: 'windows/ui/menu/menu_llm/menu_agent.ahk'
+			}
 		},
 		{
 			menu: 'agent_linux_system_children',
@@ -1544,6 +1554,28 @@ OPENS_SUBMENU.llm_profile_parent = [
 		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
 	}
 ];
+
+// The captured receiver publishes this real parent around the completed native model picker.
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_parent_ahk',
+	platforms: ['ahk'],
+	kind: 'compose',
+	selected_group: {
+		ahk: {
+			transport: 'retained_model_receiver',
+			row: {
+				type: 'group',
+				id: 'llm_model',
+				i18n: 'menu.llm.model_parent_with_health',
+				caption_getters: ['llm_model_health_prefix', 'llm_model_current_caption'],
+				disabled_when: ['llm_model_parent_ready'],
+				platforms: ['ahk'],
+				unavailable: 'hide'
+			}
+		}
+	},
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+});
 
 // Existing native catalogue data owns brands and choices; the consumed shared frames own presentation.
 for (const menu of [
@@ -2339,6 +2371,376 @@ const {
 		false,
 		'the original whole-template predicate does not silently credit selected projections'
 	);
+}
+
+// A captured parent receiver earns credit only for the real returned native parent.
+{
+	const assert = require('node:assert/strict');
+	const file = 'windows/ui/menu/menu_llm/menu_main.ahk',
+		key = 'llm_model_parent_ahk';
+	const source = fs.readFileSync(path.join(SP, file), 'utf8');
+	const edges = OPENS_SUBMENU.llm_model.filter((edge) => edge.menu === key);
+	assert.equal(edges.length, 1, 'one actual model parent edge');
+	const edge = edges[0],
+		selected = edge.selected_group.ahk;
+	assert.deepEqual(edge.platforms, ['ahk'], 'retained model route stays Windows-only');
+	assert.equal(edge.kind, 'compose', 'the returned parent is an actual native composition');
+	assert.deepEqual(
+		edge.native_sources,
+		{ ahk: file },
+		'the route belongs to the real model emitter'
+	);
+	assert.equal(selected.transport, 'retained_model_receiver');
+	assert.deepEqual(manifest[key], [selected.row]);
+	const credits = (
+		candidate = source,
+		definition = manifest[key],
+		proof = selected,
+		section = key,
+		extension = '.ahk'
+	) => publishesSelectedMenuGroup(candidate, extension, section, definition, proof);
+	assert.equal(
+		credits(),
+		true,
+		'the real receiver, completed child and returned parent reach native AppendRows'
+	);
+	for (const [definition, proof, section, extension] of [
+		[[], selected, key, '.ahk'],
+		[[selected.row, selected.row], selected, key, '.ahk'],
+		[
+			[{ ...selected.row, platforms: ['ahk', 'hs'] }],
+			{ ...selected, row: { ...selected.row, platforms: ['ahk', 'hs'] } },
+			key,
+			'.ahk'
+		],
+		[
+			[{ ...selected.row, caption_getters: ['foreign_health', 'llm_model_current_caption'] }],
+			{
+				...selected,
+				row: { ...selected.row, caption_getters: ['foreign_health', 'llm_model_current_caption'] }
+			},
+			key,
+			'.ahk'
+		],
+		[manifest[key], { ...selected, transport: 'foreign_receiver' }, key, '.ahk'],
+		[manifest[key], selected, 'foreign_parent', '.ahk'],
+		[manifest[key], selected, key, '.lua']
+	])
+		assert.equal(
+			credits(source, definition, proof, section, extension),
+			false,
+			'scope, kind, platform and independently owned row remain mandatory'
+		);
+	const capture = 'ReceiveModel := MenuRenderer_GroupReceiver("llm_model_parent_ahk", "llm_model")';
+	const refusal =
+		'if !ReceiveModel\n\t\t\tthrow Error("Declared model parent admission was refused.")';
+	const build = 'model_menu := LLM_Menu_BuildModelMenu()';
+	const handoff =
+		'ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)';
+	const append =
+		'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_model_parent_ahk", ModelRows)';
+	const helper =
+		'_LLM_Menu_ModelParentRows(Receive, NativeChild, HealthPrefix, ModelCaption, Disabled) {';
+	const controls = [
+		[capture, 'ReceiveModel := false', 'receiver capture withdrawn'],
+		[capture, '; ' + capture + '\nReceiveModel := false', 'comment witness'],
+		[
+			capture,
+			"AuditText := '\n(\n" + capture + "\n)\n'\nReceiveModel := false",
+			'continuation data witness'
+		],
+		[
+			capture,
+			'ReceiveModel := Foreign.MenuRenderer_GroupReceiver("llm_model_parent_ahk", "llm_model")',
+			'foreign receiver owner'
+		],
+		[
+			capture,
+			capture.replace('"llm_model_parent_ahk"', '"foreign_parent"'),
+			'foreign admitted section'
+		],
+		[capture, capture.replace('"llm_model"', '"foreign_model"'), 'foreign admitted row'],
+		[capture, 'if false {\n' + capture + '\n}', 'dead nested receiver'],
+		[
+			refusal,
+			'if false\n\t\t\tthrow Error("Declared model parent admission was refused.")',
+			'early refusal withdrawn'
+		],
+		[
+			capture + '\n\t\t' + refusal + '\n\t\t' + build,
+			build + '\n\t\t' + capture + '\n\t\t' + refusal,
+			'admission moved after actual child'
+		],
+		[build, '_LLM_Menu_FireHealthProbe(true)\n\t\t' + build, 'probe before captured-child route'],
+		[build, 'model_menu := Foreign.LLM_Menu_BuildModelMenu()', 'foreign child builder'],
+		[handoff, 'ReceiveModel := Foreign\n\t\t\t' + handoff, 'receiver rebind'],
+		[
+			handoff,
+			'ReceiveModel.DefineProp("Call", {Call: Foreign})\n\t\t\t' + handoff,
+			'receiver Call replacement'
+		],
+		[handoff, 'model_menu := Foreign\n\t\t\t' + handoff, 'completed child replaced'],
+		[
+			handoff,
+			handoff.replace('(ReceiveModel, model_menu', '(Foreign, model_menu'),
+			'foreign handed receiver'
+		],
+		[
+			handoff,
+			handoff.replace('model_menu, health_dot', 'Foreign, health_dot'),
+			'foreign handed child'
+		],
+		[
+			handoff,
+			handoff.replace('health_dot, model_shown', 'model_shown, health_dot'),
+			'caption scalar positions swapped'
+		],
+		[handoff, handoff.replace(', disabled)', ', !disabled)'), 'resolved state inverted'],
+		[
+			handoff,
+			'ModelRows := Foreign(ReceiveModel, model_menu, health_dot, model_shown, disabled)',
+			'actual helper disconnected'
+		],
+		[append, append.replace('ModelRows)', '[])'), 'returned rows discarded'],
+		[append, append.replace('_LLM_Menu_Handle', 'ForeignMenu'), 'foreign native target'],
+		[append, append.replace('"llm_model_parent_ahk"', '"foreign_parent"'), 'foreign native frame'],
+		[append, 'ModelRows := []\n\t\t\t' + append, 'returned row array replaced'],
+		[append, 'ModelRows[1] := Foreign\n\t\t\t' + append, 'actual returned parent replaced'],
+		[append, 'return\n\t\t\t' + append, 'unreachable publication'],
+		[append, 'if false {\n' + append + '\n}', 'dead nested publication'],
+		['if !_MR_DeclaredParentCallable(Receive)', 'if false', 'canonical callable guard withdrawn'],
+		['(*) => HealthPrefix', '(*) => Foreign()', 'health getter is no longer a scalar read'],
+		['(*) => ModelCaption', '(*) => (Receive := Foreign)', 'constructor callback changes receiver'],
+		[
+			'"llm_model_parent_ready", (*) => !Disabled',
+			'"llm_model_parent_ready", (*) => Disabled',
+			'ready getter inverted'
+		],
+		[
+			'"llm_model_current_caption", (*) => ModelCaption',
+			'"foreign_caption", (*) => ModelCaption',
+			'foreign caption getter key'
+		],
+		[
+			'Parent := Receive.Call(NativeChild, Getters)',
+			'Parent := Foreign.Call(NativeChild, Getters)',
+			'foreign parent receiver'
+		],
+		[
+			'Parent := Receive.Call(NativeChild, Getters)',
+			'Alias := Receive\n\tParent := Alias.Call(NativeChild, Getters)',
+			'receiver alias supplies parent'
+		],
+		[
+			'Parent := Receive.Call(NativeChild, Getters)',
+			'Parent := Receive.Call(Foreign, Getters)',
+			'foreign child supplies parent'
+		],
+		[
+			'Parent := Receive.Call(NativeChild, Getters)',
+			'Parent := Receive.Call(NativeChild, Foreign)',
+			'foreign getters supply parent'
+		],
+		[
+			'Parent.Get("submenu", false) != NativeChild',
+			'false',
+			'real child identity refusal withdrawn'
+		],
+		['return [Parent]', 'return [Foreign]', 'actual parent discarded'],
+		['return [Parent]', 'Parent := Foreign\n\treturn [Parent]', 'actual parent rebound'],
+		[helper, helper + '\n\tlocal Receive := Foreign', 'local receiver shadow'],
+		[helper, helper + '\n\tglobal Getters', 'getter storage loses local ownership'],
+		[helper, helper + '\n\tstatic Parent := Foreign', 'parent storage loses local ownership'],
+		[helper, helper + '\n\tReceive["Call"] := Foreign', 'indexed receiver mutation'],
+		[
+			helper,
+			helper + '\n\tIgnored := {Call: (*) => (Receive := Foreign)}',
+			'nested constructor authority write'
+		],
+		[helper, helper + '\n\tGetters := "{"', 'quoted brace cannot delimit helper grammar'],
+		[helper, helper + '\n\treturn [Foreign]', 'premature helper return'],
+		['case "llm_model":', 'case "foreign_model":', 'real producer case withdrawn'],
+		[
+			'case "llm_backend":',
+			'case "llm_backend", "llm_model":',
+			'earlier literal list steals model dispatch'
+		],
+		[
+			'case "llm_backend":',
+			'case "LLM_MODEL":',
+			'earlier case-folded selector steals model dispatch'
+		],
+		[
+			'case "llm_backend":',
+			'case "llm_backend", "LLM_MODEL":',
+			'earlier case-folded list steals model dispatch'
+		],
+		[
+			'case "llm_backend":',
+			'case "llm_" . "model":',
+			'earlier expression can claim model dispatch'
+		],
+		[
+			'case "llm_backend":',
+			'case ForeignSelector():',
+			'earlier executed selector can mutate or claim dispatch'
+		],
+		[
+			'case "llm_profile":',
+			'case "llm_profile", "llm_model":',
+			'later selector still duplicates the actual producer domain'
+		],
+		[
+			'default:',
+			'default ForeignSelector():',
+			'unsupported default grammar cannot supply branch credit'
+		]
+	];
+	for (const [before, after, reason] of controls) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': actual unique preimage');
+		assert.equal(
+			credits(source.replace(before, after)),
+			false,
+			reason + ': no selected-group publication'
+		);
+		assert.equal(credits(), true, reason + ': exact source inverse');
+	}
+	for (const candidate of [
+		'MenuRenderer_GroupReceiver := Foreign\n' + source,
+		'MENURENDERER_GROUPRECEIVER := Foreign\n' + source,
+		'Alias := MenuRenderer_GroupReceiver\n' + source,
+		'Map := Foreign\n' + source,
+		'global Getters\n' + source,
+		'global Ignored, ReceiveModel\n' + source,
+		'_LLM_Menu_EmitRow := Foreign\n' + source,
+		source + '\n' + helper + '\nreturn [Foreign]\n}\n',
+		source.replace('case "llm_profile":', 'case "llm_model":\n\t\treturn\n\tcase "llm_profile":'),
+		source.replace(capture, 'ReceiveModel := false') +
+			'\n_UnusedModelReceiver() {\n' +
+			capture +
+			'\n}\n',
+		source.replace(capture, 'ReceiveModel := false') +
+			'\n_UnusedModelGroup() {\nParent := MenuRenderer_GroupRow("llm_model_parent_ahk", "llm_model", Child, Getters)\n}\n'
+	])
+		assert.equal(
+			credits(candidate),
+			false,
+			'duplicate, shadowed, aliased or decorative owners do not replace the actual receiver route'
+		);
+	const helperStart = source.indexOf(helper),
+		helperEnd = source.indexOf('\n}', helperStart) + 2;
+	assert(helperStart >= 0 && helperEnd > helperStart, 'actual finite helper is present');
+	const actualHelper = source.slice(helperStart, helperEnd);
+	const renamed =
+		source.slice(0, helperStart) +
+		actualHelper.replace(/\bGetters\b/g, 'ModelGetters').replace(/\bParent\b/g, 'ModelParent') +
+		source.slice(helperEnd);
+	assert.notEqual(renamed, source, 'actual fresh-local rename changes the original helper');
+	assert.equal(
+		credits(renamed),
+		true,
+		'fresh helper-local names preserve actual parameter/getter/parent relationships'
+	);
+	const originalGetterOrder =
+		'"llm_model_health_prefix", (*) => HealthPrefix,\n\t\t"llm_model_current_caption", (*) => ModelCaption';
+	assert.equal(
+		source.split(originalGetterOrder).length - 1,
+		1,
+		'actual scalar getter-order preimage'
+	);
+	const reordered = source.replace(
+		originalGetterOrder,
+		'"llm_model_current_caption", (*) => ModelCaption,\n\t\t"llm_model_health_prefix", (*) => HealthPrefix'
+	);
+	assert.notEqual(reordered, source, 'actual getter-order control changes the helper');
+	assert.equal(
+		credits(reordered),
+		true,
+		'getter map insertion order does not change scalar ownership'
+	);
+	const caseStart = source.indexOf('case "llm_model":'),
+		caseEnd = source.indexOf('case "llm_profile":', caseStart);
+	assert(caseStart >= 0 && caseEnd > caseStart, 'actual model producer case is present');
+	const actualCase = source.slice(caseStart, caseEnd);
+	const renamedCase = actualCase
+		.replace(/\bReceiveModel\b/g, 'ModelReceiver')
+		.replace(/\bmodel_menu\b/g, 'ModelChild')
+		.replace(/\blast_status\b/g, 'ModelStatus')
+		.replace(/\bhealth_dot\b/g, 'ModelPrefix')
+		.replace(/\bmodel_shown\b/g, 'ModelShown')
+		.replace(/\bModelRows\b/g, 'ReturnedModelRows');
+	assert.notEqual(
+		renamedCase,
+		actualCase,
+		'actual model case alpha control changes physical local roles'
+	);
+	assert.equal(
+		credits(source.slice(0, caseStart) + renamedCase + source.slice(caseEnd)),
+		true,
+		'fresh capture, child, scalar and result names preserve the actual transport relationships'
+	);
+	const originalBackendSelector = 'case "llm_backend":';
+	assert.equal(
+		source.split(originalBackendSelector).length - 1,
+		1,
+		'actual unrelated sibling selector preimage'
+	);
+	const unrelatedAlias = source.replace(
+		originalBackendSelector,
+		'case "llm_backend", "llm_backend_native_alias":'
+	);
+	assert.notEqual(unrelatedAlias, source, 'actual unrelated literal selector list changes source');
+	assert.equal(
+		credits(unrelatedAlias),
+		true,
+		'unrelated literal selector lists do not claim or execute model dispatch'
+	);
+	assert.equal(
+		publishesTemplate(source, '.ahk', key),
+		false,
+		'generic whole-template publication is not widened for retained receivers'
+	);
+	const actualArrayConstructor = 'return [\n\t\tMap("id", "llm_backend",';
+	const actualTernaryConstructor = 'OwnedOptions := IsSet(Options) ? Options : Map()';
+	for (const [before, after, reason] of [
+		[
+			actualArrayConstructor,
+			'return [ Map("id", "llm_backend",',
+			'the genuine fallback Array contains a direct Map constructor'
+		],
+		[
+			actualTernaryConstructor,
+			'OwnedOptions := IsSet(Options) ? Options :  Map()',
+			'the genuine ternary fallback contains a direct Map constructor'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': actual unique preimage');
+		const changed = source.replace(before, after);
+		assert.notEqual(changed, source, reason + ': actual value-context change');
+		assert.equal(credits(changed), true, reason + ': canonical constructor retains route');
+		assert.equal(credits(), true, reason + ': exact source inverse');
+	}
+	for (const prefix of [
+		'Unused := Foreign[Map]\n',
+		'Unused := Foreign[Map()]()\n',
+		'Unused := Foreign[Map]()\n',
+		'Unused := Foreign.return[Map()]()\n',
+		'Unused := Foreign[Flag ? Options : Map()]()\n',
+		'Unused := Foreign[[Map()]]()\n',
+		'Unused := [Map]\n',
+		'Unused := Foreign.Map()\n',
+		'Map := Foreign\n',
+		'Map["Call"] := Foreign\n',
+		'Unused := Foreign[MenuRenderer_GroupReceiver]\n'
+	]) {
+		assert.equal(
+			credits(prefix + source),
+			false,
+			'indexed callable, bare alias, member or class write remains refused'
+		);
+		assert.equal(credits(), true, 'exact constructor authority inverse');
+	}
+	assert.equal(credits(), true, 'actual inverse retains the real selected parent transport');
 }
 
 // An inert readout is admissible only through composition. A clicked parent,
@@ -6912,3 +7314,203 @@ function languageParentSource(source, driver) {
 	assert.equal(admits(''), false, 'missing actual native owner');
 	assert.equal(admits(source), true, 'genuine source remains admitted after negative controls');
 })();
+
+// Authenticated Group5 configuration recovery coexists with the genuine Layout receiver.
+{
+	const assert = require('node:assert/strict');
+	const proof = require('../lib/menu-native-llm-parent-binding.cjs');
+	const expected = JSON.parse(
+		fs.readFileSync(
+			path.join(__dirname, 'fixtures/menu-macos-configuration-recovery-dispatch.json'),
+			'utf8'
+		)
+	);
+	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8');
+	const layout = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_keyboard_layout.lua'), 'utf8');
+	const admits = (candidate) =>
+		proof.nativeMacLayoutTopLevelPublication(candidate, layout, manifest);
+	const count = (text, needle) => text.split(needle).length - 1;
+	assert.equal(
+		count(source, expected.original_configuration) + count(source, expected.configuration_recovery),
+		1,
+		'one genuine authenticated configuration dispatch'
+	);
+	const current = source.includes(expected.original_configuration)
+		? expected.original_configuration
+		: expected.configuration_recovery;
+	const historical = source.replace(current, expected.original_configuration);
+	const recovery = source.replace(current, expected.configuration_recovery);
+	assert.equal(
+		recovery.replace(expected.configuration_recovery, current),
+		source,
+		'recovery source exact inverse'
+	);
+	assert.equal(
+		historical.replace(expected.original_configuration, current),
+		source,
+		'historical source exact inverse'
+	);
+	assert.equal(admits(historical), true, 'complete original dispatch remains supported');
+	assert.equal(
+		admits(recovery),
+		true,
+		'authenticated recovery dispatch retains actual Layout receiver'
+	);
+	const historicalRefusals = [
+		[
+			'ManifestMenu.group_receiver("top_level", "keyboard_layout")',
+			'ManifestMenu.group_receiver("top_level", "shortcuts")'
+		],
+		[
+			'if not receive then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")',
+			'if false then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")'
+		],
+		['layout_enabled = function() return nil end', 'layout_enabled = function() return false end'],
+		[
+			'local parent = receive(submenu, { layout_enabled',
+			'local parent = receive({}, { layout_enabled'
+		],
+		['return collect(key .. ".build", mod.build, arg or ctx)', 'return {}'],
+		[
+			'local result = Logger.build(LOG, label, fn, arg)',
+			'local result = { label = "Foreign", submenu = {} }'
+		],
+		[
+			'local builders = {',
+			'local function module_rows(ignored) return { {submenu = {}} } end\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'local function collect(ignored) return { {submenu = {}} } end\nlocal builders = {'
+		],
+		['local builders = {', 'local module_rows\nlocal builders = {'],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders.keyboard_layout = function() return {} end\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders["keyboard_layout"] = function() return {} end\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'local builders = {}\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders = {}\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'local unused = builders\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'local children = builders[id]() or {}',
+			'builders.keyboard_layout = function() return {} end\nlocal children = builders[id]() or {}'
+		],
+		[
+			'\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do',
+			'\n\t\tkeyboard_layout = function(ignored) return {} end,\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do'
+		],
+		['local builders = {', 'local ignored, module_rows\nlocal builders = {'],
+		[
+			'local builders = {',
+			'module_rows, Foreign.slot = function() return { {submenu = {}} } end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, Foreign[1] = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, (Foreign).slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, Factory().slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'local function unrelated(module_rows) return {} end\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'for ignored, module_rows in pairs({}) do break end\nlocal builders = {'
+		],
+		['local builders = {', 'local ignored, collect\nlocal builders = {'],
+		[
+			'local builders = {',
+			'collect, Foreign.slot = function() return { {submenu = {}} } end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, Foreign[1] = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, (Foreign).slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, Factory().slot = function() return {} end, nil\nlocal builders = {'
+		],
+		['local builders = {', 'local function unrelated(collect) return {} end\nlocal builders = {'],
+		['local builders = {', 'for ignored, collect in pairs({}) do break end\nlocal builders = {'],
+		[
+			'local builders = {',
+			'module_rows, ignored = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'return parent and { parent } or {}\n\t\tend,\n\t\t["hotstrings"]',
+			'return {}\n\t\tend,\n\t\t["hotstrings"]'
+		]
+	];
+	for (const candidate of [historical, recovery]) {
+		for (const [before, after] of historicalRefusals) {
+			assert.equal(count(candidate, before), 1, 'same genuine historical refusal coordinate');
+			const withdrawn = candidate.replace(before, after);
+			assert.notEqual(withdrawn, candidate);
+			assert.equal(
+				admits(withdrawn),
+				false,
+				'historical refusal also binds authenticated dispatch'
+			);
+			const offset = candidate.indexOf(before);
+			assert.equal(withdrawn.slice(offset, offset + after.length), after);
+			assert.equal(
+				withdrawn.slice(0, offset) + before + withdrawn.slice(offset + after.length),
+				candidate,
+				'historical refusal exact inverse'
+			);
+		}
+	}
+	for (const [before, after] of [
+		['local switch_providers = {}', 'local switch_providers = { foreign = true }'],
+		[
+			'local switch_commands, switch_getters, providers = require("ui.menu.remap_switch")',
+			'local switch_commands, switch_getters, providers = require("foreign.remap_switch")'
+		],
+		[
+			'.rows(ctx.karabiner, ctx.updateMenu, ctx.recover_shared_runtime, ctx.can_recover_shared_runtime)',
+			'.rows(ctx.karabiner, ctx.updateMenu, ctx.recover_shared_runtime, nil)'
+		],
+		['\n\t\t\t\tswitch_providers = providers\n', '\n\t\t\t\tswitch_providers = {}\n'],
+		[
+			'local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx, switch_providers)',
+			'local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx, {})'
+		],
+		['if row.disabled == true then row.fn = nil end', 'if false then row.fn = nil end']
+	]) {
+		assert.equal(count(recovery, before), 1, 'authenticated recovery mutation unique source owner');
+		const withdrawn = recovery.replace(before, after);
+		assert.notEqual(withdrawn, recovery);
+		assert.equal(admits(withdrawn), false, 'partial or foreign recovery dispatch refuses');
+		const offset = recovery.indexOf(before);
+		assert.equal(withdrawn.slice(offset, offset + after.length), after);
+		assert.equal(
+			withdrawn.slice(0, offset) + before + withdrawn.slice(offset + after.length),
+			recovery,
+			'recovery refusal exact inverse'
+		);
+	}
+}

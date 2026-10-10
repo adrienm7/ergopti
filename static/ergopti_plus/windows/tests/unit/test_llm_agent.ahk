@@ -1986,3 +1986,102 @@ _LAG_ModelCaptionGetterRefusal() {
 }
 Test("LLM agent: canonical Model getter refusal and native repair (agent-model-caption-getter)",
 	_LAG_ModelCaptionGetterRefusal)
+
+
+; Original 21-language provider captions captured before this shared migration.
+_LAG_WindowsProviderCaptionCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\windows_agent_fixed_captions_original.json", "UTF-8"))
+}
+
+_LAG_WindowsProviderCaptionLocale(Code) {
+	Corpus := _LAG_WindowsProviderCaptionCorpus()
+	_LAG_Run(_LAG_Menu("action", Corpus["backend"], Corpus["backend"]), _LTN_Screen(""), _Body.Bind(Code, Corpus))
+	_Body(Code, Corpus, Fx, Lines, Sent) {
+		_LAG_WithModelCaptionLocale(Code, _Read.Bind(Code, Corpus, Fx))
+		_Read(Code, Corpus, Fx) {
+			global _LLM_Menu, _MenuDispatchCallbacks
+			Expected := Corpus["locales"][Code]
+			Owned := []
+			try {
+				_LLM_Menu["agent_disabled_apps"] := ["slack.exe", "mail.exe"]
+				Built := LLM_Agent_MenuBuild()
+				Owned.Push(Built)
+				AssertEqual(Expected["systems"]["system1"]["cerebras"], _CTC_LabelAt(Built, 2))
+				AssertEqual(Expected["systems"]["system2"]["cerebras"], _CTC_LabelAt(Built, 3))
+				AssertEqual(Expected["apps"]["2"], _CTC_LabelAt(Built, 5))
+				CommandId := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", 5, "uint")
+				AssertTrue(_MenuDispatchCallbacks.Has(CommandId), "the actual picker command reaches the native dispatcher")
+				for System in ["system1", "system2"] {
+					Row := _LLM_Agent_SystemRow("agent_" . System)
+					AssertEqual(Expected["systems"][System]["cerebras"], Row["label"])
+					Literal := _LLM_Agent_MenuSystemFrame("agent_" . System, Corpus["literal_native"], Row["items"])
+					AssertEqual(Expected["systems"][System]["literal_native"], Literal["label"])
+					AssertTrue(Literal["items"] == Row["items"], "the declared group keeps the finished native children")
+					_LLM_Menu["agent_" . System] := ""
+					AssertEqual(Expected["systems"][System]["off"], _LLM_Agent_SystemRow("agent_" . System)["label"])
+				}
+				for Count in Corpus["counts"] {
+					Apps := []
+					Loop Count
+						Apps.Push("app" . A_Index . ".exe")
+					_LLM_Menu["agent_disabled_apps"] := Apps
+					Row := _LLM_Agent_AppsRow()
+					AssertEqual(Expected["apps"]["" . Count], Row["label"])
+					AssertTrue(HasMethod(Row["action"], "Call"))
+				}
+				AssertEqual(0, Fx.Commits.Length)
+				AssertEqual(0, Fx.Rebuilds)
+			} finally {
+				for Built in Owned
+					_CTC_ReleaseMenu(Built)
+			}
+		}
+	}
+}
+for Code in ["ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl",
+	"no", "pl", "pt", "ru", "sv", "tr", "uk", "zh"]
+	Test("LLM agent: shared Windows fixed provider captions " . Code . " (agent-windows-provider-captions)",
+		_LAG_WindowsProviderCaptionLocale.Bind(Code))
+
+_LAG_WindowsProviderFrameRefusal() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		Root := _MR_GetManifestRoot()
+		Owned := []
+		try {
+			for Entry in [["agent_linux_system1_frame", "agent_system1", 2],
+				["agent_linux_system2_frame", "agent_system2", 3],
+				["agent_windows_disabled_apps_command", "agent_disabled_apps", 5]] {
+				Section := Entry[1], Key := Entry[2], Original := Root[Section]
+				try {
+					for Fault in ["missing", "foreign getter", "foreign row"] {
+						if Fault == "missing"
+							Root.Delete(Section)
+						else if Fault == "foreign getter" {
+							Broken := Original[1].Clone()
+							Broken["caption_getter"] := "unowned_agent_caption"
+							Root[Section] := [Broken]
+						} else
+							Root[Section] := [Original[1], Map("type", "label", "id", "foreign_agent_tail", "i18n", "menu.agent.off")]
+						Row := Key == "agent_disabled_apps" ? _LLM_Agent_AppsRow() : _LLM_Agent_SystemRow(Key)
+						AssertFalse(Row, Fault . " refuses the actual provider before native append")
+						Built := LLM_Agent_MenuBuild()
+						Owned.Push(Built)
+						AssertTrue(Built is Menu, "other actual Agent providers still build")
+						AssertEqual(0, Fx.Commits.Length)
+						AssertEqual(0, Fx.Rebuilds)
+						Root[Section] := Original
+					}
+				} finally Root[Section] := Original
+				Row := Key == "agent_disabled_apps" ? _LLM_Agent_AppsRow() : _LLM_Agent_SystemRow(Key)
+				AssertTrue(Row is Map, "same canonical declaration repair restores its native provider")
+			}
+		} finally {
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
+	}
+}
+Test("LLM agent: shared Windows provider declaration refusal and repair (agent-windows-provider-captions)",
+	_LAG_WindowsProviderFrameRefusal)

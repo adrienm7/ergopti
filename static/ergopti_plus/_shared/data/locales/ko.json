@@ -3284,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "진단 검사 실패: %s.",
 	"healthcheck.export.privacy_notice": "이 보고서는 허용된 기술 정보만 공유합니다. 상세 정보를 켜도 로그, 자유 형식 텍스트, 경로 및 식별 정보는 제외됩니다. 로컬 페이지 테스트는 포함되지 않습니다.",
 	"sg_actions.llm_translate_context": "🌐 현재 문장 번역 [설정 가능]",
-	"menu.about.startup_other_command_reason": "다른 시작 명령: 시작이 다른 명령 또는 설치에 설정되어 있습니다. 기존 설정은 유지됩니다."
+	"menu.about.startup_other_command_reason": "다른 시작 명령: 시작이 다른 명령 또는 설치에 설정되어 있습니다. 기존 설정은 유지됩니다.",
+	"menu.llm.model_parent_with_health": "%s선택된 모델: %s"
 }

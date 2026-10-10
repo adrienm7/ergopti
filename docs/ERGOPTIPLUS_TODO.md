@@ -6210,6 +6210,34 @@ required the actual captured Linux renderer owner. macOS Brew packaging and two
 Windows network subjects remain failed; dependent Windows E2E/package/install
 and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
 
+The Windows Agent System1/System2 parents now consume the same declared fixed
+caption frames as Linux, with literal native backend labels and finished native
+children retained. The disabled-applications command uses a Windows-only shared
+declaration and its existing picker callback. All 21 original locale projections
+and counts 0/2/1234 remain in an independently captured original-source corpus;
+all prior 466 native assertions and 47 registrations remain byte-exact. Genuine
+menu generation and the whole manifest/parity source controls pass. The actual
+allocation census remains 22 Windows/6 macOS/4 Linux. Complete local checks pass:
+407 JavaScript checks, 18,158 macOS modeled assertions and 12,997 Linux assertions.
+Windows native execution and installed acceptance remain pending; these results
+do not close items 54, 16 or 38.
+
+The Windows model parent now consumes a declared health prefix and the existing
+model caption through two ordered scalar getters. An independent original-label
+corpus preserves all 252 projections across 21 locales, three health states and
+four model states. Actual whole manifest and parity controls pass, including
+retained native child ownership and constructor-context refusal regressions.
+All previous native assertions remain. Complete native Windows, packaging and
+installed acceptance remain pending; items 54, 16 and 38 stay open.
+
+The macOS paths editor now gives its actual application identity to the native
+window factory, which consumes the existing shared application title declaration
+before allocating or retitling the window. All 21 original captions remain in an
+independent corpus. The actual producer/factory modeled host passes 34/0 and the
+existing asynchronous-owner module passes 5/0. Legacy callback title timing is
+preserved. Cocoa, Hammerspoon, packaging and installed acceptance are unexecuted.
+This bounded migration does not close items 54, 16 or 38.
+
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
@@ -6468,6 +6496,22 @@ providers. The owning generator now records 22 Windows, 6 macOS and 4 Linux
 residual sites. Full composed, native and installed qualification remain open;
 this neutral cleanup completes no parent item.
 
+The Layout source proof also admits the authenticated Group5 configuration
+recovery route without changing its production code or the original complete
+dispatch. Both exact dispatch variants retain all 32 original refusal controls;
+six additional controls reject partial or foreign recovery ownership. The
+independent fixture comes from the immutable original Group5 source, before
+the proof change. This compatibility correction completes no parent item and
+does not provide native or installed-device acceptance.
+
+The actual Windows run for the model parent declaration executed all 30 new
+subjects: 27 passed and three failed during fixture setup, before the production
+emitter, because the previous native handle was absent. The two scoped fixtures
+now preserve the original handle presence as well as its reference. Production,
+all assertions and the independent caption corpus remain unchanged. The Agent
+provider subjects passed 22/22. Corrected model emitter and cleanup execution
+still require Windows validation; the historical full suite remains failed.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -6478,6 +6522,34 @@ this neutral cleanup completes no parent item.
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+2026-10-10 selected-release native receiving enrollment. A bounded new Mac
+matrix step now runs the frozen50 shell-corpus vectors and original guardian
+SIGTERM/SIGINT controls independently of the failing archive prerequisite. Its
+always-retained evidence and mandatory raw-command/condition guards are additive;
+fourteen independent omissions reject dropped or weakened enrollment. The two
+new receiving tools preserve the original50 corpus, native guardian and120-second
+clock. Twenty-five controlled Linux POSIX wrapper checks are separately enrolled
+in the normal JS registry; they are synthetic envelope/refusal controls, not
+Darwin50 or native network acceptance. All407 previous entries and481 scripts
+stay intact; the Linux registry adds one entry, with Windows/Darwin unchanged.
+Root Windows guards and direct Mac55 receiving are preserved. Actual25 pass
+in Linux; selected formatting passes and407/408 JS checks pass, with only the
+unchanged protected-temporary-root uninstall fixture failing. Its exact replay
+in a non-Git temporary root passes. Darwin50, native cancellation and final
+package/install outcomes remain pending. No
+production guard, original assertion or item36/62/16/38 closure changes.
+
+2026-10-10 direct Mac helper receiving enrollment. The existing Group6 native
+receiving step now adds APIwire20 and serve35 beside its unchanged private-session5
+and numeric-TLS8. Exactly three body spans add the calls, strict count allowlist
+and two always-retained logs; reversing those spans recovers the entire current
+Dev workflow. Original five-minute clock, PIPESTATUS, oneOK/noSKIP/1MiB guards,
+job topology and Root Windows evidence guards remain unchanged. This enrolls
+portable process/pipe/EOF/reap controls on both Mac architectures; it does not
+qualify a genuine signed listener, model generation or enterprise routing.
+Actual hosted55 and complete native/package/install acceptance remain pending;
+item62, item36 and transversal16/38 stay open.
 
 2026-10-10 native TLS fixture receiving at fe3da8332. Exact manual38032632804
 is terminal failure:3 successful,7 failed and7 skipped jobs. Both native
@@ -8530,6 +8602,22 @@ and the complete Linux package/install verdict. Its JS frame consumer assertion
 required the actual captured Linux renderer owner. macOS Brew packaging and two
 Windows network subjects remain failed; dependent Windows E2E/package/install
 and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
+
+The Windows Agent fixed-caption migration uses canonical shared declarations
+without changing backend/model/save/picker owners or the 21 prior captions. See
+item 54 for the original-source corpus and actual local qualification. The
+22/6/4 allocation census and native/installed acceptance keep item 81 open.
+
+The Windows model-parent caption now consumes shared declared policy while
+retaining actual child/probe/callback ownership. The canonical allocation census
+remains 22 Windows/6 macOS/4 Linux before the separate Mac title slice. Item 54
+records the independent corpus and qualification limits; item 81 stays open.
+
+The actual macOS paths-editor window factory now consumes its canonical app
+title identity. The unchanged owning generator retires one genuine title site,
+yielding 22 Windows/5 macOS/4 Linux. Original captions and legacy lifecycle
+behavior remain covered; native/installed qualification and other presentation
+sites remain open. Neither item 54 nor item 81 is complete.
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.

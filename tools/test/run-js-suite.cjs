@@ -1961,6 +1961,16 @@ const CHECKS = [
 		args: ['tools/test/test-python-resolution.cjs'],
 		repro: 'node tools/test/test-python-resolution.cjs'
 	},
+	...(process.platform === 'linux'
+		? [
+				{
+					name: 'Darwin receiver controlled refusal contracts; actual Darwin remains unexecuted',
+					cmd: process.execPath,
+					args: ['tools/test/test-macos-release-stage-native-receiving.cjs'],
+					repro: 'npm run test:macos-release-stage-native-receiving-controls'
+				}
+			]
+		: []),
 	{
 		name: 'Ollama server command preserves exact process ownership',
 		cmd: 'node',
