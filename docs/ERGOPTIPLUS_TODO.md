@@ -3372,6 +3372,11 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
 
+The custom local-server publication fixture now clones the native callback
+table before installing its interceptors and asserts the genuine singleton
+remains unchanged. This dependency-isolation correction preserves every prior
+assertion; Windows execution is pending.
+
 The Windows journal now retains the actual eight native callback owners before
 and after each recovery and guarded I/O leg, including the final source guard.
 Genuine acquired-read timer controls are registered; their native execution
