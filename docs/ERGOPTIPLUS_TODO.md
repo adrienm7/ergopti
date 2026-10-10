@@ -7953,6 +7953,20 @@ controlled fixtures, not macOS qualification. Shared migration consent,
 authenticated readiness, Lua lifecycle consumption and retained serve cleanup
 authority remain software work; items 62, 16 and 38 remain open.
 
+2026-10-10 native daemon API readiness prerequisite. The optional
+`--acquire-readiness` path requires a caller nonce and authenticates the original
+accepted listener and same-session challenge through the shared pull admission
+policy before READY. Each helper is registered before resource acquisition;
+callback retirement, source/session withdrawal and partial child-constructor
+failure preserve exact ownership and the original absolute deadline. Uncertain
+helper closure retains debt and refuses READY or namespace retirement. All
+31 previous method bodies remain unchanged; 55 actual POSIX controls pass and
+two causal mutations fail. Native signing, catalogue and listener frames are
+controlled fixtures, not Darwin production qualification. The production guard
+stays false. Eventual listener readiness, shared migration consent, G4 lifecycle
+consumption and retained serve cleanup authority remain CODE; items 62, 16 and
+38 remain open.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
