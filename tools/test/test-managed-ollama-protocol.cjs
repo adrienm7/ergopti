@@ -298,7 +298,7 @@ const cases = [
 if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
 	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
-	cases.push(['tools/test/macos_native_ollama_api_test.py', 8]);
+	cases.push(['tools/test/macos_native_ollama_api_test.py', 20]);
 	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 55]);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 16]);
@@ -322,7 +322,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_trusted_native_guardian_test.py', 10]);
 	cases.push(['tools/diagnostics/macos_guardian_retirement_order_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_test.py', 14]);
-	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 23]);
+	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 35]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_reader_test.py', 13]);
 	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 10]);
 	// Preserve the original 37 controls and add seven atomic-result receiving laws.
