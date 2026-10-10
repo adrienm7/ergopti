@@ -900,6 +900,20 @@ _HS_PersonalRows(Options := unset) {
 		; what they were until 2026-08-07: MenuRenderer_AppendRows renders row DATA
 		; into a menu the CALLER owns, so the driver can hold the reference it needs
 		; and still let the renderer draw every row in it.
+		; An empty inventory has no dynamic leaf source to admit on any driver.
+		HasDefaultChoices := false
+		for _, SecName in TomlData["sections_order"] {
+			if SecName != "-" && TomlData["sections"].Has(SecName) {
+				HasDefaultChoices := true
+				break
+			}
+		}
+		if HasDefaultChoices {
+			; Admit the actual record source before allocating callback-owned menus.
+			DefaultChoiceDefinition := _MR_FindItemById("hotstring_personal_default_choice", "personal_default_section")
+			if !(DefaultChoiceDefinition is Map) || _MR_Get(DefaultChoiceDefinition, "type") != "check"
+				return []
+		}
 		PersonalMenu := Menu()
 		OwnedMenus.Push(PersonalMenu)
 		DefaultSectionMenu := Menu()
@@ -914,10 +928,13 @@ _HS_PersonalRows(Options := unset) {
 			if !TomlData["sections"].Has(SecName)
 				continue
 			SecLabel := DisambiguatedLabels[SecName]
-			DefaultRows.Push(Map(
-				"label",   SecLabel,
-				"action",  _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
-				"checked", (CurDefaultSec == SecName) ? true : false))
+			DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",
+				Map("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)),
+				Map("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),
+					"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))
+			if !(DefaultChoice is Map)
+				return []
+			DefaultRows.Push(DefaultChoice)
 		}
 		DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
 		DefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)

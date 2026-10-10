@@ -1610,6 +1610,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 
+	local personal_choices_admitted = true
 	local providers = {
 		["hotstring_categories_standard"] = function()
 			local rows = {}
@@ -1817,14 +1818,21 @@ local function _manifest_hotstring_rows(ctx, config)
 				local choices = {}
 
 				for _, name in ipairs(personal and personal.sections_order or {}) do
-					choices[#choices + 1] = {
-						label   = name,
-						checked = (current == name),
-						action      = function()
+					local selected = (current == name)
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {
+						["personal_default_section"] = function()
 							Editor.set_pref("default_section", name)
 							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 						end,
-					}
+					}, {
+						personal_default_section_label = function() return name end,
+						personal_default_section_selected = function() return selected end,
+					})
+					if type(choice) ~= "table" then
+						personal_choices_admitted = false
+						return {}
+					end
+					choices[#choices + 1] = choice
 				end
 				local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {
 					["personal_default_none"] = none_action,
@@ -2220,7 +2228,9 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.state_getters["hotstrings_enabled"] = hotstrings_on
 	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree ~= nil and whole_tree.checked end
 
-	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
+	local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
+	if not personal_choices_admitted then return nil end
+	return rows
 end
 
 --- Builds the hotstrings submenu: the manifest's rows, then this driver's own.

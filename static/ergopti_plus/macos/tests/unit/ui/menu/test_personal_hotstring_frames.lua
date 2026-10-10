@@ -214,3 +214,82 @@ helpers.describe("personal hotstrings complete shared frames", function()
 	end)
 
 end)
+
+--- Restores the exact private declaration independently of scenario failure.
+--- @param frame table Genuine existing provider fixture.
+--- @param scenario function Receives the retained original leaf declaration.
+local function with_default_choice_declaration(frame, scenario)
+	local key = "hotstring_personal_default_choice"
+	local original = rawget(frame.root, key)
+	assert(type(original) == "table", "the genuine generated choice declaration exists")
+	local native_index
+	for index, row in ipairs(original) do
+		for _, platform in ipairs(row.platforms or {}) do
+			if platform == "hs" then
+				assert(native_index == nil, "the original leaf has one actual native-visible owner")
+				native_index = index
+			end
+		end
+	end
+	assert(native_index ~= nil, "the original leaf has its actual native-visible owner")
+	local ok, result = xpcall(function() return scenario(key, original, native_index) end, function(err) return err end)
+	rawset(frame.root, key, original)
+	if not ok then error(result, 0) end
+	return result
+end
+
+helpers.describe("shared personal default-category leaf policy", function()
+	for _, kind in ipairs({ "missing", "kind", "caption" }) do
+		helpers.it("refuses actual provider with " .. kind .. " leaf source and repairs exactly", function()
+			with_personal_frame(function(f)
+				with_default_choice_declaration(f, function(key, original, native_index)
+					assert(type(f.build()) == "table")
+					local changed = {}
+					if kind ~= "missing" then
+						for index, row in ipairs(original) do changed[index] = row end
+						local row = {}
+						for field, value in pairs(original[native_index]) do row[field] = value end
+						if kind == "kind" then row.type = "label"
+						else row.caption_getter = "unavailable_default_caption" end
+						changed[native_index] = row
+					end
+					rawset(f.root, key, changed)
+					helpers.assert_eq(f.build(), nil, "a refused dynamic leaf cannot publish a partial default frame")
+					helpers.assert_eq(f.context.state.custom_default_section, "beta")
+					helpers.assert_eq(f.calls.defaults, 0); helpers.assert_eq(f.calls.saves, 0)
+					helpers.assert_eq(f.calls.updates, 0)
+					rawset(f.root, key, original)
+					local repaired = assert(f.build())
+					local parent = assert(find(repaired.submenu, f.corpus.default_parent_labels.hs[f.locale]))
+					for index, caption in ipairs(f.corpus.default_choices.hs_duplicate_and_placeholder) do
+						if caption == "none" then caption = f.corpus.none_captions.hs[f.locale] end
+						if caption == "separator" then caption = "-" end
+						helpers.assert_eq(parent.menu[index].title, caption)
+						helpers.assert_eq(parent.menu[index].checked == true, f.corpus.default_checks.hs[index])
+					end
+				end)
+			end)
+		end)
+	end
+	helpers.it("retained actual choice refuses missing source and dispatches after exact repair", function()
+		with_personal_frame(function(f)
+			with_default_choice_declaration(f, function(key, original)
+				local rows = assert(f.build()).submenu
+				local parent = assert(find(rows, f.corpus.default_parent_labels.hs[f.locale]))
+				local choice = assert(parent.menu[3])
+				helpers.assert_eq(choice.title, f.corpus.default_choices.hs_duplicate_and_placeholder[3])
+				rawset(f.root, key, {})
+				helpers.assert_eq(choice.fn(), false)
+				helpers.assert_eq(f.context.state.custom_default_section, "beta")
+				helpers.assert_eq(f.calls.defaults, 0); helpers.assert_eq(f.calls.saves, 0)
+				helpers.assert_eq(f.calls.updates, 0)
+				rawset(f.root, key, original)
+				choice.fn()
+				helpers.assert_eq(f.context.state.custom_default_section, "alpha")
+				helpers.assert_eq(f.calls.defaults, 1); helpers.assert_eq(f.calls.saves, 1)
+				helpers.assert_eq(f.calls.updates, 1)
+				-- Existing context ports record callback effects; this is not a durable native preference ACK.
+			end)
+		end)
+	end)
+end)

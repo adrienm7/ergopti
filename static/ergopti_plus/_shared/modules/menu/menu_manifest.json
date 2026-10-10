@@ -6979,5 +6979,34 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"hotstring_personal_default_choice": [
+		{
+			"type": "check",
+			"id": "personal_default_section",
+			"caption_source": "native",
+			"caption_getter": "personal_default_section_label",
+			"checked_when": [
+				"personal_default_section_selected"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "check",
+			"id": "personal_default_section",
+			"caption_source": "native",
+			"caption_getter": "personal_default_section_label",
+			"checked_when": [
+				"personal_default_section_selected"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

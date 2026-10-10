@@ -9592,3 +9592,22 @@ caption_getters = ["llm_model_health_prefix", "llm_model_current_caption"]
 disabled_when = ["llm_model_parent_ready"]
 platforms = ["ahk"]
 unavailable = "hide"
+
+# Runtime personal section inventories retain their native labels and callbacks.
+[[menu.hotstring_personal_default_choice]]
+type = "check"
+id = "personal_default_section"
+caption_source = "native"
+caption_getter = "personal_default_section_label"
+checked_when = ["personal_default_section_selected"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_default_choice]]
+type = "check"
+id = "personal_default_section"
+caption_source = "native"
+caption_getter = "personal_default_section_label"
+checked_when = ["personal_default_section_selected"]
+platforms = ["linux"]
+unavailable = "hide"

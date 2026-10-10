@@ -231,9 +231,8 @@ function reachable(source, extension, effect, flow) {
 }
 
 /** Requires ordered, unique and reachable native effects in the actual owner. */
-function route(source, extension, statements) {
+function route(source, extension, statements, flow = paths(source, extension)) {
 	let previous = -1;
-	const flow = paths(source, extension);
 	for (const [fragment, depth = 0] of statements) {
 		const matches = ranges(source, fragment, extension, depth);
 		if (
@@ -1067,6 +1066,29 @@ function luaDeclaredLinuxRoot(source, topGraph) {
 	);
 }
 
+/** The actual Linux enclosing build retains its result through its final refusal and return. */
+function luaLinuxHotstringsResult(outer, built, source) {
+	const rows = luaLocal(outer, 'rows');
+	const terminal =
+		'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)\nif not personal_choices_admitted then return nil end\nreturn rows';
+	const shape = (text) => scriptTokens(text, '.lua').map((token) => [token.kind, token.value]);
+	return (
+		rows.statement.live &&
+		rows.value?.live &&
+		rows.value === built &&
+		luaRetained(outer, rows) &&
+		luaReturnBinding(outer, rows) &&
+		route(source, '.lua', [
+			[
+				'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
+			],
+			['if not personal_choices_admitted then return nil end'],
+			['return rows']
+		]) &&
+		isDeepStrictEqual(shape(source).slice(-shape(terminal).length), shape(terminal))
+	);
+}
+
 function luaHotstringGraph(sources, platform) {
 	const source = sources[files[platform][0]],
 		moduleGraph = luaGraph(source);
@@ -1103,7 +1125,11 @@ function luaHotstringGraph(sources, platform) {
 		if (
 			built.length !== 1 ||
 			!luaSame(built[0].args[5], providers) ||
-			!outer.nodes.some((n) => n.type === 'return' && n.live && n.values.includes(built[0]))
+			!luaLinuxHotstringsResult(
+				outer,
+				built[0],
+				owner(source, 'local function _manifest_hotstring_rows(ctx, config)', '.lua')
+			)
 		)
 			return false;
 		const nativeProducer = luaLocal(moduleGraph, '_build_hotstrings'),
@@ -1695,8 +1721,10 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 			route(outer, '.lua', [
 				['["hotstring_languages"] = language_rows,'],
 				[
-					'return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
-				]
+					'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
+				],
+				['if not personal_choices_admitted then return nil end'],
+				['return rows']
 			]) &&
 			route(owner(source, 'local function _build_hotstrings(ctx)', '.lua'), '.lua', [
 				['local items = _manifest_hotstring_rows(ctx, config)']
@@ -1707,4 +1735,326 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 	}
 }
 
-module.exports = { hotstringScopePublication, hotstringLanguagePublication, files };
+const PERSONAL_DEFAULT_CHOICES = {
+	ahk: {
+		signature: '_HS_PersonalRows(Options := unset) {',
+		extension: '.ahk',
+		row: 'DefaultChoice',
+		collection: 'DefaultRows',
+		depth: 3,
+		frameDepth: 2,
+		init: 'DefaultRows := []',
+		append: 'DefaultRows.Push(DefaultChoice)',
+		refusal: 'if !(DefaultChoice is Map)\n\t\t\t\treturn []',
+		call: 'DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",\n\t\t\t\tMap("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)),\n\t\t\t\tMap("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),\n\t\t\t\t\t"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))',
+		frame:
+			'DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))\n\t\tDefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)\n\t\tDefaultProviders := Map("personal_default_choices", (*) => DefaultRows)\n\t\tDefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)',
+		prefix:
+			'DefaultRows := []\n\t\tfor _, SecName in TomlData["sections_order"] {\n\t\t\tif (SecName == "-")\n\t\t\t\tcontinue\n\t\t\tif !TomlData["sections"].Has(SecName)\n\t\t\t\tcontinue\n\t\t\tSecLabel := DisambiguatedLabels[SecName]',
+		enclosure: 'if (PersonalTomlData != false) {',
+		enclosureDepth: 1,
+		sink: 'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted\n\t\t\treturn []'
+	},
+	hs: {
+		signature: 'function M.build_custom(ctx, counts)',
+		extension: '.lua',
+		row: 'choice',
+		collection: 'cat_choices',
+		depth: 4,
+		frameDepth: 0,
+		init: 'local cat_choices = {}',
+		append: 'table.insert(cat_choices, choice)',
+		refusal: 'if type(choice) ~= "table" then return nil end',
+		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\tstate.custom_default_section = sname\n\t\t\t\t\t\t\tif ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then\n\t\t\t\t\t\t\t\tpcall(ctx.hotstring_editor.set_default_section, sname)\n\t\t\t\t\t\t\tend\n\t\t\t\t\t\t\tif ctx.save_prefs() ~= true then return false end\n\t\t\t\t\t\t\tctx.updateMenu()\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return lbl end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
+		frame:
+			'local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame", {\n\t\t["personal_default_none"] = none_action,\n\t}, {\n\t\t["personal_default_unset"] = function() return not state.custom_default_section end,\n\t\t["personal_default_boundary"] = function() return #cat_choices > 0 end,\n\t}, { ["personal_default_choices"] = function() return cat_choices end })',
+		prefix:
+			'local cat_choices = {}\n\tif type(personal_secs) == "table" then\n\t\tlocal has_real = false\n\t\tfor _, sec in ipairs(personal_secs) do\n\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\thas_real = true; break\n\t\t\tend\n\t\tend\n\t\tif has_real then\n\t\t\tfor _, sec in ipairs(personal_secs) do\n\t\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\t\tlocal lbl   = (type(sec.description) == "string" and sec.description ~= "")\n\t\t\t\t\t\tand sec.description or tostring(sec.name):gsub("_", " ")\n\t\t\t\t\tlbl = ctx.applyTriggerChar(lbl)\n\t\t\t\t\tlocal sname = sec.name\n\t\t\t\t\tlocal selected = (state.custom_default_section == sname) or nil',
+		frameVariable: 'cat_menu'
+	},
+	linux: {
+		signature: '["hotstring_personal"] = function()',
+		extension: '.lua',
+		row: 'choice',
+		collection: 'choices',
+		depth: 2,
+		frameDepth: 1,
+		init: 'local choices = {}',
+		append: 'choices[#choices + 1] = choice',
+		refusal:
+			'if type(choice) ~= "table" then\n\t\t\t\t\t\tpersonal_choices_admitted = false\n\t\t\t\t\t\treturn {}\n\t\t\t\t\tend',
+		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\tEditor.set_pref("default_section", name)\n\t\t\t\t\t\t\tif type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return name end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
+		frame:
+			'local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {\n\t\t\t\t\t["personal_default_none"] = none_action,\n\t\t\t\t}, {\n\t\t\t\t\t["personal_default_unset"] = function() return current == nil or current == "" end,\n\t\t\t\t\t["personal_default_boundary"] = function() return false end,\n\t\t\t\t}, { ["personal_default_choices"] = function() return choices end })',
+		prefix:
+			'local choices = {}\n\n\t\t\t\tfor _, name in ipairs(personal and personal.sections_order or {}) do\n\t\t\t\t\tlocal selected = (current == name)',
+		enclosure: 'if ok_editor and type(Editor.get_pref) == "function" then',
+		enclosureDepth: 0,
+		frameVariable: 'sub'
+	}
+};
+
+/** The two actual unbraced refusal bodies are conditional children of their native guards. */
+function personalDefaultChoiceFlow(body, proof) {
+	const flow = paths(body, '.ahk');
+	for (const [fragment, depth] of [
+		[proof.refusal, proof.depth],
+		['if !(DefaultFrame is Array)\n\t\t\treturn []', proof.frameDepth]
+	]) {
+		const found = ranges(body, fragment, '.ahk', depth);
+		if (found.length !== 1) throw Error('One actual conditional default-choice refusal');
+		const guard = found[0],
+			returns = flow.tokens
+				.map((token, index) => ({ token, index }))
+				.filter(
+					({ token }) =>
+						token.value === 'return' && token.start > guard.start && token.end < guard.end
+				);
+		if (returns.length !== 1) throw Error('One actual guarded refusal body');
+		const index = returns[0].index;
+		flow.contexts[index] = [...flow.contexts[index], guard.index];
+	}
+	return flow;
+}
+
+/** Actual Linux check refusal invalidates this invocation's real enclosing build. */
+function personalDefaultLinuxRefusal(moduleGraph, native, graph, proof, source) {
+	const admitted = luaLocal(native, 'personal_choices_admitted'),
+		rows = luaLocal(native, 'rows'),
+		failure = ranges(
+			owner(
+				owner(source, 'local function _manifest_hotstring_rows(ctx, config)', '.lua'),
+				proof.signature,
+				'.lua'
+			),
+			proof.refusal,
+			'.lua',
+			proof.depth
+		);
+	if (
+		failure.length !== 1 ||
+		admitted.value?.type !== 'literal' ||
+		admitted.value.value !== true ||
+		!admitted.statement.live ||
+		admitted.writes.length !== 1 ||
+		!luaRetained(native, rows)
+	)
+		return false;
+	const write = admitted.writes[0];
+	if (
+		!write.live ||
+		write.type !== 'assign' ||
+		write.targets.length !== 1 ||
+		write.targets[0].binding !== admitted ||
+		write.values.length !== 1 ||
+		write.values[0].type !== 'literal' ||
+		write.values[0].value !== false ||
+		!graph.nodes.includes(write)
+	)
+		return false;
+	const refusal = graph.nodes.filter(
+		(node) =>
+			node.type === 'if' && node.branches.length === 1 && node.branches[0].body.includes(write)
+	);
+	if (
+		refusal.length !== 1 ||
+		refusal[0].branches[0].body.length !== 2 ||
+		refusal[0].branches[0].body[1].type !== 'return'
+	)
+		return false;
+	const actual = owner(source, 'local function _manifest_hotstring_rows(ctx, config)', '.lua');
+	if (
+		!route(actual, '.lua', [
+			['local personal_choices_admitted = true'],
+			[
+				'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
+			],
+			['if not personal_choices_admitted then return nil end'],
+			['return rows']
+		])
+	)
+		return false;
+	const terminal = native.nodes.filter(
+		(node) =>
+			node.type === 'if' &&
+			node.branches.length === 1 &&
+			node.branches[0].test?.type === 'unary' &&
+			node.branches[0].test.op === 'not' &&
+			node.branches[0].test.value.binding === admitted &&
+			node.branches[0].body.length === 1 &&
+			node.branches[0].body[0].type === 'return' &&
+			node.branches[0].body[0].values.length === 1 &&
+			node.branches[0].body[0].values[0].type === 'literal' &&
+			node.branches[0].body[0].values[0].value === null
+	);
+	if (terminal.length !== 1 || !terminal[0].live || terminal[0].start <= rows.statement.end)
+		return false;
+	const parent = luaOwnerGraph(moduleGraph, luaPhysicalFunction(moduleGraph, '_build_hotstrings')),
+		items = luaLocal(parent, 'items'),
+		receive = luaLocal(parent, 'receive');
+	return (
+		luaCall(items.value, '_manifest_hotstring_rows') &&
+		luaSame(items.value.callee, luaLocal(moduleGraph, '_manifest_hotstring_rows')) &&
+		luaRendererGraph(native) &&
+		luaRendererGraph(parent) &&
+		luaRetained(parent, items) &&
+		// Calling the retained native receiver is its real sink, not a data mutation.
+		luaRetained(
+			{
+				...parent,
+				nodes: parent.nodes.filter((node) => node.type !== 'call' || !luaSame(node.callee, receive))
+			},
+			receive
+		) &&
+		route(owner(source, 'local function _build_hotstrings(ctx)', '.lua'), '.lua', [
+			['local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "hotstrings")'],
+			['if not receive then return nil end'],
+			['local items = _manifest_hotstring_rows(ctx, config)'],
+			[
+				'return receive(items, { hotstrings_enabled = function() return _hotstrings_on(ctx) end,\n\t\thotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return true end })'
+			]
+		])
+	);
+}
+
+/** The actual default list consumes one typed shared checkbox per native section. */
+function personalDefaultChoicePublication(source, platform, manifest) {
+	try {
+		if (!Object.hasOwn(PERSONAL_DEFAULT_CHOICES, platform)) return false;
+		const expected = [['ahk', 'hs'], ['linux']].map((platforms) => ({
+			type: 'check',
+			id: 'personal_default_section',
+			caption_source: 'native',
+			caption_getter: 'personal_default_section_label',
+			checked_when: ['personal_default_section_selected'],
+			platforms,
+			unavailable: 'hide'
+		}));
+		if (!isDeepStrictEqual(manifest?.hotstring_personal_default_choice, expected)) return false;
+		const frame = manifest?.hotstring_personal_default_frame;
+		if (
+			!Array.isArray(frame) ||
+			frame.filter((row) => row?.id === 'personal_default_choices').length !== 1 ||
+			!isDeepStrictEqual(
+				frame.find((row) => row?.id === 'personal_default_choices'),
+				{ type: 'list', id: 'personal_default_choices' }
+			)
+		)
+			return false;
+		const proof = PERSONAL_DEFAULT_CHOICES[platform],
+			extension = proof.extension;
+		let body;
+		if (platform === 'ahk') {
+			body = owner(source, proof.signature, extension);
+			if (
+				bindings(body, extension, 'MenuRenderer_CheckRow').length ||
+				bindings(body, extension, 'MenuRenderer_TemplateRows').length
+			)
+				return false;
+		} else {
+			const moduleGraph = luaGraph(source);
+			const native = luaOwnerGraph(
+				moduleGraph,
+				luaPhysicalFunction(
+					moduleGraph,
+					platform === 'hs' ? 'M.build_custom' : '_manifest_hotstring_rows'
+				)
+			);
+			let graph = native;
+			if (platform === 'linux') {
+				const providers = luaLocal(native, 'providers');
+				const fields = luaField(providers.value, 'hotstring_personal');
+				if (
+					fields.length !== 1 ||
+					fields[0].value.type !== 'function' ||
+					!luaRetained(native, providers)
+				)
+					return false;
+				graph = luaOwnerGraph(moduleGraph, fields[0].value);
+			}
+			const row = luaLocal(graph, proof.row),
+				collection = luaLocal(graph, proof.collection),
+				frame = luaLocal(graph, proof.frameVariable);
+			if (
+				!luaRendererGraph(graph) ||
+				bindings(source, extension, '_ENV').length ||
+				![row, collection, frame].every((record) => record.statement.live && record.value?.live) ||
+				!luaRetained(graph, row) ||
+				!luaRetained(graph, collection, true) ||
+				!luaRetained(graph, frame)
+			)
+				return false;
+			const facade = luaLocal(moduleGraph, 'ManifestMenu');
+			const rootedFacade = (expression, seen = new Set()) => {
+				if (expression?.type !== 'id') return false;
+				if (expression.binding === facade) return true;
+				const binding = expression.binding;
+				if (!binding || seen.has(binding) || binding.writes.length) return false;
+				seen.add(binding);
+				return rootedFacade(binding.value, seen);
+			};
+			if (
+				moduleGraph.nodes.some(
+					(node) =>
+						['assign', 'assign-function'].includes(node.type) &&
+						(node.type === 'assign' ? node.targets : [node.target]).some(
+							(target) => ['field', 'index'].includes(target.type) && rootedFacade(target.object)
+						)
+				)
+			)
+				return false;
+			if (
+				platform === 'linux' &&
+				!personalDefaultLinuxRefusal(moduleGraph, native, graph, proof, source)
+			)
+				return false;
+			body =
+				platform === 'hs'
+					? owner(source, proof.signature, extension)
+					: owner(
+							owner(source, 'local function _manifest_hotstring_rows(ctx, config)', extension),
+							proof.signature,
+							extension
+						);
+		}
+		const statements = [
+			...(proof.enclosure ? [[proof.enclosure, proof.enclosureDepth]] : []),
+			[proof.prefix, proof.frameDepth],
+			[proof.call, proof.depth],
+			[proof.refusal, proof.depth],
+			[proof.append, proof.depth],
+			[proof.frame, proof.frameDepth],
+			...(proof.sink ? [[proof.sink, proof.frameDepth]] : [])
+		];
+		if (
+			!route(
+				body,
+				extension,
+				statements,
+				platform === 'ahk' ? personalDefaultChoiceFlow(body, proof) : paths(body, extension)
+			)
+		)
+			return false;
+		const sink = proof.sink ?? proof.frame;
+		if (
+			!retainedChild(body, extension, proof.row, proof.call, proof.append, proof.depth) ||
+			!retainedChild(body, extension, proof.collection, proof.init, sink, proof.frameDepth)
+		)
+			return false;
+		return (
+			platform !== 'ahk' ||
+			['DefaultCommands', 'DefaultGetters', 'DefaultProviders'].every((name) =>
+				retainedChild(body, extension, name, proof.frame, proof.sink, proof.frameDepth)
+			)
+		);
+	} catch {
+		return false;
+	}
+}
+
+module.exports = {
+	hotstringScopePublication,
+	hotstringLanguagePublication,
+	personalDefaultChoicePublication,
+	files
+};
