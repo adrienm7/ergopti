@@ -11,7 +11,7 @@ const browsers = require('../ci/install-playwright.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const scopes = new Map([
-	['ci-linux.yml', 37],
+	['ci-linux.yml', 38],
 	['ci-macos.yml', 2],
 	['ci.yml', 1],
 	['linux-layout.yml', 2],
@@ -195,6 +195,36 @@ for (const [file, floor] of scopes) {
 		assert.ok(
 			problems(withoutXi2, rel, floor).includes('missing acquisition floor'),
 			'the new XI2 acquisition cannot compensate for an omitted mandatory invocation'
+		);
+		const luaJitInvocation =
+			command +
+			' -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb';
+		const luaJitOwner = pipeline
+			.jobsOfText(text, rel)
+			.filter((job) => job.id === 'test-linux')
+			.flatMap((job) => pipeline.steps(job.body))
+			.filter((step) => step.name === 'Qualify actual LuaJIT XI2 ABI and property cookies');
+		assert.equal(
+			luaJitOwner.length,
+			1,
+			'the LuaJIT acquisition retains one genuine independent unit owner'
+		);
+		assert.equal(
+			(pipeline.runOf(luaJitOwner[0].body) || []).filter((line) => line.trim() === luaJitInvocation)
+				.length,
+			1,
+			'the LuaJIT prerequisites retain the signed acquisition owner'
+		);
+		assert.equal(
+			text.split(luaJitInvocation).length,
+			2,
+			'the LuaJIT acquisition mutation is unique'
+		);
+		const withoutLuaJit = text.replace(luaJitInvocation, 'echo "LuaJIT acquisition omitted"');
+		assert.notEqual(withoutLuaJit, text, 'the LuaJIT omission must change the actual workflow');
+		assert.ok(
+			problems(withoutLuaJit, rel, floor).includes('missing acquisition floor'),
+			'neither native XI2 acquisition can compensate for omission of the other'
 		);
 	}
 	for (const [name, replacement] of [

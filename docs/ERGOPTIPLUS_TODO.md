@@ -9388,6 +9388,24 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   review passes; native receiving remains UNRUN. This does not retroactively
   identify the observed first miss or qualify physical input.
 
+  A separate LuaJIT borrowed-cookie diagnostic first requires the unchanged
+  original C3 receiving. All 43 modeled cookie cases on each Lua ABI and 15 portable
+  lifecycle controls retain their independent expectations. The proposed
+  native experiment requires 29 actual layout observations and three genuine
+  cdata property-cookie paths, followed by acknowledged Display/FD closure
+  through the original full-family owner. Those native cases remain UNRUN.
+  Its existing registered CI guard admits exact steps and seven typed evidence
+  files while retaining all original generic refusal loops and adding 21
+  independent artifact refusals. No registry/provider/ELF, field-signedness,
+  physical source epoch or input/output grant follows from these diagnostics.
+
+  Its observer and strict evidence retention follow every original unit-job
+  step. This permits independent native receiving after a separate runtime
+  acceptance failure without changing that failure, the original E2E
+  prerequisites or any release policy. Exact END ownership, 22 source
+  refusals and four placement refusals are required; native receiving remains
+  UNRUN until the source-specific hosted dispatch.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
