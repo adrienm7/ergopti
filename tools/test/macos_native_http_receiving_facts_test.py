@@ -2320,5 +2320,192 @@ class NativeTrustRemovalOriginalDeadlineTests(unittest.TestCase):
         self.assertEqual(deadlines, [115.0, 215.0])
 
 
+class TrustInstallObservationControls(unittest.TestCase):
+    """Actual trust/command bodies over a recording child; no native acquisition."""
+
+    def receive(self, *, settle=True, timeout=True, raw=b"private output", logging_failure=False):
+        fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+        fixture.native = True
+        fixture.ca = Path("private-owner/ca.pem")
+        fixture.keychain = Path("private-owner/owned.keychain-db")
+        fixture.command_file_debt = []
+        fixture.trust_attempted = False
+        child = SimpleNamespace(pid=7729, returncode=None, stdin=io.BytesIO())
+        primary = subprocess.TimeoutExpired("owned native child", 15)
+        owner = SimpleNamespace(process=child, reaped=False, capture_read_attempts=0)
+        calls = []
+
+        class HostileCapture(io.BytesIO):
+            def seek(self, *arguments):
+                if not owner.reaped:
+                    owner.capture_read_attempts += 1
+                    raise AssertionError("Live child still owns the shared capture offset")
+                return super().seek(*arguments)
+
+            def read(self, *arguments):
+                if not owner.reaped:
+                    owner.capture_read_attempts += 1
+                    raise AssertionError("Live child still owns the writable capture")
+                return super().read(*arguments)
+
+        def wait(timeout):
+            calls.append(("wait", timeout))
+            if timeout == 15 and receive_timeout:
+                raise primary
+            child.returncode = 0
+
+        receive_timeout = timeout
+
+        def retire():
+            calls.append(("settle",))
+            owner.reaped = settle
+            if settle and child.returncode is None:
+                child.returncode = -15
+            return settle
+
+        owner.wait_for_exit = wait
+        owner.settle = retire
+
+        def acquire(arguments, native, register, **ports):
+            calls.append(("argv", arguments))
+            register(owner)
+            ports["stdout"].write(b"private-owner/ca.pem personal@example.test")
+            ports["stderr"].write(raw)
+            return owner
+
+        fixture.groups = SimpleNamespace(acquire_owned=acquire)
+        fixture.native_groups = object()
+        output = io.StringIO()
+        protocol_output = io.StringIO()
+        failure = None
+        capture_port = (
+            mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=HostileCapture)
+            if not settle
+            else contextlib.nullcontext()
+        )
+        with (
+            capture_port,
+            contextlib.redirect_stderr(output),
+            contextlib.redirect_stdout(protocol_output),
+        ):
+            with mock.patch.object(WIRE.time, "monotonic", side_effect=[100.0, 115.25]):
+                with (
+                    mock.patch("builtins.print", side_effect=RuntimeError("recording log refusal"))
+                    if logging_failure
+                    else contextlib.nullcontext()
+                ):
+                    try:
+                        fixture.trust(True)
+                    except BaseException as caught:
+                        failure = caught
+        self.assertEqual(
+            protocol_output.getvalue(),
+            "",
+            "Passive facts must not corrupt the Swift JSON reply pipe",
+        )
+        return fixture, child, owner, primary, failure, output.getvalue(), calls
+
+    def testTimeoutPreservesPrimaryDebtAndBoundedPrivateOutput(self):
+        fixture, child, owner, primary, failure, output, calls = self.receive()
+        self.assertIs(failure, primary)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+        self.assertEqual(
+            calls[0][1],
+            [
+                "/usr/bin/sudo",
+                "-n",
+                "/usr/bin/security",
+                "add-trusted-cert",
+                "-d",
+                "-r",
+                "trustRoot",
+                "-k",
+                str(fixture.keychain),
+                str(fixture.ca),
+            ],
+        )
+        self.assertEqual(calls[1:], [("wait", 15), ("settle",)])
+        self.assertTrue(child.stdin.closed)
+        self.assertTrue(owner.reaped)
+        self.assertIn("# native_http_trust_install ", output)
+        fact = json.loads(output.removeprefix("# native_http_trust_install "))
+        self.assertEqual(
+            (fact["action"], fact["domain"], fact["keychain"]),
+            ("add_trusted_cert", "admin", "owned_private"),
+        )
+        self.assertEqual((fact["pid"], fact["exit_status"], fact["elapsed_ms"]), (7729, -15, 15250))
+        self.assertEqual(
+            (fact["child_settled"], fact["streams_closed"], fact["phase"]), (True, True, "deadline")
+        )
+        self.assertEqual(failure.trust_install_output["stderr"], b"private output")
+        self.assertEqual(
+            fact["stderr"]["bounded_sha256"], hashlib.sha256(b"private output").hexdigest()
+        )
+        self.assertEqual(fact["stderr"]["category"], "unknown")
+        for secret in ("private-owner", "personal@example.test", "private output", "ca.pem"):
+            self.assertNotIn(secret, output)
+
+    def testFailedRetirementCannotAdvertiseChildACK(self):
+        fixture, child, owner, primary, failure, output, calls = self.receive(settle=False)
+        self.assertIs(failure, primary)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertFalse(owner.reaped)
+        self.assertEqual(
+            owner.capture_read_attempts, 0, "No capture seek/read before exact child retirement"
+        )
+        self.assertEqual(failure.trust_install_output, {})
+        self.assertIn("# native_http_trust_install ", output)
+        fact = json.loads(output.removeprefix("# native_http_trust_install "))
+        self.assertEqual(fixture.command_fact["phase"], "settle")
+        self.assertFalse(fact["child_settled"])
+        self.assertEqual(fact["stdout"], {"observed": False})
+        self.assertEqual(fact["stderr"], {"observed": False})
+        self.assertFalse(fact["streams_closed"])
+        self.assertIsNone(fact["exit_status"])
+        self.assertEqual(calls[-1], ("settle",))
+
+    def testClosedStderrCategoriesAndTruncationNeverInferCause(self):
+        vectors = [
+            (b"", "empty"),
+            (
+                b"SecTrustSettingsSetTrustSettings: User interaction is not allowed.\n",
+                "user_interaction_required",
+            ),
+            (b"security: SecKeychainUnlock: The keychain is locked.\n", "keychain_locked"),
+            (b"SecKeychainItemImport: Access denied.\n", "access_denied"),
+            (b"SecTrustSettingsSetTrustSettings: Authorization denied.\n", "access_denied"),
+            (b"SecTrustSettingsSetTrustSettings: private-owner personal@example.test\n", "unknown"),
+            (b"personal: Access denied.\n", "unknown"),
+            (b"SecKeychainUnlock: The keychain is locked.\n" + b"X" * 1024, "unknown"),
+        ]
+        for raw, expected in vectors:
+            with self.subTest(category=expected, bytes=len(raw)):
+                fixture, _, _, primary, failure, output, _ = self.receive(raw=raw)
+                self.assertIs(failure, primary)
+                self.assertIn("# native_http_trust_install ", output)
+                fact = json.loads(output.removeprefix("# native_http_trust_install "))["stderr"]
+                self.assertEqual(fact["category"], expected)
+                self.assertEqual(fact["captured_bytes"], min(1024, len(raw)))
+                self.assertEqual(fact["truncated"], len(raw) > 1024)
+                self.assertEqual(failure.trust_install_output["stderr"], raw[:1024])
+                self.assertEqual(fact["bounded_sha256"], hashlib.sha256(raw[:1024]).hexdigest())
+                self.assertTrue(fixture.trust_attempted)
+
+    def testObserverFailureKeepsOriginalTimeoutAndSuccessStaysExact(self):
+        fixture, _, _, primary, failure, _, _ = self.receive(logging_failure=True)
+        self.assertIs(failure, primary)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertEqual(str(failure.__cause__), "recording log refusal")
+        fixture, child, _, _, failure, output, _ = self.receive(timeout=False)
+        self.assertIsNone(failure)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertEqual(fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertIn("# native_http_trust_install ", output)
+        fact = json.loads(output.removeprefix("# native_http_trust_install "))
+        self.assertEqual(fact["exit_status"], 0)
+        self.assertTrue(fact["child_settled"])
+
+
 if __name__ == "__main__":
     unittest.main()
