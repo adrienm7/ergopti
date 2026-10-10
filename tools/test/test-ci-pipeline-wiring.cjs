@@ -4226,10 +4226,13 @@ function linuxSimultaneousEnrollmentProblems(source) {
 	return [];
 }
 
-const linuxSimultaneousHarness =
-	require('./fixtures/ci-scoped-full-branches.cjs').projectLinuxHarness(
-		fs.readFileSync(path.resolve(__dirname, '../..', LINUX_SIMULTANEOUS_HARNESS), 'utf8')
-	);
+// This enrollment guard owns the raw saved-selection protocol. Its full
+// projection is inspected separately below; projection cannot replace policy
+// admission and its failure/cleanup assertions with the native command alone.
+const linuxSimultaneousHarness = fs.readFileSync(
+	path.resolve(__dirname, '../..', LINUX_SIMULTANEOUS_HARNESS),
+	'utf8'
+);
 errors.push(...linuxSimultaneousEnrollmentProblems(linuxSimultaneousHarness));
 const linuxSimultaneousBlock = LINUX_SIMULTANEOUS_ENVELOPE.slice(6, -4).join('\n');
 const linuxSimultaneousNormalized = linuxSimultaneousHarness
@@ -4322,6 +4325,58 @@ assert.equal(linuxSimultaneousEnvelopeRefusals, 23);
 console.log(
 	`PASS: Linux simultaneous wiring ${linuxSimultaneousWorkflowRefusals} workflow and ${linuxSimultaneousEnvelopeRefusals} custody-envelope refusals; native execution unqualified.`
 );
+
+// The separate full projection must preserve every executable native command
+// and its failing custody status after strict raw scope admission.
+const linuxSimultaneousProjected =
+	require('./fixtures/ci-scoped-full-branches.cjs').projectLinuxHarness(linuxSimultaneousHarness);
+const LINUX_SIMULTANEOUS_FULL_ENVELOPE = [
+	LINUX_SIMULTANEOUS_ENVELOPE[0],
+	'CUSTODY=$?',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	LINUX_SIMULTANEOUS_ENVELOPE[3],
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	LINUX_SIMULTANEOUS_COMMAND,
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" != "0" ]; then',
+	'kill ${PIDS} 2>/dev/null',
+	'exit "${CUSTODY}"',
+	'fi'
+];
+function linuxSimultaneousProjectedProblems(source) {
+	const lines = logicalLines(
+		`        run: |\n${source
+			.split('\n')
+			.map((line) => `          ${line}`)
+			.join('\n')}`
+	).filter((line) => line !== '');
+	const at = lines.indexOf(LINUX_SIMULTANEOUS_ENVELOPE[0]);
+	const end = lines.indexOf('LLM_READY="$(mktemp -u)"');
+	return at >= 0 &&
+		end > at &&
+		JSON.stringify(lines.slice(at, end)) === JSON.stringify(LINUX_SIMULTANEOUS_FULL_ENVELOPE)
+		? []
+		: ['full native projection must preserve the ordered custody commands and failure cleanup'];
+}
+assert.equal(linuxSimultaneousProjectedProblems(linuxSimultaneousProjected).length, 0);
+for (const [name, from, to] of [
+	['missing full native command', LINUX_SIMULTANEOUS_COMMAND, 'true'],
+	[
+		'forgiven full native command',
+		LINUX_SIMULTANEOUS_COMMAND,
+		`${LINUX_SIMULTANEOUS_COMMAND} || true`
+	],
+	['forgiven full custody status', 'exit "${CUSTODY}"', 'exit 0']
+]) {
+	assert.ok(linuxSimultaneousProjected.includes(from), `${name}: causal preimage exists`);
+	assert.ok(
+		linuxSimultaneousProjectedProblems(linuxSimultaneousProjected.replace(from, to)).length > 0,
+		`${name} must refuse full native qualification`
+	);
+}
 
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');
