@@ -370,6 +370,20 @@ return function(run)
 					publish_phase("stopping")
 					return true
 				end,
+				-- Accepted-request model only: no PONG, timer or native liveness receipt.
+				refresh_liveness = function()
+					local phase = calls.lease_phase
+					local initialized = calls.lease_init > 0
+					-- This fixture constructs active/paused owners, not native recovery.
+					local accepted = initialized and (phase == "active" or phase == "paused")
+						and #calls.stop_callbacks == 0 and options.refresh_requested ~= false
+					calls.liveness_requests = calls.liveness_requests or {}
+					calls.liveness_requests[#calls.liveness_requests + 1] = {
+						phase = phase, token = lease_token, initialized = initialized,
+						start_paused = calls.start_paused, accepted = accepted,
+					}
+					return accepted
+				end,
 				status = function()
 					return calls.lease_phase, {
 						phase = calls.lease_phase,

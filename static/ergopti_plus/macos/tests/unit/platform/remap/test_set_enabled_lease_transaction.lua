@@ -251,3 +251,128 @@ helpers.describe("karabiner enable state is committed only after READY", functio
 		end)
 	end)
 end)
+
+
+-- This fixture models accepted requests only; it never supplies a native PONG.
+helpers.describe("transaction fixture serialized liveness port", function()
+	helpers.it("observes a paused refresh only after actual fresh READY and before enable publication", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap({ initially_enabled = false, paused = true })
+			local controller = package.loaded["platform.remap.lease_controller"]
+			helpers.assert_eq(type(controller.refresh_liveness), "function")
+			helpers.assert_eq(controller.refresh_liveness(), false)
+			local published
+			remap.set_enabled(true, function(ok)
+				local requests = calls.liveness_requests
+				local request = requests[#requests]
+				published = { ok = ok, count = #requests, phase = request.phase,
+					accepted = request.accepted, token = request.token, start_paused = request.start_paused }
+			end)
+			helpers.assert_eq(calls.start_paused, 1)
+			helpers.assert_eq(controller.refresh_liveness(), false)
+			helpers.assert_nil(published)
+			calls.deliver_ready()
+			helpers.assert_true(published.ok == true)
+			helpers.assert_eq(published.count, 3)
+			helpers.assert_eq(published.phase, "paused")
+			helpers.assert_eq(published.accepted, true)
+			helpers.assert_eq(published.token, controller.token())
+			helpers.assert_eq(published.start_paused, 1)
+			helpers.assert_eq(calls.liveness_requests[1].phase, "prepared")
+			helpers.assert_eq(calls.liveness_requests[1].accepted, false)
+			helpers.assert_eq(calls.liveness_requests[2].phase, "starting")
+			helpers.assert_eq(calls.liveness_requests[2].accepted, false)
+			helpers.assert_eq(calls.liveness_requests[3].initialized, true)
+			helpers.assert_eq(calls.lease_bound_starts, 0)
+			helpers.assert_eq(calls.resume_prepared or 0, 0)
+		end)
+	end)
+
+	helpers.it("refuses an uninitialized or failed and stopping fixture owner", function()
+		with_fixture(function(fixture)
+			local _, calls = fixture.load_enabled_remap({ paused = true, skip_init = true })
+			local controller = package.loaded["platform.remap.lease_controller"]
+			helpers.assert_eq(type(controller.refresh_liveness), "function")
+			helpers.assert_eq(controller.refresh_liveness(), false)
+			helpers.assert_eq(calls.liveness_requests[1].initialized, false)
+		end)
+		with_fixture(function(fixture)
+			local _, calls = fixture.load_enabled_remap({ paused = true })
+			local controller = package.loaded["platform.remap.lease_controller"]
+			helpers.assert_eq(type(controller.refresh_liveness), "function")
+			helpers.assert_eq(controller.refresh_liveness(), true)
+			calls.deliver_ready(false)
+			helpers.assert_eq(controller.refresh_liveness(), false)
+			helpers.assert_eq(calls.liveness_requests[2].phase, "failed")
+			controller.stop_exact(controller.token(), "controlled-fixture-retirement")
+			helpers.assert_eq(controller.refresh_liveness(), false)
+			helpers.assert_eq(calls.liveness_requests[3].phase, "stopping")
+			calls.finish_stop(true)
+			helpers.assert_eq(controller.refresh_liveness(), false)
+			helpers.assert_eq(calls.liveness_requests[4].phase, "idle")
+		end)
+	end)
+
+	helpers.it("retains a controlled refresh refusal without committing paused enable", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap({
+				initially_enabled = false, paused = true, refresh_requested = false,
+			})
+			local result
+			remap.set_enabled(true, function(ok) result = ok end)
+			calls.deliver_ready()
+			helpers.assert_eq(#calls.liveness_requests, 1)
+			helpers.assert_eq(calls.liveness_requests[1].phase, "paused")
+			helpers.assert_eq(calls.liveness_requests[1].accepted, false)
+			helpers.assert_eq(remap.get_enabled(), false)
+			helpers.assert_eq(calls.save, 0)
+			helpers.assert_eq(calls.stop_exact, 1)
+			helpers.assert_nil(result, "failed enable still waits for its original exact teardown")
+			calls.finish_stop(true)
+			helpers.assert_true(result == false)
+			helpers.assert_eq(calls.lease_bound_starts, 0)
+			helpers.assert_eq(calls.resume_prepared or 0, 0)
+		end)
+	end)
+end)
+
+
+helpers.describe("retained PAUSED precommit probe ownership", function()
+	helpers.it("refuses a commit-hook owner loss before cleanup and retained success", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap({ initially_enabled = false, paused = true })
+			local controller = package.loaded["platform.remap.lease_controller"]
+			local config = package.loaded["platform.remap.config"]
+			local save = config.save_user_config
+			local held, result
+			config.save_user_config = function(...)
+				if held == nil then
+					local requests = calls.liveness_requests or {}
+					local request = requests[#requests]
+					held = { request_count = #requests, phase = request and request.phase,
+						accepted = request and request.accepted, token = controller.token() }
+					controller.stop_exact(held.token, "controlled-commit-hook-owner-loss")
+					-- Native-phase listener work belongs to this exact callback; subsequent
+					-- activation cleanup must not run after its owner has been lost.
+					held.classifier_clears = calls.classifier_clears
+				end
+				return save(...)
+			end
+			remap.set_enabled(true, function(ok) result = ok end)
+			calls.deliver_ready()
+			helpers.assert_true(held ~= nil)
+			helpers.assert_eq(held.request_count, 1)
+			helpers.assert_eq(held.phase, "paused")
+			helpers.assert_eq(held.accepted, true)
+			helpers.assert_eq(calls.classifier_clears, held.classifier_clears)
+			helpers.assert_eq(remap.get_enabled(), false)
+			helpers.assert_true(helpers.deep_equal(calls.saved_enabled, { true, false }),
+				"a completed ON write still requires the original compensating OFF on owner loss")
+			helpers.assert_nil(result, "owner loss still waits for original exact abort teardown")
+			calls.finish_stop(true)
+			helpers.assert_true(result == false)
+			helpers.assert_eq(calls.lease_bound_starts, 0)
+			helpers.assert_eq(calls.resume_prepared or 0, 0)
+		end)
+	end)
+end)

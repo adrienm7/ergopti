@@ -3384,6 +3384,17 @@ Windows PC acceptance, delegated to the maintainer:
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
   banner stays). Integrated; verify on a Mac.
+  Retained-PAUSED startup now requires one accepted serialized liveness
+  request before committing the saved enable preference. Captured ownership
+  is checked before and after the request, after the existing commit hook,
+  and after cleanup. Refusal avoids a transient saved ON value; owner loss
+  uses the existing compensation and exact stop transaction. Independent
+  current-Dev receiving passes 14 legacy and 26 composed cases, with genuine
+  production and post-hook omissions restoring failures. The logger fixture
+  prerequisite is a separate published correction. Native PONG confirmation,
+  scheduler delays, physical input and the initial exit-73 cause remain
+  unqualified; the existing deadlines and ordinary ACTIVE/RESUME path stay
+  unchanged. This item remains partial and still requires Mac acceptance.
   Validation prerequisite: the macOS daily-reset logger fixture now observes
   only its owned complete sub-file path. A legitimate append from another
   folder cannot mask the owned stale-file truncation. The three original

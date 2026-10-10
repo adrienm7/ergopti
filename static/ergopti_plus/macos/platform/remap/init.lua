@@ -941,6 +941,28 @@ local function activate_lease_generation(options, on_done)
 	local pause_won = phase == "paused" and respect_pause_intent
 		and (script_paused or snapshot.activation_blocked == true)
 	if pause_won then
+		-- This branch deliberately sends no RESUME. Probe only the captured
+		-- PAUSED owner before publishing retained success; READY may have waited
+		-- in the main-runloop pipe before its first recurring timer was armed.
+		local function captured_paused_owner()
+			local current_ok, current_phase, current_snapshot = pcall(LeaseController.status)
+			return current_ok and current_phase == "paused"
+				and type(current_snapshot) == "table" and current_snapshot.token == token
+		end
+		if not captured_paused_owner() then
+			finish(false, "retained-paused-generation-changed")
+			return false
+		end
+		local refresh_ok, refreshed = pcall(LeaseController.refresh_liveness)
+		if not refresh_ok or refreshed ~= true then
+			fail_activation_inputs("retained PAUSED liveness request refused", false, token)
+			finish(false, "retained-paused-liveness-refused")
+			return false
+		end
+		if not captured_paused_owner() then
+			finish(false, "retained-paused-generation-changed")
+			return false
+		end
 		if type(options.before_resume) == "function" then
 			local hook_ok, committed, commit_reason = xpcall(options.before_resume, debug.traceback)
 			if not hook_ok or committed ~= true then
@@ -954,8 +976,16 @@ local function activate_lease_generation(options, on_done)
 				return false
 			end
 		end
+		if not captured_paused_owner() then
+			finish(false, "retained-paused-generation-changed")
+			return false
+		end
 		clear_managed_output_set()
 		stop_lease_bound_inputs()
+		if not captured_paused_owner() then
+			finish(false, "retained-paused-generation-changed")
+			return false
+		end
 		finish(true, "ready-paused-by-user-intent")
 		return true
 	end
