@@ -1066,6 +1066,88 @@ console.log(
 		Object.keys(require('../diagnostics/managed_http_pac_xctest_evidence.cjs').METHODS)
 	);
 	const pattern = new RegExp(evidence.pacSkipPattern(admission));
+	const bootstrapMethod = 'testActualNativeBootstrapTLSFullURLPACAndArtifactPublication';
+	const bootstrapSuite = 'ManagedBootstrapDownloadTests';
+	assert.equal(
+		pattern.test('ErgoptiPlusTests.' + bootstrapSuite + '/' + bootstrapMethod),
+		true,
+		'Only the exact duplicate native PAC method is omitted under the existing admission.'
+	);
+	assert.deepEqual(result.qualification.methods, { [bootstrapSuite]: [bootstrapMethod] });
+	const bootstrapSource = fs.readFileSync(
+		path.join(
+			__dirname,
+			'../..',
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedBootstrapDownloadTests.swift'
+		),
+		'utf8'
+	);
+	const bootstrapMethods = [...bootstrapSource.matchAll(/\bfunc (test\w+)\(/g)].map(
+		(match) => match[1]
+	);
+	assert.ok(bootstrapMethods.length > 1);
+	assert.equal(bootstrapMethods.filter((name) => name === bootstrapMethod).length, 1);
+	for (const method of bootstrapMethods)
+		assert.equal(
+			pattern.test('ErgoptiPlusTests.' + bootstrapSuite + '/' + method),
+			method === bootstrapMethod
+		);
+	assert.equal(
+		pattern.test('ErgoptiPlusTests.' + bootstrapSuite + '/' + bootstrapMethod + 'Extra'),
+		false
+	);
+	assert.equal(
+		pattern.test('ErgoptiPlusTests.' + bootstrapSuite + 'Extra/' + bootstrapMethod),
+		false
+	);
+	assert.equal(pattern.test('OtherTarget.' + bootstrapSuite + '/' + bootstrapMethod), false);
+	for (const name of [
+		'-[ErgoptiPlusTests.' + bootstrapSuite + ' ' + bootstrapMethod + ']',
+		'ErgoptiPlusTests.' + bootstrapSuite + '.' + bootstrapMethod,
+		'ErgoptiPlusTests.' + bootstrapSuite + '/' + bootstrapMethod
+	]) {
+		const extra = selected
+			.replace(
+				"Test Suite 'Selected tests' passed",
+				`Test Case '${name}' started.\nTest Case '${name}' passed (0.050 seconds).\nTest Suite 'Selected tests' passed`
+			)
+			.replace('Executed 15 tests', 'Executed 16 tests');
+		const refused = evidence.evaluate(extra, 0, 0, undefined, admission);
+		assert.equal(refused.exit_status, 1);
+		assert.ok(
+			refused.failures.some(
+				(failure) => failure.message === 'A deferred PAC case was unexpectedly executed.'
+			)
+		);
+		const all = extra.replaceAll('Selected tests', 'All tests');
+		assert.equal(
+			evidence.evaluate(all, 0, 0).exit_status,
+			0,
+			'Full default still admits this actual method.'
+		);
+	}
+	const neighbor =
+		'-[ErgoptiPlusTests.' +
+		bootstrapSuite +
+		' testActualDescriptorPublicationRequiresPersistedDigestAndExclusiveDestination]';
+	const retained = selected
+		.replace(
+			"Test Suite 'Selected tests' passed",
+			`Test Case '${neighbor}' started.\nTest Case '${neighbor}' passed (0.050 seconds).\nTest Suite 'Selected tests' passed`
+		)
+		.replace('Executed 15 tests', 'Executed 16 tests');
+	assert.equal(evidence.evaluate(retained, 0, 0, undefined, admission).exit_status, 0);
+	assert.equal(
+		evidence.evaluate(
+			retained.replace(`'${neighbor}' passed`, `'${neighbor}' failed`),
+			0,
+			0,
+			undefined,
+			admission
+		).exit_status,
+		1
+	);
+
 	for (const suite of result.qualification.classes) {
 		assert.ok(pattern.test('ErgoptiPlusTests.' + suite + '/testOriginal'));
 		assert.equal(pattern.test('ErgoptiPlusTests.' + suite + 'Extra/testOriginal'), false);
