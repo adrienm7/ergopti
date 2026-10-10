@@ -6029,6 +6029,25 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 MLX managed admission continuation. The actual generated downloader
+already installs the bundled per-request managed HTTP transport. Its launcher
+now admits that receiver instead of refusing PAC/WPAD through the opaque-client
+gate first. The pinned interpreter, system trust, explicit-route precedence,
+download ownership and disabled Xet/hf_transfer paths remain unchanged. Four
+focused caller controls pass, including native-receiver refusal without an
+opaque fallback; the same two new controls fail on the original301fae8c7
+producer while both original controls still pass. The actual emitted Python
+passes all five independent trust-activation vectors. These are portable
+receipts, not actual macOS PAC, trust or packaged model-download acceptance.
+The original opaque policy/Ollama vectors and both owners' callback-classifier
+controls remain intact. The updated receiving suite passes61 controls,
+including MLX's own managed-refusal bytes, fresh/stale/terminal/start-refused
+owners, exact admission-before-dependency order, unchanged inherited selectors
+and no detached PID on refusal. The HS-007 publication-yield case receives the
+genuine managed prelude while retaining every original lifecycle assertion.
+The external/stock Ollama daemon, rollback fetch and final native/package/
+installation/enterprise qualifications remain open; item62 stays incomplete.
+
 2026-10-09 final upstream refresh. Explicit refspec receiving now includes actualDev20f66968 (including the approved thirteen-scope publication policy and renewed window), without changing that policy or the other groups' code. Raw full-default124, Mac source/typed78, item36 constructed65, PAC portable82, approved-policy controls and normal formatting pass on this composed source. Native corrected Windows44 and final cross-platform acceptance remain pending; inherited whole-gate failures remain reported above.
 
 2026-10-09 upstream receiving. The latest actual Dev253fe1ab is preserved. The Source10 CI step retains its strict original command, source/run/attempt receipt and ten-minute budget while adopting the mandatory non-cancellation condition after upstream retired the fast input. The raw full-default guard preserves124 controls; the Mac source/typed-receipt guard preserves all58 upstream and12 Source10 bodies, plus eight negative controls for the approved explicit PAC qualification wrapper (78/0). Item36 constructed65 and PAC selected-cohort portable82 controls pass; this is not native Mac qualification. Windows manual37995346703 ataa6d73f3 has10657 passes and one original Source44 failure: the genuine ErrorRecord identifies DecoderFallbackException atFetch.Invoke line241, outside the original TargetInvocationException catch. Its new closed diagnostic case passes; E2E/package/install are skipped, and the corrected catch now requires the path-specific decoder/oversize class or an actual HTTP503 WebException; unrelated failures and owner debt are not admitted. Seven actual PS7 controls pass, including two real HTTP503 exchanges and physical peer retirement; corrected Windows44 execution remains pending. Release is skipped. No TODO identifier is removed. Normal formatting passes; the full local JS run has401 passes/five failures. The unchanged source-toolchain test is requalified successfully with scoped TMPDIR=/tmp after the retained ENOSPC failure, and the Homebrew guard passes after exact qualification-wrapper binding. Source10 raw-condition5 and constructed source-receipt22 controls pass. The same whole pipeline test then reaches an incoming Linux live-harness causal-preimage failure; it is not a whole-gate pass. The incoming Linux evidence and Windows desktop guards also remain red and are byte-identical toDev253fe1ab. Their owners have been notified; no assertion or original native command is removed.
