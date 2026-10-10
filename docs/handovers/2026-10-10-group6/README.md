@@ -119,6 +119,38 @@ no debt. It is an admission failure, not a command timeout; the absence of
 E2E and Release/Publish are skipped. Cold MLX passes. The new catalogue candidate
 has not yet received native macOS qualification at this checkpoint.
 
+## Current receiving checkpoint and stream followup
+
+Atoms `011ea9a50` and `fd5b686bf` are integrated without squash in Dev
+`9087bec0f1d6beb112fb23779e948ff35fae96e8`. Candidate manual
+[38059108448](https://github.com/adrienm7/ergopti/actions/runs/38059108448) is
+whole terminal FAIL:7 successful,5 failed and5 skipped jobs. Core JS passes408
+checks. Both architectures pass the unchanged frozen50 release-tool corpus and
+actual guardian-owned TERM/INT retirement, plus original SDK41 and controlled
+API/daemon5/8/20/35 cohorts. The corpus uses explicit tool doubles; these results
+do not qualify native routing, installed operation or genuine daemon readiness.
+PAC/WPAD and independent HTTP remain red on both architectures; Homebrew
+admission remains red and packaging/installation are skipped. Release is skipped.
+Exact integrated manual38060796417 is whole terminal FAIL with the same
+7 successful,5 failed and5 skipped jobs. Release is skipped. Its verified owner
+then deletes lock912c6b3e and releases the integration phase; the feature remains
+active for reviewed source followups.
+
+The subsequent exact-task stream correction preserves ownership while a native
+stop remains pending and separates resource retirement from revoked business
+generations. Original38 cases/127 assertion calls are conserved; seven new
+controls include six predecessor failures and six red causal mutants. Its
+independent source ACK is SHA256
+`3da52ee2645a9999234d9c4a43758b9a81bd128a2f603e8f775a00b8f2fb424b`.
+Portable receiving uses actual ShellRunner logic with controlled task ports;
+physical Hammerspoon/POSIX closure remains unqualified.
+Canonical selected format passes; the Hammerspoon stub executes18165 passes
+across1563 modules and E2E101 passes/one original skip. JS executes407 passes and
+one failure caused by the container's protected `/tmp/.git` ancestor; the exact
+unchanged uninstall fixture passes under the owned non-Git temporary root.
+The full selected gate exits1 and is not reported wholly green. Hosted macOS
+receiving of this source remains pending.
+
 ## Remaining implementation and qualification
 
 - TODO36: resolve the actual same-identity Automation admission failure;
@@ -137,9 +169,10 @@ has not yet received native macOS qualification at this checkpoint.
   a success path or treat a shell-start boolean as authenticated readiness.
   A stock/foreign daemon has no retroactive tree authority; safely refuse and
   request manual stopping rather than using broad process matching.
-- TODO62: execute the original50 selected-release controls on genuine Darwin,
-  including original guardian-owned TERM/INT receiving. The independent caller
-  is prepared but its shared CI/guard file ownership is pending.
+- TODO62: preserve the now executed50 selected-release controls and actual
+  guardian-owned TERM/INT receiving on both Darwin architectures. Full native
+  routing, production packaging and installed operation remain independent
+  qualifications; the literal corpus does not establish them.
 - Windows: retain the existing native failures and packaged artifact NTLM/SSPI
   integration steps in TODO62. The maintainer will perform physical Windows
   receiving. Corporate proxy/authentication/certificate and real desktop

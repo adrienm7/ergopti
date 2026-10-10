@@ -119,7 +119,8 @@ helpers.describe("ApiOllama.cancel_streaming", function()
 		helpers.assert_eq(ApiOllama.cancel_streaming(), false)
 		helpers.assert_eq(calls, 1)
 
-		task.terminate = function() calls = calls + 1; return true end
+		task.terminate = function() calls = calls + 1; return true, "settled" end
+		task.isSettled = function() return true end
 		helpers.assert_eq(ApiOllama.cancel_streaming(), true,
 			"a retained native capability must remain retryable")
 		helpers.assert_eq(calls, 2)
@@ -575,9 +576,11 @@ helpers.describe("ApiOllama streaming task ownership", function()
 			local spawns, failures, terminations = 0, 0, 0
 			shell_runner.spawn = function()
 				spawns = spawns + 1
+				local settled = case.name == "false"
 				return {
 					start = case.start,
-					terminate = function() terminations = terminations + 1; return true end,
+					terminate = function() terminations = terminations + 1; settled = true; return true, "settled" end,
+					isSettled = function() return settled end,
 				}
 			end
 
@@ -604,7 +607,8 @@ helpers.describe("ApiOllama streaming task ownership", function()
 					on_done(0, "", "")
 					return true
 				end,
-				terminate = function() return true end,
+				terminate = function() return true, "settled" end,
+				isSettled = function() return true end,
 			}
 		end
 
@@ -637,7 +641,8 @@ helpers.describe("ApiOllama streaming task ownership", function()
 					on_done(28, "{}\n", "Operation timed out")
 					return true
 				end,
-				terminate = function() return true end,
+				terminate = function() return true, "settled" end,
+				isSettled = function() return true end,
 			}
 		end
 
