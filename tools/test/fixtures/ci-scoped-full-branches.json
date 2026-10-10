@@ -107,6 +107,31 @@
 			"format": "bash",
 			"retained_prefix": "set -euo pipefail\nstatus=0\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1",
 			"retained_suffix": "exit \"$status\""
+		},
+		{
+			"scope": "macos-native-pac",
+			"prefix": "pac_receipt=\"$RUNNER_TEMP/swift-launcher-evidence/native-pac-package-qualification.json\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt \"$pac_receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt \"$pac_receipt\")\"\npac_skip_args=()\nswift_root_suite=\"All tests\"\nif [ \"$mode\" = deferred ]; then\n    pac_skip_args=(--skip \"$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern \"$pac_receipt\")\")\n    swift_root_suite=\"Selected tests\"\n    echo \"[DEFERRED] macos-native-pac: duplicate package cohort not executed; still compiled; qualified=false.\"\nelif [ \"$mode\" = full ]; then\n    :\nelse\n    echo \"Invalid package PAC qualification disposition\" >&2\n    exit 1\nfi\n",
+			"suffix": "",
+			"strip": 0,
+			"format": "bash",
+			"embedded": true,
+			"edits": [
+				{
+					"before": " ${pac_skip_args[@]+\"${pac_skip_args[@]}\"}",
+					"after": "",
+					"count": 1
+				},
+				{
+					"before": " --pac-qualification-receipt \"$pac_receipt\"",
+					"after": "",
+					"count": 2
+				},
+				{
+					"before": "Test Suite '$swift_root_suite' passed",
+					"after": "Test Suite 'All tests' passed",
+					"count": 1
+				}
+			]
 		}
 	],
 	"slots": [
@@ -143,7 +168,7 @@
 		{
 			"file": ".github/workflows/ci-macos.yml",
 			"job": "e2e-hs",
-			"step": "Run virtual-keyboard harness (stubbed hs.* \u2014 no real Hammerspoon)",
+			"step": "Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)",
 			"protocol": 5
 		},
 		{
@@ -905,7 +930,7 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
-			"step": "The whole daemon, live \u2014 a trigger typed, a tray shown",
+			"step": "The whole daemon, live — a trigger typed, a tray shown",
 			"protocol": 9
 		},
 		{
@@ -1077,6 +1102,14 @@
 			"protocol": 12,
 			"owner_job": "managed-ollama-native",
 			"owner_step": "Receive actual independent managed HTTP native clients"
+		},
+		{
+			"file": ".github/workflows/ci-macos.yml",
+			"job": "package-macos",
+			"step": "Run Swift launcher tests",
+			"protocol": 13,
+			"owner_job": "managed-ollama-native",
+			"owner_step": "Qualify actual native PAC and WPAD XCTest controls"
 		}
 	],
 	"linux_harness": {
