@@ -10667,6 +10667,100 @@ test precondition failure, not a Lua defect or a successful permission grant.
   successful later tap-holds do not close the incident. Retain source-bound
   native regression and retirement evidence before claiming the lease repaired.
 
+- [ ] **141.** Make newer configuration schemas visibly read-only on every driver.
+
+  Preserve the file and the original migration refusal; never downgrade its
+  schema or offer unknown future keys for cleanup. Disable AI persistence
+  actions with a translated explanation and recheck retained callbacks.
+  Exercise genuine future-schema boot, unchanged bytes, current-schema
+  admission and cross-driver cleanup and menu regressions. The maintainer's
+  local checkout was updated from schema 11 to 12 without editing the profile;
+  the subsequent activation incident below is separate.
+
+- [ ] **142.** Provide an explicit local driver control command for reload.
+
+  The maintainer requested a supported way for tools to request Reload when
+  the native tray exposes no accessible window. Route it through the existing
+  lifecycle owner, preserving pause, configuration transactions, cleanup and
+  successor identity. Report requested, refused and completed separately;
+  never start a duplicate driver or force termination. Cover all three OSes
+  through their native control facilities and add refusal and exact-instance
+  regressions.
+
+- [ ] **143.** Fix AI activation retained behind incomplete Windows startup.
+
+  On October 10, the actual local driver at fe980a298 accepted schema 12 and
+  applied 136 settings with no rejection, but repeated reloads did not reach
+  the ready marker. Bounded content-free tracing and an isolated canonical
+  fixture locate expensive source/schema checks during local-server Rescan:
+  Capture took 2828 ms and Current 1531 ms; the panel call did not finish within
+  180 seconds. The isolated actor was explicitly retired after that timeout;
+  this is failed bounded evidence, not a successful startup qualification.
+  Correct and measure the repeated parsing without caching write authority,
+  dropping source freshness or weakening registry validation. Check the same
+  admission cost on macOS and Linux before declaring cross-driver completion.
+  Source.Current performs seven full schema admissions; the local-server job
+  path nests four Current calls. The classification memo removes redundant
+  decoding but a post-change isolated panel still exceeded 90 seconds; do not
+  present that memo as the startup fix. Preserve its failed receipt and reduce
+  duplicate validation at operation boundaries with real interleaving tests.
+
+  The native menu Reload callback incorrectly waited for input readiness.
+  Its correction retains the existing lifecycle owner; four canonical cases
+  pass and the maintainer confirms that the button now reloads. A separate
+  optional boot-save wake-up reports failure when old auto-execution resumes
+  behind a newly acquired reload barrier; preserve real save errors and user
+  obligations while retiring that optional work. Also move genuine CapsLock
+  intent initialization before parse-time key callbacks: an early Alt press
+  otherwise raises UnsetError during startup. The initialization fix has one
+  canonical regression pass, causal recording controls, valid encoding and a
+  successful full-source compile; live AI activation is still unqualified.
+  The inspected macOS/Linux entry paths have neither the delayed optional
+  full-save caller nor the AHK load-time callback/global ordering defect;
+  their lifecycle and input initialization owners remain unchanged.
+
+  The reviewed Windows correction now removes redundant pending-job observer
+  checks, retains full source admission at the operation boundaries, and reads
+  a detached provider view in one batch. Regression controls cover stale source,
+  context withdrawal, reentry and publication ownership. With actual native
+  job/Models timers and a controlled transport, both timely response and no
+  response settle after two menu builds with all jobs and requests retired.
+  The earlier bounded fixture's first projection took approximately 36 seconds;
+  subsequent builds took 1.5-1.8 seconds. The maintainer now confirms that live
+  enable and disable work, but reported more than ten seconds before menu
+  feedback. The follow-up applies runtime effects before repaint and moves
+  source/view preparation out of row construction. Six composed deferred-view
+  controls and the registered ordering test with six child cases pass; the
+  installed source compiles and passes encoding. Measure the real click again
+  after reload before claiming an immediate response. The existing old panel
+  fixture has the same seven passes and thirteen failures before and after the
+  change; retain that explicit fixture debt. macOS/Linux already apply runtime
+  state before repaint and do not have the duplicate Windows polling observer.
+
+  A read-only performance audit of October 10 logs also identifies remaining
+  work. The earlier observed startup takes 36.47 seconds. Hotstring registration's
+  12.38-second interval contains 6.89 seconds of native menu navigation; its wall
+  time excluding navigation is 5.49 seconds. Prefix-watcher initialization takes
+  2.45 seconds, including a 1.42-second index build. Keep the first-input readiness
+  guarantee while investigating this work. In the latest flushed session,
+  OnChar averages 1.11 ms across 403 samples, while suggestion input-to-visible
+  averages 62.93 ms across 31 samples and reaches 393.58 ms. Investigate the
+  render queue before optimizing character matching. Full guarded configuration
+  writes average 864 ms across eight samples. These are uncontrolled usage
+  observations with overlapping timing scopes, not isolated CPU benchmarks;
+  repeat comparable measurements after the fixes without logging typed text.
+
+  Subsequent local reloads reach ready in 7.54 and 10.49 seconds, with no error
+  recorded after 18:00. Their navigation and load differ, so the timings do not
+  isolate a causal speedup. They expose a separate live defect: root staging
+  rebuilds an already constructed AI child, consumes the prepared view twice
+  and schedules another preparation. The log aggregates 131 repeated builds
+  between 18:01 and 18:10 and another 112 before 18:18. Pass the exact caller-owned
+  child through the root's per-invocation builder map, retain the original final
+  publication authorization, and prove that the queue settles without a second
+  child construction. Native verification after installing that correction and
+  the real enable/disable click latency remain open.
+
 ## Current patch release qualification
 
 The maintainer explicitly selected v1.0.1 despite two feature-labelled commits
