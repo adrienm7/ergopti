@@ -6219,6 +6219,40 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 native TLS fixture receiving at fe3da8332. Exact manual38032632804
+is terminal failure:3 successful,7 failed and7 skipped jobs. Both native
+architectures compile and passSDK41/PAC-source10/producer6. The original14
+cohorts retain12 passing methods/2 failing methods, with14 assertion failures
+and2 unexpected failures each. Each actual WPAD method emits two native
+NSURLErrorDomain codes -1202; synthetic privacy-unit and SDK negative-control
+codes are excluded. Buffered certificate outputs have no individual cross-stream
+join, and the Wire request phase is unknown. No detailed trust cause or primary
+TLS fix is established. Independent HTTP receiving has3 errors per architecture;
+packaging, installation and Release are skipped. After this receiving, feature
+d1703d302 merges latest Devc4e236830 and preserves the other owner's fixture
+deadline and stderr corrections. Its merged sources require fresh qualification;
+the fe3 native receipt is historical. Item62 remains open, including migration
+CODE and Darwin50 qualification, rather than only device verification.
+
+2026-10-10 native TLS fixture preparation checkpoint. The original leaf
+signing command now explicitly selects SHA256. Its previous native digest and
+the certificate failure's cause remain unproved; trust, hostname, key usages,
+owners, deadlines and every original assertion are unchanged. The existing
+seven-code certificate branch reports only its already-read NSURLErrorDomain
+code in DEBUG. Release classification is unchanged; compiled no-emission and
+native TLS receiving still require qualification. Strict complete-function
+inverse enrollment retains the original whole-source hash and rejects partial,
+duplicate, raw-error and changed-return mutations. Original and paired portable
+facts both pass52/52; original and pinned Linux live peers both pass3/3. All
+receiving commands physically close without retained debt. These results grant
+no native macOS or primary TLS-fix credit, and item62 remains open.
+The preceding integrated manual38030504308 on01955e89a is terminal failure:
+3 successful,7 failed and7 skipped jobs. Both SDK41/PAC-source10/producer6
+cohorts pass. ARM emits two certificate observations; Intel refuses in the
+fixture's shared initial read and emits none, so its positive reason remains
+unknown. Packaging, installation and Release are actually skipped. New native
+compilation and qualification were pending at this preparation checkpoint.
+
 2026-10-10 missing managed Ollama catalogue diagnostic continuation. The
 original fixed release-catalogue read now retains FileNotFoundError as the
 cause of a typed refusal; the original install, verify and create-session CLI

@@ -108,8 +108,29 @@ PAC_OWNERSHIP_INVERSE = (
 HISTORICAL_HTTP_RELEASE_SHA256 = "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98"
 
 
+# Admit only the complete reviewed DEBUG certificate-code observation. The
+# original whole-source hash still rejects every byte outside this exact inverse.
+DEBUG_CERTIFICATE_FAILURE_INVERSE = (
+    'func managedHTTPFailure(_ error: NSError) -> String {\n\tguard error.domain == NSURLErrorDomain else { return "unavailable" }\n\tlet code = error.code\n\tswitch code {\n\tcase NSURLErrorTimedOut: return "deadline"\n\tcase NSURLErrorCancelled: return "cancelled"\n\tcase NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "offline"\n\tcase NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "offline"\n\tcase NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,\n\t\tNSURLErrorServerCertificateHasUnknownRoot, NSURLErrorServerCertificateNotYetValid,\n\t\tNSURLErrorSecureConnectionFailed, NSURLErrorClientCertificateRejected,\n\t\tNSURLErrorClientCertificateRequired:\n\t\t#if DEBUG\n\t\t_ = fputs("# native_http_certificate_code domain=NSURLErrorDomain code=\\(code)\\n", stderr)\n\t\t#endif\n\t\treturn "certificate"\n\tcase NSURLErrorUserAuthenticationRequired: return "unavailable"\n\tcase NSURLErrorCannotConnectToHost: return "connect"\n\tdefault: return "unavailable"\n\t}\n}',
+    'func managedHTTPFailure(_ error: NSError) -> String {\n\tguard error.domain == NSURLErrorDomain else { return "unavailable" }\n\tswitch error.code {\n\tcase NSURLErrorTimedOut: return "deadline"\n\tcase NSURLErrorCancelled: return "cancelled"\n\tcase NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "offline"\n\tcase NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "offline"\n\tcase NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,\n\t\tNSURLErrorServerCertificateHasUnknownRoot, NSURLErrorServerCertificateNotYetValid,\n\t\tNSURLErrorSecureConnectionFailed, NSURLErrorClientCertificateRejected,\n\t\tNSURLErrorClientCertificateRequired: return "certificate"\n\tcase NSURLErrorUserAuthenticationRequired: return "unavailable"\n\tcase NSURLErrorCannotConnectToHost: return "connect"\n\tdefault: return "unavailable"\n\t}\n}',
+)
+
+
+def debug_certificate_failure_projection(source):
+    """Invert one exact diagnostic function or preserve one exact original."""
+    diagnostic, original = DEBUG_CERTIFICATE_FAILURE_INVERSE
+    if source.count("func managedHTTPFailure(") != 1:
+        raise ValueError("Certificate diagnostic function identity refused")
+    if source.count(original) == 1 and diagnostic not in source:
+        return source
+    if source.count(diagnostic) != 1 or original in source:
+        raise ValueError("Certificate diagnostic enrollment refused")
+    return source.replace(diagnostic, original, 1)
+
+
 def historical_pac_ownership_projection(source):
     """Accept the exact legacy source or the complete approved ownership repair."""
+    source = debug_certificate_failure_projection(source)
     source = pac_source_acquisition_projection(source)
     if hashlib.sha256(source.encode("utf-8")).hexdigest() == HISTORICAL_HTTP_RELEASE_SHA256:
         return source

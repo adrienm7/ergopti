@@ -320,7 +320,8 @@ enum ManagedProxyLookup {
 /// challenges are deliberately absent from the receiving protocol.
 func managedHTTPFailure(_ error: NSError) -> String {
 	guard error.domain == NSURLErrorDomain else { return "unavailable" }
-	switch error.code {
+	let code = error.code
+	switch code {
 	case NSURLErrorTimedOut: return "deadline"
 	case NSURLErrorCancelled: return "cancelled"
 	case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "offline"
@@ -328,7 +329,11 @@ func managedHTTPFailure(_ error: NSError) -> String {
 	case NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,
 		NSURLErrorServerCertificateHasUnknownRoot, NSURLErrorServerCertificateNotYetValid,
 		NSURLErrorSecureConnectionFailed, NSURLErrorClientCertificateRejected,
-		NSURLErrorClientCertificateRequired: return "certificate"
+		NSURLErrorClientCertificateRequired:
+		#if DEBUG
+		_ = fputs("# native_http_certificate_code domain=NSURLErrorDomain code=\(code)\n", stderr)
+		#endif
+		return "certificate"
 	case NSURLErrorUserAuthenticationRequired: return "unavailable"
 	case NSURLErrorCannotConnectToHost: return "connect"
 	default: return "unavailable"

@@ -412,6 +412,7 @@ class WireFixture:
                 openssl,
                 "x509",
                 "-req",
+                "-sha256",
                 "-days",
                 "1",
                 "-in",

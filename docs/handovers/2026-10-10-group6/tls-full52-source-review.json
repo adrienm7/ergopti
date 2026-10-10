@@ -1,0 +1,58 @@
+{
+	"schema": 1,
+	"result": "ACK_SAVED_COMPLETE_ORIGINAL52_RECEIVING",
+	"packet": "/tmp/group6-http-debug-full52-29jd7xop",
+	"actual_receipt_sha256": "dfa27c52d655ddd17b8abdc36d4ccf2ab8ad720f795c8a7fd1351c639dcd5c76",
+	"actual_results_sha256": "e239308dbcdf6b74eef1931a18e7a72371b5858d55fde523a5a18d152a5bed2e",
+	"prior_bounded_source_ack": {
+		"path": "/tmp/group6-review-resume-20261010/HTTP-DEBUG-CERTIFICATE-EXACT-INVERSE-AND-SAVED-RECEIVING-SOURCE-ACK.json",
+		"sha256": "b9eaa5623ff3497e2968f388388a048fc675951e494214a62f2eb3e4e28ab38d"
+	},
+	"source_identity_bindings_verified": 30,
+	"actual_file_hash_size_refs_verified": 18,
+	"archive": {
+		"path": "/workspace/scratch/group6-http-debug-full52-20261010/private-full52-source-and-receiving.tar.gz",
+		"sha256": "0e42c6eab3d3f77a85447bd37f7cfbb9db50e08766e8abc1616fd1a62a41f27a",
+		"safe_regular_files": 33,
+		"safe_directories": 32,
+		"no_links_or_unsafe_paths": true
+	},
+	"cohort_sources_exact_previous_reviewed_images": true,
+	"identical52_unique_case_identities": true,
+	"phases": [
+		{
+			"label": "original",
+			"pid": 684886,
+			"status": 0,
+			"pass": 52,
+			"fail": 0,
+			"errors": 0,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "08ea5830b106616f08f19c6cfc2be74de6b98cc84bcde6cd41cbc8b0a9171965"
+		},
+		{
+			"label": "paired",
+			"pid": 685452,
+			"status": 0,
+			"pass": 52,
+			"fail": 0,
+			"errors": 0,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "da60562728e0b05621a7479dd55cf109a76a59f6f3f75c2cefcd4d814e20a6cb"
+		}
+	],
+	"normal_entry_phase_budget_seconds": 60,
+	"original_receiver_clock_seconds": 120,
+	"blockers": [],
+	"limits": [
+		"Read-only saved receiving review only; no reviewer target execution/import/parser/test/native/formatter or main/index/ref/CI mutation.",
+		"Both52PASS/0FAIL/0ERROR/0SKIP are original portable facts cohort executions under unchanged genuine ownPhase command/subreaper, not Swift/native Darwin execution or TLS cause evidence.",
+		"Original397 assertion lines and historical SHA remain protected by prior exact inverse review; no corpus/expected hash/normal-entry timeout change.",
+		"Actual DEBUG Swift compilation/native14/SDK41 and compiled release no-emission are unrun. No trust fix, serving activation/full migration or whole-suite qualification credit.",
+		"Root source formatting/rebind and delivery/native receiving remain separately owned."
+	]
+}
