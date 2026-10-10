@@ -6591,6 +6591,19 @@ callable after Fill leaves explicitly tested native residue until exact repair;
 automatic retirement is not claimed for these two cases. Native qualification
 remains required for every corrected subject.
 
+Run 38074007561 on exact corrected source cebe19479 stops before the full
+unit suite: the new tray adapter bootstrap cannot retain its genuine intrinsic
+cohort. The recovered native diagnostic names tray_menu.ahk line 38. Its nested
+held guard overwrites the captured outer Name result before comparison. The
+reviewed correction keeps the native name in a distinct local and preserves
+every intrinsic guard; exact original-adapter regression and inverse controls
+and repeated actual native-cohort assertions are added. Corrected native
+execution remains pending. All
+seventeen personal, twelve meta and three original Agent flag subjects remain
+unexecuted in this run; correct that adapter refusal before native admission.
+The corrected source selected gates pass all 408 JS checks, format and encoding
+with 7,621 inputs, index and HEAD unchanged.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -8870,6 +8883,16 @@ the test preserves the actual cleanup errors and does not acknowledge residue
 as publication. The focused four-source JS manifest gate passes, including
 fifteen operation mutations with unique exact inverses; full selected gates
 and corrected native qualification remain pending.
+
+The next corrected-source Windows run, 38074007561, reports an actual fatal
+tray_menu.ahk line 38 bootstrap refusal before complete unit execution. This
+new adapter defect is owned by this group; no corrected personal/meta/Agent
+subject is qualified by that run. The reviewed metadata-result custody
+correction preserves all guards and original subjects; exact old-adapter
+regression/inverse controls and repeated real intrinsic checks are added.
+The constructor result is separately named without claiming its localized
+for-loop was a second observed defect. Corrected native execution is pending. The local selected source gates pass 408 JS
+checks plus format and encoding with exact unchanged inputs.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
