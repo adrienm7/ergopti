@@ -355,6 +355,7 @@
 		"test:ci-pipeline": "node ./tools/test/test-ci-pipeline.cjs",
 		"test:ci-kana-install": "node ./tools/test/test-ci-kana-install.cjs",
 		"test:ci-full-default": "node ./tools/test/test-ci-full-default.cjs",
+		"test:wp7-timer-xctest-evidence": "node ./tools/test/test-wp7-timer-xctest-evidence.cjs",
 		"test:lease165-xctest-evidence": "node ./tools/test/test-lease165-xctest-evidence.cjs",
 		"test:ci-pipeline-wiring": "node ./tools/test/test-ci-pipeline-wiring.cjs",
 		"test:ubuntu-ci-acquisition": "node ./tools/test/test-ubuntu-ci-acquisition.cjs",

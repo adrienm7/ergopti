@@ -46,6 +46,8 @@ check('raw loader and full view retain every exact source byte', () => {
 check('every scoped full body remains owned; all other product scripts remain exact', () => {
 	let jobs = 0,
 		leaseReceivers = 0,
+		hostedTaskReceivers = 0,
+		wp7Receivers = 0,
 		steps = 0;
 	for (const entry of source)
 		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
@@ -56,6 +58,20 @@ check('every scoped full body remains owned; all other product scripts remain ex
 					'724f6560de5871aa08d5cb1287657a1a760aedc8aa30bdcdfabce0bd2adf2352'
 				);
 				leaseReceivers++;
+			} else if (job.id === 'wp7-timer-native') {
+				assert.equal(entry.rel, '.github/workflows/ci-macos.yml');
+				assert.equal(
+					crypto.createHash('sha256').update(job.body.trimEnd()).digest('hex'),
+					'b2ea835e1a07a5d191e3dd58f83bb91f93d73582dcf9753f550f13b55e6d6dbf'
+				);
+				wp7Receivers++;
+			} else if (job.id === 'hosted-task-clock') {
+				assert.equal(entry.rel, '.github/workflows/ci-macos.yml');
+				assert.equal(
+					crypto.createHash('sha256').update(job.body.trimEnd()).digest('hex'),
+					'399a594d6491b9573e9a12cc4a968a8560d12ec5721e376289926b419ff8f6c7'
+				);
+				hostedTaskReceivers++;
 			} else jobs++;
 			assert.equal(Full.field(Full.job(job.id), 'if'), Raw.field(job.body, 'if'));
 			for (const step of Raw.steps(job.body)) {
@@ -86,6 +102,10 @@ check('every scoped full body remains owned; all other product scripts remain ex
 	assert.equal(jobs, 26);
 	assert.equal(leaseReceivers, 1);
 	assert.equal(jobs + leaseReceivers, 27);
+	assert.equal(hostedTaskReceivers, 1);
+	assert.equal(jobs + leaseReceivers + hostedTaskReceivers, 28);
+	assert.equal(wp7Receivers, 1);
+	assert.equal(jobs + leaseReceivers + hostedTaskReceivers + wp7Receivers, 29);
 	assert.ok(steps > 150, 'the full retained script inventory is nonvacuous');
 });
 const testedProtocols = new Set();

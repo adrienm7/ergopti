@@ -632,6 +632,26 @@ const MANUAL_LEASE165_JOB = [
 	'            ${{ runner.temp }}/lease165-native-evidence/lease165-*.json',
 	'            ${{ runner.temp }}/lease165-native-evidence/lease165-swift-child-status.txt'
 ].join('\n');
+function isManualWP7(job, rel) {
+	return (
+		rel === MACOS_BOX &&
+		job.id === 'wp7-timer-native' &&
+		pipeline.field(job.body, 'if') ===
+			"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" &&
+		require('node:crypto').createHash('sha256').update(job.body.trimEnd()).digest('hex') ===
+			'b2ea835e1a07a5d191e3dd58f83bb91f93d73582dcf9753f550f13b55e6d6dbf'
+	);
+}
+function isManualHostedTask(job, rel) {
+	return (
+		rel === MACOS_BOX &&
+		job.id === 'hosted-task-clock' &&
+		pipeline.field(job.body, 'if') ===
+			"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" &&
+		require('node:crypto').createHash('sha256').update(job.body.trimEnd()).digest('hex') ===
+			'399a594d6491b9573e9a12cc4a968a8560d12ec5721e376289926b419ff8f6c7'
+	);
+}
 function isManualLease165(job, rel) {
 	return (
 		rel === MACOS_BOX &&
@@ -652,7 +672,9 @@ for (const rel of Object.values(BOX_FILES)) {
 			condition === null ||
 				ALLOWED_JOB_IFS[boxJob.id] === condition ||
 				manualArchiveQualification ||
-				isManualLease165(boxJob, rel),
+				isManualLease165(boxJob, rel) ||
+				isManualHostedTask(boxJob, rel) ||
+				isManualWP7(boxJob, rel),
 			`${rel}: job \`${boxJob.id}\` has job-level \`if: ${condition}\`; only ` +
 				`${Object.entries(ALLOWED_JOB_IFS)
 					.map(([id, value]) => `${id} (${value})`)
@@ -664,6 +686,155 @@ for (const rel of Object.values(BOX_FILES)) {
 		);
 	}
 }
+const wp7Jobs = pipeline.jobs(MACOS_BOX).filter((job) => job.id === 'wp7-timer-native');
+check(wp7Jobs.length === 1 && isManualWP7(wp7Jobs[0], MACOS_BOX), 'one exact manual WP7 job');
+const wp7MutationWhole =
+	'  wp7-timer-native:\n    name: \'Pinned dispatcher native seven (${{ matrix.architecture }})\'\n    if: ${{ (github.event_name == \'workflow_dispatch\' && !inputs.release) }}\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: x86_64\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 25\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.sha }}\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: \'.node-version\'\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \'3.13\'\n      - name: Receive actual pinned dispatcher cancellation method\n        shell: bash\n        env:\n          WP7_EXPECTED_ARCH: ${{ matrix.architecture }}\n          SWIFT_BACKTRACE: enable=yes\n        run: |\n          set -euo pipefail\n          umask 077\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          wp7_actual_arch="$(uname -m)"\n          test "$wp7_actual_arch" = "$WP7_EXPECTED_ARCH"\n          evidence="$RUNNER_TEMP/wp7-timer-native-evidence"\n          mkdir -m 700 "$evidence"\n          transcript="$evidence/wp7-timer-xctest.log"\n          source_receipt="$evidence/wp7-timer-source.json"\n          node tools/diagnostics/wp7_timer_xctest_evidence.cjs begin \\\n            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt"\n          child_status_receipt="$evidence/wp7-timer-swift-child-status.txt"\n          child_script="$evidence/wp7-timer-swift-child.sh"\n          test ! -e "$child_status_receipt" && test ! -L "$child_status_receipt"\n          set -C\n          cat > "$child_script" <<\'WP7_TIMER_SWIFT_CHILD\'\n          set -uo pipefail\n          umask 077\n          test ! -e "$2" && test ! -L "$2" || exit 1\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$1" \\\n            --filter \'HS274NativePolicyQualificationTests/testActualPinnedDispatcherCancellationUsesGenuineOfflineLibrary\'\n          wp7_child_status=$?\n          set -eC\n          printf \'%s\\n\' "$wp7_child_status" > "$2"\n          exit "$wp7_child_status"\n          WP7_TIMER_SWIFT_CHILD\n          set +e\n          script -q /dev/null /bin/bash "$child_script" \\\n            "$RUNNER_TEMP/wp7-timer-swift-ci" "$child_status_receipt" 2>&1 | tee "$transcript"\n          wp7_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          wp7_actual_arch="$(uname -m)"\n          node tools/diagnostics/wp7_timer_xctest_evidence.cjs judge \\\n            "$transcript" "${wp7_statuses[0]}" "${wp7_statuses[1]}" \\\n            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt" \\\n            "$evidence/wp7-timer-verdict.json"\n      - name: Retain scoped pinned dispatcher evidence\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: wp7-timer-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: warn\n          path: |\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-xctest.log\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-*.json\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-swift-child-status.txt\n\n';
+for (const [what, from, to] of [
+	['missing WP7 job', '  wp7-timer-native:\n', '  foreign-wp7:\n'],
+	[
+		'WP7 package dependency',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    needs: package-macos\n'
+	],
+	[
+		'WP7 forgiveness',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    continue-on-error: true\n'
+	],
+	[
+		'WP7 output authority',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    outputs:\n      assets: fake\n'
+	],
+	['WP7 foreign secret', '  wp7-timer-native:\n', '  wp7-timer-native:\n    secrets: inherit\n'],
+	[
+		'WP7 push admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'push' && !inputs.release) }}"
+	],
+	[
+		'WP7 PR admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'pull_request' && !inputs.release) }}"
+	],
+	[
+		'WP7 release admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) }}"
+	],
+	['WP7 wrong architecture', '            architecture: x86_64', '            architecture: arm64'],
+	['WP7 wrong budget', '    timeout-minutes: 25', '    timeout-minutes: 26'],
+	[
+		'WP7 wrong method',
+		'HS274NativePolicyQualificationTests/testActualPinnedDispatcherCancellationUsesGenuineOfflineLibrary',
+		'HS274NativePolicyQualificationTests/testForeign'
+	],
+	['WP7 forged child status', '          wp7_child_status=$?', '          wp7_child_status=0'],
+	[
+		'WP7 widened artifact',
+		'            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-swift-child-status.txt',
+		'            ${{ runner.temp }}/**'
+	]
+]) {
+	const source = pipeline.file(MACOS_BOX);
+	check(source.split(wp7MutationWhole).length === 2, what + ': unique new-job scope');
+	check(wp7MutationWhole.split(from).length === 2, what + ': exact WP7 cut');
+	const changed = pipeline
+		.jobsOfText(source.replace(wp7MutationWhole, wp7MutationWhole.replace(from, to)), MACOS_BOX)
+		.filter((job) => job.id === 'wp7-timer-native');
+	check(changed.length !== 1 || !isManualWP7(changed[0], MACOS_BOX), what);
+}
+check(!isManualWP7(wp7Jobs[0], BOX_FILES.windows), 'WP7 foreign path refuses');
+check(
+	!isManualWP7({ id: 'foreign-wp7', body: wp7Jobs[0].body }, MACOS_BOX),
+	'WP7 foreign identity refuses'
+);
+const manualHostedTask = pipeline.jobs(MACOS_BOX).filter((job) => job.id === 'hosted-task-clock');
+check(
+	manualHostedTask.length === 1 && isManualHostedTask(manualHostedTask[0], MACOS_BOX),
+	'exact independent task-only hosted receiving job'
+);
+const hostedTaskMutationVectors = [
+	['missing hosted task node', '  hosted-task-clock:\n', '  foreign-task-clock:\n'],
+	[
+		'hosted task coupled to package',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    needs: package-macos\n'
+	],
+	[
+		'hosted task forgives failure',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    continue-on-error: true\n'
+	],
+	[
+		'hosted task exports release asset',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    outputs:\n      assets: false-authority\n'
+	],
+	[
+		'hosted task inherits foreign secrets',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    secrets: inherit\n'
+	],
+	[
+		'hosted task admits push',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'push' && !inputs.release) }}"
+	],
+	[
+		'hosted task admits pull request',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'pull_request' && !inputs.release) }}"
+	],
+	[
+		'hosted task admits release',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) }}"
+	],
+	[
+		'hosted task changed architecture',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15-intel"
+	],
+	[
+		'hosted task changed outer budget',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15\n    timeout-minutes: 10",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15\n    timeout-minutes: 11"
+	],
+	['hosted task substitutes success status', '          task_status=$?', '          task_status=0'],
+	[
+		'hosted task loses output receipt',
+		'            > "$evidence/projection.json"',
+		'            > /dev/null'
+	],
+	[
+		'hosted task asks for consent',
+		'      - name: Receive the isolated real task and timer boundaries\n',
+		'      - name: Receive the isolated real task and timer boundaries\n        env:\n          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: 1\n'
+	],
+	[
+		'hosted task publishes private receipts',
+		'            ${{ runner.temp }}/hosted-task-clock-evidence/child-status.txt',
+		'            ${{ runner.temp }}/hosted-task-clock-private/**'
+	]
+];
+for (const [what, from, to] of hostedTaskMutationVectors) {
+	const source = pipeline.file(MACOS_BOX);
+	check(source.includes(from), 'hosted task mutation has an actual preimage');
+	const changed = pipeline
+		.jobsOfText(source.replace(from, to), MACOS_BOX)
+		.filter((job) => job.id === 'hosted-task-clock');
+	check(changed.length !== 1 || !isManualHostedTask(changed[0], MACOS_BOX), what);
+}
+check(
+	!isManualHostedTask(manualHostedTask[0], BOX_FILES.windows),
+	'foreign hosted task lane refuses'
+);
+check(
+	!isManualHostedTask({ id: 'foreign-task', body: manualHostedTask[0].body }, MACOS_BOX),
+	'foreign hosted task identity refuses'
+);
 const manualLease165Job = pipeline.jobs(MACOS_BOX).filter((job) => job.id === 'lease165-native');
 check(
 	manualLease165Job.length === 1 && isManualLease165(manualLease165Job[0], MACOS_BOX),

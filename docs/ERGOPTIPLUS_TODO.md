@@ -3618,6 +3618,14 @@ admit the preserved configuration-recovery dispatch. The original proof
 remains untouched under its active owner; Windows-native and Swift checks
 remain deferred on this host. These results do not qualify physical input.
 
+The next narrow receiving step prepares two manual-only native receivers:
+the hosted Hammerspoon task-boundary experiment on ARM and the existing WP7
+dispatcher test on ARM and Intel. Both retain exact committed source binding;
+the whole lease165 job, its 146 + 19 corpus and budgets remain unchanged.
+Execution is still unrun at preparation time. Neither receiver grants input,
+profile or prompt consent, confirms the original exit73 cause, or completes
+item24. Required source gates precede publication and actual manual receiving.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

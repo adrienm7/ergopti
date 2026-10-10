@@ -34,6 +34,16 @@ const JOBS = [
 	],
 	[
 		'.github/workflows/ci-macos.yml',
+		'wp7-timer-native',
+		"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'hosted-task-clock',
+		"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
 		'lease165-native',
 		"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 	],

@@ -57,6 +57,146 @@ env:
   ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
 
 jobs:
+  wp7-timer-native:
+    name: 'Pinned dispatcher native seven (${{ matrix.architecture }})'
+    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Receive actual pinned dispatcher cancellation method
+        shell: bash
+        env:
+          WP7_EXPECTED_ARCH: ${{ matrix.architecture }}
+          SWIFT_BACKTRACE: enable=yes
+        run: |
+          set -euo pipefail
+          umask 077
+          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          wp7_actual_arch="$(uname -m)"
+          test "$wp7_actual_arch" = "$WP7_EXPECTED_ARCH"
+          evidence="$RUNNER_TEMP/wp7-timer-native-evidence"
+          mkdir -m 700 "$evidence"
+          transcript="$evidence/wp7-timer-xctest.log"
+          source_receipt="$evidence/wp7-timer-source.json"
+          node tools/diagnostics/wp7_timer_xctest_evidence.cjs begin \
+            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt"
+          child_status_receipt="$evidence/wp7-timer-swift-child-status.txt"
+          child_script="$evidence/wp7-timer-swift-child.sh"
+          test ! -e "$child_status_receipt" && test ! -L "$child_status_receipt"
+          set -C
+          cat > "$child_script" <<'WP7_TIMER_SWIFT_CHILD'
+          set -uo pipefail
+          umask 077
+          test ! -e "$2" && test ! -L "$2" || exit 1
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$1" \
+            --filter 'HS274NativePolicyQualificationTests/testActualPinnedDispatcherCancellationUsesGenuineOfflineLibrary'
+          wp7_child_status=$?
+          set -eC
+          printf '%s\n' "$wp7_child_status" > "$2"
+          exit "$wp7_child_status"
+          WP7_TIMER_SWIFT_CHILD
+          set +e
+          script -q /dev/null /bin/bash "$child_script" \
+            "$RUNNER_TEMP/wp7-timer-swift-ci" "$child_status_receipt" 2>&1 | tee "$transcript"
+          wp7_statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          wp7_actual_arch="$(uname -m)"
+          node tools/diagnostics/wp7_timer_xctest_evidence.cjs judge \
+            "$transcript" "${wp7_statuses[0]}" "${wp7_statuses[1]}" \
+            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt" \
+            "$evidence/wp7-timer-verdict.json"
+      - name: Retain scoped pinned dispatcher evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp7-timer-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-xctest.log
+            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-*.json
+            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-swift-child-status.txt
+
+  hosted-task-clock:
+    name: 'Hosted inert Hammerspoon task clock (arm64)'
+    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Acquire the pinned official task-only runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          runtime="$RUNNER_TEMP/hosted-task-runtime"
+          mkdir -m 700 "$runtime"
+          archive="$runtime/Hammerspoon-1.1.1.zip"
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 2 --max-time 120 \
+            -o "$archive" https://github.com/Hammerspoon/hammerspoon/releases/download/1.1.1/Hammerspoon-1.1.1.zip
+          printf '%s  %s\n' 11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa "$archive" | shasum -a 256 --check
+          ditto -x -k "$archive" "$runtime/official"
+      - name: Receive the isolated real task and timer boundaries
+        shell: bash
+        env:
+          ERGOPTI_NATIVE_HS_METADATA_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          evidence="$RUNNER_TEMP/hosted-task-clock-evidence"
+          mkdir -m 700 "$evidence"
+          set +e
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/diagnostics/native_hs_task_clock/run_hosted.py \
+            --source-root "$GITHUB_WORKSPACE" --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/hosted-task-clock-private" \
+            --app "$RUNNER_TEMP/hosted-task-runtime/official/Hammerspoon.app" \
+            --archive "$RUNNER_TEMP/hosted-task-runtime/Hammerspoon-1.1.1.zip" \
+            > "$evidence/projection.json"
+          task_status=$?
+          set -e
+          printf '%s\n' "$task_status" > "$evidence/child-status.txt"
+          exit "$task_status"
+      - name: Retain closed task-only observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosted-task-clock-arm64-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/hosted-task-clock-evidence/projection.json
+            ${{ runner.temp }}/hosted-task-clock-evidence/child-status.txt
+
   # Independent manual receiving; never full-package or installed qualification.
   lease165-native:
     name: 'Lease native 165 (${{ matrix.architecture }})'

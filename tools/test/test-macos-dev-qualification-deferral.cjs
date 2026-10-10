@@ -309,6 +309,20 @@ function admitPermissionObservationSelector(mac) {
 }
 
 // Strip only the exact independently admitted manual job, never arbitrary filters.
+function admitWP7Selector(mac) {
+	const jobs = fullDefault
+		.jobsOfText(mac, '.github/workflows/ci-macos.yml')
+		.filter((job) => job.id === 'wp7-timer-native');
+	if (
+		jobs.length !== 1 ||
+		fullDefault.field(jobs[0].body, 'if') !==
+			"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" ||
+		require('node:crypto').createHash('sha256').update(jobs[0].body.trimEnd()).digest('hex') !==
+			'b2ea835e1a07a5d191e3dd58f83bb91f93d73582dcf9753f550f13b55e6d6dbf'
+	)
+		return null;
+	return mac.replace(jobs[0].body, '');
+}
 function admitLease165Selector(mac) {
 	const jobs = fullDefault
 		.jobsOfText(mac, '.github/workflows/ci-macos.yml')
@@ -319,7 +333,8 @@ function admitLease165Selector(mac) {
 			'724f6560de5871aa08d5cb1287657a1a760aedc8aa30bdcdfabce0bd2adf2352'
 	)
 		return null;
-	return mac.replace(jobs[0].body, '');
+	const admitted = admitWP7Selector(mac);
+	return admitted === null ? null : admitted.replace(jobs[0].body, '');
 }
 // Only this complete read-only cohort may add the NumberRow selector.
 // Source/producer copies, test+tee status, twelve cases, seven TIS closures and
@@ -1313,6 +1328,79 @@ numberRowSelectorCheck('foreign-package-exclusion-remains-refused', () => {
 });
 assert.equal(numberRowSelectorChecks, 30);
 assert.equal(new Set(numberRowSelectorNames).size, 30);
+
+const wp7SelectorWhole =
+	'  wp7-timer-native:\n    name: \'Pinned dispatcher native seven (${{ matrix.architecture }})\'\n    if: ${{ (github.event_name == \'workflow_dispatch\' && !inputs.release) }}\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: x86_64\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 25\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.sha }}\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: \'.node-version\'\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \'3.13\'\n      - name: Receive actual pinned dispatcher cancellation method\n        shell: bash\n        env:\n          WP7_EXPECTED_ARCH: ${{ matrix.architecture }}\n          SWIFT_BACKTRACE: enable=yes\n        run: |\n          set -euo pipefail\n          umask 077\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          wp7_actual_arch="$(uname -m)"\n          test "$wp7_actual_arch" = "$WP7_EXPECTED_ARCH"\n          evidence="$RUNNER_TEMP/wp7-timer-native-evidence"\n          mkdir -m 700 "$evidence"\n          transcript="$evidence/wp7-timer-xctest.log"\n          source_receipt="$evidence/wp7-timer-source.json"\n          node tools/diagnostics/wp7_timer_xctest_evidence.cjs begin \\\n            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt"\n          child_status_receipt="$evidence/wp7-timer-swift-child-status.txt"\n          child_script="$evidence/wp7-timer-swift-child.sh"\n          test ! -e "$child_status_receipt" && test ! -L "$child_status_receipt"\n          set -C\n          cat > "$child_script" <<\'WP7_TIMER_SWIFT_CHILD\'\n          set -uo pipefail\n          umask 077\n          test ! -e "$2" && test ! -L "$2" || exit 1\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$1" \\\n            --filter \'HS274NativePolicyQualificationTests/testActualPinnedDispatcherCancellationUsesGenuineOfflineLibrary\'\n          wp7_child_status=$?\n          set -eC\n          printf \'%s\\n\' "$wp7_child_status" > "$2"\n          exit "$wp7_child_status"\n          WP7_TIMER_SWIFT_CHILD\n          set +e\n          script -q /dev/null /bin/bash "$child_script" \\\n            "$RUNNER_TEMP/wp7-timer-swift-ci" "$child_status_receipt" 2>&1 | tee "$transcript"\n          wp7_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          wp7_actual_arch="$(uname -m)"\n          node tools/diagnostics/wp7_timer_xctest_evidence.cjs judge \\\n            "$transcript" "${wp7_statuses[0]}" "${wp7_statuses[1]}" \\\n            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt" \\\n            "$evidence/wp7-timer-verdict.json"\n      - name: Retain scoped pinned dispatcher evidence\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: wp7-timer-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: warn\n          path: |\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-xctest.log\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-*.json\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-swift-child-status.txt\n\n';
+check('one separately admitted exact WP7 selector', () =>
+	assert.notEqual(admitWP7Selector(workflow), null)
+);
+for (const [what, from, to] of [
+	['missing WP7 job', '  wp7-timer-native:\n', '  foreign-wp7:\n'],
+	[
+		'WP7 package dependency',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    needs: package-macos\n'
+	],
+	[
+		'WP7 forgiveness',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    continue-on-error: true\n'
+	],
+	[
+		'WP7 output authority',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    outputs:\n      assets: fake\n'
+	],
+	['WP7 foreign secret', '  wp7-timer-native:\n', '  wp7-timer-native:\n    secrets: inherit\n'],
+	[
+		'WP7 push admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'push' && !inputs.release) }}"
+	],
+	[
+		'WP7 PR admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'pull_request' && !inputs.release) }}"
+	],
+	[
+		'WP7 release admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) }}"
+	],
+	['WP7 wrong architecture', '            architecture: x86_64', '            architecture: arm64'],
+	['WP7 wrong budget', '    timeout-minutes: 25', '    timeout-minutes: 26'],
+	[
+		'WP7 wrong method',
+		'HS274NativePolicyQualificationTests/testActualPinnedDispatcherCancellationUsesGenuineOfflineLibrary',
+		'HS274NativePolicyQualificationTests/testForeign'
+	],
+	['WP7 forged child status', '          wp7_child_status=$?', '          wp7_child_status=0'],
+	[
+		'WP7 widened artifact',
+		'            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-swift-child-status.txt',
+		'            ${{ runner.temp }}/**'
+	]
+]) {
+	check(what + ': separate WP7 selector refusal', () => {
+		assert.equal(workflow.split(wp7SelectorWhole).length, 2);
+		assert.equal(wp7SelectorWhole.split(from).length, 2);
+		assert.equal(
+			admitWP7Selector(workflow.replace(wp7SelectorWhole, wp7SelectorWhole.replace(from, to))),
+			null
+		);
+	});
+}
+check('duplicated WP7 selector refuses', () =>
+	assert.equal(
+		admitWP7Selector(workflow.replace(wp7SelectorWhole, wp7SelectorWhole + wp7SelectorWhole)),
+		null
+	)
+);
+check('unadmitted foreign filter remains visible', () =>
+	assert.ok(
+		admitWP7Selector(workflow + '\n--filter ForeignTests\n').includes('--filter ForeignTests')
+	)
+);
 console.log(
 	JSON.stringify({
 		scope: 'NumberRow-exact-selector-source-controls',

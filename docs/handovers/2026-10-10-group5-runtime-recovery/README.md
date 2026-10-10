@@ -499,3 +499,20 @@ proof only; these eight additive controls do not exercise their omission.
 Native/private lease liveness and the original PONG/READY/exit73 cause remain
 unqualified. Required final change-scoped gates run after this four-file freeze;
 their actual outcomes are recorded externally without rewriting these inputs.
+
+### Hosted task boundary and WP7 Darwin receiving preparation
+
+Two separate manual-only receivers are prepared on the published feature source.
+The ARM Hammerspoon experiment measures the existing task, timer and completion
+boundaries with a controlled child. An accepted `TASK_DONE` write keeps stdin open
+until genuine child completion; acceptance is not a delivered-write receipt.
+The WP7 ARM/Intel receiver selects the one existing Swift test that executes the
+seven frozen controls against the genuine pinned offline dispatcher library.
+The lease165 job, its 146 Worker + 19 Observer corpus and all budgets stay whole.
+
+These receivers require their actual committed source and closed result receipts.
+Execution remains unrun at this preparation boundary; required source gates and
+then a manual macOS run provide the next evidence. No input, profile, prompt
+consent or release action is requested. Existing native165 results remain separate
+from Hammerspoon timer/task evidence and WP7 runtime evidence. Neither preparation
+attributes or resolves the original PONG/READY/exit73 incident.

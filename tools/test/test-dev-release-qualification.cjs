@@ -475,6 +475,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'manual-verdict', 'release'],
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 		'ci-macos.yml': [
+			'wp7-timer-native',
+			'hosted-task-clock',
 			'lease165-native',
 			'item36-native',
 			'managed-ollama-native',
@@ -496,6 +498,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		release: "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
 		'windows-ok': 'always()',
 		'item36-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		'wp7-timer-native': "${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		'hosted-task-clock': "${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
 		'lease165-native': "${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
 		'macos-ok': 'always()',
 		'package-linux':
@@ -504,6 +508,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	};
 	let jobs = 0,
 		leaseReceivers = 0,
+		hostedTaskReceivers = 0,
+		wp7Receivers = 0,
 		steps = 0;
 	for (const [file, required] of Object.entries(workflows)) {
 		const relative = '.github/workflows/' + file;
@@ -527,6 +533,20 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 					'724f6560de5871aa08d5cb1287657a1a760aedc8aa30bdcdfabce0bd2adf2352'
 				);
 				leaseReceivers++;
+			} else if (job.id === 'wp7-timer-native') {
+				assert.equal(relative, '.github/workflows/ci-macos.yml');
+				assert.equal(
+					crypto.createHash('sha256').update(job.body.trimEnd()).digest('hex'),
+					'b2ea835e1a07a5d191e3dd58f83bb91f93d73582dcf9753f550f13b55e6d6dbf'
+				);
+				wp7Receivers++;
+			} else if (job.id === 'hosted-task-clock') {
+				assert.equal(relative, '.github/workflows/ci-macos.yml');
+				assert.equal(
+					crypto.createHash('sha256').update(job.body.trimEnd()).digest('hex'),
+					'399a594d6491b9573e9a12cc4a968a8560d12ec5721e376289926b419ff8f6c7'
+				);
+				hostedTaskReceivers++;
 			} else jobs++;
 			assert.notEqual(job.body.trim(), '', job.id + ': job evidence cannot be empty');
 			assert.equal(
@@ -552,6 +572,10 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert.equal(jobs, 26);
 	assert.equal(leaseReceivers, 1);
 	assert.equal(jobs + leaseReceivers, 27);
+	assert.equal(hostedTaskReceivers, 1);
+	assert.equal(jobs + leaseReceivers + hostedTaskReceivers, 28);
+	assert.equal(wp7Receivers, 1);
+	assert.equal(jobs + leaseReceivers + hostedTaskReceivers + wp7Receivers, 29);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');

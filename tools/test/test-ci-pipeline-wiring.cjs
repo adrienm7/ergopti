@@ -391,6 +391,8 @@ const WINDOWS_FILE_RETENTION = [
 ];
 
 const STEP_CONDITIONS = [
+	[MACOS_BOX, 'wp7-timer-native', 'Retain scoped pinned dispatcher evidence', 'always()'],
+	[MACOS_BOX, 'hosted-task-clock', 'Retain closed task-only observations', 'always()'],
 	[MACOS_BOX, 'lease165-native', 'Retain scoped native lease evidence', 'always()'],
 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
@@ -1212,6 +1214,8 @@ function graphProblems(files) {
 		const exposed =
 			rel === MACOS_BOX
 				? [
+						'wp7-timer-native',
+						'hosted-task-clock',
 						'lease165-native',
 						'item36-native',
 						'managed-ollama-native',
@@ -1255,6 +1259,36 @@ function graphProblems(files) {
 			}
 		}
 		if (rel === MACOS_BOX) {
+			const wp7 = jobs.find((candidate) => candidate.id === 'wp7-timer-native');
+			if (
+				!wp7 ||
+				pipeline.needsOf(wp7.body).length !== 0 ||
+				pipeline.field(wp7.body, 'if') !==
+					"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" ||
+				['continue-on-error', 'outputs', 'secrets'].some(
+					(key) => pipeline.field(wp7.body, key) !== null
+				) ||
+				require('node:crypto').createHash('sha256').update(wp7.body.trimEnd()).digest('hex') !==
+					'b2ea835e1a07a5d191e3dd58f83bb91f93d73582dcf9753f550f13b55e6d6dbf'
+			)
+				problems.push(
+					'wp7-timer-native must retain its exact independent fatal manual nonrelease pinned dispatcher body'
+				);
+			const hosted = jobs.find((candidate) => candidate.id === 'hosted-task-clock');
+			if (
+				!hosted ||
+				pipeline.needsOf(hosted.body).length !== 0 ||
+				pipeline.field(hosted.body, 'if') !==
+					"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" ||
+				['continue-on-error', 'outputs', 'secrets'].some(
+					(key) => pipeline.field(hosted.body, key) !== null
+				) ||
+				require('node:crypto').createHash('sha256').update(hosted.body.trimEnd()).digest('hex') !==
+					'399a594d6491b9573e9a12cc4a968a8560d12ec5721e376289926b419ff8f6c7'
+			)
+				problems.push(
+					'hosted-task-clock must retain its exact independent fatal manual nonrelease task-only body'
+				);
 			const lease = jobs.find((candidate) => candidate.id === 'lease165-native');
 			if (
 				!lease ||
@@ -1312,6 +1346,8 @@ function graphProblems(files) {
 			.map((candidate) => candidate.id);
 		if (rel === MACOS_BOX) {
 			const expectedEntries = [
+				'wp7-timer-native',
+				'hosted-task-clock',
 				'lease165-native',
 				'item36-native',
 				'managed-ollama-native',
@@ -1329,7 +1365,9 @@ function graphProblems(files) {
 			);
 		}
 		const expectedExits =
-			rel === MACOS_BOX ? ['lease165-native', 'item36-native', 'macos-ok'] : [sequence[4]];
+			rel === MACOS_BOX
+				? ['wp7-timer-native', 'hosted-task-clock', 'lease165-native', 'item36-native', 'macos-ok']
+				: [sequence[4]];
 		if (
 			rel === MACOS_BOX
 				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
@@ -1424,6 +1462,123 @@ for (const [what, from, to] of [
 		'  lease165-native:\n    outputs:\n      assets: fake\n'
 	],
 	['foreign lease165 secret', '  lease165-native:\n', '  lease165-native:\n    secrets: inherit\n']
+])
+	mustCatch(what, MACOS_BOX, from, to, graphProblems);
+const wp7MutationWhole =
+	'  wp7-timer-native:\n    name: \'Pinned dispatcher native seven (${{ matrix.architecture }})\'\n    if: ${{ (github.event_name == \'workflow_dispatch\' && !inputs.release) }}\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: x86_64\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 25\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.sha }}\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: \'.node-version\'\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \'3.13\'\n      - name: Receive actual pinned dispatcher cancellation method\n        shell: bash\n        env:\n          WP7_EXPECTED_ARCH: ${{ matrix.architecture }}\n          SWIFT_BACKTRACE: enable=yes\n        run: |\n          set -euo pipefail\n          umask 077\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          wp7_actual_arch="$(uname -m)"\n          test "$wp7_actual_arch" = "$WP7_EXPECTED_ARCH"\n          evidence="$RUNNER_TEMP/wp7-timer-native-evidence"\n          mkdir -m 700 "$evidence"\n          transcript="$evidence/wp7-timer-xctest.log"\n          source_receipt="$evidence/wp7-timer-source.json"\n          node tools/diagnostics/wp7_timer_xctest_evidence.cjs begin \\\n            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt"\n          child_status_receipt="$evidence/wp7-timer-swift-child-status.txt"\n          child_script="$evidence/wp7-timer-swift-child.sh"\n          test ! -e "$child_status_receipt" && test ! -L "$child_status_receipt"\n          set -C\n          cat > "$child_script" <<\'WP7_TIMER_SWIFT_CHILD\'\n          set -uo pipefail\n          umask 077\n          test ! -e "$2" && test ! -L "$2" || exit 1\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$1" \\\n            --filter \'HS274NativePolicyQualificationTests/testActualPinnedDispatcherCancellationUsesGenuineOfflineLibrary\'\n          wp7_child_status=$?\n          set -eC\n          printf \'%s\\n\' "$wp7_child_status" > "$2"\n          exit "$wp7_child_status"\n          WP7_TIMER_SWIFT_CHILD\n          set +e\n          script -q /dev/null /bin/bash "$child_script" \\\n            "$RUNNER_TEMP/wp7-timer-swift-ci" "$child_status_receipt" 2>&1 | tee "$transcript"\n          wp7_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          wp7_actual_arch="$(uname -m)"\n          node tools/diagnostics/wp7_timer_xctest_evidence.cjs judge \\\n            "$transcript" "${wp7_statuses[0]}" "${wp7_statuses[1]}" \\\n            "$GITHUB_SHA" "$WP7_EXPECTED_ARCH" "$wp7_actual_arch" "$source_receipt" \\\n            "$evidence/wp7-timer-verdict.json"\n      - name: Retain scoped pinned dispatcher evidence\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: wp7-timer-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: warn\n          path: |\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-xctest.log\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-*.json\n            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-swift-child-status.txt\n\n';
+for (const [what, from, to] of [
+	['missing WP7 job', '  wp7-timer-native:\n', '  foreign-wp7:\n'],
+	[
+		'WP7 package dependency',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    needs: package-macos\n'
+	],
+	[
+		'WP7 forgiveness',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    continue-on-error: true\n'
+	],
+	[
+		'WP7 output authority',
+		'  wp7-timer-native:\n',
+		'  wp7-timer-native:\n    outputs:\n      assets: fake\n'
+	],
+	['WP7 foreign secret', '  wp7-timer-native:\n', '  wp7-timer-native:\n    secrets: inherit\n'],
+	[
+		'WP7 push admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'push' && !inputs.release) }}"
+	],
+	[
+		'WP7 PR admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'pull_request' && !inputs.release) }}"
+	],
+	[
+		'WP7 release admission',
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) }}"
+	],
+	['WP7 wrong architecture', '            architecture: x86_64', '            architecture: arm64'],
+	['WP7 wrong budget', '    timeout-minutes: 25', '    timeout-minutes: 26'],
+	[
+		'WP7 wrong method',
+		'HS274NativePolicyQualificationTests/testActualPinnedDispatcherCancellationUsesGenuineOfflineLibrary',
+		'HS274NativePolicyQualificationTests/testForeign'
+	],
+	['WP7 forged child status', '          wp7_child_status=$?', '          wp7_child_status=0'],
+	[
+		'WP7 widened artifact',
+		'            ${{ runner.temp }}/wp7-timer-native-evidence/wp7-timer-swift-child-status.txt',
+		'            ${{ runner.temp }}/**'
+	]
+]) {
+	assert.equal(wp7MutationWhole.split(from).length, 2, what + ': exact WP7 cut');
+	mustCatch(what, MACOS_BOX, wp7MutationWhole, wp7MutationWhole.replace(from, to), graphProblems);
+}
+for (const [what, from, to] of [
+	['missing hosted task node', '  hosted-task-clock:\n', '  foreign-task-clock:\n'],
+	[
+		'hosted task coupled to package',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    needs: package-macos\n'
+	],
+	[
+		'hosted task forgives failure',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    continue-on-error: true\n'
+	],
+	[
+		'hosted task exports release asset',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    outputs:\n      assets: false-authority\n'
+	],
+	[
+		'hosted task inherits foreign secrets',
+		'  hosted-task-clock:\n',
+		'  hosted-task-clock:\n    secrets: inherit\n'
+	],
+	[
+		'hosted task admits push',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'push' && !inputs.release) }}"
+	],
+	[
+		'hosted task admits pull request',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'pull_request' && !inputs.release) }}"
+	],
+	[
+		'hosted task admits release',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) }}"
+	],
+	[
+		'hosted task changed architecture',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15-intel"
+	],
+	[
+		'hosted task changed outer budget',
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15\n    timeout-minutes: 10",
+		"  hosted-task-clock:\n    name: 'Hosted inert Hammerspoon task clock (arm64)'\n    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}\n    runs-on: macos-15\n    timeout-minutes: 11"
+	],
+	['hosted task substitutes success status', '          task_status=$?', '          task_status=0'],
+	[
+		'hosted task loses output receipt',
+		'            > "$evidence/projection.json"',
+		'            > /dev/null'
+	],
+	[
+		'hosted task asks for consent',
+		'      - name: Receive the isolated real task and timer boundaries\n',
+		'      - name: Receive the isolated real task and timer boundaries\n        env:\n          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: 1\n'
+	],
+	[
+		'hosted task publishes private receipts',
+		'            ${{ runner.temp }}/hosted-task-clock-evidence/child-status.txt',
+		'            ${{ runner.temp }}/hosted-task-clock-private/**'
+	]
 ])
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 errors.push(...graphProblems(pipeline.files()));

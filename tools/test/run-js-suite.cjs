@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'native WP7 one-method receiving retains direct status and pinned seven-case assertion',
+		cmd: process.execPath,
+		args: ['tools/test/test-wp7-timer-xctest-evidence.cjs'],
+		repro: 'npm run test:wp7-timer-xctest-evidence'
+	},
+	{
 		name: 'manual native lease receiving retains exact 165 historical identities and source custody',
 		cmd: process.execPath,
 		args: ['tools/test/test-lease165-xctest-evidence.cjs'],
