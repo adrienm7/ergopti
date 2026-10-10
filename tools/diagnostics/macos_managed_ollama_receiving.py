@@ -343,6 +343,84 @@ class Receiver:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
 
+    def receiving_catalogue(self, destination, payload):
+        """Project only publication routing for this private owned loopback fixture.
+
+        The original release catalogue remains retained and source-bound; actual
+        asset hashes, byte sizes and native provenance never change here.
+        """
+        owner_path = "tools/build/stage-macos-managed-ollama-catalogue.py"
+        owner_hash = digest(self.root / owner_path)
+        owner = load("ollama_receiving_catalogue_owner", self.root / owner_path)
+        inputs = owner.Inputs()
+        inputs.admit(self.root / owner_path)
+        original = inputs.read_json(self.options.catalogue)
+        require(
+            isinstance(original.get("assets"), dict) and bool(original["assets"]),
+            "receiving_catalogue_assets",
+        )
+        policy_path = "static/ergopti_plus/_shared/python/managed_ollama_runtime.py"
+        policy = load("ollama_receiving_catalogue_policy", self.root / policy_path)
+        inputs.admit(self.root / policy_path)
+        contract = (payload / "_shared/modules/llm/managed_ollama_runtime.json").read_bytes()
+        original_bytes = self.options.catalogue.read_bytes()
+        require(
+            hashlib.sha256(original_bytes).hexdigest() == self.input_hashes["catalogue"],
+            "receiving_catalogue_input",
+        )
+        for host in original["assets"]:
+            policy.select_asset(contract, original_bytes, host)
+        channel = inputs.read_json(owner.source_file(self.root, owner.CHANNELS))[
+            "unreleased_build_channel"
+        ]
+        plan = original["publication"]
+        require(
+            plan.get("mode") in ("planned-release", "unpublished-ci"),
+            "receiving_catalogue_publication",
+        )
+        expected_plan = owner.publication(
+            self.root,
+            inputs,
+            release=plan["mode"] == "planned-release",
+            tag=plan.get("tag"),
+            version=plan.get("version"),
+            channel=plan.get("channel"),
+        )
+        require(plan == expected_plan, "receiving_catalogue_publication")
+        for asset in original["assets"].values():
+            expected_url = (
+                "https://github.com/"
+                + expected_plan["repository"]
+                + "/releases/download/"
+                + expected_plan["tag"]
+                + "/"
+                + asset["filename"]
+                if expected_plan["mode"] == "planned-release"
+                else ""
+            )
+            require(asset["url"] == expected_url, "receiving_catalogue_publication")
+        projected = json.loads(original_bytes)
+        projected["publication"] = owner.publication(
+            self.root, inputs, release=False, tag="", version="", channel=channel
+        )
+        for asset in projected["assets"].values():
+            asset["url"] = ""
+        encoded = (json.dumps(projected, indent="\t", sort_keys=True) + "\n").encode("utf-8")
+        for host in projected["assets"]:
+            policy.select_asset(contract, encoded, host)
+        inputs.current()
+        require(digest(self.root / owner_path) == owner_hash, "receiving_catalogue_source")
+        for path, (_, fingerprint) in inputs.files.items():
+            if path.is_relative_to(self.root):
+                self.source_hashes[path.relative_to(self.root).as_posix()] = fingerprint
+        destination.write_bytes(encoded)
+        self.receipt["receiving_catalogue"] = {
+            "purpose": "owned-loopback-fixture",
+            "original_sha256": hashlib.sha256(original_bytes).hexdigest(),
+            "original_publication": original["publication"],
+            "projected_sha256": hashlib.sha256(encoded).hexdigest(),
+        }
+
     def payload(self, app):
         payload = app / "Contents/Resources/static/ergopti_plus"
         relatives = [
@@ -366,7 +444,7 @@ class Receiver:
         for relative in relatives:
             self.copy_source("static/ergopti_plus/" + relative, payload / relative)
         catalogue = payload / "_shared/modules/llm/managed_ollama_release.json"
-        shutil.copy2(self.options.catalogue, catalogue)
+        self.receiving_catalogue(catalogue, payload)
         return payload
 
     @staticmethod
