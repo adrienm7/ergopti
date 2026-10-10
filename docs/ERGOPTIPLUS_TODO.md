@@ -9165,6 +9165,19 @@ Carbon classification, physical keys or installed release qualification.
   barriers do not establish a native source epoch or unseen ABA transition.
   Actual TIS/GUI, packaging and installed qualification remain pending.
 
+  The Linux direct-source producer now retains its original native enumerator,
+  source getter, map and group-count witnesses before callbacks. A foreign fact
+  issuer refuses even when the original source generation remains current;
+  request metatables refuse before their readers run. Validated positions still
+  survive caller mutation. All original tests and eight callback-currency cases
+  remain unchanged, with 15 additive cases. Controlled actual-producer replay
+  changes 5 passes/10 failures to 15 passes/0 failures on both Lua ABIs; nine
+  independent omissions fail causally. This grants no input/output authority.
+  Joined-source validation passes Linux 12,791/0, E2E 193/0 and the actual X11
+  source fixture 53/0. Formatting passes 364 checks. JS retains the baseline
+  406/1 result from the two missing Windows retention workflow conditions.
+  Native Linux CI and physical editor-key delivery remain unqualified here.
+
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
   None/personal records or weakening compensation. Native qualification:

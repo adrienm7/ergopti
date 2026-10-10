@@ -892,39 +892,49 @@ end
 --- @return string|nil error
 function M.direct_sources(codes)
 	if not _session then return nil, "XKB capture state is not ready" end
-	if type(codes) ~= "table" then return nil, "direct source codes are required" end
-	local count, seen, expected = 0, {}, {}
+	if type(codes) ~= "table" or getmetatable(codes) ~= nil then return nil, "direct source codes are required" end
+	local count, seen, expected, snapshot = 0, {}, {}, {}
 	for key, code in pairs(codes) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #codes
 			or type(code) ~= "number" or code < 1 or code > UINPUT_KEY_MAX or code % 1 ~= 0 or seen[code] then
 			return nil, "invalid direct source codes"
 		end
-		seen[code], expected[key], count = true, code, count + 1
+		seen[code], expected[key], snapshot[key], count = true, code, code, count + 1
 	end
 	if count ~= #codes then return nil, "direct source codes must be dense" end
 	if type(_backend.direct_sources) ~= "function" then return nil, "the capture backend cannot prove direct sources" end
+	-- The validated intent survives caller changes; native callbacks receive only its separate copy.
 	local session, backend, raw_map = _session, _backend, _keymap_text
+	local enumerate, getter, native_map, groups = backend.direct_sources, backend.source_group, session.identity, session.groups
+	local function original_owner()
+		return _session == session and _backend == backend and _keymap_text == raw_map
+			and backend.direct_sources == enumerate and backend.source_group == getter
+			and session.identity == native_map and session.groups == groups
+	end
+	local function exact_request()
+		if getmetatable(snapshot) ~= nil then return false end
+		local found = 0
+		for index, code in pairs(snapshot) do
+			if expected[index] ~= code then return false end
+			found = found + 1
+		end
+		return found == count
+	end
 	local generation, detail = source_identity()
 	if not generation then return nil, detail end
-	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map then
-		return nil, "direct-source-changed"
-	end
-	local group, native_map = _source_group, session.identity
-	local snapshot = {}; for index, code in ipairs(expected) do snapshot[index] = code end
-	local ok, rows, err = pcall(backend.direct_sources, session, snapshot, group)
+	if not original_owner() then return nil, "direct-source-changed" end
+	local group = _source_group
+	local ok, rows, err = pcall(enumerate, session, snapshot, group)
 	if not ok then return nil, tostring(rows) end
 	if type(rows) ~= "table" then return nil, err or "the capture backend returned no direct sources" end
+	-- Do not invoke a getter installed by enumeration or its request validation.
+	if not original_owner() then return nil, "direct-source-changed" end
+	if not exact_request() then return nil, "direct-source-invalid-response" end
 	local after_generation = source_identity()
-	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map
-		or after_generation ~= generation or _source_group ~= group or session.identity ~= native_map then
+	if not original_owner() or after_generation ~= generation or _source_group ~= group then
 		return nil, "direct-source-changed"
 	end
-	local snapshot_count = 0
-	for index, code in pairs(snapshot) do
-		if expected[index] ~= code then return nil, "direct-source-invalid-response" end
-		snapshot_count = snapshot_count + 1
-	end
-	if snapshot_count ~= count then return nil, "direct-source-invalid-response" end
+	if not exact_request() then return nil, "direct-source-invalid-response" end
 	return rows
 end
 
