@@ -363,7 +363,13 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = pcall(function()
 					local document = read_json("modules/menu/menu_manifest.json")
-					local translator = { get = function(key) return key end }
+					local header_captions = read_json("data/locales/en.json")
+					local translator = { get = function(key)
+						if key == "menu.builder.active_brand" or key == "menu.builder.title_paused" then
+							return header_captions[key]
+						end
+						return key
+					end }
 					local native_translator = require("infra.i18n")
 					translator.locale = native_translator.locale
 					translator.section = native_translator.section
@@ -551,7 +557,13 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 			local ok,err=xpcall(function()
 				local document=read_json("modules/menu/menu_manifest.json")
 				local native_i18n=require("infra.i18n")
-				local i18n=setmetatable({get=function(key) return key end}, {__index=native_i18n})
+				local header_captions=read_json("data/locales/en.json")
+				local i18n=setmetatable({get=function(key)
+					if key == "menu.builder.active_brand" or key == "menu.builder.title_paused" then
+						return header_captions[key]
+					end
+					return key
+				end}, {__index=native_i18n})
 				package.loaded["infra.i18n"]=i18n
 				local renderer=assert(require("menu.renderer").new({platform="linux",
 					manifest_path=function() return shared("modules/menu/menu_manifest.json") end,
@@ -1087,7 +1099,13 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = xpcall(function()
 					local document = read("modules/menu/menu_manifest.json")
-					local i18n = setmetatable({ get = function(key) return key end }, { __index = require("infra.i18n") })
+					local header_captions = read("data/locales/en.json")
+					local i18n = setmetatable({ get = function(key)
+						if key == "menu.builder.active_brand" or key == "menu.builder.title_paused" then
+							return header_captions[key]
+						end
+						return key
+					end }, { __index = require("infra.i18n") })
 					package.loaded["infra.i18n"] = i18n
 					package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
 						platform = "linux", manifest_path = function() return shared("modules/menu/menu_manifest.json") end,

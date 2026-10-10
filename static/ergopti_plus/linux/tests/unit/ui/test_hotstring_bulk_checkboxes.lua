@@ -589,3 +589,182 @@ helpers.describe("dynamic family menu acknowledges its actual owner", function()
 		end)
 	end)
 end)
+
+
+--- Retains the actual engine and installs a fresh genuine renderer cohort.
+local function with_dynamic_section_frame(body)
+	with_dynamic_family_owners(function(owner)
+		local names = { "infra.manifest_menu", "ui.menu.menu_builder" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local called, detail = xpcall(function()
+			local translator = require("infra.i18n")
+			local renderer = assert(require("menu.renderer").new({ platform = "linux",
+				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+				json_decode = require("json").decode, i18n = translator, logger = require("logger.shim"),
+			}))
+			package.loaded["infra.manifest_menu"] = renderer
+			local root = renderer.get_root()
+			assert(type(root) == "table" and type(root.hotstrings_parameter_boundary) == "table")
+			body({ root = root, owner = owner, build = function()
+				local rows = hotstrings_menu(fake_config(false, false), owner.dynamic)
+				return row_for(rows, "category.dynamic_hotstrings")
+			end })
+		end, debug.traceback)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not called then error(detail, 0) end
+	end)
+end
+
+helpers.describe("dynamic families consume the genuine shared boundaries", function()
+	helpers.it("retains both old boundary positions and inert native delivery", function()
+		with_dynamic_section_frame(function(f)
+			local category = assert(f.build())
+			local children = assert(category.menu)
+			helpers.assert_eq(children[4].title, require("infra.i18n").get("menu.shortcuts.edit_personal_info"))
+			for _, index in ipairs({ 5, 12 }) do
+				helpers.assert_eq(children[index].title, "-", "the independent old family order fixes this boundary")
+				helpers.assert_nil(children[index].fn); helpers.assert_nil(children[index].menu)
+			end
+			helpers.assert_type(children[6].fn, "function", "the date owner remains actionable")
+			helpers.assert_type(children[13].fn, "function", "the personal-info family retains its native owner")
+			helpers.assert_eq(f.owner.read(f.owner.path), f.owner.source, "rendering preserves exact preferences")
+		end)
+	end)
+	for _, damage in ipairs({ "absent", "empty", "duplicate", "label" }) do
+		helpers.it("withdraws only dynamic construction after " .. damage .. " boundary and recovers", function()
+			with_dynamic_section_frame(function(f)
+				assert(f.build(), "the genuine category must exist before withdrawal")
+				local saved = f.root.hotstrings_parameter_boundary
+				local called, detail = xpcall(function()
+					if damage == "absent" then f.root.hotstrings_parameter_boundary = nil
+					elseif damage == "empty" then f.root.hotstrings_parameter_boundary = {}
+					elseif damage == "duplicate" then f.root.hotstrings_parameter_boundary = { { type = "---" }, { type = "---" } }
+					else f.root.hotstrings_parameter_boundary = { { type = "label", i18n = "common.cancel" } } end
+					helpers.assert_nil(f.build(), "a malformed shared boundary cannot be replaced by native separators")
+					helpers.assert_eq(f.owner.read(f.owner.path), f.owner.source, "refused presentation cannot write preferences")
+				end, debug.traceback)
+				f.root.hotstrings_parameter_boundary = saved
+				if not called then error(detail, 0) end
+				helpers.assert_type(f.build(), "table", "restoring the genuine shared declaration recovers construction")
+			end)
+		end)
+	end
+end)
+
+
+--- Retains the real dynamic engine, manifest binding and genuine Hotstrings constructor/category subtree.
+local function with_personal_info_leaf(body)
+	with_dynamic_family_owners(function(owner)
+		local translator = require("infra.i18n")
+		package.loaded["infra.manifest_menu"] = nil
+		local renderer = assert(require("infra.manifest_menu"))
+		local builder = helpers.load_module("ui.menu.menu_builder")
+		-- Receive the real Hotstrings parent only: a withdrawn template must not
+		-- dispatch unrelated full-tray producers before the leaf assertions.
+		local get_upvalue = assert(debug.getupvalue)
+		local source = debug.getinfo(builder.build, "S").source
+		assert(source:match("/ui/menu/menu_builder%.lua$"), "actual native builder file required")
+		local build_hotstrings, matches = nil, 0
+		for index = 1, math.huge do
+			local name, value = get_upvalue(builder.build, index)
+			if name == nil then break end
+			if name == "_build_hotstrings" then build_hotstrings, matches = value, matches + 1 end
+		end
+		assert(matches == 1 and type(build_hotstrings) == "function", "unique original native Hotstrings constructor required")
+		assert(debug.getinfo(build_hotstrings, "S").source == source, "constructor must belong to the actual builder file")
+		local opened = {}
+		local config, changes = fake_config(false, false)
+		local ctx = { config = config, _version = "9.9.9", dyn_hotstrings = owner.dynamic,
+			paused = false, is_paused = function() return false end,
+			webview = { show = function(name) opened[#opened + 1] = name end },
+			on_toggle_pause = function() error("editor leaf never toggles capture") end }
+		body({ renderer = renderer, root = renderer.get_root(), context = ctx, owner = owner,
+			opened = opened, changes = changes, build = function()
+				assert(rawequal(debug.getupvalue, get_upvalue), "actual upvalue reader must remain owned")
+				local parent = assert(build_hotstrings(ctx), "actual retained native Hotstrings parent required")
+				local title = translator.get("menu.hotstrings.title")
+				assert(type(parent.label) == "string" and parent.label:sub(1, #title) == title,
+					"genuine declared parent caption required")
+				return row_for(parent.submenu, "category.dynamic_hotstrings")
+			end })
+	end)
+end
+
+helpers.describe("personal-info editor original declared leaf (Linux)", function()
+	helpers.it("personal-info Linux leaf: retains original callback, native delivery and family order", function()
+		with_personal_info_leaf(function(f)
+			local template, supplied = f.renderer.template_rows, nil
+			local called, detail = xpcall(function()
+				f.renderer.template_rows = function(key, ...)
+					local rows = template(key, ...)
+					if key == "personal_info_editor_frame" then supplied = rows end
+					return rows
+				end
+				local category = assert(f.build())
+				local command = assert(row_for(category.menu, "menu.shortcuts.edit_personal_info"))
+				helpers.assert_true(rawequal(command, category.menu[4]), "original control/editor/boundary order remains")
+				helpers.assert_eq(category.menu[5].title, "-")
+				helpers.assert_true(rawequal(command.fn, supplied[1].action), "actual provider callback reaches native delivery")
+				helpers.assert_nil(command.checked); helpers.assert_nil(command.disabled); helpers.assert_nil(command.menu)
+				helpers.assert_eq(f.opened, {})
+				command.fn(); helpers.assert_eq(f.opened, { "personal_info_editor" })
+				f.context.webview = nil
+				local ok = pcall(command.fn); helpers.assert_eq(ok, true, "original missing-webview refusal remains contained")
+				helpers.assert_eq(f.opened, { "personal_info_editor" })
+				helpers.assert_eq(f.changes, { set_categories_sections = {}, scoped = {}, toggled = {} })
+				helpers.assert_eq(f.owner.read(f.owner.path), f.owner.source, "editor presentation and click do not write preference neighbors")
+			end, debug.traceback)
+			f.renderer.template_rows = template
+			if not called then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("personal-info Linux leaf: refuses a held callback after source withdrawal and accepts exact repair", function()
+		with_personal_info_leaf(function(f)
+			local command = assert(row_for(assert(f.build()).menu, "menu.shortcuts.edit_personal_info"))
+			local source = assert(f.root.personal_info_editor_frame)
+			local called, detail = xpcall(function()
+				f.root.personal_info_editor_frame = nil
+				helpers.assert_eq(command.fn(), false)
+				local category = assert(f.build())
+				helpers.assert_nil(row_for(category.menu, "menu.shortcuts.edit_personal_info"))
+				helpers.assert_eq(f.opened, {})
+				helpers.assert_eq(f.owner.read(f.owner.path), f.owner.source)
+			end, debug.traceback)
+			f.root.personal_info_editor_frame = source
+			if not called then error(detail, 0) end
+			command.fn(); helpers.assert_eq(f.opened, { "personal_info_editor" })
+		end)
+	end)
+
+	for _, damage in ipairs({ "array", "record", "platform", "template" }) do
+		helpers.it("personal-info Linux leaf: refuses actual-template withdrawal " .. damage .. " and repairs", function()
+			with_personal_info_leaf(function(f)
+				local template, source = f.renderer.template_rows, assert(f.root.personal_info_editor_frame)
+				local declaration, platforms = source[1], source[1].platforms
+				local caption, platform = declaration.i18n, platforms[1]
+				local called, detail = xpcall(function()
+					f.renderer.template_rows = function(key, ...)
+						local rows = template(key, ...)
+						if key == "personal_info_editor_frame" then
+							if damage == "array" then f.root.personal_info_editor_frame = nil
+							elseif damage == "record" then declaration.i18n = "common.cancel"
+							elseif damage == "platform" then platforms[1] = "ahk"
+							else f.renderer.template_rows = nil end
+						end
+						return rows
+					end
+					local category = assert(f.build())
+					helpers.assert_nil(row_for(category.menu, "menu.shortcuts.edit_personal_info"))
+					helpers.assert_eq(f.opened, {})
+					helpers.assert_eq(f.owner.read(f.owner.path), f.owner.source)
+				end, debug.traceback)
+				f.renderer.template_rows, f.root.personal_info_editor_frame = template, source
+				declaration.i18n, platforms[1] = caption, platform
+				if not called then error(detail, 0) end
+				helpers.assert_type(row_for(assert(f.build()).menu, "menu.shortcuts.edit_personal_info").fn,
+					"function", "actual descriptor repair restores genuine projection")
+			end)
+		end)
+	end
+end)

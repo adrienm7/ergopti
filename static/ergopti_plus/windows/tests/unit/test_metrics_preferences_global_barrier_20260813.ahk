@@ -193,8 +193,12 @@ _MPGB_EncryptionRefusalCompensatesBeforeDurableRollback() {
 	HadReady := IsSet(_SaveFullConfigReady)
 	SavedReady := HadReady ? _SaveFullConfigReady : false
 	SavedEncrypt := MetricsFilters.encrypt
+	Fixture := 0
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_metrics_encryption_rollback.toml"
+		; Startup owns current source/schema admission before the downstream
+		; injected encryption/notification effects can be exercised.
+		Fixture := _ScopeOwnerFixture('[metrics]`nencrypt = false`n')
+		ConfigurationFile := Fixture.path
 		_SaveFullConfigReady := true
 		MetricsFilters.encrypt := false
 		_MPGB_ResetFakes()
@@ -218,6 +222,8 @@ _MPGB_EncryptionRefusalCompensatesBeforeDurableRollback() {
 		_SaveFullConfigReady := HadReady ? SavedReady : unset
 		MetricsFilters.encrypt := SavedEncrypt
 		_MPGB_ResetFakes()
+		if Fixture is Object
+			_ScopeOwnerCleanup(Fixture)
 	}
 }
 
@@ -233,8 +239,12 @@ _MPGB_EncryptionUnavailableIsVisibleWithoutSideEffects() {
 	HadReady := IsSet(_SaveFullConfigReady)
 	SavedReady := HadReady ? _SaveFullConfigReady : false
 	SavedEncrypt := MetricsFilters.encrypt
+	Fixture := 0
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_metrics_encryption_unavailable.toml"
+		; Startup owns current source/schema admission before the downstream
+		; injected encryption/notification effects can be exercised.
+		Fixture := _ScopeOwnerFixture('[metrics]`nencrypt = false`n')
+		ConfigurationFile := Fixture.path
 		_SaveFullConfigReady := true
 		MetricsFilters.encrypt := false
 		_MPGB_ResetFakes()
@@ -260,6 +270,8 @@ _MPGB_EncryptionUnavailableIsVisibleWithoutSideEffects() {
 		_SaveFullConfigReady := HadReady ? SavedReady : unset
 		MetricsFilters.encrypt := SavedEncrypt
 		_MPGB_ResetFakes()
+		if Fixture is Object
+			_ScopeOwnerCleanup(Fixture)
 	}
 }
 
@@ -275,8 +287,12 @@ _MPGB_EncryptionUnavailableNotifierFailureIsConfined() {
 	HadReady := IsSet(_SaveFullConfigReady)
 	SavedReady := HadReady ? _SaveFullConfigReady : false
 	SavedEncrypt := MetricsFilters.encrypt
+	Fixture := 0
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_metrics_encryption_notify_failure.toml"
+		; Startup owns current source/schema admission before the downstream
+		; injected encryption/notification effects can be exercised.
+		Fixture := _ScopeOwnerFixture('[metrics]`nencrypt = false`n')
+		ConfigurationFile := Fixture.path
 		_SaveFullConfigReady := true
 		MetricsFilters.encrypt := false
 		_MPGB_ResetFakes()
@@ -294,6 +310,8 @@ _MPGB_EncryptionUnavailableNotifierFailureIsConfined() {
 		_SaveFullConfigReady := HadReady ? SavedReady : unset
 		MetricsFilters.encrypt := SavedEncrypt
 		_MPGB_ResetFakes()
+		if Fixture is Object
+			_ScopeOwnerCleanup(Fixture)
 	}
 }
 
@@ -320,9 +338,13 @@ _MPGB_InheritedCriticalStopsAtMetricsEffects() {
 	HadReady := IsSet(_SaveFullConfigReady)
 	SavedReady := HadReady ? _SaveFullConfigReady : false
 	SavedEncrypt := MetricsFilters.encrypt
+	Fixture := 0
 	SavedCritical := A_IsCritical
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_metrics_critical.toml"
+		; Startup owns current source/schema admission before the downstream
+		; injected encryption/notification effects can be exercised.
+		Fixture := _ScopeOwnerFixture('[metrics]`nencrypt = false`n')
+		ConfigurationFile := Fixture.path
 		_SaveFullConfigReady := true
 		MetricsFilters.encrypt := false
 		_MPGB_ResetFakes()
@@ -351,6 +373,8 @@ _MPGB_InheritedCriticalStopsAtMetricsEffects() {
 		_SaveFullConfigReady := HadReady ? SavedReady : unset
 		MetricsFilters.encrypt := SavedEncrypt
 		_MPGB_ResetFakes()
+		if Fixture is Object
+			_ScopeOwnerCleanup(Fixture)
 		Critical(SavedCritical)
 	}
 }

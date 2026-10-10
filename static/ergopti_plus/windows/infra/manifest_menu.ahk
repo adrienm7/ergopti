@@ -245,6 +245,8 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			continue
 		}
 
+		if Item.Has("caption_count_policy") && !_MR_TranslatedCountPolicy(Item)
+			continue
 		ItemType := _MR_Get(Item, "type", "")
 
 		if ItemType == "---" {
@@ -649,6 +651,86 @@ MenuRenderer_CommandRow(ManifestKey, CommandId, Commands, StateGetters := unset)
 }
 
 /**
+ * Captures one canonical parent before its actual native child builder runs.
+ * @param {String} ManifestKey Owning declaration.
+ * @param {String} RowId Identified group.
+ * @returns {Func|false} Completed-child receiver, with no state read on admission.
+ */
+MenuRenderer_GroupReceiver(ManifestKey, RowId) {
+	Owner := MenuRenderer_GroupRow
+	if !_MR_DeclaredParentCallable(Owner)
+		return false
+	Root := _MR_GetManifestRoot(), Rows := _MR_GetMenuDef(ManifestKey)
+	Selected := false, Matches := 0
+	for Item in Rows {
+		if _MR_Get(Item, "id") == RowId
+			Selected := Item, Matches += 1
+	}
+	if Type(RowId) != "String" || RowId == "" || Matches != 1 || _MR_Get(Selected, "type") != "group"
+		|| !_MR_IsForAhk(Selected) || Type(_MR_Get(Selected, "i18n")) != "String" || _MR_Get(Selected, "i18n") == ""
+		|| (Selected.Has("caption_count_policy") && !_MR_TranslatedCountPolicy(Selected))
+		return false
+	Source := _MR_ReasonedGroupSnapshot(Rows)
+	if !Source || MenuRenderer_GroupRow != Owner || !_MR_DeclaredParentCallable(Owner)
+		return false
+	return _MR_ReceiveDeclaredParent.Bind(ManifestKey, RowId, Root, Rows, Source, Owner)
+}
+
+; A callable identity alone does not own dispatch when the same object gains Call.
+; Use the intrinsic property test, never the callable object's own HasOwnProp.
+_MR_DeclaredParentCallable(Owner) {
+	return (Owner is Func || Owner is BoundFunc)
+		&& !Object.Prototype.HasOwnProp.Call(Owner, "Call")
+}
+
+_MR_DeclaredParentCurrent(Cohort) {
+	if MenuRenderer_GroupRow != Cohort["owner"] || !_MR_DeclaredParentCallable(Cohort["owner"])
+		|| _MR_GetManifestRoot() != Cohort["root"] || _MR_GetMenuDef(Cohort["key"]) != Cohort["rows"]
+		|| !_MR_ReasonedGroupCurrent(Cohort["source"]) || !_MR_ReasonedGroupCurrent(Cohort["states"])
+		return false
+	for Key, Owner in Cohort["callables"]
+		if !Cohort["getters"].Has(Key) || Cohort["getters"][Key] != Owner || !_MR_DeclaredParentCallable(Owner)
+			return false
+	return true
+}
+
+; Each wrapper checks the whole retained original cohort before and after the
+; real getter. Withdrawal by one getter cannot invoke a later foreign getter.
+_MR_ReadDeclaredParentState(Cohort, Owner) {
+	if !_MR_DeclaredParentCurrent(Cohort)
+		throw Error("The admitted native feature-parent owner was withdrawn.")
+	Value := Owner.Call()
+	if !_MR_DeclaredParentCurrent(Cohort)
+		throw Error("The native feature-parent owner changed during its state read.")
+	return Value
+}
+
+_MR_ReceiveDeclaredParent(ManifestKey, RowId, Root, Rows, Source, Owner, Child, Getters) {
+	if !(Getters is Map) || !(Child is Menu)
+		return false
+	States := _MR_ReasonedGroupSnapshot(Getters)
+	if !States
+		return false
+	Cohort := Map("owner", Owner, "root", Root, "key", ManifestKey, "rows", Rows,
+		"source", Source, "states", States, "getters", Getters, "callables", Map())
+	Guarded := Map()
+	for Key, Getter in Getters {
+		if !_MR_DeclaredParentCallable(Getter)
+			return false
+		Cohort["callables"][Key] := Getter
+		Guarded[Key] := _MR_ReadDeclaredParentState.Bind(Cohort, Getter)
+	}
+	if !_MR_DeclaredParentCurrent(Cohort)
+		return false
+	try Row := Owner.Call(ManifestKey, RowId, Child, Guarded)
+	catch
+		return false
+	if !(Row is Map) || !_MR_DeclaredParentCurrent(Cohort)
+		return false
+	return Row
+}
+
+/**
  * Supplies one declared parent around a completed native Menu.
  * @param {String} ManifestKey Owning shared menu declaration.
  * @param {String} RowId Unique declared group identity.
@@ -678,7 +760,10 @@ MenuRenderer_GroupRow(ManifestKey, RowId, NativeChild, StateGetters := unset) {
 	}
 	Getters := IsSet(StateGetters) ? StateGetters : Map()
 	Label := _MR_Get(Selected, "caption_source") == "native" ? "" : t(_MR_Get(Selected, "i18n"))
-	if Selected.Has("caption_format") {
+	if Selected.Has("caption_count_policy") {
+		if !_MR_ReadTranslatedCountCaption(Selected, Getters, &Label)
+			return false
+	} else if Selected.Has("caption_format") {
 		if !_MR_ReadNumberedCaption(Selected, Getters, &Label)
 			return false
 	} else if Selected.Has("caption_source") {
@@ -867,6 +952,8 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 	for Item in Def {
 		if !_MR_CommandLiteralPrefix(Item, &Prefix)
 			return false
+		if Item.Has("caption_count_policy") && !_MR_TranslatedCountPolicy(Item)
+			return false
 		if !_MR_CaptionLayoutMetadata(Item) || !_MR_CaptionVectorMetadata(Item, StateGetters, _MR_IsForAhk(Item))
 			|| (Item.Has("caption_format") && _MR_IsForAhk(Item) && !_MR_ReadNumberedCaption(Item, StateGetters, &NumberedCaption))
 			|| (Item.Has("caption_source") && _MR_IsForAhk(Item) && !_MR_ReadNativeCaption(Item, StateGetters, &NativeCaption))
@@ -999,6 +1086,8 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 				return false
 		} else if ItemType == "group" && Children.Has(Id) && (Children[Id] is Array || HasMethod(Children[Id], "Call")) {
 			Label := unset
+			if Item.Has("caption_count_policy") && !_MR_ReadTranslatedCountCaption(Item, StateGetters, &Label)
+				return false
 			if Item.Has("caption_format") && !_MR_ReadNumberedCaption(Item, StateGetters, &Label)
 				return false
 			if Item.Has("caption_source") && !_MR_ReadNativeCaption(Item, StateGetters, &Label)
@@ -1105,6 +1194,94 @@ _MR_ReadNumberedCaption(Item, Getters, &Caption) {
 		return false
 	Caption := StrReplace(Title, "{1}", Value)
 	return true
+}
+
+; A translated caption consumes a bounded native count, not a supplied native label.
+_MR_TranslatedCountPolicy(Item) {
+	if _MR_Get(Item, "type") != "group" || Type(_MR_Get(Item, "id")) != "String" || _MR_Get(Item, "id") == ""
+		|| Type(_MR_Get(Item, "i18n")) != "String" || _MR_Get(Item, "i18n") == ""
+		return false
+	for Field in ["caption_source", "caption_format", "caption_getter", "caption_getters", "caption_layout", "caption_joiner", "caption_count_getter", "caption_count_format", "label_prefix"]
+		if Item.Has(Field)
+			return false
+	Policy := _MR_Get(Item, "caption_count_policy", false)
+	if !(Policy is Map) || ObjGetBase(Policy) != Map.Prototype || Policy.Count != 6
+		return false
+	for Name in ObjOwnProps(Policy)
+		return false
+	Fields := Map("value_getter", true, "present_getter", true, "visibility", true, "style", true, "format", true, "maximum", true)
+	for Field in Policy
+		if !Fields.Has(Field)
+			return false
+	for Field in ["value_getter", "present_getter"]
+		if Type(Policy[Field]) != "String" || Policy[Field] == ""
+			return false
+	Maximum := Policy["maximum"], Format := Policy["format"]
+	if !IsNumber(Maximum) || Type(Maximum) == "String" || Maximum != Maximum || Maximum < 0 || Maximum > 2**53 - 1 || Mod(Maximum, 1) != 0
+		|| Type(Format) != "String" || !_MR_PlainUnicodeCaption(Format) || !_MR_CaptionValues(Format, ["", ""], &Probe)
+		return false
+	for Field in ["visibility", "style"] {
+		Values := Policy[Field]
+		if !(Values is Map) || ObjGetBase(Values) != Map.Prototype || Values.Count != 3
+			return false
+		for Name in ObjOwnProps(Values)
+			return false
+		for Platform in ["ahk", "hs", "linux"] {
+			if !Values.Has(Platform)
+				return false
+			Value := Values[Platform]
+			if Type(Value) != "String" || (Field == "visibility" ? !(Value == "always" || Value == "available" || Value == "positive") : !(Value == "space" || Value == "decimal"))
+				return false
+		}
+	}
+	return Policy
+}
+
+_MR_ReadTranslatedCountCaption(Item, Getters, &Caption) {
+	Policy := _MR_TranslatedCountPolicy(Item)
+	if !Policy || !(Getters is Map)
+		return false
+	for Field in ["value_getter", "present_getter"]
+		if !Getters.Has(Policy[Field]) || !_MR_DeclaredParentCallable(Getters[Policy[Field]])
+			return false
+	ValueOwner := Getters[Policy["value_getter"]], PresentOwner := Getters[Policy["present_getter"]]
+	Title := t(Item["i18n"])
+	if Type(Title) != "String" || Title == "" || Title == Item["i18n"] || !_MR_PlainUnicodeCaption(Title)
+		return false
+	try {
+		if Getters[Policy["value_getter"]] != ValueOwner || Getters[Policy["present_getter"]] != PresentOwner
+			|| !_MR_DeclaredParentCallable(ValueOwner) || !_MR_DeclaredParentCallable(PresentOwner)
+			return false
+		Total := ValueOwner.Call()
+		if Getters[Policy["value_getter"]] != ValueOwner || Getters[Policy["present_getter"]] != PresentOwner
+			|| !_MR_DeclaredParentCallable(ValueOwner) || !_MR_DeclaredParentCallable(PresentOwner)
+			return false
+		Present := PresentOwner.Call()
+		if Getters[Policy["value_getter"]] != ValueOwner || Getters[Policy["present_getter"]] != PresentOwner
+			|| !_MR_DeclaredParentCallable(ValueOwner) || !_MR_DeclaredParentCallable(PresentOwner)
+			return false
+	} catch
+		return false
+	if Type(Present) != "Integer" || (Present != 0 && Present != 1)
+		|| !IsNumber(Total) || Type(Total) == "String" || Total != Total || Total < 0 || Total > Policy["maximum"] || Mod(Total, 1) != 0
+		return false
+	Visible := Policy["visibility"]["ahk"]
+	if Visible != "always" && (!Present || (Visible == "positive" && Total == 0)) {
+		Caption := Title
+		return true
+	}
+	Text := Total == 0 ? "0" : Format("{:.0f}", Total)
+	if Policy["style"]["ahk"] == "space" {
+		Grouped := "", Length := StrLen(Text)
+		loop Length {
+			Position := A_Index
+			Grouped .= SubStr(Text, Position, 1)
+			if Position < Length && Mod(Length - Position, 3) == 0
+				Grouped .= " "
+		}
+		Text := Grouped
+	}
+	return _MR_CaptionValues(Policy["format"], [Title, Text], &Caption)
 }
 
 ; Record captions are native Unicode data, with kind and policy owned by the declaration.
@@ -1635,6 +1812,8 @@ _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := ""
 		return
 	}
 	Label := _MR_Get(Item, "caption_source") == "native" ? "" : t(I18nKey)
+	if Item.Has("caption_count_policy") && !_MR_ReadTranslatedCountCaption(Item, StateGetters, &Label)
+		return false
 	if Item.Has("caption_format") && !_MR_ReadNumberedCaption(Item, StateGetters, &Label)
 		return false
 	if Item.Has("caption_source") && !_MR_ReadNativeCaption(Item, StateGetters, &Label)
@@ -1657,7 +1836,7 @@ _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := ""
 	}
 	; New typed captions are literal data; preserve the native ampersand transport.
 	; Existing unspecified/scalar group captions retain their prior byte behavior.
-	if Item.Has("caption_source") || Item.Has("caption_getters") || Item.Has("caption_format")
+	if Item.Has("caption_source") || Item.Has("caption_getters") || Item.Has("caption_format") || Item.Has("caption_count_policy")
 		Label := StrReplace(Label, "&", "&&")
 	ResultMenu.Add(Label, Sub)
 	if IsSet(Disabled) && Disabled
@@ -1995,4 +2174,140 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 	}
 	Active.Delete(Identity)
 	return true
+}
+
+
+/**
+ * Captures an existing declared group before its native child producer runs.
+ * The returned receiver never adopts a successor source or destination owner.
+ * @param {Menu} TargetMenu Existing native destination.
+ * @param {String} ManifestKey Canonical declaration owner.
+ * @param {String} GroupId Unique declared parent identity.
+ * @param {Menu} PreviousChild Exact child currently attached to the parent.
+ * @returns {Func|false} Captured replacement receiver, or refused admission.
+ */
+MenuRenderer_GroupReplacement(TargetMenu, ManifestKey, GroupId, PreviousChild) {
+	static EntryOwner := MenuRenderer_GroupReplacement, GroupOwner := MenuRenderer_GroupRow
+	static RootOwner := _MR_GetManifestRoot, DefinitionOwner := _MR_GetMenuDef
+	static SnapshotOwner := _MR_ReasonedGroupSnapshot, CurrentOwner := _MR_ReasonedGroupCurrent
+	static CaptionOwner := TrayMenuItemCaption, CountOwner := TrayMenuHandleItemCount
+	static ChildOwner := TrayMenuSubmenuHandle, RenderOwner := _MR_RenderRows
+	static TranslationOwner := t, FieldOwner := _MR_Get, PlatformOwner := _MR_IsForAhk
+	static DisabledOwner := MenuRenderer_ResolveDisabledWhen, CheckedOwner := MenuRenderer_ResolveCheckedWhen
+	static DialectOwner := _MR_ReportDriverDialect, SharedRootOwner := _MM_GetManifestRoot, ItemCountOwner := TrayMenuItemCount
+	static LookupOwner := _MR_FindItemById, PlatformAliasOwner := _MR_IsForPlatform
+	static TranslationLookupOwner := I18nLookup, ActiveLocaleOwner := _I18nEnsureActiveLoaded
+	static FallbackLocaleOwner := _I18nEnsureFallbacksLoaded
+	static NativeMethods := Map("Add", Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Add").Call,
+		"Enable", Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Enable").Call,
+		"Uncheck", Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Uncheck").Call,
+		"Check", Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Check").Call)
+	NativeLive() {
+		if ObjGetBase(TargetMenu) != Menu.Prototype || Object.Prototype.HasOwnProp.Call(TargetMenu, "Handle")
+			|| ObjGetBase(PreviousChild) != Menu.Prototype || Object.Prototype.HasOwnProp.Call(PreviousChild, "Handle")
+			return false
+		for Name, Method in NativeMethods {
+			if Object.Prototype.HasOwnProp.Call(TargetMenu, Name)
+				|| !Object.Prototype.HasOwnProp.Call(Menu.Prototype, Name)
+				|| Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, Name).Call != Method
+				|| Object.Prototype.HasOwnProp.Call(Method, "Call")
+				return false
+		}
+		return true
+	}
+	OwnersLive() {
+		for Owner in [EntryOwner, GroupOwner, RootOwner, DefinitionOwner, SnapshotOwner,
+			CurrentOwner, CaptionOwner, CountOwner, ChildOwner, RenderOwner,
+			TranslationOwner, FieldOwner, PlatformOwner, DisabledOwner, CheckedOwner,
+			DialectOwner, SharedRootOwner, ItemCountOwner, LookupOwner, PlatformAliasOwner,
+			TranslationLookupOwner, ActiveLocaleOwner, FallbackLocaleOwner] {
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		}
+		return EntryOwner == MenuRenderer_GroupReplacement && GroupOwner == MenuRenderer_GroupRow
+			&& RootOwner == _MR_GetManifestRoot && DefinitionOwner == _MR_GetMenuDef
+			&& SnapshotOwner == _MR_ReasonedGroupSnapshot && CurrentOwner == _MR_ReasonedGroupCurrent
+			&& CaptionOwner == TrayMenuItemCaption && CountOwner == TrayMenuHandleItemCount
+			&& ChildOwner == TrayMenuSubmenuHandle && RenderOwner == _MR_RenderRows
+			&& TranslationOwner == t && FieldOwner == _MR_Get && PlatformOwner == _MR_IsForAhk
+			&& DisabledOwner == MenuRenderer_ResolveDisabledWhen && CheckedOwner == MenuRenderer_ResolveCheckedWhen
+			&& DialectOwner == _MR_ReportDriverDialect && SharedRootOwner == _MM_GetManifestRoot
+			&& ItemCountOwner == TrayMenuItemCount && LookupOwner == _MR_FindItemById
+			&& PlatformAliasOwner == _MR_IsForPlatform && TranslationLookupOwner == I18nLookup
+			&& ActiveLocaleOwner == _I18nEnsureActiveLoaded && FallbackLocaleOwner == _I18nEnsureFallbacksLoaded
+			&& NativeLive()
+	}
+	if !(TargetMenu is Menu) || !(PreviousChild is Menu) || !OwnersLive()
+		|| Type(ManifestKey) != "String" || ManifestKey == ""
+		|| Type(GroupId) != "String" || GroupId == ""
+		return false
+	Root := RootOwner.Call()
+	if !OwnersLive() || !(Root is Map)
+		return false
+	SourceRows := DefinitionOwner.Call(ManifestKey)
+	if !OwnersLive() || !Root.Has(ManifestKey) || Root[ManifestKey] != SourceRows
+		return false
+	Source := SnapshotOwner.Call(SourceRows)
+	if !OwnersLive() || !Source
+		return false
+	Row := GroupOwner.Call(ManifestKey, GroupId, PreviousChild, Map())
+	if !OwnersLive() || !(Row is Map) || Row.Get("submenu", false) != PreviousChild || Row.Get("disabled", false)
+		return false
+	Caption := Row["label"], Handle := TargetMenu.Handle, PreviousHandle := PreviousChild.Handle
+	SourceLive() {
+		if !OwnersLive()
+			return false
+		CurrentRoot := RootOwner.Call()
+		if !OwnersLive() || CurrentRoot != Root || !Root.Has(ManifestKey) || Root[ManifestKey] != SourceRows
+			return false
+		Accepted := CurrentOwner.Call(Source)
+		return OwnersLive() && (Accepted is Integer) && Accepted == 1
+	}
+	SlotLive() {
+		if !SourceLive() || TargetMenu.Handle != Handle || PreviousChild.Handle != PreviousHandle
+			return false
+		Count := CountOwner.Call(Handle)
+		if !SourceLive() || Count < 0
+			return false
+		Matches := 0, CaptionMatches := 0, Position := -1
+		loop Count {
+			Text := CaptionOwner.Call(TargetMenu, A_Index - 1)
+			if !SourceLive()
+				return false
+			if Text == Caption
+				CaptionMatches += 1
+			ChildHandle := ChildOwner.Call(Handle, A_Index - 1)
+			if !SourceLive()
+				return false
+			if ChildHandle == PreviousHandle {
+				if Text != Caption
+					return false
+				Position := A_Index - 1
+				Matches += 1
+			}
+		}
+		return Matches == 1 && CaptionMatches == 1 && Position >= 0 && SourceLive()
+			&& TargetMenu.Handle == Handle && PreviousChild.Handle == PreviousHandle
+	}
+	Publish(NativeChild) {
+		if !OwnersLive() || !(NativeChild is Menu) || TargetMenu == NativeChild || PreviousChild == NativeChild
+			|| ObjGetBase(NativeChild) != Menu.Prototype || Object.Prototype.HasOwnProp.Call(NativeChild, "Handle")
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if !SlotLive()
+				return false
+			NewRow := GroupOwner.Call(ManifestKey, GroupId, NativeChild, Map())
+			if !SourceLive() || !(NewRow is Map) || NewRow.Get("submenu", false) != NativeChild
+				|| NewRow.Get("label", "") != Caption || NewRow.Get("disabled", false) || !SlotLive()
+				return false
+			if RenderOwner.Call(TargetMenu, [NewRow], ManifestKey, 1) != 1
+				return false
+			TargetMenu.Enable(Caption)
+			if !NewRow.Get("checked", false)
+				TargetMenu.Uncheck(Caption)
+			return true
+		} finally Critical(PreviousCritical)
+	}
+	return SlotLive() ? Publish : false
 }

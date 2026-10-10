@@ -246,6 +246,74 @@ function numberedCaptionFits(title) {
 	);
 }
 
+function plainPolicyObject(value) {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return false;
+	return Reflect.ownKeys(value).every(
+		(key) =>
+			typeof key === 'string' &&
+			Object.getOwnPropertyDescriptor(value, key).enumerable &&
+			Object.hasOwn(Object.getOwnPropertyDescriptor(value, key), 'value')
+	);
+}
+
+/** A translated parent consumes typed native count receipts, never a native label. */
+function translatedCountPolicyFits(row) {
+	const policy = row.caption_count_policy;
+	const fields = ['value_getter', 'present_getter', 'visibility', 'style', 'format', 'maximum'];
+	if (
+		row.type !== 'group' ||
+		typeof row.id !== 'string' ||
+		row.id === '' ||
+		typeof row.i18n !== 'string' ||
+		row.i18n === '' ||
+		!policy ||
+		typeof policy !== 'object' ||
+		!plainPolicyObject(policy) ||
+		Object.keys(policy).length !== fields.length ||
+		Object.keys(policy).some((field) => !fields.includes(field)) ||
+		[
+			'caption_source',
+			'caption_format',
+			'caption_getter',
+			'caption_getters',
+			'caption_layout',
+			'caption_joiner',
+			'caption_count_getter',
+			'caption_count_format',
+			'label_prefix'
+		].some((field) => row[field] !== undefined) ||
+		typeof policy.value_getter !== 'string' ||
+		policy.value_getter === '' ||
+		typeof policy.present_getter !== 'string' ||
+		policy.present_getter === '' ||
+		!Number.isSafeInteger(policy.maximum) ||
+		policy.maximum < 0 ||
+		typeof policy.format !== 'string' ||
+		/[\x00-\x1f\x7f]/.test(policy.format) ||
+		!policy.format.isWellFormed() ||
+		nativeCountSlots(policy.format) !== 2
+	)
+		return false;
+	for (const field of ['visibility', 'style']) {
+		const values = policy[field];
+		if (
+			!plainPolicyObject(values) ||
+			Object.keys(values).length !== 3 ||
+			Object.keys(values).some((platform) => !PLATFORMS.includes(platform)) ||
+			PLATFORMS.some(
+				(platform) =>
+					!(
+						field === 'visibility' ? ['always', 'available', 'positive'] : ['space', 'decimal']
+					).includes(values[platform])
+			)
+		)
+			return false;
+	}
+	return true;
+}
+
 function validateChildTemplates(menu, captionFormat) {
 	validateNativeCompositions(menu);
 	function inertCaptionFits(row) {
@@ -330,6 +398,10 @@ function validateChildTemplates(menu, captionFormat) {
 	for (const [key, rows] of Object.entries(menu)) {
 		if (!Array.isArray(rows)) continue;
 		for (const row of rows) {
+			if (row.caption_count_policy !== undefined && !translatedCountPolicyFits(row))
+				throw new Error(
+					`menu.${key}: translated count needs a closed group policy and typed receipt identities`
+				);
 			if (Object.hasOwn(row, 'label_prefix')) {
 				if (
 					row.type !== 'command' ||

@@ -5,7 +5,10 @@
 const { isDeepStrictEqual } = require('node:util');
 const { scriptTokens } = require('./script-source.cjs');
 const { nativeTemplateBinding } = require('./menu-template-binding.cjs');
-const { nativeTopLevelProjection } = require('./menu-native-llm-parent-binding.cjs');
+const {
+	nativeTopLevelProjection,
+	declaredMacTopLevelPublication
+} = require('./menu-native-llm-parent-binding.cjs');
 
 /** A finite physical Lua route check, not runtime authority or general data-flow analysis. */
 function nativeBadgeRootComposition(sources, manifest, platform) {
@@ -379,17 +382,23 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!imported(builder, 'ManifestMenu', 'infra.manifest_menu', loadRoot)
 	)
 		return false;
+	const declaredTop = declaredMacTopLevelPublication(builder);
+	const directTop =
+		soleLocal(loadTop, 'data', 'local data = load_manifest()') &&
+		soleLocal(loadTop, 'result', 'local result = {}') &&
+		nativeTopLevelProjection(loadTop, lex) &&
+		writes(loadTop, '_top_level_cache').length === 1 &&
+		writes(loadTop, '_top_level_cache')[0] ===
+			matches(loadTop, '_top_level_cache = result', 0)[0] &&
+		unique(loadTop, 'for _, entry in ipairs(data.top_level) do') &&
+		unique(loadTop, 'if _top_level_cache then return _top_level_cache end') &&
+		unique(loadTop, '_top_level_cache = result return _top_level_cache');
+	const rootRenderStatement = declaredTop
+		? 'local rendered = separator_render(items, "top_level")'
+		: 'local rendered = ManifestMenu.render_rows(items, "top_level")';
 	if (
 		!unique(loadRoot, 'return ManifestMenu.get_root()') ||
-		!soleLocal(loadTop, 'data', 'local data = load_manifest()') ||
-		!soleLocal(loadTop, 'result', 'local result = {}') ||
-		!nativeTopLevelProjection(loadTop, lex) ||
-		writes(loadTop, '_top_level_cache').length !== 1 ||
-		writes(loadTop, '_top_level_cache')[0] !==
-			matches(loadTop, '_top_level_cache = result', 0)[0] ||
-		!unique(loadTop, 'for _, entry in ipairs(data.top_level) do') ||
-		!unique(loadTop, 'if _top_level_cache then return _top_level_cache end') ||
-		!unique(loadTop, '_top_level_cache = result return _top_level_cache') ||
+		!(directTop || declaredTop) ||
 		!soleLocal(generate, 'items', 'local items = {}') ||
 		!unique(generate, 'table.insert(items, row)')
 	)
@@ -422,11 +431,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		return false;
 	if (
 		!unique(generate, 'for _, entry in ipairs(load_top_level()) do') ||
-		!soleLocal(
-			generate,
-			'rendered',
-			'local rendered = ManifestMenu.render_rows(items, "top_level")'
-		) ||
+		!soleLocal(generate, 'rendered', rootRenderStatement) ||
 		!unique(generate, 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()') ||
 		!unique(generate, 'return rendered')
 	)
@@ -542,17 +547,10 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!soleLocal(lex(llm), 'create_menu', 'local function create_menu(deps)') ||
 		!unique(createMenu, 'build_download_item = build_download_item,') ||
 		!imported(llm, 'ManifestMenu', 'infra.manifest_menu', download) ||
-		!soleLocal(
-			download,
-			'rows',
-			'local rows = ManifestMenu.template_rows("llm_download_shortcut_frame", {'
+		!require('./menu-native-download-binding.cjs').retainedNativeDownloadProjection(
+			download.source,
+			true
 		) ||
-		!unique(
-			download,
-			'if type(rows) ~= "table" or #rows ~= 1 or type(rows[1].action) ~= "function" then return nil end'
-		) ||
-		!soleLocal(download, 'row', 'local row = rows[1]') ||
-		!unique(download, 'return { title = row.label, fn = row.action }') ||
 		!soleBinding(
 			generate,
 			'dl_result',
@@ -591,11 +589,11 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 				prepend,
 				'if compose({ badge = { badge }, boundary = { boundary }, body = items }) ~= true then'
 			) &&
-		position(generate, 'local rendered = ManifestMenu.render_rows(items, "top_level")') <
+		position(generate, rootRenderStatement) <
 			position(generate, 'local compose_download = ManifestMenu.native_composition(') &&
 		position(generate, 'local compose_download = ManifestMenu.native_composition(') <
 			position(generate, 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()') &&
-		position(generate, 'local rendered = ManifestMenu.render_rows(items, "top_level")') <
+		position(generate, rootRenderStatement) <
 			position(generate, 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()') &&
 		position(generate, 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()') <
 			position(generate, 'return rendered')

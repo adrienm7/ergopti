@@ -77,7 +77,7 @@ local function menu_commands(owner, gestures, state)
 	local original_renderer = package.loaded["infra.manifest_menu"]
 	local original_menu = package.loaded["ui.menu.menu_gestures"]
 	local commands
-	package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, context)
+	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, context)
 		commands = context.commands
 		return {}
 	end }

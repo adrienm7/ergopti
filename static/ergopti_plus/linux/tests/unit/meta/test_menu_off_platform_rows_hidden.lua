@@ -264,3 +264,7 @@ require("test.menu_platform_lookup").register(helpers, "linux")
 
 
 require("test.menu_native_composition").register(helpers, "linux")
+
+require("test.menu_fixed_feature_parent_contract").register(helpers, "linux")
+
+require("test.menu_top_level_separator_contract").register(helpers, "linux")
