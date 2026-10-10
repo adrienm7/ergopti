@@ -1896,12 +1896,9 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 
 			if #order == 0 then
-				rows[#rows + 1] = {
-					label    = i18n_safe("menu.extensions.none_installed"),
-					action       = function() end,
-					disabled = true,
-				}
-				return
+				if type(ManifestMenu.status_rows) ~= "function" then return {} end
+				local status = ManifestMenu.status_rows("hotstrings_menu", "hotstring_extensions", "none_installed")
+				return type(status) == "table" and status or {}
 			end
 
 			for _, extension_id in ipairs(order) do

@@ -40,14 +40,13 @@
 		]
 	},
 	"linux": {
-		"count": 6,
+		"count": 5,
 		"sites": [
 			"linux/ui/menu/menu_builder.lua:387 static",
 			"linux/ui/menu/menu_builder.lua:543 static",
-			"linux/ui/menu/menu_builder.lua:1900 static",
-			"linux/ui/menu/menu_builder.lua:2263 static",
-			"linux/ui/menu/menu_builder.lua:4013 static",
-			"linux/ui/menu/menu_builder.lua:4688 static"
+			"linux/ui/menu/menu_builder.lua:2260 static",
+			"linux/ui/menu/menu_builder.lua:4010 static",
+			"linux/ui/menu/menu_builder.lua:4685 static"
 		]
 	}
 }
