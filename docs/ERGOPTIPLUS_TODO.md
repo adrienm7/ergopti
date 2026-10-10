@@ -9379,6 +9379,15 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   Preserve the container's original preallocation refusal and keep items
   16 and 38 open for complete CI and physical-device acceptance.
 
+  The live-daemon fixture now requests one real separator before its first
+  word-only trigger, inside the original output-reader admission allowance.
+  Exact DOWN/UP, four KEY/SYN rows, terminal would-block and empty held-key
+  state are required on the same retained Reader. All original failure sites,
+  first adn input, ADN-space expectation and three-second observation remain.
+  Unknown preceding-text and privacy policies are unchanged. Source/syntax
+  review passes; native receiving remains UNRUN. This does not retroactively
+  identify the observed first miss or qualify physical input.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
