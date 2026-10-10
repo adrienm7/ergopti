@@ -1,0 +1,93 @@
+{
+	"version": 1,
+	"feature_candidate": "1576dce4a7cead68d252829a4e1c461e08e7130f",
+	"dev_at_snapshot": "591d59a942780465bca95956dc3cc9b2e960fa9e",
+	"archives": {
+		"brew-capability-r3.tar.gz": {
+			"sha256": "350b39cb56880ff4c72037af443cc7b9436b6a0385c93a0087571a6024821751",
+			"bytes": 226776,
+			"regular_members": 19
+		},
+		"catalogue-r6-receiving.tar.gz": {
+			"sha256": "68809b99b8bcce54ac2f38d7710ad66198b7e92d07efcc8f41c7c0fcfe2bdc84",
+			"bytes": 135168,
+			"regular_members": 67
+		},
+		"followup-source-preparations.tar.gz": {
+			"sha256": "f682122fc6ca2a132c50ba16e19db9dc2425119cfbb1de5b088bf65b76792c6d",
+			"bytes": 183926,
+			"regular_members": 42
+		},
+		"original-preparations.tar.gz": {
+			"sha256": "507be224c1cfe686148b53e216de44abfc6d5814cb69ff93465e59742ecc3281",
+			"bytes": 633118,
+			"regular_members": 67
+		},
+		"receiving-source-preparations.tar.gz": {
+			"sha256": "691e966ea11fcbc07cb19acaf5599f8e3dfd9eb34244794deef2f95ae441efdb",
+			"bytes": 207330,
+			"regular_members": 101
+		},
+		"tls-code-inverse-receiving.tar.gz": {
+			"sha256": "8bea7e0664946d76abee7a8b1f280f05c286a8ee36b8836eb8d1a85796935e63",
+			"bytes": 99768,
+			"regular_members": 71,
+			"directories": 34
+		},
+		"tls-code-full52-receiving.tar.gz": {
+			"sha256": "0e42c6eab3d3f77a85447bd37f7cfbb9db50e08766e8abc1616fd1a62a41f27a",
+			"bytes": 131536,
+			"regular_members": 33,
+			"directories": 32
+		},
+		"tls-leaf-live3-receiving.tar.gz": {
+			"sha256": "3cdc81fbcceae7a5908e114848b23adc3092a2ff5721a28b833f5f946fe35cd8",
+			"bytes": 78842,
+			"regular_members": 32,
+			"directories": 35
+		},
+		"extra-ca-debug-source-only.tar.gz": {
+			"sha256": "8b4e6d50b0f614c76e5261f8abff20ba43b50f0142fea790e023850c2c69e059",
+			"bytes": 6000,
+			"regular_members": 6,
+			"qualification": "SOURCE_ONLY_UNADOPTED_UNCOMPILED"
+		}
+	},
+	"source_execution_during_snapshot": 0,
+	"todo_removed": [],
+	"limits": [
+		"Historical locators are provenance, not live authority",
+		"Never apply a saved patch before checking actual preimages and ownership",
+		"Superseded revisions are preserved as evidence only",
+		"An archived patch is not integrated or native-qualified functionality"
+	],
+	"native_tls_continuation": {
+		"dev_base": "01955e89affc3674ff44e72b78db936a2a48d4fd",
+		"sources": {
+			"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift": "761b1a636bfc69d987545a30502db5a7c549e76c9b674630fc27bb4b157febc7",
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "b75587753ccaea788cbc82e4e3b7bf2d27fd0eb699353ea9f71fb98ec65a08e0",
+			"tools/test/macos_native_http_receiving_facts_test.py": "7122e745d7ca4ad815ab9107dfaa4f59299934c761502c7d166f9b23ed7874c7"
+		},
+		"native_compilation_and_tls_cause": "Historical pre-CI snapshot: fe3 later compiled; detailed TLS cause and primary fix remain unqualified",
+		"original_receipt_sha256": {
+			"tls-inverse-source-review.json": "b9eaa5623ff3497e2968f388388a048fc675951e494214a62f2eb3e4e28ab38d",
+			"tls-full52-source-review.json": "aebb6133710199864e448de1ebbf51b2b67dc2e70fed46b09a879a8af43d33b5",
+			"tls-leaf-source-review.json": "1c4b4ab5682c362268e0378192ac45ee3a49a65448324f93ecf252857d0ccd36",
+			"integrated-01955-ci-terminal.json": "f89e6bfeea44e87465bb5cc82a1773b34bfa6f62162ef15e7daba18bd2df57ac"
+		},
+		"original_five_archive_source_review": "Historical source-review.json binds the preceding manifest, not this continuation",
+		"source_execution_during_snapshot": 0
+	},
+	"native_tls_ci_fe3": {
+		"candidate": "fe3da8332dbc4905a19765501be1314cdfdef034",
+		"run_id": 38032632804,
+		"event": "workflow_dispatch",
+		"os_lanes": "macos",
+		"original_receipt_sha256": "76f974ad64c87152b09361e6a256dd33060c27127b683d9708041d9257871189",
+		"receipt": "tls-fe3-ci-terminal.json",
+		"later_dev_merge": "d1703d302aa48f98b7e6e9f68957a3c68e69ce53",
+		"dev_base": "c4e2368308b51de6d3147ec4f1e85083f38e20a9",
+		"merged_wire_fixture_sha256": "0577b05a0be8ea97980d15aad9bd27112e0293a2e515406b567cec2ac0936d80",
+		"merged_source_qualification": "PENDING"
+	}
+}

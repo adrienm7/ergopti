@@ -933,13 +933,26 @@ jobs:
 
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
+      # This duplicate wire receiver belongs to the existing macos-native-http scope.
+      # The owned-process and client-only controls remain mandatory here.
       - name: Receive actual managed HTTP native clients
         run: |
           set -euo pipefail
           status=0
           "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
           "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
+          receipt="$RUNNER_TEMP/stable-macos-native-http-package.json"
+          mkdir -p "$(dirname "$receipt")"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."
+          elif [ "$mode" = full ]; then
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
           exit "$status"
         timeout-minutes: 5
 
@@ -1007,12 +1020,27 @@ jobs:
           export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$RUNNER_TEMP/swift-launcher-evidence/tis-session.XXXXXX")"
           echo "tis_session_dir=$ERGOPTI_TIS_EVIDENCE_DIR" >> "$GITHUB_OUTPUT"
           export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          pac_receipt="$RUNNER_TEMP/swift-launcher-evidence/native-pac-package-qualification.json"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$pac_receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$pac_receipt")"
+          pac_skip_args=()
+          swift_root_suite="All tests"
+          if [ "$mode" = deferred ]; then
+              pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$pac_receipt")")
+              swift_root_suite="Selected tests"
+              echo "[DEFERRED] macos-native-pac: duplicate package cohort not executed; still compiled; qualified=false."
+          elif [ "$mode" = full ]; then
+              :
+          else
+              echo "Invalid package PAC qualification disposition" >&2
+              exit 1
+          fi
           set +e
-          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" ${pac_skip_args[@]+"${pac_skip_args[@]}"} 2>&1 | tee "$xctest_log"
           swift_pipeline_status=("${PIPESTATUS[@]}")
-          node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json"
+          node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" --pac-qualification-receipt "$pac_receipt"
           xctest_evidence_status=$?
-          node tools/diagnostics/owned_program_xctest_notice.cjs "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" "$xctest_log" "$(git rev-parse HEAD)"
+          node tools/diagnostics/owned_program_xctest_notice.cjs "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" "$xctest_log" "$(git rev-parse HEAD)" --pac-qualification-receipt "$pac_receipt"
           owned_program_evidence_status=$?
           node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"
           tis_evidence_status=$?
@@ -1020,7 +1048,7 @@ jobs:
           if [ "$xctest_evidence_status" -ne 0 ]; then exit "$xctest_evidence_status"; fi
           if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi
           if [ "$owned_program_evidence_status" -ne 0 ]; then exit "$owned_program_evidence_status"; fi
-          if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
+          if ! grep -Fq "Test Suite '$swift_root_suite' passed" "$xctest_log"; then
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
           fi
@@ -1047,7 +1075,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-brew-qualification-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json
+          path: |
+            ${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json
+            ${{ runner.temp }}/stable-macos-native-http-package.json
+            ${{ runner.temp }}/swift-launcher-evidence/native-pac-package-qualification.json
           if-no-files-found: error
 
       - name: Upload Swift launcher failure transcript

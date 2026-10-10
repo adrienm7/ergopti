@@ -10,6 +10,82 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const pacAdmissions = new WeakSet();
+
+/** The bootstrap transfer invokes the same native TLS/full-URL PAC fixture. */
+const pacMethods = Object.freeze({
+	ManagedBootstrapDownloadTests: Object.freeze([
+		'testActualNativeBootstrapTLSFullURLPACAndArtifactPublication'
+	])
+});
+
+/** Reuses the actual PAC method owner; the selected family is never a guessed regex. */
+function pacClasses() {
+	return Object.keys(require('./managed_http_pac_xctest_evidence.cjs').METHODS);
+}
+
+/** Admits only the same existing PAC scope and current source/context/expiry. */
+function pacQualification(receipt, env = process.env, now = new Date()) {
+	const q = require('../ci/dev-release-qualification.cjs');
+	const mode = q.scopeDisposition(
+		receipt,
+		'macos-native-pac',
+		env.GITHUB_SHA,
+		q.environmentContext(env),
+		now
+	);
+	const admission = Object.freeze({
+		mode,
+		source_sha: env.GITHUB_SHA,
+		profile_id: receipt.profile_id
+	});
+	pacAdmissions.add(admission);
+	return admission;
+}
+
+function readPacQualification(file) {
+	const q = require('../ci/dev-release-qualification.cjs');
+	return pacQualification(q.parseClosedJson(fs.readFileSync(file, 'utf8')));
+}
+
+function rootPattern(admission) {
+	if (admission === null) return 'All tests';
+	if (!pacAdmissions.has(admission)) throw new TypeError('Unadmitted PAC qualification.');
+	return admission.mode === 'deferred' ? 'Selected tests' : 'All tests';
+}
+
+function pacSkipPattern(admission) {
+	rootPattern(admission);
+	if (admission === null || admission.mode !== 'deferred')
+		throw new Error('PAC execution may only be omitted under its active scope.');
+	const methods = Object.entries(pacMethods).flatMap(([suite, names]) =>
+		names.map((name) => suite + '/' + name + '$')
+	);
+	return '^ErgoptiPlusTests[.](?:(?:' + pacClasses().join('|') + ')/|' + methods.join('|') + ')';
+}
+
+function isDeferredPacCase(name, admission) {
+	return (
+		admission !== null &&
+		admission.mode === 'deferred' &&
+		(pacClasses().some(
+			(suite) =>
+				name.startsWith('-[ErgoptiPlusTests.' + suite + ' ') ||
+				name.startsWith('ErgoptiPlusTests.' + suite + '.') ||
+				name.startsWith('ErgoptiPlusTests.' + suite + '/')
+		) ||
+			Object.entries(pacMethods).some(([suite, methods]) =>
+				methods.some((method) =>
+					[
+						'-[ErgoptiPlusTests.' + suite + ' ' + method + ']',
+						'ErgoptiPlusTests.' + suite + '.' + method,
+						'ErgoptiPlusTests.' + suite + '/' + method
+					].includes(name)
+				)
+			))
+	);
+}
+
 /** Removes PTY styling and normalizes line endings without changing Unicode. */
 function cleanTranscript(text) {
 	return text
@@ -206,7 +282,17 @@ function loggerAnnotation(evidence) {
 }
 
 /** Judges the serial, unfiltered XCTest transcript independently of process zero. */
-function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dirname, '../..')) {
+function evaluate(
+	text,
+	scriptStatus,
+	teeStatus,
+	repository = path.resolve(__dirname, '../..'),
+	admission = null
+) {
+	const root = rootPattern(admission);
+	const rootStart = new RegExp("^Test Suite '" + root + "' started at ");
+	const rootFinish = new RegExp("^Test Suite '" + root + "' (passed|failed) at ");
+	const rootPass = new RegExp("^Test Suite '" + root + "' passed at ");
 	const script = exitStatus(scriptStatus);
 	const tee = exitStatus(teeStatus);
 	const lines = cleanTranscript(text).split('\n');
@@ -219,10 +305,10 @@ function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dir
 	let rootSummary = null;
 	let awaitingSummary = false;
 	for (const line of lines) {
-		if (/^Test Suite 'All tests' started at /.test(line)) rootStarts++;
-		if (/^Test Suite 'All tests' (passed|failed) at /.test(line)) {
+		if (rootStart.test(line)) rootStarts++;
+		if (rootFinish.test(line)) {
 			rootFinishes++;
-			rootPassed = /^Test Suite 'All tests' passed at /.test(line);
+			rootPassed = rootPass.test(line);
 			awaitingSummary = true;
 			if (!rootPassed) failures.push({ message: 'The complete XCTest suite reported failure.' });
 			continue;
@@ -264,6 +350,9 @@ function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dir
 	for (const name of started)
 		if (!completed.some((test) => test.name === name))
 			failures.push({ message: 'XCTest case did not complete: ' + name });
+	for (const name of started)
+		if (isDeferredPacCase(name, admission))
+			failures.push({ message: 'A deferred PAC case was unexpectedly executed.' });
 	const complete =
 		rootStarts === 1 &&
 		rootFinishes === 1 &&
@@ -285,6 +374,19 @@ function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dir
 		failures.push({ message: `The native Swift/PTY command exited with status ${script}.` });
 	if (tee !== 0) failures.push({ message: `XCTest transcript capture exited with status ${tee}.` });
 	return {
+		...(admission !== null && admission.mode === 'deferred'
+			? {
+					qualification: {
+						scope: 'macos-native-pac',
+						status: 'deferred',
+						qualified: false,
+						classes: pacClasses(),
+						methods: pacMethods,
+						source_sha: admission.source_sha,
+						profile_id: admission.profile_id
+					}
+				}
+			: {}),
 		schema_version: 1,
 		script_status: script,
 		tee_status: tee,
@@ -311,7 +413,10 @@ const archiveCases = Object.freeze([
 ]);
 
 /** Projects authentic case completion independently of another case's failure. */
-function archiveOutcomes(text, scriptStatus, teeStatus) {
+function archiveOutcomes(text, scriptStatus, teeStatus, admission = null) {
+	const root = rootPattern(admission);
+	const rootStart = new RegExp("^Test Suite '" + root + "' started at ");
+	const rootFinish = new RegExp("^Test Suite '" + root + "' (passed|failed) at ");
 	const script = exitStatus(scriptStatus);
 	const tee = exitStatus(teeStatus);
 	const unavailable = () =>
@@ -332,12 +437,12 @@ function archiveOutcomes(text, scriptStatus, teeStatus) {
 	const starts = new Set();
 	const terminals = new Map();
 	for (const line of cleanTranscript(text).split('\n')) {
-		if (/^Test Suite 'All tests' started at /.test(line)) {
+		if (rootStart.test(line)) {
 			if (state !== 'before') invalid = true;
 			state = 'running';
 			continue;
 		}
-		const finish = /^Test Suite 'All tests' (passed|failed) at /.exec(line);
+		const finish = rootFinish.exec(line);
 		if (finish) {
 			if (state !== 'running' || active !== null) invalid = true;
 			rootResult = finish[1];
@@ -369,6 +474,7 @@ function archiveOutcomes(text, scriptStatus, teeStatus) {
 			line
 		);
 		if (start) {
+			if (isDeferredPacCase(start[1], admission)) invalid = true;
 			if (state !== 'running' || active !== null || starts.has(start[1])) invalid = true;
 			starts.add(start[1]);
 			active = start[1];
@@ -436,13 +542,14 @@ function main(args = process.argv.slice(2), log = console.log) {
 	let script = 0;
 	let tee = 0;
 	try {
-		if (args.length !== 4)
+		if (args.length !== 4 && !(args.length === 6 && args[4] === '--pac-qualification-receipt'))
 			throw new Error('Expected transcript path, script status, tee status and verdict path.');
 		script = exitStatus(args[1]);
 		tee = exitStatus(args[2]);
 		const transcript = fs.readFileSync(args[0], 'utf8');
-		const result = evaluate(transcript, script, tee);
-		result.archive_outcomes = archiveOutcomes(transcript, script, tee);
+		const admission = args.length === 6 ? readPacQualification(args[5]) : null;
+		const result = evaluate(transcript, script, tee, undefined, admission);
+		result.archive_outcomes = archiveOutcomes(transcript, script, tee, admission);
 		fs.writeFileSync(args[3], JSON.stringify(result, null, '\t') + '\n');
 		const lines = cleanTranscript(transcript).split('\n');
 		const archiveObserved = archiveCases.some(([, name]) =>
@@ -479,6 +586,9 @@ function main(args = process.argv.slice(2), log = console.log) {
 }
 
 module.exports = {
+	pacQualification,
+	readPacQualification,
+	pacSkipPattern,
 	annotation,
 	cleanTranscript,
 	evaluate,
@@ -490,4 +600,9 @@ module.exports = {
 	archiveOutcomes,
 	main
 };
-if (require.main === module) process.exitCode = main();
+if (require.main === module) {
+	const args = process.argv.slice(2);
+	if (args.length === 2 && args[0] === '--pac-skip-pattern') {
+		process.stdout.write(pacSkipPattern(readPacQualification(args[1])));
+	} else process.exitCode = main();
+}

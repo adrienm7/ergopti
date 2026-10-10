@@ -612,6 +612,7 @@ BootProfile_Stamp("LLM defaults loaded")
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk
+#Include modules/llm/ollama_install_files_port.ahk
 #Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip/tooltip_llm.ahk
 #Include ui/menu/menu_llm/_index.ahk
@@ -901,7 +902,8 @@ try {
 }
 _HotstringExtensionPacks := HotstringExtensions_Prepare(Features,
 	HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir))
-_BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
+_BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml", &_BootConfigSnapshot)
+HotstringsTerminatorRecordsInitBoot(_BootConfigSnapshot)
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",

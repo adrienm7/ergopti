@@ -1291,3 +1291,228 @@ require('./fixtures/tis_observation_projection_control.cjs');
 		'[OK] Exact native Brew/Sparkle XCTest outcomes remain bounded, retrievable and independent of the global failure verdict.'
 	);
 }
+
+// The duplicate PAC family uses its existing scope; every other XCTest receipt stays mandatory.
+{
+	const evidence = require('../diagnostics/swift_xctest_evidence.cjs');
+	const qualification = require('../ci/dev-release-qualification.cjs');
+	const configuration = JSON.parse(fs.readFileSync(qualification.STABLE_POLICY_PATH, 'utf8'));
+	const now = new Date(Date.parse(configuration.expires_at) - 60000);
+	const sourceSha = '0123456789abcdef0123456789abcdef01234567';
+	const env = {
+		GITHUB_ACTIONS: 'true',
+		GITHUB_REPOSITORY: configuration.repository,
+		GITHUB_EVENT_NAME: configuration.event_name,
+		GITHUB_REF: configuration.ref,
+		GITHUB_SHA: sourceSha,
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: configuration.prerelease,
+		ERGOPTI_DEV_RELEASE_CHANNEL: configuration.channel,
+		ERGOPTI_DEV_RELEASE_TAG: configuration.tag,
+		ERGOPTI_DEV_RELEASE_VERSION: configuration.version
+	};
+	const context = qualification.environmentContext(env);
+	const profile = qualification.authorizeQualificationProfile(configuration.id, context, now);
+	const receipt = qualification.qualificationReceipt(profile, 'macos-native-pac', {
+		source_sha: sourceSha
+	});
+	const admission = evidence.pacQualification(receipt, env, now);
+	const cases = fs
+		.readFileSync(path.join(__dirname, 'fixtures/owned-program-xctest/complete.xctest.txt'), 'utf8')
+		.split('\n')
+		.filter((line) => /^Test Case '-\[ErgoptiPlusTests\.OwnedProgramWorkerTests /.test(line));
+	assert.equal(cases.length, 28);
+	const sparkle =
+		'-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch]';
+	const selected = [
+		"Test Suite 'Selected tests' started at 2026-10-09 23:00:00.000.",
+		...cases,
+		`Test Case '${sparkle}' started.`,
+		`Test Case '${sparkle}' passed (0.050 seconds).`,
+		"Test Suite 'Selected tests' passed at 2026-10-09 23:00:01.000.",
+		'Executed 15 tests, with 0 failures (0 unexpected) in 1 seconds'
+	].join('\n');
+	assert.equal(
+		evaluate(selected, 0, 0).exit_status,
+		1,
+		'Default remains a full All-tests collector.'
+	);
+	const result = evidence.evaluate(selected, 0, 0, undefined, admission);
+	assert.equal(result.exit_status, 0);
+	assert.equal(result.qualification.qualified, false);
+	assert.equal(result.qualification.scope, 'macos-native-pac');
+	assert.deepEqual(
+		result.qualification.classes,
+		Object.keys(require('../diagnostics/managed_http_pac_xctest_evidence.cjs').METHODS)
+	);
+	const pattern = new RegExp(evidence.pacSkipPattern(admission));
+	const bootstrapMethod = 'testActualNativeBootstrapTLSFullURLPACAndArtifactPublication';
+	const bootstrapSuite = 'ManagedBootstrapDownloadTests';
+	assert.equal(
+		pattern.test('ErgoptiPlusTests.' + bootstrapSuite + '/' + bootstrapMethod),
+		true,
+		'Only the exact duplicate native PAC method is omitted under the existing admission.'
+	);
+	assert.deepEqual(result.qualification.methods, { [bootstrapSuite]: [bootstrapMethod] });
+	const bootstrapSource = fs.readFileSync(
+		path.join(
+			__dirname,
+			'../..',
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedBootstrapDownloadTests.swift'
+		),
+		'utf8'
+	);
+	const bootstrapMethods = [...bootstrapSource.matchAll(/\bfunc (test\w+)\(/g)].map(
+		(match) => match[1]
+	);
+	assert.ok(bootstrapMethods.length > 1);
+	assert.equal(bootstrapMethods.filter((name) => name === bootstrapMethod).length, 1);
+	for (const method of bootstrapMethods)
+		assert.equal(
+			pattern.test('ErgoptiPlusTests.' + bootstrapSuite + '/' + method),
+			method === bootstrapMethod
+		);
+	assert.equal(
+		pattern.test('ErgoptiPlusTests.' + bootstrapSuite + '/' + bootstrapMethod + 'Extra'),
+		false
+	);
+	assert.equal(
+		pattern.test('ErgoptiPlusTests.' + bootstrapSuite + 'Extra/' + bootstrapMethod),
+		false
+	);
+	assert.equal(pattern.test('OtherTarget.' + bootstrapSuite + '/' + bootstrapMethod), false);
+	for (const name of [
+		'-[ErgoptiPlusTests.' + bootstrapSuite + ' ' + bootstrapMethod + ']',
+		'ErgoptiPlusTests.' + bootstrapSuite + '.' + bootstrapMethod,
+		'ErgoptiPlusTests.' + bootstrapSuite + '/' + bootstrapMethod
+	]) {
+		const extra = selected
+			.replace(
+				"Test Suite 'Selected tests' passed",
+				`Test Case '${name}' started.\nTest Case '${name}' passed (0.050 seconds).\nTest Suite 'Selected tests' passed`
+			)
+			.replace('Executed 15 tests', 'Executed 16 tests');
+		const refused = evidence.evaluate(extra, 0, 0, undefined, admission);
+		assert.equal(refused.exit_status, 1);
+		assert.ok(
+			refused.failures.some(
+				(failure) => failure.message === 'A deferred PAC case was unexpectedly executed.'
+			)
+		);
+		const all = extra.replaceAll('Selected tests', 'All tests');
+		assert.equal(
+			evidence.evaluate(all, 0, 0).exit_status,
+			0,
+			'Full default still admits this actual method.'
+		);
+	}
+	const neighbor =
+		'-[ErgoptiPlusTests.' +
+		bootstrapSuite +
+		' testActualDescriptorPublicationRequiresPersistedDigestAndExclusiveDestination]';
+	const retained = selected
+		.replace(
+			"Test Suite 'Selected tests' passed",
+			`Test Case '${neighbor}' started.\nTest Case '${neighbor}' passed (0.050 seconds).\nTest Suite 'Selected tests' passed`
+		)
+		.replace('Executed 15 tests', 'Executed 16 tests');
+	assert.equal(evidence.evaluate(retained, 0, 0, undefined, admission).exit_status, 0);
+	assert.equal(
+		evidence.evaluate(
+			retained.replace(`'${neighbor}' passed`, `'${neighbor}' failed`),
+			0,
+			0,
+			undefined,
+			admission
+		).exit_status,
+		1
+	);
+
+	for (const suite of result.qualification.classes) {
+		assert.ok(pattern.test('ErgoptiPlusTests.' + suite + '/testOriginal'));
+		assert.equal(pattern.test('ErgoptiPlusTests.' + suite + 'Extra/testOriginal'), false);
+	}
+	assert.equal(pattern.test('ErgoptiPlusTests.OwnedProgramWorkerTests/testOriginal'), false);
+	assert.equal(pattern.test('OtherTarget.ManagedHTTPWorkerTests/testOriginal'), false);
+	assert.equal(
+		evidence.archiveOutcomes(selected, 0, 0, admission).find((row) => row.case === 'sparkle')
+			.outcome,
+		'PASS'
+	);
+	const owned = require('../diagnostics/owned_program_xctest_notice.cjs').judge(
+		result,
+		selected,
+		admission
+	);
+	assert.equal(owned.own_qualified, true);
+	assert.equal(owned.root_qualified, false);
+	assert.equal(
+		require('../diagnostics/owned_program_xctest_notice.cjs').judge(result, selected).own_qualified,
+		false
+	);
+	assert.equal(evidence.evaluate(selected, 17, 0, undefined, admission).exit_status, 17);
+	assert.equal(evidence.evaluate(selected, 0, 23, undefined, admission).exit_status, 23);
+	assert.equal(
+		evidence.evaluate(
+			selected.replace("'Selected tests' passed", "'Other tests' passed"),
+			0,
+			0,
+			undefined,
+			admission
+		).exit_status,
+		1
+	);
+	assert.equal(
+		evidence.evaluate(
+			selected.replace("'Selected tests' started", "'All tests' started"),
+			0,
+			0,
+			undefined,
+			admission
+		).exit_status,
+		1
+	);
+	const forbidden =
+		'-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries]';
+	const executedPAC = selected
+		.replace(
+			"Test Suite 'Selected tests' passed",
+			`Test Case '${forbidden}' started.\nTest Case '${forbidden}' passed (0.050 seconds).\nTest Suite 'Selected tests' passed`
+		)
+		.replace('Executed 15 tests', 'Executed 16 tests');
+	assert.equal(evidence.evaluate(executedPAC, 0, 0, undefined, admission).exit_status, 1);
+	assert.throws(() => evidence.evaluate(selected, 0, 0, undefined, { mode: 'deferred' }));
+	assert.throws(() =>
+		evidence.pacQualification({ ...receipt, source_sha: 'f'.repeat(40) }, env, now)
+	);
+	assert.throws(() =>
+		evidence.pacQualification(receipt, { ...env, GITHUB_EVENT_NAME: 'pull_request' }, now)
+	);
+	assert.throws(() =>
+		evidence.pacQualification(receipt, { ...env, ERGOPTI_DEV_RELEASE_VERSION: '1.0.1' }, now)
+	);
+	assert.throws(() => evidence.pacQualification(receipt, env, new Date(configuration.expires_at)));
+	assert.throws(() =>
+		evidence.pacQualification(
+			qualification.qualificationReceipt(profile, 'macos-native-http', { source_sha: sourceSha }),
+			env,
+			now
+		)
+	);
+	const local = { GITHUB_SHA: sourceSha };
+	const fullReceipt = {
+		schema: 1,
+		profile_id: null,
+		scope: 'macos-native-pac',
+		status: 'full',
+		qualified: false,
+		source_sha: sourceSha
+	};
+	const fullAdmission = evidence.pacQualification(fullReceipt, local, now);
+	assert.equal(evidence.evaluate(selected, 0, 0, undefined, fullAdmission).exit_status, 1);
+	assert.equal(evidence.evaluate(passed, 0, 0, undefined, fullAdmission).exit_status, 0);
+	assert.throws(() => evidence.pacSkipPattern(fullAdmission));
+	console.log(
+		'[OK] Same-scope PAC package routing retains all other receipts and truthful partial qualification.'
+	);
+}

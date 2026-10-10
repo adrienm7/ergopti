@@ -559,6 +559,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-app-windows-keep-their-frame.cjs'
 	},
 	{
+		name: 'website stable downloads survive a page of newer prereleases',
+		cmd: 'node',
+		args: ['tools/test/test-site-github-release.cjs'],
+		repro: 'node tools/test/test-site-github-release.cjs'
+	},
+	{
 		name: 'every asset the release notes link to is uploaded by a build job (no dead download button)',
 		cmd: 'node',
 		args: ['tools/test/test-release-notes-assets-are-uploaded.cjs'],

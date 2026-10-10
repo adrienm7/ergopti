@@ -1,0 +1,690 @@
+{
+	"schema": 1,
+	"run_id": 38032632804,
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/38032632804",
+	"candidate": "fe3da8332dbc4905a19765501be1314cdfdef034",
+	"branch": "codex/ci-release-network",
+	"event": "workflow_dispatch",
+	"workflow": ".github/workflows/ci.yml",
+	"attempt": 1,
+	"os_lanes_actual": "macos",
+	"selection_proof": "actual Validate log CI_OS_SELECTION: macos",
+	"status": "completed",
+	"conclusion": "failure",
+	"observed_at": "2026-10-10T07:06:14Z",
+	"job_counts": {
+		"success": 3,
+		"failure": 7,
+		"skipped": 7
+	},
+	"jobs": [
+		{
+			"id": 114156585192,
+			"name": "Validate / Checks and plan",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"id": 114156785113,
+			"name": "Core / js",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114156785140,
+			"name": "Core / properties",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"id": 114156785188,
+			"name": "macOS / Item 36 native archive qualification",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114156785197,
+			"name": "macOS / Unit tests (stubbed)",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114156785250,
+			"name": "macOS / Managed Ollama native \u00b7 arm64",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114156785285,
+			"name": "macOS / Native cold MLX bootstrap \u00b7 macos-15 arm64",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"id": 114156785314,
+			"name": "macOS / Managed Ollama native \u00b7 amd64",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114156786147,
+			"name": "Windows",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114156786412,
+			"name": "Linux",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114158162236,
+			"name": "macOS / Verdict",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114158162406,
+			"name": "macOS / E2E tests (stubbed)",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114158162461,
+			"name": "macOS / Package",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114158162715,
+			"name": "macOS / Native tooltip canvas \u00b7 12 captures",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114158162991,
+			"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114158326729,
+			"name": "Validate / Selected OS verdict",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114158327562,
+			"name": "Release / Publish",
+			"status": "completed",
+			"conclusion": "skipped"
+		}
+	],
+	"CoreJS406": {
+		"PASS": 403,
+		"FAIL": 3,
+		"failure_names": [
+			"Linux CI requires successful mandatory jobs and assertion evidence",
+			"Desktop verdicts and parallel shared-core gates",
+			"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)"
+		]
+	},
+	"macOS_stub17968": {
+		"PASS": 17957,
+		"FAIL": 11,
+		"total": 17968,
+		"modules": 1562,
+		"failure_names": [
+			"deactivates a preview registration that reports throw",
+			"deactivates a preview registration that reports false",
+			"rolls back registry writes when the final sort explicitly refuses",
+			"rolls back registry ownership when reporter installation returns throw",
+			"rolls back registry ownership when reporter installation returns false",
+			"hands is_private = true to keymap.inject_dynamic",
+			"passes the magic key through and does not log completion",
+			"installs once on the first selection and never on re-selection",
+			"reinstalls a runtime removed after it was ready",
+			"rebuilds a broken runtime on the next selection, never before",
+			"HS-034 rechecks the live factory gate at a real pending-model continuation"
+		],
+		"actual_Hammerspoon_native_credit": false
+	},
+	"managed_native_architectures": {
+		"amd64": {
+			"job_id": 114156785314,
+			"job_conclusion": "FAIL",
+			"PAC_artifact_id": 11662352617,
+			"PAC_artifact_sha256": "3a51834072af4c82e1db813af674839594514c843f4b77e02c99740e1d164465",
+			"compiled_source_worker_sha256": "761b1a636bfc69d987545a30502db5a7c549e76c9b674630fc27bb4b157febc7",
+			"Swift_compilation": "PASS: actual Build complete transcript",
+			"SDK41": {
+				"PASS": 41,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"PACSource10": {
+				"PASS": 10,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"original14": {
+				"PASS_methods": 12,
+				"FAIL_methods": 2,
+				"SKIP_methods": 0,
+				"assertion_failures": 14,
+				"unexpected": 2,
+				"methods": [
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+						"outcome": "failed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure]",
+						"outcome": "failed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPPACArgumentShapeObservation]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPSPACArgumentShapeObservation]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACPreservesHTTPPathAndOrderedNativeChoices]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testBinaryFrameLengthAndNULPayloadAreExact]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testInvalidRequestsRefuseBeforeAnyNativeDispatch]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy]",
+						"outcome": "passed"
+					}
+				]
+			},
+			"PAC14_DEBUG_codes": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-Wire-method-request-phase-unknown"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "synthetic-privacy-unit"
+				}
+			],
+			"real_WPAD_same_method_codes": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				}
+			],
+			"synthetic_privacy_unit_codes_excluded_from_cause": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "synthetic-privacy-unit"
+				}
+			],
+			"Wire_request_phase_unproved_codes": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-Wire-method-request-phase-unknown"
+				}
+			],
+			"separate_SDK_custom_anchor_refusal_control_codes_not_positive_cause": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeCustomAnchorsPreserveHostnameAndDefaultRefusal]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "unattributed"
+				}
+			],
+			"positive_WPAD_terminal_reasons": [
+				{
+					"printed_method_context": null,
+					"reason": "certificate",
+					"source_scope": "sole original positive-WPAD-loop insertion; stdout may flush outside method boundary",
+					"individual_request_to_DEBUG_join": "NOT_PROVED"
+				},
+				{
+					"printed_method_context": null,
+					"reason": "certificate",
+					"source_scope": "sole original positive-WPAD-loop insertion; stdout may flush outside method boundary",
+					"individual_request_to_DEBUG_join": "NOT_PROVED"
+				}
+			],
+			"cause_limits": "Genuine WPAD method codes and source-unique positive terminal certificate observations; no exact per-request cross-stream join, trust/root/policy failure cause, or functional fix proved. Intel is not inferred from previous run; current code observations source/job/test-bound. ExtraCA refusal/load can bypass mapper; absence would not disprove.",
+			"HTTP_receiving2": {
+				"PASS_methods": 0,
+				"ERROR_methods": 2,
+				"additional_tearDownClass_ERROR": 1,
+				"total_error_records": 3,
+				"original_add_trust_timeout_seconds": 15,
+				"restoration_exit_status": 1,
+				"physical_closure_frames": [
+					{
+						"active": 0,
+						"closed": 0,
+						"keychain_unsettled": 0,
+						"trust_unsettled": 1,
+						"version": 1
+					}
+				],
+				"DEBUG_defined": false,
+				"no_DEBUG_code_absence_is_cause_proof": false,
+				"qualified": false
+			},
+			"native_runtime_producer6": {
+				"PASS": 6,
+				"FAIL": 0,
+				"SKIP": 0,
+				"whole_runtime_release_qualification": false
+			},
+			"portable_client_suites": {
+				"suites": 2,
+				"cases_per_suite": 2,
+				"native_credit": false
+			}
+		},
+		"arm64": {
+			"job_id": 114156785250,
+			"job_conclusion": "FAIL",
+			"PAC_artifact_id": 11663171772,
+			"PAC_artifact_sha256": "659c6d2a62cfd91f69276ea85be82f62da30fc29aca82f693f14d39b07fdb539",
+			"compiled_source_worker_sha256": "761b1a636bfc69d987545a30502db5a7c549e76c9b674630fc27bb4b157febc7",
+			"Swift_compilation": "PASS: actual Build complete transcript",
+			"SDK41": {
+				"PASS": 41,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"PACSource10": {
+				"PASS": 10,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"original14": {
+				"PASS_methods": 12,
+				"FAIL_methods": 2,
+				"SKIP_methods": 0,
+				"assertion_failures": 14,
+				"unexpected": 2,
+				"methods": [
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+						"outcome": "failed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure]",
+						"outcome": "failed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPPACArgumentShapeObservation]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPSPACArgumentShapeObservation]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACPreservesHTTPPathAndOrderedNativeChoices]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testBinaryFrameLengthAndNULPayloadAreExact]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testInvalidRequestsRefuseBeforeAnyNativeDispatch]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains]",
+						"outcome": "passed"
+					},
+					{
+						"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy]",
+						"outcome": "passed"
+					}
+				]
+			},
+			"PAC14_DEBUG_codes": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-Wire-method-request-phase-unknown"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "synthetic-privacy-unit"
+				}
+			],
+			"real_WPAD_same_method_codes": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				},
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-WPAD-method-request"
+				}
+			],
+			"synthetic_privacy_unit_codes_excluded_from_cause": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "synthetic-privacy-unit"
+				}
+			],
+			"Wire_request_phase_unproved_codes": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "real-Wire-method-request-phase-unknown"
+				}
+			],
+			"separate_SDK_custom_anchor_refusal_control_codes_not_positive_cause": [
+				{
+					"method": "-[ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeCustomAnchorsPreserveHostnameAndDefaultRefusal]",
+					"domain": "NSURLErrorDomain",
+					"code": -1202,
+					"role": "unattributed"
+				}
+			],
+			"positive_WPAD_terminal_reasons": [
+				{
+					"printed_method_context": null,
+					"reason": "certificate",
+					"source_scope": "sole original positive-WPAD-loop insertion; stdout may flush outside method boundary",
+					"individual_request_to_DEBUG_join": "NOT_PROVED"
+				},
+				{
+					"printed_method_context": null,
+					"reason": "certificate",
+					"source_scope": "sole original positive-WPAD-loop insertion; stdout may flush outside method boundary",
+					"individual_request_to_DEBUG_join": "NOT_PROVED"
+				}
+			],
+			"cause_limits": "Genuine WPAD method codes and source-unique positive terminal certificate observations; no exact per-request cross-stream join, trust/root/policy failure cause, or functional fix proved. Intel is not inferred from previous run; current code observations source/job/test-bound. ExtraCA refusal/load can bypass mapper; absence would not disprove.",
+			"HTTP_receiving2": {
+				"PASS_methods": 0,
+				"ERROR_methods": 2,
+				"additional_tearDownClass_ERROR": 1,
+				"total_error_records": 3,
+				"original_add_trust_timeout_seconds": 15,
+				"restoration_exit_status": 1,
+				"physical_closure_frames": [
+					{
+						"active": 0,
+						"closed": 0,
+						"keychain_unsettled": 0,
+						"trust_unsettled": 1,
+						"version": 1
+					}
+				],
+				"DEBUG_defined": false,
+				"no_DEBUG_code_absence_is_cause_proof": false,
+				"qualified": false
+			},
+			"native_runtime_producer6": {
+				"PASS": 6,
+				"FAIL": 0,
+				"SKIP": 0,
+				"whole_runtime_release_qualification": false
+			},
+			"portable_client_suites": {
+				"suites": 2,
+				"cases_per_suite": 2,
+				"native_credit": false
+			}
+		}
+	},
+	"source_binding_receipt_sha256": "c3767ea748f92900727dd532c10c57ac919009f4993737062aef4810b8036085",
+	"original_assertions_clocks": "Original14 test files exact audit hashes; new diagnostic observation does not change assertions, clocks, trust policy or native qualification requirements.",
+	"archive25": {
+		"job_id": 114156785188,
+		"PASS_methods": 24,
+		"FAIL_methods": 1,
+		"failure_assertions": 2,
+		"staging8": "PASS8",
+		"Sparkle15": "PASS15",
+		"consent_arguments1": "PASS1",
+		"Brew6": "UNEXECUTED: owning consent prerequisite refused",
+		"private_delivery3": "UNEXECUTED: same prerequisite",
+		"primary": {
+			"role": "permission-request",
+			"stage": "ui-observer",
+			"fixed_error": "Owned Automation prompt exceeded its deadline",
+			"original_budget_seconds": 30,
+			"cause": "UNKNOWN"
+		},
+		"first_timeout": {
+			"actual_field_present": false,
+			"absence_reason": "AdmissionError owning predicate, not subprocess.TimeoutExpired path; no new deadline/global absence inference"
+		},
+		"physical_closure_checkpoints": [
+			{
+				"scope": "owned-native-groups",
+				"status": "refused",
+				"phase": "candidate.failed",
+				"ownership_closed": true,
+				"debt_kinds": [],
+				"cases": {},
+				"elapsed_seconds": 50.766349,
+				"history_omitted": 145
+			},
+			{
+				"scope": "helper-and-native-groups",
+				"status": "accepted",
+				"phase": "cleanup.closed",
+				"ownership_closed": true,
+				"debt_kinds": null,
+				"cases": {},
+				"elapsed_seconds": 51.53271429166665,
+				"history_omitted": 0
+			},
+			{
+				"scope": "application-installer-server-and-commands",
+				"status": "accepted",
+				"phase": "cleanup.closed",
+				"ownership_closed": true,
+				"debt_kinds": null,
+				"cases": {},
+				"elapsed_seconds": 19.66611283333333,
+				"history_omitted": 0
+			}
+		],
+		"sdk_no_prompt": {
+			"complete": true,
+			"caller": "native-test-product",
+			"osstatus": -600,
+			"catalogue_qualified": false,
+			"signed_application_qualified": false,
+			"osascript_principal_qualified": false,
+			"script_status": 0,
+			"capture_status": 0
+		},
+		"artifact_id": 11662407317,
+		"artifact_sha256": "4e68ef9c56af97283d18484a3f24eeb6be7e3f5bd57f0ae8b3bb4b4b54dba829",
+		"full_package_qualified": false
+	},
+	"cold_MLX_native": {
+		"job_id": 114156785285,
+		"job_conclusion": "SUCCESS",
+		"artifact_id": 11662327417,
+		"actual_receipt_status": "passed",
+		"limits": "Not package/install/Brew/network qualification"
+	},
+	"Darwin50": {
+		"actual_qualifying_invocation": false,
+		"status": "UNEXECUTED: proposed cohort unapplied in this candidate",
+		"portable_substitution": false
+	},
+	"actual_skipped_jobs": [
+		{
+			"job_id": 114156786147,
+			"name": "Windows",
+			"conclusion": "SKIP"
+		},
+		{
+			"job_id": 114156786412,
+			"name": "Linux",
+			"conclusion": "SKIP"
+		},
+		{
+			"job_id": 114158162406,
+			"name": "macOS / E2E tests (stubbed)",
+			"conclusion": "SKIP"
+		},
+		{
+			"job_id": 114158162461,
+			"name": "macOS / Package",
+			"conclusion": "SKIP"
+		},
+		{
+			"job_id": 114158162715,
+			"name": "macOS / Native tooltip canvas \u00b7 12 captures",
+			"conclusion": "SKIP"
+		},
+		{
+			"job_id": 114158162991,
+			"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+			"conclusion": "SKIP"
+		},
+		{
+			"job_id": 114158327562,
+			"name": "Release / Publish",
+			"conclusion": "SKIP"
+		}
+	],
+	"release_publish": {
+		"job_id": 114158327562,
+		"conclusion": "SKIP",
+		"release_created_by_monitor": false
+	},
+	"download_access": {
+		"earlier_fresh_host12_refusals": "Preserved separate interim receipt; download access only, not native cause.",
+		"terminal_recovery": "Fresh legitimate whole-run archive and later task artifact GETs succeeded; no URL/host/signature/auth rewriting, no credential/network-setting changes or setup-active claim."
+	},
+	"evidence": {
+		"run.latest.json": "690c55ab72fd26852e221ff6683ea76a0df1248df000d86513617b34996b03c1",
+		"jobs.latest.json": "1a374689b633ae155af620a66388bc94804fa3cc835619699f6ff3604959fcb1",
+		"runlogs.zip": "44a68d14aa0aee04f7c76333b775debf6f84122f14b260a9e954d7e0031c0180",
+		"validate.private.log": "9adc7d18e6fd15c372f22247ad3e3a4222ebbd22062df9e3a08f3c59b0b319aa",
+		"corejs.private.log": "179829ac6040712fde9e73378687785e320d59f2a030bd687f088544294e5ab4",
+		"stub.private.log": "ef385e574a13158b1597143ab4d7d1d7114e3e56a3168facc219f89ab9f59e17",
+		"archive.private.log": "b318419d268b3e7edeae2a74cbfc0004b4499b4df53b184b89e9b602618ca430",
+		"amd64.private.log": "77401d1279981365a05775c0e4d064dc25902d824e731c94a6d384c1a440ef4a",
+		"arm64.private.log": "7214fac15dd391787cef817216874ca897ef2187afbb030062d9abcc254bc014",
+		"item36.zip": "4e68ef9c56af97283d18484a3f24eeb6be7e3f5bd57f0ae8b3bb4b4b54dba829",
+		"pac-amd64.zip": "3a51834072af4c82e1db813af674839594514c843f4b77e02c99740e1d164465",
+		"pac-arm64.zip": "659c6d2a62cfd91f69276ea85be82f62da30fc29aca82f693f14d39b07fdb539",
+		"cold-mlx.zip": "00beee790b1ce82b7cf994515126f283a6445e80eab92b8ce3f88f6bafa19435"
+	},
+	"actions": {
+		"manual_cancelled": false,
+		"main_index_refs_mutated": false,
+		"target_imports_or_suites_or_native_tests_run_here": false,
+		"scope": "Read-only exactfe3 manual run/task artifacts only",
+		"monitor_process": "poll.py session89694 physically completed exit0 at terminal API result"
+	}
+}

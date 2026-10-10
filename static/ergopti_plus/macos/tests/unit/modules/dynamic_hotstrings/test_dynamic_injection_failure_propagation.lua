@@ -243,7 +243,11 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		helpers.assert_type(interceptor, "function")
 		local successes_before = #logs.successes
 		local errors_before = #logs.errors
-		local result = interceptor(fake_event("\u{2605}"), "td")
+		interceptor(fake_event("\u{2605}"), "td", { start_is_word_boundary = false })
+		interceptor(fake_event("\u{2605}"), "td")
+		interceptor(fake_event("\u{2605}"), "xtd", { start_is_word_boundary = true })
+		helpers.assert_eq(inject_calls, 0, "refused word-start ownership must not attempt replacement")
+		local result = interceptor(fake_event("\u{2605}"), "td", { start_is_word_boundary = true })
 
 		helpers.assert_nil(result,
 			"when no replacement batch exists, the user's magic key must pass through")
@@ -290,7 +294,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		rules.start(fake_keymap)
 
 		synthetic.enter_callback()
-		local result = interceptor(fake_event("\u{2605}"), "td")
+		local result = interceptor(fake_event("\u{2605}"), "td", { start_is_word_boundary = true })
 		local consume, events = synthetic.leave_callback(false)
 
 		helpers.assert_nil(result,

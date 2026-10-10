@@ -392,16 +392,19 @@ assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_A
 -- process), against a scripted keyboard and a model of the focused field.
 -- These pin what no engine-level vector can: the injector's erase arithmetic,
 -- the undo, and the order the hook and the daemon see keys in.
+-- Startup focus invalidation deliberately forgets the unseen prefix. Positive
+-- word-only cases first type a real separator and retain it in the independent
+-- screen oracle; an empty modeled field never grants the engine that knowledge.
 local DAEMON_SCENARIOS = {
-	{ name = "an end-char trigger expands and keeps its terminator", keys = "adn ", screen = "ADN " },
-	{ name = "Enter is a terminator", keys = "adn{ENTER}", screen = "ADN\n" },
+	{ name = "an end-char trigger expands and keeps its terminator", keys = " adn ", screen = " ADN " },
+	{ name = "Enter is a terminator", keys = " adn{ENTER}", screen = " ADN\n" },
 	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
 	-- "adn " → "ADN ", and the Backspace removes the REPLAYED space: undo must
 	-- count it, or the first character of the replacement stays ("Aadn").
-	{ name = "Backspace after an end-char expansion restores the trigger", keys = "adn {BS}", screen = "adn" },
+	{ name = "Backspace after an end-char expansion restores the trigger", keys = " adn {BS}", screen = " adn" },
 	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
 	-- Backspace edits the buffer instead of wiping it and declaring a word start.
-	{ name = "a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN " },
+	{ name = "a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
 	{ name = "a word-only trigger does not fire after an arrow key", keys = "x{LEFT}adn ", screen = "xadn " },
 	-- Ctrl+Backspace deletes a word, not one character: it neither undoes the
@@ -412,25 +415,29 @@ local DAEMON_SCENARIOS = {
 	{ name = "Ctrl+Backspace drops the whole word from the buffer", keys = "hello adnx{CBS} ", screen = "hello  " },
 	-- The same edits with the AI prediction engine loaded, as in the demo
 	-- configuration: its cancel on Backspace reset the buffer behind the edit.
-	{ name = "with AI loaded, a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN ", llm = true },
+	{ name = "with AI loaded, a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN ", llm = true },
 	{ name = "with AI loaded, a word-only trigger does not fire mid-word after a Backspace",
 		keys = "xy{BS}adn ", screen = "xadn ", llm = true },
-	{ name = "with AI loaded, an end-char trigger expands", keys = "adn ", screen = "ADN ", llm = true },
+	{ name = "with AI loaded, an end-char trigger expands", keys = " adn ", screen = " ADN ", llm = true },
 	-- Without luv the daemon's clock counts whole seconds, and two keys typed
 	-- together read a second apart whenever that second turns over between
 	-- them: the 0.75 s expansion delay then dropped the trigger. This is the
 	-- stubbed CI step's clock, where the AI twin above once failed that way.
-	{ name = "a trigger typed across a clock second still expands", keys = "ad{TICK}n ", screen = "ADN ",
+	{ name = "a trigger typed across a clock second still expands", keys = " ad{TICK}n ", screen = " ADN ",
 		clock = "seconds" },
 	{ name = "with AI loaded, a corrected typo typed across a clock second still expands",
-		keys = "adx{BS}{TICK}n ", screen = "ADN ", llm = true, clock = "seconds" },
+		keys = " adx{BS}{TICK}n ", screen = " ADN ", llm = true, clock = "seconds" },
 	-- Two seconds on that clock is more than one of real pause: the delay holds.
-	{ name = "a pause the whole-second clock can prove still expires the trigger", keys = "ad{TICK}{TICK}n ",
-		screen = "adn ", clock = "seconds" },
+	{ name = "a pause the whole-second clock can prove still expires the trigger", keys = " ad{TICK}{TICK}n ",
+		screen = " adn ", clock = "seconds" },
 	-- A touchpad reader that fails stops the reader alone: the same module
 	-- still runs the tap actions (gesture-pump-keeps-actions).
 	{ name = "a failing touchpad pump leaves the tap actions running", keys = "{PUMP}{TAP}",
 		screen = "[reader stopped]<select_all>", gesture_pump = "fails" },
+	{ name = "an unknown initial suffix does not authorize a word-only trigger",
+		keys = "adn ", screen = "adn " },
+	{ name = "with AI loaded, an unknown initial suffix does not authorize a word-only trigger",
+		keys = "adn ", screen = "adn ", llm = true },
 }
 
 -- These scenarios use the neutral template and explicit acknowledged choices,
