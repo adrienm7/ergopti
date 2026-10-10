@@ -6504,6 +6504,14 @@ independent fixture comes from the immutable original Group5 source, before
 the proof change. This compatibility correction completes no parent item and
 does not provide native or installed-device acceptance.
 
+The actual Windows run for the model parent declaration executed all 30 new
+subjects: 27 passed and three failed during fixture setup, before the production
+emitter, because the previous native handle was absent. The two scoped fixtures
+now preserve the original handle presence as well as its reference. Production,
+all assertions and the independent caption corpus remain unchanged. The Agent
+provider subjects passed 22/22. Corrected model emitter and cleanup execution
+still require Windows validation; the historical full suite remains failed.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
