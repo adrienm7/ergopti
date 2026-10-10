@@ -158,3 +158,67 @@ helpers.describe("FocusGuard: same-window secure-field navigation", function()
 
 	package.loaded["logger.shim"] = previous_logger
 end)
+
+
+helpers.describe("FocusGuard: live daemon word-boundary premise", function()
+	local previous_logger = package.loaded["logger.shim"]
+	local previous_engine = package.loaded["hotstring_engine"]
+	local previous_guard = package.loaded["modules.keylogger.focus_guard"]
+	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local Engine = helpers.load_module("hotstring_engine")
+	local FocusGuard = helpers.load_module("modules.keylogger.focus_guard")
+
+	local function observe(keys)
+		local engine = Engine.new()
+		helpers.assert_eq(engine:load_mappings({
+			{ trigger = "adn", replacement = "ADN", is_word = true, auto_expand = false, is_case_sensitive = true },
+		}), true)
+		local guard = FocusGuard.new({
+			detector = { invalidateFocus = function() return 1 end, refresh = function() return true end,
+				isSecureField = function() return false end },
+			keylogger = { set_secure_field = function() end }, now_ms = function() return 0 end,
+			reset_text = function() engine:reset(false) end,
+		})
+		helpers.assert_eq(guard.prime(), true)
+		helpers.assert_eq(guard.blocks_text(), false)
+		helpers.assert_eq(engine:buffer_starts_at_word_boundary(), false,
+			"a conclusive non-password verdict does not locate the caret at a word start")
+		local text, matches = "", 0
+		for char in keys:gmatch(".") do
+			text = text .. char
+			local result = engine:on_char(char, { is_terminator = char == " ", typed_at_ms = 1000 })
+			if result then
+				matches = matches + 1
+				text = text:sub(1, #text - result.backspace_count) .. result.replacement
+					.. (result.end_char and not result.consume_terminator and result.terminator or "")
+			end
+		end
+		return text, matches
+	end
+
+	helpers.it("daemon word boundary: real probe types an observed separator", function()
+		local input = assert(io.open(helpers.driver_root() .. "/tests/hardware/run_daemon_live.lua", "r"))
+		local source = input:read("*a")
+		input:close()
+		local keys = assert(source:match('type_text%("([^"\n]+)"%)%s*local got, trail = read_output%(3%)'))
+		local expected = assert(source:match('if got == "([^"\n]+)" then'))
+		local text, matches = observe(keys)
+		helpers.assert_eq(text, expected, "the real matcher must produce the probe's independent desktop expectation")
+		helpers.assert_eq(matches, 1)
+		helpers.assert_eq(keys, " adn ", "the live probe must observe the separator on its real keyboard")
+		helpers.assert_eq(expected, " ADN ", "the expected desktop result keeps the independent separator literal")
+	end)
+	helpers.it("daemon word boundary: unknown initial suffix remains refused", function()
+		local text, matches = observe("adn ")
+		helpers.assert_eq(matches, 0)
+		helpers.assert_eq(text, "adn ")
+	end)
+	helpers.it("daemon word boundary: larger word remains refused", function()
+		local text, matches = observe("xadn ")
+		helpers.assert_eq(matches, 0)
+		helpers.assert_eq(text, "xadn ")
+	end)
+	package.loaded["hotstring_engine"] = previous_engine
+	package.loaded["modules.keylogger.focus_guard"] = previous_guard
+	package.loaded["logger.shim"] = previous_logger
+end)
