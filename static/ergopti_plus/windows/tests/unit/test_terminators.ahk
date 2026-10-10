@@ -633,8 +633,8 @@ _HTR_Operation() {
 }
 
 _HTR_WalLifecycle(Refuse) {
-	Fixture := _ScopeOwnerFixture()
-	Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
+	; Author the complete current image before the genuine native boot.
+	Fixture := _ScopeOwnerFixture(_HTR_Source())
 	Bundle := 0, OnSuccess := 0, OnRefused := 0, Calls := 0
 	Launch(Success, Borrowed, Refused) {
 		Bundle := Borrowed, OnSuccess := Success, OnRefused := Refused
@@ -651,11 +651,11 @@ _HTR_WalLifecycle(Refuse) {
 		if Refuse {
 			OnRefused.Call("controlled refusal")
 			AssertEqual("refused", Receipt["status"])
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path), "the genuine rollback must restore all original bytes")
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path), "the genuine rollback must restore all original bytes")
 			Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 			AssertEqual("pending", Receipt["status"], "settled refusal permits one new admitted retry")
 			OnRefused.Call("controlled second refusal")
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
 		} else {
 			OnSuccess.Call()
 			AssertEqual("committed", Receipt["status"], "only the actual replacement callback acknowledges runtime completion")
@@ -779,8 +779,8 @@ _HTRA_Source(Kind) {
 
 _HTRA_MenuAddCollisionBody(Kind) {
 	global _HotstringsTerminatorRecords
-	AddFixture := _ScopeOwnerFixture()
-	AddSource := _HTRA_Source(Kind)
+	AddFixture := _ScopeOwnerFixture(_HTRA_Source(Kind))
+	AddSource := AddFixture.source
 	AddBundle := 0, AddAcknowledge := 0, AddRefused := 0, AddLaunches := 0
 	AddLaunch(Acknowledge, Borrowed, Refused) {
 		AddBundle := Borrowed, AddAcknowledge := Acknowledge, AddRefused := Refused
@@ -789,7 +789,6 @@ _HTRA_MenuAddCollisionBody(Kind) {
 	}
 	AddFixture.options["reload"] := AddLaunch
 	try {
-		AssertTrue(FSWriteDurable(AddFixture.path, AddSource))
 		HotstringsTerminatorRecordsInit(AddSource)
 		PriorAddOwner := _HotstringsTerminatorRecords
 		PriorAddDocument := TOML_ParseDocument(AddSource)
@@ -945,13 +944,12 @@ _HTRB_WithBoot(Body) {
 }
 
 _HTRB_AdmittedGeneration() {
-	Fixture := _ScopeOwnerFixture()
+	Fixture := _ScopeOwnerFixture(_HTR_Source())
 	try {
-		Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
 		BootSnapshot := 0
 		ApplyBootConfigToml(Map(), Fixture.path, &BootSnapshot)
 		Assert(BootSnapshot is Object, "the actual loader must publish its admitted image")
-		AssertEqual(_HTR_Source(), BootSnapshot.Source)
+		AssertEqual(Fixture.source, BootSnapshot.Source)
 		Assert(FSWriteDurable(Fixture.path, 'hotstrings = [unterminated`n'))
 		AssertTrue(HotstringsTerminatorRecordsInitBoot(BootSnapshot),
 			"the consumer must not borrow a later refused source generation")
@@ -990,7 +988,7 @@ _HTRB_RemoveAfterModal(PauseAfterConfirmation) {
 
 _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 	global _HotstringsTerminatorRecords
-	Fixture := _ScopeOwnerFixture(), PriorSuspend := A_IsSuspended
+	Fixture := _ScopeOwnerFixture(_HTR_Source()), PriorSuspend := A_IsSuspended
 	Calls := 0, Acquisitions := 0, Success := 0, Bundle := 0
 	Confirm(*) {
 		Calls += 1
@@ -1012,15 +1010,14 @@ _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 		Fixture.options["acquire"] := RefuseAcquisition
 	try {
 		Suspend(false)
-		Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
-		HotstringsTerminatorRecordsInit(_HTR_Source())
+		HotstringsTerminatorRecordsInit(Fixture.source)
 		Admission := HotstringsTerminatorRecordCapture(_HotstringsTerminatorRecords.Records[1])
 		Outcome := _HS_DelimRemoveRecord(Admission, Fixture.options)
 		AssertEqual(1, Calls, "the real removal helper must receive the confirmation")
 		if PauseAfterConfirmation {
 			AssertEqual(false, Outcome, "a pause during confirmation revokes admission")
 			AssertEqual(0, Acquisitions, "paused confirmation must not acquire transaction ownership")
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
 		} else {
 			Assert(Outcome is Map)
 			AssertEqual("pending", Outcome["status"], "publication still requires the runtime ACK")
