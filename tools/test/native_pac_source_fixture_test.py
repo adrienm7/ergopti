@@ -334,56 +334,68 @@ class PACSourcePeerTests(unittest.TestCase):
                     refused.set()
 
         owner = PEERS.SourceFixture()
-        connection = socket.create_connection(("127.0.0.1", owner.http.server_port), 2)
-        try:
-            with (
-                mock.patch.object(PEERS.threading, "Thread", HeldRequest),
-                mock.patch.object(
-                    threading, "excepthook", lambda args: errors.append(args.exc_value)
-                ),
-            ):
-                connection.sendall(
-                    b"GET /source/utf8 HTTP/1.1\r\nHost: owned\r\nConnection: close\r\n\r\n"
-                )
-                self.assertTrue(entered.wait(2))
-                self.assertTrue(refused.wait(2))
-                deadline = time.monotonic() + 2
-                while owner.request_starts[0]["failure"] is None and time.monotonic() < deadline:
-                    threading.Event().wait(0.001)
-                with self.assertRaises(KeyboardInterrupt) as first:
-                    owner.close()
-                self.assertIs(first.exception, primary)
-                self.assertIs(owner.request_starts[0]["worker"], held[0])
-                self.assertIsNone(held[0].ident)
-                self.assertFalse(owner.closed)
-                self.assertTrue(owner.root.exists())
-                self.assertTrue(all(server.socket.fileno() >= 0 for server in owner.servers))
-                self.assertEqual(len(owner.connections), 1)
+        original_connect = socket.create_connection
+
+        def acquire_client(*arguments, **options):
+            # Acceptance can construct a request worker before GET bytes arrive.
+            self.assertIs(PEERS.threading.Thread, HeldRequest)
+            return original_connect(*arguments, **options)
+
+        connection = None
+        with mock.patch.object(socket, "create_connection", side_effect=acquire_client):
+            try:
+                with (
+                    mock.patch.object(PEERS.threading, "Thread", HeldRequest),
+                    mock.patch.object(
+                        threading, "excepthook", lambda args: errors.append(args.exc_value)
+                    ),
+                ):
+                    connection = socket.create_connection(("127.0.0.1", owner.http.server_port), 2)
+                    connection.sendall(
+                        b"GET /source/utf8 HTTP/1.1\r\nHost: owned\r\nConnection: close\r\n\r\n"
+                    )
+                    self.assertTrue(entered.wait(2))
+                    self.assertTrue(refused.wait(2))
+                    deadline = time.monotonic() + 2
+                    while (
+                        owner.request_starts[0]["failure"] is None and time.monotonic() < deadline
+                    ):
+                        threading.Event().wait(0.001)
+                    with self.assertRaises(KeyboardInterrupt) as first:
+                        owner.close()
+                    self.assertIs(first.exception, primary)
+                    self.assertIs(owner.request_starts[0]["worker"], held[0])
+                    self.assertIsNone(held[0].ident)
+                    self.assertFalse(owner.closed)
+                    self.assertTrue(owner.root.exists())
+                    self.assertTrue(all(server.socket.fileno() >= 0 for server in owner.servers))
+                    self.assertEqual(len(owner.connections), 1)
+                    release.set()
+                    self.assertTrue(held[0]._started.wait(2))
+                    original_thread.join(held[0], 2)
+                    self.assertFalse(held[0].is_alive())
+                    original_thread.join(owner.threads[0], 2)
+                self.assertEqual(errors, [primary])
+            finally:
                 release.set()
-                self.assertTrue(held[0]._started.wait(2))
-                original_thread.join(held[0], 2)
-                self.assertFalse(held[0].is_alive())
-                original_thread.join(owner.threads[0], 2)
-            self.assertEqual(errors, [primary])
-        finally:
-            release.set()
-            connection.close()
-            for thread in held:
-                self.assertTrue(thread._started.wait(2))
-                original_thread.join(thread, 2)
-                self.assertFalse(thread.is_alive())
-            for state in owner.server_starts:
-                if state["worker"].is_alive():
-                    state["server"].shutdown()
-                original_thread.join(state["worker"], 2)
-                self.assertFalse(state["worker"].is_alive())
-            for owned_connection in owner.connections:
-                owned_connection.close()
-            for server in owner.servers:
-                server.server_close()
-            owner.directory.cleanup()
-            if owner in PEERS.RETAINED_DEBT:
-                PEERS.RETAINED_DEBT.remove(owner)
+                if connection is not None:
+                    connection.close()
+                for thread in held:
+                    self.assertTrue(thread._started.wait(2))
+                    original_thread.join(thread, 2)
+                    self.assertFalse(thread.is_alive())
+                for state in owner.server_starts:
+                    if state["worker"].is_alive():
+                        state["server"].shutdown()
+                    original_thread.join(state["worker"], 2)
+                    self.assertFalse(state["worker"].is_alive())
+                for owned_connection in owner.connections:
+                    owned_connection.close()
+                for server in owner.servers:
+                    server.server_close()
+                owner.directory.cleanup()
+                if owner in PEERS.RETAINED_DEBT:
+                    PEERS.RETAINED_DEBT.remove(owner)
 
     def test_numeric_listener_binding_never_acquires_unused_reverse_dns(self):
         with mock.patch.object(
