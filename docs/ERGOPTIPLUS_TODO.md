@@ -10492,6 +10492,24 @@ test precondition failure, not a Lua defect or a successful permission grant.
   packaging success does not qualify it. Restore this method with the full
   native PAC scope after correcting the fixture failure.
 
+  Actual stable publication followed on October 10 at 01:31:54 UTC:
+  `v1.0.0`, source `5ef675e08d9f75b0902026a21f36782e999b3ac2`,
+  CI 38011314333 and 33 verified assets. Its thirteen explicit deferrals
+  remain unqualified. Work for v1.0.1 continues on dev with the full default
+  test policy; main remains at the published stable source.
+
+  Full dev CI 38033156889 on `c4e2368308` passed 406 of 407 JavaScript
+  checks. The remaining guard omitted two Windows evidence-retention steps.
+  The Windows prerequisite also exposed Unicode corruption in a PowerShell
+  fixture's native stdout; `debc3dbb07` preserves the original assertions
+  under both OEM and UTF-8 encodings. Native macOS trust installation still
+  times out before managed model qualification. Preserve that failure and
+  add passive, redacted child/stream diagnostics without changing permissions
+  or claiming that a retired child proves successful trust installation.
+  Linux's live-daemon first-word probe expected expansion before the driver
+  had observed a word boundary; its fixture correction must pass the actual
+  kernel test before that lane is qualified.
+
 - [x] **134.** Preserve the website custom domain during Pages deployments.
 
   The main deployment removed the prior gh-pages CNAME while the source had
@@ -10503,6 +10521,22 @@ test precondition failure, not a Lua defect or a successful permission grant.
   of either the trigger or pre-deployment check. Actual successor deployment
   37996719619 completed successfully, retained the root CNAME, and served
   HTTP 200 after publication. This closes that specific domain-loss defect.
+
+- [ ] **135.** Remove the deprecated Homebrew macOS dependency syntax.
+
+  The cask generator emits a quoted comparison for the minimum macOS version.
+  Use the supported unquoted minimum-version symbol for every channel and
+  archive format, preserve the existing OS floor, and add a regression that
+  rejects the former generated declaration. Regenerate the public casks
+  through their owner while retaining each published version, URL and hash.
+  Native Homebrew acceptance and publication remain separate checks.
+
+  The maintainer also reported that `brew upgrade` did not offer stable
+  v1.0.0 from a dev installation. The tap has two distinct packages:
+  `ergoptiplus@dev` currently publishes dev.157, while `ergoptiplus` publishes
+  v1.0.0. A normal upgrade does not switch packages. Document an explicit
+  dev-to-stable switch without `--zap`; retain the user's configuration and
+  never change their subscribed channel implicitly.
 
 ## Time estimate
 
