@@ -334,6 +334,76 @@ LoggerCrashReportsDir() {
 		return LoggerLogsDir() . AppDirsCrashReportsDir() . "\"
 }
 
+
+/** Owns the admitted policy and immutable platform identity before sink effects. */
+_LoggerPrivacyState() {
+	static State := Map("config", 0, "root", "")
+	return State
+}
+
+/** Returns zero only before the shared source exists; invalid admission throws. */
+_LoggerPrivacyConfig() {
+	global _SharedDir
+	State := _LoggerPrivacyState()
+	if !IsSet(_SharedDir) || (_SharedDir is String && _SharedDir == "") {
+		if State["config"] is Map
+			throw Error("Logger privacy source disappeared after admission.")
+		return 0
+	}
+	if !(_SharedDir is String)
+		throw TypeError("Logger privacy source is invalid.")
+	if State["config"] is Map {
+		if !(State["root"] == _SharedDir)
+			throw Error("Logger privacy source changed after admission.")
+		return State["config"]
+	}
+	Rules := JsonParse(FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8"))
+	Context := Map("home", EnvGet("USERPROFILE"), "user", A_UserName, "case_insensitive", true)
+	if Context["home"] == "" || Context["user"] == ""
+		throw Error("Logger privacy identity is unavailable.")
+	Redact_Apply("", Rules, Context) ; Validate the real canonical rule owner before publication.
+	Config := Map("rules", Rules, "context", Context)
+	State["root"] := _SharedDir
+	State["config"] := Config
+	return Config
+}
+
+/** Preserves core metadata while applying canonical redaction to every body. */
+_LoggerPrivacyBlob(Blob, Config, Records := 0) {
+	if !(Records is Array)
+		return Redact_Apply(Blob, Config["rules"], Config["context"])
+	Original := "", Result := ""
+	for Record in Records {
+		if !(Record is String)
+			throw TypeError("Logger source record is invalid.")
+		Original .= Record . "`r`n"
+		; Only the first prefix belongs to this detached queue entry. A body may
+		; contain newlines and prefix-like text, which remain untrusted together.
+		if RegExMatch(Record, "s)^([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(?::[0-9]{3})? \[(?:DEBUG|TRACE|DONE|INFO|START|SUCCESS|WARNING|ERROR)\] \[[^\]\r\n]+\] )(.*)$", &Parts)
+			Result .= Parts[1] . Redact_Apply(Parts[2], Config["rules"], Config["context"]) . "`r`n"
+		else if RegExMatch(Record, "^===== [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{3} " . Chr(0x2014) . " ErgoptiPlus session opened =====$")
+			Result .= Record . "`r`n"
+		else
+			Result .= Redact_Apply(Record, Config["rules"], Config["context"]) . "`r`n"
+	}
+	if !(Original == Blob)
+		throw Error("Logger batch differs from its source-owned entries.")
+	return Result
+}
+
+/** Early mutex outcomes are closed technical data; untrusted detail is withheld. */
+_LoggerBootstrapMessage(Severity, Source, Message) {
+	if !(Severity == "WARNING" || Severity == "ERROR") || !(Source == "ErgoptiPlus" || Source == "ConfigTransition")
+		throw ValueError("Bootstrap metadata is outside its closed owner set.")
+	Config := _LoggerPrivacyConfig()
+	if Config is Map
+		return Redact_Apply(Message, Config["rules"], Config["context"])
+	if Source == "ErgoptiPlus" && (Severity == "WARNING" || Severity == "ERROR")
+		&& RegExMatch(Message, "^(?:Another instance owns the single-owner mutex after [0-9]+ ms|Single-owner mutex acquisition failed \(wait=0x[0-9A-F]{8}, error=[0-9]+\)); terminating without registering any hook\.$")
+		return Message
+	return "Bootstrap detail withheld: log privacy policy is not initialized."
+}
+
 ; Appends one line to bootstrap.log, the sink for what happens before
 ; paths.toml is read and before LoggerInit may run: a second instance yielding
 ; to the live owner, a refused configuration transition. LogsDirPath is not
@@ -345,6 +415,7 @@ LoggerCrashReportsDir() {
 ; @param Message {String} The line, without timestamp.
 ; @returns {String} The file written.
 LoggerAppendBootstrapLine(Severity, Source, Message) {
+		Message := _LoggerBootstrapMessage(Severity, Source, Message)
 		global _DefaultLogsDir
 		Dir := (IsSet(_DefaultLogsDir) && (_DefaultLogsDir is String) && _DefaultLogsDir != "")
 				? _DefaultLogsDir : LoggerDefaultLogsDir()
@@ -383,6 +454,8 @@ LoggerInit() {
 		global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir, _LOGGER_PENDING
 		global LOGGER_RETENTION_DAYS
 
+		if !(_LoggerPrivacyConfig() is Map)
+				throw Error("Logger privacy policy is not initialized.")
 		LogDir := _LoggerResolveDatedPaths()
 		_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
 		; Sub-file routing comes from _generated/logger_sub_files.ahk, generated from
@@ -521,7 +594,7 @@ _LoggerRepairAppendDebt(Path, FlushFn, TruncateFn) {
 ; Injectable seams make short writes and failed stable flushes deterministic in
 ; regression tests without weakening the production filesystem boundary.
 _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
-		FlushFn := 0, TruncateFn := 0, WriteFn := 0) {
+		FlushFn := 0, TruncateFn := 0, WriteFn := 0, SourceRecords := 0) {
 	global _LOGGER_APPEND_OWNERS
 	if !(Path is String) or Path = "" or !(Blob is String)
 		return false
@@ -542,6 +615,10 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		_LOGGER_APPEND_OWNERS[Key] := true
 	} finally Critical(PreviousCritical)
 	try {
+		Config := _LoggerPrivacyConfig()
+		if !(Config is Map)
+			return false
+		Blob := _LoggerPrivacyBlob(Blob, Config, SourceRecords)
 		if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
 			return false
 		; Another writer must not commit bytes that this owner's rollback can erase
@@ -803,7 +880,7 @@ _LoggerFlushOwned(ForceFlush := false) {
 						if SubBlob == ""
 										continue
 						SubWritten := _LoggerAppendComplete(
-								_LOGGER_SUB_PATHS[Name], SubBlob, ForceFlush)
+								_LOGGER_SUB_PATHS[Name], SubBlob, ForceFlush, 0, 0, 0, 0, Lines)
 						if !SubWritten
 										_LoggerRequeueSub(Name, Lines)
 	}
@@ -866,7 +943,7 @@ _LoggerAppendDatedQueue(Lines, ErrorsOnly, FallbackDate, ForceFlush) {
 		for _, Line in DatedLines
 			Blob .= Line . "`r`n"
 		Path := _LoggerDatedPathForDate(Date, ErrorsOnly)
-		if (Path != "" && _LoggerAppendComplete(Path, Blob, ForceFlush)) {
+		if (Path != "" && _LoggerAppendComplete(Path, Blob, ForceFlush, 0, 0, 0, 0, DatedLines)) {
 			Result["wrote"] := true
 			continue
 		}
