@@ -108,7 +108,6 @@ _LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 	global LLM_HEALTH_PROBE_INTERVAL_MS
 	LoggerInfo("LLM", "Toggle clicked — enabled: "
 		. (Candidate["enabled"] ? "true" : "false") . ".")
-	LLM_Menu_RequestBuild("toggle_committed")
 	if Candidate["enabled"] {
 		; Model readiness is checked by the deferred bootstrap after this global
 		; barrier releases, so it cannot start a nested persistence transaction.
@@ -119,6 +118,8 @@ _LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 		LLM_Menu_BackendLifecycleInvalidate(true)
 		LLM_Bridge_Stop()
 	}
+	; Runtime admission/retirement precedes a potentially slow or refused repaint.
+	LLM_Menu_RequestBuild("toggle_committed")
 	return true
 }
 
