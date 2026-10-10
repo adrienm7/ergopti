@@ -55,7 +55,7 @@ class _LSP_World {
 			LLM_Defaults_Load()
 			AssertTrue(LLM_API_PROVIDERS.Has("lmstudio"), "the actual native local-provider catalogue must be present")
 			AssertTrue(LLM_LOCAL_API_SERVERS.Has("lmstudio"))
-			this.ConfigImage := '[llm]`napi_entry_id = "native-active"`n[llm.models]`nselected = "ollama"`n'
+			this.ConfigImage := _LSP_CurrentConfigSource('[llm]`napi_entry_id = "native-active"`n[llm.models]`nselected = "ollama"`n')
 			this.ApiImage := '[{"Id":"native-first","Name":"Original first","Provider":"lmstudio","BaseUrl":"http://127.0.0.1:1234/v1","Token":"private-first-sentinel","Model":"independent-first"},{"Id":"native-active","Name":"Original active","Provider":"lmstudio","BaseUrl":"http://127.0.0.1:1235/v1","Token":"private-active-sentinel","Model":"independent-active"}]'
 			AssertTrue(FSWriteDurable(this.ConfigPath, this.ConfigImage))
 			AssertTrue(FSWriteDurable(this.ApiPath, this.ApiImage))
@@ -728,7 +728,8 @@ Test("Local server source: config loader aliases cannot borrow canonical default
 
 _LSP_InvalidSchema(World) {
 	for Version in [0, -1] {
-		Image := "[_meta]`nschema_version = " . Version . "`n" . World.ConfigImage
+		Image := StrReplace(World.ConfigImage, "schema_version = " . ConfigMigrateCurrentVersion(),
+			"schema_version = " . Version)
 		AssertTrue(FSWriteDurable(World.ConfigPath, Image))
 		AssertFalse(World.Owner.Capture(), "an explicit version rejected by native boot cannot mint private authority")
 		AssertEqual(Image, FSReadUtf8Exact(World.ConfigPath))
@@ -800,7 +801,8 @@ Test("Local server publication: inherited Critical restored on refusal (local-se
 
 
 _LSP_IntegralFloatSchema(World) {
-	Image := "[_meta]`nschema_version = 3.0`n" . World.ConfigImage
+	Image := StrReplace(World.ConfigImage, "schema_version = " . ConfigMigrateCurrentVersion(),
+		"schema_version = " . ConfigMigrateCurrentVersion() . ".0")
 	AssertTrue(FSWriteDurable(World.ConfigPath, Image))
 	ParsedVersion := TOML_ParseDocument(FSReadUtf8Exact(World.ConfigPath))["_meta"]["schema_version"]
 	AssertTrue(ParsedVersion is Float, "the independent native source must contain a genuine integral Float")
@@ -1244,7 +1246,7 @@ _LSER_AbsenceAndPending(Fixture, Observed) {
 	_LLM_Menu["api_entry_id"] := ""
 	AssertTrue(FSWriteDurable(Fixture.World.ApiPath, "[]"))
 	AssertTrue(FSWriteDurable(Fixture.World.ConfigPath,
-		'[llm]`napi_entry_id = ""`n[llm.models]`nselected = "ollama"`n'))
+		_LSP_CurrentConfigSource('[llm]`napi_entry_id = ""`n[llm.models]`nselected = "ollama"`n')))
 	Receipt := Fixture.World.Owner.Capture()
 	AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
 	AssertFalse(Fixture.World.Owner.EntryBound("lmstudio", Receipt))
@@ -1417,8 +1419,6 @@ class _LSP_SourceOperationObserver {
 }
 
 _LSP_SourceOperationBody(ReadIndex, Kind, World) {
-	; The joined fixture's authored source must satisfy the real current schema.
-	World.ConfigImage .= "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
 	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
 	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
 	World.Capture()
@@ -1459,7 +1459,6 @@ _LSP_RegisterSourceOperationCases()
 
 ; The same read-boundary contract also applies to initial source acquisition.
 _LSP_CaptureOperationBody(ReadIndex, Kind, World) {
-	World.ConfigImage .= "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
 	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
 	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
 	Observed := _LSP_SourceOperationObserver(World, ReadIndex, Kind)
@@ -1491,3 +1490,24 @@ _LSP_RegisterCaptureOperationCases() {
 }
 _LSP_RegisterCaptureOperationCases()
 
+
+
+; Authored native source fixtures preserve the same current stamp as their real boot.
+_LSP_CurrentConfigSource(AuthoredImage) {
+	return AuthoredImage . "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
+}
+
+_LSP_AuthoredSchemaAdmission(World) {
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "the authored fixture must retain its genuine current boot admission")
+	World.Capture()
+	Unstamped := StrReplace(World.ConfigImage, "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n")
+	AssertTrue(FSWriteDurable(World.ConfigPath, Unstamped))
+	AssertFalse(ConfigSchemaCanPrepareWrite(World.ConfigPath), "removing the genuine stamp must lose native schema admission")
+	AssertFalse(World.Owner.Capture(), "an unstamped fixture cannot borrow its earlier READY receipt")
+	AssertEqual(Unstamped, FSReadUtf8Exact(World.ConfigPath), "qualification cannot repair an unversioned source")
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "restoring the exact current source is observed afresh")
+	AssertTrue(World.Owner.Current(World.Receipt), "the original receipt remains bound to exact restored source bytes")
+}
+Test("Local server source: authored current stamp and unstamped refusal (local-server-current-schema-fixture)",
+	(*) => _LSP_WithWorld(_LSP_AuthoredSchemaAdmission))
