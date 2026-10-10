@@ -142,8 +142,10 @@ function M.new(ports)
 			if entry.constructing or active ~= entry or not entry.completed or not settled(entry) then return end
 			active = nil
 			if entry.cancelled or generation ~= entry.epoch then return end
-			if not entry.reply or entry.code ~= 0 or entry.errors ~= "" or not same(cli)
-				or not qualified("discovery") then finish(nil, "query_refused"); return end
+			local refused = not entry.reply or entry.code ~= 0 or entry.errors ~= "" or not same(cli)
+				or not qualified("discovery")
+			if entry.cancelled or generation ~= entry.epoch then return end
+			if refused then finish(nil, "query_refused"); return end
 			local value, reason = packet(entry.reply, request)
 			finish(value, reason, cli)
 		end
@@ -236,11 +238,14 @@ function M.new(ports)
 			local ok, ready = observe(admitted, consumer)
 			return ok and ready == true and generation == epoch and choices[key] == selected
 				and same(selected and selected.cli) and qualified("invocation") and qualified("cancellation")
+				and generation == epoch and choices[key] == selected
 		end
 		if not allowed() then return false, "admission_refused" end
 		return owner.resolve(key, {}, function(scalar, reason)
 			if not scalar then finish(false, reason); return end
-			if active or not allowed() then finish(false, "admission_refused"); return end
+			local admitted_now = not active and allowed()
+			if generation ~= epoch or choices[key] ~= selected then return end
+			if not admitted_now then finish(false, "admission_refused"); return end
 			local entry = { epoch = epoch, automation = true, constructing = true }
 			active = entry
 			local function complete()
@@ -248,6 +253,7 @@ function M.new(ports)
 				active = nil
 				if entry.cancelled or generation ~= epoch then return end
 				local admitted_now = allowed()
+				if entry.cancelled or generation ~= epoch then return end
 				finish(entry.success == true and admitted_now, not admitted_now and "admission_refused"
 					or entry.success == true and "completed" or "execution_refused")
 			end
@@ -258,6 +264,7 @@ function M.new(ports)
 			end)
 			if not ok or not handle_valid(handle, true) then
 				entry.constructing, entry.cancelled = false, true
+				if generation ~= epoch then return end
 				finish(false, "transport_refused"); return
 			end
 			entry.handle = handle
