@@ -35,6 +35,11 @@ static int factWindowError = 0, factControlErrors[3] = {0, 0, 0};
 static const char *factWindowRole = "absent", *factWindowType = "absent";
 static const char *factControlTypes[3] = {"absent", "absent", "absent"};
 static const char *factControlRelations[3] = {"unobserved", "unobserved", "unobserved"};
+static NSTimeInterval identityDeadline = 0;
+static BOOL factIdentityObserved = NO, factIdentitySender = NO, factIdentityReceiver = NO;
+static BOOL factIdentityComplete = NO;
+static int factIdentityNodes = 0, factIdentityError = 0;
+static const char *factIdentityRefusal = "none";
 
 static const char *kind(id value) {
     if (value == nil) return "absent";
@@ -97,6 +102,20 @@ static void publish_facts(void) {
             factTrusted ? "true" : "false", factRequester ? "true" : "false",
             factScanned, factWindows, factNodes, factCandidates, factMatches,
             factAgent, factAttribute, factType, factError, buttonPacket);
+        if (factIdentityObserved && length > 2 && length < (int)sizeof(packet)) {
+            // Preserve the original projection if the optional facts do not fit.
+            char extended[1024];
+            int extendedLength = snprintf(extended, sizeof(extended),
+                "%.*s,\"identity\":{\"schema\":1,\"sender\":%s,\"receiver\":%s,"
+                "\"complete\":%s,\"nodes\":%d,\"refusal\":\"%s\",\"error\":%d}}\n",
+                length - 2, packet, factIdentitySender ? "true" : "false",
+                factIdentityReceiver ? "true" : "false", factIdentityComplete ? "true" : "false",
+                factIdentityNodes, factIdentityRefusal, factIdentityError);
+            if (extendedLength > 0 && extendedLength < (int)sizeof(extended)) {
+                memcpy(packet, extended, (size_t)extendedLength + 1);
+                length = extendedLength;
+            }
+        }
         if (length > 0 && length < (int)sizeof(packet)) {
             size_t offset = 0;
             while (offset < (size_t)length) {
@@ -273,6 +292,68 @@ static BOOL owned_window_chrome(AXUIElementRef window, AXUIElementRef button) {
     return NO;
 }
 
+// Passive traversal of only the retained refused window. These booleans describe
+// observed static text, never signed identity, permission or a consent candidate.
+// The existing child timeout=min(3, remaining) also caps the original request.
+static id identity_attribute(AXUIElementRef element, CFStringRef key) {
+    NSTimeInterval remaining = identityDeadline - NSProcessInfo.processInfo.systemUptime;
+    if (remaining <= 0 || remaining > 3) {
+        factIdentityRefusal = "deadline";
+        return nil;
+    }
+    AXError timeoutError = AXUIElementSetMessagingTimeout(element, (float)MIN(0.1, remaining));
+    if (timeoutError != kAXErrorSuccess) {
+        factIdentityRefusal = "timeout";
+        factIdentityError = (int)timeoutError;
+        return nil;
+    }
+    id value = attribute(element, key);
+    factIdentityError = (int)attributeError;
+    if (NSProcessInfo.processInfo.systemUptime >= identityDeadline) {
+        factIdentityRefusal = "deadline";
+        return nil;
+    }
+    return value;
+}
+
+static void observe_refused_identity(AXUIElementRef window, NSString *sender, NSString *receiver) {
+    factIdentityObserved = YES;
+    NSMutableArray *pending = [NSMutableArray arrayWithObject:(__bridge id)window];
+    while (pending.count > 0) {
+        if (factIdentityNodes >= 256) { factIdentityRefusal = "node-limit"; return; }
+        id item = pending.lastObject;
+        [pending removeLastObject];
+        AXUIElementRef element = (__bridge AXUIElementRef)item;
+        if (CFGetTypeID(element) != AXUIElementGetTypeID()) { factIdentityRefusal = "node-type"; return; }
+        factIdentityNodes++;
+        id role = identity_attribute(element, kAXRoleAttribute);
+        if (strcmp(factIdentityRefusal, "none") != 0) return;
+        if (![role isKindOfClass:[NSString class]]) { factIdentityRefusal = "role"; return; }
+        if ([role isEqualToString:(__bridge NSString *)kAXStaticTextRole]) {
+            id value = identity_attribute(element, kAXValueAttribute);
+            if (strcmp(factIdentityRefusal, "none") != 0) return;
+            if (![value isKindOfClass:[NSString class]] || [value length] > 4096) {
+                factIdentityRefusal = "value"; return;
+            }
+            if ([value rangeOfString:sender].location != NSNotFound) factIdentitySender = YES;
+            if ([value rangeOfString:receiver].location != NSNotFound) factIdentityReceiver = YES;
+        }
+        NSArray *children = identity_attribute(element, kAXChildrenAttribute);
+        if (strcmp(factIdentityRefusal, "none") != 0) return;
+        if (children == nil && (attributeError == kAXErrorSuccess || attributeError == kAXErrorAttributeUnsupported || attributeError == kAXErrorNoValue)) {
+            factIdentityError = 0;
+            continue;
+        }
+        if (attributeError != kAXErrorSuccess || ![children isKindOfClass:[NSArray class]] ||
+            children.count > 256 || pending.count + children.count > 256) {
+            factIdentityRefusal = "children"; return;
+        }
+        [pending addObjectsFromArray:children];
+    }
+    factIdentityComplete = YES;
+    factIdentityError = 0;
+}
+
 static BOOL inspect_window(AXUIElementRef window, NSString *sender, NSString *receiver,
     NSMutableArray *allowButtons, BOOL *targetSeen, BOOL *senderSeen, BOOL *denySeen, int agent) {
     NSMutableArray *pending = [NSMutableArray arrayWithObject:(__bridge id)window];
@@ -303,6 +384,8 @@ static BOOL inspect_window(AXUIElementRef window, NSString *sender, NSString *re
                     BOOL firstButton = strcmp(factAttribute, "none") == 0 && factDescriptor >= 0;
                     refused_fact(agent, "button-title", title, titleError);
                     if (firstButton) observe_refused_button(window, element);
+                    if (firstButton && title == nil && titleError == kAXErrorAttributeUnsupported)
+                        observe_refused_identity(window, sender, receiver);
                     return NO;
                 }
                 if (![enabled isKindOfClass:[NSNumber class]]) { refused_fact(agent, "button-enabled", enabled, attributeError); return NO; }
@@ -321,6 +404,7 @@ static BOOL inspect_window(AXUIElementRef window, NSString *sender, NSString *re
 
 int main(int argc, const char **argv) {
     @autoreleasepool {
+        identityDeadline = NSProcessInfo.processInfo.systemUptime + 3;
         if (argc != 4 && argc != 5) return 64;
         if (argc == 5 && !prepare_facts(argv[4])) return 68;
         NSString *sender = [NSString stringWithUTF8String:argv[1]];

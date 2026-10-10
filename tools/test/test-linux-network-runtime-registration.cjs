@@ -3,6 +3,7 @@
 /** Keeps portable registration separate from mandatory native execution. */
 'use strict';
 const assert = require('node:assert/strict');
+const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const { run } = require('./run-linux-network-runtime.cjs');
@@ -165,7 +166,7 @@ function validateRuntimeCI(workflow, coverage) {
 	assert.equal(Pipeline.stepField(native, 'if'), '${{ !cancelled() }}');
 	assert.equal(Pipeline.stepField(native, 'continue-on-error'), null);
 	assert.equal(Pipeline.stepField(native, 'timeout-minutes'), '3');
-	assert.deepEqual(Pipeline.runOf(native), [
+	assertLinuxQualifiedRun(Pipeline.runOf(native), [
 		'set -euo pipefail',
 		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
 		'npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"'
@@ -232,12 +233,8 @@ for (const [before, after] of [
 	['- name: ' + NATIVE_STEP, '- name: omitted native runtime'],
 	['npm run test:linux:network-runtime | tee', 'npm run test:linux-network-runtime | tee'],
 	[
-		'- name: ' +
-			NATIVE_STEP +
-			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit',
-		'- name: ' +
-			NATIVE_STEP +
-			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -eu\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit'
+		'elif [ "$mode" = full ]; then\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
+		'elif [ "$mode" = full ]; then\n          set -eu\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
 	],
 	[COUNT_LINE, 'network_runtime_assertions=4'],
 	[COUNT_LINE, COUNT_LINE + '\n          ' + COUNT_LINE],

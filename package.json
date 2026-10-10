@@ -448,6 +448,7 @@
 		"test:macos-managed-bootstrap-http": "node ./tools/test/test-macos-managed-bootstrap-http.cjs",
 		"test:managed-python-release": "node ./tools/test/test-managed-python-release.cjs",
 		"test:network-pac-helpers": "node ./tools/test/test-network-pac-helpers.cjs",
+		"test:native-pac-source-contract": "node ./tools/test/test-native-pac-source-contract.cjs",
 		"test:macos-opaque-network-admission": "node ./tools/test/test-macos-opaque-network-admission.cjs",
 		"test:python-resolution": "node ./tools/test/test-python-resolution.cjs",
 		"test:ollama-server-command": "node ./tools/test/test-ollama-server-command.cjs",
