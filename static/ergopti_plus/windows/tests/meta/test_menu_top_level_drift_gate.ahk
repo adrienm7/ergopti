@@ -213,8 +213,13 @@ _DG_EveryBuilderStagesItsOwnRow() {
 		if (Id == "llm")
 			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
 		Assert(Body != "", "the '" . Id . "' builder " . Builder.Name . " must be readable")
+		if Id == "keyboard_layout" || Id == "hotstrings" || Id == "shortcuts" || Id == "tap_holds" || Id == "gestures" {
+			AssertTrue(_DG_DeclaredBuilderSourceValid(Id, Body, _DriverFuncBody("_MI_StageDeclaredFeature")),
+				"the '" . Id . "' builder must retain its canonical title receiver and exact native child stage")
+		} else {
 		Assert(InStr(Body, _DG_BUILDER_TITLES[Id]) > 0,
 			"the '" . Id . "' builder " . Builder.Name . " must stage the row titled " . _DG_BUILDER_TITLES[Id])
+		}
 		for OtherId, Title in _DG_BUILDER_TITLES {
 			if (OtherId != Id)
 				Assert(!InStr(Body, Title), "the '" . Id . "' builder " . Builder.Name
@@ -296,3 +301,333 @@ _DG_AgentUnreadyDoesNotDisableNeighbors() {
 
 Test("Agent IA unready: real root stages an inert localized header while neighboring AI stays available",
 	_DG_AgentUnreadyDoesNotDisableNeighbors)
+
+; A declaration-driven parent has no native title literal in its builder. This
+; closed source proof checks the complete reached coordinator and the complete
+; borrowed-child builders, rather than exempting a helper by its name. Any new
+; executable statement requires review of the read-only stage contract.
+_DG_SourceLines(Source) {
+	Out := ""
+	for Line in StrSplit(_StripFullLineComments(Source), "`n", "`r") {
+		Line := Trim(Line, " `t")
+		if Line != ""
+			Out .= (Out == "" ? "" : "`n") . Line
+	}
+	return Out
+}
+_DG_SourceJoin(Lines) {
+	Out := ""
+	for Line in Lines
+		Out .= (Out == "" ? "" : "`n") . Line
+	return Out
+}
+_DG_DeclaredStageExpected() {
+	return _DG_SourceJoin([
+		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {',
+		'Published := false',
+		'try {',
+		'Row := Receiver.Call(Child, Getters)',
+		'if !(Row is Map) || Row.Get("submenu", false) != Child',
+		'throw Error("The canonical feature parent changed during native construction.")',
+		'TrayMenuStage_AddFeature(Row["label"], Child)',
+		'Published := true',
+		'if Row.Get("checked", false)',
+		'TrayMenuStage_Check(Row["label"])',
+		'return true',
+		'} finally {',
+		'if DisposeOnRefusal && !Published {',
+		'try Child.Delete()',
+		'finally MenuDispatcher_PruneMenu(Child)',
+		'}',
+		'}',
+		'}'])
+}
+_DG_DeclaredStageSourceValid(Source) {
+	return _DG_SourceLines(Source) == _DG_DeclaredStageExpected()
+}
+_DG_DeclaredBuilderExpected(Id) {
+	if Id == "keyboard_layout"
+		return _DG_SourceJoin([
+			'_MI_StageLayout() {',
+			'Receiver := MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
+			'if !Receiver',
+			'throw Error("The declared keyboard_layout feature parent was refused before native construction.")',
+			'LayoutListProviders := Map(',
+			'"number_row_policy",      (*) => _LAY_NumberRowRows(),',
+			'"custom_layouts",         (*) => _LAY_CustomLayoutRows(),',
+			'"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),',
+			'"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),',
+			'"magic_key_source",       (*) => MagicKeySourceMenuRows(),',
+			')',
+			'LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,',
+			'_LAY_ScopeCommands(),',
+			'Map("layout_enabled", () => IsCategoryGated("Layout")))',
+			'_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)',
+			'BootProfile_Mark("MENU/initMenu: layout built+added")',
+			'}'])
+	if Id == "hotstrings"
+		return _DG_SourceJoin([
+			'_MI_StageHotstrings() {',
+			'Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")',
+			'if !Receiver',
+			'throw Error("The declared hotstrings feature parent was refused before native construction.")',
+			'HotstringsAllEnabled := IsCategoryGated("Hotstrings")',
+			'_HotDynHandlers := Map()',
+			'_HotParamCommands := Map(',
+			'"repeat_key", ToggleRepeatKeyEnabled,',
+			')',
+			'_HotParamGetters := Map(',
+			'"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),',
+			')',
+			'_HotListProviders := Map(',
+			'"word_expanders",                (*) => _HS_WordExpanderRows(),',
+			'"magic_key_config",              (*) => _HS_MagicKeyRows(),',
+			'"delays_colors",                 (*) => _HS_DelaysColorsRows(),',
+			'"hotstring_categories_standard", (*) => _HS_CategoryRowsStandard(),',
+			'"hotstring_categories_dynamic",  (*) => _HS_CategoryRowsDynamic(),',
+			'"hotstring_languages",           (*) => _HS_LanguageRows(),',
+			'"hotstring_personal",           (*) => _HS_PersonalRows(),',
+			'"hotstring_extensions",          (*) => _HS_ExtensionRows(),',
+			')',
+			'HotstringsAllSectionsOn := _HS_AllHotstringsOn()',
+			'_HotCommands := _HS_ScopeCommands()',
+			'_HotCommands["hotstrings_toggle"] := MenuRenderer_CategoryGateCommand("Hotstrings")',
+			'_HotCommands["hotstrings_all_sections"] := (*) => ToggleAllHotstrings(!HotstringsAllSectionsOn)',
+			'_HotGetters := Map(',
+			'"hotstrings_enabled",              () => IsCategoryGated("Hotstrings"),',
+			'"hotstrings_all_sections_enabled", () => HotstringsAllSectionsOn,',
+			')',
+			'_HotGroupBuilders := Map(',
+			'"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders, _HotParamCommands, _HotParamGetters),',
+			')',
+			'BootProfile_Mark("MENU/initMenu: pre-hotstrings render")',
+			'HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters)',
+			'BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")',
+			'HotstringsTotal := _HS_ComputeGrandTotal()',
+			'_MI_StageDeclaredFeature(Receiver, HotstringsMenu, Map("hotstrings_enabled", () => HotstringsAllEnabled,',
+			'"hotstrings_parent_total", () => HotstringsTotal, "hotstrings_parent_count_present", () => true), true)',
+			'BootProfile_Mark("MENU/initMenu: hotstrings grandtotal+added")',
+			'}'])
+	if Id == "gestures"
+		return _DG_SourceJoin([
+			'_MI_StageGestures() {',
+			'Receiver := MenuRenderer_GroupReceiver("top_level", "gestures")',
+			'if !Receiver',
+			'throw Error("The declared gestures feature parent was refused before native construction.")',
+			'GesturesMenu := BuildGesturesMenu()',
+			'_MI_StageDeclaredFeature(Receiver, GesturesMenu, Map("gestures_enabled", () => Features["gestures"]["enabled"]), true)',
+			'}'])
+	if Id != "shortcuts" && Id != "tap_holds"
+		return ""
+	Category := Id == "shortcuts" ? "Shortcuts" : "TapHolds"
+	Missing := Id == "shortcuts" ? "Shortcuts" : "Tap-Holds"
+	State := Id == "shortcuts" ? "shortcuts_enabled" : "tapholds_enabled"
+	return _DG_SourceJoin([
+		'_MI_Stage' . Category . '() {',
+		'Receiver := MenuRenderer_GroupReceiver("top_level", "' . Id . '")',
+		'if !Receiver',
+		'throw Error("The declared ' . Id . ' feature parent was refused before native construction.")',
+		'global SubMenus',
+		'if !SubMenus.Has("' . Category . '") {',
+		'try LoggerError("Menu", "The ' . Missing . ' submenu was not built — its tray row is missing.")',
+		'return',
+		'}',
+		'_MI_StageDeclaredFeature(Receiver, SubMenus["' . Category . '"], Map("' . State . '", () => IsCategoryGated("' . Category . '")))',
+		'}'])
+}
+_DG_DeclaredBuilderSourceValid(Id, Body, StageBody) {
+	Expected := _DG_DeclaredBuilderExpected(Id)
+	return Expected != "" && _DG_SourceLines(Body) == Expected && _DG_DeclaredStageSourceValid(StageBody)
+}
+_DG_DeclaredSourceCounterfactuals() {
+	Stage := _DriverFuncBody("_MI_StageDeclaredFeature")
+	AssertTrue(_DG_DeclaredStageSourceValid(Stage), "the actual reached coordinator must satisfy the complete stage-only contract")
+	Mutations := [
+		['Row := Receiver.Call(Child, Getters)', 'Child.Insert("Sentinel")`nRow := Receiver.Call(Child, Getters)'],
+		['Published := true', 'Child.Add("Injected", (*) => 0)`nPublished := true'],
+		['return true', 'Child.Delete()`nreturn true'],
+		['return true', 'Child.Disable("Sentinel")`nreturn true'],
+		['return true', 'MutateBorrowedChild(Child)`nreturn true'],
+		['Row := Receiver.Call(Child, Getters)', 'Alias := Child`nAlias.Delete()`nRow := Receiver.Call(Child, Getters)'],
+		['DisposeOnRefusal := false', 'DisposeOnRefusal := true'],
+		['Row.Get("submenu", false) != Child', 'Row.Get("submenu", false) != false'],
+		['TrayMenuStage_AddFeature(Row["label"], Child)', 'TrayMenuStage_AddFeature("Foreign parent", Child)']]
+	Count := 0
+	for Vector in Mutations {
+		Changed := StrReplace(Stage, Vector[1], Vector[2])
+		AssertTrue(Changed != Stage, "every source counterfactual changes actual executable stage source")
+		AssertFalse(_DG_DeclaredStageSourceValid(Changed), "child mutation or an unowned parent must invalidate the read-only stage proof")
+		AssertTrue(_DG_DeclaredStageSourceValid(StrReplace(Changed, Vector[2], Vector[1])), "the exact inverse restores the actual coordinator")
+		Count += 1
+	}
+	AssertEqual(9, Count)
+	for Id in ["keyboard_layout", "hotstrings", "shortcuts", "tap_holds", "gestures"] {
+		Builder := _MI_TopLevelBuilders()[Id]
+		Body := _DriverFuncBody(Builder.Name)
+		AssertTrue(_DG_DeclaredBuilderSourceValid(Id, Body, Stage))
+		AssertFalse(_DG_DeclaredBuilderSourceValid("about", Body, Stage), "a matching staging line in a foreign root builder cannot inherit this proof")
+		Needle := 'MenuRenderer_GroupReceiver("top_level", "' . Id . '")'
+		Wrong := StrReplace(Body, Needle, 'MenuRenderer_GroupReceiver("top_level", "foreign")')
+		AssertTrue(Wrong != Body)
+		AssertFalse(_DG_DeclaredBuilderSourceValid(Id, Wrong, Stage), "a swapped builder id cannot borrow another declared title")
+		AssertTrue(_DG_DeclaredBuilderSourceValid(Id, StrReplace(Wrong, 'MenuRenderer_GroupReceiver("top_level", "foreign")', Needle), Stage))
+		Wrong := StrReplace(Body, '_MI_StageDeclaredFeature(Receiver,', '_MI_StageDeclaredFeature(ForeignReceiver,')
+		AssertTrue(Wrong != Body)
+		AssertFalse(_DG_DeclaredBuilderSourceValid(Id, Wrong, Stage), "the completed child must reach its admitted receiver")
+		AssertTrue(_DG_DeclaredBuilderSourceValid(Id, StrReplace(Wrong, '_MI_StageDeclaredFeature(ForeignReceiver,', '_MI_StageDeclaredFeature(Receiver,'), Stage))
+		if Id == "shortcuts" || Id == "tap_holds" {
+			Wrong := StrReplace(Body, ')))', ')), true)')
+			AssertTrue(Wrong != Body)
+			AssertFalse(_DG_DeclaredBuilderSourceValid(Id, Wrong, Stage), "a borrowed persistent child cannot be disposed on refusal")
+			AssertTrue(_DG_DeclaredBuilderSourceValid(Id, StrReplace(Wrong, ')), true)', ')))'), Stage))
+		}
+	}
+}
+Test("menu drift gate (AHK): actual declared stage source rejects child and title counterfactuals",
+	_DG_DeclaredSourceCounterfactuals)
+
+; Read actual native labels, IDs and flags: a byte-identical provider row alone
+; cannot prove that staging preserved its persistent native child.
+_DG_ChildImage(Child) {
+	Handle := Child.Handle
+	AssertTrue(Handle != 0)
+	Count := DllCall("GetMenuItemCount", "ptr", Handle, "int")
+	Assert(Count >= 0, "the genuine native child must expose its rows")
+	Image := Handle . ":" . Count
+	Loop Count {
+		Position := A_Index - 1
+		Length := DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+			"ptr", 0, "int", 0, "uint", 0x400, "int")
+		BufferValue := Buffer((Length + 1) * 2, 0)
+		DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+			"ptr", BufferValue, "int", Length + 1, "uint", 0x400, "int")
+		State := DllCall("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")
+		Assert(State != 0xFFFFFFFF, "native child flags must remain readable")
+		CommandId := DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+		Image .= "|" . Position . ":" . CommandId . ":" . State . ":" . Length . ":" . StrGet(BufferValue, "UTF-16")
+	}
+	return Image
+}
+_DG_StageStateReceipt(Reads, Value) {
+	Reads["state"] += 1
+	return Value
+}
+_DG_StageCountReceipt(Reads, Kind, Value) {
+	Reads[Kind] += 1
+	return Value
+}
+_DG_CheckDeclaredStageLocale(Expected, Corpus) {
+	global _TrayMenuStage, _TrayFeatureHeadLabels, _MenuDispatchCallbacks
+	Categories := Map("keyboard_layout", "", "hotstrings", "", "shortcuts", "Shortcuts", "tap_holds", "TapHolds", "gestures", "Gestures")
+	States := Map("keyboard_layout", "layout_enabled", "hotstrings", "hotstrings_enabled", "shortcuts", "shortcuts_enabled", "tap_holds", "tapholds_enabled", "gestures", "gestures_enabled")
+	Child := Menu(), Calls := Map("callback", 0)
+	RegisterMenuItem(Child, "Checked sentinel", (*) => Calls["callback"] += 1)
+	Child.Add()
+	RegisterMenuItem(Child, "Disabled sentinel", (*) => Calls["callback"] += 1)
+	Child.Check("Checked sentinel"), Child.Disable("Disabled sentinel")
+	AssertEqual(3, DllCall("GetMenuItemCount", "ptr", Child.Handle, "int"), "the native child starts with two actions and its separator")
+	AssertTrue(DllCall("GetMenuState", "ptr", Child.Handle, "uint", 0, "uint", 0x400, "uint") & 0x8)
+	AssertTrue(DllCall("GetMenuState", "ptr", Child.Handle, "uint", 2, "uint", 0x400, "uint") & 0x3)
+	Image := _DG_ChildImage(Child), Registry := _MenuDispatchCallbacks, Callbacks := Registry.Clone()
+	SavedStage := _TrayMenuStage, SavedLabels := _TrayFeatureHeadLabels
+	try {
+		for Id, Category in Categories {
+			OriginalTitle := Category != "" ? GetCategoryTitle(Category) : t(Id == "keyboard_layout" ? "menu.layout.title" : "menu.hotstrings.title")
+			AssertEqual(Expected[Id], OriginalTitle, "the original title obligation remains independent of the new receiver")
+			Vectors := [Map("total", 0, "aggregate_available", false, "suffix", "")]
+			if Id == "hotstrings" {
+				Vectors := []
+				for Vector in Corpus["count_cases"]
+					if Vector["driver"] == "ahk"
+						Vectors.Push(Vector)
+				AssertEqual(2, Vectors.Length, "both independent original Windows count vectors must reach actual staging")
+			}
+			for Vector in Vectors {
+				ExpectedLabel := Expected[Id] . Vector["suffix"]
+				for Value in [false, true] {
+					Loop 2 {
+						_TrayMenuStage := false
+						TrayMenuStage_Begin()
+						Receiver := MenuRenderer_GroupReceiver("top_level", Id)
+						AssertTrue(HasMethod(Receiver, "Call"), "the actual canonical parent must admit a native completed child")
+						Reads := Map("state", 0, "total", 0, "present", 0)
+						Getters := Map(States[Id], _DG_StageStateReceipt.Bind(Reads, Value))
+						if Id == "hotstrings" {
+							Getters["hotstrings_parent_total"] := _DG_StageCountReceipt.Bind(Reads, "total", Vector["total"])
+							Getters["hotstrings_parent_count_present"] := _DG_StageCountReceipt.Bind(Reads, "present", Vector["aggregate_available"])
+						}
+						AssertTrue(_MI_StageDeclaredFeature(Receiver, Child, Getters))
+						AssertEqual(1, Reads["state"])
+						AssertEqual(Id == "hotstrings" ? 1 : 0, Reads["total"]), AssertEqual(Id == "hotstrings" ? 1 : 0, Reads["present"])
+						AssertEqual(Value ? 2 : 1, _TrayMenuStage.Length)
+						Row := _TrayMenuStage[1]
+						AssertEqual("submenu", Row["kind"]), AssertEqual(ExpectedLabel, Row["label"])
+						AssertTrue(Row["target"] == Child), AssertTrue(Row["feature"])
+						if Value {
+							AssertEqual("check", _TrayMenuStage[2]["kind"])
+							AssertEqual(ExpectedLabel, _TrayMenuStage[2]["label"])
+						}
+						AssertEqual(Image, _DG_ChildImage(Child), "repeated actual staging preserves native handle, count, labels, IDs and flags")
+						AssertTrue(_MenuDispatchCallbacks == Registry), AssertEqual(Callbacks.Count, Registry.Count)
+						for CommandId, Callback in Callbacks
+							AssertTrue(Registry.Has(CommandId) && Registry[CommandId] == Callback)
+						AssertEqual(0, Calls["callback"], "staging must never execute a child action")
+						; Withdrawal occurs after admission and before the real coordinator call.
+						Root := _MR_GetManifestRoot(), Selected := false
+						for Item in Root["top_level"]
+							if _MR_Get(Item, "id") == Id
+								Selected := Item
+						AssertTrue(Selected is Map)
+						OriginalTitleKey := Selected["i18n"]
+						Receiver := MenuRenderer_GroupReceiver("top_level", Id)
+						_TrayMenuStage := []
+						try {
+							Selected["i18n"] := "foreign.title"
+							AssertThrows(_MI_StageDeclaredFeature.Bind(Receiver, Child, Getters),
+								"a withdrawn parent cannot stage or dispose a borrowed native child")
+							AssertEqual(0, _TrayMenuStage.Length)
+							AssertEqual(1, Reads["state"]), AssertEqual(Id == "hotstrings" ? 1 : 0, Reads["total"])
+							AssertEqual(Id == "hotstrings" ? 1 : 0, Reads["present"])
+							AssertEqual(Image, _DG_ChildImage(Child), "refusal preserves every actual child row")
+							AssertEqual(0, Calls["callback"])
+						} finally {
+							Selected["i18n"] := OriginalTitleKey
+						}
+					}
+				}
+			}
+		}
+	} finally {
+		_TrayMenuStage := SavedStage, _TrayFeatureHeadLabels := SavedLabels
+		try Child.Delete()
+		finally MenuDispatcher_PruneMenu(Child)
+	}
+}
+_DG_DeclaredStageOriginalCaptions() {
+	global _SharedDir, _I18nCache, _I18nCacheLoaded
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\fixed_feature_parents.json", "UTF-8"))
+	AssertEqual("98572fe1a57dde86c6e8591e79112fc5400ec819", Corpus["original_sha"])
+	HadCache := IsSet(_I18nCache), Cache := HadCache ? _I18nCache : false
+	HadLoaded := IsSet(_I18nCacheLoaded), Loaded := HadLoaded ? _I18nCacheLoaded : false
+	Languages := 0
+	try {
+		for Code, Expected in Corpus["captions"] {
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+			_I18nCacheLoaded := true
+			_DG_CheckDeclaredStageLocale(Expected, Corpus)
+			Languages += 1
+		}
+		AssertEqual(21, Languages)
+	} finally {
+		if HadCache
+			_I18nCache := Cache
+		else
+			_I18nCache := unset
+		if HadLoaded
+			_I18nCacheLoaded := Loaded
+		else
+			_I18nCacheLoaded := unset
+	}
+}
+Test("menu drift gate (AHK): actual declared receiving preserves original 21-language titles and native children",
+	_DG_DeclaredStageOriginalCaptions)

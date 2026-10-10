@@ -29,6 +29,11 @@ local TITLE_KEYS = {
 	["token_prompt"] = "token_prompt.window_title",
 	["update_check"] = "update_check.window_title",
 }
+local PRESENTATIONS = {
+	["action_picker"] = {
+		["keyboard_slot_selection"] = { title_key = "dialog.keyboard_shortcut.title_prefix", label_key = "dialog.keyboard_shortcut.prompt", platforms = {"hs"} },
+	},
+}
 
 --- Compose a native caption from an already-translated, brandless label.
 --- @param label string|nil
@@ -44,6 +49,29 @@ end
 --- @return string|nil
 function M.key_for_app(app_id)
 	return TITLE_KEYS[app_id]
+end
+
+--- Returns a bounded projection from the private compiled declaration.
+--- @param app_id string Existing UI app identity.
+--- @param presentation_id string Explicit contextual identity.
+--- @param platform string Native platform id.
+--- @return table|nil
+function M.presentation_for_app(app_id, presentation_id, platform)
+	if type(app_id) ~= "string" or type(presentation_id) ~= "string" or type(platform) ~= "string" then return nil end
+	local app = rawget(PRESENTATIONS, app_id)
+	if type(app) ~= "table" or getmetatable(app) ~= nil then return nil end
+	local entry = rawget(app, presentation_id)
+	if type(entry) ~= "table" or getmetatable(entry) ~= nil then return nil end
+	local platforms = rawget(entry, "platforms")
+	if type(platforms) ~= "table" or getmetatable(platforms) ~= nil then return nil end
+	for _, native in ipairs(platforms) do
+		if native == platform then
+			local declared_platforms = {}
+			for index, value in ipairs(platforms) do declared_platforms[index] = value end
+			return { title_key = rawget(entry, "title_key"), label_key = rawget(entry, "label_key"), platforms = declared_platforms }
+		end
+	end
+	return nil
 end
 
 return M

@@ -357,7 +357,8 @@ const OPENS_SUBMENU = {
 		menu: 'personal_shortcuts_frame',
 		platforms: ['ahk'],
 		kind: 'compose',
-		native_sources: { ahk: 'windows/ui/menu/menu_init.ahk' }
+		retained_frame_data: { ahk: 'personal_shortcuts' },
+		native_sources: { ahk: 'windows/ui/menu/menu_shortcuts.ahk' }
 	},
 	extensions_shortcuts: [
 		{
@@ -1465,13 +1466,6 @@ OPENS_SUBMENU.agent_disabled_apps = [
 		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
 	}
 ];
-// The actual Windows dynamic slot publishes the declared picker command.
-OPENS_SUBMENU.agent_disabled_apps.push({
-	menu: 'agent_windows_disabled_apps_command',
-	platforms: ['ahk'],
-	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_agent.ahk' }
-});
 OPENS_SUBMENU.agent_disabled_app_records = {
 	menu: 'agent_linux_disabled_app_remove',
 	platforms: ['linux'],
@@ -1689,6 +1683,41 @@ for (const [driver, method] of [
 const errors = [];
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+
+// Windows owns a leaf command in the actual Build; Lua retains genuine submenus.
+{
+	const assert = require('node:assert/strict');
+	const { nativeBuildCommandBinding } = require('../lib/menu-template-binding.cjs');
+	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_llm/menu_agent.ahk'), 'utf8');
+	const renderer = fs.readFileSync(path.join(SP, 'windows/infra/manifest_menu.ahk'), 'utf8');
+	for (const [key, port] of [
+		['agent_disabled_apps', 1],
+		['agent_disabled_apps_count', 2]
+	])
+		assert.equal(
+			nativeBuildCommandBinding(
+				source,
+				'LLM_Agent_MenuBuild',
+				'agent_menu',
+				key,
+				port,
+				[{ src: source }, { src: renderer }],
+				manifest
+			),
+			true,
+			key + ': actual returned Windows Build port'
+		);
+	assert.deepEqual(
+		OPENS_SUBMENU.agent_disabled_apps.map(({ menu, platforms }) => ({ menu, platforms })),
+		[
+			{ menu: 'agent_excluded_apps_frame', platforms: ['hs'] },
+			{ menu: 'agent_linux_disabled_apps_frame', platforms: ['linux'] },
+			{ menu: 'agent_linux_disabled_apps_children', platforms: ['linux'] }
+		],
+		'only the retired Windows dynamic composition leaves the original Lua graph'
+	);
+}
+
 const MENU_KEYS = Object.keys(manifest).filter((k) => Array.isArray(manifest[k]));
 
 for (const [driver, relative] of [
@@ -5010,6 +5039,132 @@ function personalInfoProviderComposition(source, declarations, platform) {
 		);
 }
 
+/** This mode belongs only to the genuine Windows declared personal DATA frame. */
+function personalFrameSources() {
+	return Object.fromEntries(
+		[
+			'windows/ui/menu/menu_shortcuts.ahk',
+			'windows/ui/menu/menu_init.ahk',
+			'windows/infra/manifest_menu.ahk',
+			'windows/adapters/tray_menu.ahk'
+		].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+	);
+}
+
+function personalFrameEdgePublication(edge, sources, definition, row, platform) {
+	const files = [
+		'windows/ui/menu/menu_shortcuts.ahk',
+		'windows/ui/menu/menu_init.ahk',
+		'windows/infra/manifest_menu.ahk',
+		'windows/adapters/tray_menu.ahk'
+	];
+	if (
+		platform !== 'ahk' ||
+		edge?.kind !== 'compose' ||
+		edge.menu !== 'personal_shortcuts_frame' ||
+		!require('node:util').isDeepStrictEqual(edge.platforms, ['ahk']) ||
+		!require('node:util').isDeepStrictEqual(edge.retained_frame_data, {
+			ahk: 'personal_shortcuts'
+		}) ||
+		!require('node:util').isDeepStrictEqual(edge.native_sources, { ahk: files[0] }) ||
+		!sources ||
+		!require('node:util').isDeepStrictEqual(Object.keys(sources).sort(), files.slice().sort()) ||
+		files.some((file) => typeof sources[file] !== 'string')
+	)
+		return false;
+	return require('../lib/menu-native-personal-shortcuts-binding.cjs').personalFrameDataPublication(
+		sources,
+		definition,
+		row
+	);
+}
+
+// The proof mode is closed to its actual four native sources and graph owner.
+{
+	const assert = require('node:assert/strict');
+	const edge = OPENS_SUBMENU.personal_shortcuts;
+	const sources = personalFrameSources();
+	const definition = manifest.personal_shortcuts_frame;
+	const row = manifest.shortcuts_menu.find((item) => item.id === 'personal_shortcuts');
+	assert.equal(
+		personalFrameEdgePublication(edge, sources, definition, row, 'ahk'),
+		true,
+		'actual declared personal DATA route reaches its native frame publication'
+	);
+	for (const changed of [
+		{ ...edge, kind: 'include' },
+		{ ...edge, menu: 'foreign_frame' },
+		{ ...edge, platforms: ['hs'] },
+		{ ...edge, retained_frame_data: undefined },
+		{ ...edge, retained_frame_data: { ahk: 'foreign_personal' } },
+		{ ...edge, native_sources: { ahk: 'macos/ui/menu/menu_shortcuts.lua' } },
+		{ ...edge, native_sources: { ahk: 'windows/ui/menu/menu_init.ahk' } }
+	])
+		assert.equal(
+			personalFrameEdgePublication(changed, sources, definition, row, 'ahk'),
+			false,
+			'foreign source, kind, mode or scope cannot borrow personal DATA ownership'
+		);
+	assert.equal(
+		personalFrameEdgePublication(edge, sources, definition, row, 'hs'),
+		false,
+		'a macOS edge cannot borrow a native Windows DATA route'
+	);
+	const missing = { ...sources };
+	delete missing['windows/infra/manifest_menu.ahk'];
+	assert.equal(
+		personalFrameEdgePublication(edge, missing, definition, row, 'ahk'),
+		false,
+		'the real retained central receiving source is mandatory'
+	);
+	assert.equal(
+		personalFrameEdgePublication(
+			edge,
+			{ ...sources, 'windows/foreign.ahk': '' },
+			definition,
+			row,
+			'ahk'
+		),
+		false,
+		'foreign module context cannot enlarge the dedicated source domain'
+	);
+	const caller = 'windows/ui/menu/menu_shortcuts.ahk';
+	const anchor = '"provider", _PersonalShortcutRows';
+	assert.equal(
+		sources[caller].split(anchor).length - 1,
+		1,
+		'actual personal provider registration has one genuine preimage'
+	);
+	const changed = {
+		...sources,
+		[caller]: sources[caller].replace(anchor, '"provider", Foreign._PersonalShortcutRows')
+	};
+	assert.equal(
+		personalFrameEdgePublication(edge, changed, definition, row, 'ahk'),
+		false,
+		'the selected graph route refuses a foreign callable provider'
+	);
+	assert.equal(
+		changed[caller].replace('"provider", Foreign._PersonalShortcutRows', anchor),
+		sources[caller],
+		'the actual caller mutation has an exact source inverse'
+	);
+	assert.equal(
+		personalFrameEdgePublication(
+			edge,
+			{
+				...changed,
+				[caller]: changed[caller].replace('"provider", Foreign._PersonalShortcutRows', anchor)
+			},
+			definition,
+			row,
+			'ahk'
+		),
+		true,
+		'restored actual caller retains the genuine frame route'
+	);
+}
+
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
 // and a check that silently depends on declaration order is a check that breaks
@@ -5078,54 +5233,62 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					if (
 						typeof file !== 'string' ||
 						!file.startsWith(driver + '/') ||
-						!(opened.completed_linux_ai_parent === row.id && platform === 'linux'
-							? nativeLinuxAiParentPublication(linuxAiSources, manifest, row.id, platform)
-							: opened.hotstring_language_owner
-								? hotstringLanguagePublication(
-										Object.fromEntries(
-											languageOwnerFiles[platform].map((file) => [
-												file,
-												fs.readFileSync(path.join(SP, file), 'utf8')
-											])
-										),
-										manifest,
-										platform,
-										target
-									)
-								: opened.completed_parent?.[platform] === 'llm'
-									? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
-											fs.readFileSync(path.join(SP, file), 'utf8'),
-											fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8'),
-											manifest[target],
-											manifest.top_level,
-											platform
+						!(opened.retained_frame_data !== undefined
+							? personalFrameEdgePublication(
+									opened,
+									personalFrameSources(),
+									manifest[target],
+									row,
+									platform
+								)
+							: opened.completed_linux_ai_parent === row.id && platform === 'linux'
+								? nativeLinuxAiParentPublication(linuxAiSources, manifest, row.id, platform)
+								: opened.hotstring_language_owner
+									? hotstringLanguagePublication(
+											Object.fromEntries(
+												languageOwnerFiles[platform].map((file) => [
+													file,
+													fs.readFileSync(path.join(SP, file), 'utf8')
+												])
+											),
+											manifest,
+											platform,
+											target
 										)
-									: opened.forwarded_template?.[platform] === 'layout'
-										? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
+									: opened.completed_parent?.[platform] === 'llm'
+										? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
 												fs.readFileSync(path.join(SP, file), 'utf8'),
-												target,
-												manifest[target]
+												fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8'),
+												manifest[target],
+												manifest.top_level,
+												platform
 											)
-										: opened.selected_group?.[platform]
-											? publishesSelectedMenuGroup(
+										: opened.forwarded_template?.[platform] === 'layout'
+											? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
 													fs.readFileSync(path.join(SP, file), 'utf8'),
-													path.extname(file),
 													target,
-													manifest[target],
-													opened.selected_group[platform]
+													manifest[target]
 												)
-											: publishesTemplate(
-													fs.readFileSync(path.join(SP, file), 'utf8'),
-													path.extname(file),
-													target
-												) ||
-												publishesIncludedCommands(
-													fs.readFileSync(path.join(SP, file), 'utf8'),
-													path.extname(file),
-													target,
-													manifest,
-													platform
-												))
+											: opened.selected_group?.[platform]
+												? publishesSelectedMenuGroup(
+														fs.readFileSync(path.join(SP, file), 'utf8'),
+														path.extname(file),
+														target,
+														manifest[target],
+														opened.selected_group[platform]
+													)
+												: publishesTemplate(
+														fs.readFileSync(path.join(SP, file), 'utf8'),
+														path.extname(file),
+														target
+													) ||
+													publishesIncludedCommands(
+														fs.readFileSync(path.join(SP, file), 'utf8'),
+														path.extname(file),
+														target,
+														manifest,
+														platform
+													))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`

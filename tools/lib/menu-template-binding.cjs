@@ -13,7 +13,8 @@ function nativeTemplateBinding(
 	port,
 	nativeSources = [{ src: source }],
 	menuManifest,
-	platform
+	platform,
+	buildOwner
 ) {
 	const ahk = extension === '.ahk',
 		tokens = scriptTokens(source, extension);
@@ -355,20 +356,57 @@ function nativeTemplateBinding(
 			sym(i + 1, '(')
 		)
 			open = i + 1;
-		if (ahk && id(i, 'MenuRenderer_TemplateRows') && bare(i) && sym(i + 1, '(')) open = i + 1;
+		if (!buildOwner && ahk && id(i, 'MenuRenderer_TemplateRows') && bare(i) && sym(i + 1, '('))
+			open = i + 1;
+		if (buildOwner && ahk && id(i, 'MenuRenderer_Build') && bare(i) && sym(i + 1, '('))
+			open = i + 1;
 		if (open === undefined || tokens[i - 1]?.value === 'function') continue;
 		const end = close(open);
 		if (end < 0) continue;
 		const args = parts(open + 1, end);
+		if (buildOwner) {
+			if (!ahk || platform !== 'ahk' || ![1, 2].includes(port)) continue;
+			const owners = functions.filter((fn) => sameName(fn.name, buildOwner));
+			const owner = owners[0];
+			if (
+				owners.length !== 1 ||
+				owner.params[0] !== owner.params[1] ||
+				owner.body + 1 !== i ||
+				!id(owner.body, 'return') ||
+				end + 1 !== owner.end ||
+				!reference('MenuRenderer_Build', i)
+			)
+				continue;
+			let depth = 0;
+			for (let at = 0; at < owner.start; at++) {
+				if (sym(at, '{')) depth++;
+				if (sym(at, '}')) depth--;
+			}
+			if (depth !== 0) continue;
+			const rows = menuManifest?.[section];
+			if (!Array.isArray(rows)) continue;
+			const visible = rows.filter((row) => !row.platforms || row.platforms.includes('ahk'));
+			const selected = visible.filter((row) =>
+				port === 1 ? row.id === key : row.caption_getter === key
+			);
+			if (
+				selected.length !== 1 ||
+				selected[0].type !== 'command' ||
+				visible.filter((row) => row.id === selected[0].id).length !== 1
+			)
+				continue;
+		}
 		if (
 			!args ||
 			args[0]?.[1] !== args[0]?.[0] + 1 ||
 			!literal(args[0][0]) ||
 			!includesSection(tokens[args[0][0]].value) ||
-			!publishesMenuTemplate(source, extension, tokens[args[0][0]].value)
+			(buildOwner
+				? tokens[args[0][0]].value !== section
+				: !publishesMenuTemplate(source, extension, tokens[args[0][0]].value))
 		)
 			continue;
-		const arg = args[port];
+		const arg = args[buildOwner ? port + 4 : port];
 		if (!arg) continue;
 		const fields = dictionary(...arg);
 		if (fields?.some((f) => f.key === key && callable(f.value, i))) return true;
@@ -376,4 +414,20 @@ function nativeTemplateBinding(
 	return false;
 }
 
-module.exports = { nativeTemplateBinding };
+/** Necessary typed ports of an actual returned Windows Build, never native execution proof. */
+function nativeBuildCommandBinding(source, owner, section, key, port, nativeSources, menuManifest) {
+	if (typeof owner !== 'string' || owner === '') return false;
+	return nativeTemplateBinding(
+		source,
+		'.ahk',
+		section,
+		key,
+		port,
+		nativeSources,
+		menuManifest,
+		'ahk',
+		owner
+	);
+}
+
+module.exports = { nativeTemplateBinding, nativeBuildCommandBinding };
