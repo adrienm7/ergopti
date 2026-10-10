@@ -1790,3 +1790,66 @@ _CMJ_ClassificationMemoPresence() {
 }
 Test("config journal: classification memo does not alias missing and present empty source (classification-memo-presence)",
 	_CMJ_ClassificationMemoPresence)
+
+
+_CMJ_RegistryLeafScalarTypes() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	Step := Registry["steps"][1], Reason := Step["reason"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Registry["current"] := Current + 0.0
+		AssertTrue(Registry["current"] is Float, "the numeric parity vector must be a real Float")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "native integer and equal Float retain canonical numeric equality")
+		AssertTrue(Guard.Call(Source, 1))
+		Registry["current"] := String(Current)
+		AssertTrue(Registry["current"] is String, "the numeric-looking refusal vector must remain a String")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "numeric-looking strings cannot borrow native numeric registry authority")
+		AssertFalse(Guard.Call(Source, 1))
+		Registry["current"] := Current
+		Step["reason"] := StrUpper(Reason)
+		AssertTrue(StrCompare(Step["reason"], Reason, true) != 0, "the actual reason must have a distinct case mutation")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "registry strings remain exactly case-sensitive")
+		AssertFalse(Guard.Call(Source, 1))
+		Step["reason"] := Reason
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact scalar repair restores observed native registry authority")
+		AssertTrue(Guard.Call(Source, 1))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		Step["reason"] := Reason
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves preserve typed numeric and exact string semantics (registry-leaf-safety)",
+	_CMJ_RegistryLeafScalarTypes)
+
+_CMJ_RegistryLeafNativeOwner() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call"))
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(Guard.Call(Source, 1))
+		ConfigMigrateSameValue.DefineProp("Call", {Call: (*) => (Invocations.count += 1, true)})
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "direct scalar comparisons cannot skip the exact canonical native owner fence")
+		AssertFalse(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count, "foreign native scalar callbacks are refused before invocation")
+		ConfigMigrateSameValue.DeleteProp("Call")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call")
+			ConfigMigrateSameValue.DeleteProp("Call")
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves retain canonical native owner admission (registry-leaf-safety)",
+	_CMJ_RegistryLeafNativeOwner)

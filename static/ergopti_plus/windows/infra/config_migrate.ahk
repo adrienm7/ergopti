@@ -1000,14 +1000,22 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	}
 
 	SameRegistry(Left, Right) {
+		; NativeLive still binds the canonical scalar owner before comparison.
+		if Left is String
+			return (Right is String) && StrCompare(Left, Right, true) == 0
+		if Left is Integer || Left is Float
+			return (Right is Integer || Right is Float) && Left = Right
 		if Left is Map {
 			if !PlainContainer(Left, Map.Prototype) || !PlainContainer(Right, Map.Prototype)
 					|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
 				return false
-			ExactRight := Map()
-			ExactRight.CaseSense := "On"
-			for Key, Value in Right
-				ExactRight[Key] := Value
+			ExactRight := Right
+			if Right.CaseSense != "On" {
+				ExactRight := Map()
+				ExactRight.CaseSense := "On"
+				for Key, Value in Right
+					ExactRight[Key] := Value
+			}
 			for Key, Value in Left {
 				if !ExactRight.Has(Key) || !SameRegistry(Value, ExactRight[Key])
 					return false
