@@ -610,7 +610,18 @@ helpers.describe("logger file sinks — canonical privacy", function()
 				local accepted, refusal = pcall(Fresh.initialize_privacy, case[1], case[2])
 				helpers.assert_eq(accepted, false)
 				helpers.assert_contains(refusal, "privacy")
-				helpers.assert_eq(pcall(Fresh.redact_message, "PrivateUser"), false)
+				local saved_open, saved_print = io.open, _G.print
+				local effects = { opens = 0, outputs = 0 }
+				io.open = function() effects.opens = effects.opens + 1; return nil end
+				_G.print = function() effects.outputs = effects.outputs + 1 end
+				local rejected, closed_refusal = pcall(Fresh.redact_message, "PrivateUser")
+				io.open, _G.print = saved_open, saved_print
+				helpers.assert_eq(rejected, false)
+				helpers.assert_contains(closed_refusal, "logger: privacy not initialized")
+				helpers.assert_eq(effects, { opens = 0, outputs = 0 }, "Uncommitted privacy cannot acquire output effects")
+				Fresh.initialize_privacy(policy, { home = "/Users/PrivateUser", user = "PrivateUser" })
+				helpers.assert_eq(Fresh.redact_message("PrivateUser /Users/PrivateUser/cache; password=secret12345"),
+					"<user> ~/cache; password=<secret>", "Rejected construction must leave privacy ownership uncommitted")
 			end)
 		end
 		Logger.claim_core_hooks()
