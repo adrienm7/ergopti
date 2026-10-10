@@ -51,7 +51,7 @@ const BUILD_SCRIPT = fs.readFileSync(
 	path.join(ROOT, 'tools', 'build', 'build_macos_app.sh'),
 	'utf8'
 );
-const PACKAGE = fs.readFileSync(path.join(LAUNCHER_ROOT, 'Package.swift'), 'utf8');
+const RAW_PACKAGE = fs.readFileSync(path.join(LAUNCHER_ROOT, 'Package.swift'), 'utf8');
 
 /** Reads every matching source file under one fixed tree. */
 function readTree(directory, extension) {
@@ -72,6 +72,17 @@ const XCTEST = readTree(TEST_ROOT, '.swift');
 const PLIST_PATH = path.join(LAUNCHER_ROOT, 'com.ergoptiplus.remap-guardian.plist');
 const PLIST = fs.existsSync(PLIST_PATH) ? fs.readFileSync(PLIST_PATH, 'utf8') : '';
 const failures = [];
+
+// Admit only the new Debug C target before the unchanged Swift-target guard.
+const NATIVE_LISTENER_C_TARGET =
+	'\t\t.target(\n\t\t\tname: "CPOSIXCompatibility",\n\t\t\tpath: "Sources/CPOSIXCompatibility",\n\t\t\tpublicHeadersPath: "include",\n\t\t\tcSettings: [.define("ERGOPTI_GUARDIAN_TEST_SUPPORT", .when(configuration: .debug))]\n\t\t),';
+const ORIGINAL_C_TARGET =
+	'\t\t.target(\n\t\t\tname: "CPOSIXCompatibility",\n\t\t\tpath: "Sources/CPOSIXCompatibility",\n\t\t\tpublicHeadersPath: "include"\n\t\t),';
+check(
+	RAW_PACKAGE.split(NATIVE_LISTENER_C_TARGET).length - 1 === 1,
+	'the exact native compatibility target must compile listener fixture support only in debug builds'
+);
+const PACKAGE = RAW_PACKAGE.replace(NATIVE_LISTENER_C_TARGET, ORIGINAL_C_TARGET);
 
 const PLIST_WITHOUT_COMMENTS = PLIST.replace(/<!--[\s\S]*?-->/g, '');
 

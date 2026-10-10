@@ -833,6 +833,13 @@ local function new(options)
 		return true
 	end
 
+	--- Reports physical settlement of this exact HTTP owner and its timers.
+	--- An inactive business request may still retain native cleanup debt.
+	--- @return boolean settled
+	function inst.isSettled()
+		return _fully_settled() and _lifecycle_depth == 0
+	end
+
 	--- Returns true when a request is currently in flight.
 	--- @return boolean
 	function inst.isActive()

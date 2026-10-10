@@ -30,6 +30,11 @@ SOURCE_FILES = (
     "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json",
     "static/ergopti_plus/_shared/modules/network/proxy_policy.json",
     "tools/diagnostics/macos_owned_process.py",
+    "static/ergopti_plus/_shared/go/native_http/listener_event_posix.go",
+    "static/ergopti_plus/_shared/go/native_http/listener_event_darwin.go",
+    "static/ergopti_plus/_shared/go/native_http/listener_event_linux.go",
+    "static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go",
+    "static/ergopti_plus/_shared/go/native_http/listener_event_test.go",
 )
 VERSION = "0.24.0"
 CAPABILITY = "ERGOPTI_OLLAMA_NATIVE_HTTP_V1"
