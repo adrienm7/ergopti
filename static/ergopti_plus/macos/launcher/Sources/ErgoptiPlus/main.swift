@@ -1172,6 +1172,10 @@ if InstalledVirtualHIDProbeWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(InstalledVirtualHIDProbeWorker.run(arguments: CommandLine.arguments))
 }
 
+if NumberRowSourceProbeWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(NumberRowSourceProbeWorker.run(arguments: CommandLine.arguments))
+}
+
 if LoginStartupWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(LoginStartupWorker.run(arguments: CommandLine.arguments))
 }

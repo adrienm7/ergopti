@@ -3285,6 +3285,7 @@
 	"healthcheck.export.privacy_notice": "يشارك هذا التقرير الحقائق التقنية المسموح بها فقط. تُستبعد السجلات والنصوص الحرة والمسارات وبيانات الهوية، حتى عند تفعيل التفاصيل. اختبارات الصفحة المحلية غير مضمنة.",
 	"sg_actions.llm_translate_context": "🌐 ترجمة الجملة الحالية [قابل للتخصيص]",
 	"menu.about.startup_other_command_reason": "أمر بدء آخر: تم إعداد بدء التشغيل لأمر أو تثبيت آخر. يبقى الإعداد الحالي محفوظًا.",
+	"menu.llm.model_parent_with_health": "%sالنموذج المحدد: %s",
 	"menu.global.karabiner_runtime": "محرك Karabiner",
 	"menu.global.karabiner_runtime.owned": "محرك تديره Ergopti",
 	"menu.global.karabiner_runtime.shared": "Karabiner مشترك",

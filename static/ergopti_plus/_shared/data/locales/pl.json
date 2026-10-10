@@ -3285,6 +3285,7 @@
 	"healthcheck.export.privacy_notice": "Ten raport udostępnia tylko dozwolone dane techniczne. Logi, dowolny tekst, ścieżki i dane identyfikujące są pomijane również przy włączonych szczegółach. Lokalne testy strony nie są uwzględnione.",
 	"sg_actions.llm_translate_context": "🌐 Przetłumacz bieżące zdanie [konfigurowalne]",
 	"menu.about.startup_other_command_reason": "Inne polecenie startowe: Uruchamianie skonfigurowano dla innego polecenia lub instalacji. Obecne ustawienie zostaje zachowane.",
+	"menu.llm.model_parent_with_health": "%sWybrany model: %s",
 	"menu.global.karabiner_runtime": "Środowisko wykonawcze Karabiner",
 	"menu.global.karabiner_runtime.owned": "Środowisko zarządzane przez Ergopti",
 	"menu.global.karabiner_runtime.shared": "Współdzielony Karabiner",

@@ -553,6 +553,94 @@ const ALLOWED_JOB_IFS = {
 	'package-linux':
 		"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 };
+// Exact independent manual receiver; no wildcard inventory or condition exception.
+const MANUAL_LEASE165_JOB = [
+	"    name: 'Lease native 165 (${{ matrix.architecture }})'",
+	"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+	'    strategy:',
+	'      fail-fast: false',
+	'      matrix:',
+	'        include:',
+	'          - runner: macos-15',
+	'            architecture: arm64',
+	'          - runner: macos-15-intel',
+	'            architecture: x86_64',
+	'    runs-on: ${{ matrix.runner }}',
+	'    timeout-minutes: 25',
+	'    steps:',
+	'      - uses: actions/checkout@v4',
+	'        with:',
+	'          ref: ${{ github.sha }}',
+	'      - uses: actions/setup-node@v4',
+	'        with:',
+	"          node-version-file: '.node-version'",
+	'      - name: Receive exact native lease worker and next-observation cohorts',
+	'        shell: bash',
+	'        env:',
+	'          LEASE_EXPECTED_ARCH: ${{ matrix.architecture }}',
+	'          SWIFT_BACKTRACE: enable=yes',
+	'        run: |',
+	'          set -euo pipefail',
+	'          umask 077',
+	'          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"',
+	'          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
+	'          lease_actual_arch="$(uname -m)"',
+	'          test "$lease_actual_arch" = "$LEASE_EXPECTED_ARCH"',
+	'          evidence="$RUNNER_TEMP/lease165-native-evidence"',
+	'          mkdir -m 700 "$evidence"',
+	'          transcript="$evidence/lease165-xctest.log"',
+	'          source_receipt="$evidence/lease165-source.json"',
+	'          node tools/diagnostics/lease165_xctest_evidence.cjs begin \\',
+	'            "$GITHUB_SHA" "$LEASE_EXPECTED_ARCH" "$lease_actual_arch" "$source_receipt"',
+	'          child_status_receipt="$evidence/lease165-swift-child-status.txt"',
+	'          child_script="$evidence/lease165-swift-child.sh"',
+	'          test ! -e "$child_status_receipt" && test ! -L "$child_status_receipt"',
+	'          set -C',
+	'          cat > "$child_script" <<\'LEASE165_SWIFT_CHILD\'',
+	'          set -uo pipefail',
+	'          umask 077',
+	'          test ! -e "$2" && test ! -L "$2" || exit 1',
+	'          set +e',
+	'          swift test --package-path static/ergopti_plus/macos/launcher \\',
+	'            --scratch-path "$1" \\',
+	"            --filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests'",
+	'          lease_child_status=$?',
+	'          set -eC',
+	'          printf \'%s\\n\' "$lease_child_status" > "$2"',
+	'          exit "$lease_child_status"',
+	'          LEASE165_SWIFT_CHILD',
+	'          set +e',
+	'          script -q /dev/null /bin/bash "$child_script" \\',
+	'            "$RUNNER_TEMP/lease165-swift-ci" "$child_status_receipt" 2>&1 | tee "$transcript"',
+	'          lease_statuses=("${PIPESTATUS[@]}")',
+	'          set -e',
+	'          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
+	'          lease_actual_arch="$(uname -m)"',
+	'          node tools/diagnostics/lease165_xctest_evidence.cjs judge \\',
+	'            "$transcript" "${lease_statuses[0]}" "${lease_statuses[1]}" \\',
+	'            "$GITHUB_SHA" "$LEASE_EXPECTED_ARCH" "$lease_actual_arch" "$source_receipt" \\',
+	'            "$evidence/lease165-verdict.json"',
+	'      - name: Retain scoped native lease evidence',
+	'        if: always()',
+	'        uses: actions/upload-artifact@v4',
+	'        with:',
+	'          name: lease165-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+	'          retention-days: 7',
+	'          if-no-files-found: warn',
+	'          path: |',
+	'            ${{ runner.temp }}/lease165-native-evidence/lease165-xctest.log',
+	'            ${{ runner.temp }}/lease165-native-evidence/lease165-*.json',
+	'            ${{ runner.temp }}/lease165-native-evidence/lease165-swift-child-status.txt'
+].join('\n');
+function isManualLease165(job, rel) {
+	return (
+		rel === MACOS_BOX &&
+		job.id === 'lease165-native' &&
+		pipeline.field(job.body, 'if') ===
+			"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" &&
+		job.body.trimEnd() === MANUAL_LEASE165_JOB
+	);
+}
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
 		const condition = pipeline.field(boxJob.body, 'if');
@@ -561,7 +649,10 @@ for (const rel of Object.values(BOX_FILES)) {
 			boxJob.id === 'item36-native' &&
 			condition === "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}";
 		check(
-			condition === null || ALLOWED_JOB_IFS[boxJob.id] === condition || manualArchiveQualification,
+			condition === null ||
+				ALLOWED_JOB_IFS[boxJob.id] === condition ||
+				manualArchiveQualification ||
+				isManualLease165(boxJob, rel),
 			`${rel}: job \`${boxJob.id}\` has job-level \`if: ${condition}\`; only ` +
 				`${Object.entries(ALLOWED_JOB_IFS)
 					.map(([id, value]) => `${id} (${value})`)
@@ -573,6 +664,41 @@ for (const rel of Object.values(BOX_FILES)) {
 		);
 	}
 }
+const manualLease165Job = pipeline.jobs(MACOS_BOX).filter((job) => job.id === 'lease165-native');
+check(
+	manualLease165Job.length === 1 && isManualLease165(manualLease165Job[0], MACOS_BOX),
+	'exact independent manual lease165 receiving job'
+);
+for (const [old, next] of [
+	["github.event_name == 'workflow_dispatch' && !inputs.release", "github.event_name == 'push'"],
+	["github.event_name == 'workflow_dispatch'", "github.event_name == 'pull_request'"],
+	['!inputs.release', 'inputs.release'],
+	['    timeout-minutes: 25', '    timeout-minutes: 26'],
+	['architecture: x86_64', 'architecture: arm64'],
+	['          lease_statuses=("${PIPESTATUS[@]}")', '          lease_statuses=(0 0)'],
+	[
+		"--filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests'",
+		"--filter 'LeaseDiagnosticNextObservationTests'"
+	],
+	['    steps:', '    continue-on-error: true\n    steps:']
+]) {
+	check(MANUAL_LEASE165_JOB.includes(old), 'lease165 mutation has an actual preimage');
+	check(
+		!isManualLease165(
+			{ id: 'lease165-native', body: MANUAL_LEASE165_JOB.replace(old, next) },
+			MACOS_BOX
+		),
+		'lease165 changed scope, architecture, status, count or failure authority refuses'
+	);
+}
+check(
+	!isManualLease165({ id: 'foreign-native', body: MANUAL_LEASE165_JOB }, MACOS_BOX),
+	'foreign manual job identity refuses'
+);
+check(
+	!isManualLease165({ id: 'lease165-native', body: MANUAL_LEASE165_JOB }, BOX_FILES.windows),
+	'foreign lane receiver refuses'
+);
 for (const [id, condition] of Object.entries(ALLOWED_JOB_IFS)) {
 	check(
 		pipeline.field(pipeline.job(id), 'if') === condition,

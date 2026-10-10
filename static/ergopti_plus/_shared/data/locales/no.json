@@ -3285,6 +3285,7 @@
 	"healthcheck.export.privacy_notice": "Denne rapporten deler bare tillatte tekniske opplysninger. Logger, fritekst, stier og identifiserende opplysninger utelates også når detaljer er aktivert. Lokale sidetester er ikke inkludert.",
 	"sg_actions.llm_translate_context": "🌐 Oversett gjeldende setning [kan tilpasses]",
 	"menu.about.startup_other_command_reason": "Annen oppstartskommando: Oppstart er konfigurert for en annen kommando eller installasjon. Den eksisterende innstillingen beholdes.",
+	"menu.llm.model_parent_with_health": "%sValgt modell: %s",
 	"menu.global.karabiner_runtime": "Karabiner-kjøremiljø",
 	"menu.global.karabiner_runtime.owned": "Kjøremiljø administrert av Ergopti",
 	"menu.global.karabiner_runtime.shared": "Delt Karabiner",

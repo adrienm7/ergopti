@@ -31,6 +31,7 @@
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
 		"test:defaults-single-source": "node ./tools/test/test-defaults-single-source.cjs",
 		"test:linux-feature-parity": "node ./tools/test/test-linux-feature-parity.cjs",
+		"test:linux-xi2-cookie-ci-contract": "node ./tools/test/test-linux-xi2-cookie-ci-contract.cjs",
 		"test:llm-legacy-basic-prompt-single-source": "node ./tools/test/test-llm-legacy-basic-prompt-single-source.cjs",
 		"test:keycode-data-js-parity": "node ./tools/test/test-keycode-data-js-parity.cjs",
 		"test:physical-keys-registry": "node ./tools/test/test-physical-keys-registry.cjs",
@@ -354,6 +355,7 @@
 		"test:ci-pipeline": "node ./tools/test/test-ci-pipeline.cjs",
 		"test:ci-kana-install": "node ./tools/test/test-ci-kana-install.cjs",
 		"test:ci-full-default": "node ./tools/test/test-ci-full-default.cjs",
+		"test:lease165-xctest-evidence": "node ./tools/test/test-lease165-xctest-evidence.cjs",
 		"test:ci-pipeline-wiring": "node ./tools/test/test-ci-pipeline-wiring.cjs",
 		"test:ubuntu-ci-acquisition": "node ./tools/test/test-ubuntu-ci-acquisition.cjs",
 		"test:ci-release-reruns": "node ./tools/test/test-ci-release-reruns.cjs",
@@ -483,6 +485,7 @@
 		"test:macos-guardian-signature-flags": "node ./tools/test/test-macos-guardian-signature-flags.cjs",
 		"test:managed-ollama-protocol": "node ./tools/test/test-managed-ollama-protocol.cjs",
 		"test:macos-managed-ollama-catalogue": "node ./tools/test/test-macos-managed-ollama-catalogue.cjs",
+		"test:macos-release-stage-native-receiving-controls": "node ./tools/test/test-macos-release-stage-native-receiving.cjs",
 		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs",
 		"test:macos-launch-qualification": "node ./tools/test/test-macos-launch-qualification.cjs",
 		"test:macos-launch-qualification-lifetime": "node ./tools/test/test-macos-launch-qualification-lifetime.cjs"

@@ -6633,7 +6633,8 @@
 			"caption_getter": "agent_system_backend_current_caption",
 			"caption_format": "numbered",
 			"platforms": [
-				"linux"
+				"linux",
+				"ahk"
 			],
 			"unavailable": "hide"
 		}
@@ -6646,7 +6647,8 @@
 			"caption_getter": "agent_system_backend_current_caption",
 			"caption_format": "numbered",
 			"platforms": [
-				"linux"
+				"linux",
+				"ahk"
 			],
 			"unavailable": "hide"
 		}
@@ -6968,6 +6970,37 @@
 			"caption_joiner": " — ",
 			"platforms": [
 				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"agent_windows_disabled_apps_command": [
+		{
+			"type": "command",
+			"id": "agent_disabled_apps",
+			"i18n": "menu.agent.disabled_apps",
+			"caption_getter": "agent_disabled_apps_count",
+			"caption_format": "numbered",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_model_parent_ahk": [
+		{
+			"type": "group",
+			"id": "llm_model",
+			"i18n": "menu.llm.model_parent_with_health",
+			"caption_getters": [
+				"llm_model_health_prefix",
+				"llm_model_current_caption"
+			],
+			"disabled_when": [
+				"llm_model_parent_ready"
+			],
+			"platforms": [
+				"ahk"
 			],
 			"unavailable": "hide"
 		}

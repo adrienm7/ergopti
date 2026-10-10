@@ -31,6 +31,18 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'manual native lease receiving retains exact 165 historical identities and source custody',
+		cmd: process.execPath,
+		args: ['tools/test/test-lease165-xctest-evidence.cjs'],
+		repro: 'node tools/test/test-lease165-xctest-evidence.cjs'
+	},
+	{
+		name: 'native XI2 three-cookie CI preserves original family and source receipts',
+		cmd: process.execPath,
+		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],
+		repro: 'npm run test:linux-xi2-cookie-ci-contract'
+	},
+	{
 		name: 'macOS native PAC and WPAD qualification requires all twelve original cases',
 		cmd: process.execPath,
 		args: ['tools/test/test-macos-native-pac-qualification.cjs'],
@@ -1967,6 +1979,16 @@ const CHECKS = [
 		args: ['tools/test/test-python-resolution.cjs'],
 		repro: 'node tools/test/test-python-resolution.cjs'
 	},
+	...(process.platform === 'linux'
+		? [
+				{
+					name: 'Darwin receiver controlled refusal contracts; actual Darwin remains unexecuted',
+					cmd: process.execPath,
+					args: ['tools/test/test-macos-release-stage-native-receiving.cjs'],
+					repro: 'npm run test:macos-release-stage-native-receiving-controls'
+				}
+			]
+		: []),
 	{
 		name: 'Ollama server command preserves exact process ownership',
 		cmd: 'node',

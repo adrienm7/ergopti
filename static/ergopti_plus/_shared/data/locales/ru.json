@@ -3285,6 +3285,7 @@
 	"healthcheck.export.privacy_notice": "Отчёт передаёт только разрешённые технические данные. Журналы, произвольный текст, пути и идентифицирующие сведения исключены даже при включённых подробностях. Локальные тесты страницы не включены.",
 	"sg_actions.llm_translate_context": "🌐 Перевести текущее предложение [настраивается]",
 	"menu.about.startup_other_command_reason": "Другая команда запуска: Автозапуск настроен для другой команды или установки. Существующая настройка сохраняется.",
+	"menu.llm.model_parent_with_health": "%sВыбранная модель: %s",
 	"menu.global.karabiner_runtime": "Среда выполнения Karabiner",
 	"menu.global.karabiner_runtime.owned": "Среда под управлением Ergopti",
 	"menu.global.karabiner_runtime.shared": "Общий Karabiner",

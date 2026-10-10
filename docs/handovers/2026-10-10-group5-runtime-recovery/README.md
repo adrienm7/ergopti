@@ -441,3 +441,22 @@ the post-hook owner check restores 13/1 legacy results. Original source, setup
 refusals, the failed required Lua run and the intermediate 12/1 focused result
 remain preserved beside these successor receipts. Final selected verification
 uses the unchanged approved production/tests and this six-file scope.
+
+## Dedicated native lease receiving enrollment
+
+The feature candidate receives current Dev ancestry through the published logger
+fixture prerequisite. The reviewed locale, worker-dispatch and UI admission
+unions preserve both parents. The fixture keeps the original truncation
+assertion and excludes a legitimate append belonging to another folder.
+
+The dedicated manual-only macOS job enrolls the unchanged 146 worker and 19
+observer identities independently of the existing PAC and package prerequisites.
+Its child-exit reader preserves all 38 original controls and 19 frozen additions;
+earlier actual software receiving passed 57 controls and all 19 individual CLI
+vectors. The composed XI2 and NumberRow guards retain their original refusals.
+Existing managed native jobs, matrices, budgets and release policy are unchanged.
+
+Source enrollment is preparation. Final selected merge/workflow gates and actual
+native execution remain required. No physical device, native PONG or original
+PONG/READY/exit-73 cause is qualified, and item 24 remains partial. No absent G6
+native closure or its larger test counts is imported into this candidate.

@@ -32,6 +32,11 @@ const JOBS = [
 		'item36-native',
 		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
 	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'lease165-native',
+		"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+	],
 	['.github/workflows/ci-macos.yml', 'managed-ollama-native', null],
 	['.github/workflows/ci-macos.yml', 'test-hs', null],
 	['.github/workflows/ci-macos.yml', 'e2e-hs', null],
@@ -56,6 +61,30 @@ const JOBS = [
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']
 ];
 const FULL_STEPS = [
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Qualify actual selected number-row Carbon XCTest controls',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Receive selected-release shell corpus and native guardian cancellation',
+		null
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain selected number-row Carbon XCTest diagnostics',
+		'always()'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain selected-release native ownership receiving',
+		'always()'
+	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'item36-native',
@@ -371,6 +400,18 @@ function validateRaw(files) {
 		const job = jobs.find((entry) => entry.file === rel && entry.id === id);
 		const body = raw.step(job.body, name);
 		requireEqual(raw.stepField(body, 'if'), condition, `${id}/${name} full step condition`);
+		if (name === 'Receive selected-release shell corpus and native guardian cancellation') {
+			requireEqual(raw.stepField(body, 'shell'), 'bash', 'selected-release receiver exact shell');
+			requireEqual(
+				raw.runOf(body)?.join('\n'),
+				[
+					'set -euo pipefail',
+					'node tools/diagnostics/macos_release_stage_native_receiving.cjs \\',
+					'  --output "$RUNNER_TEMP/native-selected-release-$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE"'
+				].join('\n'),
+				'selected-release receiver exact command'
+			);
+		}
 		requireEqual(
 			raw.stepField(body, 'continue-on-error'),
 			null,

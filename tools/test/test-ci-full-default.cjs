@@ -2,6 +2,7 @@
 
 /** Raw full-default controls; source models never qualify skipped native work. */
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
@@ -44,10 +45,18 @@ check('raw loader and full view retain every exact source byte', () => {
 });
 check('every scoped full body remains owned; all other product scripts remain exact', () => {
 	let jobs = 0,
+		leaseReceivers = 0,
 		steps = 0;
 	for (const entry of source)
 		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
-			jobs++;
+			if (job.id === 'lease165-native') {
+				assert.equal(entry.rel, '.github/workflows/ci-macos.yml');
+				assert.equal(
+					crypto.createHash('sha256').update(job.body.trimEnd()).digest('hex'),
+					'724f6560de5871aa08d5cb1287657a1a760aedc8aa30bdcdfabce0bd2adf2352'
+				);
+				leaseReceivers++;
+			} else jobs++;
 			assert.equal(Full.field(Full.job(job.id), 'if'), Raw.field(job.body, 'if'));
 			for (const step of Raw.steps(job.body)) {
 				if (!step.name) continue;
@@ -75,6 +84,8 @@ check('every scoped full body remains owned; all other product scripts remain ex
 			}
 		}
 	assert.equal(jobs, 26);
+	assert.equal(leaseReceivers, 1);
+	assert.equal(jobs + leaseReceivers, 27);
 	assert.ok(steps > 150, 'the full retained script inventory is nonvacuous');
 });
 const testedProtocols = new Set();
@@ -256,6 +267,8 @@ for (const lane of ['macos', 'windows', 'linux']) {
 		});
 }
 for (const [rel, id, name] of [
+	[MAC, 'managed-ollama-native', 'Qualify actual selected number-row Carbon XCTest controls'],
+	[MAC, 'managed-ollama-native', 'Retain selected number-row Carbon XCTest diagnostics'],
 	[MAC, 'item36-native', 'Observe the actual no-prompt SDK permission API independently'],
 	[MAC, 'managed-ollama-native', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
 	[MAC, 'managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls'],
