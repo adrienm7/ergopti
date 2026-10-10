@@ -50,7 +50,7 @@ _LLM_Automation_Queue(Presented, TimerFn := unset) {
 			return 0
 		_LLM_Automation_CancelPending()
 		if !IsSet(TimerFn)
-			TimerFn := (Callback, Period) => SetTimer(Callback, Period)
+			TimerFn := _LLM_Automation_NativeTimer
 		State := { Presented: Presented, Generation: _LLM_Automation_Generation, TimerFn: TimerFn, Cancelled: false }
 		State.Callback := _LLM_Automation_Accept.Bind(State)
 		_LLM_Automation_Pending := State
@@ -127,4 +127,11 @@ _LLM_Automation_StartListener(Port := 0, StopFn := unset) {
 		}
 		throw FirstError
 	}
+}
+
+/** Arms only an owned one-shot or cancels its exact callback. */
+_LLM_Automation_NativeTimer(Callback, Period) {
+	if !(Period is Integer) || Period > 0
+		throw TypeError("Automation timers require cancellation or a negative one-shot period.")
+	return SetTimer(Callback, -Abs(Period))
 }

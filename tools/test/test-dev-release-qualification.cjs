@@ -669,7 +669,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		assert.equal(receipt.status, 'deferred');
 		assert.equal(receipt.source_sha, sha);
 		assert.equal(receipt.tag, 'v1.0.0');
-		assert.equal(receipt.expires_at, '2026-10-10T00:00:00Z');
+		assert.equal(receipt.expires_at, '2026-10-10T02:00:00Z');
 		q.validateQualificationReceipt(receipt, scope, sha, exact, before);
 		assert.throws(() =>
 			q.validateQualificationReceipt({ ...receipt, qualified: true }, scope, sha, exact, before)
@@ -710,6 +710,16 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			q.authorizeQualificationProfile(stable.id, { ...exact, [field]: value }, before)
 		);
 	}
+	assert.equal(
+		q.authorizeQualificationProfile(stable.id, exact, new Date('2026-10-10T01:59:59.999Z')),
+		accepted,
+		'the proposed window admits the existing profile only before the exact cutoff'
+	);
+	assert.equal(
+		q.stablePublicationProfile(exact, new Date('2026-10-10T02:00:00.001Z')),
+		null,
+		'the proposed window refuses one millisecond after expiry'
+	);
 	assert.equal(q.stablePublicationProfile(exact, new Date(stable.expires_at)), null);
 	assert.throws(() =>
 		q.stablePublicationNotice(stable.id, exact, sha, new Date(stable.expires_at))
@@ -818,7 +828,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	};
 	const source = 'a'.repeat(40),
 		hash = 'b'.repeat(64),
-		clock = new Date('2026-10-09T23:59:59Z');
+		clock = new Date('2026-10-10T01:59:59.999Z');
 	Signing.admit(context, source, source, clock);
 	Signing.requireFreshUnsigned('true');
 	for (const value of ['false', undefined, '', true]) {
@@ -840,7 +850,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	}
 	assert.throws(() => Signing.admit(context, source, 'c'.repeat(40), clock));
 	assert.throws(() => Signing.admit(context, 'A'.repeat(40), 'A'.repeat(40), clock));
-	assert.throws(() => Signing.admit(context, source, source, new Date('2026-10-10T00:00:00Z')));
+	assert.throws(() => Signing.admit(context, source, source, new Date('2026-10-10T02:00:00Z')));
 	assert.throws(() => Signing.admit(context, source, source, new Date('invalid')));
 	assert.throws(() =>
 		Signing.admit(context, source, source, clock, { ...Signing.POLICY, authorized: false })

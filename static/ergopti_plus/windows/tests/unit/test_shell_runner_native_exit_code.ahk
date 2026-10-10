@@ -56,14 +56,19 @@ _SRNE_ExitCode(ExpectedCode, SuspendCompletion := false, Tree := false) {
 	}
 }
 
-for Code in [0, 37, 259]
-	Test("shell runner: preserves native exit " . Code . " (shell-native-exit-code)",
-		_SRNE_ExitCode.Bind(Code))
-Test("shell runner: retains failure across suspension (shell-native-exit-code)",
-	_SRNE_ExitCode.Bind(37, true))
+/** Registers native exit-code vectors without publishing a global loop variable. */
+_SRNE_RegisterExitCodeCases() {
+	local Code
+	for Code in [0, 37, 259]
+		Test("shell runner: preserves native exit " . Code . " (shell-native-exit-code)",
+			_SRNE_ExitCode.Bind(Code))
+	Test("shell runner: retains failure across suspension (shell-native-exit-code)",
+		_SRNE_ExitCode.Bind(37, true))
 
-for Code in [0, 37, 259]
-	Test("shell runner: preserves tree exit " . Code . " (shell-tree-native-exit-code)",
-		_SRNE_ExitCode.Bind(Code, false, true))
-Test("shell runner: retains tree exit 259 across suspension (shell-tree-native-exit-code)",
-	_SRNE_ExitCode.Bind(259, true, true))
+	for Code in [0, 37, 259]
+		Test("shell runner: preserves tree exit " . Code . " (shell-tree-native-exit-code)",
+			_SRNE_ExitCode.Bind(Code, false, true))
+	Test("shell runner: retains tree exit 259 across suspension (shell-tree-native-exit-code)",
+		_SRNE_ExitCode.Bind(259, true, true))
+}
+_SRNE_RegisterExitCodeCases()

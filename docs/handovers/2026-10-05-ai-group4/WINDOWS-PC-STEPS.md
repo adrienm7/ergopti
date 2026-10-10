@@ -7,15 +7,23 @@ Use final committed sources and unchanged independent expectations. Record
 exact native runs, failed/skipped/unexecuted cases and installation limitations.
 
 The Windows archive installer, runtime-source acquisition, daemon handoff and
-model orchestration remain prepared SOURCE PROPOSALS requiring actual production
-integration. Their 25 native controls are unexecuted. Steps 8–10 therefore need
-production implementation and qualification, not merely device verification.
+model orchestration still require production integration and full acceptance.
+On October 10, the private managed-file successor passed all 31 native Windows
+PS 5.1 controls (the original 25 plus six namespace controls). Earlier runs
+exposed a PowerShell module-path mismatch and then a real publication failure:
+retained child handles prevented directory rename. The successor closes only
+its owned descendants, retains the stage/parent handles, and revalidates the
+published identities and content. These are file-component results, not proof
+of archive acquisition, executable launch, daemon handoff or model use.
+The exact bridge also passes 14 inert AHK task/retirement cases using current
+canonical termination bodies; it has not yet passed the complete native runner.
+Steps 8–10 still need production implementation and qualification.
 
 The current Linux-hosted BOM/LF check passed for 1841 AHK sources with zero
 failures. This encoding receipt does not qualify native AHK execution, Windows
 GUI or physical input.
 
-Latest exact-tree native run 37316704100 finished 9303 passed, 44 failed, 0 skipped
+Historical exact-tree native run 37316704100 finished 9303 passed, 44 failed, 0 skipped
 of 9347, with complete agreeing mirrored TAP. All Group4 cohorts pass: private 42,
 JOIN 9, cohort 6, panel 20, models 20, timer 4, logical 39 and native GDI/line 28.
 All 12 prior marker failures are closed; same 44 old failure names remain.
@@ -34,9 +42,11 @@ Windows production gaps above and all twelve PC requirements remain.
 5. Qualify duplicate-label HMENU row IDs/callbacks/check/disable/icon ownership,
    lazy/batch menus, invalid-ID refusal and direct Add update behavior; click
    real menus rather than inferring behavior from labels.
-6. Review and exercise preserved Windows installer proposals with the 25 native
-   cases: DACL, held handle ancestry, no reparse, namespace/private-prefix
-   fencing, conservative creation receipts and exact cleanup.
+6. Integrate the reviewed file component and requalify its 31 native cases
+   through mandatory Windows CI: DACL, held handle ancestry, no reparse,
+   namespace/private-prefix fencing, conservative creation receipts and exact
+   cleanup. Preserve the original ten fixture-generator cases and all six
+   added namespace cases; regenerated ZIPs and receipts must agree.
 7. Verify native producer construction and retirement with actual AHK/PS 5.1;
    an extra argument, empty task state or accepted signal is no settlement proof.
 8. Qualify finite official HTTPS archives: system proxy/TLS, redirects, timeout,

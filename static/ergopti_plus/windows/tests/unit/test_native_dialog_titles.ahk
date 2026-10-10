@@ -482,12 +482,79 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. '}' . "`n"
 		. '}' . "`n"
 		. '_NFO_Error(ObserverFailure, *) {' . "`n"
-		. 'FileAppend(ObserverFailure.Message, A_Args[1] . ".failure", "UTF-8-RAW")' . "`n"
+		. 'ObserverErrorText := ObserverFailure.Message' . "`n"
+		. 'if ObserverFailure is OSError {' . "`n"
+		. 'ObserverErrorPhase := "not-started"' . "`n"
+		. 'try {' . "`n"
+		. 'if FileExist(A_Args[1] . ".phase")' . "`n"
+		. 'ObserverErrorPhase := SubStr(FileRead(A_Args[1] . ".phase", "UTF-8"), 1, 128)' . "`n"
+		. '} catch as PhaseFailure {' . "`n"
+		. 'ObserverErrorPhase := "read-error:" . (PhaseFailure is OSError ? PhaseFailure.Number : Type(PhaseFailure))' . "`n"
+		. '}' . "`n"
+		. 'ObserverErrorText .= " | phase=" . ObserverErrorPhase . " | what=" . SubStr(ObserverFailure.What, 1, 128) . " | line=" . ObserverFailure.Line' . "`n"
+		. '}' . "`n"
+		. 'FileAppend(ObserverErrorText, A_Args[1] . ".failure", "UTF-8-RAW")' . "`n"
 		. 'ExitApp(2)' . "`n"
 		. '}' . "`n"
 		. '#Include ' . UiaOwner . "`n"
 }
 
+
+
+/**
+ * Executes the generated error callback without querying a desktop provider.
+ * Numeric native failures keep their last phase and exact call site; semantic
+ * refusal strings remain unchanged so the real no-filter mutation stays causal.
+ */
+_NDT_FileFilterFailureDiagnostics() {
+	Root := A_Temp . "\ergopti_filter_error_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the observer error fixture has one private root")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	try {
+		ObserverSource := _NDT_FileFilterObserverSource("unused-observer-library.ahk")
+		Start := InStr(ObserverSource, "`n_NFO_Error(")
+		Finish := InStr(ObserverSource, "`n#Include ", , Start)
+		AssertTrue(Start > 0 && Finish > Start, "the actual generated error callback must exist")
+		CallbackSource := SubStr(ObserverSource, Start + 1, Finish - Start)
+		for CaseName in ["native", "no-phase", "unreadable-phase", "semantic"] {
+			Receipt := Root . "\" . CaseName
+			if CaseName == "unreadable-phase"
+				DirCreate(Receipt . ".phase")
+			else if CaseName != "no-phase"
+				FileAppend("restricted-txt|elapsed_ms=501", Receipt . ".phase", "UTF-8-RAW")
+			Harness := Receipt . ".ahk"
+			FailureSource := CaseName == "semantic"
+				? 'Error("Owned BIN visible under the restricted file filter")'
+				: 'OSError(0x80131505, "_NFO_Visible")'
+			FileAppend('#Requires AutoHotkey v2.0' . "`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n"
+				. 'try _NFO_Error(' . FailureSource . ')' . "`n"
+				. 'catch' . "`n" . 'ExitApp(3)' . "`n" . CallbackSource,
+				Harness, "UTF-8")
+			AssertEqual("", _NDT_RunChild(A_AhkPath, ["/ErrorStdOut", Harness, Receipt], Ownership, 2),
+				"a native error remains a failing child with no fabricated success output")
+			Detail := FileRead(Receipt . ".failure", "UTF-8")
+			if CaseName == "semantic" {
+				AssertEqual("Owned BIN visible under the restricted file filter", Detail,
+					"semantic mutation refusals retain their exact independent expected message")
+			} else {
+				Assert(InStr(Detail, "0x80131505") > 0, "the native HRESULT remains visible")
+				if CaseName == "unreadable-phase" {
+					Assert(RegExMatch(Detail, " \| phase=read-error:-?[0-9]+ \| what=_NFO_Visible \| line=[0-9]+") > 0,
+						"an unreadable phase retains both the primary native failure and the numeric read refusal")
+				} else {
+					ExpectedPhase := CaseName == "native" ? "restricted-txt|elapsed_ms=501" : "not-started"
+					Assert(InStr(Detail, " | phase=" . ExpectedPhase . " | what=_NFO_Visible | line=") > 0,
+						"the error retains its native phase, call site and generated line")
+				}
+			}
+		}
+	} finally {
+		if Ownership.CanRetire
+			DirDelete(Root, true)
+	}
+}
+Test("native file filter: generated failure receipts retain phase and call site", _NDT_FileFilterFailureDiagnostics)
 
 /**
  * Pumps the modal provider while the distinct owned observer captures both streams.

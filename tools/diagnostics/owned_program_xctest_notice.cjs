@@ -3,7 +3,7 @@
 'use strict';
 
 const fs = require('node:fs');
-const { cleanTranscript, evaluate } = require('./swift_xctest_evidence.cjs');
+const { cleanTranscript, evaluate, readPacQualification } = require('./swift_xctest_evidence.cjs');
 
 // Fixed reviewed inventory, deliberately independent of source discovery/generation.
 const EXPECTED = Object.freeze([
@@ -77,7 +77,7 @@ function empty(reason) {
 	};
 }
 
-function judge(verdict, transcript) {
+function judge(verdict, transcript, admission = null) {
 	const result = empty('invalid-evidence');
 	if (
 		!verdict ||
@@ -103,7 +103,13 @@ function judge(verdict, transcript) {
 	result.script = verdict.script_status;
 	result.capture = verdict.tee_status;
 	result.collector = verdict.exit_status;
-	const parsed = evaluate(transcript, verdict.script_status, verdict.tee_status);
+	const parsed = evaluate(
+		transcript,
+		verdict.script_status,
+		verdict.tee_status,
+		undefined,
+		admission
+	);
 	const sameSummary =
 		(verdict.summary === null && parsed.summary === null) ||
 		(verdict.summary &&
@@ -113,6 +119,7 @@ function judge(verdict, transcript) {
 			));
 	if (
 		!sameSummary ||
+		JSON.stringify(verdict.qualification) !== JSON.stringify(parsed.qualification) ||
 		verdict.complete !== parsed.complete ||
 		verdict.exit_status !== parsed.exit_status ||
 		verdict.failures.length !== parsed.failures.length ||
@@ -164,6 +171,7 @@ function judge(verdict, transcript) {
 			(receipt) => receipt.starts === 1 && receipt.ends === 1 && receipt.passed === 1
 		);
 	result.root_qualified =
+		parsed.qualification === undefined &&
 		parsed.complete &&
 		parsed.script_status === 0 &&
 		parsed.tee_status === 0 &&
@@ -175,12 +183,15 @@ function judge(verdict, transcript) {
 
 function main(args = process.argv.slice(2), log = console.log) {
 	let result = empty('input-unavailable');
-	const sha = args.length === 3 && /^[0-9a-f]{40}$/.test(args[2]) ? args[2] : 'unknown';
+	const validArgs =
+		args.length === 3 || (args.length === 5 && args[3] === '--pac-qualification-receipt');
+	const sha = validArgs && /^[0-9a-f]{40}$/.test(args[2]) ? args[2] : 'unknown';
 	if (sha !== 'unknown') {
 		try {
 			result = judge(
 				JSON.parse(fs.readFileSync(args[0], 'utf8')),
-				fs.readFileSync(args[1], 'utf8')
+				fs.readFileSync(args[1], 'utf8'),
+				args.length === 5 ? readPacQualification(args[4]) : null
 			);
 		} catch {
 			result = empty('invalid-evidence');

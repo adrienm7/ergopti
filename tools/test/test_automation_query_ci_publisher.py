@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import tempfile
 import types
 import subprocess
@@ -66,6 +67,23 @@ class PublisherTests(unittest.TestCase):
         self.compiler = Path(self.temp.name) / "swift"
         self.compiler.write_bytes(b"controlled compiler identity")
         self.directory = self.root / "private-compiler"
+        self.native_stat = Path.stat
+        self.custody_mode = 0o700
+        if os.name == "nt":
+            # This controlled POSIX metadata is not a Windows ACL observation.
+            # Only the fixture's exact directory receives it; files and links
+            # retain their real native facts and all production checks remain.
+            def directory_stat(candidate, *arguments, **options):
+                facts = self.native_stat(candidate, *arguments, **options)
+                if candidate == self.directory and stat.S_ISDIR(facts.st_mode):
+                    return os.stat_result(
+                        ((facts.st_mode & ~0o777) | self.custody_mode, *facts[1:])
+                    )
+                return facts
+
+            metadata = mock.patch.object(Path, "stat", autospec=True, side_effect=directory_stat)
+            metadata.start()
+            self.addCleanup(metadata.stop)
         self.app = self.root / "Bound.app"
         (self.app / "Contents/MacOS").mkdir(parents=True)
         self.helper = self.app / "Contents/MacOS/ErgoptiAutomationQuery"
@@ -254,6 +272,34 @@ class PublisherTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
             with self.assertRaisesRegex(P.Refused, "not_hosted_ci"):
                 P.compile_product(self.root, self.directory, self.compiler_run)
+
+    def test_incorrect_directory_mode_remains_exactly_refused(self):
+        P.compile_product(self.root, self.directory, self.compiler_run)
+        before = (self.directory / P.STATE).read_bytes()
+        if os.name == "nt":
+            self.custody_mode = 0o755
+        else:
+            self.directory.chmod(0o755)
+        with self.assertRaisesRegex(P.Refused, "^state_custody$"):
+            P.copied(self.root, self.directory, self.app)
+        self.assertEqual((self.directory / P.STATE).read_bytes(), before)
+        self.assertFalse((self.directory / "copied.json").exists())
+
+    def test_directory_metadata_port_preserves_every_other_native_path(self):
+        P.compile_product(self.root, self.directory, self.compiler_run)
+        facts = self.native_stat(self.directory)
+        observed = self.directory.stat()
+        self.assertEqual(observed.st_mode & 0o777, 0o700)
+        self.assertEqual(stat.S_IFMT(observed.st_mode), stat.S_IFMT(facts.st_mode))
+        for field in ("st_ino", "st_dev", "st_nlink", "st_uid", "st_gid", "st_size"):
+            self.assertEqual(getattr(observed, field), getattr(facts, field))
+        product = Path(json.loads((self.directory / P.STATE).read_bytes())["product"])
+        for target in (self.root, self.compiler, product, self.root / self.inputs[2]):
+            self.assertEqual(target.stat(), self.native_stat(target))
+        if os.name == "nt":
+            link_facts = os.stat_result((stat.S_IFLNK | 0o777, *facts[1:]))
+            with mock.patch.object(self, "native_stat", return_value=link_facts):
+                self.assertEqual(self.directory.lstat().st_mode, link_facts.st_mode)
 
 
 class CompilerCustodyTests(unittest.TestCase):

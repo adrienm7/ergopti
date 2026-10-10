@@ -682,23 +682,19 @@ console.log(
 );
 
 // Versioned Lua54 native paths outrank LUA_CPATH in the genuine interpreter.
+const providerBuild = path.resolve('/private/provider/build');
+const providerTemplate = providerBuild + path.sep + '?.so';
 let versionedCpathCount = 0;
 function cpathControl(name, body) {
 	body();
 	versionedCpathCount++;
 }
 cpathControl('private provider precedes genuine default native Lua54 paths', () => {
-	assert.equal(
-		Provider.providerCpath('/private/provider/build', undefined),
-		'/private/provider/build/?.so;;'
-	);
+	assert.equal(Provider.providerCpath(providerBuild, undefined), providerTemplate + ';;');
 });
 cpathControl('versioned native Lua54 luv and lfs paths retained exactly', () => {
 	const native = '/native/lua/5.4/?.so;/native/lua/5.4/?/init.so;;';
-	assert.equal(
-		Provider.providerCpath('/private/provider/build', native),
-		'/private/provider/build/?.so;' + native
-	);
+	assert.equal(Provider.providerCpath(providerBuild, native), providerTemplate + ';' + native);
 });
 cpathControl('wrong type versioned native path refused', () =>
 	assert.throws(() => Provider.providerCpath('/private/provider/build', true))
