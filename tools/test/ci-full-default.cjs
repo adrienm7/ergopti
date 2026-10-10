@@ -77,8 +77,20 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
+		'Qualify actual selected number-row Carbon XCTest controls',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
 		'Receive selected-release shell corpus and native guardian cancellation',
 		null
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain selected number-row Carbon XCTest diagnostics',
+		'always()'
 	],
 	[
 		'.github/workflows/ci-macos.yml',
