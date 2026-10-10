@@ -162,7 +162,11 @@ _DIPC_InstallerPortCall(State, Model, Epoch, OnReady?, OnFailed?) {
 _DIPC_WithInertInstaller(Body) {
 	global _LLM_Deps_InstallerOwner, _LLM_Deps_Checking, _LLM_Deps_State
 	global _LLM_Deps_Epoch, _LLM_Deps_FailureMessage, _LLM_Deps_PollTimer, _LLM_Deps_PollStartTick
+	global DRIVER_BASELINE_PRIORITY_CLASS
 	Saved := Map()
+	Saved["priority_set"] := IsSet(DRIVER_BASELINE_PRIORITY_CLASS)
+	if Saved["priority_set"]
+		Saved["priority"] := DRIVER_BASELINE_PRIORITY_CLASS
 	Saved["owner_set"] := IsSet(_LLM_Deps_InstallerOwner)
 	if Saved["owner_set"]
 		Saved["owner"] := _LLM_Deps_InstallerOwner
@@ -195,6 +199,14 @@ _DIPC_WithInertInstaller(Body) {
 		"tip", _DIPC_InstallerPortEvent.Bind(State, "tip"),
 		"timer", _DIPC_InstallerPortEvent.Bind(State, "timer"))
 	try {
+		Driver := _DriverSourceConcat()
+		ActiveDriver := _DriverMaskBlockComments(&Driver)
+		Pattern := 'm)^global DRIVER_BASELINE_PRIORITY_CLASS := "([^"`r`n]+)"$'
+		Assert(RegExMatch(ActiveDriver, Pattern, &Baseline) > 0,
+			"The production baseline priority declaration must remain available.")
+		Assert(!RegExMatch(ActiveDriver, Pattern, , Baseline.Pos + Baseline.Len),
+			"Only one production baseline declaration may seed this fixture.")
+		DRIVER_BASELINE_PRIORITY_CLASS := Baseline[1]
 		_LLM_Deps_InstallerOwner := 0
 		_LLM_Deps_Checking := true
 		_LLM_Deps_State := "pending"
@@ -205,6 +217,10 @@ _DIPC_WithInertInstaller(Body) {
 		Body.Call(State)
 	} finally {
 		; Every actor/timer above is an inert retained object, never a native task.
+		if Saved["priority_set"]
+			DRIVER_BASELINE_PRIORITY_CLASS := Saved["priority"]
+		else
+			DRIVER_BASELINE_PRIORITY_CLASS := unset
 		if Saved["owner_set"]
 			_LLM_Deps_InstallerOwner := Saved["owner"]
 		else
@@ -320,3 +336,67 @@ Test("Ollama deps: false and throwing start retain cancellation debt without fal
 	_DIPC_StartCleanupDebtCases)
 Test("Ollama deps: false start needs exact cancellation ACK before browser fallback (installer-debt-admission)",
 	(*) => _DIPC_WithInertInstaller(_DIPC_StartCleanupAck))
+
+; Canonical enrollment is required by the real callback controls above.
+_DIPC_CanonicalCheckerEnrollment() {
+	global _LLM_Deps_State
+	Runner := FileRead(A_ScriptDir . "\run_all.ahk", "UTF-8")
+	ActiveRunner := _DriverMaskNonCode(&Runner)
+	Assert(RegExMatch(ActiveRunner, "m)^#Include \.\./modules/llm/ollama_deps_checker\.ahk$") > 0,
+		"The canonical runner must include the production dependency checker.")
+	Stubs := FileRead(A_ScriptDir . "\test_stubs.ahk", "UTF-8")
+	Assert(!_DriverFindFunctionDefinition(&Stubs, "LLM_Deps_IsReady"),
+		"A permissive dependency readiness stub cannot replace the production subject.")
+	Saved := _LLM_Deps_State
+	try {
+		_LLM_Deps_State := "ready"
+		AssertTrue(LLM_Deps_IsReady(), "The real state getter accepts the ready state.")
+		_LLM_Deps_State := "pending"
+		AssertFalse(LLM_Deps_IsReady(), "The real state getter refuses a pending state.")
+	} finally _LLM_Deps_State := Saved
+}
+
+Test("Ollama deps: canonical checker is enrolled without a permissive subject stub (installer-debt-enrollment)",
+	_DIPC_CanonicalCheckerEnrollment)
+
+_DIPC_BaselineFixtureRestoresExactState() {
+	global DRIVER_BASELINE_PRIORITY_CLASS
+	PriorSet := IsSet(DRIVER_BASELINE_PRIORITY_CLASS)
+	if PriorSet
+		Prior := DRIVER_BASELINE_PRIORITY_CLASS
+	try {
+		for Assigned in [false, true] {
+			for ThrowBody in [false, true] {
+				DRIVER_BASELINE_PRIORITY_CLASS := Assigned ? "saved-priority-sentinel" : unset
+				try {
+					_DIPC_WithInertInstaller(_DIPC_BaselineFixtureBody.Bind(ThrowBody))
+					AssertFalse(ThrowBody, "A throwing fixture callback cannot be swallowed.")
+				} catch Error as Err {
+					Assert(ThrowBody && Err.Message == "inert baseline body refusal",
+						"Only the exact deliberately injected body refusal is expected.")
+				}
+				Assert(IsSet(DRIVER_BASELINE_PRIORITY_CLASS) == Assigned,
+					"The baseline fixture must preserve set/unset lifetime exactly.")
+				if Assigned
+					AssertEqual("saved-priority-sentinel", DRIVER_BASELINE_PRIORITY_CLASS,
+						"A prior suite baseline must not be replaced by the fixture seed.")
+			}
+		}
+	} finally {
+		if PriorSet
+			DRIVER_BASELINE_PRIORITY_CLASS := Prior
+		else
+			DRIVER_BASELINE_PRIORITY_CLASS := unset
+	}
+}
+
+_DIPC_BaselineFixtureBody(ThrowBody, State) {
+	global DRIVER_BASELINE_PRIORITY_CLASS
+	Assert(IsSet(DRIVER_BASELINE_PRIORITY_CLASS), "The callback receives the actual production baseline seed.")
+	AssertEqual(0, State["constructors"], "Baseline lifetime needs no installer or task acquisition.")
+	if ThrowBody
+		throw Error("inert baseline body refusal")
+}
+
+Test("Ollama deps: baseline fixture preserves assigned and unset state after success or refusal (installer-debt-baseline)",
+	_DIPC_BaselineFixtureRestoresExactState)
