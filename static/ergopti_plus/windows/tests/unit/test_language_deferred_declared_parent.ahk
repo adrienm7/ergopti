@@ -206,14 +206,16 @@ _LDDP_OwnerWithdrawal(Owner) {
 		Owner.DefineProp("Call", {Call: Observer})
 		AssertFalse(Publish.Call(Replacement), "a same-object raw producer observer withdraws admitted renderer custody")
 		AssertEqual(0, Counter["hits"], "the withdrawn observer must never dispatch")
-		AssertEqual(Previous.Handle, TrayMenuSubmenuHandle(Target.Handle, 0))
-		AssertEqual(1, TrayMenuItemCount(Target))
+		; Restore the observer owner before using it as a genuine native reader.
 		if HadCall
 			Owner.DefineProp("Call", Descriptor)
 		else
 			Owner.DeleteProp("Call")
+		AssertEqual(Previous.Handle, TrayMenuSubmenuHandle(Target.Handle, 0))
+		AssertEqual(1, TrayMenuItemCount(Target))
 		AssertTrue(Publish.Call(Replacement), "repair of the exact descriptor restores the original captured native owner")
 		AssertEqual(Replacement.Handle, TrayMenuSubmenuHandle(Target.Handle, 0))
+		AssertEqual(0, Counter["hits"], "restored native reads and publication execute no withdrawn observer")
 	} finally {
 		if HadCall
 			Owner.DefineProp("Call", Descriptor)
