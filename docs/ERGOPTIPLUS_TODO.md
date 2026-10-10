@@ -8826,6 +8826,19 @@ mandatory.
   still has separate qualification/upload contract failures; the original Linux
   cancellation assertions remain intact pending workflow-owner resolution.
 
+  The separately prepared XI2 borrowed-cookie consumer passes all 43 controlled
+  cases on each Lua ABI, using the real probe and logger with modeled FFI ports.
+  Strict C compilation checks its three ABI declarations against installed
+  X11/XI2 headers; all 16 controlled C scalar/peer cases pass. Neither result
+  proves a genuine cookie or input/output delivery. The original full-family
+  native supervisor refuses before allocation because this container does not
+  expose `/proc/self/task/<pid>/children`, even with approved execution. Keep
+  that admission unchanged and qualify the three original native property
+  cookies in Linux CI. Runtime registry, actual FFI/cdata, installed provider
+  closure and shared enrollment remain held software/native work. Exact sources,
+  refusals and receiving reviews are saved in
+  `handovers/2026-10-10-group3-native-preparations/`.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
@@ -9497,6 +9510,18 @@ Carbon classification, physical keys or installed release qualification.
   modifier, permission or output authority is added. Native receiving and the
   separately coordinated dispatch/transport remain software work before hardware.
 
+  Private native receiving preparations retain the mandatory twelve-method
+  census, original source IDs, actual process exits and original restoration
+  observations. Fifteen Node receiving controls pass. The native CLI reader
+  passes all 21 independently fixed controls; its first replay failed because
+  the Linux host home inode exceeded the native signed-64-bit representation.
+  The corrected fixture uses an owned representable directory and keeps the
+  parser, C source and every expectation unchanged. Darwin and home-domain
+  lookup are controlled in this replay; actual macOS SDK/C/CLI execution remains
+  unrun. The four-line launcher dispatch and shared workflow enrollment remain
+  inactive pending their current owners' custody. These preparations and both
+  failed/successful receipts are recoverable from the native-preparations handover.
+
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
   reconstruct/review lost runtime preparation. Never fall back from a refused
@@ -9570,8 +9595,11 @@ Carbon classification, physical keys or installed release qualification.
   output failures. The exact original shortcut source reproduces the same
   E2E failure lines; native Lua stat exposes a negative rounded inode for the
   genuine shipped catalogue and the unchanged loader refuses it. Actual
-  read-only X11 qualification passes 53/53. JS remains 406/407 on the
-  unchanged Windows retention guard. None of these failures is waived.
+  read-only X11 qualification passes 53/53. The 597bae78 qualification passes
+  JS 406/407 on the then-unchanged Windows retention guard. The owner's published
+  guard and PowerShell corrections are now received atomically; the composed
+  guard passes its actual targeted run. Full current-source qualification remains
+  separate from that targeted result. None of the retained failures is waived.
 
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding

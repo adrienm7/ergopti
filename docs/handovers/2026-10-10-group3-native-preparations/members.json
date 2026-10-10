@@ -1,0 +1,2389 @@
+{
+	"kind": "INACTIVE_GROUP3_NATIVE_PREPARATIONS",
+	"inventory_sha256": "9bbf0b9018a2c531c5d52885eee0603c5adf44938fa0c53bb74dad13ac9ba56f",
+	"packets": [
+		"continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+		"continuation-2026-10-10-recovery/macos-number-row-ci-receiving-independent-review",
+		"continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+		"continuation-2026-10-10-recovery/macos-number-row-main-cli-independent-review",
+		"continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+		"continuation-2026-10-10-recovery/macos-number-row-portable-guard-v2-execution",
+		"continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+		"continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+		"continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+		"continuation-2026-10-10-recovery/macos-number-row-reader-v2-execution-1",
+		"continuation-2026-10-10-recovery/macos-number-row-reader-v3-execution-1",
+		"reviews/macos-number-row-native-cli-prototype",
+		"reviews/macos-number-row-native-cli-prototype-v2",
+		"reviews/macos-number-row-native-cli-prototype-v3",
+		"reviews/macos-number-row-reader-v3-receiving",
+		"continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+		"continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+		"continuation-2026-10-10/xi2-controlled-v3-execution-1",
+		"continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+		"continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+		"continuation-2026-10-10/xi2-c-controlled-execution-1",
+		"continuation-2026-10-10/xi2-native-receiving-scope-assessment",
+		"continuation-2026-10-10/xi2-provider-audit",
+		"continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+		"continuation-2026-10-10-recovery/xi2-native-cookie-preparation-v2-independent-review",
+		"continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+		"reviews/root-ci-guard-source-receiving",
+		"reviews/root-ci-guard-object-receiving"
+	],
+	"archive": "native-preparations.tar.gz",
+	"archive_sha256": "b52f138ae3d08776c3d4b981569f46e05108ba873c09b18f5144db38248d2465",
+	"archive_bytes": 1166226,
+	"member_count": 289,
+	"retained_bytes": 4866951,
+	"members": [
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "REPORT.md",
+			"sha256": "da9f7954faf89a5b18a4aa52f4d511758de8da10446c845c79e2f2a30f837518",
+			"bytes": 6884,
+			"source_mode": 384,
+			"member": "p01/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "candidate/.github/workflows/ci-macos.yml",
+			"sha256": "1022048081658a308a6b16caf92af265570682c8238e5504aa2d073f5fd1cd5d",
+			"bytes": 97950,
+			"source_mode": 384,
+			"member": "p01/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "candidate/tools/test/ci-full-default.cjs",
+			"sha256": "c3b028113361153ae956dd2684ff8b5c4b00e269a9105044b31c522e4e57d99e",
+			"bytes": 13920,
+			"source_mode": 384,
+			"member": "p01/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "candidate/tools/test/test-ci-full-default.cjs",
+			"sha256": "82016a33282a301af36a24ff138e8db52eb74006bd43cb084c75fcc98e5c9c7c",
+			"bytes": 24632,
+			"source_mode": 384,
+			"member": "p01/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "candidate/tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "589bbbb31b81b9400b09d888b8ea904b7eacfca2c8d487d16425ce8ad5fecb3a",
+			"bytes": 177239,
+			"source_mode": 384,
+			"member": "p01/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift",
+			"sha256": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02",
+			"bytes": 7928,
+			"source_mode": 384,
+			"member": "p01/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift",
+			"sha256": "dd63291c327060482c5a57bc48da53a6521c391afafb2aa0b20e7629cef7a0ad",
+			"bytes": 12561,
+			"source_mode": 384,
+			"member": "p01/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestTransport.swift",
+			"sha256": "5b3e8603ddfdd1c9cff0683e6ffcb3fd66de81e5365e3e764465f17b98e449b3",
+			"bytes": 12937,
+			"source_mode": 384,
+			"member": "p01/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift",
+			"sha256": "c5fc9a251c9de50196e0ef97ee7741ecdc3e01078cbeb7f77fabd6927a2a20c3",
+			"bytes": 18954,
+			"source_mode": 384,
+			"member": "p01/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "dependencies/tools/diagnostics/keyboard_geometry_xctest_receipt.py",
+			"sha256": "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
+			"bytes": 4705,
+			"source_mode": 384,
+			"member": "p01/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "dependencies/tools/diagnostics/tis_evidence_transport.cjs",
+			"sha256": "f62344840267ab207370df974cc344fce83cbe3b758f2a25c986837a41d04269",
+			"bytes": 7888,
+			"source_mode": 384,
+			"member": "p01/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "final-seal.json",
+			"sha256": "5e4af933ce45911abbc0bde9fc327a6790bfbdba87d5fa69297b3e89f4877bea",
+			"bytes": 2772,
+			"source_mode": 384,
+			"member": "p01/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "native-number-row-receiving-v2.patch",
+			"sha256": "1b3a5540957b9c3f42788e5c07a0dfd0c7f323abc25846a8e04e35421388f73f",
+			"bytes": 18683,
+			"source_mode": 384,
+			"member": "p01/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "number-row-step.yml",
+			"sha256": "2f6f1f9a9b0f4e5b301159eb540ce1f96169f511cef752f9ab9e56d3ab722b1f",
+			"bytes": 6498,
+			"source_mode": 384,
+			"member": "p01/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "original/.github/workflows/ci-macos.yml",
+			"sha256": "88b4fb4c83609fd23aad2890aeb3b04873aac8d336aafe303f5f6f7589466cbd",
+			"bytes": 91452,
+			"source_mode": 384,
+			"member": "p01/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "original/tools/test/ci-full-default.cjs",
+			"sha256": "9b2b524b00274e164330472d1bf7fa688ca5dc16bfc9d6bc58eda7947a115ae8",
+			"bytes": 13622,
+			"source_mode": 384,
+			"member": "p01/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "original/tools/test/test-ci-full-default.cjs",
+			"sha256": "908f143f031b9b4aff3c474ffb74279e399f295b371dbab991a58b3c9401b2d1",
+			"bytes": 24449,
+			"source_mode": 384,
+			"member": "p01/f0017.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "original/tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "d73377c2c33d72430437529c78b8f5f621b1cb6bf9ff16bec2f09891ae218982",
+			"bytes": 167445,
+			"source_mode": 384,
+			"member": "p01/f0018.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "registered-inventory.json",
+			"sha256": "6ef939575d27722e145517e8aaf03b6a5eece19391047c4c09f37d36d49322d0",
+			"bytes": 1797,
+			"source_mode": 384,
+			"member": "p01/f0019.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-v2",
+			"original": "source-patch-check.json",
+			"sha256": "81f76b3ad067770da48f37183e715d24a1889a17a60561e67b0af7ee7c912b29",
+			"bytes": 1246,
+			"source_mode": 384,
+			"member": "p01/f0020.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-independent-review",
+			"original": "REPORT.md",
+			"sha256": "443d2c11a1cb30365ee2a06ac95d37b1dccddefcb7966f14529a5db83a83a78c",
+			"bytes": 8271,
+			"source_mode": 384,
+			"member": "p02/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-independent-review",
+			"original": "final-seal.json",
+			"sha256": "5c94d1ec05569ec1b472a152c0cf5cb6a6ec910d28e5adbf3eb42d0b3d0d3a10",
+			"bytes": 354,
+			"source_mode": 384,
+			"member": "p02/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-ci-receiving-independent-review",
+			"original": "source-review-receipt.json",
+			"sha256": "f01fed7f380a72dd0091f65687d9fa324423a59e30b9f01efe0929b9d5f390b0",
+			"bytes": 7985,
+			"source_mode": 384,
+			"member": "p02/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "REPORT.md",
+			"sha256": "0d088bc672cbeb26c1b7138b75fd6b1c5e1a396cd5ec9a64301a6211c9e94799",
+			"bytes": 2561,
+			"source_mode": 384,
+			"member": "p03/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "SUPERVISOR-RECEIVING.md",
+			"sha256": "5626cf4cb5901f56cc101661bf56af21bcd41cebf43097e7bf8c66f60f23bed6",
+			"bytes": 9251,
+			"source_mode": 384,
+			"member": "p03/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "candidate/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+			"sha256": "026be5385514fc3b859e235d5c5202a781ed4e5ade1281da1639b650e460423a",
+			"bytes": 47289,
+			"source_mode": 384,
+			"member": "p03/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedProgramCompatibility.c",
+			"sha256": "34d66c9060226019fcbaea5247bcfa7a00af646f76bceb53a48c187efb757ef8",
+			"bytes": 23281,
+			"source_mode": 384,
+			"member": "p03/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedProgramCompatibility.h",
+			"sha256": "d46e7ff27cbe876935cf6a9a60f98093d69a24b836ecedd1dd1925f4c44836ab",
+			"bytes": 2919,
+			"source_mode": 384,
+			"member": "p03/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeyboardSourceProbe.swift",
+			"sha256": "c8c05f6dfb62086055cad8f4d0095940d48bf5c95a4dda864472ae8ecf356273",
+			"bytes": 6706,
+			"source_mode": 384,
+			"member": "p03/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift",
+			"sha256": "b7e8331bba602456ce21fd3324cae990a8c60bba4b94dcffa141635c94d67b96",
+			"bytes": 1113,
+			"source_mode": 384,
+			"member": "p03/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift",
+			"sha256": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02",
+			"bytes": 7928,
+			"source_mode": 384,
+			"member": "p03/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedAutomationQueryWorker.swift",
+			"sha256": "e499c5a78bbb851bd4e2421855b5589b8114e1544f3bf4e10fd04a34c70664a8",
+			"bytes": 36658,
+			"source_mode": 384,
+			"member": "p03/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedProgramWorker.swift",
+			"sha256": "d30f6b30f844210786d545a77534ca41d6b9d5cd6b89e56e9f154d578755a3b8",
+			"bytes": 20252,
+			"source_mode": 384,
+			"member": "p03/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift",
+			"sha256": "c5fc9a251c9de50196e0ef97ee7741ecdc3e01078cbeb7f77fabd6927a2a20c3",
+			"bytes": 18954,
+			"source_mode": 384,
+			"member": "p03/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "dependencies/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedProgramWorkerTests.swift",
+			"sha256": "b896fdbabfe931a4ffe42aa05dfe05096c06ee5750936b0491252717471a0185",
+			"bytes": 19188,
+			"source_mode": 384,
+			"member": "p03/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "final-seal.json",
+			"sha256": "4334b71c667b20fbc3b5fa65465c99b474cc210a96d8c42faa7f23b6e700c281",
+			"bytes": 2538,
+			"source_mode": 384,
+			"member": "p03/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "main-read-only-dispatch.patch",
+			"sha256": "9e87c77e424b14fbb7e3b8f25f7a3d0f9186657f00a7b999cb754e2a93c6ffb8",
+			"bytes": 553,
+			"source_mode": 384,
+			"member": "p03/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "main-source-receipt.json",
+			"sha256": "1643fa127975dd60ff0f58a238b18db4ed2def5bf7ade8eadd8a4d4161fc918f",
+			"bytes": 1365,
+			"source_mode": 384,
+			"member": "p03/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-source-assessment",
+			"original": "original/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+			"sha256": "72850ab086e8acddce2e8f01bfa90210df1fe6baaa300396c1fd1a7411d05ae5",
+			"bytes": 47133,
+			"source_mode": 384,
+			"member": "p03/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-independent-review",
+			"original": "REPORT.md",
+			"sha256": "6c49451eaf7eb9428e7d5ed6c53f2f4855aae1ca2d97ef037646cbadbb7a5264",
+			"bytes": 4845,
+			"source_mode": 384,
+			"member": "p04/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-independent-review",
+			"original": "final-seal.json",
+			"sha256": "24df2c7349526ec41ec6b1147a4657302e8e8cf98fbe10f61ed12617a63ec80f",
+			"bytes": 392,
+			"source_mode": 384,
+			"member": "p04/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-independent-review",
+			"original": "inventory.json",
+			"sha256": "5872d41e591310402b9510d936047a9e16058cc0a6a540260af405fe5578bf35",
+			"bytes": 15997,
+			"source_mode": 384,
+			"member": "p04/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-main-cli-independent-review",
+			"original": "receipt.json",
+			"sha256": "b2b82ee9b1b324c67892cc23f347684fd8573a468fa53d83dd80fdcaa98cda8d",
+			"bytes": 789,
+			"source_mode": 384,
+			"member": "p04/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "REPORT.md",
+			"sha256": "7bc7e5ec15efa9f6a8b696d6e32aaf4b12e3a51ed95a1e68db700ce48cb1d602",
+			"bytes": 2986,
+			"source_mode": 384,
+			"member": "p05/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "exact-extracted-sections.json",
+			"sha256": "ec6a94c45226d469df08ea1ffe106e71c958a3f02bc397f2a629d040e9e012cf",
+			"bytes": 12081,
+			"source_mode": 384,
+			"member": "p05/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "final-seal.json",
+			"sha256": "4ed30d62a5d5a2bceebe2f29fc2d2dfb834874fd293239d75cdefdc6a18cb2d8",
+			"bytes": 2005,
+			"source_mode": 384,
+			"member": "p05/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/.github/ci/dev_release_qualification_exceptions.json",
+			"sha256": "f4c0c26d1315738a138e8020d0ea7793391c7d87edc3bdb6ed139b58615928e9",
+			"bytes": 2632,
+			"source_mode": 384,
+			"member": "p05/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/.github/ci/stable_release_qualification_exception.json",
+			"sha256": "0b26059b9b266b2890ad340df1920b89414c88c409f4c31b332d06508ba07aa1",
+			"bytes": 6841,
+			"source_mode": 384,
+			"member": "p05/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/.github/workflows/ci-linux.yml",
+			"sha256": "d10ae746a11839c1e2ea28a8294fdeccc7ebd6586bb3a5ead5fa724e483dc13a",
+			"bytes": 239507,
+			"source_mode": 384,
+			"member": "p05/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/.github/workflows/ci-macos.yml",
+			"sha256": "1022048081658a308a6b16caf92af265570682c8238e5504aa2d073f5fd1cd5d",
+			"bytes": 97950,
+			"source_mode": 384,
+			"member": "p05/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/.github/workflows/ci-windows.yml",
+			"sha256": "ce060f00c4af7f297b9c67a715c1d6bf8700f98b33adbea6c35d317d8d8d6b87",
+			"bytes": 72231,
+			"source_mode": 384,
+			"member": "p05/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/.github/workflows/ci.yml",
+			"sha256": "826e8825083745bf92acc11802e410aad09487d4d60818d481f8d471e2369f35",
+			"bytes": 57054,
+			"source_mode": 384,
+			"member": "p05/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/tools/ci/dev-release-qualification.cjs",
+			"sha256": "c92285f0bdbd038b7ed5ecf4675458e4264b8a2b92070d2d209f84a7cee13949",
+			"bytes": 21999,
+			"source_mode": 384,
+			"member": "p05/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/tools/test/ci-full-default.cjs",
+			"sha256": "c3b028113361153ae956dd2684ff8b5c4b00e269a9105044b31c522e4e57d99e",
+			"bytes": 13920,
+			"source_mode": 384,
+			"member": "p05/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/tools/test/ci-pipeline.cjs",
+			"sha256": "218541aa704890e91df5fba31dff48456def4ed4e46e00a733f84b866d4b73f5",
+			"bytes": 20161,
+			"source_mode": 384,
+			"member": "p05/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/tools/test/fixtures/ci-scoped-full-branches.cjs",
+			"sha256": "f01028cf43fc5db5d9b934b94104106ba53cc4e7bddb8e32bd6854359dacf1e3",
+			"bytes": 6302,
+			"source_mode": 384,
+			"member": "p05/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "image/tools/test/fixtures/ci-scoped-full-branches.json",
+			"sha256": "84e1d2319ac0ecba50a74a731189fecfd94c9dbb18cca3fd5a6c16ad5489ad51",
+			"bytes": 43325,
+			"source_mode": 384,
+			"member": "p05/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "imports-manifest.json",
+			"sha256": "0635b95ddf2deb3dc01f0a34789af689ffd0123a868eff31becbaf3cecdd9267",
+			"bytes": 4186,
+			"source_mode": 384,
+			"member": "p05/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "run-focused-guards.cjs",
+			"sha256": "7e95c936a1145986399c8bd97171cab3193d0979c98975eaff1ee30e305676b9",
+			"bytes": 13487,
+			"source_mode": 384,
+			"member": "p05/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-projection-v2",
+			"original": "source-enrollment-receipt.json",
+			"sha256": "f2e4af26f4e86d5cd3d925eae6620887977dfa87c785b01583d9e7c44c843005",
+			"bytes": 1228,
+			"source_mode": 384,
+			"member": "p05/f0017.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-v2-execution",
+			"original": "stderr.log",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p06/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-v2-execution",
+			"original": "stdout.log",
+			"sha256": "600cd06c5c405d0a9a5e97c63ae7dea1f05df2c1a71c9c6982989f7d44af4d9e",
+			"bytes": 959,
+			"source_mode": 384,
+			"member": "p06/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-portable-guard-v2-execution",
+			"original": "terminal-receipt.json",
+			"sha256": "6f4d2020a12f9eb54d22e1bbd4107bcb6baab1afcd760cf9fc4b9fbea12c56ec",
+			"bytes": 1691,
+			"source_mode": 384,
+			"member": "p06/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "BUILD-AND-RECEIVE.md",
+			"sha256": "77ab90f429f71b5c8b42ebf37763d736b4f5254a99dbf9bf68eba52b2586d07b",
+			"bytes": 5082,
+			"source_mode": 384,
+			"member": "p07/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "REPORT.md",
+			"sha256": "dc7e6e9ea01c1a295e9f51ec7ef2e01740f274412503186ef41ace6f282c1f7c",
+			"bytes": 3034,
+			"source_mode": 384,
+			"member": "p07/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "cases.json",
+			"sha256": "dd5e1703316a9b2ff9671f7b24eee58de6014b08f29771bdb4d4ec86e5d0048d",
+			"bytes": 906,
+			"source_mode": 384,
+			"member": "p07/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "final-seal.json",
+			"sha256": "f4dc75d34ed94657864b5d1e80542bc8807594be2ee53c4874519128daa79f00",
+			"bytes": 2122,
+			"source_mode": 384,
+			"member": "p07/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "judge_native_case.py",
+			"sha256": "dc6276bceee636c6898997669329d4e02f9c6d6d9b0d755043446607acf418a4",
+			"bytes": 8578,
+			"source_mode": 384,
+			"member": "p07/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "number_row_cli_supervisor.c",
+			"sha256": "c174e07ec291b36afb7510a8a9f4f8c1aa72c12a5c681d615a4d70483283746f",
+			"bytes": 16571,
+			"source_mode": 384,
+			"member": "p07/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/CPOSIXCompatibility.c",
+			"sha256": "884d6ff39c5ff6ed70e4c0a724755aed88b6a46d3681b4f71f19c359b6fce381",
+			"bytes": 1741,
+			"source_mode": 384,
+			"member": "p07/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedProgramCompatibility.c",
+			"sha256": "34d66c9060226019fcbaea5247bcfa7a00af646f76bceb53a48c187efb757ef8",
+			"bytes": 23281,
+			"source_mode": 384,
+			"member": "p07/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+			"sha256": "08a1a7051843b50945bcf79c33cc6ac440b2fbdec4361589308661a19c476cd2",
+			"bytes": 755,
+			"source_mode": 384,
+			"member": "p07/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedProgramCompatibility.h",
+			"sha256": "d46e7ff27cbe876935cf6a9a60f98093d69a24b836ecedd1dd1925f4c44836ab",
+			"bytes": 2919,
+			"source_mode": 384,
+			"member": "p07/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeyboardSourceProbe.swift",
+			"sha256": "c8c05f6dfb62086055cad8f4d0095940d48bf5c95a4dda864472ae8ecf356273",
+			"bytes": 6706,
+			"source_mode": 384,
+			"member": "p07/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift",
+			"sha256": "b7e8331bba602456ce21fd3324cae990a8c60bba4b94dcffa141635c94d67b96",
+			"bytes": 1113,
+			"source_mode": 384,
+			"member": "p07/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift",
+			"sha256": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02",
+			"bytes": 7928,
+			"source_mode": 384,
+			"member": "p07/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+			"sha256": "72850ab086e8acddce2e8f01bfa90210df1fe6baaa300396c1fd1a7411d05ae5",
+			"bytes": 47133,
+			"source_mode": 384,
+			"member": "p07/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "BUILD-AND-RECEIVE.md",
+			"sha256": "77ab90f429f71b5c8b42ebf37763d736b4f5254a99dbf9bf68eba52b2586d07b",
+			"bytes": 5082,
+			"source_mode": 384,
+			"member": "p08/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "CONTROL-INVENTORY.json",
+			"sha256": "67a9e07b685306e4b8959f504658d540208ec58411227b4d1498ac1bcfb92143",
+			"bytes": 1075,
+			"source_mode": 384,
+			"member": "p08/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "REPORT.md",
+			"sha256": "d86cf8024e6bba5a81f17be848ec534f05aaf32c36a16125d2bb0a98242226f7",
+			"bytes": 3270,
+			"source_mode": 384,
+			"member": "p08/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "SEAL.json",
+			"sha256": "98d31dbfc11be0fdcc081d48ea67301b2e806d7832ef49bab9242d01b13db409",
+			"bytes": 1394,
+			"source_mode": 384,
+			"member": "p08/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "cases.json",
+			"sha256": "dd5e1703316a9b2ff9671f7b24eee58de6014b08f29771bdb4d4ec86e5d0048d",
+			"bytes": 906,
+			"source_mode": 384,
+			"member": "p08/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "judge_native_case.py",
+			"sha256": "eec83ce6ed62d55b059beef28eaa199b1812d95df4f54679bc24c32e634cfc3a",
+			"bytes": 10093,
+			"source_mode": 384,
+			"member": "p08/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "number_row_cli_supervisor.c",
+			"sha256": "836cb65208c338626c1dab26f7a6e177074477f7f06f2e22791c793929897692",
+			"bytes": 16858,
+			"source_mode": 384,
+			"member": "p08/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "original/BUILD-AND-RECEIVE.md",
+			"sha256": "77ab90f429f71b5c8b42ebf37763d736b4f5254a99dbf9bf68eba52b2586d07b",
+			"bytes": 5082,
+			"source_mode": 384,
+			"member": "p08/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "original/cases.json",
+			"sha256": "dd5e1703316a9b2ff9671f7b24eee58de6014b08f29771bdb4d4ec86e5d0048d",
+			"bytes": 906,
+			"source_mode": 384,
+			"member": "p08/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "original/judge_native_case.py",
+			"sha256": "dc6276bceee636c6898997669329d4e02f9c6d6d9b0d755043446607acf418a4",
+			"bytes": 8578,
+			"source_mode": 384,
+			"member": "p08/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "original/number_row_cli_supervisor.c",
+			"sha256": "c174e07ec291b36afb7510a8a9f4f8c1aa72c12a5c681d615a4d70483283746f",
+			"bytes": 16571,
+			"source_mode": 384,
+			"member": "p08/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "original-dependency-pins.json",
+			"sha256": "e65330e0de6d38cc942201b4bc6d075a0c646ce729b3ce481f4986dcf96f604e",
+			"bytes": 1949,
+			"source_mode": 384,
+			"member": "p08/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "reader_controls.py",
+			"sha256": "5d32dd476555168d78aeda9cb2882353265d56ae207a5836c40d4acd48f5d91c",
+			"bytes": 8479,
+			"source_mode": 384,
+			"member": "p08/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v2",
+			"original": "repair.patch",
+			"sha256": "6a78f4777774f2973312278100b3a7f60116edfb8e2a7fbd2de71b159aeb3c16",
+			"bytes": 4421,
+			"source_mode": 384,
+			"member": "p08/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "BUILD-AND-RECEIVE.md",
+			"sha256": "77ab90f429f71b5c8b42ebf37763d736b4f5254a99dbf9bf68eba52b2586d07b",
+			"bytes": 5082,
+			"source_mode": 384,
+			"member": "p09/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "CONTROL-INVENTORY.json",
+			"sha256": "6e4253f9354cf8180f1e3d19f7666b44c55abe78724e5c2cc6d79b2969bcb4fb",
+			"bytes": 1142,
+			"source_mode": 384,
+			"member": "p09/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "REPORT.md",
+			"sha256": "e21e9bbc863d95ab236cfb0b8662cf9e4fc38cb7af87b31499a2755f84abed81",
+			"bytes": 2267,
+			"source_mode": 384,
+			"member": "p09/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "SEAL.json",
+			"sha256": "e6a9df2b60da0373b5de44cdc9a061e6d0b1aa4059778732feedb70ea4273aff",
+			"bytes": 1540,
+			"source_mode": 384,
+			"member": "p09/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "cases.json",
+			"sha256": "dd5e1703316a9b2ff9671f7b24eee58de6014b08f29771bdb4d4ec86e5d0048d",
+			"bytes": 906,
+			"source_mode": 384,
+			"member": "p09/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "controls-repair.patch",
+			"sha256": "83fcdf72e986f4284426711a58b0ee60f9800260e3f97f29ce90baa9607c2230",
+			"bytes": 3420,
+			"source_mode": 384,
+			"member": "p09/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "historical/reader_controls-v2.py",
+			"sha256": "5d32dd476555168d78aeda9cb2882353265d56ae207a5836c40d4acd48f5d91c",
+			"bytes": 8479,
+			"source_mode": 384,
+			"member": "p09/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "judge_native_case.py",
+			"sha256": "eec83ce6ed62d55b059beef28eaa199b1812d95df4f54679bc24c32e634cfc3a",
+			"bytes": 10093,
+			"source_mode": 384,
+			"member": "p09/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "number_row_cli_supervisor.c",
+			"sha256": "836cb65208c338626c1dab26f7a6e177074477f7f06f2e22791c793929897692",
+			"bytes": 16858,
+			"source_mode": 384,
+			"member": "p09/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "original/BUILD-AND-RECEIVE.md",
+			"sha256": "77ab90f429f71b5c8b42ebf37763d736b4f5254a99dbf9bf68eba52b2586d07b",
+			"bytes": 5082,
+			"source_mode": 384,
+			"member": "p09/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "original/cases.json",
+			"sha256": "dd5e1703316a9b2ff9671f7b24eee58de6014b08f29771bdb4d4ec86e5d0048d",
+			"bytes": 906,
+			"source_mode": 384,
+			"member": "p09/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "original/judge_native_case.py",
+			"sha256": "dc6276bceee636c6898997669329d4e02f9c6d6d9b0d755043446607acf418a4",
+			"bytes": 8578,
+			"source_mode": 384,
+			"member": "p09/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "original/number_row_cli_supervisor.c",
+			"sha256": "c174e07ec291b36afb7510a8a9f4f8c1aa72c12a5c681d615a4d70483283746f",
+			"bytes": 16571,
+			"source_mode": 384,
+			"member": "p09/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "original-dependency-pins.json",
+			"sha256": "e65330e0de6d38cc942201b4bc6d075a0c646ce729b3ce481f4986dcf96f604e",
+			"bytes": 1949,
+			"source_mode": 384,
+			"member": "p09/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-native-cli-prototype-v3",
+			"original": "reader_controls.py",
+			"sha256": "7c4187af09f83be548057562670bd2662bcd54b2eb3dc7289234b285313f77c3",
+			"bytes": 9113,
+			"source_mode": 384,
+			"member": "p09/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v2-execution-1",
+			"original": "before.json",
+			"sha256": "854d695020afb8617aa7038412aaa5fc243ed93b1e8eb9edb41c8c39403135fb",
+			"bytes": 1919,
+			"source_mode": 384,
+			"member": "p10/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v2-execution-1",
+			"original": "receipt.json",
+			"sha256": "268dd258841edd880e58ee21bca54d159c517e65bff821743287d8b53718078b",
+			"bytes": 162,
+			"source_mode": 384,
+			"member": "p10/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v2-execution-1",
+			"original": "stderr.log",
+			"sha256": "acb8eda70a6436ce70c8d9bccc91c189fb788b95e982a7d275c866a21cc5e3ed",
+			"bytes": 728,
+			"source_mode": 384,
+			"member": "p10/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v2-execution-1",
+			"original": "stdout.log",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p10/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v3-execution-1",
+			"original": "after.json",
+			"sha256": "90c83d901acc6a0aa7f6533934081359b928fabd4d0786209ae0fe3856656c95",
+			"bytes": 1443,
+			"source_mode": 384,
+			"member": "p11/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v3-execution-1",
+			"original": "before.json",
+			"sha256": "90c83d901acc6a0aa7f6533934081359b928fabd4d0786209ae0fe3856656c95",
+			"bytes": 1443,
+			"source_mode": 384,
+			"member": "p11/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v3-execution-1",
+			"original": "receipt.json",
+			"sha256": "97e33d9a5b915121364f3825191c05f5e79e9fba037554454ecac696398fe91f",
+			"bytes": 4645,
+			"source_mode": 384,
+			"member": "p11/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v3-execution-1",
+			"original": "stderr.log",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p11/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/macos-number-row-reader-v3-execution-1",
+			"original": "stdout.log",
+			"sha256": "80f23aab35e04d48d9749280771a5888610eb15b26741109722edf487d2b059c",
+			"bytes": 3065,
+			"source_mode": 384,
+			"member": "p11/f0005.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-native-cli-prototype",
+			"original": "REPORT.md",
+			"sha256": "4422cbc493ad674abebb201ad4543b1c4a3d44bfcbc290979262698a9b806932",
+			"bytes": 6549,
+			"source_mode": 384,
+			"member": "p12/f0001.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-native-cli-prototype",
+			"original": "review.json",
+			"sha256": "fe32ee8093a562d0eba866fd067d9ca5ee0a3922d1a6dd0920dfb2178815d55e",
+			"bytes": 2596,
+			"source_mode": 384,
+			"member": "p12/f0002.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-native-cli-prototype-v2",
+			"original": "REPORT.md",
+			"sha256": "5a4463ef5a3bb0b269659a42d6b675d71cfb47946a897dab993821f93132bfd2",
+			"bytes": 5465,
+			"source_mode": 384,
+			"member": "p13/f0001.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-native-cli-prototype-v2",
+			"original": "review.json",
+			"sha256": "aef81089dd47bb686cc4bcaf00d156188847cd6a757592739b426990aa6dba3a",
+			"bytes": 1238,
+			"source_mode": 384,
+			"member": "p13/f0002.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-native-cli-prototype-v3",
+			"original": "REPORT.md",
+			"sha256": "1701761c3f90c30052aceb6755d6edb335c0a5b93b9d43f6e9b1a5e83e4dbd35",
+			"bytes": 2565,
+			"source_mode": 384,
+			"member": "p14/f0001.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-native-cli-prototype-v3",
+			"original": "review.json",
+			"sha256": "a134302f8f7a29a6dd6d0db2b80d82665fe7c546e0f4a4fff3ef753a411291f3",
+			"bytes": 682,
+			"source_mode": 384,
+			"member": "p14/f0002.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-reader-v3-receiving",
+			"original": "REPORT.md",
+			"sha256": "6cbdbbf8c2b95823f2e45633ba7b4e8cc4f84b0497e3b6dbf009d655ef25c3bf",
+			"bytes": 2588,
+			"source_mode": 384,
+			"member": "p15/f0001.txt"
+		},
+		{
+			"packet": "reviews/macos-number-row-reader-v3-receiving",
+			"original": "review.json",
+			"sha256": "a0979b727e4c9135ebe05aad6d8eb8d710f5b6d7c748ddbfbe63a6ccf1d2d97e",
+			"bytes": 658,
+			"source_mode": 384,
+			"member": "p15/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "DESIGN.md",
+			"sha256": "ca49dbac773ceeadd7ebee00cdc40ca007c49c7623d523ca2d72a25c1543e753",
+			"bytes": 6407,
+			"source_mode": 384,
+			"member": "p16/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "LOST-PREDECESSORS.md",
+			"sha256": "90c8c9cc991b08c67afda06a5646640f2da497cbea2fc7c3f8ff3edfb139835c",
+			"bytes": 1444,
+			"source_mode": 384,
+			"member": "p16/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "candidate/static/ergopti_plus/linux/adapters/xkb_source_probe.lua",
+			"sha256": "97444bb6613176d384f166e7836a2df3ec831a6f91e89d95d07d3619c1c58b5a",
+			"bytes": 46128,
+			"source_mode": 384,
+			"member": "p16/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "candidate.patch",
+			"sha256": "c3da21912478a621dd8deaf74dcba125683739c1ed92c55ec900022aeb005849",
+			"bytes": 24431,
+			"source_mode": 384,
+			"member": "p16/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "controlled.lua",
+			"sha256": "39e4af78e33c683c1686c6056d665b930c26532e9d6f832e4b42a20bfea3d724",
+			"bytes": 16334,
+			"source_mode": 384,
+			"member": "p16/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "controls-plan.json",
+			"sha256": "1a6e1c1d9722dbc72460b75ed2bb7e43068071973cfce6d497e9e664f9307844",
+			"bytes": 883,
+			"source_mode": 384,
+			"member": "p16/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "dependencies/logger/init.lua",
+			"sha256": "d7ae7f28344e48f5fb2176331111b8bcc6d5cb9f7fd329fa932d7a96c3eaf2a6",
+			"bytes": 27714,
+			"source_mode": 384,
+			"member": "p16/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "files.sha256",
+			"sha256": "2fe0bb3ac74d67dc7e3e123f0b253d8cbdd1be9ce68bb0da6bc7eeed2413d710",
+			"bytes": 1439,
+			"source_mode": 384,
+			"member": "p16/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "parts/bind.lua.txt",
+			"sha256": "0213fc6fe8948185e9e59873158abd07465b031042526134a9419d07b23dfdec",
+			"bytes": 3677,
+			"source_mode": 384,
+			"member": "p16/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "parts/cookies.lua.txt",
+			"sha256": "b810ec6ccb5218c482b3583ae678909de9fd52e9ce2365f39a36ca1d60c05185",
+			"bytes": 5769,
+			"source_mode": 384,
+			"member": "p16/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "parts/lifecycle.lua.txt",
+			"sha256": "90a890cfdf9208eea9dfe6d83c67fc44ee7ab979851ad1389b0c708269d34115",
+			"bytes": 8881,
+			"source_mode": 384,
+			"member": "p16/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "preimages/static/ergopti_plus/linux/adapters/xkb_source_probe.lua",
+			"sha256": "6efcf4ac0b2ef59f5a61765c5cbae71f1518961268bb82131ed66943ac08c609",
+			"bytes": 29092,
+			"source_mode": 384,
+			"member": "p16/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "prepare.py",
+			"sha256": "68f5018f452959ad369fc6fa616630358e59eb27959c7516b95ae135aa9bb6a0",
+			"bytes": 4914,
+			"source_mode": 384,
+			"member": "p16/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "preservation.json",
+			"sha256": "a76b9967b9369636062722cf9052d54eb9dfd7c46b415960dba817ba7f5d9773",
+			"bytes": 209,
+			"source_mode": 384,
+			"member": "p16/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "receipt.json",
+			"sha256": "84935c583bf374df001b69e313e47ca5f16b5af819c03dae91e3e8df008a1222",
+			"bytes": 3246,
+			"source_mode": 384,
+			"member": "p16/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "source-frame.json",
+			"sha256": "79bc136e1948dea4f3639b845124661b64223fc340b01dc8beb9b34f16dea5b3",
+			"bytes": 1746,
+			"source_mode": 384,
+			"member": "p16/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "PORTABLE-RECEIVING-CONCEPT.md",
+			"sha256": "6bbf4d5e597d72efc933e591bb74d4545efc1377edef4ea9e61a195fc7519e2e",
+			"bytes": 4032,
+			"source_mode": 384,
+			"member": "p17/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "REPORT.md",
+			"sha256": "c13c7cf7dad39af5dca633891396ba93dd3786773efd7c2978d24dee8ec7f6b3",
+			"bytes": 2781,
+			"source_mode": 384,
+			"member": "p17/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "case-census.json",
+			"sha256": "854528b16122d50c367e9750cc733edc6b040a550c453c6741710e5da005d683",
+			"bytes": 2885,
+			"source_mode": 384,
+			"member": "p17/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "controlled-v3.lua",
+			"sha256": "9ae8c8785f702847527ec73b53ef8663ee9f09f12d91266e2a80ab0867ae00ba",
+			"bytes": 18288,
+			"source_mode": 384,
+			"member": "p17/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "controls.patch",
+			"sha256": "de0779a7d6cba0cdde345a0ed6003b47ed7828e54cf2ae97bcd970e8d0f31766",
+			"bytes": 3040,
+			"source_mode": 384,
+			"member": "p17/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "dependencies.json",
+			"sha256": "008360e46e4aecdcae6acf119f1ca40378812ae8235aa9c7c53c0e664a6a6a56",
+			"bytes": 888,
+			"source_mode": 384,
+			"member": "p17/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "files.sha256",
+			"sha256": "9d5221cb7cc80f0e1490e7df17d7ba58934bce12082497031880382d93424dd1",
+			"bytes": 754,
+			"source_mode": 384,
+			"member": "p17/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "preimage-controlled.lua.txt",
+			"sha256": "39e4af78e33c683c1686c6056d665b930c26532e9d6f832e4b42a20bfea3d724",
+			"bytes": 16334,
+			"source_mode": 384,
+			"member": "p17/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "prepare.py",
+			"sha256": "93f4406db74a61fc3ae73149ae3a792a14652766f65b3d9b7790642b7d31e9d1",
+			"bytes": 6006,
+			"source_mode": 384,
+			"member": "p17/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-controls-v3",
+			"original": "receipt.json",
+			"sha256": "2ff3b06ea6acb5124db5e147131afebd99ad3bcb1490024ce08697bde9263bda",
+			"bytes": 2076,
+			"source_mode": 384,
+			"member": "p17/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-controlled-v3-execution-1",
+			"original": "lua5.4.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p18/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-controlled-v3-execution-1",
+			"original": "lua5.4.stdout",
+			"sha256": "c1e605740b782cb76eda73ca82c15f0f0f7b694a1b4245e1716f435ea9d6cc04",
+			"bytes": 2606,
+			"source_mode": 384,
+			"member": "p18/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-controlled-v3-execution-1",
+			"original": "luajit.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p18/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-controlled-v3-execution-1",
+			"original": "luajit.stdout",
+			"sha256": "c1e605740b782cb76eda73ca82c15f0f0f7b694a1b4245e1716f435ea9d6cc04",
+			"bytes": 2606,
+			"source_mode": 384,
+			"member": "p18/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-controlled-v3-execution-1",
+			"original": "plan.json",
+			"sha256": "6ff00c2e5976cb4dee1f88ac2c30842cb57d477e6c4f9a028e5b8b6f8363dba8",
+			"bytes": 1775,
+			"source_mode": 384,
+			"member": "p18/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-controlled-v3-execution-1",
+			"original": "receipt.json",
+			"sha256": "94f7269eef774ff71dbb37a0e71e06a91f15ec302d692c34ab56214d91aa3f00",
+			"bytes": 151,
+			"source_mode": 384,
+			"member": "p18/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-controlled-v3-execution-1",
+			"original": "receiving-receipt.json",
+			"sha256": "99a9400b07cd1bff83060790249db7523362e9325ae33540aacc406189311147",
+			"bytes": 549,
+			"source_mode": 384,
+			"member": "p18/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "README.md",
+			"sha256": "78e68d36a1de03c8b986bcaa074ca11a9b14d9efc3e62f976468552956aab1eb",
+			"bytes": 5184,
+			"source_mode": 384,
+			"member": "p19/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "candidate-types.h",
+			"sha256": "96b02b21619deb2148b279e2b8dc183b311f1ab66aa57c7dbcef669d285691be",
+			"bytes": 571,
+			"source_mode": 384,
+			"member": "p19/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "candidate.patch",
+			"sha256": "cdfa22722b46a0c57d5d0c4152c6b12956ca5a184edc4867335cfa1958ed3ace",
+			"bytes": 17420,
+			"source_mode": 384,
+			"member": "p19/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "cookie_experiment.c",
+			"sha256": "a3a8415bc24d942345980fad67240c6d1b7fad0a26297c04cd1cdfef839e2c3f",
+			"bytes": 11699,
+			"source_mode": 384,
+			"member": "p19/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "files.sha256",
+			"sha256": "475dbbaca3aa9ef34b696abda4181e73913204c44c007e0f50eec626f3bea298",
+			"bytes": 1122,
+			"source_mode": 384,
+			"member": "p19/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "native-prerequisite-pins.json",
+			"sha256": "ecf85d39d6e0bd92d4da3d6c0d30aac364b90b3898af28a369db7a61921b01ba",
+			"bytes": 2966,
+			"source_mode": 384,
+			"member": "p19/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "native_fixture_family.py.txt",
+			"sha256": "7545c2d6aa8d48e5d48557b2b218e6d8a864eeb42ae761e055d4f917cdf06334",
+			"bytes": 13489,
+			"source_mode": 384,
+			"member": "p19/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "official-XExtInt.c.txt",
+			"sha256": "de4bdb02e55cc4937c332fbdd00bd053164c6ff983fb8af45820c65fe4fd2dfd",
+			"bytes": 74363,
+			"source_mode": 384,
+			"member": "p19/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "official-source-pins.json",
+			"sha256": "d01c7736b56319d3e9d25de4c11540e2194f23fc5a098bd1f1c98a0b18773105",
+			"bytes": 1411,
+			"source_mode": 384,
+			"member": "p19/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "owned_display.py",
+			"sha256": "467f14fd359abeec758c33919319f5679116c8b30ac0fb432e9376fd0ab6fda3",
+			"bytes": 5749,
+			"source_mode": 384,
+			"member": "p19/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "prepare_source.py",
+			"sha256": "bff99eac070ad8ada3ca6708d302e0e934e9f38a034872ba8e5f89ae37d966f5",
+			"bytes": 2684,
+			"source_mode": 384,
+			"member": "p19/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "receipt.json",
+			"sha256": "2c5983ec1b14d5b16676a9ff3a50a6cd7dd560ef29094c7421551390b56111c8",
+			"bytes": 4815,
+			"source_mode": 384,
+			"member": "p19/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "run_prepared.py",
+			"sha256": "1148eda37440cd155c13707b42b3ffdb791cd1c98a59b0c83460c3fb74a94ae7",
+			"bytes": 3046,
+			"source_mode": 384,
+			"member": "p19/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-recovered-preparation-v2",
+			"original": "source-contract-excerpt.txt",
+			"sha256": "deade00f7c8d8ecc748e954a3c1d83edf48d462297f03fcef7777cb587592171",
+			"bytes": 576,
+			"source_mode": 384,
+			"member": "p19/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "README.md",
+			"sha256": "78e68d36a1de03c8b986bcaa074ca11a9b14d9efc3e62f976468552956aab1eb",
+			"bytes": 5184,
+			"source_mode": 384,
+			"member": "p20/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "approved-runner.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "approved-runner.stdout",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "candidate-types.h",
+			"sha256": "96b02b21619deb2148b279e2b8dc183b311f1ab66aa57c7dbcef669d285691be",
+			"bytes": 571,
+			"source_mode": 384,
+			"member": "p20/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "candidate.patch",
+			"sha256": "cdfa22722b46a0c57d5d0c4152c6b12956ca5a184edc4867335cfa1958ed3ace",
+			"bytes": 17420,
+			"source_mode": 384,
+			"member": "p20/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "compile-plan.json",
+			"sha256": "3db9c25d29c9f465baf49116899e0120821205c7ad4038374ea9ace870c14dbb",
+			"bytes": 410,
+			"source_mode": 384,
+			"member": "p20/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "compile-receipt.json",
+			"sha256": "5e37c7f10788af89d0740b6ac09347adcb89ebf390dafd4ed8af4299ca4437e3",
+			"bytes": 115,
+			"source_mode": 384,
+			"member": "p20/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "compiler.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "compiler.stdout",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "cookie_experiment.c",
+			"sha256": "a3a8415bc24d942345980fad67240c6d1b7fad0a26297c04cd1cdfef839e2c3f",
+			"bytes": 11699,
+			"source_mode": 384,
+			"member": "p20/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "family-receipts.jsonl",
+			"sha256": "2711536119af3be652d3eb599c5660920b29b93894964bae6b78d232c0436f15",
+			"bytes": 182,
+			"source_mode": 384,
+			"member": "p20/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "family-summary.json",
+			"sha256": "62994fe181bf19b7867f2fc5d99b9cda09cc34b926c8993f421ef58b8d497404",
+			"bytes": 333,
+			"source_mode": 384,
+			"member": "p20/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "family.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "family.stdout",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "files.sha256",
+			"sha256": "475dbbaca3aa9ef34b696abda4181e73913204c44c007e0f50eec626f3bea298",
+			"bytes": 1122,
+			"source_mode": 384,
+			"member": "p20/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "native-prerequisite-pins.json",
+			"sha256": "ecf85d39d6e0bd92d4da3d6c0d30aac364b90b3898af28a369db7a61921b01ba",
+			"bytes": 2966,
+			"source_mode": 384,
+			"member": "p20/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "native_fixture_family.py.txt",
+			"sha256": "7545c2d6aa8d48e5d48557b2b218e6d8a864eeb42ae761e055d4f917cdf06334",
+			"bytes": 13489,
+			"source_mode": 384,
+			"member": "p20/f0017.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "official-XExtInt.c.txt",
+			"sha256": "de4bdb02e55cc4937c332fbdd00bd053164c6ff983fb8af45820c65fe4fd2dfd",
+			"bytes": 74363,
+			"source_mode": 384,
+			"member": "p20/f0018.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "official-source-pins.json",
+			"sha256": "d01c7736b56319d3e9d25de4c11540e2194f23fc5a098bd1f1c98a0b18773105",
+			"bytes": 1411,
+			"source_mode": 384,
+			"member": "p20/f0019.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "owned_display.py",
+			"sha256": "467f14fd359abeec758c33919319f5679116c8b30ac0fb432e9376fd0ab6fda3",
+			"bytes": 5749,
+			"source_mode": 384,
+			"member": "p20/f0020.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "prepare_source.py",
+			"sha256": "bff99eac070ad8ada3ca6708d302e0e934e9f38a034872ba8e5f89ae37d966f5",
+			"bytes": 2684,
+			"source_mode": 384,
+			"member": "p20/f0021.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "receipt.json",
+			"sha256": "2c5983ec1b14d5b16676a9ff3a50a6cd7dd560ef29094c7421551390b56111c8",
+			"bytes": 4815,
+			"source_mode": 384,
+			"member": "p20/f0022.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "run_prepared.py",
+			"sha256": "1148eda37440cd155c13707b42b3ffdb791cd1c98a59b0c83460c3fb74a94ae7",
+			"bytes": 3046,
+			"source_mode": 384,
+			"member": "p20/f0023.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "runner.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0024.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "runner.stdout",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p20/f0025.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "source-contract-excerpt.txt",
+			"sha256": "deade00f7c8d8ecc748e954a3c1d83edf48d462297f03fcef7777cb587592171",
+			"bytes": 576,
+			"source_mode": 384,
+			"member": "p20/f0026.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-c-controlled-execution-1",
+			"original": "receipt.json",
+			"sha256": "7e258dfc981669674b93084325d6d7edbbdafda3a12f0714a8aa2a84e27fc5f4",
+			"bytes": 195,
+			"source_mode": 384,
+			"member": "p21/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-c-controlled-execution-1",
+			"original": "stderr.log",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p21/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-c-controlled-execution-1",
+			"original": "stdout.log",
+			"sha256": "d7640d621a209cf015ba5e7a3b3d42b8aa0d7c716ca5def591a1f4bcdaaeb1b7",
+			"bytes": 58,
+			"source_mode": 384,
+			"member": "p21/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-receiving-scope-assessment",
+			"original": "ASSESSMENT.md",
+			"sha256": "88d07c3361cb1537187cd2db64df3d1c19497f8afe5a2e586673161efdb98375",
+			"bytes": 5994,
+			"source_mode": 384,
+			"member": "p22/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-receiving-scope-assessment",
+			"original": "files.sha256",
+			"sha256": "dfca325242725e21b8f9787a0048362fe6fb299e8b3972b918fd7b9ce7d3d1e7",
+			"bytes": 159,
+			"source_mode": 384,
+			"member": "p22/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-receiving-scope-assessment",
+			"original": "receipt.json",
+			"sha256": "6debf23399c7304f0fe3b26c81bc41923acc71f7220f9c09d5f8d4e3d595e46d",
+			"bytes": 2271,
+			"source_mode": 384,
+			"member": "p22/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "REPORT.md",
+			"sha256": "12601ce27895b2ffe6ef657ee7bf2b7c3097ed90d7500f7820d67ad3a9326bff",
+			"bytes": 5596,
+			"source_mode": 384,
+			"member": "p23/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "alpine-source.response.txt",
+			"sha256": "b0301324601179054390b34b5ff0dfb8f591e43f40009b877e6882771542afdb",
+			"bytes": 967,
+			"source_mode": 384,
+			"member": "p23/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "arch-historical.response.txt",
+			"sha256": "a116f9de3e17d885029d63e41aa889649ad2b76e4d94b5a6db0ff0e10fc04ec6",
+			"bytes": 1227,
+			"source_mode": 384,
+			"member": "p23/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "debian-packaging-diff.txt",
+			"sha256": "e1b17ff94b55c2ef53beaa9d15a912c3a32fab40d0c7de6fe034524752e6f8d7",
+			"bytes": 70326,
+			"source_mode": 384,
+			"member": "p23/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "debian-results.json",
+			"sha256": "88ec1c036ce1af6f093a5e83b2f7fe2138a8b43501396ed901b3ef5e347f0dd0",
+			"bytes": 500,
+			"source_mode": 384,
+			"member": "p23/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "fetch-results.json",
+			"sha256": "3dc8787fd7ac3d8fa12c6973935fbf9f3d690d1988605e5918b4b5aa958eabd7",
+			"bytes": 2278,
+			"source_mode": 384,
+			"member": "p23/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "fetch_metadata.py",
+			"sha256": "549c9e07dffd36a078f4fc0fd7542c513517c72b98593aad78059d03ba92bcb3",
+			"bytes": 2027,
+			"source_mode": 384,
+			"member": "p23/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "fetch_sources.py",
+			"sha256": "21a5e478419430c4e21b2375c9c0ee36ac2289b0d1915aabb503ba767dd8c460",
+			"bytes": 1937,
+			"source_mode": 384,
+			"member": "p23/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "files.sha256",
+			"sha256": "5c6d4a05c4a204a3753e2c6038be0fa775ba94f9b3cc8d059f45ef13a085cd82",
+			"bytes": 1816,
+			"source_mode": 384,
+			"member": "p23/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "impact-plan.json",
+			"sha256": "d2c988c004ce15826648257c118f34c214bcee43e779ba0b16382e07780b5167",
+			"bytes": 5059,
+			"source_mode": 384,
+			"member": "p23/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "libxi_1.8.2-1.dsc",
+			"sha256": "06669e65a5a382b97c6c1bf886dca7b6da0ebbcda17862243e53fee700195bb8",
+			"bytes": 2286,
+			"source_mode": 384,
+			"member": "p23/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "metadata-requests.json",
+			"sha256": "6ec326d5a8675af55d5041070bd60b2f5c3a0e8b77439879d38065b74431a138",
+			"bytes": 5094,
+			"source_mode": 384,
+			"member": "p23/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "nix.response.txt",
+			"sha256": "06e1ef69116187d0217ec54716789bf61a8d85c155eaf7174755637f9460e6f8",
+			"bytes": 206930,
+			"source_mode": 384,
+			"member": "p23/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "provider-excerpts.json",
+			"sha256": "cb947e92e11610cc1eca65acf1a8ef4c229163abc3dfb7fa61241d2344b67917",
+			"bytes": 4516,
+			"source_mode": 384,
+			"member": "p23/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "receipt.json",
+			"sha256": "d1e9e56a1206b1b8d931cbe13eed87c801f4ae67e0375029d54ae79c890625f5",
+			"bytes": 3294,
+			"source_mode": 384,
+			"member": "p23/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "seal_audit.py",
+			"sha256": "8e6f9d66b8a53833e01c675c395cf2e3296f39baf6e145468187ecf2135d5aa4",
+			"bytes": 5953,
+			"source_mode": 384,
+			"member": "p23/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "source-fetch-results.json",
+			"sha256": "97260ac1094a543cbaf9a98ca35447a19add51e3e5b49713a6a0c413d189074e",
+			"bytes": 2322,
+			"source_mode": 384,
+			"member": "p23/f0017.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "upstream-Makefile.am.txt",
+			"sha256": "c5a3840a0d3de69cfb7a620db29914e1ee4bbc87281cd85a16a6404c0cb1c523",
+			"bytes": 1672,
+			"source_mode": 384,
+			"member": "p23/f0018.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "void-soname.response.txt",
+			"sha256": "7426e7593934c0ce05025735746c4dd6d867156586781aa5ed3d38b5c550d58b",
+			"bytes": 181110,
+			"source_mode": 384,
+			"member": "p23/f0019.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "xbps.response.txt",
+			"sha256": "b4f5cb5b84a73917ffdd2a321c05e9c5b679482fa81e4d20307476921eceaee9",
+			"bytes": 802,
+			"source_mode": 384,
+			"member": "p23/f0020.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "REPORT.md",
+			"sha256": "bc3d72a2adc3785102cbcc56d29b0db3f4fb19648d957bd8cf5091f9a6407d12",
+			"bytes": 5619,
+			"source_mode": 384,
+			"member": "p24/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "files.sha256",
+			"sha256": "30c507c0094694d47b3c279914418e0e1c62aa8b5c2ccc8096c59389debb0883",
+			"bytes": 2170,
+			"source_mode": 384,
+			"member": "p24/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "inventory.json",
+			"sha256": "b808aa4f9796e3d8d207f0e28ba31e779956ec478bb2f74143a8aaa0baa9b992",
+			"bytes": 6330,
+			"source_mode": 384,
+			"member": "p24/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "receipt.json",
+			"sha256": "9f3ae1d73429a296ad551ca3e92ccfdf030237d84b607a976742372f360e9d49",
+			"bytes": 2264,
+			"source_mode": 384,
+			"member": "p24/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/components/lua5.4.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/components/lua5.4.stdout",
+			"sha256": "c1e605740b782cb76eda73ca82c15f0f0f7b694a1b4245e1716f435ea9d6cc04",
+			"bytes": 2606,
+			"source_mode": 384,
+			"member": "p24/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/components/luajit.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/components/luajit.stdout",
+			"sha256": "c1e605740b782cb76eda73ca82c15f0f0f7b694a1b4245e1716f435ea9d6cc04",
+			"bytes": 2606,
+			"source_mode": 384,
+			"member": "p24/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/components/plan.json",
+			"sha256": "6ff00c2e5976cb4dee1f88ac2c30842cb57d477e6c4f9a028e5b8b6f8363dba8",
+			"bytes": 1775,
+			"source_mode": 384,
+			"member": "p24/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/components/receipt.json",
+			"sha256": "94f7269eef774ff71dbb37a0e71e06a91f15ec302d692c34ab56214d91aa3f00",
+			"bytes": 151,
+			"source_mode": 384,
+			"member": "p24/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/components/receiving-receipt.json",
+			"sha256": "99a9400b07cd1bff83060790249db7523362e9325ae33540aacc406189311147",
+			"bytes": 549,
+			"source_mode": 384,
+			"member": "p24/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/approved-runner.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/approved-runner.stdout",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/compile-plan.json",
+			"sha256": "3db9c25d29c9f465baf49116899e0120821205c7ad4038374ea9ace870c14dbb",
+			"bytes": 410,
+			"source_mode": 384,
+			"member": "p24/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/compile-receipt.json",
+			"sha256": "5e37c7f10788af89d0740b6ac09347adcb89ebf390dafd4ed8af4299ca4437e3",
+			"bytes": 115,
+			"source_mode": 384,
+			"member": "p24/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/compiler.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/compiler.stdout",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0017.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/family-receipts.jsonl",
+			"sha256": "2711536119af3be652d3eb599c5660920b29b93894964bae6b78d232c0436f15",
+			"bytes": 182,
+			"source_mode": 384,
+			"member": "p24/f0018.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/family-summary.json",
+			"sha256": "62994fe181bf19b7867f2fc5d99b9cda09cc34b926c8993f421ef58b8d497404",
+			"bytes": 333,
+			"source_mode": 384,
+			"member": "p24/f0019.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/family.stderr",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0020.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-controlled-v3-receiving-independent-review",
+			"original": "reviewed-evidence/latest-native/family.stdout",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"bytes": 0,
+			"source_mode": 384,
+			"member": "p24/f0021.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-native-cookie-preparation-v2-independent-review",
+			"original": "REPORT.md",
+			"sha256": "a3f86457056e414e89cbcad4377da45114390eb70a12ff3e3e75cba58e4f7243",
+			"bytes": 5602,
+			"source_mode": 384,
+			"member": "p25/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-native-cookie-preparation-v2-independent-review",
+			"original": "files.sha256",
+			"sha256": "0ecb6f210a2a9099559aa53b032f0a37816d541980b7fd273a81beed7e2b202c",
+			"bytes": 236,
+			"source_mode": 384,
+			"member": "p25/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-native-cookie-preparation-v2-independent-review",
+			"original": "inventory.json",
+			"sha256": "1298f3a56719dc9decd19a622526b15354d7a381a45c8895413ca3ad35831226",
+			"bytes": 1615,
+			"source_mode": 384,
+			"member": "p25/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10-recovery/xi2-native-cookie-preparation-v2-independent-review",
+			"original": "receipt.json",
+			"sha256": "f8b98fa1ffdd3dd260dd7a6a36aceb4a3fc28e562d4ba2de4973a667325a409d",
+			"bytes": 679,
+			"source_mode": 384,
+			"member": "p25/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "PLAN.md",
+			"sha256": "25a6cdd05a00dc6a22e20e8901e54396363d1a8b36d5ee1da5ac2aaa82eeb856",
+			"bytes": 7574,
+			"source_mode": 384,
+			"member": "p26/f0001.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "checksums.sha256",
+			"sha256": "cfde0a6d31e489c44c38f177c0d2d60e1b309da64e0c2fda036d5c473fa592ad",
+			"bytes": 2445,
+			"source_mode": 384,
+			"member": "p26/f0002.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/static/ergopti_plus/macos/adapters/apple_shortcuts_native.lua",
+			"sha256": "e70cf287cf175195d6e7985fa9368a1ea04f5cab5696b51b0e206aa964684edc",
+			"bytes": 10146,
+			"source_mode": 384,
+			"member": "p26/f0003.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/static/ergopti_plus/macos/adapters/apple_shortcuts_query.js",
+			"sha256": "a5c66420ab92dae276c483f0047eeb27b5eac2ad0bf869fa44449368b0ee2f10",
+			"bytes": 3515,
+			"source_mode": 384,
+			"member": "p26/f0004.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedAutomationQueryWorker.swift",
+			"sha256": "e499c5a78bbb851bd4e2421855b5589b8114e1544f3bf4e10fd04a34c70664a8",
+			"bytes": 36658,
+			"source_mode": 384,
+			"member": "p26/f0005.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedAutomationQueryWorkerTests.swift",
+			"sha256": "dbc8a50dcddbfb532967a46f1c1cd103bc059dbc7b52e25024206d07c5c499e9",
+			"bytes": 24793,
+			"source_mode": 384,
+			"member": "p26/f0006.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/tools/diagnostics/apple_shortcuts_probe/README.md",
+			"sha256": "ae42ce537f2476975b84d2d7489a667dc577bd767fa268949f80fd13088d9abf",
+			"bytes": 10838,
+			"source_mode": 384,
+			"member": "p26/f0007.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/tools/diagnostics/apple_shortcuts_probe/chosen_id_backend.py",
+			"sha256": "5305e63ddee3eb65edf7156b65c3f817c9134faeb6cf56d85066383b5199eeae",
+			"bytes": 12145,
+			"source_mode": 384,
+			"member": "p26/f0008.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/tools/diagnostics/apple_shortcuts_probe/discover.js",
+			"sha256": "cc8d43d9b9a0eac5b4f29ffb0aa601e604592c7c3b96c305479a6a83b5140fcc",
+			"bytes": 5182,
+			"source_mode": 384,
+			"member": "p26/f0009.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/tools/diagnostics/apple_shortcuts_probe/run_probe.py",
+			"sha256": "eeb75f1686a4fb50e85e9e79e8a632f344c4e19d756fab7f5e086237520ab257",
+			"bytes": 17972,
+			"source_mode": 384,
+			"member": "p26/f0010.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/tools/diagnostics/apple_shortcuts_probe/test_probe.cjs",
+			"sha256": "4efbfa9de5bca4cadf209fd11f0855789139e932b5a8f87742b9224ecf598b92",
+			"bytes": 15830,
+			"source_mode": 384,
+			"member": "p26/f0011.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/tools/diagnostics/apple_shortcuts_probe/test_probe.py",
+			"sha256": "6c6ef1999e30423b86cdc683eb96a60fd93db65b769acb3a994d0c1478b44b93",
+			"bytes": 32165,
+			"source_mode": 384,
+			"member": "p26/f0012.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "preimages/tools/diagnostics/macos_owned_process.py",
+			"sha256": "9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98",
+			"bytes": 19070,
+			"source_mode": 384,
+			"member": "p26/f0013.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "receipt.json",
+			"sha256": "dc9cac954ad290577bd567e38f2e4102a05983e6272bc8d09f0f3c2733be1409",
+			"bytes": 6515,
+			"source_mode": 384,
+			"member": "p26/f0014.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/AE.h",
+			"sha256": "c18090b0c8579856e9a067b03f93dad1ea2009429948f1bdd21677cbfa064855",
+			"bytes": 935,
+			"source_mode": 384,
+			"member": "p26/f0015.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/AEDataModel.h",
+			"sha256": "f1e1ac5a56cf7a5b75bd40e5220719636ad997aa51f8a98f6a003cf246e8b6ef",
+			"bytes": 109882,
+			"source_mode": 384,
+			"member": "p26/f0016.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/AERegistry.h",
+			"sha256": "8f9b7266f707b392005304d44ec1e046b230545d090924d2c980dc7cb0e097f9",
+			"bytes": 49913,
+			"source_mode": 384,
+			"member": "p26/f0017.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/AppleEvents.h",
+			"sha256": "f75e4312045a486119b247b4f7d76859d74fb754e7c1ef79cfddbf5a887af3ee",
+			"bytes": 22133,
+			"source_mode": 384,
+			"member": "p26/f0018.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/MacErrors.h",
+			"sha256": "c1843d1e6719c06ee70f04f2cd086b509cf1d49fbfc4571a9b7bf71584372588",
+			"bytes": 170569,
+			"source_mode": 384,
+			"member": "p26/f0019.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/SBApplication.h",
+			"sha256": "7722afd0a268c14322b151a2eb2b008b5fc80b86445a506ad71bfaceb8424ea3",
+			"bytes": 2532,
+			"source_mode": 384,
+			"member": "p26/f0020.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/SBObject.h",
+			"sha256": "3cf0a95445ffa63239533e985e7e9b249c4240edadb6e83d0a04b1d235d29cb5",
+			"bytes": 2932,
+			"source_mode": 384,
+			"member": "p26/f0021.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/ShortcutsEvents.h",
+			"sha256": "5d8a527c47526b98dafe5fd91cabbb609893a8bb805bcfd6e71b3a588539c24c",
+			"bytes": 4927,
+			"source_mode": 384,
+			"member": "p26/f0022.txt"
+		},
+		{
+			"packet": "continuation-2026-10-10/apple-shortcuts-no-prompt-source-assessment",
+			"original": "sources/libshortcuts.m",
+			"sha256": "87e4bf626776219b590f187752e98dfa5505abd0e5a49f2399db4b15689cc046",
+			"bytes": 2487,
+			"source_mode": 384,
+			"member": "p26/f0023.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "checksums.sha256",
+			"sha256": "740e387e1ef2d20575f1fe207f92ce42e11b70f95ded8ff377e77f1901a9b235",
+			"bytes": 1054,
+			"source_mode": 384,
+			"member": "p27/f0001.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "preimages/.github/workflows/ci-windows.yml",
+			"sha256": "ce060f00c4af7f297b9c67a715c1d6bf8700f98b33adbea6c35d317d8d8d6b87",
+			"bytes": 72231,
+			"source_mode": 384,
+			"member": "p27/f0002.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "preimages/tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "d73377c2c33d72430437529c78b8f5f621b1cb6bf9ff16bec2f09891ae218982",
+			"bytes": 167445,
+			"source_mode": 384,
+			"member": "p27/f0003.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "preimages/tools/test/test-managed-ollama-protocol.cjs",
+			"sha256": "036e0ee76f151b1ecba7af52596efc5b03a371f57ff8ccaf672a1c70d634be68",
+			"bytes": 16278,
+			"source_mode": 384,
+			"member": "p27/f0004.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "preservation.json",
+			"sha256": "b773f70c47616b3064b69fb320e457245e0dde31969559a213afdd9fff5cfe10",
+			"bytes": 3318,
+			"source_mode": 384,
+			"member": "p27/f0005.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "proposed-current-hunk-application/.github/workflows/ci-windows.yml",
+			"sha256": "9fda9bad22d0eec1c4d5394f13f657e66c473aaf705ec1e963ad1f5f4c6cb3cc",
+			"bytes": 72291,
+			"source_mode": 384,
+			"member": "p27/f0006.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "proposed-current-hunk-application/tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "44c78c503f54851a7d25a6c429bdc375c9013184275b07fd0f91acef17834e43",
+			"bytes": 173442,
+			"source_mode": 384,
+			"member": "p27/f0007.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "proposed-current-hunk-application/tools/test/test-managed-ollama-protocol.cjs",
+			"sha256": "bc0f30fdbf3a24281d98e46f8bd779ceabca05fc3ab0b74dd189cbe2b23cfac5",
+			"bytes": 20436,
+			"source_mode": 384,
+			"member": "p27/f0008.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "prospective-disjoint-union/tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "d3210446036c3afc5d2767e9e208da592efa29a18e92ad5d1f3ce7a6840e8d86",
+			"bytes": 183236,
+			"source_mode": 384,
+			"member": "p27/f0009.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-source-receiving",
+			"original": "review.json",
+			"sha256": "cde91694eb8370155bdce22dcfe897035b8c716a061e24c9b569de3045d036ad",
+			"bytes": 4373,
+			"source_mode": 384,
+			"member": "p27/f0010.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "actual-c8-parent/.github/workflows/ci-windows.yml",
+			"sha256": "0515bb7dc078f06251c0d9a01ad64958eb20f658ebb669efc6c5fa07d1911718",
+			"bytes": 72259,
+			"source_mode": 384,
+			"member": "p28/f0001.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "actual-c8-parent/tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "1c2cf4e8780e238375c7e03419173518d0bea595c9ad238bb29b5b80a0004cdb",
+			"bytes": 173422,
+			"source_mode": 384,
+			"member": "p28/f0002.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "actual-c8-parent/tools/test/test-managed-ollama-protocol.cjs",
+			"sha256": "e75ec45d4ecb07b48f44d01697180c342ed452e5c106f11915fcc53d857642b0",
+			"bytes": 16278,
+			"source_mode": 384,
+			"member": "p28/f0003.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "actual-c8-post/.github/workflows/ci-windows.yml",
+			"sha256": "f07ca08dab15ff17a1e71b54de7999cdeff7840c873cdffba341198a95b000d2",
+			"bytes": 72319,
+			"source_mode": 384,
+			"member": "p28/f0004.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "actual-c8-post/tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "44c78c503f54851a7d25a6c429bdc375c9013184275b07fd0f91acef17834e43",
+			"bytes": 173442,
+			"source_mode": 384,
+			"member": "p28/f0005.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "actual-c8-post/tools/test/test-managed-ollama-protocol.cjs",
+			"sha256": "b055ee608b60228453e34ece3ce470088c4c278c8a96fa393276edf2cfa7dbea",
+			"bytes": 20436,
+			"source_mode": 384,
+			"member": "p28/f0006.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "checksums.sha256",
+			"sha256": "4d1c5a84ce59c5ad0eeb02b8f78752a4d11d8ff715833596ac514eb9155e9104",
+			"bytes": 893,
+			"source_mode": 384,
+			"member": "p28/f0007.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "object-preservation.json",
+			"sha256": "a704e7957d3e781454a63595a353696cbf6998b5d098bdb3fe143c14ba027161",
+			"bytes": 3431,
+			"source_mode": 384,
+			"member": "p28/f0008.txt"
+		},
+		{
+			"packet": "reviews/root-ci-guard-object-receiving",
+			"original": "review.json",
+			"sha256": "74b129d26f8d08e93c24ae2ea7ec3e0b7ac2886649e5c9e1aa96d69caa0323eb",
+			"bytes": 2569,
+			"source_mode": 384,
+			"member": "p28/f0009.txt"
+		}
+	],
+	"excluded": [
+		{
+			"packet": "continuation-2026-10-10/xi2-borrowed-cookie-recovered-v2",
+			"original": "source-pair.tar",
+			"sha256": "4ea8c31c48c138c52f1602936d20d4e6b221dc118e07ac386b139c8846eb26cc",
+			"bytes": 81920,
+			"source_mode": 384,
+			"reason": "object-library-package-or-nested-archive"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-native-cookie-execution-v2-1",
+			"original": "cookie_experiment",
+			"sha256": "46abf206e2d564cf1ff915a6ad93fe33c3a82cdb335d7152aa481119d5250d41",
+			"bytes": 22208,
+			"source_mode": 448,
+			"reason": "compiled-cookie-executable"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "debian-upstream.tar.gz",
+			"sha256": "5542daec66febfeb6f51d57abfa915826efe2e3af57534f4105b82240ea3188d",
+			"bytes": 611246,
+			"source_mode": 384,
+			"reason": "object-library-package-or-nested-archive"
+		},
+		{
+			"packet": "continuation-2026-10-10/xi2-provider-audit",
+			"original": "libxi_1.8.2-1.diff.gz",
+			"sha256": "f7a6b01f918159bc19570470ee315ea32284ae88a9cde269954e5086537716f8",
+			"bytes": 27701,
+			"source_mode": 384,
+			"reason": "object-library-package-or-nested-archive"
+		}
+	],
+	"representation": "Exact source bytes in inert .txt members; source names/modes mapped here.",
+	"limits": "No production adoption or full native qualification; excluded artifacts unavailable."
+}
