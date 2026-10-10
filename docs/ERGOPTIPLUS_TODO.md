@@ -33,7 +33,7 @@ either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
 
 ### v1.0.1 integration receiving
 
-The isolated integration branch has received `dev` through `7299783b8e`.
+The isolated integration branch has received `dev` through `1e0556e802`.
 The merge retains both histories and the complete test union: 179 Homebrew
 controls and 55 native HTTP controls. `main` remains the published v1.0.0.
 
