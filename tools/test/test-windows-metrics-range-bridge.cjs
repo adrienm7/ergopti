@@ -457,6 +457,78 @@ for (const pageName of ['metrics_typing', 'metrics_apps']) {
 	}
 }
 
+// Exercise the exact snapshot caller with process/file observation ports only.
+const reopenSource = read('tools/test/support/typing-snapshot-reopen-runtime.cjs');
+const nativeStart = reopenSource.indexOf('function nativeSnapshots() {');
+const nativeEnd = reopenSource.indexOf('\nmodule.exports =', nativeStart);
+assert.ok(nativeStart >= 0 && nativeEnd > nativeStart);
+function snapshotReceiptCustody(existing, mutation) {
+	const sentinel = Buffer.from('existing checkout evidence');
+	let legacy = existing ? sentinel : null;
+	let starts = 0;
+	let removals = 0;
+	const isLegacy = (name) => name.endsWith('test_results.txt');
+	const context = vm.createContext({
+		assert,
+		path,
+		__dirname: path.join(root, 'tools/test/support'),
+		process: { env: { OWNED: 'retained' } },
+		os: { tmpdir: () => '/owned-temp' },
+		fs: {
+			existsSync: (name) => (isLegacy(name) ? legacy !== null : name.includes('AutoHotkey')),
+			readFileSync: (name) => (isLegacy(name) ? Buffer.from(legacy) : 'owned canonical result'),
+			mkdtempSync(prefix) {
+				assert.match(prefix, /ergopti-typing-reopen-$/);
+				return '/owned-temp/exclusive';
+			},
+			rmSync(name, options) {
+				assert.strictEqual(name, '/owned-temp/exclusive');
+				assert.strictEqual(options.recursive, true);
+				removals++;
+			}
+		},
+		spawnSync(executable, args, options) {
+			starts++;
+			assert.match(executable, /AutoHotkey/);
+			assert.ok(args.includes('--only=metrics-history-reopen'));
+			assert.strictEqual(
+				options.env.ERGOPTI_AHK_RESULTS_FILE,
+				path.join('/owned-temp/exclusive', 'results.txt')
+			);
+			if (mutation === 'overwrite') legacy = Buffer.from('changed checkout evidence');
+			if (mutation === 'delete') legacy = null;
+			if (mutation === 'create') legacy = Buffer.from('unexpected checkout evidence');
+			return {
+				status: 0,
+				stdout: ['live', 'manifest', 'live-cleared', 'manifest-cleared']
+					.map((mode) => `# history_snapshot ${mode} {}`)
+					.join('\n'),
+				stderr: ''
+			};
+		},
+		validateAhkSuiteManifest(text) {
+			assert.strictEqual(text, 'owned canonical result');
+			return { complete: true, failed: 0, executed_count: 4, errors: [] };
+		}
+	});
+	vm.runInContext(
+		reopenSource.slice(nativeStart, nativeEnd) + '\nthis.snapshots = nativeSnapshots;',
+		context
+	);
+	const rows = context.snapshots();
+	assert.strictEqual(rows.length, 4);
+	assert.strictEqual(starts, 1);
+	assert.strictEqual(removals, 1);
+}
+snapshotReceiptCustody(true);
+snapshotReceiptCustody(false);
+for (const [existing, mutation] of [
+	[true, 'overwrite'],
+	[true, 'delete'],
+	[false, 'create']
+])
+	assert.throws(() => snapshotReceiptCustody(existing, mutation), /snapshot receiving preserves/);
+
 require('./support/typing-snapshot-reopen-runtime.cjs')(html)
 	.then(() => {
 		console.log('Windows metrics selected-range bridge contract: OK');
