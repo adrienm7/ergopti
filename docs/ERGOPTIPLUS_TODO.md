@@ -2806,6 +2806,23 @@ portable macOS unit cases and 101 macOS E2E checks with one host-specific skip.
 Hosted native/package/install qualification and physical wizard re-runs remain
 open. TODO7 stays partial.
 
+The Lua Finish publication now retains the actual native cleanup callback and
+exact candidate/source through refused cleanup and compensation. Another Finish
+or reopen cannot replace the indebted owner; acknowledged phases do not replay,
+and an external successor refuses the retained conditional inverse. macOS forwards
+the original source precondition through its native writer. The shared file
+inverse binds a fresh receiver to its actual writer while keeping the single
+inverse algorithm and strict custody of already retained owners. Independent
+source and actual-receipt review pass. Existing Linux bridge cases pass64/0 and
+Answers controls pass44/0 on both Lua runtimes. macOS Lua5.4 window cases pass4/0
+and genuinely initialized physical-file Finish cases pass13/0; the same thirteen
+cases against the previous receiver and cached inverse give12/1. Native SDK locks
+are controlled in these host fixtures; actual Darwin/AppKit, installed Windows
+equivalence, packaging and physical wizard acceptance remain unrun. Full receiving
+checkout validation remains pending. Earlier fixture failures are preserved with
+unchanged functional assertions. This correction does not complete item7 or
+transversal items16/38.
+
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] On Windows, exercise all seven wizard pages, cancellation, Finish/restart/rerun, changed-folder reads, delayed/stale responses and explicit trigger choices on a disposable profile. Preserve untouched obsolete trigger values.
