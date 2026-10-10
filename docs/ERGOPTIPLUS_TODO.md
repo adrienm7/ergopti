@@ -8978,6 +8978,16 @@ mandatory.
   are prerequisites, not assignment authority. Active new physical delivery remains
   unavailable on Linux/macOS; fixed accent menus/defaults are not retired.
 
+  The Linux daemon E2E fixture now explicitly activates the real virtual
+  magic-replacement preference before selecting a repeat source. Enabling
+  mapping sections alone does not establish that precondition. Original
+  receipt/screen assertions remain unchanged: the isolated original inverse
+  gives no output, while both initially disabled and already-enabled real
+  preference paths give the exact expected three stars and dispatch receipts.
+  These isolated controls do not qualify the full E2E suite or native delivery;
+  the historical hosted/local difference remains separate from this proven
+  fixture admission correction.
+
   The Linux observer now captures an admitted physical position through the
   original Reader, Hook and source witness before remapping. Shared request
   ownership and the thin host rejoin the original page, source, callbacks and
