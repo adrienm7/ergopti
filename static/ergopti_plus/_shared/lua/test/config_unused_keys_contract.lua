@@ -24,6 +24,8 @@ local M = {}
 
 local Engine    = require("config_unused_keys")
 local TomlCodec = require("toml_codec")
+-- The cached contract and its Engine must share the same write-refusal owner.
+local TomlWriter = require("toml_codec.writer")
 
 local STAMP = "20990101-000000"
 local _sequence = 0
@@ -139,7 +141,7 @@ local function register_driver_rule(h, opts)
 
 		h.it("a protected file is never scanned or offered (protected-schema-cleanup)", function()
 			with_config(opts.fixture, function(path)
-				local Writer = require("toml_codec.writer")
+				local Writer = TomlWriter
 				local before = read_bytes(path)
 				local ordinary = Engine.find({ path = path, collect = opts.collect })
 				h.assert_eq(ordinary.status, "ok")
