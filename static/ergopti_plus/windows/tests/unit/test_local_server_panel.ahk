@@ -23,6 +23,13 @@
 class _LSPN_Fixture extends _LSJ_Fixture {
 	__New() {
 		super.__New()
+		; The World replaces the admitted boot image with its independent source.
+		; Admit this panel-owned image before testing runtime authority.
+		try _LSPB_Stamp(this.World)
+		catch as Err {
+			_LSJ_Fixture.Prototype.Dispose.Call(this)
+			throw Err
+		}
 		global _LLM_LocalServerPanel, _LLM_Menu_RuntimeActivated, _LifecycleTransitionsByPhase
 		this.SavedPanel := _LLM_LocalServerPanel
 		this.HadActivated := IsSet(_LLM_Menu_RuntimeActivated)
@@ -46,6 +53,50 @@ class _LSPN_Fixture extends _LSJ_Fixture {
 		_LLM_Menu_RuntimeActivated := true
 	}
 
+	Prepare() {
+		SavedSpawn := this.NativeSpawn
+		this.NativeSpawn := _LSPN_ReadyChildFactory.Bind(this)
+		try super.Prepare()
+		finally this.NativeSpawn := SavedSpawn
+	}
+
+	RescanReady() {
+		SavedSpawn := this.NativeSpawn
+		this.NativeSpawn := _LSPN_ReadyChildFactory.Bind(this)
+		try return this.Native.Rescan()
+		finally this.NativeSpawn := SavedSpawn
+	}
+
+	RescanWithCancellationDebt() {
+		Index := this.Children.Length + 1
+		SavedSpawn := this.NativeSpawn
+		; Arm the exact child at acquisition: the real curl deadline may expire
+		; while the remaining catalogue entries perform their authority checks.
+		this.NativeSpawn := _LSPN_CancellationDebtChildFactory.Bind(this, Index)
+		try {
+			AssertTrue(this.Native.Rescan())
+			Child := this.Children[Index]
+			AssertEqual(1, Child.Starts)
+			AssertFalse(Child.TerminateAllowed)
+			AssertTrue(this.Owner.Records.Count > 0, "the exact refused child must retain cancellation debt")
+			return Child
+		} finally this.NativeSpawn := SavedSpawn
+	}
+
+	Complete(Index, Status, Body) {
+		Child := this.Children[Index]
+		if Child is _LSPN_ReadyChild {
+			; The response already traversed the real request/controller callbacks.
+			; Validate that observation instead of rewriting retired curl artifacts.
+			AssertTrue(Child.ResponseDelivered)
+			AssertEqual(Status, Child.ResponseStatus)
+			AssertEqual(Body, Child.ResponseBody)
+			AssertTrue(this.Requests[Index].Completed)
+			return
+		}
+		super.Complete(Index, Status, Body)
+	}
+
 	FormatReport(Key, Values*) {
 		this.ObserveCritical.Push(A_IsCritical)
 		if !this.FormatMutated && this.PanelControl != "" {
@@ -57,7 +108,7 @@ class _LSPN_Fixture extends _LSJ_Fixture {
 					if !FSWriteDurable(this.World.ApiPath, _LLM_Menu_SerializeApiEntries(Map("api_entries", Records), (Value) => Value))
 						throw Error("The fixture-owned format-time source replacement failed.")
 				case "cache":
-					this.Native.Rescan()
+					this.RescanReady()
 					for Index, Id in this.Order {
 						Body := Id == "lmstudio" ? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
 						this.Complete(this.Order.Length + Index, 200, Body)
@@ -240,10 +291,8 @@ _LSPN_ShutdownRepair(PendingDebt := false) {
 	Fixture := _LSPN_Fixture()
 	try {
 		Fixture.Prepare()
-		if PendingDebt {
-			AssertTrue(Fixture.Native.Rescan())
-			Fixture.Children[Fixture.Order.Length + 1].TerminateAllowed := false
-		}
+		if PendingDebt
+			Fixture.RescanWithCancellationDebt()
 		Attempt := Fixture.BeginShutdown()
 		AssertEqual(!PendingDebt, LLM_Menu_LocalServersPrepareShutdown())
 		AssertFalse(Fixture.World.Owner.Admit())
@@ -416,9 +465,7 @@ _LSPN_FailedResumeRetainsExactIntent() {
 	Fixture := _LSPN_Fixture()
 	try {
 		Fixture.Prepare()
-		AssertTrue(Fixture.Native.Rescan())
-		Child := Fixture.Children[Fixture.Order.Length + 1]
-		Child.TerminateAllowed := false
+		Child := Fixture.RescanWithCancellationDebt()
 		AssertFalse(Fixture.Panel.Retire(false))
 		Transition := Fixture.Transition("resume")
 		AssertTrue(LLM_Menu_LocalServersOnResume())
@@ -635,7 +682,6 @@ _LSPB_JoinedView() {
 	AssertTrue(HasMethod(LocalServersOwner.Prototype, "CaptureView"))
 	Fixture := _LSPN_Fixture()
 	try {
-		_LSPB_Stamp(Fixture.World)
 		; Complete the controlled child at its owned start, before another slow
 		; provider factory can exhaust the real curl deadline against fixture clock0.
 		Fixture.NativeSpawn := _LSPB_CompletedChildFactory.Bind(Fixture)
@@ -715,7 +761,6 @@ class _LSPD_Fixture extends _LSPN_Fixture {
 		this.ArmCalls := 0
 		this.NativeSpawn := _LSPB_CompletedChildFactory.Bind(this)
 		this.Native.DefineProp("Rescan", {Call: ObjBindMethod(this, "ObserveRescan")})
-		_LSPB_Stamp(this.World)
 	}
 
 	ObserveRescan(Native, Args*) {
@@ -1083,3 +1128,71 @@ _LSPV_ConsumptionFence() {
 	} finally Fixture.Dispose()
 }
 Test("local deferred view: lifecycle replacement refuses prepared row consumption", _LSPV_ConsumptionFence)
+
+
+
+
+
+_LSPN_FixtureSchemaAdmission() {
+	Fixture := _LSPN_Fixture()
+	try {
+		AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.World.ConfigPath))
+		Document := TOML_ParseDocument(Fixture.World.ConfigImage)
+		AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
+		AssertEqual(Fixture.World.ConfigImage, FSReadUtf8Exact(Fixture.World.ConfigPath))
+		Receipt := Fixture.World.Owner.Capture()
+		AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		AssertTrue(Fixture.World.Owner.Current(Receipt))
+		Future := StrReplace(Fixture.World.ConfigImage,
+			"schema_version = " ConfigMigrateCurrentVersion(),
+			"schema_version = " (ConfigMigrateCurrentVersion() + 1))
+		AssertTrue(Future != Fixture.World.ConfigImage)
+		AssertTrue(FSWriteDurable(Fixture.World.ConfigPath, Future))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Fixture.World.ConfigPath))
+		AssertFalse(Fixture.World.Owner.Admit(), "a supported fixture does not weaken the real future-schema fence")
+		AssertFalse(Fixture.World.Owner.Current(Receipt), "the old receipt cannot borrow a future image")
+		AssertTrue(FSWriteDurable(Fixture.World.ConfigPath, Fixture.World.ConfigImage))
+		AssertTrue(Fixture.World.Owner.Admit())
+	} finally Fixture.Dispose()
+}
+Test("local server panel: fixture admits its exact supported image but refuses a future replacement", _LSPN_FixtureSchemaAdmission)
+
+
+
+
+
+class _LSPN_ReadyChild extends _LSM_ChildReceipt {
+	__New(Fixture, OnDone) {
+		super.__New()
+		this.Fixture := Fixture
+		this.OnDone := OnDone
+		this.ResponseDelivered := false
+		this.ResponseStatus := 0
+		this.ResponseBody := ""
+	}
+
+	start() {
+		super.start()
+		Fixture := this.Fixture
+		Request := Fixture.Requests[Fixture.Requests.Length]
+		Id := Fixture.Order[Mod(Fixture.Children.Length - 1, Fixture.Order.Length) + 1]
+		this.ResponseStatus := 200
+		this.ResponseBody := Id == "lmstudio"
+			? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 Fixture`r`n`r`n"))
+		this.OnDone.Call(0, this.ResponseBody, "")
+		this.ResponseDelivered := true
+		return true
+	}
+}
+
+_LSPN_ReadyChildFactory(Fixture, OnDone) {
+	return _LSPN_ReadyChild(Fixture, OnDone)
+}
+
+_LSPN_CancellationDebtChildFactory(Fixture, Index, OnDone) {
+	Child := _LSM_ChildReceipt()
+	if Fixture.Children.Length + 1 == Index
+		Child.TerminateAllowed := false
+	return Child
+}
