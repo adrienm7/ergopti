@@ -6132,5 +6132,164 @@ class TimeoutEvidenceMissingCapabilityControls(unittest.TestCase):
         self.assertEqual(hasattr(probe.os, "O_NOFOLLOW"), present)
 
 
+class LastNativeUIEvidenceControls(unittest.TestCase):
+    """Actual recorder decisions with explicit in-memory filesystem boundaries."""
+
+    @contextmanager
+    def recorder(self):
+        writer = probe.PhaseEvidence(None)
+        writer.descriptor = 73136
+        files, descriptors = {}, {}
+        serial = [0]
+        clock = [10.0]
+
+        class CapturedStream(io.BytesIO):
+            def __init__(self, name):
+                super().__init__()
+                self.name = name
+
+            def fileno(self):
+                return 73136
+
+            def close(self):
+                files[self.name] = self.getvalue()
+                super().close()
+
+        def acquire(name, flags, mode, *, dir_fd):
+            self.assertEqual(dir_fd, 73136)
+            self.assertEqual(mode, 0o600)
+            self.assertNotIn(name, files)
+            serial[0] += 1
+            descriptors[serial[0]] = name
+            return serial[0]
+
+        def link(source, target, *, src_dir_fd, dst_dir_fd, follow_symlinks):
+            self.assertEqual((src_dir_fd, dst_dir_fd, follow_symlinks), (73136, 73136, False))
+            self.assertNotIn(target, files)
+            files[target] = files[source]
+
+        def replace(source, target, *, src_dir_fd, dst_dir_fd):
+            self.assertEqual((src_dir_fd, dst_dir_fd), (73136, 73136))
+            files[target] = files.pop(source)
+
+        def unlink(name, *, dir_fd):
+            self.assertEqual(dir_fd, 73136)
+            if name not in files:
+                raise FileNotFoundError(name)
+            del files[name]
+
+        with (
+            patch.object(probe.os, "O_NOFOLLOW", 0x10000000, create=True),
+            patch.object(probe.os, "open", side_effect=acquire),
+            patch.object(
+                probe.os, "fdopen", side_effect=lambda fd, mode: CapturedStream(descriptors[fd])
+            ),
+            patch.object(probe.os, "fsync"),
+            patch.object(probe.os, "link", side_effect=link),
+            patch.object(probe.os, "replace", side_effect=replace),
+            patch.object(probe.os, "unlink", side_effect=unlink),
+            patch.object(probe.time, "monotonic", side_effect=lambda: clock[0]),
+        ):
+            writer.started = 0.0
+            yield writer, files, clock
+
+    @staticmethod
+    def ui():
+        return {
+            "schema": 1,
+            "ax_trusted": True,
+            "requester_qualified": True,
+            "scanned_agents": 1,
+            "windows": 1,
+            "nodes": 0,
+            "candidates": 0,
+            "matches": 0,
+            "first_agent": -1,
+            "first_attribute": "none",
+            "first_type": "none",
+            "first_error": 0,
+        }
+
+    def test_last_ui_survives_full_history_and_terminal_without_claiming_consent(self):
+        with self.recorder() as (writer, files, clock):
+            for index in range(300):
+                self.assertTrue(
+                    writer.record("command.begin", command="one" if index % 2 else "two")
+                )
+            packet = self.ui()
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=packet))
+            packet["windows"] = 7
+            clock[0] = 20.0
+            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
+            terminal = json.loads(files["checkpoint.json"])
+            self.assertIn("last_native_ui", terminal)
+            self.assertEqual(terminal["last_native_ui"], self.ui())
+            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 10.0)
+            self.assertEqual(terminal["elapsed_seconds"], 20.0)
+            self.assertEqual(terminal["phase"], "candidate.failed")
+            self.assertEqual(terminal["status"], "refused")
+            self.assertTrue(terminal["ownership_closed"])
+            self.assertEqual(terminal["debt_kinds"], [])
+            self.assertNotIn("native_ui", terminal)
+            self.assertEqual(terminal["history_omitted"], 46)
+            self.assertEqual(len(files), 257)
+            self.assertTrue(all(len(image) <= 4096 for image in files.values()))
+            self.assertFalse(
+                any(
+                    "last_native_ui" in json.loads(image)
+                    for name, image in files.items()
+                    if name.startswith("phase-")
+                )
+            )
+
+    def test_latest_validated_ui_survives_invalid_input_and_retains_cleanup_debt(self):
+        with self.recorder() as (writer, files, clock):
+            first = self.ui()
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=first))
+            latest = dict(
+                first,
+                windows=0,
+                first_agent=0,
+                first_attribute="windows",
+                first_type="absent",
+                first_error=-25204,
+            )
+            clock[0] = 11.0
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=latest))
+            before = files["checkpoint.json"]
+            self.assertFalse(
+                writer.record(
+                    "automation.ui-observation", native_ui=dict(latest, PRIVATE="not-for-export")
+                )
+            )
+            self.assertEqual(files["checkpoint.json"], before)
+            self.assertFalse(
+                writer.record("cleanup.debt", status="cleanup-debt", debt_kinds=["process-group"])
+            )
+            terminal = json.loads(files["checkpoint.json"])
+            self.assertIn("last_native_ui", terminal)
+            self.assertEqual(terminal["last_native_ui"], latest)
+            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 11.0)
+            self.assertFalse(terminal["ownership_closed"])
+            self.assertEqual(terminal["debt_kinds"], ["process-group"])
+            self.assertNotIn("PRIVATE", files["checkpoint.json"].decode())
+
+    def test_identical_later_ui_updates_observation_time_through_terminal(self):
+        with self.recorder() as (writer, files, clock):
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=self.ui()))
+            clock[0] = 11.0
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=self.ui()))
+            repeated = json.loads(files["checkpoint.json"])
+            self.assertEqual(repeated["last_native_ui_elapsed_seconds"], 11.0)
+            clock[0] = 20.0
+            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
+            terminal = json.loads(files["checkpoint.json"])
+            self.assertEqual(terminal["last_native_ui"], self.ui())
+            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 11.0)
+            self.assertTrue(terminal["ownership_closed"])
+            self.assertEqual(terminal["status"], "refused")
+            self.assertEqual(len(files), 4)
+
+
 if __name__ == "__main__":
     unittest.main()
