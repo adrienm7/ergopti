@@ -6074,6 +6074,19 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 WPAD failed-request diagnostic continuation. A failed positive
+native WPAD request now reports only a fixed terminal-reason label from its
+already completed, uniquely terminated and bounded frame collection; malformed
+or unknown observations report unknown. It adds no request, trust mutation,
+clock, retry or cleanup action. The complete original source is restored by
+removing the single insertion, and all original assertions and14 native cases
+remain intact. Independent source review and selected formatting pass. Selected
+JS402/406 and macOS stub17,957/17,968 retain the same four and eleven failures,
+respectively, as the executed predecessor. Portable transcript admission
+does not execute this inline Swift projection; actual native compilation,
+failed-request reason observation and qualification remain pending. No primary
+PAC/WPAD or trust failure is claimed repaired, and item62 stays open.
+
 2026-10-10 selected-release corpus enrollment continuation. The normal awaited
 JS check retains all61 original controls and runs the independently frozen50
 shell cases through the existing Linux command phase or Darwin guardian.
