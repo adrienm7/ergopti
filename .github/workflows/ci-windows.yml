@@ -262,7 +262,7 @@ jobs:
 
       - name: Run AHK test suite
         shell: pwsh
-        timeout-minutes: 25
+        timeout-minutes: 60
         env:
           ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine
           ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}

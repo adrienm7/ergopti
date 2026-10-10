@@ -647,3 +647,101 @@ try {
 } finally {
 	fs.rmSync(transportRoot, { recursive: true, force: true });
 }
+
+/** Parses active runner declarations and the actual CI owner before budget models. */
+function assertCompleteAhkWatchdogBudget() {
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const yaml = require('yaml');
+	const root = path.resolve(__dirname, '../..');
+	const runner = fs.readFileSync(
+		path.join(root, 'static/ergopti_plus/windows/tests/run_all.ahk'),
+		'utf8'
+	);
+	const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci-windows.yml'), 'utf8');
+	function checkBudget(source, yamlSource) {
+		const active = source.replace(/[^\n]/g, ' ').split('');
+		for (const token of scriptTokens(source, '.ahk')) {
+			if (token.kind === 'string') continue;
+			for (let at = token.start; at < token.end; at++) active[at] = source[at];
+		}
+		const code = active.join('');
+		const values = {};
+		for (const name of ['STARTUP_BUDGET', 'PER_TEST_BUDGET', 'MAX_TIMEOUT']) {
+			const declarations = [
+				...code.matchAll(new RegExp('^global _SUITE_' + name + '_MS := (\\d+)\\s*$', 'gm'))
+			];
+			assert.equal(declarations.length, 1, 'one active finite budget declaration');
+			values[name] = Number(declarations[0][1]);
+			assert.ok(Number.isSafeInteger(values[name]) && values[name] > 0);
+		}
+		const bodies = [...code.matchAll(/^_SuiteTimeoutForCount\(PlannedCount\) \{([\s\S]*?)^\}/gm)];
+		assert.equal(bodies.length, 1, 'one genuine timeout calculation');
+		assert.equal(
+			bodies[0][1].replace(/\s+/g, ' ').trim(),
+			'global _SUITE_MAX_TIMEOUT_MS, _SUITE_STARTUP_BUDGET_MS, _SUITE_PER_TEST_BUDGET_MS return Min(_SUITE_MAX_TIMEOUT_MS, _SUITE_STARTUP_BUDGET_MS + PlannedCount * _SUITE_PER_TEST_BUDGET_MS)'
+		);
+		assert.equal(
+			(
+				code.match(
+					/^global _SUITE_TIMEOUT_MS := _SuiteTimeoutForCount\(TEST_REGISTRY.Length\)\s*$/gm
+				) || []
+			).length,
+			1
+		);
+		assert.equal(
+			(code.match(/^SetTimer\(_WatchdogFire, -_SUITE_TIMEOUT_MS\)\s*$/gm) || []).length,
+			1
+		);
+		const parsed = yaml.parse(yamlSource, { uniqueKeys: true });
+		const steps = parsed.jobs['test-ahk'].steps.filter(
+			(step) => step.name === 'Run AHK test suite'
+		);
+		assert.equal(steps.length, 1, 'one actual complete-suite CI owner');
+		const minutes = steps[0]['timeout-minutes'];
+		assert.equal(minutes, 60);
+		assert.ok(steps[0].run.includes('validate-ahk-suite-manifest.cjs'));
+		const startup = values.STARTUP_BUDGET,
+			perTest = values.PER_TEST_BUDGET,
+			cap = values.MAX_TIMEOUT;
+		assert.equal(startup, 120000);
+		assert.equal(cap, 55 * 60 * 1000);
+		assert.equal(minutes * 60 * 1000 - cap, 5 * 60 * 1000);
+		const budget = (count) => Math.min(cap, startup + count * perTest);
+		assert.equal(budget(0), startup);
+		assert.equal(budget(1), startup + perTest);
+		assert.ok(budget(11197) >= 45 * 60 * 1000 && budget(11197) <= cap);
+		assert.equal(budget(11197), 2919250);
+		const saturation = Math.ceil((cap - startup) / perTest);
+		assert.ok(saturation > 1);
+		assert.ok(budget(saturation - 1) < cap);
+		assert.equal(budget(saturation), cap);
+		assert.equal(budget(saturation + 1000), cap);
+		assert.equal(budget(1000000), cap);
+		return budget(11197);
+	}
+	assert.equal(checkBudget(runner, workflow), 2919250);
+	for (const [before, after] of [
+		['global _SUITE_MAX_TIMEOUT_MS := 3300000', 'global _SUITE_MAX_TIMEOUT_MS := 1320000'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 250', 'global _SUITE_PER_TEST_BUDGET_MS := 200'],
+		['global _SUITE_MAX_TIMEOUT_MS := 3300000', '; global _SUITE_MAX_TIMEOUT_MS := 3300000'],
+		['return Min(_SUITE_MAX_TIMEOUT_MS,', 'return Max(_SUITE_MAX_TIMEOUT_MS,'],
+		['SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)', '; SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)']
+	]) {
+		assert.ok(runner.includes(before));
+		assert.throws(() => checkBudget(runner.replace(before, after), workflow));
+	}
+	const step =
+		'      - name: Run AHK test suite\n        shell: pwsh\n        timeout-minutes: 60\n';
+	assert.equal(workflow.split(step).length - 1, 1);
+	for (const after of [
+		step.replace(': 60', ': 25'),
+		step.replace(': 60', ': 0'),
+		step.replace(': 60', ': 55')
+	])
+		assert.throws(() => checkBudget(runner, workflow.replace(step, after)));
+	console.log(
+		'PASS: complete AHK budget source/CI parsing, growth, saturation and eight refusal controls; native/full suite NOT_RUN.'
+	);
+}
+
+assertCompleteAhkWatchdogBudget();
