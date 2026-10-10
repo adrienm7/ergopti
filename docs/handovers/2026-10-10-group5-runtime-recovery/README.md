@@ -383,3 +383,17 @@ format, conventions and diff integrity. The overall required verdict remains
 RED. All gate-frozen inputs, HEAD and index
 stay exact through the serial runs; the JS child owner reaps 90 adopted
 children with no pending child or rescue. Native execution remains 0.
+
+## Portable pinned debounce library prerequisite
+
+Seven independently frozen controls now execute the genuine upstream
+`pqrs::dispatcher`/`debounced_task` and its software clock, using the exact
+existing eight-header offline closure. GCC14.2 compiles the actual control;
+all seven cases pass with zero failures, errors or skips (1.420s), and the
+process owner closes without pending children or rescue. Existing model
+vectors and production timer/lease sources stay unchanged. This is a library
+subset: it does not execute the Darwin manipulator engine or physical
+key-up/off/pause/revocation predicates, compile the new ordinary Swift test,
+enable capture, or establish the initial PONG/READY/exit73 cause. Selected
+source verification follows this actual receiving; native qualification
+remains pending.

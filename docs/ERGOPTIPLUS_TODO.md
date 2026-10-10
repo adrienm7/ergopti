@@ -4129,6 +4129,15 @@ Native event-tap/AX delivery, other-held nonempty flag release, installed captur
 whole configuration policy and device acceptance remain unqualified. WP3/item31
 and the initial PONG/READY/exit73 cause remain open; no TODO item is removed.
 
+WP7 portable timer prerequisite now exercises the authentic pinned dispatcher
+and debounced-task library with its software clock. Seven frozen cases cover
+199/200 eligibility, cancellation, rearming, independent owners and exact
+client retirement. Actual GCC14.2 compilation and all seven executions pass;
+no source, model vector, runtime version or production timer is replaced.
+The Darwin manipulator engine, physical key-up/off/pause/revocation paths and
+new ordinary Swift registration remain unexecuted. This library subset does
+not complete WP7/item31, enable capture, or establish the initial exit73 cause.
+
 WP3 remains partial. An explicitly initialized, dormant physical-capture session
 owner now composes the real accounting policy, delivery receiver and transport.
 It verifies the caller's pinned executable requirement asynchronously, waits for
