@@ -665,9 +665,9 @@ TomlConfigMergeFeatureRecord(Features, Section, Seed, Typed, ChildRaw,
 ; Later reads of candidates must neither poison nor clear that authority.
 ; Outdated entries are not rejections: the boot records them so a full save
 ; keeps them on disk for the cleanup instead of erasing them silently.
-ApplyBootConfigToml(Features, FilePath) {
+ApplyBootConfigToml(Features, FilePath, &AdmittedSnapshot := 0) {
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
-	Applied := ApplyConfigToml(Features, FilePath, &RejectedOverrides, , &OutdatedEntries)
+	Applied := ApplyConfigToml(Features, FilePath, &RejectedOverrides, , &OutdatedEntries, &AdmittedSnapshot)
 	_ConfigBootRejectedOverrides += RejectedOverrides
 	for Id, Detail in OutdatedEntries
 		_ConfigBootOutdatedEntries[Id] := Detail
@@ -677,7 +677,8 @@ ApplyBootConfigToml(Features, FilePath) {
 ; OutdatedEntries receives a Map from "Section`nKey" to the reason each
 ; outdated entry was left unapplied (see TomlConfigOutdatedReason).
 ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
-		&MigratedOverrides := 0, &OutdatedEntries := 0) {
+		&MigratedOverrides := 0, &OutdatedEntries := 0, &AdmittedSnapshot := 0) {
+	AdmittedSnapshot := 0
 	RejectedOverrides := 0
 	MigratedOverrides := 0
 	OutdatedEntries := Map()
@@ -704,6 +705,9 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		return -1
 	}
 
+	; The optional boot consumer shares this exact admitted generation. A read
+	; or semantic refusal leaves the output at zero, never an empty source.
+	AdmittedSnapshot := Snapshot
 	if !Snapshot.Present {
 		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
 		return Applied

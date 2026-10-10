@@ -67,11 +67,18 @@ helpers.describe("LLM Factory Recovery Wiring", function()
 			real_switcher = true,
 			candidate_recovery_gate = function() return gate_result end,
 		}, function(_, state, calls)
+			-- This case owns a pending requirements continuation. Off-state model
+			-- configuration intentionally commits without provisioning that branch.
+			state.llm_enabled = true
+			helpers.assert_eq(calls.root_deps.keymap.set_llm_enabled(true), true)
+			helpers.assert_eq(calls.get_runtime_enabled(), true)
 			local selector = calls.models_selector_ctx
 			local runtime_before = #calls.runtime_models
 			local display_before = #calls.display_models
 			helpers.assert_eq(selector.switch_model("replacement"), true)
 			helpers.assert_eq(calls.requirements, 1)
+			helpers.assert_eq(calls.requirements_opts.configuration_only, false,
+				"the actual dispatcher must retain a pending enabled-model check")
 			helpers.assert_type(calls.requirements_ok, "function")
 
 			gate_result = false

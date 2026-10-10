@@ -2,8 +2,8 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-09. Latest release: [v0.0.0-dev.157](https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.157)
-at `9652afc3d121b19851e02d93446d91e4c1fcc877`, published at 16:19:50 UTC.
+Updated: 2026-10-10. Latest stable: [v1.0.0](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0)
+at `5ef675e08d9f75b0902026a21f36782e999b3ac2`, published at 01:31:54 UTC.
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
 Item numbers are stable identifiers: a finished item is removed (its durable
@@ -11,15 +11,151 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
+finished successfully with 65 successful jobs, the explicitly deferred native
+archive job and the inapplicable selected-OS verdict skipped. The thirteen
+approved qualification scopes remain DEFERRED and qualified:false; the Windows
+executable remains unsigned. Neither this verdict nor publication certifies
+the deferred tests or unfinished features.
+
+The actual tag matches the source above. All 33 release assets are published:
+19 product and updater assets, 13 retained command receipts and the Windows
+signature receipt. Public API sizes and digests, downloaded small metadata,
+canonical receipt admission and the complete public qualification notice agree.
+This verification did not reinstall every published binary. The rendered
+production download links now select v1.0.0, while `/dev/` selects dev.157.
+
+Work now resumes from the latest `dev`, integrating all other groups and the
+stable corrections without discarding published history. Prioritize the
+maintainer's ten-hour v1.0.1 follow-up: maximum verified fixes and restoration
+of full CI. The v1.0.0 qualification and unsigned exceptions do not authorize
+either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
+
+### v1.0.1 integration receiving
+
+The isolated integration branch has received `dev` through `591d59a942`.
+The merge retains both histories and the complete test union: 179 Homebrew
+controls and 55 native HTTP controls. `main` remains the published v1.0.0.
+
+[CI 38025215348](https://github.com/adrienm7/ergopti/actions/runs/38025215348)
+on `de812ab633` has completed Core JavaScript, Linux units, macOS units,
+macOS stubbed E2E and native cold MLX successfully. Windows units completed
+10,761 of 10,764 cases successfully. The three remaining failures share a
+missing production dependency-checker function in the canonical test include
+graph; isolated receiving had explicitly loaded that module. The enrollment
+correction is now applied locally. Actual canonical filtered receiving exposed
+a second fixture defect: its priority assertion read an uninitialized baseline.
+The fixture now restores its exact prior state after success or failure; all
+five selected canonical cases pass. Subsequent full local receiving completed
+10,793 of 10,800 Windows cases successfully, plus all 70 E2E cases and actual
+entry-point compilation. Source bytes remained unchanged throughout. The seven
+native network failures retain the original assertions: CurrentUser root
+insertion remained at `before_add`, with a visible dialog belonging to the
+owned fixture. Trust admission and graceful service cleanup were not proved;
+no dialog was accepted or root-store policy changed. All observed suite and
+fixture processes had exited afterward. Windows desktop cohorts, hosted
+packaging and installation still require receiving on the integrated source.
+Linux E2E completed with four simultaneous-key failures: the
+forward pair passes raw edges through, while the reverse pair leaves Tab
+edges around the expected copy chord. Native retirement passed. The dispatch
+module omitted its captured directory when comparing the relative manager
+source used by CI. The minimal correction now passes all five registered
+relative-loader controls locally, including three authority refusals. This
+inert receiving does not replace the unchanged native simultaneous-key check.
+The complete CI is red; Linux
+packaging passed, while its installation matrix was skipped by the verdict.
+
+Both macOS managed-Ollama jobs still fail the native PAC/WPAD and independent
+client controls. The trusted clients time out in `security add-trusted-cert`
+under the unchanged 15-second command deadline. The subsequent removal refusal
+retains its cleanup debt; the underlying native cause remains unknown. All 41
+listener/runtime XCTest controls passed on each architecture, but do not
+qualify either complete job. The Homebrew native control also remains red at
+its owned Automation-prompt deadline. No new release exception is adopted.
+
+The Windows managed-install components now pass 31 actual native file cases,
+22 source-bound controls and byte-exact generation of all 16 archive fixtures.
+Resolving omitted fixture paths in the script body fixes a real PowerShell 5
+entry-point failure that explicit-path probes missed. Runtime handoff receiving
+also passes 15 actual AHK controls and nine PowerShell 5 recording controls.
+The nine PowerShell cases are now registered in the Windows collector; Root
+received its complete selected file-port path with all 22 existing controls
+and all 16 byte-exact archive fixtures retained.
+These component receipts do not qualify a real download, server, model pull or
+menu activation; their integrated UI and native acceptance remain open.
+The private UI assembly is not adopted: review found that its admission
+rejected the actual default `localhost` URL, and its omitted failure callback
+was passed as a noncallable value. Corrections, migration of the old installer
+controls, reuse of an existing version and managed model acquisition remain
+required before feature completion.
+
+[CI 38018626491](https://github.com/adrienm7/ergopti/actions/runs/38018626491)
+completed on `cb5ad8f3d2`: Linux unit tests passed 12,743 cases; Windows passed
+10,758 of 10,763, including all 32 Group 2 terminator cases. Four Windows
+fixture failures have local corrections with causal regression receiving.
+The remaining native file-filter timeout has more precise diagnostics; its
+cause remains open. Linux expansion and diagnostic-label fixtures also have
+local corrections. Four simultaneous-input observation failures remain open;
+new failure output retains the actual event rows without changing the oracle.
+
+[CI 38019831532](https://github.com/adrienm7/ergopti/actions/runs/38019831532)
+completed on `591d59a942`: macOS passed 17,957 unit cases and failed eleven.
+The three MLX runtime fixtures, seven dynamic-hotstring boundary fixtures and
+one pending-model continuation fixture now pass focused inert receiving with
+their original assertions preserved and causal inverses failing. Native macOS
+receiving of these corrections is still required. The cold MLX check passed;
+native trust activation and the Homebrew positive control still timed out.
+
+The earlier full local source gate passed formatting and AHK encoding, with
+395 of 407 JavaScript checks passing. The combined receiving also passed
+formatting and encoding, but JavaScript passed 394 of 407: the twelve earlier
+failures remain and the native file-filter source guard still expected the
+previous diagnostic output. The corrected guard now passes its full focused
+suite, retains the original semantic error, and adds eight diagnostic-removal
+mutations. Full native CI qualification remains required; these receipts do
+not constitute a green complete gate and renew no release exception.
+
+The latest component source gate again passed formatting and encoding. It
+completed all 407 JavaScript checks: 394 passed, twelve earlier failures stayed
+red, the window-title mutation check improved, and one newly introduced pinned
+source read failed. That read now uses the existing production-source helper;
+the unchanged ratchet, encoding gate and all five canonical installer cases
+pass after this one-line correction. This targeted receipt does not claim a
+new complete JavaScript pass. Five atomic local commits retain the relative
+Linux loader correction, macOS fixture stderr, Windows checker enrollment,
+owned downloader output and coherent Ollama components. Native CI is next.
+
+Current Windows Notepad 11.2607.14.0 receiving passed all six actual HSE/LLM
+caller scenarios through the production DLL. All 280 source dependencies and
+the DLL remained unchanged; the sender exited naturally, stderr was empty,
+and both owned Notepad processes were retired. The receipt retains 55 AHK
+variable-shadowing warnings. This controlled synthetic-document prerequisite
+does not qualify physical default triggers, navigation, concurrent typing, or
+the full focus/document/retirement matrix; Group 7 remains open.
+The persistent private bootstrap has source and inert supervision controls,
+including exact mutex and retirement ownership. Its default smoke profile
+still disables predictions; the real navigation matrix is being connected
+through the existing deterministic transport seam. Neither this bootstrap nor
+synthetic OS key injection is a hardware-keyboard qualification.
+
+### Stable preparation history
+
 The original October 9 publication deadline was missed. After midnight Paris,
 the maintainer renewed the immediate v1.0.0 publication request because the
 website needs an actual latest stable release for its download buttons. The
 same thirteen already approved qualification reports and unsigned Windows
-permission are now bounded to October 10 at 00:00 UTC (02:00 Paris), only for
+permission are now bounded to October 10 at 02:00 UTC (04:00 Paris), only for
 v1.0.0. No additional test scope is excluded. Compilation, packaging, source
 and asset integrity, installation and all unlisted checks remain mandatory.
 Public receipts must state DEFERRED and qualified:false; this is not full
 native qualification. Actual tag, source and assets still require verification.
+
+The maintainer explicitly approved the further bounded renewal: “Oui, mêmes
+limites jusqu’à 04 h”. Only the expiry changes to 02:00 UTC (04:00 Paris);
+the same thirteen qualification reports and separate unsigned Windows
+allowance remain unqualified and source/artifact-bound. There is no new
+scope or permission for v1.0.1. Do not renew beyond this window without
+a separate explicit human answer.
 
 Both published histories and the local video commits are retained without
 force-push or squashing. Promo item 113 implementations remain local and are
@@ -3808,9 +3944,13 @@ alone does not prove the complete transactional writer or migrations.
   their source-fenced whole-list persistence owners. Restart, refusal and
   unowned-neighbor preservation have callable regression coverage. Changed
   lists normalize to inline TOML; standalone comments remain preserved.
-  Windows currently consumes native delimiter strings rather than custom
-  record lists; the missing record consumer/editor is an explicit PC
-  implementation step below, alongside native qualification.
+  Windows now consumes and edits the canonical record lists as well as native
+  delimiter strings. Commit `254b4c6770` adds boot admission, source-fenced
+  Add/Delete/toggle and displayed-owner validation. Twenty pure registered
+  cases and entrypoint compilation pass on Windows. Hosted CI `38018626491`
+  subsequently passes all 32 registered cases on source `cb5ad8f3d2`, including
+  the twelve WAL/modal controls. The overall AHK suite has five other failures;
+  actual menu/save/restart acceptance remains open, so this item stays partial.
 
 The measured-delay native fixture now isolates the real corpus metadata
 cache from the earlier resolution-cascade double and restores the exact
@@ -3831,8 +3971,8 @@ unknown nested fields in each admitted record and normalizes only its owned
 label/consume defaults. Untouched valid neighbors, standalone comments and
 foreign array-of-table siblings survive the actual preference writer. The same
 five cases fail against the original replay. Linux already merges untouched
-stored records; Windows manages delimiter strings in its existing override
-transaction instead of projecting custom record fields.
+stored records. The Windows record path is now implemented as described above;
+its native transaction qualification remains separate from these Lua receipts.
 
 The shared writer intentionally replaces a changed array-of-table list with an
 inline list. Its inline record comments normalize with that rewritten value;
@@ -3854,8 +3994,8 @@ the original planner and now pass through the real catalogue, preference lease
 and source-fenced writer, including publication refusal and explicit retry.
 The selected source gate passed 5,002 Linux unit cases and 176 E2E scenarios;
 strict conventions passed. The unchanged macOS repair-owner module passed its
-19 existing portable tests. Windows uses delimiter strings through its existing
-native override transaction; no custom-record migration was invented.
+19 existing portable tests. These earlier receipts cover the Lua changes;
+the later Windows record implementation still requires its native acceptance.
 Explicit cleanup and the reader's first-usable policy are unchanged. An otherwise
 valid duplicate retained after removal may become admitted on a later reload.
 Complete three-OS native qualification remains pending, so item 34 stays partial.
@@ -9948,7 +10088,7 @@ test precondition failure, not a Lua defect or a successful permission grant.
   in `d9e747660c`; all scopes remain unqualified. The original 22:00 UTC expiry
   was retained. The requested 23:59 Paris publication deadline was missed;
   the later immediate-release instruction renews only the existing limits
-  until October 10 at 00:00 UTC as stated in the delivery checkpoint. Do not
+  until October 10 at 02:00 UTC as stated in the delivery checkpoint. Do not
   renew this policy or the unsigned Windows permission beyond that window.
 
   First stable attempt 37994227917 exposed 61 Linux unit failures, six Core
@@ -9958,6 +10098,14 @@ test precondition failure, not a Lua defect or a successful permission grant.
   51 controls with original and inverse failures preserved; native Linux and
   the complete suite remain unqualified. Other fixture corrections are still
   in progress. No stable publication is established by these bounded results.
+
+  CI 38008863714 completed 417 Swift cases: 416 passed and the native
+  bootstrap TLS/full-URL PAC/artifact-publication case failed. Its exact
+  method is covered by the existing macos-native-pac deferral; the other
+  nine bootstrap cases and all fourteen OwnedProgram cases remain mandatory.
+  Native bootstrap TLS/PAC and artifact-publication proof is still missing;
+  packaging success does not qualify it. Restore this method with the full
+  native PAC scope after correcting the fixture failure.
 
 - [x] **134.** Preserve the website custom domain during Pages deployments.
 

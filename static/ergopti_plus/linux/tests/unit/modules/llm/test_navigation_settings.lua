@@ -97,11 +97,14 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.menu_builder", "adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "infra.i18n" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local previous_execute, previous_rename = os.execute, os.rename
-			local notices, changed = 0, 0
+			local notices, changed, refused_publications = 0, 0, 0
 			local ok, failure = xpcall(function()
 				package.loaded["infra.config_paths"] = { config = function() return path end,
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end }
-				package.loaded["ui.menu.start_at_login"] = { enabled = function() return false end }
+				package.loaded["ui.menu.start_at_login"] = {
+					enabled = function() return false end,
+					command_available = function() return true end,
+				}
 				local i18n = require("infra.i18n")
 				if type(variant) == "table" and type(variant.translate) == "function" then
 					local localized = {}; for key, value in pairs(i18n) do localized[key] = value end
@@ -160,9 +163,12 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 				end
 				body({ path = path, build = build, full = full, settings = settings, i18n = i18n,
 					changed = function() return changed end, notices = function() return notices end,
+					refused_publications = function() return refused_publications end,
 					fault = function(mode)
 						os.rename = function(source, destination)
-							if destination == path then
+							-- Refuse only the real forward staging rename, preserving the inverse ACK.
+							if source == path .. ".tmp" and destination == path then
+								refused_publications = refused_publications + 1
 								if mode == "throw" then error("controlled native publication refusal") end
 								if mode == "nil" then return nil, "refused" end
 								return mode == "number" and 2 or false
@@ -250,6 +256,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					fixture.fault(mode)
 					local called, result = pcall(callback)
 					fixture.clear_fault()
+					helpers.assert_true(fixture.refused_publications() > 0, "the actual staging publication must reach the injected refusal")
 					helpers.assert_eq({ called, result }, { true, false }, "the callback exposes actual publication refusal")
 					helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
 					helpers.assert_eq(fixture.settings.get(), {})

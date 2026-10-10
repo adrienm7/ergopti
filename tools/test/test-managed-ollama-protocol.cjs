@@ -5,8 +5,210 @@
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
+
+// The standalone selector is the existing collector's Windows component lane;
+// the default still receives every original platform control below.
+const args = process.argv.slice(2);
+assert.ok(
+	args.length === 0 || (args.length === 1 && args[0] === '--windows-file-port'),
+	'Unknown managed Ollama receiving selector.'
+);
+function receiveFileFixtureProducer() {
+	const fixtures = path.resolve(
+		__dirname,
+		'../../static/ergopti_plus/windows/tests/fixtures/ollama-install-files'
+	);
+	const receipts = JSON.parse(fs.readFileSync(path.join(fixtures, 'receipts.json'), 'utf8'));
+	assert.equal(
+		Object.keys(receipts).length,
+		16,
+		'All declared namespace fixtures must be present.'
+	);
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ollama-fixture-'));
+	const producer = path.join(owned, 'build-fixtures.py');
+	fs.copyFileSync(path.join(fixtures, 'build-fixtures.py'), producer);
+	const result = spawnSync(pythonExecutable(), [producer], {
+		encoding: 'utf8',
+		timeout: 60000,
+		windowsHide: true
+	});
+	assert.equal(result.error, undefined, `Fixture producer must start; retained ${owned}`);
+	assert.equal(result.signal, null, `Fixture producer must retire; retained ${owned}`);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.equal(result.stderr, '');
+	const expected = [
+		'build-fixtures.py',
+		'receipts.json',
+		'payloads.json',
+		...Object.keys(receipts).map((name) => `${name}.zip`)
+	].sort();
+	assert.deepEqual(
+		fs.readdirSync(owned).sort(),
+		expected,
+		'Producer must author every exact declared fixture.'
+	);
+	for (const name of expected) {
+		const file = path.join(owned, name);
+		assert.ok(
+			fs.lstatSync(file).isFile() && !fs.lstatSync(file).isSymbolicLink(),
+			'Only exact owned regular files may retire.'
+		);
+		assert.deepEqual(
+			fs.readFileSync(file),
+			fs.readFileSync(path.join(fixtures, name)),
+			`Generated ${name} must preserve its canonical bytes.`
+		);
+	}
+	// Only successful, terminal generation and the closed file census permit
+	// exact unlinks; failures retain the owned namespace and never recurse.
+	for (const name of expected) fs.unlinkSync(path.join(owned, name));
+	fs.rmdirSync(owned);
+	process.stdout.write('WINDOWS-FILE-FIXTURES generated=16 byte_exact=true native=false\n');
+}
+function receiveWindowsFilePort() {
+	assert.equal(process.platform, 'win32', 'The Windows file-port models require native PS5.1.');
+	const repository = path.resolve(__dirname, '../..');
+	const psHome = path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0');
+	const moduleKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'psmodulepath');
+	const env = { ...process.env };
+	const modules = path.join(psHome, 'Modules');
+	const inherited = moduleKey ? env[moduleKey] : '';
+	if (moduleKey) delete env[moduleKey];
+	env.PSModulePath = [
+		modules,
+		...inherited
+			.split(';')
+			.filter(
+				(entry) =>
+					entry && path.resolve(entry).toLowerCase() !== path.resolve(modules).toLowerCase()
+			)
+	].join(';');
+	const helper = path.join(
+		repository,
+		'static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1'
+	);
+	let models = 0;
+	for (const [script, count] of [
+		['windows_ollama_file_validation_test.ps1', 13],
+		['windows_ollama_file_publication_test.ps1', 4],
+		['windows_ollama_file_default_paths_test.ps1', 4],
+		['windows_ollama_file_final_close_test.ps1', 1]
+	]) {
+		const result = spawnSync(
+			path.join(psHome, 'powershell.exe'),
+			[
+				'-NoLogo',
+				'-NoProfile',
+				'-NonInteractive',
+				'-File',
+				path.join(__dirname, script),
+				'-Helper',
+				helper
+			],
+			{ cwd: repository, env, encoding: 'utf8', timeout: 60000, windowsHide: true }
+		);
+		assert.equal(result.error, undefined, 'The actual source-bound model must start.');
+		assert.equal(result.signal, null, 'The actual source-bound model must retire.');
+		assert.equal(result.stderr, '', result.stderr);
+		const stdout = result.stdout.replace(/\r\n?/g, '\n');
+		if (count !== 1) {
+			assert.equal(result.status, 0, stdout);
+			assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, count);
+			assert.doesNotMatch(stdout, /^FAIL /m);
+			assert.match(
+				stdout,
+				new RegExp(
+					`^RESULT passed=${count} failed=0 native_calls=0(?: real_file_acquisitions=0)?\\n$`,
+					'm'
+				)
+			);
+		} else {
+			// The actual CLI preserves its refusal exit; that is the control's input.
+			assert.equal(result.status, 1, 'Final root-close refusal must retain the actual CLI exit1.');
+			const fact = JSON.parse(stdout);
+			assert.equal(fact.ok, false);
+			assert.equal(fact.phase, 'refused');
+			assert.equal(fact.cleanup_pending, true);
+			assert.equal(fact.error, 'Injected exact final root close refusal.');
+			assert.equal(fact.ticket, '1'.repeat(32));
+			assert.ok(!Object.hasOwn(fact, 'executable'));
+			assert.deepEqual(fact.publication_receipt, {
+				ticket: '1'.repeat(32),
+				root_identity: '11111111:0000000000000000',
+				stage_identity: '11111111:0000000000000001',
+				manifest_sha256: '2'.repeat(64),
+				version_path: 'Z:\\owned\\versions\\captured',
+				renamed: true,
+				cleanup_pending: true
+			});
+		}
+		models += count;
+		process.stdout.write(stdout);
+	}
+	assert.equal(models, 22, 'All source-bound Windows model controls must be received.');
+	process.stdout.write('WINDOWS-FILE-PORT models=22 native=false acquisition=false\n');
+}
+function receiveWindowsRuntimeHandoff() {
+	assert.equal(
+		process.platform,
+		'win32',
+		'Runtime recording receiving requires the production PS5 interpreter.'
+	);
+	const repository = path.resolve(__dirname, '../..');
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-model-'));
+	const psHome = path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0');
+	const env = { ...process.env, TEMP: owned, TMP: owned };
+	const moduleKey = Object.keys(env).find((key) => key.toLowerCase() === 'psmodulepath');
+	if (moduleKey) delete env[moduleKey];
+	env.PSModulePath = path.join(psHome, 'Modules');
+	const result = spawnSync(
+		path.join(psHome, 'powershell.exe'),
+		[
+			'-NoLogo',
+			'-NoProfile',
+			'-NonInteractive',
+			'-File',
+			path.join(
+				repository,
+				'static/ergopti_plus/windows/tests/unit/test_ollama_runtime_launch.ps1'
+			),
+			'-Source',
+			path.join(repository, 'static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1'),
+			'-PrivateRoot',
+			owned
+		],
+		{ cwd: owned, env, encoding: 'utf8', timeout: 60000, windowsHide: true }
+	);
+	assert.equal(result.error, undefined, `Runtime model must start; retained ${owned}`);
+	assert.equal(result.signal, null, `Runtime model must retire; retained ${owned}`);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	const stdout = result.stdout.replace(/\r\n?/g, '\n');
+	const stderr = result.stderr.replace(/\r\n?/g, '\n');
+	assert.equal(
+		stderr,
+		'Owned runtime retains image leases: exact job accounting is unavailable.\n'
+	);
+	assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, 9);
+	assert.doesNotMatch(stdout, /^FAIL /m);
+	assert.match(stdout, /^RESULT passed=9 failed=0\n$/m);
+	// The small private fixture namespace remains a retained receiving artifact.
+	process.stdout.write(stdout);
+	process.stdout.write('WINDOWS-RUNTIME-HANDOFF models=9 native_runtime=false http=false\n');
+}
+receiveFileFixtureProducer();
+if (args.length === 1) {
+	receiveWindowsFilePort();
+	receiveWindowsRuntimeHandoff();
+	process.exit(0);
+}
+if (process.platform === 'win32') {
+	receiveWindowsFilePort();
+	receiveWindowsRuntimeHandoff();
+}
 
 const cases = [
 	['tools/test/managed_ollama_runtime_policy_test.py', 7],
@@ -16,7 +218,7 @@ if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
 	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 8]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 52]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 55]);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 16]);
 	cases.push(['tools/test/managed_ollama_sessions_test.py', 11]);

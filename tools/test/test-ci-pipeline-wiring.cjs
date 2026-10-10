@@ -75,6 +75,19 @@
 'use strict';
 
 const pipeline = require('./ci-full-default.cjs');
+const scoped = require('./fixtures/ci-scoped-full-branches.cjs');
+function isRetainedQualification(entry, candidate, step) {
+	const owner = scoped.contract.retained_steps.find(
+		(owner) => owner.file === entry.rel && owner.job === candidate.id && owner.name === step.name
+	);
+	if (!owner) return false;
+	assert.equal(
+		step.body.replace(/\n+$/, ''),
+		owner.body,
+		'exact qualification receipt transport must remain'
+	);
+	return true;
+}
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -264,6 +277,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 ];
 const STEP_CONDITIONS = [
 	...MACOS_NATIVE_STEP_CONDITIONS,
+	...scoped.contract.retained_steps.map((owner) => [
+		owner.file,
+		owner.job,
+		owner.name,
+		owner.condition
+	]),
 	[
 		WINDOWS_BOX,
 		'test-ahk',
@@ -700,6 +719,12 @@ for (const [key, value] of planOutputs) {
 		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which ${ROOT} does not have`);
 	} else if (
 		!(source[1] === 'lanes' && ['lane_windows', 'lane_macos', 'lane_linux'].includes(key)) &&
+		!(
+			source[1] === 'qualification' &&
+			key === 'native_qualification_profile' &&
+			pipeline.stepField(owner.body, 'run') ===
+				'node tools/ci/dev-release-qualification.cjs --publication-select >> "$GITHUB_OUTPUT"'
+		) &&
 		!new RegExp(`\\bemit ${key} |"${key}=`).test(codeOf(owner.body))
 	) {
 		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which never writes ${key}`);
@@ -761,7 +786,30 @@ function rootProblems(files) {
 		setupAt < 0
 			? []
 			: rootSteps.slice(setupAt + 1).filter((step) => step.name !== 'Select native OS lanes');
-	const expected = [...VALIDATE_CHECKS.map(([name]) => name), DEEPEN_STEP, ...PLAN_STEPS];
+	const expected = [
+		...VALIDATE_CHECKS.map(([name]) => name),
+		DEEPEN_STEP,
+		...PLAN_STEPS,
+		'Select the proposed one-candidate native qualification'
+	];
+	const qualifier = after.at(-1);
+	if (
+		pipeline.stepField(qualifier?.body ?? '', 'run') !==
+		'node tools/ci/dev-release-qualification.cjs --publication-select >> "$GITHUB_OUTPUT"'
+	)
+		problems.push('the native qualification selector must use the sole typed owner');
+	for (const field of ['RELEASE', 'PRERELEASE', 'CHANNEL', 'TAG', 'VERSION']) {
+		if (
+			!qualifier?.body.includes(
+				'          ERGOPTI_DEV_RELEASE_' +
+					field +
+					': ${{ steps.meta.outputs.' +
+					field.toLowerCase() +
+					' }}'
+			)
+		)
+			problems.push('qualification must bind the current plan ' + field);
+	}
 	if (JSON.stringify(after.map((candidate) => candidate.name)) !== JSON.stringify(expected)) {
 		problems.push(
 			`${ROOT} must run exactly, after "${VALIDATE_SETUP}": ${expected.join(' | ')}; ` +
@@ -2243,6 +2291,7 @@ for (const entry of pipeline.files()) {
 				continue;
 			const name = /^ {10}name: (assets-\S+)$/m.exec(found.body)?.[1];
 			if (!name) continue;
+			if (isRetainedQualification(entry, candidate, found)) continue;
 			retained.set(name, /^ {10}retention-days: (.+)$/m.exec(found.body)?.[1] ?? null);
 			if (!/^ {10}if-no-files-found: error$/m.test(found.body)) {
 				errors.push(
@@ -2292,7 +2341,11 @@ function namingProblems(files) {
 				if (found.name && !/^[A-Z]/.test(found.name)) {
 					problems.push(`${entry.rel} job ${candidate.id} has a lowercase step: ${found.name}`);
 				}
-				if (entry.rel !== ENTRY && /\b(?:macOS|Linux|Windows(?! Defender))\b/.test(found.name)) {
+				if (
+					entry.rel !== ENTRY &&
+					/\b(?:macOS|Linux|Windows(?! Defender))\b/.test(found.name) &&
+					!isRetainedQualification(entry, candidate, found)
+				) {
 					problems.push(
 						`${entry.rel} job ${candidate.id} repeats its zone in a step: ${found.name}`
 					);
@@ -2303,6 +2356,36 @@ function namingProblems(files) {
 	return problems;
 }
 
+for (const owner of scoped.contract.retained_steps) {
+	const entry = { rel: owner.file },
+		candidate = { id: owner.job };
+	assert.equal(
+		isRetainedQualification(entry, candidate, { name: owner.name, body: owner.body }),
+		true
+	);
+	for (const [before, after] of [
+		['uses: actions/upload-artifact@v4', 'uses: unrelated/uploader@v4'],
+		['path:', 'unrelated_path:'],
+		['if-no-files-found:', 'continue-on-error: true\n          if-no-files-found:']
+	]) {
+		const body = owner.body.replace(before, after);
+		assert.notEqual(body, owner.body);
+		assert.throws(() => isRetainedQualification(entry, candidate, { name: owner.name, body }));
+	}
+	assert.equal(
+		isRetainedQualification(entry, candidate, { name: owner.name + ' unknown', body: owner.body }),
+		false
+	);
+}
+for (const [before, after] of [
+	['--publication-select', '--unknown-select'],
+	['ERGOPTI_DEV_RELEASE_TAG: ${{ steps.meta.outputs.tag }}', 'ERGOPTI_DEV_RELEASE_TAG: fixed'],
+	[
+		'ERGOPTI_DEV_RELEASE_VERSION: ${{ steps.meta.outputs.version }}',
+		'ERGOPTI_DEV_RELEASE_VERSION: fixed'
+	]
+])
+	mustCatch('qualification owner ' + before, ENTRY, before, after, rootProblems);
 errors.push(...namingProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	['an unqualified root name', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate'"],
@@ -3956,6 +4039,23 @@ const LINUX_SIMULTANEOUS_ENVELOPE = [
 ];
 
 const LINUX_SIMULTANEOUS_STEP = 'The whole daemon, live — a trigger typed, a tray shown';
+const LINUX_SIMULTANEOUS_ENV = [
+	'GITHUB_ACTIONS',
+	'GITHUB_REPOSITORY',
+	'GITHUB_EVENT_NAME',
+	'GITHUB_REF',
+	'GITHUB_SHA',
+	'RUNNER_TEMP',
+	'ERGOPTI_DEV_RELEASE_RELEASE',
+	'ERGOPTI_DEV_RELEASE_PRERELEASE',
+	'ERGOPTI_DEV_RELEASE_CHANNEL',
+	'ERGOPTI_DEV_RELEASE_TAG',
+	'ERGOPTI_DEV_RELEASE_VERSION'
+];
+const LINUX_SIMULTANEOUS_SOURCE_ENTRY =
+	'sudo env \\\n' +
+	LINUX_SIMULTANEOUS_ENV.map((key) => '            ' + key + '="$' + key + '" \\\n').join('') +
+	`            bash ${LINUX_SIMULTANEOUS_HARNESS}`;
 const LINUX_SIMULTANEOUS_ENTRY = `bash ${LINUX_SIMULTANEOUS_HARNESS}`;
 const LINUX_SIMULTANEOUS_NATIVE_WORKFLOW = [
 	'sudo modprobe uinput',
@@ -3978,6 +4078,11 @@ const LINUX_SIMULTANEOUS_NATIVE_WORKFLOW = [
 
 /** Binds the inspected harness to its mandatory existing native workflow call. */
 function linuxSimultaneousWorkflowProblems(files) {
+	try {
+		pipeline.fromFiles(files);
+	} catch {
+		return ['Linux raw workflow admission refused'];
+	}
 	const steps = files
 		.filter((entry) => entry.rel === LINUX_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
@@ -4008,13 +4113,29 @@ function linuxSimultaneousWorkflowProblems(files) {
 	return [];
 }
 
-errors.push(...linuxSimultaneousWorkflowProblems(pipeline.files()));
-const linuxSimultaneousStepBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_SIMULTANEOUS_STEP);
+// Inspect the raw wrapper only after the strict full graph admits it.
+const linuxSimultaneousRawFiles = pipeline.rawFiles();
+errors.push(...linuxSimultaneousWorkflowProblems(linuxSimultaneousRawFiles));
+const linuxSimultaneousRawJob = pipeline
+	.jobsOfText(linuxSimultaneousRawFiles.find((file) => file.rel === LINUX_BOX).text, LINUX_BOX)
+	.find((job) => job.id === 'e2e-linux');
+const linuxSimultaneousStepBody = pipeline.step(
+	linuxSimultaneousRawJob.body,
+	LINUX_SIMULTANEOUS_STEP
+);
 let linuxSimultaneousWorkflowRefusals = 0;
 for (const [what, from, to] of [
-	['omitted live harness', LINUX_SIMULTANEOUS_ENTRY, 'true'],
-	['redirected live harness', LINUX_SIMULTANEOUS_ENTRY, `${LINUX_SIMULTANEOUS_ENTRY} --skip`],
-	['forgiven live harness', LINUX_SIMULTANEOUS_ENTRY, `${LINUX_SIMULTANEOUS_ENTRY} || true`],
+	['omitted live harness', LINUX_SIMULTANEOUS_SOURCE_ENTRY, 'true'],
+	[
+		'redirected live harness',
+		LINUX_SIMULTANEOUS_SOURCE_ENTRY,
+		`${LINUX_SIMULTANEOUS_SOURCE_ENTRY} --skip`
+	],
+	[
+		'forgiven live harness',
+		LINUX_SIMULTANEOUS_SOURCE_ENTRY,
+		`${LINUX_SIMULTANEOUS_SOURCE_ENTRY} || true`
+	],
 	['disabled live step', NOT_CANCELLED, '${{ false }}'],
 	['changed live budget', 'timeout-minutes: 6', 'timeout-minutes: 12'],
 	[
@@ -4053,7 +4174,7 @@ for (const [what, from, to] of [
 ]) {
 	assert.ok(linuxSimultaneousStepBody.includes(from), `${what}: causal preimage must exist`);
 	assert.equal(linuxSimultaneousStepBody.split(from).length, 2, `${what}: one step-local target`);
-	const changed = pipeline.files().map((entry) => ({
+	const changed = linuxSimultaneousRawFiles.map((entry) => ({
 		...entry,
 		text:
 			entry.rel === LINUX_BOX
@@ -4105,6 +4226,9 @@ function linuxSimultaneousEnrollmentProblems(source) {
 	return [];
 }
 
+// This enrollment guard owns the raw saved-selection protocol. Its full
+// projection is inspected separately below; projection cannot replace policy
+// admission and its failure/cleanup assertions with the native command alone.
 const linuxSimultaneousHarness = fs.readFileSync(
 	path.resolve(__dirname, '../..', LINUX_SIMULTANEOUS_HARNESS),
 	'utf8'
@@ -4201,6 +4325,58 @@ assert.equal(linuxSimultaneousEnvelopeRefusals, 23);
 console.log(
 	`PASS: Linux simultaneous wiring ${linuxSimultaneousWorkflowRefusals} workflow and ${linuxSimultaneousEnvelopeRefusals} custody-envelope refusals; native execution unqualified.`
 );
+
+// The separate full projection must preserve every executable native command
+// and its failing custody status after strict raw scope admission.
+const linuxSimultaneousProjected =
+	require('./fixtures/ci-scoped-full-branches.cjs').projectLinuxHarness(linuxSimultaneousHarness);
+const LINUX_SIMULTANEOUS_FULL_ENVELOPE = [
+	LINUX_SIMULTANEOUS_ENVELOPE[0],
+	'CUSTODY=$?',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	LINUX_SIMULTANEOUS_ENVELOPE[3],
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	LINUX_SIMULTANEOUS_COMMAND,
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" != "0" ]; then',
+	'kill ${PIDS} 2>/dev/null',
+	'exit "${CUSTODY}"',
+	'fi'
+];
+function linuxSimultaneousProjectedProblems(source) {
+	const lines = logicalLines(
+		`        run: |\n${source
+			.split('\n')
+			.map((line) => `          ${line}`)
+			.join('\n')}`
+	).filter((line) => line !== '');
+	const at = lines.indexOf(LINUX_SIMULTANEOUS_ENVELOPE[0]);
+	const end = lines.indexOf('LLM_READY="$(mktemp -u)"');
+	return at >= 0 &&
+		end > at &&
+		JSON.stringify(lines.slice(at, end)) === JSON.stringify(LINUX_SIMULTANEOUS_FULL_ENVELOPE)
+		? []
+		: ['full native projection must preserve the ordered custody commands and failure cleanup'];
+}
+assert.equal(linuxSimultaneousProjectedProblems(linuxSimultaneousProjected).length, 0);
+for (const [name, from, to] of [
+	['missing full native command', LINUX_SIMULTANEOUS_COMMAND, 'true'],
+	[
+		'forgiven full native command',
+		LINUX_SIMULTANEOUS_COMMAND,
+		`${LINUX_SIMULTANEOUS_COMMAND} || true`
+	],
+	['forgiven full custody status', 'exit "${CUSTODY}"', 'exit 0']
+]) {
+	assert.ok(linuxSimultaneousProjected.includes(from), `${name}: causal preimage exists`);
+	assert.ok(
+		linuxSimultaneousProjectedProblems(linuxSimultaneousProjected.replace(from, to)).length > 0,
+		`${name} must refuse full native qualification`
+	);
+}
 
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');

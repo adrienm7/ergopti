@@ -16,6 +16,17 @@ import run_native_probe as subject
 
 
 class BootstrapCallerControls(unittest.TestCase):
+    def test_actual_ownership_pin_accepts_current_source_and_refuses_changed_bytes(self):
+        path = Path(__file__).resolve().parents[1] / "macos_owned_process.py"
+        raw = path.read_bytes()
+        with mock.patch("subprocess.Popen", side_effect=AssertionError("native child forbidden")):
+            ownership = subject.pinned_module(path, "ownership")
+        self.assertTrue(callable(ownership.acquire_owned))
+        self.assertTrue(callable(ownership.NativeProcessGroups))
+        with mock.patch.object(Path, "read_bytes", return_value=raw + b"\nforeign = True\n"):
+            with self.assertRaisesRegex(RuntimeError, "Native dependency source pin differs"):
+                subject.pinned_module(path, "ownership")
+
     def inventory(self):
         path = Path(__file__).resolve().parents[1] / "native_hs_program_providers/run_native.py"
         raw = path.read_bytes()
