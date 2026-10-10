@@ -47,12 +47,16 @@ LLM_Agent_MenuBuild() {
 
 ; Dynamic slot agent_system1 or agent_system2: its row and its backends.
 _LLM_Agent_MenuSystemSlot(Key, Target, CategoryName) {
-	MenuRenderer_AppendRows(Target, "agent_menu", Key, [_LLM_Agent_SystemRow(Key)])
+	Row := _LLM_Agent_SystemRow(Key)
+	if Row is Map
+		MenuRenderer_AppendRows(Target, "agent_menu", Key, [Row])
 }
 
 ; Dynamic slot agent_disabled_apps: the application picker.
 _LLM_Agent_MenuAppsSlot(Target, CategoryName) {
-	MenuRenderer_AppendRows(Target, "agent_menu", "agent_disabled_apps", [_LLM_Agent_AppsRow()])
+	Row := _LLM_Agent_AppsRow()
+	if Row is Map
+		MenuRenderer_AppendRows(Target, "agent_menu", "agent_disabled_apps", [Row])
 }
 
 
@@ -81,7 +85,7 @@ _LLM_Agent_SystemRow(Key) {
 		Map("agent_system_is_off", _LLM_Agent_MenuSystemIsOff.Bind(Key),
 			"agent_system_off_ready", (*) => true))
 	if !(Off is Map)
-		return Map("label", StrReplace(t("menu.agent." . SubStr(Key, 7)), "{1}", t("menu.agent.off")), "items", [])
+		return _LLM_Agent_MenuSystemFrame(Key, t("menu.agent.off"), [])
 	Items := [Off]
 	CurrentLabel := t("menu.agent.off")
 	for Choice in LLM_Agent_BackendChoices(Key) {
@@ -100,10 +104,31 @@ _LLM_Agent_SystemRow(Key) {
 		Map("agent_system_model_ready", (*) => Current != "",
 			"agent_system_model_caption", (*) => Model), Map())
 	if !(ModelRows is Array)
-		return Map("label", StrReplace(t("menu.agent." . SubStr(Key, 7)), "{1}", CurrentLabel), "items", [])
+		return _LLM_Agent_MenuSystemFrame(Key, CurrentLabel, [])
 	for Row in ModelRows
 		Items.Push(Row)
-	return Map("label", StrReplace(t("menu.agent." . SubStr(Key, 7)), "{1}", CurrentLabel), "items", Items)
+	return _LLM_Agent_MenuSystemFrame(Key, CurrentLabel, Items)
+}
+
+/**
+ * Receives the unchanged native backend/model children through their declared caption.
+ * @param {String} Key The actual System 1 or System 2 setting identity.
+ * @param {String} Caption The current native backend label, kept literal.
+ * @param {Array} Items The finished native child rows, including empty refusal data.
+ * @returns {Map|false} One canonical group or a refused declaration.
+ */
+_LLM_Agent_MenuSystemFrame(Key, Caption, Items) {
+	if Key == "agent_system1"
+		Rows := MenuRenderer_TemplateRows("agent_linux_system1_frame", Map(),
+			Map("agent_system_backend_current_caption", (*) => Caption),
+			Map("agent_system1", Items))
+	else if Key == "agent_system2"
+		Rows := MenuRenderer_TemplateRows("agent_linux_system2_frame", Map(),
+			Map("agent_system_backend_current_caption", (*) => Caption),
+			Map("agent_system2", Items))
+	else
+		return false
+	return (Rows is Array) && Rows.Length == 1 && (Rows[1] is Map) ? Rows[1] : false
 }
 
 /**
@@ -121,9 +146,10 @@ _LLM_Agent_MenuSystemIsOff(Key) {
  * @returns {Map}
  */
 _LLM_Agent_AppsRow() {
-	return Map(
-		"label", StrReplace(t("menu.agent.disabled_apps"), "{1}", LLM_Agent_Setting("agent_disabled_apps").Length),
-		"action", (*) => LLM_Agent_OpenAppPicker())
+	Rows := MenuRenderer_TemplateRows("agent_windows_disabled_apps_command",
+		Map("agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker()),
+		Map("agent_disabled_apps_count", (*) => "" . LLM_Agent_Setting("agent_disabled_apps").Length), Map())
+	return (Rows is Array) && Rows.Length == 1 && (Rows[1] is Map) ? Rows[1] : false
 }
 
 

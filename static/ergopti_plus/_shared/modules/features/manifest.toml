@@ -9303,7 +9303,7 @@ id = "agent_system1"
 i18n = "menu.agent.system1"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
-platforms = ["linux"]
+platforms = ["linux", "ahk"]
 unavailable = "hide"
 
 [[menu.agent_linux_system2_frame]]
@@ -9312,7 +9312,7 @@ id = "agent_system2"
 i18n = "menu.agent.system2"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
-platforms = ["linux"]
+platforms = ["linux", "ahk"]
 unavailable = "hide"
 
 # The actual Windows dynamic profile row retains its finished native Menu child.
@@ -9552,4 +9552,14 @@ caption_getter = "linux_tray_version"
 caption_layout = "prefix"
 caption_joiner = " — "
 platforms = ["linux"]
+unavailable = "hide"
+
+# The Windows Agent picker remains native; its fixed count caption is declared.
+[[menu.agent_windows_disabled_apps_command]]
+type = "command"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
+caption_getter = "agent_disabled_apps_count"
+caption_format = "numbered"
+platforms = ["ahk"]
 unavailable = "hide"
