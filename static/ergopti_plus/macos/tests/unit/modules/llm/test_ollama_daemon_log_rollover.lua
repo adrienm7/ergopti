@@ -153,6 +153,8 @@ local function assert_native_context(fixture, task, port)
 	helpers.assert_true(command:find("exec " .. text_utils.shell_quote("/fixture/python") .. " -IB ", 1, true) == 1)
 	helpers.assert_true(command:find(text_utils.shell_quote(fixture.owner_script), 1, true) ~= nil)
 	helpers.assert_true(command:find("--port " .. tostring(port), 1, true) ~= nil)
+	helpers.assert_true(command:find("--log-directory '/tmp'", 1, true) ~= nil,
+		"native capture must retain the configured stable directory, never the launch-day filename")
 	helpers.assert_true(command:find("--caller-nonce " .. text_utils.shell_quote(fixture.nonce), 1, true) ~= nil)
 	helpers.assert_true(command:find("--acquire-readiness --owned-stdin", 1, true) ~= nil)
 	helpers.assert_eq(command:find("nohup", 1, true), nil)

@@ -317,7 +317,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_owned_private_session_test.py', 5]);
 	cases.push(['tools/test/macos_bootstrap_tls_numeric_binding_test.py', 8]);
 	cases.push(['tools/test/owned_suspended_image_portable_test.py', 3]);
-	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 28]);
+	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 34]);
 	cases.push(['tools/diagnostics/macos_ollama_bootstrap_owner_test.py', 22]);
 	cases.push(['tools/diagnostics/macos_trusted_native_guardian_test.py', 10]);
 	cases.push(['tools/diagnostics/macos_guardian_retirement_order_test.py', 6]);

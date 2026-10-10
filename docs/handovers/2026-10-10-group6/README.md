@@ -226,23 +226,27 @@ conditions and owned44-count changes. Caller integration is still CODE.
 
 ## Remaining implementation and qualification
 
-- TODO36: resolve the actual same-identity Automation admission failure;
-  execute complete Brew6, archive/package/install, upgrade/refusal/retry and
-  relaunch acceptance. Do not edit TCC databases, relax ownership assertions or
-  infer that granting Terminal fixes generated application identities.
-- TODO62: determine and repair the actual native TLS failure, then receive the
+- TODO 36: qualify the actual same-identity Automation consent prerequisite,
+  then execute all six Brew profiles, archive/package/install, upgrade/refusal/retry
+  and relaunch acceptance. Its original owned window deadline remains a failure;
+  no software cause or general hosted-runner incapability is proved. Do not edit
+  TCC databases, relax ownership assertions or infer that granting Terminal
+  fixes generated application identities.
+- TODO 62: determine and repair the actual native TLS failure, then receive the
   original full-URL PAC/WPAD cases on both architectures. A leaf SHA256 pin is
   prepared, but the original leaf algorithm is unbound and its causal value is
   unproved. The pin is source-adopted and compiled in the `fe3da8332` receiving,
   while the original native positive requests still fail.
-- TODO62: complete managed Ollama migration. Shared consent must be consumed by
-  the real native commit; authenticated READY/RETIRED observations must join the
-  Lua lifecycle, active pull/stream/warmup retirement and qualified native
-  serving. `NATIVE_PRODUCTION_QUALIFIED` remains false. Do not flip it to obtain
-  a success path or treat a shell-start boolean as authenticated readiness.
-  A stock/foreign daemon has no retroactive tree authority; safely refuse and
-  request manual stopping rather than using broad process matching.
-- TODO62: preserve the now executed50 selected-release controls and actual
+- TODO 62: qualify the integrated managed Ollama callers, shared one-use consent
+  and authenticated ACTIVE/READY/RETIRED lifecycle with actual native serving,
+  active pull/stream/warmup retirement and installation. These code owners are
+  implemented; their native model receiving remains incomplete. Daily native
+  daemon logging is a separate prepared implementation awaiting receiving and
+  coordinated publication. `NATIVE_PRODUCTION_QUALIFIED` remains false. Do not
+  flip it to obtain a success path or treat a shell-start boolean as authenticated
+  readiness. A stock/foreign daemon has no retroactive tree authority; safely
+  refuse and request manual stopping rather than using broad process matching.
+- TODO 62: preserve the now executed50 selected-release controls and actual
   guardian-owned TERM/INT receiving on both Darwin architectures. Full native
   routing, production packaging and installed operation remain independent
   qualifications; the literal corpus does not establish them.
@@ -251,10 +255,15 @@ conditions and owned44-count changes. Caller integration is still CODE.
   receiving. Corporate proxy/authentication/certificate and real desktop
   acceptance on all three OS remain independent device qualifications.
 
-Full migration still needs coordinated changes to six group4 macOS consumers
-and genuine21-language labels/catalogue publication. Exact source spans are coordinated in issue86, including caller/checker
-notices6098836591,6099485637 and6099655173. Preserve concrete overlapping
-hunks and the other groups' workflow and generated ownership.
+The seven-commit integration already includes the coordinated caller changes
+and genuine labels in all 21 locales; do not reopen them from this handover's
+historical preparation bullets. Packaged Python/uv/wheel bootstrap stages each
+native request before offline uv installation, and the HuggingFace caller installs
+ManagedHTTPTransport before snapshot_download so every request/redirect reaches
+the native adapter. The historical opaque-client shell comment does not establish
+an unimplemented packaged route. These implementations still require actual
+trust/PAC and installed qualification. Issue 86 owns current source spans; preserve
+concrete overlapping hunks and the other groups' workflow/generated ownership.
 Group1 owns the Linux audio dependency addition `language-pack-fr` and
 `language-pack-de`; this checkpoint does not modify that workflow.
 
@@ -368,7 +377,7 @@ joint idle admission. Original HTTP, warmup, preflight and task cleanup debt
 cannot admit a successor. A stale context after deadline acquisition cancels that
 original timer before releasing task/PTY ownership. Ambiguous native task-start
 refusal retains its original owner until physical settlement. Seven new labels
-are translated in all21 locales, preserving every existing locale entry.
+are translated in all 21 locales, preserving every existing locale entry.
 
 Controlled receiving records125 unchanged passing cases plus84 checker cases
 rerun after the timer repair. The identical84-case corpus fails four causal timer
@@ -495,10 +504,14 @@ owns the receiving correction; later archive/signature assertions remain unrun.
 
 Official integrated manual
 [38081991583](https://github.com/adrienm7/ergopti/actions/runs/38081991583)
-tests exact `d92a72d5` with `os_lanes=macos` and no Release. The owned lock is
-`0bdb0d5b628a0935296100bd6130af32f750ea73`; only its owner releases it after
-the whole result. Automatic push 38081968269 is cancelled. The official result
-is pending and cannot be inferred from the candidate's partial passes.
+tests exact `d92a72d5` with `os_lanes=macos` and finishes with 6 successful,
+6 failed, 5 skipped and 0 cancelled jobs; Release is skipped. Its actual SDK 49,
+Python 77, Go 54, source PAC 10 and catalogue 27 pass on both architectures. The
+PAC/WPAD, trust setup/restoration, Homebrew and cold-receiving limitations above
+remain. Packaging and installation are skipped. Automatic push 38081968269 is
+cancelled. The exact owner deleted lock
+`0bdb0d5b628a0935296100bd6130af32f750ea73` only after this whole terminal
+result. No candidate observation replaces the official verdict.
 
 ## Independent primary and cleanup diagnostics
 
@@ -516,16 +529,81 @@ debt. This causal comparison is portable evidence only, not native model
 qualification. Its receipt is retained separately from the current 23/23 run.
 
 All 16 old portable tests remain; all 23 current tests pass, including the
-original compiler exception and its retained qualification owner. Exact native
-replay remains required. Success carries no failure fields. The false production
-qualification guard and model and package/install requirements stay intact.
+original compiler exception and its retained qualification owner. Exact manual
+[38083455237](https://github.com/adrienm7/ergopti/actions/runs/38083455237)
+on `0f003a591` finishes with 6 successful, 6 failed, 5 skipped and 0 cancelled jobs;
+Release is skipped. Both architectures emit the same bounded model receipt:
+`prepare_phase=trust_add`, a command/deadline primary failure and an
+unknown/unknown cleanup failure, `private_children_retired=true` and `native_trust_restored=false`.
+The current primary exception is exactly subprocess.TimeoutExpired at the
+original fixture.trust(True) checkpoint and command budget. Its OS/authorization
+cause remains unknown; this does not retrospectively attribute `d92a72d5`'s discarded
+exception. Create/pull/inference, later profiles and package/install remain
+unrun or unqualified. Success carries no failure fields. The false production
+qualification guard and every model/package/install requirement stay intact.
 
-The separately frozen daily-logging R6 and native seven-case enrollment are
-SOURCE-only preparations, not integrated or executed functionality. The new
-seven-case cohort includes an actual mapped-shell/original-guardian/stdio/sink
-composition; it does not qualify packaged Ollama logging. Original 49 must
-replay after the helper extension. Shared Group 5 product/workflow writer
-coordination remains outstanding. Current preparations are also copied under
-`/workspace/scratch`; no new-container or publication retention is claimed for
-private local files. TODO 36/62 remain open and no item is removed by this
-partial delivery.
+## Daily logging R6 receiving and pending native enrollment
+
+The reviewed daily-logging R6 preparation passes 34 actual portable Python
+controls. The same corpus against the original owner/serve passes all 28 old
+cases and totals 30 passes, one failure and three errors. These controlled
+process/file receipts do not qualify packaged native Ollama logging. The nine
+reviewed source paths are received on the owning feature from `0f003a591`;
+this is not Dev qualification.
+
+The initial private selected run passes formatting, 408 JS controls and Mac
+E2E 101 with one original skip. Its one JS failure is the known `node_modules`
+symlink `EISDIR`; the unit capture stops at `capture_bound` without a full-suite
+verdict. A separately verified real-dependency copy passes the unchanged
+targeted drift subject. The separate 600-second unit command owner closes with
+exit 1/deadline and `retained=false`. Preserve both unsuccessful receipts.
+
+The replay using the unchanged original 1,200-second budget now passes all
+1,569 modules and 18,347 assertions, with zero failures. Its original owner
+closes with exit 0, `cancelled=false`, no error and `retained=false`, before
+admission of the original captured output identities. All nine source bindings,
+the index and the private HEAD remain exact. The source-bound receiving receipt
+is `ACTUAL-RECEIVING.json`, SHA-256
+`fae41e3e7546ddb230e9697f2c2ed226cd13124852dfce0fd29e601055d2ec7d`.
+The initial JS failure remains recorded. A complete canonical selected run is
+still required to qualify all 409 JS controls together.
+
+The separate formatted R2 admission now passes 383 portable controls, with zero
+failures, skips or unknown outcomes. Its original command owner physically
+closes with exit 0, no signal/error and `retained=false`; all 34 source bindings,
+six original owner inputs, Node/specification and original capture identities remain
+exact. This is model/source and actual Git/CLI evidence only. The receiving
+receipt SHA-256 is
+`0e80bb1798dd2bdbd518ff1dd6c92482d13ea4cf753ebb79025cbdf517c14a77`.
+The complete canonical R6 selected gate remains pending; append its outcomes
+only after terminal receiving.
+
+The proposed native enrollment is SDK 49 plus seven daily cases and 42 original
+logger cases. None of these native extension cohorts has executed. The new
+seven-case source includes a mapped-shell/original-guardian/stdio/sink
+composition; source enrollment cannot qualify that composition or packaged
+Ollama logging. Group 5 released the bounded product source window in
+[6102079783](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6102079783).
+The separate CI writer custody request
+[6102114078](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6102114078)
+remains pending. Preserve the original native budgets and all original SDK/logger assertions;
+append actual native outcomes only after custody and exact-source receiving.
+
+The current packaged bootstrap and HuggingFace routes already consume their
+native per-request adapters. Launcher/device/inode authority is inherited by
+the genuine PTY worker; Python/uv/locked wheels stage through the native owner
+before offline installation. HuggingFace installs its HTTPX client factory
+before `snapshot_download`; each request and redirect reaches the native
+transport. The old opaque-client comment describes neither a missing owned-Go
+adapter nor a new packaged bootstrap/HuggingFace CODE gap. Manual/native-absent
+contexts and explicit environment routes remain separately admitted or refused;
+no native refusal silently falls back to an ambient client.
+
+Native trust/PAC, actual model create/pull/inference/retirement and final
+package/install receiving remain incomplete. Normal same-pair Homebrew
+Automation consent remains unqualified, with no proved software cause. Windows
+steps retain their existing owner and native/device requirements. The native
+production guard stays false. TODO 36/62 and transverse 16/38 remain open; no
+item is removed. Recoverable source and receiving metadata must be preserved
+before container replacement; private paths and historical receipts do not
+restore live authority.

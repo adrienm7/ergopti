@@ -6534,8 +6534,11 @@ still require Windows validation; the historical full suite remains failed.
       Windows/Linux transport, publication and receiving repairs; those changes
       must be preserved rather than rebuilt from the old interrupted worktree.
       Complete native, package, installation and enterprise acceptance remains
-      open. macOS system trust and explicit proxy relays are integrated, while
-      opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+      open. macOS system trust and explicit proxy relay code is integrated.
+      Packaged Python/uv/wheel bootstrap and HuggingFace downloads already use
+      native per-request adapters; system-trust/PAC and installed qualification
+      remains incomplete. A manual context without admitted native capabilities
+      refuses automatic proxy routing instead of bypassing it.
 
 2026-10-10 partial integration and native failure observations. Seven atomic
 commits are integrated without squash in Dev `d92a72d5`. The final selected
@@ -6549,17 +6552,52 @@ before request dispatch at the original 15-second add-trust command deadline.
 The model receiver reaches trust addition after compilation/signing, but its
 initial exception is discarded and native trust cleanup remains unsettled.
 Model stages and package/install remain unqualified. Official integrated
-manual 38081991583 on exact `d92a72d5` is running; its verdict is separate.
+manual 38081991583 on exact `d92a72d5` finishes with 6 successful,
+6 failed, 5 skipped and 0 cancelled jobs. Release is skipped. Its exact native
+receiving retains the same case-level limitations; candidate passes do not
+substitute for this official result. The owned integration lock was released
+only after the complete terminal verdict.
 
 The model diagnostic now retains independent closed-code primary and cleanup
 facts and a fixed preparation checkpoint. Original fatal status, reason
 precedence, owner run/close order and all clocks remain unchanged. Raw exception
 messages, arguments, paths and foreign subclass properties are excluded.
-All 16 original portable controls remain and all 23 candidate controls pass;
-actual native replay is still required. Daily daemon logging remains a reviewed,
-unexecuted preparation, with a separate seven-case native enrollment awaiting
-shared writer coordination. The production qualification guard stays false;
-items 36/62 and transverse 16/38 remain open.
+All 16 original portable controls remain and all 23 candidate controls pass.
+Exact diagnostic manual 38083455237 on `0f003a591` is wholly terminal with
+6 successful, 6 failed, 5 skipped and 0 cancelled jobs; Release is skipped.
+Both architectures retain `prepare_phase=trust_add`, a command/deadline primary
+failure and an unknown/unknown cleanup failure. Actual private children retire,
+while `native_trust_restored=false`. This proves the original trust-add command
+exceeded its deadline; the OS/authorization cause remains unknown, and the old
+`d92a72d5` exception remains unattributed. Native model operations and final
+packaging/install remain unqualified.
+
+Daily daemon logging R6 passes 34 actual portable Python controls. The same
+corpus against the old owner/serve passes all original 28 and totals 30 passes,
+one failure and three errors. The nine reviewed source paths are received on
+the owning feature from `0f003a591`; they are not Dev-qualified. Its initial
+private selected run passes formatting, 408 JS controls and Mac E2E 101 with
+one original skip. One JS subject fails with `EISDIR` on the known `node_modules`
+symlink, and the unit capture stops at `capture_bound` without a full-suite
+verdict. A separate verified real-dependency copy passes the unchanged targeted
+drift subject. Preserve the separate 600-second unit command refusal: its owner
+closes with exit 1/deadline and `retained=false`.
+
+The replay using the unchanged original 1,200-second budget passes all 1,569
+modules and 18,347 unit assertions, with zero failures. Its original command
+owner closes with exit 0, `cancelled=false`, no error and `retained=false`;
+captured source, index and original output identities remain exact. These
+separate receipts do not qualify a complete selected gate or claim all 409 JS
+controls green. Separate formatted R2 portable admission now passes 383
+controls, with zero failures, skips or unknown outcomes. Its original command
+owner physically closes with exit 0, no signal/error and `retained=false`;
+source, Node, specification and original capture identities remain exact. This
+is portable model/source and actual Git/CLI evidence, not native qualification.
+The complete canonical R6 selected gate remains pending. Native SDK 49 plus
+seven daily cases and 42 original logger cases remain unexecuted for this extension. CI writer
+custody request 6102114078 awaits Group 5; product window 6102079783 is released.
+The production qualification guard stays false; items 36/62 and transverse
+16/38 remain open.
 
 2026-10-10 final canonical caller receiving. Selected format366 passes;
 Mac controlled unit18327/0 across1569 modules, Mac E2E101 with one original

@@ -28,6 +28,7 @@ struct OwnedSuspendedImageRequest {
 	let outgoingSHA256: String?
 	let bootstrap: ManagedNetworkBootstrapBinding?
 	let listenerEvent: Bool
+	let logDirectory: String?
 
 	private static func unsigned(_ value: Any?) -> UInt64? {
 		guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
@@ -48,10 +49,13 @@ struct OwnedSuspendedImageRequest {
 		let outgoingKeys: Set<String> = ["outgoing_worker", "outgoing_device", "outgoing_inode", "outgoing_sha256"]
 		let bootstrapKeys: Set<String> = ["bootstrap_path", "bootstrap_device", "bootstrap_inode", "store_mode", "store_cwd"]
 		let listenerKeys: Set<String> = ["listener_event"]
+		let logKeys: Set<String> = ["log_directory"]
 		let permitted = [keys, keys.union(outgoingKeys), keys.union(bootstrapKeys), keys.union(outgoingKeys).union(bootstrapKeys)]
 		guard data.count <= 65_536,
 			let fields = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-			(permitted + permitted.map { $0.union(listenerKeys) }).contains(Set(fields.keys)),
+			(permitted + permitted.map { $0.union(listenerKeys) } + permitted.map { $0.union(logKeys) }
+				+ permitted.map { $0.union(listenerKeys).union(logKeys) }).contains(Set(fields.keys)),
+			fields["log_directory"] == nil || (fields["log_directory"] as? String).map { validPath($0) } == true,
 			fields["listener_event"] == nil || (fields["listener_event"] as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } == true,
 			unsigned(fields["version"]) == 1,
 			let device = decimal(fields["device"]), device <= UInt64(UInt32.max),
@@ -132,7 +136,7 @@ struct OwnedSuspendedImageRequest {
 		if !proxy.isEmpty { environment["https_proxy"] = proxy }
 		return OwnedSuspendedImageRequest(executable: executable, arguments: arguments, device: device,
 			inode: inode, sessionPath: session, remainingMilliseconds: UInt32(remaining), environment: environment,
-			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256, bootstrap: bootstrap, listenerEvent: fields["listener_event"] != nil)
+			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256, bootstrap: bootstrap, listenerEvent: fields["listener_event"] != nil, logDirectory: fields["log_directory"] as? String)
 	}
 
 	private static func validPath(_ value: String) -> Bool {
@@ -145,6 +149,119 @@ struct OwnedSuspendedImageRequest {
 		let port = String(value.dropFirst(prefix.count))
 		guard let number = UInt16(port), number > 0, String(number) == port else { return false }
 		return true
+	}
+}
+
+/// Only stream/sink state: the original suspended guardian owns every descriptor
+/// and the sole original process owner. This object never spawns or signals.
+final class SuspendedImageLogCapture {
+	private struct Stream {
+		var read: Int32 = -1
+		var write: Int32 = -1
+		var eof = true
+		var tail = Data()
+	}
+	private var streams = [Stream(), Stream()]
+	private let sink: LoggerRecordSink
+	private let closeOperation: (Int32) -> Int32
+	private var sequence: UInt64 = 0
+	private var settlementAttempted = false
+	private(set) var settled = false
+	private(set) var setupError: Int32 = 0
+	private(set) var writeError: Int32 = 0
+	private(set) var closeError: Int32 = 0
+	var outputDescriptor: Int32 { streams[0].write }
+	var errorDescriptor: Int32 { streams[1].write }
+	var readDescriptors: [Int32] { streams.filter { !$0.eof }.map { $0.read } }
+
+	init(directory: String, sink: LoggerRecordSink = LoggerRecordSink(),
+		closeOperation: @escaping (Int32) -> Int32 = { Darwin.close($0) }) {
+		self.sink = sink
+		self.closeOperation = closeOperation
+		guard sink.configureDaemon(directoryPath: directory) else { setupError = EIO; return }
+		for index in streams.indices {
+			var pair = [Int32](repeating: -1, count: 2)
+			guard pair.withUnsafeMutableBufferPointer({ Darwin.pipe($0.baseAddress!) }) == 0 else {
+				setupError = errno == 0 ? EIO : errno; return
+			}
+			streams[index].read = pair[0]; streams[index].write = pair[1]; streams[index].eof = false
+			for descriptor in pair {
+				let flags = fcntl(descriptor, F_GETFD)
+				guard flags >= 0, fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC) == 0 else {
+					setupError = errno == 0 ? EIO : errno; return
+				}
+			}
+			let flags = fcntl(pair[0], F_GETFL)
+			guard flags >= 0, fcntl(pair[0], F_SETFL, flags | O_NONBLOCK) == 0 else {
+				setupError = errno == 0 ? EIO : errno; return
+			}
+		}
+	}
+
+	/// Parent writers close once after the original suspended spawn, including refusal.
+	func closeWriters() {
+		for index in streams.indices {
+			let descriptor = streams[index].write; streams[index].write = -1
+			closeOnce(descriptor)
+		}
+	}
+
+	private func closeOnce(_ descriptor: Int32) {
+		guard descriptor >= 0 else { return }
+		if closeOperation(descriptor) != 0 && closeError == 0 { closeError = errno == 0 ? EIO : errno }
+	}
+
+	private func append(_ data: Data) {
+		guard writeError == 0 else { return }
+		guard let line = String(data: data, encoding: .utf8), sequence < UInt64.max else { writeError = EILSEQ; return }
+		sequence += 1
+		if !sink.appendDaemon(line: line, operationId: "daemon-" + String(sequence)) { writeError = EIO }
+	}
+
+	/// A fixed amount of nonblocking work per original guardian iteration.
+	/// A refused record cancels the original process; subsequent bytes drain to
+	/// physical EOF without claiming a successful persisted log.
+	func drain() {
+		for index in streams.indices where !streams[index].eof {
+			for _ in 0..<4 {
+				var bytes = [UInt8](repeating: 0, count: 4096)
+				let count = Darwin.read(streams[index].read, &bytes, bytes.count)
+				if count > 0 {
+					if writeError != 0 { continue }
+					streams[index].tail.append(contentsOf: bytes.prefix(count))
+					while let newline = streams[index].tail.firstIndex(of: 10) {
+						let line = Data(streams[index].tail.prefix(upTo: newline))
+						streams[index].tail.removeSubrange(...newline)
+						append(line)
+						if writeError != 0 { streams[index].tail.removeAll(); break }
+					}
+					if streams[index].tail.count > LoggerRecordSink.maximumLineBytes { writeError = EOVERFLOW; streams[index].tail.removeAll() }
+					continue
+				}
+				if count == 0 {
+					if !streams[index].tail.isEmpty { append(streams[index].tail); streams[index].tail.removeAll() }
+					streams[index].eof = true
+					let descriptor = streams[index].read; streams[index].read = -1
+					closeOnce(descriptor)
+				} else if errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR {
+					// A read error cannot substitute for native writer EOF.
+					if writeError == 0 { writeError = errno == 0 ? EIO : errno }
+				}
+				break
+			}
+		}
+	}
+
+	/// Called only by the original guardian after its process owner retires.
+	/// Every ambiguous close/rollback remains debt; no fresh timer or retry owns it.
+	func settleAfterRetirement() -> Bool {
+		drain()
+		guard streams.allSatisfy({ $0.eof && $0.read < 0 && $0.write < 0 }), closeError == 0 else { return false }
+		if !settlementAttempted {
+			settlementAttempted = true
+			settled = sink.settleOwnedResources()
+		}
+		return settled
 	}
 }
 
@@ -201,15 +318,17 @@ enum OwnedSuspendedImageGuardian {
 			return []
 		}
 		var listenerChannel: OpaquePointer?
+		var logCapture: SuspendedImageLogCapture?
 		func wait() {
+			var events = [pollfd(fd: inputOpen ? STDIN_FILENO : -1, events: Int16(POLLIN), revents: 0)]
 			if let channel = listenerChannel {
-				var events = [pollfd(fd: inputOpen ? STDIN_FILENO : -1, events: Int16(POLLIN), revents: 0),
-					pollfd(fd: ergopti_owned_listener_event_descriptor(channel), events: Int16(POLLIN), revents: 0)]
-				_ = events.withUnsafeMutableBufferPointer { Darwin.poll($0.baseAddress, 2, 20) }
-			} else {
-				var event = pollfd(fd: inputOpen ? STDIN_FILENO : -1, events: Int16(POLLIN), revents: 0)
-				_ = Darwin.poll(&event, 1, 20)
+				events.append(pollfd(fd: ergopti_owned_listener_event_descriptor(channel), events: Int16(POLLIN), revents: 0))
 			}
+			for descriptor in logCapture?.readDescriptors ?? [] {
+				events.append(pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0))
+			}
+			let count = nfds_t(events.count)
+			_ = events.withUnsafeMutableBufferPointer { Darwin.poll($0.baseAddress, count, 20) }
 		}
 		guard let started = monotonic() else { return 70 }
 		var request: OwnedSuspendedImageRequest?
@@ -340,6 +459,8 @@ enum OwnedSuspendedImageGuardian {
 		}
 		guard bootstrapAdmitted(empty: true) else { _ = send("V1 REFUSED \(ESTALE)"); return 0 }
 		func refuseBeforeChild(_ error: Int32) -> Int32 {
+			logCapture?.closeWriters()
+			while let capture = logCapture, !capture.settleAfterRetirement() { _ = readLines(); wait() }
 			_ = send("V1 REFUSED \(error)")
 			if listenerChannel != nil && !ergopti_owned_listener_event_destroy(&listenerChannel) {
 				// Native uncertainty keeps this guardian and exact original capabilities.
@@ -366,12 +487,24 @@ enum OwnedSuspendedImageGuardian {
 			return refuseBeforeChild(ENOMEM)
 		}
 		defer { for case let pointer? in envp { free(pointer) } }
+		if let directory = request.logDirectory {
+			guard admissionRemaining() else { return refuseBeforeChild(ETIMEDOUT) }
+			logCapture = SuspendedImageLogCapture(directory: directory)
+			guard let capture = logCapture, capture.setupError == 0, admissionRemaining() else {
+				return refuseBeforeChild(logCapture?.setupError == 0 ? ETIMEDOUT : (logCapture?.setupError ?? EIO))
+			}
+		}
 		var mutableArgv = argv; var mutableEnvp = envp; var owner: OpaquePointer?
 		let prepareError = mutableArgv.withUnsafeMutableBufferPointer { args in
 			mutableEnvp.withUnsafeMutableBufferPointer { env in
-				ergopti_owned_program_prepare(request.executable, args.baseAddress, env.baseAddress, &owner)
+				if let capture = logCapture {
+					return ergopti_owned_query_prepare(request.executable, args.baseAddress, env.baseAddress,
+						capture.outputDescriptor, capture.errorDescriptor, &owner)
+				}
+				return ergopti_owned_program_prepare(request.executable, args.baseAddress, env.baseAddress, &owner)
 			}
 		}
+		logCapture?.closeWriters()
 		guard owner != nil else { return refuseBeforeChild(prepareError == 0 ? EPROTO : prepareError) }
 		func remaining() -> UInt32? {
 			guard let now = monotonic(), now >= admissionStarted else { return nil }
@@ -395,6 +528,8 @@ enum OwnedSuspendedImageGuardian {
 			if !ready { cancelled = true }
 		} else { cancelled = true }
 		while let retained = owner {
+			logCapture?.drain()
+			if let capture = logCapture, capture.writeError != 0 || capture.closeError != 0 { cancelled = true }
 			for line in readLines() {
 				if line == Data("CANCEL".utf8) { cancelled = true; continue }
 				if line == Data("ACTIVATE".utf8), ready, !active, !cancelled,
@@ -422,12 +557,18 @@ enum OwnedSuspendedImageGuardian {
 			if cancelled { _ = ergopti_owned_program_cancel(retained) }
 			let receipt = ergopti_owned_program_poll(retained)
 			if receipt.retired && receipt.leader_exited && receipt.status_valid && receipt.error_code == 0 {
+				if let capture = logCapture, !capture.settleAfterRetirement() {
+					cancelled = true
+					if !pendingSent { pendingSent = true; _ = send("V1 PENDING \(EIO)") }
+					wait(); continue
+				}
 				if listenerChannel != nil && !ergopti_owned_listener_event_destroy(&listenerChannel) {
 					cancelled = true
 					if !pendingSent { pendingSent = true; _ = send("V1 PENDING \(EIO)") }
 					wait(); continue
 				}
 				if ergopti_owned_program_destroy(&owner) {
+					if let capture = logCapture { _ = send("V1 LOGS_CLOSED \(capture.writeError)") }
 					var bootstrapClose: Int32 = 0
 					if bootstrapDescriptor >= 0 {
 						bootstrapClose = Darwin.close(bootstrapDescriptor) == 0 ? 0 : (errno == 0 ? EIO : errno)
