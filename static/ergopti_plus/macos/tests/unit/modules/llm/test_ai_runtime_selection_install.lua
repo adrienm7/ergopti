@@ -23,6 +23,8 @@ local HOME = "/Users/fixture"
 local PATH_DIR = "/fixture/path/bin"
 local MANAGED_DIR = HOME .. "/Library/Application Support/Ergopti/ollama"
 local MANAGED_BIN = MANAGED_DIR .. "/ollama"
+local NATIVE_DIR = HOME .. "/Library/Application Support/Ergopti/ollama-native-http"
+local NATIVE_BIN = NATIVE_DIR .. "/ollama"
 local MLX_VENV = HOME .. "/Library/Application Support/Ergopti/mlx-venv"
 
 local CANDIDATES = {
@@ -133,16 +135,110 @@ local WINDOW_STUB = {
 	session_id = function() return 1 end,
 }
 
+--- Keeps the real API's five HTTP and daemon owners over literal transports.
+--- The native case models receipt delivery; it does not qualify a native image.
+local function load_api(state, daemon)
+	daemon = daemon or { calls = 0 }
+	state.daemon = daemon
+	state.host = { uuid = function() return "00000000-0000-0000-0000-0000000a0062" end }
+	state.http_clients = {}
+	state.daemon_tasks = {}
+	state.model_tasks = {}
+	state.model_requirement_pending = false
+	local nonce = "000000000000000000000000000a0062"
+	state.daemon_frame = function(role)
+		return "ERGOPTI_MANAGED_DAEMON_V1 " .. nonce .. " " .. role .. "\n"
+	end
+	package.loaded["adapters.managed_ollama_hint"] = {
+		get = function(directory, driver)
+			helpers.assert_eq(directory, NATIVE_DIR)
+			helpers.assert_eq(driver, helpers.driver_root():gsub("/+$", ""))
+			if state.native_hint ~= true then return nil end
+			return { candidate = NATIVE_BIN, budgets = { admission = 1, idle = 1, retirement = 1 } }
+		end,
+	}
+	package.loaded["modules.llm.ollama_binary"] = nil
+	helpers.load_with_stubs("modules.llm.ollama_binary", { fs = fake_fs(state) })
+	package.loaded["adapters.http_client"] = { new = function()
+		local client = { settled = true, cancel_calls = 0 }
+		function client.isSettled() return client.settled end
+		function client.isActive() return false end
+		function client.cancel() client.cancel_calls = client.cancel_calls + 1; return client.settled == true end
+		function client.get() error("selection fixture must not acquire an HTTP request") end
+		function client.post() error("selection fixture must not acquire an HTTP request") end
+		function client.onSettled(observer)
+			if client.settled ~= true then return false end
+			observer(); return true
+		end
+		state.http_clients[#state.http_clients + 1] = client
+		return client
+	end }
+	package.loaded["adapters.shell_runner"] = { spawn = function(program, args, done, chunk, environment, private, owned)
+		helpers.assert_eq(program, "/bin/sh")
+		helpers.assert_eq(private, true)
+		helpers.assert_eq(owned, true)
+		local task = { settled = false, attempted = false, observers = {}, emitted = "" }
+		function task.start() task.attempted = true; return true end
+		function task.terminate() return true, task.settled and "settled" or "pending" end
+		function task.isSettled() return task.settled end
+		function task.wasStartAttempted() return task.attempted end
+		function task.onSettled(observer)
+			if task.settled then observer() else task.observers[#task.observers + 1] = observer end
+			return true
+		end
+		function task.emit(bytes)
+			task.emitted = task.emitted .. bytes
+			return chunk(task, bytes, "")
+		end
+		function task.complete()
+			if task.settled then return false end
+			task.settled = true
+			local status = task.emitted:find(state.daemon_frame("READY"), 1, true) and 0 or 78
+			done(status, state.daemon_frame("RETIRED " .. status), "")
+			local observers = task.observers; task.observers = {}
+			for _, observer in ipairs(observers) do observer() end
+			return true
+		end
+		state.daemon_tasks[#state.daemon_tasks + 1] = task
+		return task
+	end }
+	package.loaded["modules.llm.ollama_server_command"] = { build = function(binary, _, _, kind, actual_nonce)
+		helpers.assert_eq(binary, NATIVE_BIN)
+		helpers.assert_eq(kind, "native_managed")
+		helpers.assert_eq(actual_nonce, nonce)
+		return "exec /fixture/native-runtime --caller-nonce '" .. nonce .. "' --owned-stdin"
+	end }
+	package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+	package.loaded["modules.llm.parser"] = {}
+	package.loaded["modules.llm.profiles"] = {}
+	package.loaded["modules.llm.progressive_reveal"] = {}
+	package.loaded["modules.llm.prediction_engine"] = { on_ollama_daemon_exit = function() return true end }
+	-- This selection fixture has no keyboard inference consumer.
+	package.loaded["modules.keylogger"] = {}
+	package.loaded["adapters.managed_ollama_daemon"] = nil
+	package.loaded["modules.llm.api_ollama"] = nil
+	local api = helpers.load_with_stubs("modules.llm.api_ollama", {
+		fs = fake_fs(state), host = state.host,
+	})
+	local ensure_running = api.ensure_running
+	api.ensure_running = function(...)
+		daemon.calls = daemon.calls + 1
+		return ensure_running(...)
+	end
+	state.model_manager = {
+		migration_idle = function()
+			return next(state.model_tasks) == nil and state.model_requirement_pending == false
+		end,
+	}
+	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = state.model_manager
+	state.api = api
+	return api
+end
+
 --- Loads the real Ollama checker (and resolver) over the fake filesystem.
 local function load_ollama_checker(state, daemon)
 	package.loaded["ui.download_window"] = WINDOW_STUB
-	package.loaded["modules.llm.ollama_binary"] = nil
-	package.loaded["modules.llm.api_ollama"] = {
-		ensure_running = function()
-			if daemon then daemon.calls = daemon.calls + 1 end
-			return true
-		end,
-	}
+	load_api(state, daemon)
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
@@ -152,6 +248,7 @@ local function load_ollama_checker(state, daemon)
 	local checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 		fs = fake_fs(state),
 		task = task_api(state),
+		host = state.host,
 	})
 	helpers.assert_true(set_upvalue(checker.check_and_install_deps,
 		"resolve_project_root", function() return "/repo" end))
@@ -184,6 +281,15 @@ local STUBBED_MODULES = {
 	"modules.llm.mlx_deps_checker", "infra.dialog_util", "infra.notifications",
 	"ui.menu.menu_llm.runtime_install_offer",
 	"modules.llm.network_env", "adapters.file_system",
+	"adapters.managed_ollama_hint", "adapters.managed_ollama_daemon",
+	"adapters.http_client", "adapters.shell_runner", "adapters.json_codec",
+	"modules.llm.ollama_server_command", "modules.llm.parser", "modules.llm.profiles",
+	"modules.llm.progressive_reveal", "modules.llm.prediction_engine",
+	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",
+	"modules.llm.ollama_endpoint", "adapters.storage", "adapters.owned_program_runner",
+	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keylogger",
+	"core.llm.ollama_runtime_choice", "core.llm.managed_ollama_daemon_lifecycle",
+	"core.llm.managed_ollama_daemon_receipt", "llm.local_model_policy",
 }
 
 local function scoped(callback)
@@ -331,7 +437,11 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		state.executables[MANAGED_BIN] = true
 		state.tasks[1].done(0, "", "")
 		helpers.assert_eq(results[1], true)
-		helpers.assert_eq(daemon.calls, 1)
+		helpers.assert_eq(daemon.calls, 0, "stock client provisioning grants no daemon ownership")
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_eq(checker.get_daemon_state(), "pending")
+		helpers.assert_eq(checker.is_daemon_ready(), false)
+		helpers.assert_eq(#state.daemon_tasks, 0)
 		local Resolver = require("modules.llm.ollama_binary")
 		local path, _, source = Resolver.resolve()
 		helpers.assert_eq(path, MANAGED_BIN)
@@ -342,6 +452,51 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		helpers.assert_eq(state.tasks[2].args[6], "",
 			"a re-selection must reuse the installed runtime, never download again")
 		state.tasks[2].done(0, "", "")
+	end))
+
+	helpers.it("native provisioning waits for its exact authorized complete READY frame", scoped(function()
+		local state = new_state()
+		state.native_hint = true
+		state.executables[NATIVE_BIN] = true
+		local daemon = { calls = 0 }
+		local checker = load_ollama_checker(state, daemon)
+		local resolved, resolution_error, source = require("modules.llm.ollama_binary").resolve()
+		helpers.assert_eq(resolved, NATIVE_BIN)
+		helpers.assert_nil(resolution_error)
+		helpers.assert_eq(source, "native_managed", "only the native source kind may launch this owner")
+		local results = {}
+		local ok, primary = xpcall(function()
+			helpers.assert_true(checker.install_for_selection(function(value) results[#results + 1] = value end))
+			helpers.assert_eq(state.tasks[1].args[5], NATIVE_BIN)
+			helpers.assert_eq(state.tasks[1].args[6], "")
+			state.tasks[1].done(0, "", "")
+			helpers.assert_eq(daemon.calls, 1)
+			helpers.assert_eq(#state.daemon_tasks, 1)
+			helpers.assert_eq(#results, 0, "accepted startup is not daemon READY")
+			helpers.assert_eq(checker.get_state(), "ready")
+			helpers.assert_eq(checker.get_daemon_state(), "pending")
+			local ready = state.daemon_frame("READY")
+			state.daemon_tasks[1].emit(state.daemon_frame("ACTIVE") .. ready:sub(1, 18))
+			local partial_result_count = #results
+			local partial_ready = checker.is_daemon_ready()
+			-- Drain the original remaining frame before evaluating its observations.
+			state.daemon_tasks[1].emit(ready:sub(19))
+			helpers.assert_eq(partial_result_count, 0, "a partial READY frame cannot publish success")
+			helpers.assert_eq(partial_ready, false)
+			helpers.assert_eq(results, { true })
+			helpers.assert_eq(checker.get_daemon_state(), "ready")
+			helpers.assert_true(checker.is_daemon_ready())
+		end, debug.traceback)
+		local closed, cleanup = xpcall(function()
+			for _, task in ipairs(state.daemon_tasks) do
+				if not task.settled then helpers.assert_true(task.complete()) end
+				helpers.assert_true(task.settled)
+			end
+			helpers.assert_true(state.api.startup_idle(), "physical exit alone cannot join native lifecycle custody")
+			helpers.assert_true(state.api.migration_idle(), "the original shared RETIRED frame must join settlement")
+		end, debug.traceback)
+		if not ok then error(primary, 0) end
+		if not closed then error(cleanup, 0) end
 	end))
 
 	helpers.it("surfaces a checksum mismatch as the localized error", scoped(function()
@@ -574,6 +729,10 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 			block_alert = function(...)
 				record.dialogs = record.dialogs + 1
 				record.dialog_args = table.pack(...)
+				record.dialog_history[#record.dialog_history + 1] = record.dialog_args
+				if record.dialog_args[1] == i18n.get("ollama.native_offer_title") then
+					return i18n.get("ollama.native_offer_keep")
+				end
 				return i18n.get(choice_key)
 			end,
 		}
@@ -584,15 +743,21 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 			end,
 		}
 		package.loaded["ui.menu.menu_llm.runtime_install_offer"] = nil
-		return helpers.load_with_stubs("ui.menu.menu_llm.runtime_install_offer", {
+		local Offer = helpers.load_with_stubs("ui.menu.menu_llm.runtime_install_offer", {
 			fs = fake_fs(record.state),
 			task = task_api(record.state),
+			host = record.state.host,
 			urlevent = { openURL = function(url) record.urls[#record.urls + 1] = url return true end },
 		})
+		-- The loader refreshes every ui.menu cache; bind the original model owner last.
+		if record.state.model_manager then
+			package.loaded["ui.menu.menu_llm.models_manager_ollama"] = record.state.model_manager
+		end
+		return Offer
 	end
 
 	local function new_record()
-		return { dialogs = 0, notices = {}, urls = {}, state = new_state() }
+		return { dialogs = 0, dialog_history = {}, notices = {}, urls = {}, state = new_state() }
 	end
 
 	helpers.it("accepting downloads into the folder the resolver then finds", scoped(function()
@@ -611,8 +776,23 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		helpers.assert_true(Offer.is_installed("ollama"))
 
 		helpers.assert_true(Offer.select_ollama())
-		helpers.assert_eq(record.dialogs, 1, "an installed Ollama is never offered again")
+		helpers.assert_eq(record.dialogs, 2, "a new migration choice never reuses the stock download consent")
+		local i18n = require("infra.i18n")
+		helpers.assert_eq(record.dialog_history[1][1], i18n.get("ollama.runtime_missing_title"))
+		helpers.assert_eq(record.dialog_history[1][2], i18n.get("ollama.offer_body"))
+		helpers.assert_eq(record.dialog_history[1][3], i18n.get("ollama.offer_download"))
+		helpers.assert_eq(record.dialog_history[1][4], i18n.get("ollama.offer_website"))
+		helpers.assert_eq(record.dialog_history[2][1], i18n.get("ollama.native_offer_title"))
+		helpers.assert_eq(record.dialog_history[2][2], i18n.get("ollama.native_migration_body"))
+		helpers.assert_eq(record.dialog_history[2][3], i18n.get("ollama.native_offer_install"))
+		helpers.assert_eq(record.dialog_history[2][4], i18n.get("ollama.native_offer_keep"))
+		helpers.assert_eq(record.state.tasks[2].args[5], MANAGED_BIN)
+		helpers.assert_eq(record.state.tasks[2].args[6], "")
 		record.state.tasks[2].done(0, "", "")
+		helpers.assert_eq(record.state.daemon.calls, 0)
+		helpers.assert_eq(#record.state.daemon_tasks, 0)
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_eq(checker.get_daemon_state(), "pending")
 	end))
 
 	helpers.it("declining opens the website and keeps the AI off with a message", scoped(function()
@@ -629,16 +809,73 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 			require("infra.i18n").get("ollama.runtime_missing_body"))
 	end))
 
-	helpers.it("a found Ollama is reused without asking", scoped(function()
+	helpers.it("a found Ollama is reused after its explicit native KEEP choice", scoped(function()
 		local record = new_record()
 		record.state.executables["/opt/homebrew/bin/ollama"] = true
 		local checker = load_ollama_checker(record.state)
 		local Offer = load_offer("ollama.offer_download", record)
 		package.loaded["modules.llm.ollama_deps_checker"] = checker
 		helpers.assert_true(Offer.select_ollama())
-		helpers.assert_eq(record.dialogs, 0)
+		helpers.assert_eq(record.dialogs, 1)
+		local i18n = require("infra.i18n")
+		helpers.assert_eq(record.dialog_args[1], i18n.get("ollama.native_offer_title"))
+		helpers.assert_eq(record.dialog_args[2], i18n.get("ollama.native_migration_body"))
+		helpers.assert_eq(record.dialog_args[3], i18n.get("ollama.native_offer_install"))
+		helpers.assert_eq(record.dialog_args[4], i18n.get("ollama.native_offer_keep"))
+		helpers.assert_eq(record.state.tasks[1].args[5], "/opt/homebrew/bin/ollama")
 		helpers.assert_eq(record.state.tasks[1].args[6], "")
 		record.state.tasks[1].done(0, "", "")
+		helpers.assert_eq(record.state.daemon.calls, 0)
+		helpers.assert_eq(#record.state.daemon_tasks, 0)
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_eq(checker.get_daemon_state(), "pending")
+		helpers.assert_eq(checker.is_daemon_ready(), false)
+	end))
+
+	helpers.it("migration observes original HTTP, warmup, stream and model requirement debt", scoped(function()
+		local record = new_record()
+		record.state.executables["/opt/homebrew/bin/ollama"] = true
+		local checker = load_ollama_checker(record.state)
+		local Offer = load_offer("ollama.offer_download", record)
+		package.loaded["modules.llm.ollama_deps_checker"] = checker
+		helpers.assert_true(rawequal(require("ui.menu.menu_llm.models_manager_ollama"), record.state.model_manager),
+			"the real router must consult this original model owner")
+		helpers.assert_eq(#record.state.http_clients, 5)
+		for _, client in ipairs(record.state.http_clients) do
+			client.settled = false
+			helpers.assert_eq(Offer.select_ollama(), false)
+			helpers.assert_eq(record.dialogs, 0, "pending HTTP cleanup cannot lend migration authority")
+			helpers.assert_eq(client.cancel_calls, 0, "the admission query cannot cancel another owner")
+			client.settled = true
+		end
+		local api = record.state.api
+		helpers.assert_true(set_upvalue(api.warmup, "_warmup_active", true))
+		helpers.assert_eq(Offer.select_ollama(), false)
+		helpers.assert_eq(record.dialogs, 0, "live warmup cannot lend migration authority")
+		helpers.assert_true(set_upvalue(api.warmup, "_warmup_active", false))
+		local stream_signals = 0
+		local stream = { terminate = function() stream_signals = stream_signals + 1; return true, "pending" end }
+		helpers.assert_true(set_upvalue(api.cancel_streaming, "_active_stream_task", stream))
+		helpers.assert_eq(Offer.select_ollama(), false)
+		helpers.assert_eq(record.dialogs, 0, "the original stream must be idle before migration")
+		helpers.assert_eq(stream_signals, 0, "migration query cannot terminate a stream")
+		helpers.assert_true(set_upvalue(api.cancel_streaming, "_active_stream_task", nil))
+		record.state.model_requirement_pending = true
+		helpers.assert_eq(record.state.model_manager.migration_idle(), false, "the requirement owner is pending")
+		helpers.assert_eq(Offer.select_ollama(), false)
+		helpers.assert_eq(record.dialogs, 0)
+		record.state.model_requirement_pending = false
+		record.state.model_tasks.original = {}
+		helpers.assert_eq(record.state.model_manager.migration_idle(), false, "the original model task is pending")
+		helpers.assert_eq(Offer.select_ollama(), false)
+		helpers.assert_eq(record.dialogs, 0)
+		record.state.model_tasks.original = nil
+		helpers.assert_true(Offer.select_ollama())
+		helpers.assert_eq(record.dialogs, 1)
+		helpers.assert_eq(record.state.tasks[1].args[5], "/opt/homebrew/bin/ollama")
+		helpers.assert_eq(record.state.tasks[1].args[6], "")
+		record.state.tasks[1].done(0, "", "")
+		helpers.assert_eq(record.state.daemon.calls, 0)
 	end))
 
 	helpers.it("a boot with the API backend posts no runtime notice", scoped(function()
