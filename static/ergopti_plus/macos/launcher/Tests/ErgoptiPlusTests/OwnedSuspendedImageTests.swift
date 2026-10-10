@@ -240,7 +240,7 @@ final class OwnedSuspendedImageTests: XCTestCase {
   XCTAssertEqual(process.terminationReason, .exit)
   XCTAssertEqual(process.terminationStatus, 0, mode)
   XCTAssertEqual(try output.fileHandleForReading.readToEnd(), Data("ERGOPTI_LISTENER_EVENT_CONTROL pass=1\n".utf8))
-  XCTAssertEqual(try error.fileHandleForReading.readToEnd(), Data())
+  XCTAssertEqual(error.fileHandleForReading.readDataToEndOfFile(), Data())
   try output.fileHandleForReading.close(); try error.fileHandleForReading.close()
  }
  func testActualUnixOriginalMappedPeerFrameAndEOFAdmitted() throws { try receiveNativeListenerEvent("positive") }
