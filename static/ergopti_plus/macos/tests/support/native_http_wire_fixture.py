@@ -8,6 +8,7 @@ The portable role exercises real peers without claiming native Apple acceptance.
 """
 
 import http.server
+import hashlib
 import importlib.util
 import json
 import os
@@ -149,6 +150,7 @@ class WireFixture:
         deadline=None,
         merge_errors=False,
         security_failure_observation=False,
+        trust_install_observation=False,
     ):
         phase = "setup"
         status = None
@@ -158,6 +160,9 @@ class WireFixture:
         result = None
         closure_refused = False
         security_failure = None
+        observation_started = time.monotonic() if trust_install_observation else None
+        captured_streams = {}
+        captured_output = {}
         try:
             if self.command_file_debt:
                 phase = "settle"
@@ -279,6 +284,24 @@ class WireFixture:
                 errors,
                 output,
             )
+            if (
+                trust_install_observation
+                and owned is not None
+                and getattr(owned, "reaped", False) is True
+            ):
+                # Only exact retirement releases the shared writable file offset.
+                # A still-owned child keeps its capture unobserved and untouched.
+                # Preserve bounded bytes before closing the existing captures.
+                # Public facts contain no native message, argument or path.
+                for name, stream in (("stdout", output), ("stderr", errors)):
+                    try:
+                        fact, raw = self._trust_install_stream(stream)
+                        captured_streams[name] = fact
+                        captured_output[name] = raw
+                    except BaseException as observation_failure:
+                        captured_streams[name] = {"observed": False}
+                        if failure is None:
+                            failure = observation_failure
             for stream in streams:
                 if stream is None or any(
                     debt["stream"] is stream and debt["uncertain"]
@@ -312,6 +335,38 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        if trust_install_observation:
+            pid = getattr(process, "pid", None)
+            exit_status = getattr(process, "returncode", None)
+            observation = {
+                "version": 1,
+                "action": "add_trusted_cert",
+                "domain": "admin",
+                "keychain": "owned_private",
+                "pid": pid if type(pid) is int and pid > 0 else None,
+                "exit_status": exit_status if type(exit_status) is int else None,
+                "elapsed_ms": max(0, round((time.monotonic() - observation_started) * 1000)),
+                "phase": self.command_fact["phase"],
+                "child_settled": owned is not None and getattr(owned, "reaped", False) is True,
+                "streams_closed": not closure_refused
+                and all(stream is None or stream.closed for stream in streams),
+                "stdout": captured_streams.get("stdout", {"observed": False}),
+                "stderr": captured_streams.get("stderr", {"observed": False}),
+            }
+            # Exact bounded bytes remain private exception evidence in memory;
+            # neither traceback formatting nor the public JSON emits them.
+            if failure is not None:
+                failure.trust_install_output = captured_output
+            try:
+                print(
+                    "# native_http_trust_install " + json.dumps(observation, sort_keys=True),
+                    flush=True,
+                    file=sys.stderr,
+                )
+            except BaseException as observation_failure:
+                if failure is not None:
+                    raise failure from observation_failure
+                raise
         if security_failure is not None:
             # Closed categories are observations, never a command success or an
             # API OSStatus. Publication follows exact child and file retirement.
@@ -330,6 +385,43 @@ class WireFixture:
         if failure is not None:
             raise failure
         return result
+
+    @staticmethod
+    def _trust_install_stream(stream):
+        """Project bounded private native output into path-free public facts."""
+        if stream is None:
+            return {"observed": False}, None
+        stream.seek(0)
+        raw = stream.read(1025)
+        prefix = raw[:1024]
+        function = None
+        for name in (
+            b"SecTrustSettingsSetTrustSettings",
+            b"SecKeychainItemImport",
+            b"SecKeychainUnlock",
+        ):
+            if raw.startswith(name + b": ") or raw.startswith(b"security: " + name + b": "):
+                function = name.decode("ascii")
+                break
+        category = "empty" if not raw else "unknown"
+        if function is not None and len(raw) <= 1024:
+            # Literal stderr evidence only; interaction refusal never implies
+            # that the keychain was locked. Localized/unknown messages stay unknown.
+            message = raw.removeprefix(b"security: ").split(b": ", 1)[1]
+            category = {
+                b"User interaction is not allowed.\n": "user_interaction_required",
+                b"The keychain is locked.\n": "keychain_locked",
+                b"Access denied.\n": "access_denied",
+                b"Authorization denied.\n": "access_denied",
+            }.get(message, "unknown")
+        return {
+            "observed": True,
+            "category": category,
+            "captured_bytes": len(prefix),
+            "truncated": len(raw) > 1024,
+            "bounded_sha256": hashlib.sha256(prefix).hexdigest(),
+            "security_function": function,
+        }, prefix
 
     @staticmethod
     def _security_failure_fact(raw):
@@ -450,7 +542,8 @@ class WireFixture:
                     "-k",
                     str(self.keychain),
                     str(self.ca),
-                ]
+                ],
+                trust_install_observation=True,
             )
         elif self.trust_attempted:
             arguments = [
