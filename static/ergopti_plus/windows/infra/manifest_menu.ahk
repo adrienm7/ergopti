@@ -355,7 +355,8 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			}
 
 		} else if (ItemType == "check" or ItemType == "command") {
-			ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
+			if !Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
+				ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
 
 		} else if ItemType == "dynamic" {
 			Id := _MR_Get(Item, "id")
@@ -643,8 +644,28 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 }
 
 _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
-	Row := _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters)
+	if !(Item is Map) || ObjGetBase(Item) != Map.Prototype
+		return 0
+	for Name in ObjOwnProps(Item)
+		return 0
+	Cohort := false, Getters := StateGetters
+	if Item.Has("caption_format") {
+		if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCohort, "Call")
+			return 0
+		Cohort := _MR_NumberedCommandCohort(Item, ManifestKey, Commands, StateGetters)
+		if !Cohort
+			return 0
+		Getters := Map()
+		for Key, Getter in StateGetters {
+			if !_MR_DeclaredParentCallable(Getter)
+				return 0
+			Getters[Key] := _MR_ReadNumberedCommandState.Bind(Cohort, Getter)
+		}
+	}
+	Row := _MR_CommandRowData(Item, ManifestKey, Commands, Getters)
 	if !(Row is Map)
+		return 0
+	if Cohort && (Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort))
 		return 0
 	; Keep the existing native stand-in owner and its untracked inert callback.
 	if Row.Has("disabled_reason_key") && (Item.Has("caption_layout") || Item.Has("caption_joiner") || Item.Has("label_prefix") || Item.Has("caption_getters"))
@@ -656,6 +677,69 @@ _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 			Map("id", _MR_Get(Item, "id"), "i18n", _MR_Get(Item, "i18n"),
 				"reason_key", Row["disabled_reason_key"]), ManifestKey)
 	return _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1)
+}
+
+; Numbered command captions retain their actual visible declaration and ports.
+_MR_NumberedCommandCohort(Item, ManifestKey, Commands, Getters) {
+	Owners := [_MR_GetManifestRoot, _MR_GetMenuDef, _MR_FindItemById, _MR_ReasonedGroupSnapshot,
+		_MR_ReasonedGroupCurrent, _MR_FrameReceiptCallablesCurrent, _MR_DeclaredParentCallable,
+		_MR_CommandRowData, _MR_ReadNumberedCaption, _MR_RenderRows, _MR_NumberedCommandCurrent,
+		_MR_ReadNumberedCommandState, _MR_RenderCommand, _MR_NumberedCommandCohort,
+		_MM_GetManifestRoot, _MR_Get, _MR_IsForAhk, _MR_IsForPlatform]
+	for Owner in Owners
+		if !(Owner is Func || Owner is BoundFunc) || Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	if !(Item is Map) || !(Commands is Map) || !(Getters is Map)
+		return false
+	Root := _MR_GetManifestRoot()
+	if !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	Rows := _MR_GetMenuDef(ManifestKey)
+	Source := _MR_ReasonedGroupSnapshot(Rows), CommandPorts := _MR_ReasonedGroupSnapshot(Commands)
+	StatePorts := _MR_ReasonedGroupSnapshot(Getters)
+	if !Source || !CommandPorts || !StatePorts
+		return false
+	Cohort := Map("root", Root, "key", ManifestKey, "rows", Rows, "item", Item,
+		"id", _MR_Get(Item, "id"), "source", Source, "commands", CommandPorts,
+		"states", StatePorts, "owners", Owners, "getters", Getters)
+	return _MR_NumberedCommandCurrent(Cohort) ? Cohort : false
+}
+
+; Currentness is pure: no getter or callback is invoked during these comparisons.
+_MR_NumberedCommandCurrent(Cohort) {
+	CurrentOwners := [_MR_GetManifestRoot, _MR_GetMenuDef, _MR_FindItemById, _MR_ReasonedGroupSnapshot,
+		_MR_ReasonedGroupCurrent, _MR_FrameReceiptCallablesCurrent, _MR_DeclaredParentCallable,
+		_MR_CommandRowData, _MR_ReadNumberedCaption, _MR_RenderRows, _MR_NumberedCommandCurrent,
+		_MR_ReadNumberedCommandState, _MR_RenderCommand, _MR_NumberedCommandCohort,
+		_MM_GetManifestRoot, _MR_Get, _MR_IsForAhk, _MR_IsForPlatform]
+	for Index, Owner in Cohort["owners"]
+		if Owner != CurrentOwners[Index] || !(Owner is Func || Owner is BoundFunc)
+			|| Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	Root := Cohort["root"]
+	if ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	for Receipt in [Cohort["source"], Cohort["commands"], Cohort["states"]]
+		if !_MR_ReasonedGroupCurrent(Receipt) || !_MR_FrameReceiptCallablesCurrent(Receipt)
+			return false
+	if _MR_GetManifestRoot() != Root || !Root.Has(Cohort["key"]) || Root[Cohort["key"]] != Cohort["rows"]
+		|| _MR_FindItemById(Cohort["key"], Cohort["id"]) != Cohort["item"]
+		return false
+	return true
+}
+
+; A retained wrapper rechecks the full cohort on both sides of each actual read.
+_MR_ReadNumberedCommandState(Cohort, Getter) {
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner was withdrawn before its state read.")
+	Value := Getter.Call()
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner changed during its state read.")
+	return Value
 }
 
 ; Provider callbacks use the same current declaration as the drawn row.
@@ -1479,6 +1563,8 @@ MenuRenderer_CheckRow(ManifestKey, CheckId, Commands, StateGetters := unset) {
 MenuRenderer_AppendCommand(TargetMenu, ManifestKey, CommandId, Commands, StateGetters := unset) {
 	Item := _MR_FindItemById(ManifestKey, CommandId)
 	if !(Item is Map) || _MR_Get(Item, "type") != "command" || !_MR_IsForAhk(Item)
+		return 0
+	if Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
 		return 0
 	return _MR_RenderCommand(TargetMenu, Item, ManifestKey, Commands, IsSet(StateGetters) ? StateGetters : Map())
 }
