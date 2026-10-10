@@ -1131,6 +1131,7 @@
 	"menu.global.clean_unused_keys": "Vyčistit config.toml",
 	"menu.global.starting": "Spouštění…",
 	"menu.global.setup_wizard": "Průvodce nastavením…",
+	"menu.global.startup_bootstrap": "ErgoptiPlus — Spouštění…",
 	"menu.global.suspend": "⏸︎ Pozastavit",
 	"menu.configuration.title": "Konfigurace",
 	"menu.hotstrings.add_custom": "+ Přidat vlastní expandér…",

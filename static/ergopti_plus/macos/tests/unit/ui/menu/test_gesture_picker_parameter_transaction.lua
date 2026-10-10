@@ -68,6 +68,7 @@ local function with_picker(options, callback)
 			i18n = package.loaded["infra.i18n"], logger = logger,
 		}))
 		package.loaded["infra.manifest_menu"] = {
+			group_receiver = renderer.group_receiver,
 			template_rows = renderer.template_rows,
 			get_root = function() return { gesture_slots = { ["3"] = { "tap_3" } } } end,
 			build = function(_, _, _, _, _, providers) provider = providers.gesture_slots_3; return {} end,

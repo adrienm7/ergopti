@@ -12,6 +12,7 @@ import argparse
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import math
 import os
 from pathlib import Path
 import plistlib
@@ -713,6 +714,60 @@ def _run_appleevent_sender(children, receiver, group, role, arguments, *, confin
         raise
 
 
+def _validate_command_timeout(packet):
+    """Closed observations only; these timings cannot authorize or extend a wait."""
+    keys = {
+        "schema",
+        "command",
+        "stage",
+        "budget_seconds",
+        "request_deadline_ns",
+        "started_ns",
+        "expired_ns",
+        "spent_ns",
+    }
+    require(type(packet) is dict and set(packet) == keys, "Unadmitted command timeout fields")
+    require(
+        type(packet["schema"]) is int and packet["schema"] == 1, "Unadmitted command timeout schema"
+    )
+    require(
+        type(packet["command"]) is str
+        and packet["command"] in ("permission-request", "consent-observer", "other"),
+        "Unadmitted command timeout identity",
+    )
+    require(
+        type(packet["stage"]) is str
+        and packet["stage"] in ("readiness", "ui-observer", "exit-wait"),
+        "Unadmitted command timeout stage",
+    )
+    budget = packet["budget_seconds"]
+    require(
+        type(budget) in (int, float) and 0 < budget <= 180 and math.isfinite(budget),
+        "Unadmitted command timeout budget",
+    )
+    limit = 2**64 - 1
+    for key in ("started_ns", "expired_ns", "spent_ns"):
+        require(
+            type(packet[key]) is int and 0 <= packet[key] <= limit,
+            "Unadmitted command timeout clock",
+        )
+    deadline = packet["request_deadline_ns"]
+    require(
+        deadline is None or (type(deadline) is int and 0 < deadline <= limit),
+        "Unadmitted command timeout request deadline",
+    )
+    require(
+        packet["command"] != "permission-request" or deadline is not None,
+        "Command timeout lost its original request deadline",
+    )
+    require(
+        packet["expired_ns"] >= packet["started_ns"]
+        and packet["spent_ns"] == packet["expired_ns"] - packet["started_ns"],
+        "Unadmitted command timeout duration",
+    )
+    return dict(packet)
+
+
 class PhaseEvidence:
     """Export constructed bounded facts, never fixture files or raw command streams."""
 
@@ -732,6 +787,7 @@ class PhaseEvidence:
         self.failed = False
         self.ownership_closed = False
         self.previous = None
+        self.first_timeout = None
         if directory is not None:
             require(
                 hasattr(os, "O_NOFOLLOW"),
@@ -752,6 +808,21 @@ class PhaseEvidence:
                 except OSError:
                     pass  # Preserve the acquisition refusal or interruption.
                 raise
+
+    def retain_timeout(self, fact, *, groups=()):
+        """Retain the first typed timeout through all later bounded checkpoints."""
+        try:
+            admitted = _validate_command_timeout(fact)
+            if getattr(self, "first_timeout", None) is None:
+                self.first_timeout = admitted
+            else:
+                _validate_command_timeout(self.first_timeout)
+            return self.record("command.timeout", status="refused", groups=groups)
+        except OwnedProcessInterrupted:
+            raise
+        except Exception:
+            self.failed = True
+            return False
 
     def record(
         self,
@@ -814,6 +885,7 @@ class PhaseEvidence:
                 "server-thread",
                 "server-retirement-error",
                 "external-canary",
+                "automation-readiness",
             }
             kinds = sorted(set(debt_kinds))
             require(
@@ -853,6 +925,9 @@ class PhaseEvidence:
                     and not packet["groups"][0]["closed"],
                     "Sender observation lost its exact unreaped receiver",
                 )
+            first_timeout = getattr(self, "first_timeout", None)
+            if first_timeout is not None:
+                packet["first_timeout"] = _validate_command_timeout(first_timeout)
             semantic = json.dumps(packet, sort_keys=True)
             if semantic == self.previous:
                 return not self.failed
@@ -919,6 +994,8 @@ class OwnedAutomationRequest(list):
         self._timeout = timeout
         self._deadline_ns = now + timeout * 1_000_000_000
         self.last_ns = now
+        self.readiness_nonce = None
+        self.readiness = None
         require(self.deadline_ns <= 2**64 - 1, "Owned Automation deadline unavailable")
 
     @property
@@ -935,6 +1012,152 @@ class OwnedAutomationRequest(list):
         require(type(now) is int and now >= self.last_ns, "Owned Automation clock unavailable")
         self.last_ns = now
         return max(0, self.deadline_ns - now) / 1_000_000_000
+
+
+class OwnedAutomationReadiness:
+    """Reserve a private startup acknowledgement; it never grants signed identity or consent."""
+
+    def __init__(self, children, request):
+        self.children = children
+        self.request = request
+        self.nonce = request.readiness_nonce
+        require(
+            type(self.nonce) is str
+            and re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", self.nonce),
+            "Owned Automation readiness nonce refused",
+        )
+        self.path = children.root / ("automation-ready-" + str(uuid.uuid4()))
+        self.descriptor = os.open(
+            self.path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
+        )
+        self.closed = False
+        self.close_attempted = False
+        self.close_uncertain = False
+        self.accepted = False
+        try:
+            self.identity = os.fstat(self.descriptor)
+        except BaseException:
+            self.close_attempted = True
+            try:
+                os.close(self.descriptor)
+            except OSError:
+                self.close_uncertain = True
+            else:
+                self.closed = True
+            debt = {"kind": "automation-readiness", "path": str(self.path)}
+            if self.close_uncertain:
+                debt.update(descriptor=self.descriptor, descriptor_close="unacknowledged")
+            children.record_debt(debt)
+            raise
+
+    def environment(self):
+        """Bind only the exact request child to its reserved inode in the owned cwd."""
+        return {
+            "ERGOPTI_OWNED_AUTOMATION_READY_NAME": self.path.name,
+            "ERGOPTI_OWNED_AUTOMATION_READY_DEV": str(self.identity.st_dev),
+            "ERGOPTI_OWNED_AUTOMATION_READY_INO": str(self.identity.st_ino),
+        }
+
+    def wait(self, process):
+        """Wait for foreground readiness inside the original request budget and reservation."""
+        expected = f"OWNED_APPLEEVENT_READY/1 pid={process.pid} nonce={self.nonce}\n".encode()
+        while True:
+            require(self.request.remaining() > 0, "Owned Automation readiness exceeded deadline")
+            require(
+                process in self.children.groups
+                and self.children.groups[process].process is process
+                and not self.children.groups[process].reaped,
+                "Owned Automation readiness requester reservation changed",
+            )
+            group = self.children.groups[process]
+            after = os.fstat(self.descriptor)
+            named = os.stat(self.path, follow_symlinks=False)
+            require(
+                stat.S_ISREG(after.st_mode)
+                and after.st_uid == os.getuid()
+                and stat.S_IMODE(after.st_mode) == 0o600
+                and after.st_nlink == 1
+                and (after.st_dev, after.st_ino) == (self.identity.st_dev, self.identity.st_ino)
+                and (named.st_dev, named.st_ino) == (self.identity.st_dev, self.identity.st_ino)
+                and 0 <= after.st_size <= len(expected),
+                "Owned Automation readiness identity or bound differs",
+            )
+            os.lseek(self.descriptor, 0, os.SEEK_SET)
+            data = os.read(self.descriptor, len(expected) + 1)
+            require(
+                len(data) <= len(expected) and expected.startswith(data),
+                "Owned Automation readiness bytes differ",
+            )
+            if data == expected:
+                require(
+                    self.request.remaining() > 0,
+                    "Owned Automation readiness exceeded deadline",
+                )
+                named = os.stat(self.path, follow_symlinks=False)
+                complete = os.fstat(self.descriptor)
+                require(
+                    (named.st_dev, named.st_ino) == (self.identity.st_dev, self.identity.st_ino),
+                    "Owned Automation readiness identity or bound differs",
+                )
+                require(
+                    (complete.st_dev, complete.st_ino)
+                    == (self.identity.st_dev, self.identity.st_ino)
+                    and stat.S_ISREG(complete.st_mode)
+                    and complete.st_uid == os.getuid()
+                    and stat.S_IMODE(complete.st_mode) == 0o600
+                    and complete.st_nlink == 1
+                    and complete.st_size == len(expected),
+                    "Owned Automation readiness changed during capture",
+                )
+                self.accepted = True
+                return group.observe_exit() is None
+            if group.observe_exit() is not None:
+                # Preserve a native pre-ready refusal and its original captures.
+                # A successful exit without acknowledgement is refused by run().
+                return False
+            time.sleep(min(0.02, self.request.remaining()))
+
+    def close(self, *, retire=True):
+        """Retire only the reserved inode after its request child physically settles."""
+        if self.close_attempted:
+            return
+        self.close_attempted = True
+        failed = False
+        try:
+            os.close(self.descriptor)
+        except OSError:
+            # close() may have released the FD even when reporting an error.
+            # Its number is quarantined, never retried or used to unlink input.
+            self.close_uncertain = True
+            self.children.record_debt(
+                {
+                    "kind": "automation-readiness",
+                    "path": str(self.path),
+                    "descriptor": self.descriptor,
+                    "descriptor_close": "unacknowledged",
+                }
+            )
+            return
+        self.closed = True
+        if retire:
+            try:
+                named = os.stat(self.path, follow_symlinks=False)
+                if (
+                    (named.st_dev, named.st_ino) == (self.identity.st_dev, self.identity.st_ino)
+                    and stat.S_ISREG(named.st_mode)
+                    and named.st_uid == os.getuid()
+                    and stat.S_IMODE(named.st_mode) == 0o600
+                    and named.st_nlink == 1
+                ):
+                    os.unlink(self.path)
+                else:
+                    failed = True
+            except OSError:
+                failed = True
+        else:
+            failed = True
+        if failed:
+            self.children.record_debt({"kind": "automation-readiness", "path": str(self.path)})
 
 
 class Children:
@@ -955,6 +1178,7 @@ class Children:
         self.groups = {}
         self.captures = {}
         self.capture_identities = {}
+        self._timeout_request_deadline_ns = None
 
     def record_debt(self, entry):
         """Repeated retirement attempts keep one diagnostic per exact owned resource."""
@@ -990,6 +1214,13 @@ class Children:
                 **self.environment,
                 "ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS": str(arguments.deadline_ns),
             }
+            if arguments.readiness is not None:
+                require(
+                    type(arguments.readiness) is OwnedAutomationReadiness
+                    and arguments.readiness.request is arguments,
+                    "Owned Automation readiness request differs",
+                )
+                environment.update(arguments.readiness.environment())
         self.sequence += 1
         output = self.root / f"child-{self.sequence}.stdout"
         errors = self.root / f"child-{self.sequence}.stderr"
@@ -1026,14 +1257,60 @@ class Children:
         if request is not None:
             require(timeout == request.timeout, "Owned Automation request budget changed")
             require(request.remaining() > 0, "Owned Automation request exceeded deadline")
-        process = self.start(arguments, confined=confined)
+        # Diagnostic samples never schedule native work. The opaque group-wait
+        # deadline is deliberately not reconstructed from a new timer.
+        timeout_started_ns = None
+        timeout_stage = "exit-wait"
+        timeout_deadline_ns = (
+            request.deadline_ns
+            if request is not None
+            else getattr(self, "_timeout_request_deadline_ns", None)
+        )
+        timeout_command = (
+            "permission-request"
+            if request is not None and request[-1] == "permission-request"
+            else "consent-observer"
+            if Path(arguments[0]) == self.root / "native-appleevent-consent"
+            else "other"
+        )
+        if self.evidence is not None and getattr(self.evidence, "descriptor", None) is not None:
+            try:
+                timeout_started_ns = time.monotonic_ns()
+            except OwnedProcessInterrupted:
+                raise  # No child/readiness input has yet been acquired.
+            except Exception:
+                pass  # Optional telemetry must not alter acquisition or its primary.
+        readiness = None
+        if request is not None and request.readiness_nonce is not None:
+            require(after_start is not None, "Owned Automation readiness observer unavailable")
+            readiness = OwnedAutomationReadiness(self, request)
+            request.readiness = readiness
+        before_active = tuple(self.active)
+        try:
+            process = self.start(arguments, confined=confined)
+        except BaseException:
+            if readiness is not None:
+                readiness.close(retire=all(child in before_active for child in self.active))
+                request.readiness = None
+            raise
         output, errors = self.captures[process]
         failure = None
         try:
             if request is not None:
                 require(request.remaining() > 0, "Owned Automation request exceeded deadline")
                 if after_start is not None:
-                    after_start(process, request.deadline_ns / 1_000_000_000)
+                    timeout_stage = "readiness" if readiness is not None else "ui-observer"
+                    if readiness is None or readiness.wait(process):
+                        timeout_stage = "ui-observer"
+                        previous_timeout_deadline = getattr(
+                            self, "_timeout_request_deadline_ns", None
+                        )
+                        self._timeout_request_deadline_ns = request.deadline_ns
+                        try:
+                            after_start(process, request.deadline_ns / 1_000_000_000)
+                        finally:
+                            self._timeout_request_deadline_ns = previous_timeout_deadline
+                timeout_stage = "exit-wait"
                 remaining = request.remaining()
                 require(remaining > 0, "Owned Automation request exceeded deadline")
                 self.groups[process].wait_for_exit(remaining)
@@ -1041,11 +1318,38 @@ class Children:
             elif after_start is None:
                 self.groups[process].wait_for_exit(timeout)
             else:
+                original_after_start = after_start
+
+                def after_start(callback_process, callback_deadline):
+                    nonlocal timeout_stage
+                    timeout_stage = "ui-observer"
+                    result = original_after_start(callback_process, callback_deadline)
+                    timeout_stage = "exit-wait"
+                    return result
+
                 deadline = time.monotonic() + timeout
                 after_start(process, deadline)
                 self.groups[process].wait_for_exit(max(0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             failure = AdmissionError("Owned native command exceeded deadline")
+            if timeout_started_ns is not None:
+                try:
+                    expired_ns = time.monotonic_ns()
+                    self.evidence.retain_timeout(
+                        {
+                            "schema": 1,
+                            "command": timeout_command,
+                            "stage": timeout_stage,
+                            "budget_seconds": timeout,
+                            "request_deadline_ns": timeout_deadline_ns,
+                            "started_ns": timeout_started_ns,
+                            "expired_ns": expired_ns,
+                            "spent_ns": expired_ns - timeout_started_ns,
+                        },
+                        groups=[self.groups[child] for child in self.active],
+                    )
+                except BaseException:
+                    pass  # Preserve this exact primary; native retirement still runs below.
         except BaseException as error:
             failure = error
         finally:
@@ -1055,6 +1359,12 @@ class Children:
                 self.record_debt({"kind": "process-retirement-error", "pid": process.pid})
             if not any(entry.get("pid") == process.pid for entry in self.debt):
                 self.active.remove(process)
+            if readiness is not None:
+                readiness.close(
+                    retire=self.groups[process].reaped
+                    and not any(entry.get("pid") == process.pid for entry in self.debt)
+                )
+                request.readiness = None
         if self.evidence is not None:
             self.evidence.record(
                 "command.end",
@@ -1063,11 +1373,35 @@ class Children:
                 if failure is not None
                 or process.returncode != 0
                 or any(entry.get("pid") == process.pid for entry in self.debt)
+                or (
+                    readiness is not None
+                    and (
+                        not readiness.accepted
+                        or any(
+                            entry.get("kind") == "automation-readiness"
+                            and entry.get("path") == str(readiness.path)
+                            for entry in self.debt
+                        )
+                    )
+                )
                 else "accepted",
                 groups=[self.groups[child] for child in self.active],
             )
         if failure is not None:
             raise failure
+        require(
+            readiness is None or readiness.accepted or process.returncode != 0,
+            "Owned Automation requester exited without readiness acknowledgement",
+        )
+        require(
+            readiness is None
+            or not any(
+                entry.get("kind") == "automation-readiness"
+                and entry.get("path") == str(readiness.path)
+                for entry in self.debt
+            ),
+            "Owned Automation readiness retained cleanup debt",
+        )
         require(
             not any(entry.get("pid") == process.pid for entry in self.debt),
             "Owned native command left process-group retirement debt",
@@ -1934,6 +2268,7 @@ def admit_appleevent_permission_prerequisite(children, sender, policy, checkpoin
         options = {}
         ui_observation = {}
         if mode == "request" and getattr(children, "allow_owned_consent_ui", False) is True:
+            arguments.readiness_nonce = sender[-1]
             sender_name = children.automation_sender_name
             receiver_name = children.automation_receiver_name
 

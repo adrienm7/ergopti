@@ -193,7 +193,10 @@ const PIPELINE = [
 			const { ok, stderr } = runNpmScript('build:menu');
 			return { ok, detail: ok ? undefined : stderr };
 		},
-		generated: ['static/ergopti_plus/_shared/modules/menu/menu_manifest.json']
+		generated: [
+			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
+			'static/ergopti_plus/_shared/modules/menu/startup_tray_projection.ahk'
+		]
 	},
 
 	// -------------------------------------------------------

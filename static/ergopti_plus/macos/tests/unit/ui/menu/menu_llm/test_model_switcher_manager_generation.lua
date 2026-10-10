@@ -814,7 +814,10 @@ helpers.describe("model manager generation fences", function()
 				install_common_stubs()
 				-- Load the genuine method while native file lookup is still available.
 				local network = require("modules.llm.network_env")
-				local emitted_network_prelude = assert(network.opaque_prelude("MLX"))
+				local emitted_network_prelude = assert(network.managed_http_prelude("MLX"))
+				-- Preserve the admitted bundled receiver when the virtual filesystem
+				-- takes over below; this test controls publication, not native identity.
+				fake_files[helpers.driver_root() .. "platform/network/native_http.py"] = ""
 				local notifications = 0
 				local completions = 0
 				package.loaded["infra.notifications"] = {
@@ -928,7 +931,7 @@ helpers.describe("model manager generation fences", function()
 				helpers.assert_type(launcher.executable, "string")
 				local emitted_launcher = assert(fake_files[launcher.executable])
 				helpers.assert_true(emitted_launcher:find(emitted_network_prelude, 1, true) ~= nil,
-					"the exact original launcher receives the genuine opaque prelude")
+					"the exact original launcher receives the genuine managed HTTP prelude")
 				launcher.on_stream(nil, "__DLPID__:123\n", "")
 				launcher.on_done(0, "", "")
 				helpers.assert_not_nil(deps.active_tasks["download_tail"])

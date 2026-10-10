@@ -1131,6 +1131,7 @@
 	"menu.global.clean_unused_keys": "Очистить config.toml",
 	"menu.global.starting": "Запуск…",
 	"menu.global.setup_wizard": "Мастер настройки…",
+	"menu.global.startup_bootstrap": "ErgoptiPlus — Запуск…",
 	"menu.global.suspend": "⏸︎ Приостановить",
 	"menu.configuration.title": "Конфигурация",
 	"menu.hotstrings.add_custom": "+ Добавить пользовательский расширитель…",

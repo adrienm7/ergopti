@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <mach/mach_time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +36,69 @@ static int valid_nonce(const char *value) {
         }
     }
     return 1;
+}
+
+static int readiness_number(const char *encoded, uintmax_t *value) {
+    if (encoded == NULL || *encoded == '\0') return 0;
+    for (const char *byte = encoded; *byte != '\0'; byte++) {
+        if (*byte < '0' || *byte > '9') return 0;
+    }
+    errno = 0;
+    char *end = NULL;
+    *value = strtoumax(encoded, &end, 10);
+    if (errno != 0 || end == encoded || *end != '\0') return 0;
+    char canonical[32];
+    snprintf(canonical, sizeof(canonical), "%ju", *value);
+    return strcmp(canonical, encoded) == 0;
+}
+
+static int acknowledge_sender_readiness(const char *nonce) {
+    // A private startup signal only: subsequent signed identity and actual
+    // permission, reply and delivery checks retain their original authority.
+    const char *name = getenv("ERGOPTI_OWNED_AUTOMATION_READY_NAME");
+    const char *encoded_device = getenv("ERGOPTI_OWNED_AUTOMATION_READY_DEV");
+    const char *encoded_inode = getenv("ERGOPTI_OWNED_AUTOMATION_READY_INO");
+    if (name == NULL && encoded_device == NULL && encoded_inode == NULL) return 1;
+    static const char prefix[] = "automation-ready-";
+    uintmax_t device = 0, inode = 0;
+    if (name == NULL || strncmp(name, prefix, sizeof(prefix) - 1) != 0 ||
+        !valid_nonce(name + sizeof(prefix) - 1) ||
+        !readiness_number(encoded_device, &device) ||
+        !readiness_number(encoded_inode, &inode)) return 0;
+    int directory = open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (directory < 0) return 0;
+    int descriptor = -1;
+    int acknowledged = 0;
+    struct stat root, before, after, named;
+    if (fstat(directory, &root) != 0 || !S_ISDIR(root.st_mode) ||
+        root.st_uid != getuid() || (root.st_mode & 0777) != 0700) goto done;
+    descriptor = openat(directory, name, O_WRONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (descriptor < 0 || fstat(descriptor, &before) != 0 ||
+        !S_ISREG(before.st_mode) || before.st_uid != getuid() ||
+        (before.st_mode & 0777) != 0600 || before.st_nlink != 1 || before.st_size != 0 ||
+        (uintmax_t)before.st_dev != device || (uintmax_t)before.st_ino != inode) goto done;
+    char bytes[128];
+    const int length = snprintf(bytes, sizeof(bytes),
+        "OWNED_APPLEEVENT_READY/1 pid=%ld nonce=%s\n", (long)getpid(), nonce);
+    if (length <= 0 || length >= (int)sizeof(bytes)) goto done;
+    size_t offset = 0;
+    while (offset < (size_t)length) {
+        const ssize_t count = write(descriptor, bytes + offset, (size_t)length - offset);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) goto done;
+        offset += (size_t)count;
+    }
+    if (fsync(descriptor) != 0 || fstat(descriptor, &after) != 0 ||
+        fstatat(directory, name, &named, AT_SYMLINK_NOFOLLOW) != 0 ||
+        !S_ISREG(after.st_mode) || after.st_uid != getuid() ||
+        (after.st_mode & 0777) != 0600 || after.st_nlink != 1 || after.st_size != length ||
+        after.st_dev != before.st_dev || after.st_ino != before.st_ino ||
+        named.st_dev != before.st_dev || named.st_ino != before.st_ino) goto done;
+    acknowledged = 1;
+done:
+    if (descriptor >= 0 && close(descriptor) != 0) acknowledged = 0;
+    if (close(directory) != 0) acknowledged = 0;
+    return acknowledged;
 }
 
 /* Fixed scalar diagnostics only; neither reply contents nor target identity escape. */
@@ -235,6 +299,18 @@ static int admit_sender_foreground_request(NSApplication *application) {
     }
 }
 
+static bool sender_foreground_after_readiness(NSApplication *application,
+    uint64_t deadline, uint64_t previous) {
+    // The private file write can block or yield focus. It cannot preserve an
+    // earlier activity observation or extend the original request deadline.
+    uint64_t now;
+    if (application == nil || !foreground_now_ns(&now) || now < previous || now >= deadline)
+        return false;
+    previous = now;
+    if (![application isActive]) return false;
+    return foreground_now_ns(&now) && now >= previous && now < deadline;
+}
+
 /* A separate closed metadata frame never changes nonce/reply admission. */
 static void emit_sender_identity(const struct SenderIdentityObservation *identity,
     int before_policy, int after_policy) {
@@ -342,6 +418,22 @@ int main(int argc, char **argv) {
                 const char *state = foreground == 1 ? "unavailable" :
                     foreground == 2 ? "inactive" : "unadmitted";
                 fprintf(stderr, "OWNED_APPLEEVENT_FOREGROUND/1 state=%s\n", state);
+                AEDisposeDesc(&address);
+                return 65;
+            }
+            uint64_t readiness_deadline, readiness_before;
+            if (!foreground_deadline_ns(&readiness_deadline) ||
+                !foreground_now_ns(&readiness_before) || readiness_before >= readiness_deadline) {
+                fputs("OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n", stderr);
+                AEDisposeDesc(&address);
+                return 65;
+            }
+            if (!acknowledge_sender_readiness(argv[2])) {
+                AEDisposeDesc(&address);
+                return 65;
+            }
+            if (!sender_foreground_after_readiness(application, readiness_deadline, readiness_before)) {
+                fputs("OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n", stderr);
                 AEDisposeDesc(&address);
                 return 65;
             }

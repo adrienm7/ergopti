@@ -89,6 +89,25 @@ end
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
+-- The imported facade and its actual functions own every later boundary read.
+local separator_modules = package.loaded
+local separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")
+local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")
+local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")
+local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")
+
+--- Refuses facade or function withdrawal without invoking its replacement.
+--- @return boolean
+local function separator_facade_current()
+	return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
+		and rawget(package, "loaded") == separator_modules
+		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+		and type(separator_factory) == "function" and rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory
+		and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
+		and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
+		and type(separator_root) == "function" and rawget(ManifestMenu, "get_root") == separator_root
+end
+
 --- Substitutes a single placeholder in a translated template.
 ---
 --- Plain indices rather than gsub: a release tag or an interval code is data,
@@ -252,7 +271,6 @@ local function open_action_picker(title, current, binding, on_confirm, selected_
 	local editor = Gestures.get_picker_parameter_fields(items, binding)
 	return Picker.open({
 		title = title,
-		label = i18n_safe("dialog.action_picker.label"),
 		current = current or "none",
 		items = items,
 		send_vocabulary = editor.send_vocabulary,
@@ -414,6 +432,8 @@ end
 --- the day a third one is added, and says nothing about which the driver can
 --- actually decode.
 local function _build_layouts(ctx)
+	local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "keyboard_layout")
+	if not receive then return nil end
 	local current = ctx.layout or "qwerty"
 	local on_change = ctx.on_layout_change
 
@@ -558,7 +578,65 @@ local function _build_layouts(ctx)
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
 		or {}
-	return { label = i18n_safe("menu.layout.title"), submenu = rows }
+	return receive(rows, { layout_enabled = function() return nil end })
+end
+
+--- Retains the actual single editor declaration through provider projection.
+--- Native callbacks refuse a withdrawn source before scheduling or opening UI.
+--- @return function|nil current
+--- @return function|nil template
+local function personal_info_editor_source()
+	local modules = rawget(package, "loaded")
+	local renderer = ManifestMenu
+	if type(modules) ~= "table" or rawget(modules, "infra.manifest_menu") ~= renderer
+		or type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
+	local template, root_owner, array_owner = rawget(renderer, "template_rows"),
+		rawget(renderer, "get_root"), rawget(renderer, "get_array")
+	if type(template) ~= "function" or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
+	local function facade_current()
+		return rawget(package, "loaded") == modules and rawget(modules, "infra.manifest_menu") == renderer
+			and getmetatable(renderer) == nil and rawget(renderer, "template_rows") == template
+			and rawget(renderer, "get_root") == root_owner and rawget(renderer, "get_array") == array_owner
+	end
+	local root, source = root_owner(), array_owner("personal_info_editor_frame")
+	if not facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil
+		or type(source) ~= "table" or getmetatable(source) ~= nil
+		or rawget(root, "personal_info_editor_frame") ~= source or rawget(source, 1) == nil then return nil end
+	for index in next, source do if index ~= 1 then return nil end end
+	local declaration = rawget(source, 1)
+	if type(declaration) ~= "table" or getmetatable(declaration) ~= nil
+		or rawget(declaration, "type") ~= "command" or rawget(declaration, "id") ~= "personal_info_editor_open"
+		or type(rawget(declaration, "i18n")) ~= "string" or rawget(declaration, "i18n") == ""
+		or rawget(declaration, "unavailable") ~= "hide" then return nil end
+	local allowed = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
+	local fields, count = {}, 0
+	for key, value in next, declaration do
+		if not allowed[key] then return nil end
+		fields[key], count = value, count + 1
+	end
+	if count ~= 5 then return nil end
+	local platforms = rawget(declaration, "platforms")
+	if type(platforms) ~= "table" or getmetatable(platforms) ~= nil
+		or rawget(platforms, 1) ~= "hs" or rawget(platforms, 2) ~= "linux" then return nil end
+	for index in next, platforms do if index ~= 1 and index ~= 2 then return nil end end
+	local function current()
+		if not facade_current() then return false end
+		if root_owner() ~= root or array_owner("personal_info_editor_frame") ~= source or not facade_current()
+			or getmetatable(root) ~= nil or rawget(root, "personal_info_editor_frame") ~= source
+			or getmetatable(source) ~= nil or rawget(source, 1) ~= declaration
+			or getmetatable(declaration) ~= nil or getmetatable(platforms) ~= nil then return false end
+		for index in next, source do if index ~= 1 then return false end end
+		local actual_count = 0
+		for key, value in next, declaration do
+			if fields[key] ~= value then return false end
+			actual_count = actual_count + 1
+		end
+		if actual_count ~= count then return false end
+		for index in next, platforms do if index ~= 1 and index ~= 2 then return false end end
+		return rawget(platforms, 1) == "hs" and rawget(platforms, 2) == "linux"
+	end
+	if not current() then return nil end
+	return current, template
 end
 
 --- Whether any hotstring can expand: a category gate open, or the dynamic
@@ -1478,18 +1556,28 @@ local function _manifest_hotstring_rows(ctx, config)
 				count = count + dyn.user_code_count()
 			end
 
-			local sub = {
-				{
-					label = i18n_safe("menu.shortcuts.edit_personal_info"),
-					action = function()
+			local sub = {}
+			local current, template = personal_info_editor_source()
+			if current then
+				local editor = template("personal_info_editor_frame", {
+					personal_info_editor_open = function()
+						if not current() then return false end
 						if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 							Logger.error(LOG, "Personal-info editor cannot open: webview manager is unavailable.")
 							return
 						end
 						ctx.webview.show("personal_info_editor")
 					end,
-				},
-			}
+				}, {}, {})
+				local valid = current() and type(editor) == "table" and getmetatable(editor) == nil
+				if valid then for index in next, editor do if index ~= 1 then valid = false end end end
+				local row = valid and rawget(editor, 1) or nil
+				valid = type(row) == "table" and getmetatable(row) == nil
+					and type(rawget(row, "label")) == "string" and rawget(row, "label") ~= ""
+					and type(rawget(row, "action")) == "function" and rawget(row, "disabled") == nil
+				if valid then for key in next, row do if key ~= "label" and key ~= "action" then valid = false end end end
+				if valid then sub[1] = row end
+			end
 
 			-- One row per rule family, as Windows and macOS offer. The plan recorded
 			-- this as blocked by the shared engine "registering the date rules as a
@@ -1808,12 +1896,9 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 
 			if #order == 0 then
-				rows[#rows + 1] = {
-					label    = i18n_safe("menu.extensions.none_installed"),
-					action       = function() end,
-					disabled = true,
-				}
-				return
+				if type(ManifestMenu.status_rows) ~= "function" then return {} end
+				local status = ManifestMenu.status_rows("hotstrings_menu", "hotstring_extensions", "none_installed")
+				return type(status) == "table" and status or {}
 			end
 
 			for _, extension_id in ipairs(order) do
@@ -2057,12 +2142,16 @@ end
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
 local function _build_hotstrings(ctx)
+	local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "hotstrings")
+	if not receive then return nil end
 	local config = ctx.config
 
 	if type(config) ~= "table" then
 		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_hotstrings_absent_rows", {}, {}, {})
 		if not status_rows then return {} end
-		return { label = i18n_safe("menu.hotstrings.title"), items = status_rows }
+		local children = ManifestMenu.render_rows(status_rows, "linux_hotstrings_absent_rows")
+		return receive(children, { hotstrings_enabled = function() return nil end,
+			hotstrings_parent_total = function() return 0 end, hotstrings_parent_count_present = function() return false end })
 	end
 
 	local items = _manifest_hotstring_rows(ctx, config)
@@ -2089,13 +2178,12 @@ local function _build_hotstrings(ctx)
 		end
 	end
 
-	local title = i18n_safe("menu.hotstrings.title")
-	if grand_total > 0 then title = string.format("%s (%d)", title, grand_total) end
 
 	-- The parent carries the same tick as the switch that opens the submenu, for
 	-- a user scanning the top level. It cannot be clicked: no tray binds a click
 	-- on a row that opens a submenu, which is why the switch is a row inside.
-	return { label = title, checked = _hotstrings_on(ctx), submenu = items }
+	return receive(items, { hotstrings_enabled = function() return _hotstrings_on(ctx) end,
+		hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return true end })
 end
 
 --- Builds the AI / LLM submenu.
@@ -3382,11 +3470,13 @@ end
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
 local function _build_shortcuts(ctx)
+	local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "shortcuts")
+	if not receive then return nil end
 	local sc = ctx.shortcuts
 	if not sc then
 		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_shortcuts_absent_rows", {}, {}, {})
 		if not status_rows then return {} end
-		return { label = i18n_safe("menu.shortcuts.title"), items = status_rows }
+		return receive(ManifestMenu.render_rows(status_rows, "linux_shortcuts_absent_rows"), { shortcuts_enabled = function() return nil end })
 	end
 
 	local enabled = sc.is_enabled()
@@ -3828,7 +3918,7 @@ local function _build_shortcuts(ctx)
 		for _, row in ipairs(manifest_rows) do items[#items + 1] = row end
 	end
 
-	return { label = i18n_safe("menu.shortcuts.title"), checked = enabled, submenu = items }
+	return receive(items, { shortcuts_enabled = function() return enabled end })
 end
 
 --- Display name of a tap-hold key: the label key the shared key catalogue
@@ -3880,9 +3970,13 @@ end
 --- @param ctx table Menu context (ctx.tap_holds is the tap-hold manager).
 --- @return table One menu entry with its submenu.
 local function _build_tap_holds(ctx)
+	local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "tap_holds")
+	if not receive then return nil end
 	local th = ctx.tap_holds
 	if not th then
-		return { label = i18n_safe("menu.tapholds.title"), disabled = true }
+		local declared = ManifestMenu.template_rows("linux_tap_holds_absent_parent", {}, {}, {})
+		if not declared or #declared ~= 1 then return nil end
+		return declared[1]
 	end
 	local Writer = require("platform.remap.tap_hold_writer")
 	local HoldOptions = require("tap_hold.hold_options")
@@ -3914,7 +4008,6 @@ local function _build_tap_holds(ctx)
 		table.sort(items, function(left, right) return left.label < right.label end)
 		Picker.open({
 			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(catalog_entry),
-			label = i18n_safe("dialog.action_picker.label"),
 			current = current == "" and "__native__" or current,
 			allow_native = true,
 			native_label = i18n_safe("tap_hold.tap.none"),
@@ -4047,16 +4140,18 @@ local function _build_tap_holds(ctx)
 	local rows = ManifestMenu
 		and ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
 		or {}
-	return { label = i18n_safe("menu.tapholds.title"), submenu = rows }
+	return receive(rows, { tapholds_enabled = function() return nil end })
 end
 
 --- Builds the gestures submenu.
 local function _build_gestures(ctx)
+	local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "gestures")
+	if not receive then return nil end
 	local ge = ctx.gestures
 	if not ge then
 		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_gestures_absent_rows", {}, {}, {})
 		if not status_rows then return {} end
-		return { label = i18n_safe("menu.gestures.title"), items = status_rows }
+		return receive(ManifestMenu.render_rows(status_rows, "linux_gestures_absent_rows"), { gestures_enabled = function() return nil end })
 	end
 
 	local enabled = ge.is_enabled()
@@ -4206,7 +4301,7 @@ local function _build_gestures(ctx)
 	local menu = {}
 	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
 
-	return { label = i18n_safe("menu.gestures.title"), checked = gestures_on, submenu = menu }
+	return receive(menu, { gestures_enabled = function() return gestures_on end })
 end
 
 --- Checks raw dense arrays without triggering source metamethods.
@@ -4959,6 +5054,7 @@ end
 --- }
 --- @return table Array of { title, menu?, fn?, checked?, disabled? } items.
 function M.build(ctx)
+	if not separator_facade_current() then return {} end
 	local ctx = type(ctx) == "table" and ctx or {}
 	-- Row DATA since 2026-08-07, rendered at the end of this function. Every
 	-- builder used to return the finished tray row that hangs its submenu — the
@@ -5001,7 +5097,17 @@ function M.build(ctx)
 		["debug"]           = _build_debug,
 	}
 
-	local declared = ManifestMenu and ManifestMenu.get_array("top_level") or {}
+	-- Retain the existing real whole-array reader as well as shared admission.
+	-- Its result must be the same canonical source, never an equal-looking copy.
+	if not separator_facade_current() then return {} end
+	local declared = ManifestMenu.get_array("top_level")
+	if not separator_facade_current() then return {} end
+	local receive_separator, source_rows = separator_factory()
+	if not separator_facade_current() or type(receive_separator) ~= "function"
+		or type(declared) ~= "table" or not rawequal(declared, source_rows) then
+		Logger.error(LOG, "The canonical top-level boundary source is unavailable.")
+		return {}
+	end
 	if #declared == 0 then
 		Logger.error(LOG, "The manifest declares no top-level row — the tray would be empty.")
 		return {}
@@ -5017,10 +5123,15 @@ function M.build(ctx)
 	local quit_row = nil
 
 	for _, row in ipairs(declared) do
+		if not separator_facade_current() or not receive_separator("current") then return {} end
 		if type(row) == "table" then
 			local id = row.id
 			if id == "---" then
-				rows[#rows + 1] = { separator = true }
+				if _row_is_for_linux(row) then
+					local boundary = receive_separator(row)
+					if not boundary then return {} end
+					rows[#rows + 1] = boundary
+				end
 			elseif _row_is_for_linux(row) then
 				local build = builders[id]
 				if not build then
@@ -5044,20 +5155,23 @@ function M.build(ctx)
 				end
 			end
 		end
+		if not separator_facade_current() or not receive_separator("current") then return {} end
 	end
 
 	if quit_row then
-		rows[#rows + 1] = { separator = true }
+		-- The existing declared boundary before Quit follows its Linux-only last placement.
+		local boundary = receive_separator("linux_quit_last")
+		if not boundary then return {} end
+		rows[#rows + 1] = boundary
 		rows[#rows + 1] = quit_row
 	else
 		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")
 	end
 
-	if not (ManifestMenu and type(ManifestMenu.render_rows) == "function") then
-		Logger.error(LOG, "The shared renderer is unavailable — the tray cannot be drawn.")
-		return {}
-	end
-	return ManifestMenu.render_rows(rows, "top_level")
+	if not separator_facade_current() or not receive_separator("current") then return {} end
+	local rendered = separator_render(rows, "top_level")
+	if not separator_facade_current() or not receive_separator("current") then return {} end
+	return rendered
 end
 
 return M

@@ -44,6 +44,7 @@ local function build_ctrl_rows(bindings, state_shortcuts)
 		local native_renderer = require("infra.manifest_menu")
 		assert(type(native_renderer.template_rows) == "function")
 		package.loaded["infra.manifest_menu"] = {
+			group_receiver = native_renderer.group_receiver,
 			template_rows = native_renderer.template_rows,
 			build = function(_, _, _, _, _, lists) return lists.keyboard_slots() end,
 		}

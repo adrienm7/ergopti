@@ -267,6 +267,44 @@ _HotstringsScopeProductionInventory() {
 }
 Test("hotstrings-scope: production discovery inventories fresh personal and canonical extension identities", _HotstringsScopeProductionInventory)
 
+; Measure the genuine captured source predicate separately from native WAL I/O.
+; The original full transaction and its deadline remain unchanged below.
+_HSC_CapturedRegistryGuardNativeTiming() {
+	Fixture := _ScopeOwnerFixture()
+	Hits := { count: 0 }, ObserverInstalled := false
+	try {
+		Registry := ConfigMigrateShippedRegistry()
+		Guard := ConfigMigrateBoot(Fixture.path, "capture_noop")
+		AssertTrue(HasMethod(Guard, "Call"), "genuine current boot issues the actual source guard")
+		Accepted := 0
+		Started := _TestClockMs()
+		loop 32 {
+			if Guard.Call(Fixture.source, 1)
+				Accepted += 1
+		}
+		Elapsed := _TestClockMs() - Started
+		_TestPrint("# group1-registry-native-phase: phase=captured_guard;calls=32;accepted=" . Accepted
+			. ";duration_ms=" . Format("{:.3f}", Elapsed))
+		AssertEqual(32, Accepted, "every invocation retains the actual full registry and current source admission")
+		OriginalCount := Registry.Count
+		Registry.DefineProp("Count", { Get: (*) => (Hits.count += 1, OriginalCount) })
+		ObserverInstalled := true
+		AssertFalse(Guard.Call(Fixture.source, 1), "the same genuine guard refuses the altered live registry")
+		AssertEqual(0, Hits.count, "registry shape refusal executes no foreign Count observer")
+		Registry.DeleteProp("Count")
+		ObserverInstalled := false
+		AssertTrue(Guard.Call(Fixture.source, 1), "exact native registry repair restores the same captured guard")
+		AssertEqual(0, Hits.count)
+		AssertTrue(FSUtf8ExactMatches(Fixture.path, Fixture.source), "guard measurement and refusal publish no file effects")
+	} finally {
+		try {
+			if ObserverInstalled
+				Registry.DeleteProp("Count")
+		} finally _ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("hotstrings-capacity: genuine captured registry guard reports native predicate timing", _HSC_CapturedRegistryGuardNativeTiming)
+
 _HotstringsScopeLargeCatalogue() {
 	PhaseStarted := _TestClockMs()
 	Fixture := _HotstringsScopeFixture(32)

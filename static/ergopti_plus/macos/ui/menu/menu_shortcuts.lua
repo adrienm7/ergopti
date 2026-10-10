@@ -453,6 +453,8 @@ end
 function M.build(ctx)
 	local shortcuts = ctx.shortcuts
 	if not shortcuts then return nil end
+	local receive = ManifestMenu.group_receiver("top_level", "shortcuts")
+	if not receive then return nil end
 
 	local state  = ctx.state
 	local paused = ctx.paused
@@ -537,11 +539,6 @@ function M.build(ctx)
 
 	-- The parent carries the stored preference as its tick and is greyed while
 	-- paused; it has no action, since a row that opens a submenu is never clicked.
-	local item = {
-		label    = i18n.get("menu.shortcuts.title"),
-		checked  = state.shortcuts or nil,
-		disabled = paused or nil,
-	}
 
 
 	-- ==============================================
@@ -932,7 +929,8 @@ function M.build(ctx)
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 
-	item.submenu = s_menu
+	local item = receive(s_menu, { shortcuts_enabled = function() return state.shortcuts or nil end })
+	if item then item.disabled = paused or nil end
 	return item
 end
 

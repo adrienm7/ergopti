@@ -9,12 +9,23 @@
 _LMDP_DeferredLanguageMenuIsPublishedAtomically() {
 	Deferred := _DriverFuncBody("BuildLanguageMenuDeferred")
 	Assert(Deferred != "", "BuildLanguageMenuDeferred must exist")
-	Assert(InStr(Deferred, "StagedMenu := Menu()") > 0 and InStr(Deferred, "I18nBuildLanguageMenu(StagedMenu)") > 0,
+	Assert(InStr(Deferred, "StagedMenu := Menu()") > 0 and InStr(Deferred, "BuilderOwner.Call(StagedMenu)") > 0,
 		"BuildLanguageMenuDeferred must populate a detached Menu before publishing it")
-	Assert(InStr(Deferred, 'A_TrayMenu.Add(t("menu.global.language"), StagedMenu)') > 0,
+	Assert(InStr(Deferred, 'ReplacementOwner.Call(Destination, "top_level", "language", PreviousChild)') > 0,
 		"BuildLanguageMenuDeferred must replace the placeholder with the complete staged submenu")
-	Assert(InStr(Deferred, 'A_TrayMenu.Enable(t("menu.global.language"))') > 0,
+	Publisher := _DriverFuncBody("MenuRenderer_GroupReplacement")
+	Assert(Publisher != "", "the declared group replacement owner must exist")
+	RenderAt := InStr(Publisher, 'RenderOwner.Call(TargetMenu, [NewRow]')
+	EnableAt := InStr(Publisher, 'TargetMenu.Enable(Caption)')
+	Assert(RenderAt > 0 && EnableAt > RenderAt,
 		"BuildLanguageMenuDeferred must enable the row only after the complete submenu is published")
+	CaptureAt := InStr(Deferred, 'ReplacementOwner.Call(Destination, "top_level", "language", PreviousChild)')
+	ProduceAt := InStr(Deferred, 'BuilderOwner.Call(StagedMenu)')
+	Assert(CaptureAt > 0 && ProduceAt > CaptureAt,
+		"the exact current parent cohort must be captured before native locale production can yield")
+	Assert(InStr(Deferred, 'A_TrayMenu != Destination') > 0 && InStr(Deferred, '_LangMenuRef != PreviousChild') > 0
+		&& InStr(Deferred, '_I18nLocale != Locale') > 0,
+		"a completed old language child cannot adopt refreshed globals or a successor locale")
 	Tail := _DriverFuncBody("_MI_StageLanguage")
 	Assert(Tail != "", "_MI_StageLanguage must exist")
 	Assert(InStr(Tail, 'TrayMenuStage_Disable(t("menu.global.language"))') > 0,

@@ -2757,6 +2757,8 @@ Shared shortcut scope planning now filters only proved neutral deletions beneath
 
 Windows scopes classify a freshly captured strict source through the existing canonical decoder and obsolete-key owner, then admit only neutral deletion intents beneath proved obsolete scalar/array parents. Nonneutral or ancestor collisions refuse before backup/runtime publication. The candidate is built from the same captured source through existing build-only admission, drift and late session fences. Eighteen registered native controls retain the original full test prefix; native execution is pending.
 
+The four Windows scope fixtures now author current-schema source before genuine boot or stamp their subsequent owned source once. They preserve semantic metadata, strict write permission, pending/refusal and exact rollback assertions; one existing durable-write assertion now uses the same intended payload from its genuine current fixture. These source corrections address fixture prerequisites implicated in the eleven failures of manual run 38019750684: 10,908 planned, 1,905 executed, 1,894 passed, 11 failed and 9,003 unexecuted before the unchanged 22-minute watchdog. All four repairs remain native UNRUN. The next exact-source Windows CI must qualify the existing scope cases and complete the original suite; item 5 remains partial.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. Current source implements the seven-page declaration, native
@@ -3886,6 +3888,56 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-10 first Homebrew timeout diagnostic continuation. The helper retains
+the first typed command timeout in subsequent checkpoints, including after the
+256-record history cap and final cleanup. Fixed command/stage enums distinguish
+the requester, its owned consent observer and other commands; original wait
+budgets and proven request deadlines are observed without changing scheduling.
+Raw arguments, paths and exception payloads are excluded. The original timeout
+error and reservation retirement remain unchanged. All178 predecessor test
+bodies are preserved with twelve additional portable controls. The causal control
+fails on the predecessor at the missing final timeout observation and passes
+on the candidate. All190 portable controls and the owning Homebrew checks pass.
+The new missing-capability control proves the actual no-follow refusal before
+child acquisition; incapable-host positive publication remains explicitly
+UNEXECUTED. Selected formatting passes; JS402/406 retains the same four
+failures as the executed baseline. Native qualification remains pending;
+this diagnostic does not grant consent, qualify Brew6 or complete item36.
+Manual38027004065 on4e9f92fdc executes24PASS/1FAIL of the original25 archive
+cases. The failure is the original thirty-second owned Automation prompt
+deadline, not a typed command timeout; first_timeout is correctly absent.
+The owner closes with no debt; Brew6 and final package/install remain
+unexecuted or skipped. The prompt failure's cause remains unproved.
+
+2026-10-10 Homebrew unrelated-window scope continuation. The observer now
+excludes only a completely inspected, bounded window of the expected OS-agent
+PID with neither owned sender nor receiver identity. Partial identities,
+unreadable or malformed values, foreign PIDs and deadline refusals remain
+refused. The original target inspector, signatures, actions and clocks remain
+unchanged. All177 predecessor test bodies remain byte-identical;178 portable
+tests pass, including35 compiled CF/AX scope controls and six dispatch controls.
+These explicit ports do not qualify actual Accessibility/TCC or Homebrew.
+Manual38016257870 previously reached a qualified foreground requester but
+refused an unrelated OS window: archive24/25 passed, Brew failed and its six
+profile scenarios were not reached; package/install were skipped. Requalify
+actual native compilation, all25 archive cases, Brew6, final packaging and
+installed upgrade/relaunch on the corrected sources. Item36 stays open.
+
+2026-10-10 Homebrew requester startup continuation. The owned Automation
+observer now waits for an acknowledgement from the actual foreground sender
+instead of racing the sandbox wrapper's exec. A private exclusive file binds
+the original nonce, PID, device and inode; readiness does not grant consent or
+replace the original signature/UI checks. The original thirty-second deadline
+and fresh foreground check are repeated after acknowledgement I/O, before the
+native permission request. Uncertain close/unlink retains ownership debt and
+the private input; an uncertain descriptor is never closed again after reuse.
+All158 predecessor test bodies and the native consent implementation remain
+byte-identical. The177 portable controls pass, including eleven compiled
+recording-port cases for the final deadline/activity checks. These controls
+qualify neither AppKit/TCC behavior nor the six actual Brew scenarios; native
+archive, packaging and installation qualification remains required. Item36
+stays open.
+
 2026-10-09 release qualification composition. The bounded diagnostic dev.157 policy and all production workflows remain unchanged. An independently reviewed full-default source view retains every original mandatory guard and mutation, validates the exact raw policy/topology, and rejects failed receipt retention. All44 new controls and nine old guard suites pass privately; the new controls are enrolled directly in the normal JS suite. Release fixtures retain the real policy dependencies and fixed independent dev.158 refusal vectors. The original144 Brew controls are preserved with two new foreground-requester controls: only the admitted Accessory singleton requests activation, and a fresh isActive acknowledgement is required before the existing Automation request. All146 portable Python controls and36 owning JS controls pass. Native AppKit/TCC behavior and all six Brew positive scenarios remain unexecuted for this source; activation may refuse asynchronously, and unknown UI controls remain denied. Latest prior Mac37940744064 still reports archive24/25 and skipped package/install. The exact integratede896 manual37960022603 executed all25 archive cases:24 passed and the Brew prerequisite refused inactive after requesting foreground activation, before its six profile scenarios. Archive8/Sparkle15 and consent opt-in passed; package/install skipped. An independently reviewed exact fast-header parser repair now preserves the four original stub-harness assertions, adds five refusal controls and remains explicit about missing WindowServer/physical proof. The three added refusal families also require the exact nonempty name-field error; wrong-error, nonstring and nil mutations are refused, with no scanner or baseline change. The reviewed same-deadline AppKit activation correction is now adopted: the existing request captures one original30-second public monotonic deadline before its checkpoint, passes it only to its owned child, and retains that deadline through UI observation and physical completion. The same Accessory application pumps only its own AppKit events and requires fresh actual activity before the unchanged Automation request. All146 old portable method bodies remain exact and154 owning controls,36 Homebrew checks and17 compiled explicit API-model cases pass; six causal mutants refuse. Hosted manual37968407062 on479d6f68 reaches a bounded UI observation instead of the prior inactive refusal: archive24/25 pass, while Brew refuses the first unsupported-title button and its six profiles remain unreached. The actual retained window has four observed nodes; its identity remains unknown. A reviewed passive diagnostic now traverses only that same retained window, within the original three-second child/original30-second request caps, without changing the original NO/refusal or any button action. All154 old Python methods remain byte-identical;158 portable controls and37 owning checks pass, including executable-only guards that reject commented or quoted lookalikes. The actual frozen699-byte packet plus maximal new scalars fits827 bytes inside the unchanged1024-byte capture. Actual manual37975640734 on13e981637 preserves native archive24/25, both SDK41/Source10 and HTTP worker12 cohorts, but the new passive diagnostic fails native Clang compilation because its children receiver is declared id before reading NSArray.count. The independently reviewed correction changes only that receiver declaration to NSArray\*, preserving its runtime class refusal, both256 bounds, original clocks and consent rules; Fresh manual37978092202 onaa925760 confirms actual native compilation and passive-reader execution, while archive24/25 remains partial. Its child-list query returns nil with documented AXNoValue(-25212) after two nodes; identity remains unknown and all six Brew profiles remain unreached. The reviewed one-line passive-only correction treats that absent child value as an empty leaf, like the existing nil/success or unsupported cases, preserving the entire original inspector, NO/action guards, budgets, bounds and cleanup. Exact manual37984497921 on5d839b13 now confirms native compilation and complete seven-node passive traversal (refusal none/error0), with neither owned sender nor receiver observed. The original unsupported button/refusal, unknown window identity, candidates0/matches0 and NO/action guards remain unchanged. Archive25 executes24PASS/1BrewFAIL/0SKIP (archive8/Sparkle15/consent1PASS); all six Brew profiles remain unreached, and original cleanup receipts are accepted. Complete Brew and final package/installed qualification remain open; absence of owned text does not authorize an unknown window or permission grant. Native AX compilation/execution on this diagnostic, complete native25/Brew6, final package and installed upgrade/relaunch qualification remain required; no consent guard, unknown-control refusal or cleanup assertion is waived. Item36 and transversal16/38 remain open.
 
 Owned manual37934910035 on880424ae again executes24PASS/1FAIL/0SKIP in the original25 archive cohort. Qualified requester, trusted observer and successful AXWindow observation remain; the exact window close/minimize/zoom attributes all return NoValue(-25212), so their typed identity stays unobserved and the classifier preserves refusal. The same first button has unsupported title/subrole. A reviewed diagnostic now queries only that retained button's public AXDescription and AXValue, exporting fixed label-family/type/error tokens without raw text or new action authority. All original141 portable methods and the native whole-source inverse remain exact;144 Python cases and36 JS controls pass, with the original source failing the three new controls. Actual label families and six Brew acceptance scenarios on this successor remain unexecuted. Both macOS SDK41 cohorts and fresh signed cold MLX/bootstrap closure pass on880; full package/install are skipped. Item36 and transverse16/38 remain open.
@@ -4906,6 +4958,8 @@ normal and throwing exits. All original user-file protection assertions remain;
 the independent joined-discovery assertion is unchanged. Native qualification
 of this isolation correction is still pending.
 
+Manual Windows run 38019750684 passed the four ordinary full-save families and the genuine 34-store publication/rollback case, but ended incomplete with 1,894 passes, 11 failures and 9,003 unexecuted subjects at the unchanged 22-minute watchdog. The capacity case measured 142,033.737 ms for publication and 123,130.867 ms for refusal; these phases locate cost without proving an optimization. The newly registered genuine captured-registry diagnostic requires 32 accepted calls, actual native timing, zero Count-getter observer effects, exact repair and unchanged target bytes in the next Windows CI. It remains native UNRUN and requires no physical device. The original 34-store assertions and all nine acquired-read temporal controls still require complete execution; full unit, E2E, fresh startup, packaging/install and separate installed-device acceptance remain open. Count, prototype and key-index proposals remain on HOLD; no production change, cached admission, timeout relaxation or fabricated acknowledgement is included. Item 42 and transversal items 16/38 remain partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -5167,9 +5221,61 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 23, macOS 18, Linux 19, each
+  drivers still build (current baseline: Windows 22, macOS 7, Linux 5, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
-  zero. Each OS-limited row declares `unavailable = "hide"` (not
+  zero. The current received menu slices declare five fixed feature parents,
+  top-level separator placement, deferred Windows language children and
+  immutable translated Windows startup rows through shared source owners.
+  The macOS download command consumes its existing declared frame. All 31
+  registered generators complete; the genuine census falls to 22/7/6.
+  The actual TOML parser produces null-prototype records; the startup compiler
+  admits those data records while retaining custom-prototype refusals.
+  Private targeted menu hosts pass 28 macOS, 4 and 289 Linux cases on each
+  Lua runtime, and 43 macOS download cases; the genuine download predecessor
+  fails exactly six new controls. Whole final-source gates, Windows execution
+  and installed/physical acceptance remain pending; these counts do not close
+  items 54, 81, 16 or 38.
+  Genuine current positive fixture dependencies now execute 382 passing
+  macOS tests across 24 complete registered modules, and 471 passing Linux
+  tests on each of Lua 5.4 and LuaJIT. A retired internal macOS path-menu
+  constructor had no executable callers; removing it reduces the actual
+  macOS census from nine to eight without changing the native editor owner.
+  The actual shared Hotstrings source-route check passes for all three
+  drivers. Before the personal-information leaf, the complete actual
+  menu-manifest target passes, retaining the imported-owner, nested callback
+  and constructor-data controls. The
+  actual parity gate passes its native LLM route controls, then reports two
+  unresolved Linux submenu/macOS state-reader declarations. Original
+  assertions remain. These targeted receipts are not a passing full
+  suite or installed-device acceptance.
+  The existing personal-information editor leaf now consumes a shared
+  declared frame on macOS and Linux; all 21 prior captions and the Windows
+  native button remain unchanged. Its retained native opener checks source
+  ownership before scheduling and before queued delivery. Genuine generation
+  completes, and the nonincreasing census is 22/7/6. After correcting the genuine
+  native row positions and isolating the actual Hotstrings constructor, complete
+  receiving modules pass 44/0 on macOS and 69/0 on each Linux runtime. Loading
+  the preserved original production into the same complete registered hosts
+  yields 37/7 and 63/6 respectively: all 13 new cases detect the original gap,
+  while prior cases remain passing. The initial 38/6 and 68/1 failed receipts
+  are retained. These software-host results do not establish physical-device,
+  packaging, or complete final-source acceptance.
+  The current complete manifest and whole-tree parity targets now pass.
+  The source proofs preserve genuine provider composition and the guarded
+  Linux root publication; original withdrawal controls remain effective.
+  The preceding manifest/parity failures are retained as failed evidence.
+  Actual selected final-source software hosts execute 18,119 passing and
+  11 failing macOS unit tests, and 12,837 passing and 22 failing Linux unit
+  tests. Virtual macOS E2E passes 101 with one host skip; Linux E2E passes
+  175 and fails 14. After the two-file About source-proof correction, JS
+  retains four failures: the precommit domain drift against the unchanged
+  Git source and three workflow guards requiring their owners. Formatting
+  passes; local AHK unit, parse and E2E execution is unavailable and skipped.
+  All pinned inputs remain unchanged during these actual runs. These results
+  are not full-suite, native macOS, packaging, installation or physical-device
+  acceptance. Native CI and the outstanding fixture/workflow repairs remain
+  required; items 54, 81, 16 and 38 stay partial.
+  Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
@@ -6173,6 +6279,22 @@ The remaining macOS and Linux failures require final-source reconciliation
 with current dev and their owners. Platform CI and actual installed menu
 delivery remain unqualified. Neither TODO54 nor TODO81 is complete.
 
+The Linux empty-extension provider now returns the existing translated status
+through its shared declaration, rather than discarding the native message with
+an empty return. Its complete registered receiving module passes 70/0 on each
+of Lua 5.4 and LuaJIT. The exact original provider in those same complete hosts
+passes 41 and fails 29 on each runtime; every failure belongs to the additive
+empty-status controls, with no load errors, ignored or unexecuted subjects.
+All 21 captions come from preserved original locale values. Actual registered
+generation passes, and the owning census is now 22/7/5. The actual selected
+post-upstream pass completes with 18,123 passing and 11 failing macOS units,
+12,867 passing and 22 failing Linux units, 101 passing virtual macOS E2E
+plus one host skip, and 175 passing/14 failing Linux E2E. Manifest, parity,
+formatting and the census pass. JS retains the precommit generated drift and
+three workflow-guard failures; local AHK execution is skipped. All 7,567
+pinned inputs remain unchanged. The remaining named failures and native CI
+qualification stay open; this bounded delivery does not close item 54.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -6183,6 +6305,108 @@ delivery remain unqualified. Neither TODO54 nor TODO81 is complete.
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+2026-10-10 missing managed Ollama catalogue diagnostic continuation. The
+original fixed release-catalogue read now retains FileNotFoundError as the
+cause of a typed refusal; the original install, verify and create-session CLI
+actions return the fixed OLLAMA_MANAGED_CATALOGUE_MISSING marker with exit78.
+Missing contracts, permission and directory errors, malformed or empty
+catalogues and unsupported hosts keep their original generic refusal. Twelve
+additional controls are enrolled in the existing POSIX protocol check, with
+every predecessor case unchanged. Independent review and two serial owned
+receiving runs execute the same twelve cases: predecessor7PASS/5 assertion
+FAIL, candidate12PASS/0FAIL, both0ERROR/0SKIP with physical command closure and
+no retained debt. Reads, nonroot permissions and CLI execution are real Linux;
+Darwin architecture admission is explicitly modeled. These controls grant no
+native macOS, installation, activation or complete migration credit. Shared
+consent consumption, authenticated READY/RETIRED integration, active request
+retirement and qualified native serving remain CODE; item62 stays open.
+The test payload and HOME now use their actual canonical owned temporary
+root. Genuine POSIX alias receiving reproduces6PASS/6FAIL with the old test
+path bookkeeping and12PASS with the corrected bookkeeping; ordinary receiving
+also passes12. Every test body and assertion is preserved, and all three
+command owners acknowledge physical closure with no debt. This repairs the
+test's read counters on /tmp and /var aliases without native macOS credit.
+
+2026-10-10 WPAD failed-request diagnostic continuation. A failed positive
+native WPAD request now reports only a fixed terminal-reason label from its
+already completed, uniquely terminated and bounded frame collection; malformed
+or unknown observations report unknown. It adds no request, trust mutation,
+clock, retry or cleanup action. The complete original source is restored by
+removing the single insertion, and all original assertions and14 native cases
+remain intact. Independent source review and selected formatting pass. Selected
+JS402/406 and macOS stub17,957/17,968 retain the same four and eleven failures,
+respectively, as the executed predecessor. Portable transcript admission
+does not execute this inline Swift projection. Manual38027004065 on4e9f92fdc
+compiles it on Intel and ARM; each original14-case cohort reports12PASS/2FAIL
+with two fixed certificate observations. Separate PAC-source10 and SDK41
+controls pass on each architecture. The complete run fails:3 successful,
+7 failed and7 skipped jobs, including skipped packaging, installation and
+Release. Actual Darwin50 corpus receiving remains unexecuted. No primary
+PAC/WPAD or trust failure is claimed repaired, and item62 stays open.
+
+2026-10-10 selected-release corpus enrollment continuation. The normal awaited
+JS check retains all61 original controls and runs the independently frozen50
+shell cases through the existing Linux command phase or Darwin guardian.
+Inputs remain under one private root until actual child/owner closure, capture
+retirement and strict source/receipt admission; failures retain them. All50
+cases pass with genuine Linux process ownership, without native macOS network
+credit. Linux TERM/INT cancellation receiving passes: observed helpers are retired,
+inputs remain and no passing corpus receipt is emitted. Selected formatting
+passes; JS402/406 retains the same four failures as the executed baseline.
+Genuine Darwin capability, corpus and cancellation qualification are pending.
+Windows explicitly reports this POSIX macOS-shell corpus as unexecuted, retaining
+its original61 controls and gaining no50-case credit. Darwin ownership covers
+inherited process groups; escaped sessions, immediate parent-death cancellation
+and source ABA are not proved. Those limits and the remaining product network
+and installed acceptance requirements keep item62 and transversal16/38 open.
+
+2026-10-10 native-wire diagnostic framing continuation. The fixture now writes
+its fixed restoration-failure diagnostic to stderr, preserving the single
+structured stdout result. All52 portable receiving tests pass; the new actual
+producer test fails on the original method in both subcases. Every391 original
+assertion line remains intact. This repairs the secondary malformed JSON seen
+in manual38016257870; it does not settle native trust-restoration debt or fix
+the primary trust setup/routing failure. In that exact d8dbcea2 run, both Python
+trust-positive tests timed out in the original fifteen-second trust command;
+the Swift WPAD positives acknowledged trust setup but returned74 without HTTP
+headers/body/origin. Their causes are not equated. Genuine native trust, PAC,
+WPAD and redirect qualification remains required; item62 is incomplete.
+
+2026-10-10 selected-release network continuation. The actual Lua caller now
+binds its selected archive to a typed native download request. Without an
+explicit HTTPS/all-proxy route, the staging shell uses the admitted bundled
+managed receiver; explicit routes preserve the original curl/bypass behavior.
+Exclusive stage creation refuses collisions, and the original digest,
+extraction, version, signature and READY checks remain intact. The registered
+caller module passes22 tests. The independent frozen shell corpus passes50
+portable controls; the exact predecessor passes6 and fails44 with the same
+expectations. These recording ports do not qualify actual packaged PAC/WPAD,
+redirects or rollback. Normal-suite enrollment of that shell corpus remains
+CODE: the proposed timeout wrapper could strand descendants and delete their
+inputs, so that addendum is retained unapplied. Executed-image/ABA admission,
+private destination identity, complete cancellation/tree closure and translated
+native failure-class projection also remain CODE under items16/38. Item62
+stays open.
+
+2026-10-10 MLX managed admission continuation. The actual generated downloader
+already installs the bundled per-request managed HTTP transport. Its launcher
+now admits that receiver instead of refusing PAC/WPAD through the opaque-client
+gate first. The pinned interpreter, system trust, explicit-route precedence,
+download ownership and disabled Xet/hf_transfer paths remain unchanged. Four
+focused caller controls pass, including native-receiver refusal without an
+opaque fallback; the same two new controls fail on the original301fae8c7
+producer while both original controls still pass. The actual emitted Python
+passes all five independent trust-activation vectors. These are portable
+receipts, not actual macOS PAC, trust or packaged model-download acceptance.
+The original opaque policy/Ollama vectors and both owners' callback-classifier
+controls remain intact. The updated receiving suite passes61 controls,
+including MLX's own managed-refusal bytes, fresh/stale/terminal/start-refused
+owners, exact admission-before-dependency order, unchanged inherited selectors
+and no detached PID on refusal. The HS-007 publication-yield case receives the
+genuine managed prelude while retaining every original lifecycle assertion.
+The external/stock Ollama daemon, rollback fetch and final native/package/
+installation/enterprise qualifications remain open; item62 stays incomplete.
 
 2026-10-09 final upstream refresh. Explicit refspec receiving now includes actualDev20f66968 (including the approved thirteen-scope publication policy and renewed window), without changing that policy or the other groups' code. Raw full-default124, Mac source/typed78, item36 constructed65, PAC portable82, approved-policy controls and normal formatting pass on this composed source. Native corrected Windows44 and final cross-platform acceptance remain pending; inherited whole-gate failures remain reported above.
 
@@ -7848,9 +8072,9 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 23, macOS 18 and Linux 19 rows are still built by the
+  Windows 22, macOS 7 and Linux 5 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
-  was regenerated on 2026-10-09. The sites are of four kinds, and three need the
+  was regenerated by its owning generator on 2026-10-10. The sites are of four kinds, and three need the
   manifest to say more than it can today:
   (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
   `append` and `add`: the WPM widget rows of Metrics, the AI menus):
