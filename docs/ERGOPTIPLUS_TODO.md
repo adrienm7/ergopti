@@ -6629,8 +6629,12 @@ pass 67 tests, including all 21 original languages and exact fixture cleanup;
 they do not establish native WebKit. The real generator retains identical AHK
 and Swift outputs. Canonical focused tests pass 31 presentation and 36 menu
 subjects; the initial wrong-working-directory failure is retained separately.
-The canonical GUI title audit passes. Full selected gates and native
-qualification are pending.
+The canonical GUI title audit passes. Final selected gates pass 408 JS,
+18,224 portable macOS and 13,017 Linux unit tests with unchanged inputs, index
+and HEAD. A further additive saved-locale subject receives the unchanged
+German captions through genuine persistence and initialization; all 32
+presentation subjects pass. This is not installed Hammerspoon/WebKit, packaging
+or physical-device acceptance.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -8946,8 +8950,10 @@ capture remains retained independently; repository formatting must preserve its
 parsed values exactly, with an exact parsed-equality formatting receipt.
 Canonical focused tests pass 31 presentation and 36 menu subjects plus the GUI
 title audit; the first menu attempt used the wrong working directory and failed.
-Full selected, native boot/WebKit, packaging and installed-device acceptance
-remain pending.
+Final selected gates pass 408 JS, 18,224 portable macOS and 13,017 Linux unit
+tests. One additive saved-locale initialization control retains all original
+31 subjects and passes the complete focused 32-subject replay. Native
+boot/WebKit, packaging and installed-device acceptance remain pending.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
