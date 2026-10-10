@@ -17,6 +17,7 @@ local helpers = require("tests.helpers")
 
 local json     = require("json")
 local Logger   = require("infra.logger")
+helpers.admit_logger_privacy(Logger)
 local Snapshot = require("diagnostics.snapshot")
 
 local Paths    = require("infra.paths")
@@ -100,6 +101,7 @@ helpers.describe("Diagnostic snapshot: macOS collector", function()
 		-- The logs folder comes from the logger's resolver, redacted like the
 		-- configuration folder.
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local real_logs_dir = Logger.logs_dir
 		Logger.logs_dir = function() return "/Users/alice/Library/Logs/ergopti_plus/" end
 		local ok_capture, lines = pcall(capture, function()

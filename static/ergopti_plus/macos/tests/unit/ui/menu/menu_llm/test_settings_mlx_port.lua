@@ -128,6 +128,7 @@ helpers.describe("settings_manager — MLX port configuration", function()
 
 	helpers.it("keeps the old port after a throwing stop gate and returns false (HS-008)", function()
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.ring_buffer_clear()
 		ApiMlx.set_port(ApiMlx.get_default_port())
 		prompt_value[1] = "54321"

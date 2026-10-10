@@ -14,6 +14,7 @@
 -- Inject the _shared/lua root into package.path so that infra/ shims for
 -- lib.toml.codec, lib.toml.reader, and lib.toml.writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
+local logger_shared_root
 do
 	local _src = debug.getinfo(1, "S").source:gsub("^@", "")
 	-- Resolve absolute path when source is relative (Hammerspoon always provides abs)
@@ -22,7 +23,8 @@ do
 	local _hs_root = _abs:match("^(.*)[/\\][^/\\]+$") or _abs
 	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
 	local _ergopti_plus = _hs_root:match("^(.*)[/\\][^/\\]+$") or _hs_root
-	local _shared       = _ergopti_plus .. "/_shared/lua"
+	logger_shared_root = _ergopti_plus .. "/_shared"
+	local _shared       = logger_shared_root .. "/lua"
 	if not package.path:find(_shared, 1, true) then
 		package.path = _shared .. "/?.lua;" .. _shared .. "/?/init.lua;" .. package.path
 	end
@@ -77,6 +79,24 @@ do
 end
 
 local Logger             = require("infra.logger")
+-- Admit canonical privacy before any dependency can publish an error or path.
+do
+	local admitted = pcall(function()
+		local file = assert(io.open(logger_shared_root .. "/modules/diagnostics/redaction.json", "rb"))
+		local read_ok, raw = pcall(file.read, file, "*a")
+		local close_ok, closed = pcall(file.close, file)
+		assert(read_ok and type(raw) == "string" and close_ok and closed == true)
+		Logger.initialize_privacy(raw)
+	end)
+	if not admitted then
+		pcall(function()
+			require("adapters.boot_fatal").report("logger_privacy", "Canonical log privacy admission refused.", nil)
+		end)
+		pcall(print, "[logger] Privacy initialization refused; bootstrap not continued.")
+		os.exit(1)
+		return
+	end
+end
 local Storage            = require("adapters.storage")
 local TimerScheduler     = require("adapters.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then

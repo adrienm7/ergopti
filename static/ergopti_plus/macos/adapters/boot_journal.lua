@@ -89,6 +89,7 @@ end
 --- @param message string Stage message without timestamp.
 --- @return boolean written True when the fallback boot log accepted the line.
 function M.append(variant, message)
+	message = Logger.redact_message(tostring(message))
 	local open = _deps.open or io.open
 	local getenv = _deps.getenv or os.getenv
 	local clock = _deps.clock or function() return os.date("%Y-%m-%d %H:%M:%S") end

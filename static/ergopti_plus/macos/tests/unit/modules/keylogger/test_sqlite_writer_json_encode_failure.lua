@@ -54,6 +54,7 @@ helpers.describe("sqlite_writer — json.encode failure is surfaced, not swallow
 
 		-- Spy the warn channel on the logger the writer already holds.
 		local logger    = require("infra.logger")
+		helpers.admit_logger_privacy(logger)
 		local orig_warn = logger.warn
 		local warns     = {}
 		logger.warn = function(_tag, fmt, ...)

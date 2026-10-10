@@ -39,6 +39,7 @@ helpers.describe("http_client: a throwing completion callback is logged, not swa
 		local errors = {}
 		package.loaded["infra.logger"] = nil
 		local real_logger = require("infra.logger")
+		helpers.admit_logger_privacy(real_logger)
 		local spy = setmetatable({}, { __index = real_logger })
 		spy.error = function(_mod, fmt, ...)
 			local ok, formatted = pcall(string.format, fmt, ...)

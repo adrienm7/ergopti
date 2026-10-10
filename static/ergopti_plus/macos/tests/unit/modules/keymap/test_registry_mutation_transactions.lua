@@ -71,6 +71,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 	helpers.it("withholds private callback failures while preserving rollback visibility", function()
 		local _, registry = fresh_registry()
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		local previous_level = Logger.current_level
 		Logger.set_level("DEBUG")

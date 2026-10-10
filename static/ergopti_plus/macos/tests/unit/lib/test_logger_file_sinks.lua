@@ -554,3 +554,106 @@ helpers.describe("logger file sinks — the print() tee", function()
 			.. "the log — got %d copies", occurrences))
 	end)
 end)
+
+
+helpers.describe("logger file sinks — canonical privacy", function()
+	helpers.it("mac-logger-privacy: daily errors and topical records redact multiline bodies before fanout", function()
+		local writes = capture("/tmp/ergopti_privacy_sinks/", function()
+			Logger.claim_core_hooks()
+			Logger.error(ROUTED_TAG, "PrivateUser failed\n/Users/PrivateUser/cache; PrivateUser2; password=secret12345")
+		end)
+		for _, path in ipairs({ Logger.today_log_path(), Logger.today_errors_path(), routed_sub_file() }) do
+			local text = text_of(writes, path)
+			helpers.assert_contains(text, "[ERROR] [karabiner] <user> failed\n~/cache; PrivateUser2; password=<secret>")
+			helpers.assert_true(not has(text, "/Users/PrivateUser"))
+		end
+	end)
+
+	helpers.it("mac-logger-privacy: foreign print is redacted before persisted console framing", function()
+		local saved_print = _G.print
+		local ok, err = xpcall(function()
+			local writes = capture("/tmp/ergopti_privacy_print/", function()
+				_G.print = function() end
+				Logger.install_runtime_error_capture()
+				print("PrivateUser /Users/PrivateUser/cache; password=secret12345")
+			end)
+			helpers.assert_contains(text_of(writes, Logger.today_log_path()),
+				"[CONSOLE] [console] <user> ~/cache; password=<secret>")
+		end, debug.traceback)
+		_G.print = saved_print
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("mac-logger-privacy: admission is explicit immutable and rejects duplicate initialization", function()
+		local policy = require("tests.support.source_file").read(helpers.shared("modules/diagnostics/redaction.json"))
+		helpers.with_stub_scope({ "infra.logger", "logger", "adapters.log_transport" }, function()
+			local Fresh = require("infra.logger")
+			local ok, err = pcall(Fresh.redact_message, "PrivateUser")
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(err, "privacy not initialized")
+			local context = { home = "/Users/ERROR", user = "ERROR" }
+			Fresh.initialize_privacy(policy, context)
+			context.home, context.user = "/changed", "changed"
+			helpers.assert_eq(Fresh.redact_message("ERROR /users/error/file; password=secret12345"), "<user> ~/file; password=<secret>")
+			local duplicate, refusal = pcall(Fresh.initialize_privacy, policy, context)
+			helpers.assert_eq(duplicate, false)
+			helpers.assert_contains(refusal, "privacy already initialized")
+		end)
+		Logger.claim_core_hooks()
+	end)
+
+	helpers.it("mac-logger-privacy: malformed policy and identity refuse before privacy is committed", function()
+		local policy = require("tests.support.source_file").read(helpers.shared("modules/diagnostics/redaction.json"))
+		for _, case in ipairs({ { "{" }, { "{}" }, { policy, {} }, { policy, { home = "", user = "PrivateUser" } } }) do
+			helpers.with_stub_scope({ "infra.logger", "logger", "adapters.log_transport" }, function()
+				local Fresh = require("infra.logger")
+				local accepted, refusal = pcall(Fresh.initialize_privacy, case[1], case[2])
+				helpers.assert_eq(accepted, false)
+				helpers.assert_contains(refusal, "privacy")
+				helpers.assert_eq(pcall(Fresh.redact_message, "PrivateUser"), false)
+			end)
+		end
+		Logger.claim_core_hooks()
+	end)
+end)
+
+
+helpers.describe("logger canonical metadata privacy", function()
+	helpers.it("mac-logger-privacy: exact core metadata survives captured account collisions", function()
+		local policy = require("tests.support.source_file").read(helpers.shared("modules/diagnostics/redaction.json"))
+		local original = Logger
+		local ok, err = xpcall(function()
+			for _, user in ipairs({ "2026", "ERROR", "logger" }) do
+				helpers.with_stub_scope({ "infra.logger", "logger", "adapters.log_transport" }, function()
+					Logger = require("infra.logger")
+					Logger.initialize_privacy(policy, { home = "/Users/" .. user, user = user })
+					Logger.timestamp_fn = function() return "2026-10-10 12:00:00:000" end
+					local writes = capture("/tmp/ergopti_privacy_metadata/", function()
+						Logger.error("logger", "User %s failed\n/Users/%s/cache; password=secret12345", user, user)
+					end)
+					local expected = "2026-10-10 12:00:00:000 [ERROR] [logger] User <user> failed\n~/cache; password=<secret>\n"
+					local daily = writes[Logger.today_log_path()]
+					helpers.assert_eq(daily[#daily], expected)
+					helpers.assert_eq(text_of(writes, Logger.today_errors_path()), expected)
+				end)
+			end
+		end, debug.traceback)
+		Logger = original
+		Logger.claim_core_hooks()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("mac-logger-privacy: malformed private timestamp receives full redaction", function()
+		local saved_stamp = Logger.timestamp_fn
+		local ok, err = xpcall(function()
+			Logger.timestamp_fn = function() return "PrivateUser /Users/PrivateUser" end
+			local writes = capture("/tmp/ergopti_privacy_unformatted/", function()
+				Logger.error("logger", "password=secret12345")
+			end)
+			local daily = writes[Logger.today_log_path()]
+			helpers.assert_eq(daily[#daily], "<user> ~ [ERROR] [logger] password=<secret>\n")
+		end, debug.traceback)
+		Logger.timestamp_fn = saved_stamp
+		if not ok then error(err, 0) end
+	end)
+end)
