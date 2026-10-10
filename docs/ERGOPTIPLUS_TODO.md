@@ -37,6 +37,58 @@ The isolated integration branch has received `dev` through `591d59a942`.
 The merge retains both histories and the complete test union: 179 Homebrew
 controls and 55 native HTTP controls. `main` remains the published v1.0.0.
 
+[CI 38025215348](https://github.com/adrienm7/ergopti/actions/runs/38025215348)
+on `de812ab633` has completed Core JavaScript, Linux units, macOS units,
+macOS stubbed E2E and native cold MLX successfully. Windows units completed
+10,761 of 10,764 cases successfully. The three remaining failures share a
+missing production dependency-checker function in the canonical test include
+graph; isolated receiving had explicitly loaded that module. The enrollment
+correction is now applied locally. Actual canonical filtered receiving exposed
+a second fixture defect: its priority assertion read an uninitialized baseline.
+The fixture now restores its exact prior state after success or failure; all
+five selected canonical cases pass. Subsequent full local receiving completed
+10,793 of 10,800 Windows cases successfully, plus all 70 E2E cases and actual
+entry-point compilation. Source bytes remained unchanged throughout. The seven
+native network failures retain the original assertions: CurrentUser root
+insertion remained at `before_add`, with a visible dialog belonging to the
+owned fixture. Trust admission and graceful service cleanup were not proved;
+no dialog was accepted or root-store policy changed. All observed suite and
+fixture processes had exited afterward. Windows desktop cohorts, hosted
+packaging and installation still require receiving on the integrated source.
+Linux E2E completed with four simultaneous-key failures: the
+forward pair passes raw edges through, while the reverse pair leaves Tab
+edges around the expected copy chord. Native retirement passed. The dispatch
+module omitted its captured directory when comparing the relative manager
+source used by CI. The minimal correction now passes all five registered
+relative-loader controls locally, including three authority refusals. This
+inert receiving does not replace the unchanged native simultaneous-key check.
+The complete CI is red; Linux
+packaging passed, while its installation matrix was skipped by the verdict.
+
+Both macOS managed-Ollama jobs still fail the native PAC/WPAD and independent
+client controls. The trusted clients time out in `security add-trusted-cert`
+under the unchanged 15-second command deadline. The subsequent removal refusal
+retains its cleanup debt; the underlying native cause remains unknown. All 41
+listener/runtime XCTest controls passed on each architecture, but do not
+qualify either complete job. The Homebrew native control also remains red at
+its owned Automation-prompt deadline. No new release exception is adopted.
+
+The Windows managed-install components now pass 31 actual native file cases,
+22 source-bound controls and byte-exact generation of all 16 archive fixtures.
+Resolving omitted fixture paths in the script body fixes a real PowerShell 5
+entry-point failure that explicit-path probes missed. Runtime handoff receiving
+also passes 15 actual AHK controls and nine PowerShell 5 recording controls.
+The nine PowerShell cases are now registered in the Windows collector; Root
+received its complete selected file-port path with all 22 existing controls
+and all 16 byte-exact archive fixtures retained.
+These component receipts do not qualify a real download, server, model pull or
+menu activation; their integrated UI and native acceptance remain open.
+The private UI assembly is not adopted: review found that its admission
+rejected the actual default `localhost` URL, and its omitted failure callback
+was passed as a noncallable value. Corrections, migration of the old installer
+controls, reuse of an existing version and managed model acquisition remain
+required before feature completion.
+
 [CI 38018626491](https://github.com/adrienm7/ergopti/actions/runs/38018626491)
 completed on `cb5ad8f3d2`: Linux unit tests passed 12,743 cases; Windows passed
 10,758 of 10,763, including all 32 Group 2 terminator cases. Four Windows
@@ -63,6 +115,16 @@ suite, retains the original semantic error, and adds eight diagnostic-removal
 mutations. Full native CI qualification remains required; these receipts do
 not constitute a green complete gate and renew no release exception.
 
+The latest component source gate again passed formatting and encoding. It
+completed all 407 JavaScript checks: 394 passed, twelve earlier failures stayed
+red, the window-title mutation check improved, and one newly introduced pinned
+source read failed. That read now uses the existing production-source helper;
+the unchanged ratchet, encoding gate and all five canonical installer cases
+pass after this one-line correction. This targeted receipt does not claim a
+new complete JavaScript pass. Five atomic local commits retain the relative
+Linux loader correction, macOS fixture stderr, Windows checker enrollment,
+owned downloader output and coherent Ollama components. Native CI is next.
+
 Current Windows Notepad 11.2607.14.0 receiving passed all six actual HSE/LLM
 caller scenarios through the production DLL. All 280 source dependencies and
 the DLL remained unchanged; the sender exited naturally, stderr was empty,
@@ -70,6 +132,11 @@ and both owned Notepad processes were retired. The receipt retains 55 AHK
 variable-shadowing warnings. This controlled synthetic-document prerequisite
 does not qualify physical default triggers, navigation, concurrent typing, or
 the full focus/document/retirement matrix; Group 7 remains open.
+The persistent private bootstrap has source and inert supervision controls,
+including exact mutex and retirement ownership. Its default smoke profile
+still disables predictions; the real navigation matrix is being connected
+through the existing deterministic transport seam. Neither this bootstrap nor
+synthetic OS key injection is a hardware-keyboard qualification.
 
 ### Stable preparation history
 
