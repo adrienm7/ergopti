@@ -1498,11 +1498,20 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- it. This driver simply passed nil for it.
 			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
 			if #families > 0 then
-				sub[#sub + 1] = { separator = true }
+				-- The existing shared boundary is the only admitted inert entry.
+				if type(boundaries) ~= "table" or getmetatable(boundaries) ~= nil or #boundaries ~= 1
+					or type(boundaries[1]) ~= "table" or getmetatable(boundaries[1]) ~= nil
+					or boundaries[1].separator ~= true then
+					Logger.error(LOG, "Declared dynamic hotstring section boundary unavailable.")
+					return rows
+				end
+				for index in next, boundaries do if index ~= 1 then return rows end end
+				for key in next, boundaries[1] do if key ~= "separator" then return rows end end
+				sub[#sub + 1] = boundaries[1]
 
 				for _, family in ipairs(families) do
 					if family.separator then
-						sub[#sub + 1] = { separator = true }
+						sub[#sub + 1] = boundaries[1]
 					else
 						local section, enabled, family_id = family.section, family.enabled, family.id
 						-- The count, on the families that have one. A prefix family with
