@@ -3,8 +3,14 @@
 
 import CFNetwork
 import Foundation
+import Security
 import XCTest
 @testable import ErgoptiPlus
+
+/// A genuine NSError reference cycle; no native networking or trust call runs.
+private final class ManagedHTTPCyclicDiagnosticError: NSError, @unchecked Sendable {
+	override var userInfo: [String: Any] { [NSUnderlyingErrorKey: self] }
+}
 
 final class ManagedHTTPWorkerTests: XCTestCase {
 	private var request: [String: Any] {
@@ -48,7 +54,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			bytes: Data(repeating: 0, count: 65_535))).count, 65_540)
 	}
 
-	func testNativeErrorsNeverReturnPrivateDiagnosticPayload() {
+	func testNativeErrorsNeverReturnPrivateDiagnosticPayload() throws {
 		let privateData = [NSURLErrorFailingURLErrorKey: URL(string: "https://reserved.example/private?token=reserved")!,
 			NSLocalizedDescriptionKey: "reserved-secret-certificate-detail"] as [String: Any]
 		XCTAssertEqual(managedHTTPFailure(NSError(domain: NSURLErrorDomain,
@@ -56,6 +62,68 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		XCTAssertEqual(managedHTTPFailure(NSError(domain: NSURLErrorDomain,
 			code: NSURLErrorTimedOut, userInfo: privateData)), "deadline")
 		XCTAssertEqual(managedHTTPFailure(NSError(domain: "foreign", code: 1, userInfo: privateData)), "unavailable")
+
+		// The generic -1202 cannot distinguish an already reported nested TLS cause.
+		for (status, expected) in [(errSSLHostNameMismatch, "hostname_mismatch"),
+			(errSSLCertExpired, "certificate_expired"), (errSSLCertNotYetValid, "certificate_not_yet_valid"),
+			(errSSLUnknownRootCert, "unknown_root"), (errSSLXCertChainInvalid, "certificate_chain_invalid")] {
+			let inner = NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: privateData)
+			var fields = privateData
+			fields[NSUnderlyingErrorKey] = inner
+			let outer = NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted, userInfo: fields)
+			XCTAssertEqual(managedHTTPFailure(outer), "certificate", "Diagnosis never changes the fail-closed reason")
+			let observation = managedHTTPTLSDiagnostic(outer, additionalAnchorCount: 0)
+			XCTAssertEqual(Set(observation.keys), Set(["version", "trust_mode", "additional_anchor_count", "causes", "chain_termination"]))
+			XCTAssertEqual(observation["trust_mode"] as? String, "native_default")
+			XCTAssertEqual(observation["additional_anchor_count"] as? Int, 0)
+			XCTAssertEqual(observation["chain_termination"] as? String, "complete")
+			let causes = try XCTUnwrap(observation["causes"] as? [[String: Any]])
+			XCTAssertEqual(causes.count, 2)
+			XCTAssertEqual(causes.first?["kind"] as? String, "certificate_untrusted")
+			XCTAssertEqual(causes.last?["domain"] as? String, "security")
+			XCTAssertEqual(causes.last?["code"] as? Int, Int(status))
+			XCTAssertEqual(causes.last?["kind"] as? String, expected)
+			for cause in causes { XCTAssertEqual(Set(cause.keys), Set(["domain", "code", "kind"])) }
+			let bytes = try JSONSerialization.data(withJSONObject: observation, options: [.sortedKeys])
+			let rendered = String(decoding: bytes, as: UTF8.self)
+			XCTAssertLessThan(bytes.count, 4096)
+			XCTAssertFalse(rendered.contains("reserved"))
+			XCTAssertFalse(rendered.contains("https://"))
+			XCTAssertFalse(rendered.contains(NSLocalizedDescriptionKey))
+		}
+		let foreign = managedHTTPTLSDiagnostic(NSError(domain: "reserved-private-domain", code: 123456,
+			userInfo: privateData), additionalAnchorCount: 2)
+		XCTAssertEqual(foreign["trust_mode"] as? String, "added_anchors")
+		XCTAssertEqual(foreign["additional_anchor_count"] as? Int, 2)
+		let unknown = try XCTUnwrap((foreign["causes"] as? [[String: Any]])?.first)
+		XCTAssertEqual(unknown["domain"] as? String, "other")
+		XCTAssertTrue(unknown["code"] is NSNull)
+		XCTAssertEqual(unknown["kind"] as? String, "unknown")
+		let invalidCode = managedHTTPTLSDiagnostic(NSError(domain: NSOSStatusErrorDomain, code: Int.max, userInfo: nil), additionalAnchorCount: 0)
+		let invalidCause = try XCTUnwrap((invalidCode["causes"] as? [[String: Any]])?.first)
+		XCTAssertTrue(invalidCause["code"] is NSNull)
+		XCTAssertEqual(invalidCause["kind"] as? String, "unknown")
+		let malformed = managedHTTPTLSDiagnostic(NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted,
+			userInfo: [NSUnderlyingErrorKey: "reserved-private-underlying"]), additionalAnchorCount: 0)
+		XCTAssertEqual(malformed["chain_termination"] as? String, "unavailable")
+		let cycle = managedHTTPTLSDiagnostic(ManagedHTTPCyclicDiagnosticError(domain: NSURLErrorDomain,
+			code: NSURLErrorServerCertificateUntrusted, userInfo: nil), additionalAnchorCount: 0)
+		XCTAssertEqual(cycle["chain_termination"] as? String, "cycle")
+		XCTAssertEqual((cycle["causes"] as? [[String: Any]])?.count, 1)
+		var deep = NSError(domain: NSOSStatusErrorDomain, code: Int(errSSLHostNameMismatch), userInfo: nil)
+		for _ in 0..<12 {
+			deep = NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted,
+				userInfo: [NSUnderlyingErrorKey: deep])
+		}
+		let bounded = managedHTTPTLSDiagnostic(deep, additionalAnchorCount: 0)
+		XCTAssertEqual(bounded["chain_termination"] as? String, "depth")
+		XCTAssertEqual((bounded["causes"] as? [[String: Any]])?.count, 8)
+		for observation in [foreign, invalidCode, malformed, cycle, bounded] {
+			XCTAssertEqual(Set(observation.keys), Set(["version", "trust_mode", "additional_anchor_count", "causes", "chain_termination"]))
+			let bytes = try JSONSerialization.data(withJSONObject: observation)
+			XCTAssertLessThan(bytes.count, 4096)
+			XCTAssertFalse(String(decoding: bytes, as: UTF8.self).contains("reserved"))
+		}
 	}
 
 	func testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries() throws {
