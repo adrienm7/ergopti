@@ -114,6 +114,17 @@ _TPGF_EveryFeatureRowIsStagedAsAFeature() {
 	Checked := 0
 	for Id, Builder in Builders {
 		Body := _StripFullLineComments(_DriverFuncBody(Builder.Name))
+		Assert(Body != "", "the actual tray root builder " . Builder.Name . " must be readable")
+		; Only a genuine direct call reaches this shared feature staging owner.
+		if RegExMatch(Body, "m)^[ \t]*_MI_StageDeclaredFeature\(") {
+			DeclaredFeatureBody := _StripFullLineComments(_DriverFuncBody("_MI_StageDeclaredFeature"))
+			Assert(DeclaredFeatureBody != "", "the reached shared feature staging owner must be readable")
+			Assert(InStr(DeclaredFeatureBody, "TrayMenuStage_AddFeature(") > 0,
+				"the reached declared parent must stage its actual child as a feature")
+			AssertEqual(0, InStr(DeclaredFeatureBody, "TrayMenuStage_Add("),
+				"the reached declared feature owner must not stage a plain row")
+			Body .= DeclaredFeatureBody
+		}
 		; The IA row is staged by LLM_Menu_Init, which owns its persistent submenu.
 		if (Id == "llm")
 			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))

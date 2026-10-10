@@ -438,8 +438,11 @@ local function build_fixture(backend, save_results, options)
 		native_child_rows = native_renderer.native_child_rows,
 		template_rows = presentation_renderer.template_rows,
 		get_array = presentation_renderer.get_array,
+		get_root = presentation_renderer.get_root,
 		render_rows = function(rows, slot)
-			if slot == "llm_profile" then return presentation_renderer.render_rows(rows, slot) end
+			if slot == "llm_profile" or slot == "llm_download_shortcut_frame" then
+				return presentation_renderer.render_rows(rows, slot)
+			end
 			if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
 			return rows
 		end,

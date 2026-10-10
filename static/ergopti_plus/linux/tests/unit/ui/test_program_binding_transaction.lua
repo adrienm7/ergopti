@@ -34,13 +34,21 @@ local function menu_rows(gestures, path)
 	-- This fixture owns that instance as well as the real binding providers.
 	package.loaded["infra.manifest_menu"] = nil
 	local manifest = require("infra.manifest_menu")
-	local original = manifest.get_array
-	local adapter = {}; for key, value in pairs(manifest) do adapter[key] = value end
-	adapter.get_array = function(key)
-		if key == "top_level" then return { { id = "gestures" }, { id = "shortcuts" }, { id = "quit" } } end
-		return original(key)
+	local root, selected, boundary = manifest.get_root(), {}, nil
+	for _, row in ipairs(manifest.get_array("top_level")) do
+		local applicable = row.platforms == nil
+		for _, platform in ipairs(row.platforms or {}) do
+			if platform == "linux" then applicable = true end
+		end
+		if row.id == "---" and applicable then boundary = row end
+		if row.id == "gestures" or row.id == "shortcuts" then selected[#selected + 1] = row end
+		if row.id == "quit" and applicable then
+			assert(boundary, "the actual declared boundary must precede native Quit")
+			selected[#selected + 1], selected[#selected + 2] = boundary, row
+		end
 	end
-	package.loaded["infra.manifest_menu"] = adapter
+	-- Select genuine source records through the renderer's actual root and reader.
+	root.top_level = selected
 	package.loaded["ui.menu.menu_builder"] = nil
 	return require("ui.menu.menu_builder").build({ gestures = gestures, shortcuts = shortcuts,
 		is_paused = function() return false end, on_quit = function() end })

@@ -580,6 +580,14 @@ local function with_source_command(alternative, callback)
 			section = function(key) return labels[key] or key end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
+		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
+		local header_file = assert(io.open(driver .. "/../_shared/data/locales/en.json", "rb"))
+		local header_raw = header_file:read("*a")
+		assert(header_file:close())
+		local header_labels = assert(require("json").decode(assert(header_raw)))
+		local header_brand = assert(header_labels["menu.builder.active_brand"])
+		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
+		labels["menu.builder.active_brand"] = header_brand
 		package.loaded["infra.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
 		package.loaded["infra.version"] = { identity = function()
 			return {kind = "local", version = "", commit = "known"}

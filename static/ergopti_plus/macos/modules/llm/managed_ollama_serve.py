@@ -295,8 +295,30 @@ class ServeOwner:
         return status if self.retire(retirement_timeout) else 78
 
 
-def serve(port, timeout, idle_timeout, retirement_timeout):
+def serve(port, timeout, idle_timeout, retirement_timeout, *, caller_nonce=None):
+    # The caller binding is public randomness, never the daemon session token.
+    # Only this native owner may project its authenticated lifecycle to stdout.
+    if caller_nonce is not None and (
+        type(caller_nonce) is not str
+        or len(caller_nonce) != 32
+        or any(value not in "0123456789abcdef" for value in caller_nonce)
+    ):
+        raise ServeRefusal("protocol")
+
+    def publish(role, status=None):
+        if caller_nonce is None:
+            return
+        if role == "ACTIVE" and status is None:
+            line = "ERGOPTI_MANAGED_DAEMON_V1 " + caller_nonce + " ACTIVE"
+        elif role == "RETIRED" and type(status) is int and 0 <= status <= 255:
+            line = "ERGOPTI_MANAGED_DAEMON_V1 " + caller_nonce + " RETIRED " + str(status)
+        else:
+            raise ServeRefusal("protocol")
+        print(line, flush=True)
+
     if not NATIVE_PRODUCTION_QUALIFIED:
+        # This fixed refusal occurs before any source/session/daemon acquisition.
+        publish("RETIRED", 78)
         raise ServeRefusal("unavailable")
     owner = ServeOwner(port, timeout, idle_timeout, retirement_timeout, register=lambda value: None)
 
@@ -310,15 +332,30 @@ def serve(port, timeout, idle_timeout, retirement_timeout):
     try:
         try:
             owner.prepare().start()
+            # start() returns only after the mapped-image ACTIVE handshake and
+            # same-session authority publication. This is not socket/API readiness.
+            if caller_nonce is not None:
+                owner.progress()
+                publish("ACTIVE")
+                owner.progress()
             result = owner.wait(retirement_timeout)
         except BaseException as primary:
             if not owner.retire(retirement_timeout):
                 raise ServeRefusal(
                     "operation", primary=primary, cleanup=owner._cleanup_debt
                 ) from primary
+            try:
+                publish("RETIRED", 78)
+            except BaseException as publication_error:
+                raise ServeRefusal(
+                    "publication", primary=primary, cleanup=publication_error
+                ) from primary
             raise
         if not owner.retire(retirement_timeout):
             raise ServeRefusal("cleanup", cleanup=owner._cleanup_debt)
+        # wait() and the original retire() join must both precede this marker.
+        # Exit status without this marker grants no native namespace closure.
+        publish("RETIRED", result)
         return result
     finally:
         for name, handler in previous.items():
@@ -331,6 +368,7 @@ def main():
     parser.add_argument("--timeout", type=float, required=True)
     parser.add_argument("--idle-timeout", type=float, required=True)
     parser.add_argument("--retirement-timeout", type=float, required=True)
+    parser.add_argument("--caller-nonce")
     arguments = parser.parse_args()
     if not 1024 <= arguments.port <= 65535 or any(
         not math.isfinite(value) or value <= 0
@@ -339,7 +377,11 @@ def main():
         return 64
     try:
         return serve(
-            arguments.port, arguments.timeout, arguments.idle_timeout, arguments.retirement_timeout
+            arguments.port,
+            arguments.timeout,
+            arguments.idle_timeout,
+            arguments.retirement_timeout,
+            caller_nonce=arguments.caller_nonce,
         )
     except Exception:
         print("Managed Ollama daemon admission refused.", file=sys.stderr)

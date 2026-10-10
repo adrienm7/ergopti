@@ -725,13 +725,15 @@ local function menu_controls(Settings, paused, reordered)
 		i18n = i18n,
 		logger = require("logger.shim"),
 	}))
-	package.loaded["infra.manifest_menu"] = setmetatable({
-		build = function(section, ...)
-			local rows = renderer.build(section, ...)
-			if section == "word_expanders_menu" then observations.controls = rows end
-			return rows
-		end,
-	}, { __index = renderer })
+	-- Forward the actual renderer's own methods through a plain observer facade.
+	-- Native source admission deliberately does not acquire inherited methods.
+	local facade = {}; for key, value in pairs(renderer) do facade[key] = value end
+	facade.build = function(section, ...)
+		local rows = renderer.build(section, ...)
+		if section == "word_expanders_menu" then observations.controls = rows end
+		return rows
+	end
+	package.loaded["infra.manifest_menu"] = facade
 	local ctx = {
 		paused = paused,
 		config = {

@@ -922,3 +922,163 @@ global ADAPTER_FILE_SYSTEM := Map(
     "exists", FSExists,
     "delete", FSDelete,
 )
+
+
+/** Configuration-only byte receipt; native opening errors never grant write authority. */
+FSConfigReadUtf8Exact(Path, &NativeOpenError := 0) {
+	static OriginalRead := FSReadUtf8Exact, HandleRead := _FSReadUtf8ExactHandle
+	static Enter := FileReadActivityEnter, Bind := FileReadActivityBind, Leave := FileReadActivityLeave
+	NativeOpenError := 0
+	if OriginalRead != FSReadUtf8Exact || HandleRead != _FSReadUtf8ExactHandle
+			|| Enter != FileReadActivityEnter || Bind != FileReadActivityBind || Leave != FileReadActivityLeave
+		return false
+	if !(Path is String) || Path == ""
+		return false
+	static GENERIC_READ := 0x80000000
+	static FILE_SHARE_READ := 0x00000001
+	static OPEN_EXISTING := 3
+	static FILE_ATTRIBUTE_NORMAL := 0x00000080
+	Handle := -1
+	OpeningReturned := false
+	Closed := false
+	Content := false
+	for Owner in [OriginalRead, HandleRead, Enter, Bind, Leave]
+		if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	ReadActivity := Enter.Call(Path)
+	try {
+		Handle := DllCall("kernel32\CreateFileW",
+			"Str", Path,
+			"UInt", GENERIC_READ,
+			"UInt", FILE_SHARE_READ,
+			"Ptr", 0,
+			"UInt", OPEN_EXISTING,
+			"UInt", FILE_ATTRIBUTE_NORMAL,
+			"Ptr", 0,
+			"Ptr")
+		OpeningReturned := true
+		if Handle == -1
+			NativeOpenError := A_LastError ; Capture the actual failed CreateFileW before cleanup.
+		if Handle != -1 {
+			if OriginalRead != FSReadUtf8Exact || HandleRead != _FSReadUtf8ExactHandle
+					|| Enter != FileReadActivityEnter || Bind != FileReadActivityBind || Leave != FileReadActivityLeave
+				return false
+			for Owner in [OriginalRead, HandleRead, Enter, Bind, Leave]
+				if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+					return false
+			Bind.Call(ReadActivity, Handle)
+			Content := HandleRead.Call(Handle, 0, false)
+		}
+	} catch {
+		Content := false
+	} finally {
+		if Handle == -1 {
+			; A returned failed opening owns no handle; a thrown acquisition stays debt.
+			Closed := OpeningReturned
+		} else {
+			try Closed := DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
+			catch {
+				Closed := false
+			}
+		}
+		if Closed
+			Leave.Call(ReadActivity)
+	}
+	return Closed ? Content : false
+}
+
+; Pure logical admission is consumed only within a configuration native span.
+_FSNativeAdmissionAccepted(AdmissionFn) {
+	if (AdmissionFn is Integer) && AdmissionFn == 0
+		return true
+	if !HasMethod(AdmissionFn, "Call")
+		return false
+	try {
+		Accepted := AdmissionFn.Call()
+		return (Accepted is Integer) && Accepted == 1
+	} catch {
+		return false
+	}
+}
+
+/** Consumes captured unchanged-source admission within the configuration span. */
+FSNativeAcknowledge(AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		Accepted := Accept == _FSNativeAdmissionAccepted && Accept.Call(AdmissionFn)
+		return Accepted && Accept == _FSNativeAdmissionAccepted
+			&& !Object.Prototype.HasOwnProp.Call(Accept, "Call")
+	}
+	finally Critical(PreviousCritical)
+}
+
+/** Configuration replacement through the retained genuine write-through producer. */
+FSConfigAtomicMoveReplace(Source, Destination, &NativeError := 0, AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	static Move := FSAtomicMoveReplace
+	NativeError := 0
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		if Move != FSAtomicMoveReplace || Accept != _FSNativeAdmissionAccepted || !Accept.Call(AdmissionFn)
+				|| Accept != _FSNativeAdmissionAccepted
+				|| Move != FSAtomicMoveReplace {
+			; No native operation ran, so no Win32 error receipt is invented.
+			return false
+		}
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Move.Call(Source, Destination, &NativeError)
+	} finally Critical(PreviousCritical)
+}
+
+/** Configuration-only no-replace publication keeps the existing producer receipt. */
+FSConfigAtomicMoveCreate(Source, Destination, AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	static Move := FSAtomicMoveCreate
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		if Move != FSAtomicMoveCreate || Accept != _FSNativeAdmissionAccepted || !Accept.Call(AdmissionFn)
+				|| Accept != _FSNativeAdmissionAccepted
+				|| Move != FSAtomicMoveCreate
+			return 0
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Move.Call(Source, Destination)
+	} finally Critical(PreviousCritical)
+}
+
+/** Configuration-owned recovery removal retains the original strict delete receipt. */
+FSConfigDeleteStrict(Path, AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	static Delete := FSDeleteStrict, Receipt := _FSDeleteNativeReceipt
+	static DeleteWith := _FSDeleteWith, Exists := FSStrictExists
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept, Delete, Receipt, DeleteWith, Exists]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		if Delete != FSDeleteStrict || Receipt != _FSDeleteNativeReceipt
+				|| DeleteWith != _FSDeleteWith || Exists != FSStrictExists
+				|| Accept != _FSNativeAdmissionAccepted || !Accept.Call(AdmissionFn)
+				|| Accept != _FSNativeAdmissionAccepted
+				|| Delete != FSDeleteStrict || Receipt != _FSDeleteNativeReceipt
+				|| DeleteWith != _FSDeleteWith || Exists != FSStrictExists
+			return 0
+		for Owner in [Accept, Delete, Receipt, DeleteWith, Exists]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Delete.Call(Path)
+	} finally Critical(PreviousCritical)
+}
