@@ -33,9 +33,28 @@ either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
 
 ### v1.0.1 integration receiving
 
-The isolated integration branch has received `dev` through `591d59a942`.
+The isolated integration branch has received `dev` through `7299783b8e`.
 The merge retains both histories and the complete test union: 179 Homebrew
 controls and 55 native HTTP controls. `main` remains the published v1.0.0.
+
+The atomic local corrections include provider-menu state publication,
+closed MLX failure facts, removal of unnecessary device identities, complete
+English diagnostic attachments, editable issue fields, stable version/OS/driver
+prefills, and the explicitly authorized v1.0.1 release controls. Canonical
+Windows diagnostics pass 94 cases; the report and bridge callbacks pass 33
+macOS and 42 Linux recording controls. These are bounded receipts, not complete
+native qualification. All new source still needs the integrated release gates.
+
+The Windows logger privacy correction passes all 872 canonical cases selected
+by `Logger`, including existing write/flush/rollback coverage. Linux passes
+55 source and recording controls. Both use the canonical redaction policy;
+multiline bodies cannot forge a second trusted metadata prefix. The macOS
+correction also enforces the remaining per-tick preparation budget before
+redaction and terminates a refused privacy bootstrap. Its 68 registered source
+and recording controls pass; fatal-report redaction adds ten passing controls
+and retains nine passing shutdown controls. Native macOS remains unqualified.
+Existing raw logs, unrelated sinks and arbitrary free-form content are not
+certified anonymous by these changes.
 
 [CI 38025215348](https://github.com/adrienm7/ergopti/actions/runs/38025215348)
 on `de812ab633` has completed Core JavaScript, Linux units, macOS units,
@@ -10537,6 +10556,111 @@ test precondition failure, not a Lua defect or a successful permission grant.
   v1.0.0. A normal upgrade does not switch packages. Document an explicit
   dev-to-stable switch without `--zap`; retain the user's configuration and
   never change their subscribed channel implicitly.
+
+- [ ] **136.** Finish the v1.0.0 MLX installation failure investigation.
+
+  The anonymized report shows successful native bootstrap admission and a
+  created interpreter, followed by six native request failures with code 74.
+  Neither a proxy permission defect nor a native worker defect is established.
+  The local correction records a closed English stage, exception class and
+  exact child/terminal outcome after confirmed cleanup. It preserves the
+  original failure exit and excludes addresses, environment values and private
+  error text. Receive a new real Apple Silicon attempt before marking the
+  installation defect fixed.
+
+- [ ] **137.** Publish the selected AI provider before model loading completes.
+
+  In v1.0.0 the macOS local-provider transition updates its core and preferences
+  but delays menu publication until asynchronous model success. The report
+  confirms Ollama in the core while the checkmark still shows MLX. The local
+  correction uses the existing strict publication acknowledgement and rollback
+  for local providers. All fourteen registered behavioral unit cases pass,
+  including pending/failed model requirements and refused menu publication.
+  Windows and Linux already publish after provider commitment. Hosted source
+  qualification and actual model readiness remain separate results.
+
+- [ ] **138.** Export complete English diagnostics and an editable issue.
+
+  Every shared field, check label, result, technical diagnostic and attachment
+  sent to GitHub must be English, independently of the localized application
+  UI. Save one complete, anonymized local report and open a short issue draft
+  explaining how to attach it. Remove diagnostic field values from the URL so
+  GitHub cannot restore those values while the user edits them. Preserve
+  copy/save/close/open failures and open the browser only after the file is
+  available. Include actual in-depth results, separately identified page-side
+  observations, and useful recent error/log facts; do not substitute counters
+  for detailed results or call page checks native qualification. Bind retained
+  results to their actual report generation. Validate Windows, macOS and Linux
+  flows and GitHub field editability. Never upload automatically.
+
+  The current candidate carries complete English copy/save output, an
+  issue URL limited to stable host-derived version/system/driver metadata,
+  acknowledged attachment closure and generation-bound
+  page observations. Host JSON key order no longer changes export acceptance.
+  Recent lease and MLX errors produce closed technical codes and numeric facts;
+  raw messages, private paths and unknown entries remain excluded. This uses
+  the existing bounded recent tail, not a complete day-log attachment. Integrated
+  native receiving and the complete daily-log collection remain open.
+
+- [ ] **139.** Remove personal identities from daily and shared error logs.
+
+  The received macOS log exposed the computer name/device prefix at keylogger
+  startup. Local corrections remove unnecessary identities from startup,
+  database and export diagnostics while preserving stored device identity and
+  transaction refusal behavior. The corrected central sinks on all three OSes
+  admit the canonical redaction policy before output; macOS captures identity
+  without recursively resolving a paths module that logs itself. Generic fatal
+  reports redact their details before persistence. Native local log-link paths
+  remain exact for opening the file and must not enter shared attachments.
+  Preserve useful technical facts without usernames, hostnames, private paths,
+  addresses, credentials or typed content. A redacted export and safer new
+  logging do not rewrite historical originals or prove all free-form text safe.
+  Issue 93, its comment and attachment were archived privately and verified
+  before deletion; GitHub then returned HTTP 410. Revocation of the attachment's
+  direct URL was not established. Do not commit the private archive.
+
+- [ ] **140.** Resolve the recurring macOS lease failure from the v1 report.
+
+  Preserve the observed sequence: an initial PONG timeout, further PONG/READY
+  failures, and watchdog exit 73. These are symptoms, not proof of the watchdog's
+  internal cause. Coordinate with Group 5 and integrate its reviewed fix,
+  or explicitly document a safe authorized workaround. Reload recovery and
+  successful later tap-holds do not close the incident. Retain source-bound
+  native regression and retirement evidence before claiming the lease repaired.
+
+## Current patch release qualification
+
+The maintainer explicitly selected v1.0.1 despite two feature-labelled commits
+in the integrated history. An explicit publication-commit patch request must
+leave automatic defaults, breaking-change handling and published-tag guards
+intact. Only the unsigned Windows artifact is authorized for this candidate,
+until October 11, 2026 at 07:00 UTC, with a public signature notice. All tests,
+builds, integrity and installation checks remain mandatory. The prior thirteen
+v1.0.0 test deferrals are not extended.
+
+The source gate completed with formatting and encoding passing and 395 of 407
+JavaScript checks passing. The twelve remaining host/fixture failures remain
+open. The following canonical Windows run reached its existing 1,320,000 ms
+watchdog: 10,146 passed, eight failed and 648 had no completed result. Its transcript
+validator correctly refused the incomplete result. The two additional observed
+failures concern native file filtering and a held loopback HTTP response.
+One held-response run exhausted its four-second original deadline before
+native transport admission; no payload was published and no native receipt
+returned. A later instrumented run passed with only 172 ms left. Source history
+confirms this fixture deadline predates managed admission. The fixture now uses
+the constructor's request budget with all original response, heartbeat and
+cleanup assertions retained. Canonical receiving passes with a validated
+transcript. The prior admission delay's cause remains unproved. These bounded
+receipts do not qualify a release.
+The file-filter harness now retains bounded action/focus/outcome facts before
+its unchanged failing assertion and normal fixture cleanup. The exact native
+file-filter case passed, with a natural exit, an empty Job and unchanged source.
+This single success does not establish the old intermittent failure's cause.
+
+The generated stable and dev Homebrew casks were published in tap commit
+`ba0fadd9af349eca1b5d1887e034f8bebd6d0092` with only the supported
+`depends_on macos: :big_sur` declaration changed. Published artifact versions,
+URLs and hashes were retained. Native Homebrew acceptance remains separate.
 
 ## Time estimate
 
