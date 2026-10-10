@@ -70,6 +70,8 @@ function cleanEnvironment(original, home, config, tmp) {
 	const env = {
 		PATH: '/usr/bin:/bin',
 		HOME: home,
+		// Identity of this isolated fixture profile, never the host account.
+		USER: 'ergopti-nix-native',
 		XDG_CONFIG_HOME: path.join(home, '.config'),
 		XDG_CACHE_HOME: path.join(home, '.cache'),
 		NIX_CONF_DIR: config,
