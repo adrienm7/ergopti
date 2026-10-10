@@ -127,12 +127,34 @@ local function expect(literal, count, label)
 	assert(await(function() drain(); return #journal >= count end), "bounded native output observation")
 	local encoded = {}
 	for _, row in ipairs(journal) do encoded[#encoded + 1] = string.format("%d:%d:%d", row.type, row.code, row.value) end
+	local wire_matches = #journal == count and table.concat(encoded, " ") == literal
+	local observed_wire = table.concat(encoded, " ")
 	check(#journal == count and table.concat(encoded, " ") == literal, label)
 	journal = {}
 	check(not Reader.wait_readable(100, output_slot), label .. " has no extra native row")
 	local pressed = assert(Reader.capture_pressed_keys(output_slot))
 	local view = assert(Reader.pressed_keys_view(pressed))
 	check(view.origin == "native-evdev" and #view.down == 0, label .. " clears actual kernel bitmap")
+	if not wire_matches then
+		-- Observe only after the original output/quiet/bitmap assertions. These
+		-- source guards explain configuration admission, never native frame rights.
+		local runtime_ok, runtime = pcall(Combinations.capture_runtime)
+		local runtime_current_ok, runtime_current = false, false
+		if runtime_ok and type(runtime) == "function" then
+			runtime_current_ok, runtime_current = pcall(runtime)
+		end
+		local chord_ok, chord = pcall(Combinations.capture_chord,
+			"combination__tab_then_caps_lock", "copy")
+		local chord_current_ok, chord_current = false, false
+		if chord_ok and type(chord) == "function" then
+			chord_current_ok, chord_current = pcall(chord)
+		end
+		print(string.format("SIMULTANEOUS_WIRE expected=%q observed=%q", literal, observed_wire))
+		print(string.format("SIMULTANEOUS_CONFIG_ADMISSION runtime=%s chord=%s pending=%s",
+			tostring(runtime_current_ok and runtime_current == true),
+			tostring(chord_current_ok and chord_current == true),
+			tostring(Combinations.configuration_pending() == true)))
+	end
 end
 
 --- Sends one native burst; no scheduling sleep invents a simultaneous clock.
