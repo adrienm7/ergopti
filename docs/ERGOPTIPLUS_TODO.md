@@ -3552,6 +3552,26 @@ scenarios with one original driver/host skip. Required global JS stays RED at
 are absent; no global or native completion is claimed.
 Item 24 stays partial and incident 117 remains open.
 
+The existing lease worker now explicitly owns its bounded final task stream.
+A legal final suffix may settle the retained protocol after physical task
+completion; refused acquisition, a foreign start acknowledgement and explicit
+disposal cannot reopen delivery. The ordinary task lifetime and owned
+retirement protocol keep their existing authorities and deadlines. Independent
+Root-source receiving passes 49 adapter cases and eight composed controller
+cases, preserving all 29 original adapter cases. Removing the disposal fence
+reproduces four failures; removing the caller role reproduces three, retaining
+the original two-failure prediction discrepancy. These Lua controls model
+native task callbacks and do not qualify native task execution, device input,
+initial PONG/READY/exit-73 recovery or the complete release pipeline.
+
+Composed Dev9c software verification passes 19,730 macOS Lua cases,
+13,022 Linux Lua cases, 101 macOS E2E scenarios with one existing skip,
+193 Linux E2E scenarios and 53 owned Xvfb/libxkbcommon checks. The full
+selected gate stays RED at JS 408/1: its shared Layout proof does not yet
+admit the preserved configuration-recovery dispatch. The original proof
+remains untouched under its active owner; Windows-native and Swift checks
+remain deferred on this host. These results do not qualify physical input.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

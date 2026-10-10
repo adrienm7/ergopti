@@ -173,9 +173,17 @@ end
 --- @param private boolean|nil Uses payload-free native task logging.
 --- @param owned_protocol boolean|nil Retains cancellation/retirement receipt delivery.
 --- @param protocol_limit number|nil Bounded start-frame bytes; old callers keep 512.
+--- @param retain_final_stream boolean|nil Allows a constructor-owned final stream only
+--- after successful launch and completion; acquisition and cancellation stay ordinary.
 --- @return table Handle with start() (returns boolean) and terminate() methods.
-function M.spawn(executable, args, on_done, on_chunk, environment, private, owned_protocol, protocol_limit)
+function M.spawn(executable, args, on_done, on_chunk, environment, private, owned_protocol, protocol_limit, retain_final_stream)
 	local Logger = process_logger(private)
+	if retain_final_stream ~= nil and type(retain_final_stream) ~= "boolean" then
+		return refused_handle(private)
+	end
+	if retain_final_stream == true and (type(on_chunk) ~= "function" or owned_protocol == true) then
+		return refused_handle(private)
+	end
 	if protocol_limit ~= nil and (owned_protocol ~= true or type(protocol_limit) ~= "number"
 		or protocol_limit % 1 ~= 0 or protocol_limit < 512 or protocol_limit > 90000) then return refused_handle(private) end
 	local refusal = M.validate_spawn_args(executable, args)
@@ -196,6 +204,9 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	local _pending_protocol_bytes = 0
 	local _pending_protocol_overflow = false
 	local _business_stream_closed = false
+	local _consumer_stream_refused = false
+	local _final_stream_ctor_owned = false
+	local _final_stream_disposed = false
 	local _business_terminal_sent = false
 	local _settlement_observers = {}
 	local _started_ms = nil
@@ -224,6 +235,9 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	end
 
 	local function _safe_terminate()
+		-- Dispose this ordinary final-stream consumer before crossing native code,
+		-- even if completion already released its task or cancellation refuses.
+		if retain_final_stream == true then _final_stream_disposed = true end
 		if not _task then return true, "settled" end
 		_business_stream_closed = owned_protocol ~= true
 		local task = _task
@@ -293,29 +307,31 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		local ok, started = pcall(function() return task:start() end)
 		_start_dispatching = false
 		if ok and started and (private ~= true or started == true or started == task) then
-			_started_ms = now_ms()
-			_start_committed = true
-			if _lifecycle == "starting" then _lifecycle = "started" end
-			local pending_chunks = _pending_chunks
-			_pending_chunks = {}
-			for _, chunk in ipairs(pending_chunks) do
-				if _business_terminal_sent ~= true then
-					local keep_streaming = _deliver_business_chunk(
-						chunk[1], chunk[2], chunk[3], true)
-					if keep_streaming == false then
-						_business_stream_closed = true
-						_safe_terminate()
-						break
+			if retain_final_stream ~= true or started == true or started == task then
+				_started_ms = now_ms()
+				_start_committed = true
+				if _lifecycle == "starting" then _lifecycle = "started" end
+				local pending_chunks = _pending_chunks
+				_pending_chunks = {}
+				for _, chunk in ipairs(pending_chunks) do
+					if _business_terminal_sent ~= true then
+						local keep_streaming = _deliver_business_chunk(
+							chunk[1], chunk[2], chunk[3], true)
+						if keep_streaming == false then
+							_business_stream_closed = true
+							_safe_terminate()
+							break
+						end
 					end
 				end
+				local pending = _pending_completion
+				_pending_completion = nil
+				if pending ~= nil and type(_deliver_business_completion) == "function" then
+					_deliver_business_completion(table.unpack(pending, 1, pending.n))
+				end
+				_notify_settled()
+				return true
 			end
-			local pending = _pending_completion
-			_pending_completion = nil
-			if pending ~= nil and type(_deliver_business_completion) == "function" then
-				_deliver_business_completion(table.unpack(pending, 1, pending.n))
-			end
-			_notify_settled()
-			return true
 		end
 
 		if owned_protocol == true then
@@ -493,12 +509,27 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	-- generation guards on the next chunk).
 	_deliver_business_chunk = function(task, stdout_chunk, stderr_chunk, start_replay)
 		if type(on_chunk) ~= "function" then return true end
-		if owned_protocol == true and task ~= _protocol_task then return true end
-		local late_protocol = owned_protocol == true and _lifecycle == "completed"
-		if _start_committed ~= true or (_business_stream_closed == true and not late_protocol)
+		-- The native constructor installs this exact callback closure. A documented
+		-- final delivery loses its task userdata after completion; its nil argument
+		-- cannot authorize another task or reopen an explicitly refused consumer.
+		local completed_protocol = _lifecycle == "completed"
+			and _business_terminal_sent == true and _start_committed == true
+		local owned_final = owned_protocol == true and _protocol_task ~= nil
+			and completed_protocol
+		if owned_protocol == true and task ~= _protocol_task
+			and not (task == nil and owned_final) then return true end
+		local retained_final = retain_final_stream == true and _final_stream_ctor_owned
+			and completed_protocol
+		if retain_final_stream == true
+			and not ((_task ~= nil and task == _task) or (task == nil and retained_final)) then
+			return true
+		end
+		local late_protocol = owned_final or retained_final
+		if _consumer_stream_refused or _final_stream_disposed or _start_committed ~= true
+			or (_business_stream_closed == true and not late_protocol)
 			or (_business_terminal_sent == true and not late_protocol)
 			or (_lifecycle ~= "started" and start_replay ~= true
-				and not (owned_protocol == true and (_lifecycle == "start_failed" or late_protocol))) then
+				and not ((owned_protocol == true and _lifecycle == "start_failed") or late_protocol)) then
 			return true
 		end
 		local ok, result_or_err = xpcall(function()
@@ -508,6 +539,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			report_callback_throw("on_chunk", result_or_err)
 			return true
 		end
+		if result_or_err == false then _consumer_stream_refused = true end
 		return result_or_err
 	end
 
@@ -570,6 +602,9 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	if task_or_err ~= nil then
 		_task = task_or_err
 		if owned_protocol == true then _protocol_task = _task end
+		-- The final-only role uses the live _task for identity and keeps no extra
+		-- native userdata reference after completion releases that exact task.
+		_final_stream_ctor_owned = retain_final_stream == true
 		_lifecycle = "prepared"
 		-- Pin the task in M._active_tasks so the GC cannot collect it while
 		-- the subprocess is still running (shell-runner-gc-kill fix).

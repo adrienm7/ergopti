@@ -371,3 +371,367 @@ helpers.describe("supervisor ordinary child environment", function()
 		end)
 	end)
 end)
+
+-- Native hs.task documents a final streaming callback with nil userdata.
+-- These controls capture the REAL ShellRunner wrapper passed to the native
+-- constructor double; they do not invoke a protocol owner's callback directly.
+local function capture_final_stream_ports(native)
+	local original = hs.task.new
+	local ports = {}
+	hs.task.new = function(executable, done, chunk, arguments)
+		local task = original(executable, done, chunk, arguments)
+		ports[task] = { done = done, chunk = chunk }
+		return task
+	end
+	return ports
+end
+
+helpers.describe("documented native final streaming callback", function()
+	helpers.it("retains a legal nil final retirement marker after completion", function()
+		with_runner(function(create, native)
+			local ports = capture_final_stream_ports(native)
+			local handle = create()
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(task:emit("V1 HELD\nV1 ACTIVE\n"), true)
+			task:complete(0)
+			helpers.assert_eq(handle.isSettled(), false)
+			helpers.assert_eq(native.terminals, {})
+			helpers.assert_eq(ports[task].chunk(nil, "V1 RETIRED 0\n", ""), true)
+			helpers.assert_eq(handle.isSettled(), true,
+				"documented nil final callback must reach the original owned parser")
+			helpers.assert_eq(native.terminals, { { true, 0 } })
+		end)
+	end)
+
+	helpers.it("retains the exact partial retirement suffix across nil final delivery", function()
+		with_runner(function(create, native)
+			local ports = capture_final_stream_ports(native)
+			local handle = create()
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(task:emit("V1 HELD\nV1 ACTIVE\nV1 RETI"), true)
+			task:complete(0)
+			helpers.assert_eq(handle.isSettled(), false)
+			helpers.assert_eq(ports[task].chunk(nil, "RED 17\n", ""), true)
+			helpers.assert_eq(handle.isSettled(), true,
+				"the native suffix must complete the retained original frame")
+			helpers.assert_eq(native.terminals, { { false, 17 } })
+		end)
+	end)
+
+	helpers.it("refuses nil userdata before completion for an owned protocol", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks, completions = {}, 0
+			local handle = runner.spawn("/bin/cat", {}, function() completions = completions + 1 end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(ports[task].chunk(nil, "public-before", ""), true)
+			helpers.assert_eq(chunks, {})
+			helpers.assert_eq(completions, 0)
+			helpers.assert_eq(task:emit("public-live"), true)
+			helpers.assert_eq(chunks, { "public-live" })
+		end)
+	end)
+
+	helpers.it("refuses an unrelated nonnil task after completion", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks, completions = {}, 0
+			local handle = runner.spawn("/bin/cat", {}, function() completions = completions + 1 end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			task:complete(0)
+			helpers.assert_eq(ports[task].chunk({}, "public-foreign", ""), true)
+			helpers.assert_eq(chunks, {})
+			helpers.assert_eq(completions, 1)
+		end)
+	end)
+
+	helpers.it("keeps ordinary business delivery closed after completion", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks, completions = {}, 0
+			local handle = runner.spawn("/bin/cat", {}, function() completions = completions + 1 end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(task:emit("public-live"), true)
+			task:complete(0)
+			helpers.assert_eq(ports[task].chunk(nil, "public-late", ""), true)
+			helpers.assert_eq(chunks, { "public-live" })
+			helpers.assert_eq(completions, 1)
+			helpers.assert_eq(handle.set_input("public-late-input"), false)
+		end)
+	end)
+
+	helpers.it("does not reopen a protocol consumer which explicitly closed streaming", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks, completions = {}, 0
+			local handle = runner.spawn("/bin/cat", {}, function() completions = completions + 1 end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return false end, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(task:emit("public-consumer-closed"), false)
+			task:complete(0)
+			helpers.assert_eq(ports[task].chunk(nil, "public-late", ""), true)
+			helpers.assert_eq(chunks, { "public-consumer-closed" })
+			helpers.assert_eq(completions, 1)
+		end)
+	end)
+end)
+
+-- Independently frozen final-stream-only role; actual start failure retains
+-- ordinary rollback, not the owned-program retirement replay policy.
+helpers.describe("final stream delivery preserves ordinary acquisition policy", function()
+	for _, failure in ipairs({ "start_false", "start_throw" }) do
+		helpers.it("never delivers a startup frame when native acquisition refuses by " .. failure, function()
+			local ports
+			with_runner(function(_create, native, runner)
+				ports = capture_final_stream_ports(native)
+				local chunks = {}
+				local handle = runner.spawn("/bin/cat", {}, function() end,
+					function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+					nil, nil, nil, nil, true)
+				helpers.assert_eq(handle.start(), false)
+				local task = native.tasks[1]
+				helpers.assert_eq(chunks, {}, "a final-stream role cannot replay uncommitted READY")
+				helpers.assert_eq(task.terminate_calls, 1, "ordinary rollback still requests SIGTERM")
+				helpers.assert_eq(task.closed, nil, "retirement EOF policy is not acquired")
+				task:complete(73)
+				helpers.assert_eq(ports[task].chunk(nil, "READY\n", ""), true)
+				helpers.assert_eq(chunks, {}, "failed launch never gains final stream authority")
+			end, { [failure] = true, on_start = function(task)
+				helpers.assert_eq(ports[task].chunk(task, "READY\n", ""), true)
+			end })
+		end)
+	end
+
+	helpers.it("delivers a legal final suffix only after successful launch and completion", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks, completed = {}, 0
+			local handle = runner.spawn("/bin/cat", {}, function() completed = completed + 1 end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(ports[task].chunk(nil, "public-before", ""), true)
+			helpers.assert_eq(chunks, {})
+			helpers.assert_eq(task:emit("STOP"), true)
+			task:complete(0)
+			helpers.assert_eq(completed, 1)
+			helpers.assert_eq(ports[task].chunk({}, "public-foreign", ""), true)
+			helpers.assert_eq(ports[task].chunk(nil, "PED\n", ""), true)
+			helpers.assert_eq(chunks, { "STOP", "PED\n" })
+			helpers.assert_eq(handle.set_input("public-after"), false)
+			helpers.assert_eq(task.closed, nil, "physical completion does not claim modeled explicit EOF")
+		end)
+	end)
+
+	helpers.it("never reopens an explicitly closed final-stream consumer", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks = {}
+			local handle = runner.spawn("/bin/cat", {}, function() end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return false end,
+				nil, nil, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(task:emit("public-close"), false)
+			task:complete(0)
+			helpers.assert_eq(ports[task].chunk(nil, "public-after", ""), true)
+			helpers.assert_eq(chunks, { "public-close" })
+		end)
+	end)
+
+	helpers.it("does not give a prepared disposed task a final-stream lifetime", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks = {}
+			local handle = runner.spawn("/bin/cat", {}, function() end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			local task = native.tasks[1]
+			local accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(state, "settled")
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(ports[task].chunk(nil, "public-after", ""), true)
+			helpers.assert_eq(chunks, {})
+			helpers.assert_eq(task.terminate_calls, 0)
+		end)
+	end)
+end)
+
+helpers.describe("final-stream-only strict role admission", function()
+	helpers.it("suppresses startup READY when native start returns nil", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks = {}
+			local handle = runner.spawn("/bin/cat", {}, function() end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			local task = native.tasks[1]
+			local original_start = task.start
+			task.start = function(self)
+				original_start(self)
+				helpers.assert_eq(ports[self].chunk(self, "READY\n", ""), true)
+				return nil
+			end
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(chunks, {})
+			helpers.assert_eq(task.terminate_calls, 1)
+			helpers.assert_eq(task.closed, nil)
+		end)
+	end)
+
+	helpers.it("rejects truthy foreign native start acknowledgement for the final role", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks = {}
+			local handle = runner.spawn("/bin/cat", {}, function() end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			local task = native.tasks[1]
+			local original_start = task.start
+			task.start = function(self)
+				original_start(self)
+				helpers.assert_eq(ports[self].chunk(self, "READY\n", ""), true)
+				return {}
+			end
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(chunks, {})
+			helpers.assert_eq(task.terminate_calls, 1)
+		end)
+	end)
+
+	helpers.it("rejects malformed final role without native construction", function()
+		with_runner(function(_create, native, runner)
+			local handle = runner.spawn("/bin/cat", {}, function() end, function() return true end,
+				nil, nil, nil, nil, "true")
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(native.tasks, {})
+		end)
+	end)
+
+	helpers.it("rejects final role on a nonstreaming task without native construction", function()
+		with_runner(function(_create, native, runner)
+			local handle = runner.spawn("/bin/cat", {}, function() end, nil,
+				nil, nil, nil, nil, true)
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(native.tasks, {})
+		end)
+	end)
+
+	helpers.it("refuses combining final-only admission with owned retirement replay", function()
+		with_runner(function(_create, native, runner)
+			local handle = runner.spawn("/bin/cat", {}, function() end, function() return true end,
+				nil, nil, true, nil, true)
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(native.tasks, {})
+		end)
+	end)
+end)
+
+helpers.describe("final-stream-only explicit disposal remains terminal", function()
+	helpers.it("does not reopen a started explicitly terminated final stream", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks = {}
+			local handle = runner.spawn("/bin/cat", {}, function() end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			helpers.assert_eq(task:emit("public-live"), true)
+			local accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(state, "pending")
+			helpers.assert_eq(task.terminate_calls, 1)
+			task:complete(0)
+			helpers.assert_eq(ports[task].chunk(nil, "public-disposed", ""), true)
+			helpers.assert_eq(chunks, { "public-live" }, "explicit cancellation cannot be reopened by completion")
+		end)
+	end)
+
+	helpers.it("does not reopen a completed final stream explicitly disposed before final delivery", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks = {}
+			local handle = runner.spawn("/bin/cat", {}, function() end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			task:complete(0)
+			local accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(state, "settled")
+			helpers.assert_eq(task.terminate_calls, 0)
+			helpers.assert_eq(ports[task].chunk(nil, "public-disposed", ""), true)
+			helpers.assert_eq(chunks, {}, "settled native task does not revoke explicit disposal")
+		end)
+	end)
+
+	helpers.it("retains final stream refusal after a native terminate refusal and retry", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks = {}
+			local handle = runner.spawn("/bin/cat", {}, function() end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			local original_terminate, refusals = task.terminate, 1
+			task.terminate = function(self)
+				local result = original_terminate(self)
+				if refusals > 0 then refusals = refusals - 1; return false end
+				return result
+			end
+			local accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(state, "refused")
+			helpers.assert_eq(handle.isSettled(), false)
+			accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(state, "pending")
+			helpers.assert_eq(task.terminate_calls, 2)
+			task:complete(0)
+			helpers.assert_eq(ports[task].chunk(nil, "public-disposed", ""), true)
+			helpers.assert_eq(chunks, {}, "failed native cancellation retains consumer disposal")
+		end)
+	end)
+end)
+
+helpers.describe("final-stream-only reentrant native disposal", function()
+	helpers.it("fences final-stream disposal before native terminate may complete reentrantly", function()
+		with_runner(function(_create, native, runner)
+			local ports = capture_final_stream_ports(native)
+			local chunks, completed = {}, 0
+			local handle = runner.spawn("/bin/cat", {}, function() completed = completed + 1 end,
+				function(_, stdout) chunks[#chunks + 1] = stdout; return true end,
+				nil, nil, nil, nil, true)
+			helpers.assert_eq(handle.start(), true)
+			local task = native.tasks[1]
+			local original_terminate = task.terminate
+			task.terminate = function(self)
+				local result = original_terminate(self)
+				helpers.assert_eq(ports[self].chunk(self, "public-disposing", ""), true)
+				self:complete(0)
+				helpers.assert_eq(ports[self].chunk(nil, "public-disposed", ""), true)
+				return result
+			end
+			local accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(state, "settled", "actual completion wins the native terminate frame")
+			helpers.assert_eq(task.terminate_calls, 1)
+			helpers.assert_eq(completed, 1)
+			helpers.assert_eq(chunks, {}, "native reentrance cannot outrun private disposal publication")
+		end)
+	end)
+end)

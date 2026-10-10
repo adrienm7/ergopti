@@ -307,3 +307,38 @@ configuration writers remain unqualified.
 This does not fix watchdog exit73, activate an owned producer, or complete
 WP3/item31 or transversal16/38. No TODO item is removed; no shared merge, workflow
 or CI reference is changed by this tranche.
+
+## Final lease-task stream: standalone source correction
+
+Standalone `cebe69abc355600dc2540425ea805a13edc06839` was published directly
+from Root51 on `feat/macos-input-lease-final-stream`. Genuine Root receiving
+passes 49 adapter, eight composed controller and three unchanged raw-start
+cases. Frozen disposal and caller-role omissions retain their semantic failures;
+the original caller prediction of two remains recorded beside the three actual
+failures. The actual original private-start guard and refusal cleanup are kept.
+
+This feature adoption uses its own retained controller postimage; it does not
+replace that controller with the shorter Root source. Both corrected fixture
+headers preserve all executable bytes. Actual Dev9c receiving and selected gates
+completed on the composed feature tree. The four reviewed menu resolutions
+and two owner-generated outputs preserve incoming source ownership. Focused
+feature receiving passes all 60 adapter/controller/raw-start cases. Mac Lua
+units pass 19,730/0 and Linux Lua units 13,022/0; E2E passes 101 Mac cases
+with one original skip and 193 Linux cases. Actual owned Xvfb/libxkbcommon
+receiving passes 53 checks, without physical-device or native Wayland
+qualification. The full selected run remains RED: formatting initially
+rejected only the owned TODO addition (targeted repair now passes), and JS
+408/1 rejects the retained configuration dispatch through an exact whole-table
+Layout proof. Its original source stays untouched under the active shared
+owner. Windows-native and Swift checks remain explicitly deferred. Root selected verification retains
+JS 406/1 PAC projection and Lua 18,216/9 boot-fixture failures, E2E 101/0 plus
+one existing skip, and formatting PASS under its authentic frozen dependency
+installation. Complete release and native task/device receiving remain
+unqualified; this does not establish the initial PONG/READY/exit-73 cause.
+
+Strict native165 receipt software models pass original38 and final57 controls,
+with no host skips here. Independent public CLI vectors retain BEFORE7/12 and
+AFTER19/0 requirements. They model Swift transcripts/exit files and a declared
+foreign-UID port; no actual Swift child or hardware ran. Shared workflow
+adoption still preserves current owners and requires exact final 146+19 source
+binding before a native dispatch.
