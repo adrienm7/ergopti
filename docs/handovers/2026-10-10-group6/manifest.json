@@ -45,6 +45,12 @@
 			"bytes": 78842,
 			"regular_members": 32,
 			"directories": 35
+		},
+		"extra-ca-debug-source-only.tar.gz": {
+			"sha256": "8b4e6d50b0f614c76e5261f8abff20ba43b50f0142fea790e023850c2c69e059",
+			"bytes": 6000,
+			"regular_members": 6,
+			"qualification": "SOURCE_ONLY_UNADOPTED_UNCOMPILED"
 		}
 	},
 	"source_execution_during_snapshot": 0,
@@ -62,7 +68,7 @@
 			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "b75587753ccaea788cbc82e4e3b7bf2d27fd0eb699353ea9f71fb98ec65a08e0",
 			"tools/test/macos_native_http_receiving_facts_test.py": "7122e745d7ca4ad815ab9107dfaa4f59299934c761502c7d166f9b23ed7874c7"
 		},
-		"native_compilation_and_tls_cause": "UNQUALIFIED; next candidate CI required",
+		"native_compilation_and_tls_cause": "Historical pre-CI snapshot: fe3 later compiled; detailed TLS cause and primary fix remain unqualified",
 		"original_receipt_sha256": {
 			"tls-inverse-source-review.json": "b9eaa5623ff3497e2968f388388a048fc675951e494214a62f2eb3e4e28ab38d",
 			"tls-full52-source-review.json": "aebb6133710199864e448de1ebbf51b2b67dc2e70fed46b09a879a8af43d33b5",
@@ -71,5 +77,17 @@
 		},
 		"original_five_archive_source_review": "Historical source-review.json binds the preceding manifest, not this continuation",
 		"source_execution_during_snapshot": 0
+	},
+	"native_tls_ci_fe3": {
+		"candidate": "fe3da8332dbc4905a19765501be1314cdfdef034",
+		"run_id": 38032632804,
+		"event": "workflow_dispatch",
+		"os_lanes": "macos",
+		"original_receipt_sha256": "76f974ad64c87152b09361e6a256dd33060c27127b683d9708041d9257871189",
+		"receipt": "tls-fe3-ci-terminal.json",
+		"later_dev_merge": "d1703d302aa48f98b7e6e9f68957a3c68e69ce53",
+		"dev_base": "c4e2368308b51de6d3147ec4f1e85083f38e20a9",
+		"merged_wire_fixture_sha256": "0577b05a0be8ea97980d15aad9bd27112e0293a2e515406b567cec2ac0936d80",
+		"merged_source_qualification": "PENDING"
 	}
 }
