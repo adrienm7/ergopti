@@ -32,7 +32,10 @@
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
 ---    says so; a broken handle degrades to stdout. The daemon must not die
 ---    because logging failed.
---- 7. The logger boot. install() is also where this driver arms the core's
+--- 7. Privacy admission. Canonical rules and the captured account identity are
+---    admitted before output. A missing policy or identity refuses startup;
+---    directory/write failure still degrades to redacted stdout, never raw text.
+--- 8. The logger boot. install() is also where this driver arms the core's
 ---    repeat collapsing (logger SPEC § 4.2), once; the daemon's periodic callback
 ---    and exit paths own its flushes.
 --- ==============================================================================
@@ -53,6 +56,8 @@ local M = {}
 --- infra/config_paths (LogsDirPath, or ${XDG_STATE_HOME:-~/.local/state}/
 --- ergopti_plus/logs).
 local AppDirs = require("app_dirs")
+local Redact = require("diagnostics.redact")
+local Json = require("json")
 
 --- Basename prefixes for the two files. The date suffix is the day the line was
 --- written, not the day the daemon started, so a long-running daemon rolls over.
@@ -112,6 +117,9 @@ local _installed = false
 --- True when the log directory could not be created; output is stdout-only.
 local _stdout_only = false
 
+--- Pure redactor captured before the first output; never resolved on emission.
+local _redact = nil
+
 
 
 
@@ -120,6 +128,39 @@ local _stdout_only = false
 -- ======= 3/ Path Resolution ============
 -- =======================================
 -- =======================================
+
+--- Admits canonical privacy data before any output or writable handle is acquired.
+--- The existing pure layout resolver does not emit its missing-root diagnostic.
+--- @param supplied table|nil Explicit identity dependency for portable fixtures.
+--- @return function Captured immutable-context redactor.
+local function admit_redaction(supplied)
+	local context = supplied or { home = os.getenv("HOME"), user = os.getenv("USER") or os.getenv("LOGNAME") }
+	assert(type(context) == "table" and type(context.home) == "string" and context.home ~= ""
+		and type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable")
+	local captured = { home = context.home, user = context.user, case_insensitive = false }
+	local Paths = require("infra.paths")
+	local root = Paths.shared_root_from(Paths.driver_root())
+	assert(type(root) == "string" and root ~= "", "logger_sink: canonical privacy tree unavailable")
+	local file = io.open(root .. "/modules/diagnostics/redaction.json", "rb")
+	assert(file, "logger_sink: canonical privacy policy unavailable")
+	local read_ok, raw = pcall(file.read, file, "*a")
+	local close_ok, closed = pcall(file.close, file)
+	assert(read_ok and type(raw) == "string" and close_ok and closed == true,
+		"logger_sink: canonical privacy policy read did not complete")
+	local decoded, rules = pcall(Json.decode, raw)
+	assert(decoded and type(rules) == "table", "logger_sink: canonical privacy policy invalid")
+	for _, key in ipairs({ "home_placeholder", "account_placeholder", "secret_placeholder" }) do
+		assert(type(rules[key]) == "string" and rules[key] ~= "", "logger_sink: canonical privacy placeholder invalid")
+	end
+	for _, key in ipairs({ "min_account_name_length", "bearer_min_length" }) do
+		assert(type(rules[key]) == "number" and rules[key] >= 1 and rules[key] == math.floor(rules[key]),
+			"logger_sink: canonical privacy bound invalid")
+	end
+	assert(type(rules.token_prefixes) == "table" and type(rules.secret_keys) == "table",
+		"logger_sink: canonical privacy inventory invalid")
+	assert(pcall(Redact.apply, "", rules, captured), "logger_sink: canonical privacy rules invalid")
+	return function(text) return Redact.apply(text, rules, captured) end
+end
 
 --- Quotes a value for a POSIX shell command line.
 --- @param value string Raw value.
@@ -273,8 +314,8 @@ local function append_line(handle, line, channel)
 	local reason = protected and failure or accepted
 	-- Calling Logger here would recursively invoke this same failed sink.
 	pcall(function()
-		io.stderr:write("[logger_sink] " .. channel .. " write/flush failed: " .. tostring(reason)
-			.. " — channel retired; logging continues through other outputs.\n")
+		io.stderr:write(_redact("[logger_sink] " .. channel .. " write/flush failed: " .. tostring(reason)
+			.. " — channel retired; logging continues through other outputs.\n"))
 	end)
 	return nil
 end
@@ -284,6 +325,10 @@ end
 --- @param line string Already-formatted log line.
 --- @param variant string One of debug/trace/done/info/start/success/warn/error.
 local function sink(line, variant)
+	-- Core-owned timestamp, severity and module identifiers must remain intact.
+	-- The message is the untrusted/free-text part, including multiline errors.
+	local prefix, body = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d %[[A-Z]+%] %[[^%]]*%] )(.*)$")
+	line = prefix and (prefix .. _redact(body)) or _redact(line)
 	-- stdout first: it is the output that cannot fail, and under systemd it is
 	-- what journald records.
 	io.stdout:write(line, "\n")
@@ -314,18 +359,18 @@ end
 --- Installs the file sink into the shared logger core.
 --- Idempotent: a second call is a no-op so a reload cannot double-write.
 --- @param logger table The logger module returned by require("logger.shim").
---- @param opts table|nil { log_dir = string } to override the resolved directory.
+--- @param opts table|nil { log_dir = string, redaction_context = table } directory or fixture identity dependencies.
 --- @return boolean True when a durable file sink is active, false when the sink
 ---   is installed but degraded to stdout-only.
 function M.install(logger, opts)
 	if type(logger) ~= "table" or type(logger.set_sink) ~= "function"
 		or type(logger.enable_repeat_collapsing) ~= "function" then
-		io.stderr:write("[logger_sink] install(): logger is not the shared core — no output installed.\n")
-		return false
+		return false, "logger_sink: logger is not the shared core — no output installed"
 	end
 	if _installed then return M.is_file_sink_active() end
 
 	opts = opts or {}
+	_redact = admit_redaction(opts.redaction_context)
 	_dir = opts.log_dir or M.log_dir()
 
 	if ensure_dir(_dir) then
@@ -351,10 +396,10 @@ function M.install(logger, opts)
 	_installed = true
 
 	if _stdout_only then
-		io.stderr:write(
+		io.stderr:write(_redact(
 			"[logger_sink] Could not open a log file under " .. tostring(_dir) ..
 			" — logging to stdout only.\n"
-		)
+		))
 		return false
 	end
 	return true
@@ -456,6 +501,7 @@ function M.uninstall(logger)
 	_date        = nil
 	_installed   = false
 	_stdout_only = false
+	_redact = nil
 end
 
 --- Reports whether a durable file sink is currently active.
