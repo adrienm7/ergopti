@@ -371,11 +371,31 @@ helpers.describe("diagnostics probes (macOS)", function()
 	end)
 	helpers.it("passes the original start clock to the separately controlled AppleEvent collaborator", function()
 		with_probes(function(Probes, world)
-			local run, answers = start(Probes)
-			helpers.assert_eq(world.appleevent_started, hs.timer.absoluteTime() / 1e6)
-			helpers.assert_true(type(world.appleevent_timeout) == "number" and world.appleevent_timeout > 0)
-			helpers.assert_eq(answer_of(answers, "appleevent_transport").result.state, "not_run")
-			helpers.assert_eq(run.has_pending_cleanup(), false, "the closed collaborator and watchdog both acknowledge cleanup")
+			local timer = hs.timer
+			local scheduler = require("adapters.timer_scheduler")
+			local saved_clock, saved_after = timer.absoluteTime, scheduler.after
+			local now_ns, watchdog_starts = 12345 * 1e6, {}
+			timer.absoluteTime = function() return now_ns end
+			scheduler.after = function(delay, callback)
+				-- Capture the original watchdog clock before registration deliberately advances it.
+				watchdog_starts[#watchdog_starts + 1] = now_ns / 1e6
+				local handle, committed = saved_after(delay, callback)
+				now_ns = now_ns + 17 * 1e6
+				return handle, committed
+			end
+			local ok, err = pcall(function()
+				local run, answers = start(Probes)
+				local original_start = watchdog_starts[#world.timers]
+				helpers.assert_true(type(original_start) == "number", "the collaborator has an original watchdog registration")
+				helpers.assert_true(original_start < now_ns / 1e6, "watchdog registration advanced the controlled clock")
+				helpers.assert_eq(world.appleevent_started, original_start)
+				helpers.assert_true(type(world.appleevent_timeout) == "number" and world.appleevent_timeout > 0)
+				helpers.assert_eq(answer_of(answers, "appleevent_transport").result.state, "not_run")
+				helpers.assert_eq(run.has_pending_cleanup(), false, "the closed collaborator and watchdog both acknowledge cleanup")
+			end)
+			scheduler.after = saved_after
+			timer.absoluteTime = saved_clock
+			if not ok then error(err, 0) end
 		end)
 	end)
 
