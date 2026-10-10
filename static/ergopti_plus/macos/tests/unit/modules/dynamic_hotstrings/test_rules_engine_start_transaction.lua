@@ -182,9 +182,9 @@ helpers.describe("rules_engine.start owns one atomic generation", function()
 				"the test must exercise an interceptor published before the late failure")
 			helpers.assert_type(stale_provider, "function",
 				"the test must exercise a provider published before reporting failure")
-			helpers.assert_eq(stale_provider("td"), nil,
+			helpers.assert_eq(stale_provider("td", true), nil,
 				"an uncommitted provider must be inert immediately")
-			helpers.assert_eq(stale_interceptor(trigger_event(), "td"), nil,
+			helpers.assert_eq(stale_interceptor(trigger_event(), "td", { start_is_word_boundary = true }), nil,
 				"an uncommitted interceptor must never consume a key")
 
 			fixture.controls.preview_failure = nil
@@ -198,20 +198,33 @@ helpers.describe("rules_engine.start owns one atomic generation", function()
 				"retry must publish the dynamic group")
 			helpers.assert_type(fixture.state.hooks.dynamichotstrings, "function",
 				"retry must publish its post-load hook")
-			helpers.assert_eq(stale_provider("td"), nil,
+			helpers.assert_eq(stale_provider("td", true), nil,
 				"the failed generation must stay inert after a newer generation commits")
-			helpers.assert_eq(stale_interceptor(trigger_event(), "td"), nil,
+			helpers.assert_eq(stale_interceptor(trigger_event(), "td", { start_is_word_boundary = true }), nil,
 				"the failed interceptor must stay inert after retry")
 			helpers.assert_eq(fixture.state.injections, 0,
 				"no failed-generation callback may inject output")
-			local live_preview = fixture.state.providers[#fixture.state.providers]("td")
+			local live_preview = fixture.state.providers[#fixture.state.providers]("td", true)
 			helpers.assert_type(live_preview, "string",
 				"the committed generation must remain functional")
 			helpers.assert_true(fixture.RulesEngine.stop())
-			helpers.assert_eq(fixture.state.providers[#fixture.state.providers]("td"), nil,
+			helpers.assert_eq(fixture.state.providers[#fixture.state.providers]("td", true), nil,
 				"stop must revoke the committed generation")
 		end)
 	end
+
+	helpers.it("refuses a live date preview without owned word-start evidence", function()
+		local fixture = load_fixture()
+		helpers.assert_true(fixture.RulesEngine.start(fixture.keymap))
+		local provider = fixture.state.providers[#fixture.state.providers]
+		helpers.assert_type(provider, "function")
+		helpers.assert_type(provider("td", true), "string")
+		helpers.assert_nil(provider("td", false), "unknown prefix must not borrow a live generation")
+		helpers.assert_nil(provider("td"), "missing boundary must not borrow a live generation")
+		helpers.assert_nil(provider("xtd", true), "a real word prefix remains blocked")
+		helpers.assert_eq(fixture.state.injections, 0)
+		helpers.assert_true(fixture.RulesEngine.stop())
+	end)
 
 	helpers.it("rolls back registry writes when the final sort explicitly refuses", function()
 		local fixture = load_fixture()
@@ -223,15 +236,15 @@ helpers.describe("rules_engine.start owns one atomic generation", function()
 		local stale_provider = fixture.state.providers[1]
 		helpers.assert_type(stale_provider, "function",
 			"callbacks must already be staged when the registry fails late")
-		helpers.assert_eq(stale_provider("td"), nil,
+		helpers.assert_eq(stale_provider("td", true), nil,
 			"a callback from a rolled-back registry generation must be inert")
 
 		fixture.controls.sort_result = nil
 		helpers.assert_true(fixture.RulesEngine.start(fixture.keymap))
 		helpers.assert_eq(#fixture.SharedEngine.get_rules(), 3)
-		helpers.assert_eq(stale_provider("td"), nil,
+		helpers.assert_eq(stale_provider("td", true), nil,
 			"late-registry failure must not revive after retry")
-		helpers.assert_type(fixture.state.providers[#fixture.state.providers]("td"), "string")
+		helpers.assert_type(fixture.state.providers[#fixture.state.providers]("td", true), "string")
 		helpers.assert_true(fixture.RulesEngine.stop())
 	end)
 
@@ -245,15 +258,15 @@ helpers.describe("rules_engine.start owns one atomic generation", function()
 			assert_failed_start_is_empty(fixture)
 			local stale_provider = fixture.state.providers[1]
 			helpers.assert_type(stale_provider, "function")
-			helpers.assert_eq(stale_provider("td"), nil,
+			helpers.assert_eq(stale_provider("td", true), nil,
 				"a reporter failure must leave every staged callback inert")
 
 			fixture.controls.reporter_failure = nil
 			helpers.assert_true(fixture.RulesEngine.start(fixture.keymap),
 				"retry must acquire registry, reporter, and callback ownership together")
 			helpers.assert_eq(#fixture.SharedEngine.get_rules(), 3)
-			helpers.assert_type(fixture.state.providers[#fixture.state.providers]("td"), "string")
-			helpers.assert_eq(stale_provider("td"), nil)
+			helpers.assert_type(fixture.state.providers[#fixture.state.providers]("td", true), "string")
+			helpers.assert_eq(stale_provider("td", true), nil)
 			helpers.assert_true(fixture.RulesEngine.stop())
 		end)
 	end
