@@ -134,7 +134,7 @@ local _redact = nil
 --- @param supplied table|nil Explicit identity dependency for portable fixtures.
 --- @return function Captured immutable-context redactor.
 local function admit_redaction(supplied)
-	local context = supplied or { home = os.getenv("HOME"), user = os.getenv("USER") or os.getenv("LOGNAME") }
+	local context = supplied or { home = require("infra.config_paths").account_home(), user = os.getenv("USER") or os.getenv("LOGNAME") }
 	assert(type(context) == "table" and type(context.home) == "string" and context.home ~= ""
 		and type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable")
 	local captured = { home = context.home, user = context.user, case_insensitive = false }
