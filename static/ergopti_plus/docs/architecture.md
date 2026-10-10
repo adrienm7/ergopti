@@ -96,6 +96,8 @@ graph TD
         MACOS_keyboard_hook["KeyboardHook.lua"]
         MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
         MACOS_log_transport["LogTransport.lua"]
+        MACOS_managed_ollama_bootstrap["ManagedOllamaBootstrap.lua"]
+        MACOS_managed_ollama_daemon["ManagedOllamaDaemon.lua"]
         MACOS_managed_ollama_hint["ManagedOllamaHint.lua"]
         MACOS_managed_ollama_pull["ManagedOllamaPull.lua"]
         MACOS_modifier_injector["ModifierInjector.lua"]

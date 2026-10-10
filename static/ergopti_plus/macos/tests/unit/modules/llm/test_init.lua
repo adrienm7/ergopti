@@ -110,16 +110,16 @@ local function load_core_with_timer_spy(options)
 	return fresh_core, timer_spy_calls, loaded_hs, controller, load_time_calls
 end
 
---- Admits an Ollama daemon start for one fixture: the AI gate on and an
---- installed Ollama are the only state in which a backend identity starts it
---- (llm-backend-ollama-start-gate).
+--- Admits a native-owned Ollama daemon start for one fixture: the AI gate on
+--- and an installed native-managed source authorize startup. External clients
+--- remain selectable without service authority (llm-backend-ollama-start-gate).
 --- @param core table A fresh core from load_core_with_timer_spy.
 --- @return function restore Restores the executable resolver.
 local function admit_ollama_start(core)
 	helpers.assert_true(core.set_runtime_llm_enabled(true))
 	local binary = package.loaded["modules.llm.ollama_binary"]
 	local original_resolve = binary.resolve
-	binary.resolve = function() return "/Applications/Ollama.app/Contents/Resources/ollama", nil, binary.SOURCE_APP end
+	binary.resolve = function() return "/fixture/native/ollama", nil, binary.SOURCE_NATIVE_MANAGED end
 	return function() binary.resolve = original_resolve end
 end
 

@@ -8,6 +8,8 @@ import math
 import os
 from pathlib import Path
 import secrets
+import select
+import selectors
 import signal
 import stat
 import sys
@@ -46,6 +48,101 @@ class ServeRefusal(RuntimeError):
         self.primary, self.cleanup = primary, cleanup
 
 
+class _CallerInput:
+    """Borrow the caller's actual pipe; only the original guardian owns retirement.
+
+    No extra selector, descriptor, process, deadline or signalling authority is
+    acquired. EOF requests cancellation. The original selector retains its own
+    once-close acknowledgement; its uncertainty must still block RETIRED.
+    """
+
+    def __init__(self, owner):
+        self.owner = owner
+        self.descriptor = 0
+        self.eof = False
+        self.selector = None
+        self._key = object()
+        self._registration_attempted = False
+        self._unregister_attempted = False
+        self._close_attempted = False
+        self._close_error = None
+        before = os.fstat(self.descriptor)
+        if not stat.S_ISFIFO(before.st_mode):
+            raise ServeRefusal("caller")
+        self.identity = (before.st_dev, before.st_ino, before.st_mode)
+
+    def current(self):
+        now = os.fstat(self.descriptor)
+        if (now.st_dev, now.st_ino, now.st_mode) != self.identity:
+            raise ServeRefusal("caller")
+
+    def consume(self):
+        self.current()
+        data = os.read(self.descriptor, 1)
+        self.owner.cancelled = True
+        self.eof = True
+        self.detach()
+        if data:
+            raise ServeRefusal("protocol")
+        if self.owner._retirement_deadline is None:
+            raise ServeRefusal("cancelled")
+
+    def detach(self):
+        if self.selector is None or self._unregister_attempted:
+            return
+        self._unregister_attempted = True
+        try:
+            self.selector.unregister(self.descriptor)
+        except BaseException as error:
+            # Unknown registration retirement is debt, never a reason to skip
+            # draining/reaping the original guardian or to retry this capability.
+            if self.owner._cleanup_debt is None:
+                self.owner._cleanup_debt = error
+
+    def probe(self):
+        if self.eof:
+            return
+        self.current()
+        # Before the original operation/selector exists this zero-time syscall
+        # can refuse EOF before source acquisition. It creates no waiter or FD.
+        if select.select([self.descriptor], [], [], 0)[0]:
+            self.consume()
+
+    def attach(self, selector):
+        if self.selector is not None or self._registration_attempted:
+            raise ServeRefusal("state")
+        self.selector = selector
+        self._registration_attempted = True
+        self.current()
+        selector.register(self.descriptor, selectors.EVENT_READ, self._key)
+        return self
+
+    def select(self, timeout=None):
+        ready = self.selector.select(timeout)
+        # Caller loss wins over a coalesced ACTIVE frame. During retirement,
+        # EOF is already consumed and never prevents the original drain/reap.
+        if self.owner._retirement_deadline is None and any(
+            key.data is self._key for key, _ in ready
+        ):
+            self.consume()
+        return [(key, mask) for key, mask in ready if key.data is not self._key]
+
+    def close(self):
+        if self._close_attempted:
+            if self._close_error is not None:
+                raise self._close_error
+            return
+        self._close_attempted = True
+        try:
+            self.selector.close()
+        except BaseException as error:
+            self._close_error = error
+            raise
+
+    def __getattr__(self, name):
+        return getattr(self.selector, name)
+
+
 class ServeOwner:
     """Production source, session and namespace ownership is never derived from UI.
 
@@ -56,7 +153,9 @@ class ServeOwner:
     relay materialization is performed here.
     """
 
-    def __init__(self, port, timeout, idle_timeout, retirement_timeout, *, register):
+    def __init__(
+        self, port, timeout, idle_timeout, retirement_timeout, *, register, listener_event=False
+    ):
         if (
             type(port) is not int
             or not 1024 <= port <= 65535
@@ -66,6 +165,9 @@ class ServeOwner:
             )
         ):
             raise ServeRefusal("protocol")
+        if type(listener_event) is not bool:
+            raise ServeRefusal("protocol")
+        self._listener_event = listener_event
         self.port, self.idle_timeout = port, idle_timeout
         self.retirement_timeout = retirement_timeout
         self.deadline = time.monotonic() + timeout
@@ -76,6 +178,7 @@ class ServeOwner:
         self._retirement_deadline = None
         self._cleanup_debt = None
         self.cancelled = False
+        self._caller_input = None
         self._api_responses = []
         self._api_admission = None
         self._api_ready = False
@@ -84,6 +187,8 @@ class ServeOwner:
         register(self)
 
     def progress(self):
+        if self._caller_input is not None:
+            self._caller_input.probe()
         if self.cancelled:
             raise ServeRefusal("cancelled")
         if time.monotonic() >= self.deadline:
@@ -218,13 +323,25 @@ class ServeOwner:
                 "host": "127.0.0.1:" + str(self.port),
                 **self.bootstrap.fields(),
             }
+            if self._listener_event:
+                public["listener_event"] = True
+
+            def register_operation(value):
+                self.operation = value
+                if self._caller_input is not None:
+                    # Retain the adapter before registration can fail. The
+                    # original selector remains in the original operation ledger.
+                    original_selector = value._selector
+                    value._selector = self._caller_input
+                    self._caller_input.attach(original_selector)
+
             self.operation = OWNER.SuspendedImageOwner(
                 launcher,
                 public,
                 self.session,
                 self.source_check,
                 None,
-                register=lambda value: setattr(self, "operation", value),
+                register=register_operation,
                 bootstrap=self.bootstrap,
             )
             self.alias.bind_operation(self.operation)
@@ -288,6 +405,9 @@ class ServeOwner:
         ):
             raise ServeRefusal("state")
         self.progress()
+        if self._listener_event:
+            self.operation.wait_listener_bound()
+            self.progress()
         session_wire, authority_wire = self.session._written, self.authority._written
         proof = AUTHORITY.POLICY.authenticate(
             authority_wire, session_wire, self.policy.shared, os.geteuid()
@@ -379,6 +499,8 @@ class ServeOwner:
             if type(timeout) not in (float, int) or not math.isfinite(timeout) or timeout <= 0:
                 raise ServeRefusal("protocol")
             self._retirement_deadline = time.monotonic() + timeout
+            if self._caller_input is not None:
+                self._caller_input.detach()
         self._api_ready = False
         # Constructor/context closure uses the same captured one-shot method.
         # An uncertain close is retained, never retried against reused descriptors.
@@ -433,6 +555,10 @@ class ServeOwner:
             and not self.cancelled
         ):
             try:
+                if self._caller_input is not None:
+                    # Runtime cancellation does not renew or extend the startup
+                    # clock, or turn that acquisition clock into a daemon TTL.
+                    self._caller_input.probe()
                 self.operation._pump(time.monotonic() + 1)
             except OWNER.ImageRefusal as error:
                 if str(error) != "deadline":
@@ -444,7 +570,14 @@ class ServeOwner:
 
 
 def serve(
-    port, timeout, idle_timeout, retirement_timeout, *, caller_nonce=None, acquire_readiness=False
+    port,
+    timeout,
+    idle_timeout,
+    retirement_timeout,
+    *,
+    caller_nonce=None,
+    acquire_readiness=False,
+    owned_stdin=False,
 ):
     # The caller binding is public randomness, never the daemon session token.
     # Only this native owner may project its authenticated lifecycle to stdout.
@@ -456,6 +589,9 @@ def serve(
         raise ServeRefusal("protocol")
 
     if type(acquire_readiness) is not bool or (acquire_readiness and caller_nonce is None):
+        raise ServeRefusal("protocol")
+
+    if type(owned_stdin) is not bool or (owned_stdin and caller_nonce is None):
         raise ServeRefusal("protocol")
 
     def publish(role, status=None):
@@ -477,7 +613,14 @@ def serve(
         # This fixed refusal occurs before any source/session/daemon acquisition.
         publish("RETIRED", 78)
         raise ServeRefusal("unavailable")
-    owner = ServeOwner(port, timeout, idle_timeout, retirement_timeout, register=lambda value: None)
+    owner = ServeOwner(
+        port,
+        timeout,
+        idle_timeout,
+        retirement_timeout,
+        register=lambda value: None,
+        listener_event=acquire_readiness,
+    )
 
     def cancelled(signum, frame):
         owner.cancelled = True
@@ -488,6 +631,8 @@ def serve(
     }
     try:
         try:
+            if owned_stdin:
+                owner._caller_input = _CallerInput(owner)
             owner.prepare().start()
             # start() returns only after the mapped-image ACTIVE handshake and
             # same-session authority publication. This is not socket/API readiness.
@@ -532,6 +677,7 @@ def main():
     parser.add_argument("--retirement-timeout", type=float, required=True)
     parser.add_argument("--caller-nonce")
     parser.add_argument("--acquire-readiness", action="store_true")
+    parser.add_argument("--owned-stdin", action="store_true")
     arguments = parser.parse_args()
     if not 1024 <= arguments.port <= 65535 or any(
         not math.isfinite(value) or value <= 0
@@ -546,6 +692,7 @@ def main():
             arguments.retirement_timeout,
             caller_nonce=arguments.caller_nonce,
             acquire_readiness=arguments.acquire_readiness,
+            owned_stdin=arguments.owned_stdin,
         )
     except Exception:
         print("Managed Ollama daemon admission refused.", file=sys.stderr)
