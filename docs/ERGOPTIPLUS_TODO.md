@@ -3368,6 +3368,11 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
 
+The Windows journal now retains the actual eight native callback owners before
+and after each recovery and guarded I/O leg, including the final source guard.
+Genuine acquired-read timer controls are registered; their native execution
+remains pending. The prior incomplete run does not qualify this successor.
+
 The current Windows forward migration source uses the actual shared schema12
 registry and classified source witnesses. Invalid or unsupported schema versions
 continue to refuse migration and writes; retired source entries stay preserved
