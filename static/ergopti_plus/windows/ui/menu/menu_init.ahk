@@ -14,19 +14,19 @@
 
 
 
-; Render the runtime-registered personal shortcuts at the bottom of the
-; Raccourcis menu when any have been declared by personal_shortcuts.ahk
-; (separator + nested submenu of per-name toggles). Reads from the
+; Collect runtime-registered personal shortcut DATA without a native destination.
+; Literal zero means absent registry; a present empty child Array remains valid.
+; The central declared frame receiver owns separator and group rendering. Reads from the
 ; ``_PersonalShortcutsRegistry`` global populated by RegisterPersonalFeature
 ; so no Features v1 Map access is required.
-_AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
+_PersonalShortcutRows() {
 	global _PersonalShortcutsRegistry
 	if !_PersonalShortcutsRegistry.Has("__Order") {
-		return
+		return 0
 	}
 	Names := _PersonalShortcutsRegistry["__Order"]
 	if (Names.Length == 0) {
-		return
+		return 0
 	}
 
 	; One nested row per registered personal shortcut, drawn by the renderer.
@@ -42,11 +42,7 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 			PersonalRows.Push(Row)
 		}
 	}
-	FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))
-	if !(FrameRows is Array)
-		return 0
-	MenuRenderer_AppendTemplate(ShortcutsMenu, "personal_shortcuts_frame", Map(), Map(),
-		Map("personal_shortcuts_registered", PersonalRows))
+	return PersonalRows
 }
 
 

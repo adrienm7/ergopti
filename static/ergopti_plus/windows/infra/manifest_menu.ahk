@@ -20,6 +20,11 @@
 
 #Include menu_population.ahk
 
+; Capture only built-in metadata at include, before DATA/user callbacks can run.
+if !_MR_FrameNativeConstructorCurrent(Menu)
+	throw Error("The native Menu constructor lost its interpreter-owned authority")
+
+
 
 
 
@@ -179,7 +184,7 @@ _MR_Get(Obj, Key, Default := "") {
 ; Optional GroupDisabled maps declared ids to resolved native Boolean greying.
 ; Such groups must return a genuine Menu before any parent is attached.
 ; Returns the populated Menu object.
-MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", TargetMenu := unset, GroupDisabled := unset) {
+MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", TargetMenu := unset, GroupDisabled := unset, DeclaredFrames := unset) {
 	if IsSet(TargetMenu) && (!(TargetMenu is Menu)
 			|| TrayMenuItemCount(TargetMenu) != 0)
 		throw Error("A manifest menu target must be an empty native menu.")
@@ -207,6 +212,23 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			if Type(Id) != "String" || Id == "" || Type(Disabled) != "Integer"
 				|| (Disabled != 0 && Disabled != 1)
 				throw Error("Native group greying requires an explicit Boolean fact.")
+		}
+	}
+	static FrameDataOwner := MenuRenderer_AppendFrameData, FrameSnapshotOwner := _MR_ReasonedGroupSnapshot
+	if IsSet(DeclaredFrames) {
+		if FrameDataOwner != MenuRenderer_AppendFrameData || FrameSnapshotOwner != _MR_ReasonedGroupSnapshot
+			|| Object.Prototype.HasOwnProp.Call(FrameDataOwner, "Call")
+			|| Object.Prototype.HasOwnProp.Call(FrameSnapshotOwner, "Call")
+			throw Error("Declared frame DATA owner is unavailable")
+		FrameBindings := FrameSnapshotOwner.Call(DeclaredFrames)
+		HandlersReceipt := FrameSnapshotOwner.Call(DynamicHandlers)
+		ProvidersReceipt := FrameSnapshotOwner.Call(ListProviders)
+		if !FrameBindings || !(DeclaredFrames is Map) || !HandlersReceipt || !ProvidersReceipt
+			throw Error("Declared frame DATA registrations must be plain")
+		for FrameId, Binding in DeclaredFrames {
+			if Type(FrameId) != "String" || FrameId == "" || !(Binding is Map)
+				|| (DynamicHandlers is Map && DynamicHandlers.Has(FrameId)) || ListProviders.Has(FrameId)
+				throw Error("Declared frame DATA registration has competing owners")
 		}
 	}
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
@@ -255,6 +277,24 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			continue
 		}
 
+		; Frame DATA admission precedes every native effect belonging to this entry.
+		if IsSet(DeclaredFrames) && DeclaredFrames.Has(_MR_Get(Item, "id")) {
+			Id := _MR_Get(Item, "id")
+			if ItemType != "list" || FrameDataOwner != MenuRenderer_AppendFrameData
+				|| Object.Prototype.HasOwnProp.Call(FrameDataOwner, "Call")
+				|| !_MR_ReasonedGroupCurrent(FrameBindings)
+				|| !_MR_ReasonedGroupCurrent(HandlersReceipt) || !_MR_ReasonedGroupCurrent(ProvidersReceipt)
+				|| (DynamicHandlers is Map && DynamicHandlers.Has(Id)) || ListProviders.Has(Id)
+				throw Error("Declared frame DATA registration was withdrawn")
+			Added := FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [FrameBindings, HandlersReceipt, ProvidersReceipt])
+			if !FrameAdmitted
+				throw Error("Declared frame DATA was refused before publication")
+			; This frame owns its literal prefix; skipped frames never flush PendingSep.
+			if Added > 0
+				PendingSep := false
+			ItemCount += Added
+			continue
+		}
 		; Flush deferred separator before any real item (never at position 0).
 		if PendingSep and ItemCount > 0 {
 			Result.Add()
@@ -315,7 +355,8 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			}
 
 		} else if (ItemType == "check" or ItemType == "command") {
-			ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
+			if !Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
+				ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
 
 		} else if ItemType == "dynamic" {
 			Id := _MR_Get(Item, "id")
@@ -603,8 +644,28 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 }
 
 _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
-	Row := _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters)
+	if !(Item is Map) || ObjGetBase(Item) != Map.Prototype
+		return 0
+	for Name in ObjOwnProps(Item)
+		return 0
+	Cohort := false, Getters := StateGetters
+	if Item.Has("caption_format") {
+		if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCohort, "Call")
+			return 0
+		Cohort := _MR_NumberedCommandCohort(Item, ManifestKey, Commands, StateGetters)
+		if !Cohort
+			return 0
+		Getters := Map()
+		for Key, Getter in StateGetters {
+			if !_MR_DeclaredParentCallable(Getter)
+				return 0
+			Getters[Key] := _MR_ReadNumberedCommandState.Bind(Cohort, Getter)
+		}
+	}
+	Row := _MR_CommandRowData(Item, ManifestKey, Commands, Getters)
 	if !(Row is Map)
+		return 0
+	if Cohort && (Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort))
 		return 0
 	; Keep the existing native stand-in owner and its untracked inert callback.
 	if Row.Has("disabled_reason_key") && (Item.Has("caption_layout") || Item.Has("caption_joiner") || Item.Has("label_prefix") || Item.Has("caption_getters"))
@@ -616,6 +677,69 @@ _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 			Map("id", _MR_Get(Item, "id"), "i18n", _MR_Get(Item, "i18n"),
 				"reason_key", Row["disabled_reason_key"]), ManifestKey)
 	return _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1)
+}
+
+; Numbered command captions retain their actual visible declaration and ports.
+_MR_NumberedCommandCohort(Item, ManifestKey, Commands, Getters) {
+	Owners := [_MR_GetManifestRoot, _MR_GetMenuDef, _MR_FindItemById, _MR_ReasonedGroupSnapshot,
+		_MR_ReasonedGroupCurrent, _MR_FrameReceiptCallablesCurrent, _MR_DeclaredParentCallable,
+		_MR_CommandRowData, _MR_ReadNumberedCaption, _MR_RenderRows, _MR_NumberedCommandCurrent,
+		_MR_ReadNumberedCommandState, _MR_RenderCommand, _MR_NumberedCommandCohort,
+		_MM_GetManifestRoot, _MR_Get, _MR_IsForAhk, _MR_IsForPlatform]
+	for Owner in Owners
+		if !(Owner is Func || Owner is BoundFunc) || Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	if !(Item is Map) || !(Commands is Map) || !(Getters is Map)
+		return false
+	Root := _MR_GetManifestRoot()
+	if !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	Rows := _MR_GetMenuDef(ManifestKey)
+	Source := _MR_ReasonedGroupSnapshot(Rows), CommandPorts := _MR_ReasonedGroupSnapshot(Commands)
+	StatePorts := _MR_ReasonedGroupSnapshot(Getters)
+	if !Source || !CommandPorts || !StatePorts
+		return false
+	Cohort := Map("root", Root, "key", ManifestKey, "rows", Rows, "item", Item,
+		"id", _MR_Get(Item, "id"), "source", Source, "commands", CommandPorts,
+		"states", StatePorts, "owners", Owners, "getters", Getters)
+	return _MR_NumberedCommandCurrent(Cohort) ? Cohort : false
+}
+
+; Currentness is pure: no getter or callback is invoked during these comparisons.
+_MR_NumberedCommandCurrent(Cohort) {
+	CurrentOwners := [_MR_GetManifestRoot, _MR_GetMenuDef, _MR_FindItemById, _MR_ReasonedGroupSnapshot,
+		_MR_ReasonedGroupCurrent, _MR_FrameReceiptCallablesCurrent, _MR_DeclaredParentCallable,
+		_MR_CommandRowData, _MR_ReadNumberedCaption, _MR_RenderRows, _MR_NumberedCommandCurrent,
+		_MR_ReadNumberedCommandState, _MR_RenderCommand, _MR_NumberedCommandCohort,
+		_MM_GetManifestRoot, _MR_Get, _MR_IsForAhk, _MR_IsForPlatform]
+	for Index, Owner in Cohort["owners"]
+		if Owner != CurrentOwners[Index] || !(Owner is Func || Owner is BoundFunc)
+			|| Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	Root := Cohort["root"]
+	if ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	for Receipt in [Cohort["source"], Cohort["commands"], Cohort["states"]]
+		if !_MR_ReasonedGroupCurrent(Receipt) || !_MR_FrameReceiptCallablesCurrent(Receipt)
+			return false
+	if _MR_GetManifestRoot() != Root || !Root.Has(Cohort["key"]) || Root[Cohort["key"]] != Cohort["rows"]
+		|| _MR_FindItemById(Cohort["key"], Cohort["id"]) != Cohort["item"]
+		return false
+	return true
+}
+
+; A retained wrapper rechecks the full cohort on both sides of each actual read.
+_MR_ReadNumberedCommandState(Cohort, Getter) {
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner was withdrawn before its state read.")
+	Value := Getter.Call()
+	if Object.Prototype.HasOwnProp.Call(_MR_NumberedCommandCurrent, "Call") || !_MR_NumberedCommandCurrent(Cohort)
+		throw Error("The numbered command owner changed during its state read.")
+	return Value
 }
 
 ; Provider callbacks use the same current declaration as the drawn row.
@@ -1439,6 +1563,8 @@ MenuRenderer_CheckRow(ManifestKey, CheckId, Commands, StateGetters := unset) {
 MenuRenderer_AppendCommand(TargetMenu, ManifestKey, CommandId, Commands, StateGetters := unset) {
 	Item := _MR_FindItemById(ManifestKey, CommandId)
 	if !(Item is Map) || _MR_Get(Item, "type") != "command" || !_MR_IsForAhk(Item)
+		return 0
+	if Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
 		return 0
 	return _MR_RenderCommand(TargetMenu, Item, ManifestKey, Commands, IsSet(StateGetters) ? StateGetters : Map())
 }
@@ -2310,4 +2436,713 @@ MenuRenderer_GroupReplacement(TargetMenu, ManifestKey, GroupId, PreviousChild) {
 		} finally Critical(PreviousCritical)
 	}
 	return SlotLive() ? Publish : false
+}
+
+
+/**
+ * Receives one declared leaf DATA frame through its retained native destination.
+ * The provider never receives the destination and cannot draw the frame itself.
+ * @param {Menu} TargetMenu Exact existing destination.
+ * @param {String} ManifestKey Owning menu declaration.
+ * @param {String} EntryId Owning declared list identity.
+ * @param {Map} Binding Plain manifest_key/children_id/provider registration.
+ * @param {Array} ExpectedDefinition Original Build-owned definition, if supplied.
+ * @param {Map} ExpectedItem Original Build-owned list row, if supplied.
+ * @param {Boolean} Admitted True for a successful append or current intentional skip.
+ * @returns {Integer} Number of appended nonseparator parents, zero on refusal/skip.
+ */
+MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
+		ExpectedDefinition := unset, ExpectedItem := unset, &Admitted := unset, Registrations := unset) {
+	global _MenuPopulationBuilding, _MenuDispatchCallbacks, _MenuDispatchTokens
+	global _MenuDispatchOwnerHandles, _MenuDispatchLastFire, _MenuDispatchClickSequences, _MenuDispatcherEpoch
+	static EntryOwner := MenuRenderer_AppendFrameData
+	static RootOwner := _MR_GetManifestRoot, SharedRootOwner := _MM_GetManifestRoot, DefinitionOwner := _MR_GetMenuDef
+	static SnapshotOwner := _MR_ReasonedGroupSnapshot, CurrentOwner := _MR_ReasonedGroupCurrent
+	static TemplateOwner := MenuRenderer_TemplateRows, InnerTemplateOwner := _MR_TemplateRows
+	static AdmissionOwner := _MR_AppendTemplateRowsAdmitted, LeafOwner := _MR_FrameLeafAdmitted
+	static RenderOwner := _MR_RenderRows, NormalizeOwner := _MR_NormalizeSeparators
+	static RegisterOwner := RegisterMenuItem, PruneOwner := MenuDispatcher_PruneMenu
+	static DestinationOwner := _MR_FrameDestinationSnapshot, ReleaseOwner := _MR_FrameReleaseChild
+	static FrameOwner := _MR_FrameDefinitionAdmitted, PlatformOwner := _MR_IsForAhk
+	static PublishOwner := _MR_FramePublish, StageOwner := _MR_FrameStageAdmitted
+	static FieldOwner := _MR_Get, TranslationOwner := t
+	static NativeConstructor := Menu, NativePortOwner := TrayMenuFrameNative
+	static ConstructorOwner := _MR_FrameNativeConstructorCurrent
+	static CaptionOwner := TrayMenuItemCaption, CountOwner := TrayMenuItemCount
+	static LookupOwner := _MR_FindItemById, AliasOwner := MenuFromHandle
+	static ImageOwner := _MR_FrameNativeImageEqual, PendingOwner := _MR_FramePendingOwnEntry
+	static HandleCountOwner := TrayMenuHandleItemCount
+	static PrefixOwner := _MR_CommandLiteralPrefix, CaptionLayoutOwner := _MR_CaptionLayoutMetadata
+	static CaptionVectorOwner := _MR_CaptionVectorMetadata, CountPolicyOwner := _MR_TranslatedCountPolicy
+	static CaptionFormatOwner := _MR_CaptionFormat, DialectOwner := _MR_ReportDriverDialect
+	static PendingCaptureOwner := _MR_FramePendingSnapshot, PendingCurrentOwner := _MR_FramePendingCurrent
+	static ReceiptCallbacksOwner := _MR_FrameReceiptCallablesCurrent, ReceiptAdmissionOwner := _MR_FrameReceiptAdmitted
+	static NativeHandleGetter := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Handle").Get
+	static NativeMethods := Map()
+	if NativeMethods.Count == 0 {
+		for Name in ["Add", "Delete", "Check", "Disable", "Enable", "Uncheck", "SetIcon"]
+			NativeMethods[Name] := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, Name).Call
+	}
+	Admitted := false
+	Child := false, ChildHandle := 0, LeafCallbacks := [], Published := false, Population := false, Pending := false, PendingEntry := false
+	PrimaryError := false
+	RegistryOwners := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
+		_MenuDispatchLastFire, _MenuDispatchClickSequences]
+	DispatcherEpoch := _MenuDispatcherEpoch
+	OriginalCritical := Critical("On")
+	OwnersLive() {
+		Pairs := [[EntryOwner, MenuRenderer_AppendFrameData], [RootOwner, _MR_GetManifestRoot],
+			[SharedRootOwner, _MM_GetManifestRoot], [DefinitionOwner, _MR_GetMenuDef], [SnapshotOwner, _MR_ReasonedGroupSnapshot],
+			[CurrentOwner, _MR_ReasonedGroupCurrent], [TemplateOwner, MenuRenderer_TemplateRows],
+			[InnerTemplateOwner, _MR_TemplateRows], [AdmissionOwner, _MR_AppendTemplateRowsAdmitted],
+			[LeafOwner, _MR_FrameLeafAdmitted], [RenderOwner, _MR_RenderRows],
+			[NormalizeOwner, _MR_NormalizeSeparators], [RegisterOwner, RegisterMenuItem],
+			[PruneOwner, MenuDispatcher_PruneMenu], [DestinationOwner, _MR_FrameDestinationSnapshot],
+			[ReleaseOwner, _MR_FrameReleaseChild], [FrameOwner, _MR_FrameDefinitionAdmitted],
+			[PlatformOwner, _MR_IsForAhk], [FieldOwner, _MR_Get], [TranslationOwner, t],
+			[NativeConstructor, Menu], [ConstructorOwner, _MR_FrameNativeConstructorCurrent], [NativePortOwner, TrayMenuFrameNative], [CaptionOwner, TrayMenuItemCaption],
+			[CountOwner, TrayMenuItemCount], [LookupOwner, _MR_FindItemById],
+			[AliasOwner, MenuFromHandle], [ImageOwner, _MR_FrameNativeImageEqual],
+			[PendingOwner, _MR_FramePendingOwnEntry], [HandleCountOwner, TrayMenuHandleItemCount],
+			[PrefixOwner, _MR_CommandLiteralPrefix], [CaptionLayoutOwner, _MR_CaptionLayoutMetadata],
+			[CaptionVectorOwner, _MR_CaptionVectorMetadata], [CountPolicyOwner, _MR_TranslatedCountPolicy],
+			[CaptionFormatOwner, _MR_CaptionFormat], [DialectOwner, _MR_ReportDriverDialect],
+			[PendingCaptureOwner, _MR_FramePendingSnapshot], [PendingCurrentOwner, _MR_FramePendingCurrent],
+			[ReceiptCallbacksOwner, _MR_FrameReceiptCallablesCurrent], [ReceiptAdmissionOwner, _MR_FrameReceiptAdmitted],
+			[PublishOwner, _MR_FramePublish], [StageOwner, _MR_FrameStageAdmitted]]
+		for Pair in Pairs {
+			if Pair[1] != Pair[2]
+				return false
+			if Pair[1] != NativeConstructor && Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		}
+		if !ConstructorOwner.Call(NativeConstructor) || !NativePortOwner.Call("current")
+			return false
+		CurrentRegistries := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
+			_MenuDispatchLastFire, _MenuDispatchClickSequences]
+		if _MenuDispatcherEpoch != DispatcherEpoch
+			return false
+		for Index, Registry in CurrentRegistries {
+			if Registry != RegistryOwners[Index] || !(Registry is Map) || ObjGetBase(Registry) != Map.Prototype
+				return false
+			for Name in ObjOwnProps(Registry)
+				return false
+		}
+		if !Object.Prototype.HasOwnProp.Call(Menu.Prototype, "Handle")
+			|| Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Handle").Get != NativeHandleGetter
+			|| Object.Prototype.HasOwnProp.Call(NativeHandleGetter, "Call")
+			return false
+		if !(TargetMenu is Menu) || ObjGetBase(TargetMenu) != Menu.Prototype
+			return false
+		for Name in ["Handle", "Add", "Delete", "Check", "Disable", "Enable", "Uncheck", "SetIcon"]
+			if Object.Prototype.HasOwnProp.Call(TargetMenu, Name)
+				return false
+		for Name, Method in NativeMethods {
+			if !Object.Prototype.HasOwnProp.Call(Menu.Prototype, Name)
+				|| Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, Name).Call != Method
+				|| Object.Prototype.HasOwnProp.Call(Method, "Call")
+				return false
+		}
+		return true
+	}
+	try {
+		if !OwnersLive() || Type(ManifestKey) != "String" || ManifestKey == ""
+			|| Type(EntryId) != "String" || EntryId == ""
+			return 0
+		BindingReceipt := SnapshotOwner.Call(Binding)
+		if !OwnersLive() || !BindingReceipt || !(Binding is Map) || Binding.Count != 3
+			|| !Binding.Has("manifest_key") || !Binding.Has("children_id") || !Binding.Has("provider")
+			return 0
+		if IsSet(Registrations) {
+			RegistrationsReceipt := SnapshotOwner.Call(Registrations)
+			if !OwnersLive() || !RegistrationsReceipt || !(Registrations is Array) || Registrations.Length != 3
+				return 0
+			for Receipt in Registrations
+				if !ReceiptAdmissionOwner.Call(Receipt)
+					return 0
+		}
+		FrameKey := Binding["manifest_key"], ChildId := Binding["children_id"], Provider := Binding["provider"]
+		if Type(FrameKey) != "String" || FrameKey == "" || Type(ChildId) != "String" || ChildId == ""
+			|| !(Provider is Func) || Object.Prototype.HasOwnProp.Call(Provider, "Call")
+			return 0
+		Root := RootOwner.Call()
+		if !OwnersLive() || !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+			return 0
+		for Name in ObjOwnProps(Root)
+			return 0
+		Definition := DefinitionOwner.Call(ManifestKey), Frame := DefinitionOwner.Call(FrameKey)
+		if !OwnersLive() || !(Root is Map) || !Root.Has(ManifestKey) || !Root.Has(FrameKey)
+			|| Root[ManifestKey] != Definition || Root[FrameKey] != Frame
+			|| (IsSet(ExpectedDefinition) && Definition != ExpectedDefinition)
+			return 0
+		DefinitionReceipt := SnapshotOwner.Call(Definition), FrameReceipt := SnapshotOwner.Call(Frame)
+		if !OwnersLive() || !DefinitionReceipt || !FrameReceipt
+			return 0
+		Selected := false, Matches := 0
+		for Item in Definition {
+			if Item is Map && Item.Get("id", "") == EntryId {
+				Selected := Item, Matches += 1
+			}
+		}
+		if Matches != 1 || Selected.Get("type", "") != "list" || !PlatformOwner.Call(Selected)
+			|| (IsSet(ExpectedItem) && Selected != ExpectedItem)
+			|| !FrameOwner.Call(Frame, ChildId) || !OwnersLive()
+			return 0
+		Handle := TargetMenu.Handle, Destination := DestinationOwner.Call(TargetMenu)
+		if !OwnersLive() || !Destination
+			return 0
+		Population := _MenuPopulationBuilding
+		if Population is MenuPopulation {
+			if ObjGetBase(Population) != MenuPopulation.Prototype
+				|| Object.Prototype.HasOwnProp.Call(Population, "Fill")
+				|| !Object.Prototype.HasOwnProp.Call(Population, "Pending")
+				return 0
+			PendingDesc := Object.Prototype.GetOwnPropDesc.Call(Population, "Pending")
+			if !PendingDesc.HasOwnProp("Value")
+				return 0
+			Pending := PendingDesc.Value
+			PendingReceipt := PendingCaptureOwner.Call(Pending)
+			if !PendingReceipt || !(Pending is Map)
+				return 0
+			FillOwner := Object.Prototype.GetOwnPropDesc.Call(MenuPopulation.Prototype, "Fill").Call
+			if Object.Prototype.HasOwnProp.Call(FillOwner, "Call")
+				return 0
+		} else if Type(Population) != "Integer" || Population != 0
+			return 0
+		SourceLive() {
+			if Type(Child) != "Integer" || Child != 0 {
+				if !(Child is Menu) || ObjGetBase(Child) != Menu.Prototype
+					return false
+				for Name in ["Handle", "Add", "Delete", "Check", "Disable", "Enable", "Uncheck", "SetIcon"]
+					if Object.Prototype.HasOwnProp.Call(Child, Name)
+						return false
+			}
+			if !OwnersLive() || Object.Prototype.HasOwnProp.Call(Provider, "Call")
+				|| !CurrentOwner.Call(BindingReceipt)
+				return false
+			if IsSet(Registrations) {
+				if !CurrentOwner.Call(RegistrationsReceipt)
+					return false
+				for Receipt in Registrations
+					if !CurrentOwner.Call(Receipt) || !ReceiptCallbacksOwner.Call(Receipt)
+						return false
+				Frames := Registrations[1]["value"]
+				Handlers := Registrations[2]["value"], Providers := Registrations[3]["value"]
+				if !(Frames is Map) || !Frames.Has(EntryId) || Frames[EntryId] != Binding
+					|| (Handlers is Map && Handlers.Has(EntryId)) || (Providers is Map && Providers.Has(EntryId))
+					return false
+			}
+			CurrentRoot := RootOwner.Call()
+			if !OwnersLive() || CurrentRoot != Root || ObjGetBase(Root) != Map.Prototype
+				return false
+			for Name in ObjOwnProps(Root)
+				return false
+			if !Root.Has(ManifestKey) || !Root.Has(FrameKey)
+				|| Root[ManifestKey] != Definition || Root[FrameKey] != Frame
+				|| !CurrentOwner.Call(DefinitionReceipt) || !CurrentOwner.Call(FrameReceipt)
+				|| Selected.Get("type", "") != "list" || !PlatformOwner.Call(Selected)
+				|| !FrameOwner.Call(Frame, ChildId) || !OwnersLive() || TargetMenu.Handle != Handle
+				|| _MenuPopulationBuilding != Population
+				return false
+			if Population is MenuPopulation {
+				if Object.Prototype.HasOwnProp.Call(Population, "Fill")
+					|| Object.Prototype.GetOwnPropDesc.Call(MenuPopulation.Prototype, "Fill").Call != FillOwner
+					|| Object.Prototype.HasOwnProp.Call(FillOwner, "Call")
+					return false
+				NowPending := Object.Prototype.GetOwnPropDesc.Call(Population, "Pending")
+				if !NowPending.HasOwnProp("Value") || NowPending.Value != Pending
+					return false
+				if !PendingCurrentOwner.Call(PendingReceipt, Child, PendingEntry)
+					return false
+			}
+			return OwnersLive()
+		}
+		DestinationLive() {
+			if !SourceLive()
+				return false
+			Now := DestinationOwner.Call(TargetMenu)
+			return SourceLive() && (Now is Array) && ImageOwner.Call(Destination, Now)
+		}
+		if !DestinationLive()
+			return 0
+		Data := Provider.Call()
+		if !DestinationLive()
+			return 0
+		if Type(Data) == "Integer" && Data == 0 {
+			Admitted := true
+			return 0
+		}
+		if !LeafOwner.Call(Data) || !DestinationLive()
+			return 0
+		DataReceipt := SnapshotOwner.Call(Data)
+		if !DataReceipt || !DestinationLive()
+			return 0
+		Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data))
+		if !DestinationLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data)
+			|| !AdmissionOwner.Call(Rows, 1, Map()) || Rows.Length != Frame.Length
+			|| !Rows[Rows.Length].Has("items") || Rows[Rows.Length]["items"] != Data
+			return 0
+		RowsReceipt := SnapshotOwner.Call(Rows)
+		if !RowsReceipt || !DestinationLive()
+			return 0
+		for Leaf in Data
+			LeafCallbacks.Push(Leaf["action"])
+		Child := NativeConstructor.Call()
+		ChildHandle := Child.Handle
+		if !DestinationLive()
+			return 0
+		if Population is MenuPopulation {
+			FillOwner.Call(Population, Child, Data, FrameKey, 2)
+			PendingEntry := PendingOwner.Call(Pending, Child, ChildHandle)
+		} else {
+			if RenderOwner.Call(Child, Data, FrameKey, 2, 0, true) != Data.Length
+				return 0
+			NormalizeOwner.Call(Child)
+		}
+		if !DestinationLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data)
+			|| !CurrentOwner.Call(RowsReceipt)
+			return 0
+		StageReceipt := DestinationOwner.Call(Child)
+		if !DestinationLive() || !StageOwner.Call(StageReceipt, Data, Population is MenuPopulation)
+			return 0
+		Parent := Rows[Rows.Length], Label := StrReplace(Parent["label"], "&", "&&")
+		OldChild := false, OldParentFlags := 0, CaptionMatches := 0
+		for NativeRow in Destination {
+			if NativeRow[1] == Label {
+				CaptionMatches += 1
+				if NativeRow[4] == 0
+					return 0
+				OldChild := AliasOwner.Call(NativeRow[4]), OldParentFlags := NativeRow[3]
+			}
+		}
+		if CaptionMatches > 1 || !DestinationLive() || !CurrentOwner.Call(DataReceipt)
+			|| !LeafOwner.Call(Data) || !CurrentOwner.Call(RowsReceipt)
+			return 0
+		PublicationLive() {
+			if !SourceLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data)
+				|| !CurrentOwner.Call(RowsReceipt)
+				return false
+			NowStage := DestinationOwner.Call(Child)
+			return SourceLive() && StageOwner.Call(NowStage, Data, Population is MenuPopulation)
+				&& ImageOwner.Call(StageReceipt, NowStage)
+		}
+		if !PublicationLive() || !DestinationLive()
+			return 0
+		; The actual operation helper receives the held native methods, never providers.
+		Added := PublishOwner.Call(TargetMenu, Child, Rows, Label, Destination, NativeMethods,
+			OldChild, OldParentFlags, PublicationLive)
+		Published := true, Admitted := true
+		return Added
+	} catch as Failure {
+		PrimaryError := Failure
+		throw Failure
+	} finally {
+		try {
+			CleanupError := false
+			if !Published && Child is Menu {
+				try {
+					if Pending is Map && ObjGetBase(Pending) == Map.Prototype {
+						PendingEntry := PendingOwner.Call(Pending, Child, ChildHandle)
+						; Intrinsic methods retire only our exact entry from the retained Map.
+						if PendingEntry && Map.Prototype.Has.Call(Pending, ChildHandle)
+							&& Map.Prototype.Get.Call(Pending, ChildHandle) == PendingEntry
+							Map.Prototype.Delete.Call(Pending, ChildHandle)
+					}
+				} catch as PendingFailure
+					CleanupError := PendingFailure
+				try {
+					if Object.Prototype.HasOwnProp.Call(ReleaseOwner, "Call")
+						throw Error("Owned DATA stage cleanup owner was withdrawn")
+					ReleaseOwner.Call(Child, ChildHandle, RegistryOwners, LeafCallbacks, NativePortOwner, PruneOwner)
+				}
+				catch as ChildFailure {
+					if !CleanupError
+						CleanupError := ChildFailure
+					else {
+						try CleanupError.Extra := "Additional child cleanup failure: " . ChildFailure.Message
+						catch {
+						}
+					}
+				}
+			}
+			if CleanupError {
+				if PrimaryError {
+					; Diagnostics must never replace the genuine primary exception object.
+					try {
+						Detail := Object.Prototype.HasOwnProp.Call(PrimaryError, "Extra") ? PrimaryError.Extra : ""
+						PrimaryError.Extra := Detail . "; DATA frame cleanup failed: " . CleanupError.Message
+					} catch {
+					}
+				} else
+					throw CleanupError
+			}
+		} finally Critical(OriginalCritical)
+	}
+}
+
+; This mode admits real leaf DATA, never preconstructed native submenus.
+_MR_FrameLeafAdmitted(Data) {
+	if !_MR_AppendTemplateRowsAdmitted(Data, 1, Map())
+		return false
+	Allowed := Map("label", true, "action", true, "checked", true, "disabled", true)
+	for Row in Data {
+		for Name in Row
+			if !Allowed.Has(Name)
+				return false
+		if !Row.Has("action") || !(Row["action"] is Func)
+			|| Object.Prototype.HasOwnProp.Call(Row["action"], "Call")
+			return false
+	}
+	return true
+}
+
+; A leaf frame owns only its literal separator prefix and one terminal group.
+_MR_FrameDefinitionAdmitted(Frame, ChildId) {
+	if !(Frame is Array) || Frame.Length < 1
+		return false
+	for Index, Item in Frame {
+		if !(Item is Map) || !_MR_IsForAhk(Item)
+			return false
+		if Index < Frame.Length {
+			if Item.Get("type", "") != "---"
+				return false
+			Allowed := Map("type", true, "platforms", true, "unavailable", true)
+		} else {
+			if Item.Get("type", "") != "group" || Item.Get("id", "") != ChildId
+				|| Type(Item.Get("i18n", false)) != "String" || Item["i18n"] == ""
+				return false
+			Allowed := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true)
+		}
+		for Name in Item
+			if !Allowed.Has(Name)
+				return false
+		if Item.Has("unavailable") && Item["unavailable"] != "hide"
+			return false
+	}
+	return true
+}
+
+; The receipt covers native identity/order/flags/children and existing command ids.
+_MR_FrameDestinationSnapshot(TargetMenu) {
+	global _MenuDispatchCallbacks, _MenuDispatchTokens
+	static NativePortOwner := TrayMenuFrameNative
+	if NativePortOwner != TrayMenuFrameNative || Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
+		return false
+	Native := NativePortOwner.Call("capture", TargetMenu)
+	if !Native || NativePortOwner != TrayMenuFrameNative || Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
+		return false
+	Rows := []
+	for Row in Native[2] {
+		Id := Row[2]
+		Rows.Push([Row[1], Id, Row[3], Row[4],
+			_MenuDispatchCallbacks.Get(Id, false), _MenuDispatchTokens.Get(Id, false)])
+	}
+	return Rows
+}
+
+_MR_FrameNativeImageEqual(Before, After) {
+	if !(Before is Array) || !(After is Array) || Before.Length != After.Length
+		return false
+	for Index, Row in Before
+		for Field, Value in Row
+			if Type(After[Index][Field]) != Type(Value) || !(After[Index][Field] == Value)
+				return false
+	return true
+}
+
+; Retire only commands actually staged in this exact owned leaf and held registries.
+; A replacement global registry remains foreign; it is never globally reset/pruned.
+_MR_FrameReleaseChild(Child, Handle, Registries, ExpectedCallbacks, NativePortOwner, PruneOwner) {
+	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
+	global _MenuDispatchLastFire, _MenuDispatchClickSequences
+	if Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
+		throw Error("Owned DATA stage cleanup lost its native cohort")
+	for Registry in Registries {
+		if !(Registry is Map) || ObjGetBase(Registry) != Map.Prototype
+			throw Error("Owned DATA stage cleanup lost a retained dispatch registry")
+		for Name in ObjOwnProps(Registry)
+			throw Error("Owned DATA stage cleanup registry is no longer plain")
+	}
+	Owned := [], Ids := NativePortOwner.Call("ids", Child, Handle)
+	for Id in Ids {
+		if !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)
+			continue
+		Callback := Map.Prototype.Get.Call(Registries[1], Id), Matches := false
+		for Expected in ExpectedCallbacks
+			if Callback == Expected {
+				Matches := true
+				break
+			}
+		if Matches
+			Owned.Push([Id, Callback, Map.Prototype.Get.Call(Registries[2], Id)])
+	}
+	try NativePortOwner.Call("release", Child, Handle)
+	finally {
+		if !Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
+			&& NativePortOwner.Call("count", Child, Handle) <= 0 {
+			for Registration in Owned {
+				Id := Registration[1]
+				if !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)
+					|| Map.Prototype.Get.Call(Registries[1], Id) != Registration[2]
+					|| Map.Prototype.Get.Call(Registries[2], Id) != Registration[3]
+					continue
+				for Index in [1, 2, 4, 5]
+					if Map.Prototype.Has.Call(Registries[Index], Id)
+						Map.Prototype.Delete.Call(Registries[Index], Id)
+			}
+			if Map.Prototype.Has.Call(Registries[3], Handle)
+				&& Map.Prototype.Get.Call(Registries[3], Handle) == true
+				Map.Prototype.Delete.Call(Registries[3], Handle)
+		}
+		if _MenuDispatchCallbacks == Registries[1] && _MenuDispatchTokens == Registries[2]
+			&& _MenuDispatchOwnerHandles == Registries[3] && _MenuDispatchLastFire == Registries[4]
+			&& _MenuDispatchClickSequences == Registries[5]
+			&& PruneOwner == MenuDispatcher_PruneMenu && !Object.Prototype.HasOwnProp.Call(PruneOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(Child, "Handle")
+			PruneOwner.Call(Child)
+	}
+}
+
+; Raw identity admission for the exact newly-owned deferred leaf entry.
+_MR_FramePendingOwnEntry(Pending, Child, KnownHandle := unset) {
+	if !(Pending is Map) || ObjGetBase(Pending) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Pending)
+		return false
+	Handle := IsSet(KnownHandle) ? KnownHandle : Child.Handle
+	if !Pending.Has(Handle)
+		return false
+	Entry := Pending[Handle]
+	if !IsObject(Entry) || ObjGetBase(Entry) != Object.Prototype
+		|| !Object.Prototype.HasOwnProp.Call(Entry, "MenuObj")
+		return false
+	OwnerDesc := Object.Prototype.GetOwnPropDesc.Call(Entry, "MenuObj")
+	return OwnerDesc.HasOwnProp("Value") && OwnerDesc.Value == Child ? Entry : false
+}
+
+; Previous deferred entries are raw finite state, not opaque Object identities.
+_MR_FramePendingSnapshot(Pending) {
+	if !(Pending is Map) || ObjGetBase(Pending) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Pending)
+		return false
+	Entries := Map()
+	for Handle, Entry in Pending {
+		if Type(Handle) != "Integer" || !IsObject(Entry) || ObjGetBase(Entry) != Object.Prototype
+			return false
+		Fields := Map()
+		for Name in ObjOwnProps(Entry) {
+			Desc := Object.Prototype.GetOwnPropDesc.Call(Entry, Name)
+			if !Desc.HasOwnProp("Value")
+				return false
+			Fields[Name] := Desc.Value
+		}
+		Receipt := _MR_ReasonedGroupSnapshot(Fields)
+		if !Receipt || !_MR_FrameReceiptCallablesCurrent(Receipt)
+			return false
+		Entries[Handle] := Map("entry", Entry, "fields", Fields, "receipt", Receipt)
+	}
+	return Map("pending", Pending, "entries", Entries)
+}
+
+_MR_FramePendingCurrent(Capture, Child, NewEntry) {
+	Pending := Capture["pending"], Entries := Capture["entries"]
+	if ObjGetBase(Pending) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Pending)
+		return false
+	Expected := Entries.Count + (NewEntry ? 1 : 0)
+	if Pending.Count != Expected
+		return false
+	for Handle, Held in Entries {
+		if !Pending.Has(Handle) || Pending[Handle] != Held["entry"]
+			return false
+		Entry := Pending[Handle], Fields := Held["fields"], Count := 0
+		if ObjGetBase(Entry) != Object.Prototype
+			return false
+		for Name in ObjOwnProps(Entry) {
+			Count += 1
+			Desc := Object.Prototype.GetOwnPropDesc.Call(Entry, Name)
+			if !Desc.HasOwnProp("Value") || !Fields.Has(Name)
+				|| Type(Desc.Value) != Type(Fields[Name]) || Desc.Value != Fields[Name]
+				return false
+		}
+		if Count != Fields.Count || !_MR_ReasonedGroupCurrent(Held["receipt"])
+			|| !_MR_FrameReceiptCallablesCurrent(Held["receipt"])
+			return false
+	}
+	if NewEntry && (!(Child is Menu) || Entries.Has(Child.Handle)
+		|| _MR_FramePendingOwnEntry(Pending, Child) != NewEntry)
+		return false
+	return true
+}
+
+; Snapshot alone deliberately treats callable objects as scalar identities.
+_MR_FrameReceiptCallablesCurrent(Receipt, Seen := unset) {
+	Seen := IsSet(Seen) ? Seen : Map()
+	Identity := ObjPtr(Receipt)
+	if Seen.Has(Identity)
+		return true
+	Seen[Identity] := true
+	Value := Receipt["value"]
+	if Value is Func || Value is BoundFunc
+		if Object.Prototype.HasOwnProp.Call(Value, "Call")
+			return false
+	if Value is Menu {
+		if ObjGetBase(Value) != Menu.Prototype
+			return false
+		for Name in ["Handle", "Add", "Delete", "Check", "Disable", "Enable", "Uncheck", "SetIcon"]
+			if Object.Prototype.HasOwnProp.Call(Value, Name)
+				return false
+	}
+	if Receipt.Has("fields")
+		for Key, Nested in Receipt["fields"]
+			if !_MR_FrameReceiptCallablesCurrent(Nested, Seen)
+				return false
+	return true
+}
+
+; Build supplies ordinary receipts produced by the existing snapshot owner.
+_MR_FrameReceiptAdmitted(Receipt, Seen := unset) {
+	if !(Receipt is Map) || ObjGetBase(Receipt) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Receipt)
+		return false
+	Seen := IsSet(Seen) ? Seen : Map()
+	Identity := ObjPtr(Receipt)
+	if Seen.Has(Identity)
+		return true
+	Seen[Identity] := true
+	if !Receipt.Has("value")
+		return false
+	if !Receipt.Has("fields")
+		return Receipt.Count == 1
+	if Receipt.Count != 3 || !Receipt.Has("size") || Type(Receipt["size"]) != "Integer" || Receipt["size"] < 0
+		return false
+	Fields := Receipt["fields"]
+	if !(Fields is Map) || ObjGetBase(Fields) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Fields)
+		return false
+	for Key, Captured in Fields
+		if !_MR_FrameReceiptAdmitted(Captured, Seen)
+			return false
+	return true
+}
+
+; Native staging must retain the supplied callback belonging to each rendered caption.
+_MR_FrameStageAdmitted(Stage, Data, Seeded) {
+	if !(Stage is Array) || !_MR_FrameLeafAdmitted(Data)
+		return false
+	Expected := [], Positions := Map()
+	for Index, Row in Data {
+		if Seeded && Index > 1
+			break
+		Label := StrReplace(Row["label"], "&", "&&")
+		if Positions.Has(Label)
+			Expected[Positions[Label]][2] := Row["action"]
+		else {
+			Expected.Push([Label, Row["action"]])
+			Positions[Label] := Expected.Length
+		}
+	}
+	if Stage.Length != Expected.Length
+		return false
+	for Index, Row in Stage
+		if !(Row[1] == Expected[Index][1]) || Row[4] != 0 || Row[5] != Expected[Index][2]
+			|| Type(Row[6]) != "Integer" || Row[6] <= 0
+			return false
+	return true
+}
+
+; Actual publication and owned-suffix rollback, shared by the live DATA receiver.
+; The caller retains source authority; this internal operation is not a DATA admission API.
+_MR_FramePublish(Target, Child, Rows, Label, Before, NativeMethods, OldChild, OldFlags, Current) {
+	if !(Current is Func) || Object.Prototype.HasOwnProp.Call(Current, "Call")
+		throw Error("Declared DATA publication lost its current source")
+	StartCount := Before.Length
+	try {
+		loop Rows.Length - 1 {
+			if Object.Prototype.HasOwnProp.Call(Current, "Call") || !Current.Call()
+				throw Error("Declared DATA source withdrawn before native separator")
+			NativeMethods["Add"].Call(Target)
+			if Object.Prototype.HasOwnProp.Call(Current, "Call") || !Current.Call()
+				throw Error("Declared DATA source withdrawn after native separator")
+		}
+		if Object.Prototype.HasOwnProp.Call(Current, "Call") || !Current.Call()
+			throw Error("Declared DATA source withdrawn before native group")
+		NativeMethods["Add"].Call(Target, Label, Child)
+		if Object.Prototype.HasOwnProp.Call(Current, "Call") || !Current.Call()
+			throw Error("Declared DATA source withdrawn after native group")
+		return 1
+	} catch as NativeError {
+		try {
+			; The native method may complete its effect and then fail. Read actual state,
+			; rather than relying on a script marker advanced after that method returns.
+			if OldChild {
+				NativeMethods["Add"].Call(Target, Label, OldChild)
+				NativeMethods[(OldFlags & 0x8) ? "Check" : "Uncheck"].Call(Target, Label)
+				NativeMethods[(OldFlags & 0x3) ? "Disable" : "Enable"].Call(Target, Label)
+			}
+			Count := TrayMenuItemCount(Target)
+			if Count < StartCount
+				throw Error("Declared DATA publication removed a previous destination row")
+			loop Count - StartCount
+				NativeMethods["Delete"].Call(Target, (Count - A_Index + 1) . "&")
+			if !_MR_FrameNativeImageEqual(Before, _MR_FrameDestinationSnapshot(Target))
+				throw Error("Declared DATA frame rollback did not restore its destination")
+		} catch as RollbackError {
+			; Even a failed rollback must not replace the genuine native failure object.
+			try NativeError.Extra := "DATA publication rollback failed: " . RollbackError.Message
+			catch {
+			}
+		}
+		throw NativeError
+	}
+}
+
+
+/** Holds interpreter-created constructor metadata before any external DATA callback. */
+_MR_FrameNativeConstructorCurrent(Constructor) {
+	static NativeClass := Menu
+	static NativeFactory := Object.Prototype.GetOwnPropDesc.Call(Menu, "Call").Call
+	static NameGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get
+	static BuiltInGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "IsBuiltIn").Get
+	SourceLive() {
+		if Constructor != NativeClass || NativeClass != Menu
+			|| !Object.Prototype.HasOwnProp.Call(NativeClass, "Call")
+			return false
+		Descriptor := Object.Prototype.GetOwnPropDesc.Call(NativeClass, "Call")
+		if !Object.Prototype.HasOwnProp.Call(Descriptor, "Call") || Descriptor.Call != NativeFactory
+			return false
+		for Name in ObjOwnProps(Descriptor)
+			if Name != "Call"
+				return false
+		if !(NativeFactory is Func) || ObjGetBase(NativeFactory) != Func.Prototype
+			return false
+		for Name in ObjOwnProps(NativeFactory)
+			return false
+		for Name, Getter in Map("Name", NameGetter, "IsBuiltIn", BuiltInGetter) {
+			if !Object.Prototype.HasOwnProp.Call(Func.Prototype, Name)
+				return false
+			ReaderDescriptor := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, Name)
+			if !Object.Prototype.HasOwnProp.Call(ReaderDescriptor, "Get") || ReaderDescriptor.Get != Getter
+				return false
+			for Field in ObjOwnProps(ReaderDescriptor)
+				if Field != "Get"
+					return false
+			if !(Getter is Func) || ObjGetBase(Getter) != Func.Prototype
+				return false
+			for Field in ObjOwnProps(Getter)
+				return false
+		}
+		return true
+	}
+	if !SourceLive()
+		return false
+	BuiltIn := BuiltInGetter.Call(NativeFactory)
+	if !SourceLive() || !BuiltIn
+		return false
+	NativeFactoryName := NameGetter.Call(NativeFactory)
+	return SourceLive() && NativeFactoryName == "Menu.Call"
 }
