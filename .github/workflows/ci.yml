@@ -191,6 +191,7 @@ jobs:
                   range="${last_stable}..HEAD"
               fi
               IFS='.' read -r maj min pat <<< "${last_stable#v}"
+              patch_version="${maj}.${min}.$((pat+1))"
               bump="patch"
               # --format=%s ends every subject with a newline. --pretty=format:
               # left the last one, the oldest commit of the range, unterminated,
@@ -255,6 +256,23 @@ jobs:
               emit release false
               emit channel dev
               exit 0
+          fi
+
+          # A maintainer can classify the current release as the next patch
+          # with a Release-As trailer on the publication commit. Read HEAD
+          # only, so an earlier request never carries into another release.
+          # Breaking changes still require the normal major bump. This runs
+          # after the ancestry guard so rerunning a published request is inert.
+          if [ "$branch" = "main" ]; then
+              release_as=$(git log -1 --format='%(trailers:key=Release-As)')
+              if [ -n "$release_as" ]; then
+                  if [ "$release_as" != "Release-As: $patch_version" ] || [ "$bump" = "major" ]; then
+                      echo "::error::Release-As must name the next patch and cannot override a breaking change." >&2
+                      exit 1
+                  fi
+                  tag="v${patch_version}"
+                  title="Ergopti ${tag}"
+              fi
           fi
 
           # Skip if the tag already exists (duplicate push guard). The listing is
