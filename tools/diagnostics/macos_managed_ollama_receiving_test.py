@@ -178,6 +178,10 @@ class PayloadDependencyControls(unittest.TestCase):
             subject.root = ROOT
             subject.source_hashes = {}
             subject.options = SimpleNamespace(catalogue=catalogue)
+            # This existing prerequisite checks only source copying, not release admission.
+            subject.receiving_catalogue = Mock(
+                side_effect=lambda destination, _: destination.write_bytes(catalogue.read_bytes())
+            )
             payload = subject.payload(root / "OwnedPayload.app")
             relative = "static/ergopti_plus/_shared/data/http/redirect_policy.json"
             original = ROOT / relative
@@ -605,6 +609,197 @@ class TerminalFailureObservationControls(unittest.TestCase):
         )
         self.assertNotIn("cleanup_failure", value)
         self.assertNotIn("private-input-name", raw)
+
+
+class ReceivingCatalogueControls(unittest.TestCase):
+    """Pure catalogue/install admission only; no native request or installer runs."""
+
+    def catalogue(self):
+        contract_bytes = (
+            ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
+        ).read_bytes()
+        contract = json.loads(contract_bytes)
+        binding = contract["assets"]["macos-arm64"]
+        asset = {name: binding[name] for name in ("os", "architecture", "filename")}
+        asset.update(
+            url="https://github.com/adrienm7/ergopti/releases/download/v1.0.1/"
+            + binding["filename"],
+            sha256="a" * 64,
+            binary_sha256="b" * 64,
+            provenance_sha256="c" * 64,
+            bytes=123,
+            runtime_libraries_sha256={"lib/fixture.dylib": "d" * 64},
+        )
+        for field in ("version", "source_commit", "capability", "native_http_capability"):
+            asset[field] = contract[field]
+        return {
+            "schema_version": 1,
+            **{
+                field: contract[field]
+                for field in ("version", "source_commit", "capability", "native_http_capability")
+            },
+            "runtime_contract_sha256": hashlib.sha256(contract_bytes).hexdigest(),
+            "repository_commit": "e" * 40,
+            "repository_source_sha256": {
+                name: "f" * 64 for name in contract["source_fingerprint_paths"]
+            },
+            "publication": {
+                "mode": "planned-release",
+                "repository": "adrienm7/ergopti",
+                "tag": "v1.0.1",
+                "version": "1.0.1",
+                "channel": "main",
+            },
+            "assets": {"macos-arm64": asset},
+        }
+
+    def test_planned_release_receiving_projects_only_private_publication_before_install(self):
+        with tempfile.TemporaryDirectory(prefix="ergopti-receiving-catalogue-") as directory:
+            root = Path(directory)
+            input_path = root / "original.json"
+            original = self.catalogue()
+            original_bytes = json.dumps(original, sort_keys=True).encode()
+            input_path.write_bytes(original_bytes)
+            subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+            subject.root, subject.source_hashes, subject.receipt = ROOT, {}, {}
+            subject.options = SimpleNamespace(catalogue=input_path)
+            subject.input_hashes = {
+                "catalogue": hashlib.sha256(input_path.read_bytes()).hexdigest()
+            }
+            payload = subject.payload(root / "OwnedPayload.app")
+            private_path = payload / "_shared/modules/llm/managed_ollama_release.json"
+            private_bytes = private_path.read_bytes()
+            private = json.loads(private_bytes)
+            self.assertEqual(input_path.read_bytes(), original_bytes)
+            self.assertEqual(private["publication"]["mode"], "unpublished-ci")
+            self.assertEqual(private["publication"]["tag"], "")
+            self.assertEqual(private["publication"]["version"], "")
+            self.assertEqual(
+                private["publication"]["repository"], original["publication"]["repository"]
+            )
+            expected = json.loads(original_bytes)
+            expected["publication"] = private["publication"]
+            expected["assets"]["macos-arm64"]["url"] = ""
+            self.assertEqual(private, expected)
+            self.assertEqual(
+                subject.receipt["receiving_catalogue"],
+                {
+                    "purpose": "owned-loopback-fixture",
+                    "original_sha256": hashlib.sha256(original_bytes).hexdigest(),
+                    "original_publication": original["publication"],
+                    "projected_sha256": hashlib.sha256(private_bytes).hexdigest(),
+                },
+            )
+            runtime = RECEIVING.load(
+                "planned_receiving_runtime", payload / "macos/modules/llm/managed_ollama_runtime.py"
+            )
+            contract_bytes = (
+                payload / "_shared/modules/llm/managed_ollama_runtime.json"
+            ).read_bytes()
+
+            class OwnedBoundary(Exception):
+                pass
+
+            for data, admitted in [(original_bytes, False), (private_bytes, True)]:
+                contract, asset = runtime.POLICY.select_asset(contract_bytes, data, "macos-arm64")
+                with (
+                    patch.object(
+                        runtime,
+                        "inputs",
+                        return_value=(contract_bytes, data, "macos-arm64", contract, asset),
+                    ),
+                    patch.object(runtime, "owned_directory", side_effect=OwnedBoundary) as owned,
+                ):
+                    expected_error = OwnedBoundary if admitted else runtime.POLICY.RuntimeRefusal
+                    with self.assertRaises(expected_error) as error:
+                        runtime.install(
+                            10, 1, fixture_url="http://127.0.0.1:12345/" + asset["filename"]
+                        )
+                    if admitted:
+                        owned.assert_called_once_with()
+                    else:
+                        self.assertEqual(str(error.exception), "unavailable")
+                        owned.assert_not_called()
+            for url in [
+                "https://127.0.0.1:12345/" + asset["filename"],
+                "http://foreign.invalid:12345/" + asset["filename"],
+                "http://user:password@127.0.0.1:12345/" + asset["filename"],
+                "http://127.0.0.1:12345/foreign.tgz",
+            ]:
+                with (
+                    patch.object(
+                        runtime,
+                        "inputs",
+                        return_value=(
+                            contract_bytes,
+                            private_bytes,
+                            "macos-arm64",
+                            contract,
+                            asset,
+                        ),
+                    ),
+                    patch.object(runtime, "owned_directory") as owned,
+                ):
+                    with self.assertRaises(runtime.POLICY.RuntimeRefusal) as error:
+                        runtime.install(10, 1, fixture_url=url)
+                    self.assertEqual(str(error.exception), "unavailable")
+                    owned.assert_not_called()
+            for relative, fingerprint in subject.source_hashes.items():
+                self.assertEqual(
+                    hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(), fingerprint
+                )
+
+    def test_invalid_original_catalogue_is_refused_before_projection_write(self):
+        for mutation, reason in [
+            (lambda value: value.update(runtime_contract_sha256="0" * 64), "unavailable"),
+            (
+                lambda value: value["publication"].update(repository="foreign/repository"),
+                "receiving_catalogue_publication",
+            ),
+            (
+                lambda value: value["assets"]["macos-arm64"].update(
+                    url="https://foreign.invalid/input.tgz"
+                ),
+                "metadata",
+            ),
+            (lambda value: value["publication"].update(tag="v1.0.2"), None),
+            (lambda value: None, "receiving_catalogue_input"),
+            (lambda value: value.update(assets={}), "receiving_catalogue_assets"),
+        ]:
+            with (
+                self.subTest(reason=reason),
+                tempfile.TemporaryDirectory(prefix="ergopti-receiving-refusal-") as directory,
+            ):
+                root = Path(directory)
+                input_path = root / "original.json"
+                bad = self.catalogue()
+                mutation(bad)
+                encoded = json.dumps(bad).encode()
+                input_path.write_bytes(encoded)
+                subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+                subject.root, subject.source_hashes, subject.receipt = ROOT, {}, {}
+                subject.options = SimpleNamespace(catalogue=input_path)
+                subject.input_hashes = {
+                    "catalogue": hashlib.sha256(input_path.read_bytes()).hexdigest()
+                }
+                if reason == "receiving_catalogue_input":
+                    subject.input_hashes["catalogue"] = "0" * 64
+                with self.assertRaises(Exception) as refused:
+                    subject.payload(root / "OwnedPayload.app")
+                self.assertIn(
+                    type(refused.exception).__name__,
+                    ("RuntimeRefusal", "RuntimeError", "ValueError"),
+                )
+                if reason is not None:
+                    self.assertEqual(str(refused.exception), reason)
+                self.assertEqual(input_path.read_bytes(), encoded)
+                self.assertNotIn("receiving_catalogue", subject.receipt)
+                self.assertFalse(
+                    (
+                        root
+                        / "OwnedPayload.app/Contents/Resources/static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
+                    ).exists()
+                )
 
 
 if __name__ == "__main__":
