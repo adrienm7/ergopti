@@ -3813,6 +3813,35 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-10 Homebrew unrelated-window scope continuation. The observer now
+excludes only a completely inspected, bounded window of the expected OS-agent
+PID with neither owned sender nor receiver identity. Partial identities,
+unreadable or malformed values, foreign PIDs and deadline refusals remain
+refused. The original target inspector, signatures, actions and clocks remain
+unchanged. All177 predecessor test bodies remain byte-identical;178 portable
+tests pass, including35 compiled CF/AX scope controls and six dispatch controls.
+These explicit ports do not qualify actual Accessibility/TCC or Homebrew.
+Manual38016257870 previously reached a qualified foreground requester but
+refused an unrelated OS window: archive24/25 passed, Brew failed and its six
+profile scenarios were not reached; package/install were skipped. Requalify
+actual native compilation, all25 archive cases, Brew6, final packaging and
+installed upgrade/relaunch on the corrected sources. Item36 stays open.
+
+2026-10-10 Homebrew requester startup continuation. The owned Automation
+observer now waits for an acknowledgement from the actual foreground sender
+instead of racing the sandbox wrapper's exec. A private exclusive file binds
+the original nonce, PID, device and inode; readiness does not grant consent or
+replace the original signature/UI checks. The original thirty-second deadline
+and fresh foreground check are repeated after acknowledgement I/O, before the
+native permission request. Uncertain close/unlink retains ownership debt and
+the private input; an uncertain descriptor is never closed again after reuse.
+All158 predecessor test bodies and the native consent implementation remain
+byte-identical. The177 portable controls pass, including eleven compiled
+recording-port cases for the final deadline/activity checks. These controls
+qualify neither AppKit/TCC behavior nor the six actual Brew scenarios; native
+archive, packaging and installation qualification remains required. Item36
+stays open.
+
 2026-10-09 release qualification composition. The bounded diagnostic dev.157 policy and all production workflows remain unchanged. An independently reviewed full-default source view retains every original mandatory guard and mutation, validates the exact raw policy/topology, and rejects failed receipt retention. All44 new controls and nine old guard suites pass privately; the new controls are enrolled directly in the normal JS suite. Release fixtures retain the real policy dependencies and fixed independent dev.158 refusal vectors. The original144 Brew controls are preserved with two new foreground-requester controls: only the admitted Accessory singleton requests activation, and a fresh isActive acknowledgement is required before the existing Automation request. All146 portable Python controls and36 owning JS controls pass. Native AppKit/TCC behavior and all six Brew positive scenarios remain unexecuted for this source; activation may refuse asynchronously, and unknown UI controls remain denied. Latest prior Mac37940744064 still reports archive24/25 and skipped package/install. The exact integratede896 manual37960022603 executed all25 archive cases:24 passed and the Brew prerequisite refused inactive after requesting foreground activation, before its six profile scenarios. Archive8/Sparkle15 and consent opt-in passed; package/install skipped. An independently reviewed exact fast-header parser repair now preserves the four original stub-harness assertions, adds five refusal controls and remains explicit about missing WindowServer/physical proof. The three added refusal families also require the exact nonempty name-field error; wrong-error, nonstring and nil mutations are refused, with no scanner or baseline change. The reviewed same-deadline AppKit activation correction is now adopted: the existing request captures one original30-second public monotonic deadline before its checkpoint, passes it only to its owned child, and retains that deadline through UI observation and physical completion. The same Accessory application pumps only its own AppKit events and requires fresh actual activity before the unchanged Automation request. All146 old portable method bodies remain exact and154 owning controls,36 Homebrew checks and17 compiled explicit API-model cases pass; six causal mutants refuse. Hosted manual37968407062 on479d6f68 reaches a bounded UI observation instead of the prior inactive refusal: archive24/25 pass, while Brew refuses the first unsupported-title button and its six profiles remain unreached. The actual retained window has four observed nodes; its identity remains unknown. A reviewed passive diagnostic now traverses only that same retained window, within the original three-second child/original30-second request caps, without changing the original NO/refusal or any button action. All154 old Python methods remain byte-identical;158 portable controls and37 owning checks pass, including executable-only guards that reject commented or quoted lookalikes. The actual frozen699-byte packet plus maximal new scalars fits827 bytes inside the unchanged1024-byte capture. Actual manual37975640734 on13e981637 preserves native archive24/25, both SDK41/Source10 and HTTP worker12 cohorts, but the new passive diagnostic fails native Clang compilation because its children receiver is declared id before reading NSArray.count. The independently reviewed correction changes only that receiver declaration to NSArray\*, preserving its runtime class refusal, both256 bounds, original clocks and consent rules; Fresh manual37978092202 onaa925760 confirms actual native compilation and passive-reader execution, while archive24/25 remains partial. Its child-list query returns nil with documented AXNoValue(-25212) after two nodes; identity remains unknown and all six Brew profiles remain unreached. The reviewed one-line passive-only correction treats that absent child value as an empty leaf, like the existing nil/success or unsupported cases, preserving the entire original inspector, NO/action guards, budgets, bounds and cleanup. Exact manual37984497921 on5d839b13 now confirms native compilation and complete seven-node passive traversal (refusal none/error0), with neither owned sender nor receiver observed. The original unsupported button/refusal, unknown window identity, candidates0/matches0 and NO/action guards remain unchanged. Archive25 executes24PASS/1BrewFAIL/0SKIP (archive8/Sparkle15/consent1PASS); all six Brew profiles remain unreached, and original cleanup receipts are accepted. Complete Brew and final package/installed qualification remain open; absence of owned text does not authorize an unknown window or permission grant. Native AX compilation/execution on this diagnostic, complete native25/Brew6, final package and installed upgrade/relaunch qualification remain required; no consent guard, unknown-control refusal or cleanup assertion is waived. Item36 and transversal16/38 remain open.
 
 Owned manual37934910035 on880424ae again executes24PASS/1FAIL/0SKIP in the original25 archive cohort. Qualified requester, trusted observer and successful AXWindow observation remain; the exact window close/minimize/zoom attributes all return NoValue(-25212), so their typed identity stays unobserved and the classifier preserves refusal. The same first button has unsupported title/subrole. A reviewed diagnostic now queries only that retained button's public AXDescription and AXValue, exporting fixed label-family/type/error tokens without raw text or new action authority. All original141 portable methods and the native whole-source inverse remain exact;144 Python cases and36 JS controls pass, with the original source failing the three new controls. Actual label families and six Brew acceptance scenarios on this successor remain unexecuted. Both macOS SDK41 cohorts and fresh signed cold MLX/bootstrap closure pass on880; full package/install are skipped. Item36 and transverse16/38 remain open.
@@ -6028,6 +6057,53 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+2026-10-10 native-wire diagnostic framing continuation. The fixture now writes
+its fixed restoration-failure diagnostic to stderr, preserving the single
+structured stdout result. All52 portable receiving tests pass; the new actual
+producer test fails on the original method in both subcases. Every391 original
+assertion line remains intact. This repairs the secondary malformed JSON seen
+in manual38016257870; it does not settle native trust-restoration debt or fix
+the primary trust setup/routing failure. In that exact d8dbcea2 run, both Python
+trust-positive tests timed out in the original fifteen-second trust command;
+the Swift WPAD positives acknowledged trust setup but returned74 without HTTP
+headers/body/origin. Their causes are not equated. Genuine native trust, PAC,
+WPAD and redirect qualification remains required; item62 is incomplete.
+
+2026-10-10 selected-release network continuation. The actual Lua caller now
+binds its selected archive to a typed native download request. Without an
+explicit HTTPS/all-proxy route, the staging shell uses the admitted bundled
+managed receiver; explicit routes preserve the original curl/bypass behavior.
+Exclusive stage creation refuses collisions, and the original digest,
+extraction, version, signature and READY checks remain intact. The registered
+caller module passes22 tests. The independent frozen shell corpus passes50
+portable controls; the exact predecessor passes6 and fails44 with the same
+expectations. These recording ports do not qualify actual packaged PAC/WPAD,
+redirects or rollback. Normal-suite enrollment of that shell corpus remains
+CODE: the proposed timeout wrapper could strand descendants and delete their
+inputs, so that addendum is retained unapplied. Executed-image/ABA admission,
+private destination identity, complete cancellation/tree closure and translated
+native failure-class projection also remain CODE under items16/38. Item62
+stays open.
+
+2026-10-10 MLX managed admission continuation. The actual generated downloader
+already installs the bundled per-request managed HTTP transport. Its launcher
+now admits that receiver instead of refusing PAC/WPAD through the opaque-client
+gate first. The pinned interpreter, system trust, explicit-route precedence,
+download ownership and disabled Xet/hf_transfer paths remain unchanged. Four
+focused caller controls pass, including native-receiver refusal without an
+opaque fallback; the same two new controls fail on the original301fae8c7
+producer while both original controls still pass. The actual emitted Python
+passes all five independent trust-activation vectors. These are portable
+receipts, not actual macOS PAC, trust or packaged model-download acceptance.
+The original opaque policy/Ollama vectors and both owners' callback-classifier
+controls remain intact. The updated receiving suite passes61 controls,
+including MLX's own managed-refusal bytes, fresh/stale/terminal/start-refused
+owners, exact admission-before-dependency order, unchanged inherited selectors
+and no detached PID on refusal. The HS-007 publication-yield case receives the
+genuine managed prelude while retaining every original lifecycle assertion.
+The external/stock Ollama daemon, rollback fetch and final native/package/
+installation/enterprise qualifications remain open; item62 stays incomplete.
 
 2026-10-09 final upstream refresh. Explicit refspec receiving now includes actualDev20f66968 (including the approved thirteen-scope publication policy and renewed window), without changing that policy or the other groups' code. Raw full-default124, Mac source/typed78, item36 constructed65, PAC portable82, approved-policy controls and normal formatting pass on this composed source. Native corrected Windows44 and final cross-platform acceptance remain pending; inherited whole-gate failures remain reported above.
 

@@ -4875,5 +4875,734 @@ class PassiveWindowIdentityControls(unittest.TestCase):
         self.assertLess(len(json.dumps(self.packet(), separators=(",", ":")).encode()), 1024)
 
 
+class AutomationStartupReadinessControls(unittest.TestCase):
+    """Private filesystem/explicit child-port controls; none grant macOS signed identity."""
+
+    NONCE = "11111111-2222-3333-4444-555555555555"
+
+    @contextmanager
+    def fixture(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            owner = probe.Children(Path(directory))
+            clock = [1_000_000_000]
+            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
+                request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                request.readiness_nonce = self.NONCE
+                ready = probe.OwnedAutomationReadiness(owner, request)
+                process = Mock(pid=73136, returncode=None)
+                group = SimpleNamespace(
+                    process=process, reaped=False, observe_exit=Mock(return_value=None)
+                )
+                owner.groups[process] = group
+                try:
+                    yield owner, request, ready, process, group, clock
+                finally:
+                    ready.close()
+
+    def bytes(self, process):
+        return (
+            b"OWNED_APPLEEVENT_READY/1 pid="
+            + str(process.pid).encode()
+            + b" nonce=11111111-2222-3333-4444-555555555555\n"
+        )
+
+    def test_observer_cannot_run_during_launcher_or_partial_sender_acknowledgement(self):
+        with self.fixture() as (owner, request, ready, process, group, clock):
+            observations = []
+
+            def advance(seconds):
+                observations.append(ready.accepted)
+                self.assertLessEqual(seconds, 0.02)
+                ready.path.write_bytes(
+                    self.bytes(process)[:17] if len(observations) == 1 else self.bytes(process)
+                )
+                clock[0] += 10_000_000
+
+            with patch.object(probe.time, "sleep", side_effect=advance):
+                self.assertTrue(ready.wait(process))
+            self.assertEqual(observations, [False, False])
+            self.assertTrue(ready.accepted)
+            self.assertEqual(request.deadline_ns, 31_000_000_000)
+            self.assertEqual(request.remaining(), 29.98)
+            self.assertFalse(group.reaped)
+
+    def test_forged_pid_nonce_or_extra_bytes_never_admit_startup(self):
+        for payload in (
+            b"OWNED_APPLEEVENT_READY/1 pid=73 nonce=11111111-2222-3333-4444-555555555555\n",
+            b"OWNED_APPLEEVENT_READY/1 pid=73136 nonce=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n",
+            b"OWNED_APPLEEVENT_READY/1 pid=73136 nonce=11111111-2222-3333-4444-555555555555\nextra",
+            b"private arbitrary bytes",
+        ):
+            with self.subTest(payload=payload), self.fixture() as (_, _, ready, process, _, _):
+                ready.path.write_bytes(payload)
+                with self.assertRaises(probe.AdmissionError):
+                    ready.wait(process)
+                self.assertFalse(ready.accepted)
+
+    def test_truncated_acknowledgement_exhausts_only_original_deadline(self):
+        with self.fixture() as (_, request, ready, process, _, clock):
+            ready.path.write_bytes(self.bytes(process)[:-1])
+
+            def expire(seconds):
+                clock[0] = request.deadline_ns
+
+            with patch.object(probe.time, "sleep", side_effect=expire):
+                with self.assertRaisesRegex(probe.AdmissionError, "exceeded deadline"):
+                    ready.wait(process)
+            self.assertEqual(request.deadline_ns, 31_000_000_000)
+            self.assertFalse(ready.accepted)
+
+    def test_replaced_or_symlinked_name_refuses_and_preserves_foreign_inode(self):
+        for symlink in (False, True):
+            with self.subTest(symlink=symlink), self.fixture() as (owner, _, ready, process, _, _):
+                replacement = owner.root / "independent-replacement"
+                replacement.write_bytes(self.bytes(process))
+                replacement.chmod(0o600)
+                ready.path.unlink()
+                if symlink:
+                    ready.path.symlink_to(replacement)
+                else:
+                    replacement.rename(ready.path)
+                foreign = ready.path.lstat()
+                with self.assertRaisesRegex(probe.AdmissionError, "identity or bound"):
+                    ready.wait(process)
+                ready.close()
+                self.assertEqual(ready.path.lstat().st_ino, foreign.st_ino)
+                self.assertEqual(
+                    owner.debt, [{"kind": "automation-readiness", "path": str(ready.path)}]
+                )
+
+    def test_hardlink_or_changed_permissions_never_admit_or_retire_ambiguous_input(self):
+        for fault in ("hardlink", "mode"):
+            with self.subTest(fault=fault), self.fixture() as (owner, _, ready, process, _, _):
+                ready.path.write_bytes(self.bytes(process))
+                if fault == "hardlink":
+                    os.link(ready.path, owner.root / "independent-link")
+                else:
+                    ready.path.chmod(0o644)
+                with self.assertRaisesRegex(probe.AdmissionError, "identity or bound"):
+                    ready.wait(process)
+                ready.close()
+                self.assertTrue(ready.path.exists())
+                self.assertEqual(len(owner.debt), 1)
+
+    def test_terminal_requester_before_ack_never_arms_ui_or_borrows_readiness(self):
+        with self.fixture() as (_, _, ready, process, group, _):
+            group.observe_exit.return_value = SimpleNamespace(si_status=65)
+            self.assertFalse(ready.wait(process))
+            self.assertFalse(ready.accepted)
+
+    def test_complete_ack_and_terminal_requester_admit_no_ui_action(self):
+        with self.fixture() as (_, _, ready, process, group, _):
+            ready.path.write_bytes(self.bytes(process))
+            group.observe_exit.return_value = SimpleNamespace(si_status=0)
+            self.assertFalse(ready.wait(process))
+            self.assertTrue(ready.accepted)
+
+    def test_lost_reservation_or_expired_original_clock_never_reads_ready_credit(self):
+        for fault in ("reservation", "reaped", "expired", "regressed"):
+            with (
+                self.subTest(fault=fault),
+                self.fixture() as (owner, request, ready, process, group, clock),
+            ):
+                ready.path.write_bytes(self.bytes(process))
+                if fault == "reservation":
+                    owner.groups = {}
+                elif fault == "reaped":
+                    group.reaped = True
+                else:
+                    clock[0] = request.deadline_ns if fault == "expired" else 0
+                with self.assertRaises(probe.AdmissionError):
+                    ready.wait(process)
+                self.assertFalse(ready.accepted)
+
+    def test_unlink_refusal_and_live_child_keep_owned_cleanup_debt(self):
+        for fault in ("unlink", "live"):
+            with self.subTest(fault=fault), self.fixture() as (owner, _, ready, _, _, _):
+                if fault == "unlink":
+                    with patch.object(probe.os, "unlink", side_effect=OSError("private refusal")):
+                        ready.close()
+                else:
+                    ready.close(retire=False)
+                self.assertTrue(ready.path.exists())
+                self.assertEqual(
+                    owner.debt, [{"kind": "automation-readiness", "path": str(ready.path)}]
+                )
+
+    def run_port(self, root, *, code=0, acknowledge=True, callback=None):
+        """Model the reserved process port while exercising the real parent owner and files."""
+        owner = probe.Children(root)
+        request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+        request.readiness_nonce = self.NONCE
+        observations = {}
+
+        def acquire(arguments, native, register, **options):
+            process = Mock(pid=73136, returncode=None)
+            group = SimpleNamespace(
+                process=process, reaped=False, observe_exit=Mock(return_value=None)
+            )
+            observations.update(process=process, group=group, environment=options["env"])
+
+            def wait(timeout):
+                process.returncode = code
+
+            def settle():
+                process.returncode = code
+                group.reaped = True
+                return True
+
+            group.wait_for_exit, group.settle = wait, settle
+            register(group)
+            os.write(
+                options["stdout"].fileno(),
+                b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=0\n" if code == 0 else b"",
+            )
+            os.write(
+                options["stderr"].fileno(),
+                b"" if code == 0 else b"OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n",
+            )
+            if acknowledge:
+                request.readiness.path.write_bytes(self.bytes(process))
+            else:
+                group.observe_exit.return_value = SimpleNamespace(si_status=code)
+            return group
+
+        after_start = Mock() if callback is None else callback
+        observations["callback"] = after_start
+        with patch.object(probe, "acquire_owned", side_effect=acquire):
+            result = owner.run(request, timeout=30, check=False, after_start=after_start)
+        return owner, result, observations
+
+    def test_real_parent_awaits_ack_without_changing_native_receipts_or_budget(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            owner, result, observed = self.run_port(root)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(
+                result.stdout, "OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=0\n"
+            )
+            self.assertEqual(result.stderr, "")
+            observed["callback"].assert_called_once()
+            self.assertIs(observed["callback"].call_args.args[0], observed["process"])
+            self.assertTrue(observed["group"].reaped)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertEqual(list(root.glob("automation-ready-*")), [])
+            self.assertNotIn("ERGOPTI_OWNED_AUTOMATION_READY_NAME", owner.environment)
+            self.assertEqual(
+                set(observed["environment"]) - set(owner.environment),
+                {
+                    "ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS",
+                    "ERGOPTI_OWNED_AUTOMATION_READY_NAME",
+                    "ERGOPTI_OWNED_AUTOMATION_READY_DEV",
+                    "ERGOPTI_OWNED_AUTOMATION_READY_INO",
+                },
+            )
+
+    def test_pre_ready_native_refusal_retains_original_foreground_capture(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            owner, result, observed = self.run_port(Path(directory), code=65, acknowledge=False)
+            self.assertEqual(result.returncode, 65)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(result.stderr, "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n")
+            observed["callback"].assert_not_called()
+            self.assertTrue(observed["group"].reaped)
+            self.assertEqual(owner.debt, [])
+
+    def test_zero_exit_without_acknowledgement_cannot_pass_original_owner(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            with self.assertRaisesRegex(probe.AdmissionError, "without readiness acknowledgement"):
+                self.run_port(Path(directory), acknowledge=False)
+            self.assertEqual(list(Path(directory).glob("automation-ready-*")), [])
+
+    def test_callback_failure_physically_settles_request_before_private_input_retirement(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            refusal = probe.AdmissionError("independent original identity refusal")
+
+            def callback(process, deadline):
+                self.assertEqual(len(list(root.glob("automation-ready-*"))), 1)
+                raise refusal
+
+            with self.assertRaises(probe.AdmissionError) as caught:
+                self.run_port(root, callback=callback)
+            self.assertIs(caught.exception, refusal)
+            self.assertEqual(list(root.glob("automation-ready-*")), [])
+
+    def test_native_ack_is_after_foreground_before_permission_without_receipt_changes(self):
+        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
+        start = source.index(
+            'if (strcmp(argv[3], "permission-request") == 0) {', source.index("int main(")
+        )
+        caller = source[
+            start : source.index("const int outcome = owned_appleevent_permission", start)
+        ]
+        self.assertLess(
+            caller.index("admit_sender_foreground_request(application)"),
+            caller.index("acknowledge_sender_readiness(argv[2])"),
+        )
+        body_start = source.index("static int acknowledge_sender_readiness(")
+        body = source[body_start : source.index("\nstatic ", body_start + 10)]
+        self.assertNotIn("printf(", body.replace("snprintf(", "packing("))
+        self.assertNotIn("fprintf(", body)
+        self.assertIn("O_NOFOLLOW", body)
+        self.assertIn("before.st_nlink != 1", body)
+        self.assertIn("before.st_size != 0", body)
+        self.assertIn("(uintmax_t)before.st_dev != device", body)
+        self.assertIn("(uintmax_t)before.st_ino != inode", body)
+        self.assertIn("fsync(descriptor)", body)
+
+    def test_close_refusal_before_syscall_retains_live_fd_and_path_without_retry(self):
+        with self.fixture() as (owner, _, ready, _, _, _):
+            close = os.close
+            try:
+                with patch.object(
+                    probe.os, "close", side_effect=OSError("independent pre-close refusal")
+                ) as attempted:
+                    ready.close()
+                    ready.close()
+                attempted.assert_called_once_with(ready.descriptor)
+                self.assertFalse(ready.closed)
+                self.assertTrue(ready.close_attempted)
+                self.assertTrue(ready.close_uncertain)
+                self.assertEqual(os.fstat(ready.descriptor).st_ino, ready.identity.st_ino)
+                self.assertTrue(ready.path.exists())
+                self.assertEqual(
+                    owner.debt,
+                    [
+                        {
+                            "kind": "automation-readiness",
+                            "path": str(ready.path),
+                            "descriptor": ready.descriptor,
+                            "descriptor_close": "unacknowledged",
+                        }
+                    ],
+                )
+            finally:
+                # The explicit test port proves this FD never reached close().
+                close(ready.descriptor)
+
+    def test_constructor_fstat_and_close_refusal_keep_exact_acquisition_debt(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            owner = probe.Children(Path(directory))
+            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            request.readiness_nonce = self.NONCE
+            acquired = []
+            open_file, close = os.open, os.close
+
+            def allocate(*args, **options):
+                descriptor = open_file(*args, **options)
+                acquired.append(descriptor)
+                return descriptor
+
+            try:
+                with (
+                    patch.object(probe.os, "open", side_effect=allocate),
+                    patch.object(
+                        probe.os, "fstat", side_effect=OSError("independent identity refusal")
+                    ),
+                    patch.object(
+                        probe.os, "close", side_effect=OSError("independent close refusal")
+                    ) as attempted,
+                ):
+                    with self.assertRaisesRegex(OSError, "identity refusal"):
+                        probe.OwnedAutomationReadiness(owner, request)
+                self.assertEqual(len(acquired), 1)
+                attempted.assert_called_once_with(acquired[0])
+                self.assertEqual(len(owner.debt), 1)
+                debt = owner.debt[0]
+                self.assertEqual(debt["descriptor"], acquired[0])
+                self.assertEqual(debt["descriptor_close"], "unacknowledged")
+                self.assertEqual(os.fstat(acquired[0]).st_ino, Path(debt["path"]).stat().st_ino)
+            finally:
+                for descriptor in acquired:
+                    close(descriptor)
+
+    def test_close_error_after_syscall_never_closes_reused_foreign_fd_or_unlinks_input(self):
+        with self.fixture() as (owner, _, ready, _, _, _):
+            close = os.close
+
+            def released_then_refused(descriptor):
+                close(descriptor)
+                raise OSError("independent post-close refusal")
+
+            with patch.object(probe.os, "close", side_effect=released_then_refused) as attempted:
+                ready.close()
+            attempted.assert_called_once_with(ready.descriptor)
+            foreign_path = owner.root / "independently-acquired-foreign-fd"
+            foreign = os.open(foreign_path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                self.assertEqual(foreign, ready.descriptor)
+                with patch.object(probe.os, "close", wraps=close) as retry:
+                    ready.close()
+                retry.assert_not_called()
+                self.assertEqual(os.fstat(foreign).st_ino, foreign_path.stat().st_ino)
+                self.assertTrue(ready.path.exists())
+                self.assertFalse(ready.closed)
+                self.assertTrue(ready.close_uncertain)
+                self.assertEqual(owner.debt[0]["descriptor_close"], "unacknowledged")
+            finally:
+                close(foreign)
+
+    def test_post_ack_native_clock_and_activity_are_fresh_in_compiled_explicit_port(self):
+        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
+        start = source.index("static bool sender_foreground_after_readiness(")
+        body = source[start : source.index("\n/* A separate closed metadata", start)]
+        body = body.replace("NSApplication *", "struct Application *").replace("nil", "NULL")
+        body = body.replace("[application isActive]", "model_is_active(application)")
+        port = r"""
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+struct Application { bool active; int reads; };
+static uint64_t clocks[2];
+static bool available[2];
+static int cursor;
+static bool foreground_now_ns(uint64_t *value) {
+    if (cursor >= 2) return false;
+    *value = clocks[cursor];
+    return available[cursor++];
+}
+static bool model_is_active(struct Application *app) { app->reads++; return app->active; }
+"""
+        cases = r"""
+int main(void) {
+    // Independent receiving values: acknowledgement I/O may cross the clock
+    // boundary, focus may be lost, and even the fresh getter may consume time.
+    const struct { uint64_t first, second; bool first_ok, second_ok, active, missing, expected; int reads; } cases[] = {
+        {110,111,true,true,true,false,true,1},
+        {200,201,true,true,true,false,false,0},
+        {210,211,true,true,true,false,false,0},
+        {99,110,true,true,true,false,false,0},
+        {110,111,true,true,false,false,false,1},
+        {110,200,true,true,true,false,false,1},
+        {110,109,true,true,true,false,false,1},
+        {110,111,false,true,true,false,false,0},
+        {110,111,true,false,true,false,false,1},
+        {110,111,true,true,true,true,false,0},
+        {199,199,true,true,true,false,true,1}
+    };
+    for (size_t index=0; index<sizeof(cases)/sizeof(cases[0]); index++) {
+        struct Application app={cases[index].active,0};
+        clocks[0]=cases[index].first; clocks[1]=cases[index].second;
+        available[0]=cases[index].first_ok; available[1]=cases[index].second_ok;
+        cursor=0;
+        bool result=sender_foreground_after_readiness(cases[index].missing ? NULL : &app,200,100);
+        if (result!=cases[index].expected || app.reads!=cases[index].reads) return 3;
+    }
+    puts("foreground_after_readiness_controls=11");
+    return 0;
+}
+"""
+        compiler = probe.shutil.which("cc")
+        self.assertIsNotNone(compiler, "An actual C compiler is required for the explicit port")
+        with TemporaryDirectory() as directory:
+            model, binary = Path(directory) / "model.c", Path(directory) / "model"
+            model.write_text(port + body + cases)
+            built = subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Werror", str(model), "-o", str(binary)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(built.returncode, 0, built.stderr)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "foreground_after_readiness_controls=11\n")
+            self.assertEqual(result.stderr, "")
+
+    def test_native_permission_call_is_guarded_after_ack_io_without_new_activation(self):
+        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
+        start = source.index(
+            'if (strcmp(argv[3], "permission-request") == 0) {', source.index("int main(")
+        )
+        caller = source[
+            start : source.index("const int outcome = owned_appleevent_permission", start)
+        ]
+        self.assertLess(
+            caller.index("foreground_deadline_ns(&readiness_deadline)"),
+            caller.index("acknowledge_sender_readiness(argv[2])"),
+        )
+        self.assertLess(
+            caller.index("acknowledge_sender_readiness(argv[2])"),
+            caller.index(
+                "sender_foreground_after_readiness(application, readiness_deadline, readiness_before)"
+            ),
+        )
+        final_guard = caller[caller.index("if (!sender_foreground_after_readiness(") :]
+        self.assertIn("AEDisposeDesc(&address)", final_guard)
+        self.assertIn("return 65", final_guard)
+        body = source[
+            source.index("static bool sender_foreground_after_readiness(") : source.index(
+                "\n/* A separate closed metadata"
+            )
+        ]
+        self.assertNotIn("activateIgnoringOtherApps", body)
+        self.assertNotIn("admit_sender_foreground_request", body)
+
+
+class IndependentWindowDiscoveryScopeControls(unittest.TestCase):
+    """Compiled CF/AX interface port; these controls grant no native UI or consent credit."""
+
+    def test_actual_scope_core_and_original_dispatch_keep_unknown_and_owned_refusals(self):
+        source = Path(probe.__file__).with_name("native_appleevent_consent.m").read_text()
+        begin = source.index("enum OwnedWindowScope {")
+        end = source.index("// Passive traversal of only the retained refused window.", begin)
+        body = source[begin:end]
+        clock_begin = body.index("static bool scope_before_deadline(void) {")
+        clock_end = body.index("static AXError scope_copy_attribute(", clock_begin)
+        body = body[:clock_begin] + body[clock_end:]
+        self.assertNotIn("AXUIElementSetMessagingTimeout", body)
+        self.assertNotIn("AXUIElementPerformAction", body)
+        self.assertNotIn("factIdentity", body)
+        anchor = "                if (!inspect_window(window, sender, receiver, buttons, &targetSeen, &senderSeen, &denySeen, agentIndex)) {"
+        original_begin = source.index(anchor)
+        original_end = source.index("                if (!targetSeen) continue;", original_begin)
+        legacy = source[original_begin:original_end]
+        scope_begin = source.rindex(
+            "                enum OwnedWindowScope scope =", 0, original_begin
+        )
+        scoped = source[scope_begin:original_end]
+        scoped = scoped.replace("(__bridge CFStringRef)", "").replace(
+            "application.processIdentifier", "31337"
+        )
+        port = r"""#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+typedef long CFIndex;
+typedef int AXError;
+struct Object;
+typedef struct Object *CFTypeRef;
+typedef struct Object *AXUIElementRef;
+typedef struct Object *CFStringRef;
+typedef struct Object *CFArrayRef;
+struct Object {
+    int kind;
+    const char *text;
+    CFIndex length;
+    pid_t pid;
+    AXError pid_error, role_error, value_error, children_error;
+    struct Object *role, *value, *children;
+    struct Object **items;
+    CFIndex count;
+};
+struct CFRange { CFIndex location, length; };
+enum { TYPE_AX=1, TYPE_STRING=2, TYPE_ARRAY=3, TYPE_OTHER=4 };
+enum { kAXErrorSuccess=0, kAXErrorCannotComplete=-25204,
+       kAXErrorAttributeUnsupported=-25205, kAXErrorNoValue=-25212,
+       kAXErrorInvalidUIElement=-25202 };
+static const CFIndex kCFNotFound=-1;
+static struct Object role_key={.kind=TYPE_STRING,.text="AXRole"};
+static struct Object value_key={.kind=TYPE_STRING,.text="AXValue"};
+static struct Object children_key={.kind=TYPE_STRING,.text="AXChildren"};
+static struct Object static_role={.kind=TYPE_STRING,.text="AXStaticText"};
+#define kAXRoleAttribute (&role_key)
+#define kAXValueAttribute (&value_key)
+#define kAXChildrenAttribute (&children_key)
+#define kAXStaticTextRole (&static_role)
+static struct Object scope_window_role={.kind=TYPE_STRING,.text="AXWindow"};
+#define kAXWindowRole (&scope_window_role)
+static int references=0, deadline_calls=0, expire_after=-1;
+static double remaining=1;
+static bool scope_before_deadline(void) {
+    deadline_calls++;
+    return remaining>0 && remaining<=3 && (expire_after<0 || deadline_calls<=expire_after);
+}
+static int CFGetTypeID(CFTypeRef value) { return value->kind; }
+static int AXUIElementGetTypeID(void) { return TYPE_AX; }
+static int CFStringGetTypeID(void) { return TYPE_STRING; }
+static int CFArrayGetTypeID(void) { return TYPE_ARRAY; }
+static CFTypeRef CFRetain(CFTypeRef value) { references++; return value; }
+static void CFRelease(CFTypeRef value) { if (value==NULL) abort(); references--; }
+static CFIndex CFStringGetLength(CFStringRef value) { return value->length ? value->length : (CFIndex)strlen(value->text); }
+static bool CFEqual(CFTypeRef first, CFTypeRef second) {
+    return first->kind==TYPE_STRING && second->kind==TYPE_STRING && strcmp(first->text,second->text)==0;
+}
+static struct CFRange CFStringFind(CFStringRef value, CFStringRef needle, unsigned flags) {
+    (void)flags;
+    const char *found=strstr(value->text,needle->text);
+    return (struct CFRange){found ? (CFIndex)(found-value->text) : kCFNotFound, 0};
+}
+static CFIndex CFArrayGetCount(CFArrayRef value) { return value->count; }
+static CFTypeRef CFArrayGetValueAtIndex(CFArrayRef value, CFIndex index) { return value->items[index]; }
+static AXError AXUIElementGetPid(AXUIElementRef value,pid_t *pid) {
+    *pid=value->pid;
+    return value->pid_error;
+}
+static AXError AXUIElementCopyAttributeValue(AXUIElementRef value,CFStringRef key,CFTypeRef *result) {
+    AXError status;
+    if (key==kAXRoleAttribute) { *result=value->role; status=value->role_error; }
+    else if (key==kAXValueAttribute) { *result=value->value; status=value->value_error; }
+    else if (key==kAXChildrenAttribute) { *result=value->children; status=value->children_error; }
+    else abort();
+    if (*result!=NULL) CFRetain(*result);
+    return status;
+}
+"""
+        cases = r"""static struct Object sender_name={.kind=TYPE_STRING,.text="Owned AppleEvent sender 11111111-2222-3333-4444-555555555555"};
+static struct Object receiver_name={.kind=TYPE_STRING,.text="Owned AppleEvent receiver 11111111-2222-3333-4444-555555555555"};
+static struct Object window_role={.kind=TYPE_STRING,.text="AXWindow"};
+static struct Object button_role={.kind=TYPE_STRING,.text="AXButton"};
+static struct Object other={.kind=TYPE_OTHER};
+static int run_case(int which) {
+    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&window_role};
+    struct Object sender={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&sender_name};
+    struct Object receiver={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&receiver_name};
+    struct Object button={.kind=TYPE_AX,.pid=31337,.role=&button_role};
+    struct Object extra[6];
+    for (int index=0;index<6;index++) extra[index]=(struct Object){.kind=TYPE_AX,.pid=31337,.role=&button_role};
+    struct Object *items[257]={&sender,&receiver};
+    struct Object array={.kind=TYPE_ARRAY,.items=items,.count=2};
+    struct Object bad_text={.kind=TYPE_STRING,.text="unrelated",.length=4097};
+    root.children=&array;
+    remaining=1;expire_after=-1;deadline_calls=0;references=0;
+    int expected=OwnedWindowScopeRefused;
+    switch(which) {
+        case 0: /* Complete unrelated seven-node graph, including an untitled button. */
+            for(int index=0;index<6;index++)items[index]=&extra[index];
+            array.count=6;expected=OwnedWindowScopeUnrelated;break;
+        case 1: expected=OwnedWindowScopeCandidate;break;
+        case 2: array.count=1;break;
+        case 3: items[0]=&receiver;array.count=1;break;
+        case 4: root.role_error=kAXErrorCannotComplete;break;
+        case 5: root.role=&other;break;
+        case 6: root.role=&bad_text;break;
+        case 7: sender.value=NULL;sender.value_error=kAXErrorNoValue;break;
+        case 8: sender.value=&other;break;
+        case 9: sender.value=&bad_text;break;
+        case 10: root.children=NULL;root.children_error=kAXErrorNoValue;expected=OwnedWindowScopeUnrelated;break;
+        case 11: root.children=NULL;root.children_error=kAXErrorAttributeUnsupported;expected=OwnedWindowScopeUnrelated;break;
+        case 12: root.children=NULL;root.children_error=kAXErrorCannotComplete;break;
+        case 13: root.children=NULL;root.children_error=kAXErrorInvalidUIElement;break;
+        case 14: root.children=&other;break;
+        case 15: items[0]=&other;break;
+        case 16: sender.pid=31338;break;
+        case 17: root.pid_error=kAXErrorInvalidUIElement;break;
+        case 18: array.count=257;break;
+        case 19: {
+            struct Object *nested_items[2]={&sender,&receiver};
+            struct Object nested={.kind=TYPE_ARRAY,.items=nested_items,.count=2};
+            button.children=&nested;
+            for(int index=0;index<256;index++)items[index]=&button;
+            array.count=256;
+            int got=discover_window_scope(&root,&sender_name,&receiver_name,31337);
+            return got==expected && references==0 ? 0 : 3;
+        }
+        case 20: items[0]=&root;array.count=1;break;
+        case 21: remaining=0;break;
+        case 22: remaining=4;break;
+        case 23: expire_after=3;break;
+        case 24: items[0]=&other;items[1]=&sender;items[2]=&receiver;array.count=3;break;
+        case 25: root.children=NULL;root.role=&button_role;break;
+        case 26: sender.children=NULL;sender.children_error=kAXErrorNoValue;expected=OwnedWindowScopeCandidate;break;
+        case 27: sender.children=NULL;sender.children_error=kAXErrorAttributeUnsupported;expected=OwnedWindowScopeCandidate;break;
+        case 28: root.children=NULL;expire_after=7;break; /* Final clock check. */
+        case 29: root.children=NULL;expire_after=4;break; /* Read completes after deadline. */
+        case 30: root.pid=31338;break;
+        case 31: items[0]=NULL;break;
+        case 32: root.children_error=kAXErrorNoValue;break; /* Nonnull/error is ambiguous. */
+        case 33: root.role_error=kAXErrorAttributeUnsupported;break;
+        case 34: sender.value_error=kAXErrorCannotComplete;break;
+        default: return 2;
+    }
+    int got=discover_window_scope(&root,&sender_name,&receiver_name,31337);
+    return got==expected && references==0 ? 0 : 3;
+}
+"""
+        selector = r"""
+static int inspector_calls=0;
+static bool inspector_answer=false;
+#define YES true
+static bool inspect_window(AXUIElementRef window, CFStringRef sender, CFStringRef receiver,
+    void *buttons, bool *targetSeen, bool *senderSeen, bool *denySeen, int agentIndex) {
+    (void)window;(void)sender;(void)receiver;(void)buttons;
+    (void)targetSeen;(void)senderSeen;(void)denySeen;(void)agentIndex;
+    inspector_calls++;
+    return inspector_answer;
+}
+static int legacy_dispatch(AXUIElementRef window) {
+    CFStringRef sender=&sender_name,receiver=&receiver_name;
+    void *buttons=NULL;
+    bool targetSeen=false,senderSeen=false,denySeen=false,observationRefused=false;
+    int agentIndex=0;
+    do {
+LEGACY_FRAGMENT
+    } while(false);
+    return observationRefused ? 1 : 0;
+}
+static int scoped_dispatch(AXUIElementRef window) {
+    CFStringRef sender=&sender_name,receiver=&receiver_name;
+    void *buttons=NULL;
+    bool targetSeen=false,senderSeen=false,denySeen=false,observationRefused=false;
+    int agentIndex=0;
+    do {
+SCOPED_FRAGMENT
+    } while(false);
+    return observationRefused ? 1 : 0;
+}
+static int selector_case(int which) {
+    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&window_role};
+    struct Object sender={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&sender_name};
+    struct Object receiver={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&receiver_name};
+    struct Object *items[2]={&sender,&receiver};
+    struct Object array={.kind=TYPE_ARRAY,.items=items,.count=2};
+    remaining=1;expire_after=-1;deadline_calls=0;references=0;
+    inspector_calls=0;inspector_answer=false;
+    int expected=1,calls=0,got;
+    switch(which) {
+        case 0: /* Actual old call order cannot exclude a malformed unrelated window. */
+            got=legacy_dispatch(&root);calls=1;break;
+        case 1: /* Independent complete zero-identity census can exclude only this scope. */
+            got=scoped_dispatch(&root);expected=0;break;
+        case 2: /* Both private names still require the unchanged failing inspector. */
+            root.children=&array;got=scoped_dispatch(&root);calls=1;break;
+        case 3: /* Partial private identity remains refusal. */
+            root.children=&array;array.count=1;got=scoped_dispatch(&root);break;
+        case 4: /* Unknown traversal remains refusal, with no inspector/action credit. */
+            root.children_error=kAXErrorCannotComplete;got=scoped_dispatch(&root);break;
+        case 5: /* A candidate can progress only through the existing inspector. */
+            root.children=&array;inspector_answer=true;
+            got=scoped_dispatch(&root);expected=0;calls=1;break;
+        default:return 2;
+    }
+    return got==expected && inspector_calls==calls && references==0 ? 0 : 4;
+}
+int main(void) {
+    for(int index=0;index<35;index++)if(run_case(index)!=0) {
+        fprintf(stderr,"scope_case=%d\n",index);return 3;
+    }
+    for(int index=0;index<6;index++)if(selector_case(index)!=0) {
+        fprintf(stderr,"selector_case=%d\n",index);return 4;
+    }
+    puts("window_scope_controls=35; selector_controls=6");
+    return 0;
+}
+"""
+        selector = selector.replace("LEGACY_FRAGMENT", legacy).replace("SCOPED_FRAGMENT", scoped)
+        compiler = probe.shutil.which("cc")
+        self.assertIsNotNone(
+            compiler, "An actual C compiler is required for the explicit CF/AX interface port"
+        )
+        with TemporaryDirectory() as directory:
+            model, binary = Path(directory) / "model.c", Path(directory) / "model"
+            model.write_text(port + body + cases + selector)
+            built = subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Werror", str(model), "-o", str(binary)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(built.returncode, 0, built.stderr)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "window_scope_controls=35; selector_controls=6\n")
+            self.assertEqual(result.stderr, "")
+
+
 if __name__ == "__main__":
     unittest.main()
