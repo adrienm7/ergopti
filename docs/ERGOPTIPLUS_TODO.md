@@ -3384,6 +3384,12 @@ Windows PC acceptance, delegated to the maintainer:
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
   banner stays). Integrated; verify on a Mac.
+  Validation prerequisite: the macOS daily-reset logger fixture now observes
+  only its owned complete sub-file path. A legitimate append from another
+  folder cannot mask the owned stale-file truncation. The three original
+  logger assertions are retained, with an additive foreign-folder regression
+  failing before the fixture correction. This changes no logger production
+  behavior and does not qualify remap liveness, native input, or exit 73.
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
