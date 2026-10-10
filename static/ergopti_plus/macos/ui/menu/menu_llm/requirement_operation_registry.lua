@@ -12,6 +12,22 @@ local M = {}
 local Logger = require("infra.logger")
 
 local LOG = "menu_llm.requirements"
+-- Observation only: each entry is the same original operation, released only
+-- by its existing terminal-plus-physical-child join. No registry GC can erase
+-- a live requirement's migration fence.
+local retained_operations = {}
+
+--- Reports whether original backend requirements have physically retired.
+--- This query never cancels, retries or acquires a descendant owner.
+--- @param backend string Existing registry backend label.
+--- @return boolean idle
+function M.backend_idle(backend)
+	if type(backend) ~= "string" or backend == "" then return false end
+	for _, owner_backend in pairs(retained_operations) do
+		if owner_backend == backend then return false end
+	end
+	return true
+end
 
 --- Creates one backend-local capability registry.
 --- @param opts table|nil `{ backend = string, require_owned = boolean }`.
@@ -36,6 +52,7 @@ function M.new(opts)
 		end
 		operation.released = true
 		operations[operation] = nil
+		retained_operations[operation] = nil
 		return true
 	end
 
@@ -113,6 +130,7 @@ function M.new(opts)
 			children = {},
 		}
 		operations[operation] = true
+		retained_operations[operation] = backend
 
 		local lifecycle = {}
 		operation.lifecycle = lifecycle

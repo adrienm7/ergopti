@@ -334,7 +334,7 @@ class PACSourcePeerTests(unittest.TestCase):
                     refused.set()
 
         owner = PEERS.SourceFixture()
-        connection = socket.create_connection(("127.0.0.1", owner.http.server_port), 2)
+        connection = None
         try:
             with (
                 mock.patch.object(PEERS.threading, "Thread", HeldRequest),
@@ -342,6 +342,7 @@ class PACSourcePeerTests(unittest.TestCase):
                     threading, "excepthook", lambda args: errors.append(args.exc_value)
                 ),
             ):
+                connection = socket.create_connection(("127.0.0.1", owner.http.server_port), 2)
                 connection.sendall(
                     b"GET /source/utf8 HTTP/1.1\r\nHost: owned\r\nConnection: close\r\n\r\n"
                 )
@@ -367,7 +368,8 @@ class PACSourcePeerTests(unittest.TestCase):
             self.assertEqual(errors, [primary])
         finally:
             release.set()
-            connection.close()
+            if connection is not None:
+                connection.close()
             for thread in held:
                 self.assertTrue(thread._started.wait(2))
                 original_thread.join(thread, 2)

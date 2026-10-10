@@ -151,12 +151,19 @@ class OwnedSuspendedImagePortable(unittest.TestCase):
             os.kill(identity, 0)
 
     def test_compiled_mutants_fail_the_unchanged_literal_receiving_vectors(self):
-        original = self.source.read_text()
+        complete = self.source.read_text()
+        active_boundary = (
+            "\n// Exact active original owner and borrowed alias; no new PID authority.\n"
+            "int ergopti_owned_active_image_validate("
+        )
+        self.assertEqual(complete.count(active_boundary), 1)
+        original, active_suffix = complete.split(active_boundary)
+        active_suffix = active_boundary + active_suffix
         for name, (needle, replacement) in MUTANTS.items():
             with self.subTest(mutation=name):
                 self.assertEqual(original.count(needle), 1)
                 source = self.root / (name + ".c")
-                source.write_text(original.replace(needle, replacement))
+                source.write_text(original.replace(needle, replacement) + active_suffix)
                 output = self.compile(source, name)
                 result = run_owned([str(output), str(self.root)], self.root)
                 self.assertNotEqual(result.returncode, 0)
