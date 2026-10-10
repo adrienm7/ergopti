@@ -250,6 +250,7 @@ helpers.describe("hotstrings_config: priority override round-trip", function()
 			return category == "ext:demo:phrases" and extension_path or nil
 		end)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local saved, errors = Logger.error, 0
 		Logger.error = function() errors = errors + 1 end
 		local ok, resolved = pcall(mod.resolve, "ext:demo:phrases", "greetings")

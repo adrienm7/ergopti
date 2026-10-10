@@ -25,6 +25,7 @@ package.loaded["adapters.shell_runner"] = {
 package.loaded["infra.logger"] = nil
 local Logger = require("infra.logger")
 
+helpers.admit_logger_privacy(Logger)
 -- Records every path the logger opens, so the test observes where a line goes.
 local _real_io_open = io.open
 local function record_opens()

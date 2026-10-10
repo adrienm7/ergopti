@@ -11,6 +11,7 @@
 
 local helpers = require("tests.helpers")
 
+helpers.admit_logger_privacy(require("infra.logger"))
 package.loaded["adapters.boot_journal"] = nil
 local BootJournal = require("adapters.boot_journal")
 local LauncherEnvironment = require("infra.launcher_environment")
@@ -169,5 +170,25 @@ helpers.describe("managed native scripting admission (native-scripting-state)", 
 		BootJournal.configure_for_tests(nil)
 		helpers.assert_true(ok)
 		helpers.assert_eq(written, false)
+	end)
+end)
+
+
+helpers.describe("boot journal privacy", function()
+	helpers.it("mac-logger-privacy: both synchronous boot trails redact messages before opening files", function()
+		local writes = {}
+		BootJournal.configure_for_tests({ fallback_path = "/owned/boot", clock = function() return "T" end,
+			getenv = function() return "/owned/launcher" end,
+			open = function(path)
+				return { write = function(_, text) writes[path] = (writes[path] or "") .. text; return true end,
+					flush = function() return true end, close = function() return true end }
+			end })
+		local ok, err = xpcall(function()
+			helpers.assert_eq(BootJournal.append("ERROR", "PrivateUser /Users/PrivateUser/cache; password=secret12345"), true)
+			helpers.assert_eq(writes["/owned/boot"], "T [ERROR] [init] <user> ~/cache; password=<secret>\n")
+			helpers.assert_eq(writes["/owned/launcher"], "[T] embedded Hammerspoon boot ERROR: <user> ~/cache; password=<secret>\n")
+		end, debug.traceback)
+		BootJournal.configure_for_tests(nil)
+		if not ok then error(err, 0) end
 	end)
 end)
