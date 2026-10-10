@@ -6222,6 +6222,14 @@ allocation census remains 22 Windows/6 macOS/4 Linux. Complete local checks pass
 Windows native execution and installed acceptance remain pending; these results
 do not close items 54, 16 or 38.
 
+The Windows model parent now consumes a declared health prefix and the existing
+model caption through two ordered scalar getters. An independent original-label
+corpus preserves all 252 projections across 21 locales, three health states and
+four model states. Actual whole manifest and parity controls pass, including
+retained native child ownership and constructor-context refusal regressions.
+All previous native assertions remain. Complete native Windows, packaging and
+installed acceptance remain pending; items 54, 16 and 38 stay open.
+
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
@@ -8510,6 +8518,11 @@ The Windows Agent fixed-caption migration uses canonical shared declarations
 without changing backend/model/save/picker owners or the 21 prior captions. See
 item 54 for the original-source corpus and actual local qualification. The
 22/6/4 allocation census and native/installed acceptance keep item 81 open.
+
+The Windows model-parent caption now consumes shared declared policy while
+retaining actual child/probe/callback ownership. The canonical allocation census
+remains 22 Windows/6 macOS/4 Linux before the separate Mac title slice. Item 54
+records the independent corpus and qualification limits; item 81 stays open.
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.

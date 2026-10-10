@@ -3284,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "诊断检查失败：%s。",
 	"healthcheck.export.privacy_notice": "此报告仅分享允许的技术信息。即使启用详细信息，也不包含日志、自由文本、路径或身份识别信息。本地页面测试不包含在内。",
 	"sg_actions.llm_translate_context": "🌐 翻译当前句子 [可配置]",
-	"menu.about.startup_other_command_reason": "其他启动命令：启动已配置为其他命令或安装。现有设置将保留。"
+	"menu.about.startup_other_command_reason": "其他启动命令：启动已配置为其他命令或安装。现有设置将保留。",
+	"menu.llm.model_parent_with_health": "%s已选模型：%s"
 }

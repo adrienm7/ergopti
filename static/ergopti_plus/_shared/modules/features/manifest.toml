@@ -9563,3 +9563,13 @@ caption_getter = "agent_disabled_apps_count"
 caption_format = "numbered"
 platforms = ["ahk"]
 unavailable = "hide"
+
+# Windows model parent: native cached health precedes the translated model label.
+[[menu.llm_model_parent_ahk]]
+type = "group"
+id = "llm_model"
+i18n = "menu.llm.model_parent_with_health"
+caption_getters = ["llm_model_health_prefix", "llm_model_current_caption"]
+disabled_when = ["llm_model_parent_ready"]
+platforms = ["ahk"]
+unavailable = "hide"
