@@ -1089,3 +1089,38 @@ _HTRD_RetiredOwner() {
 }
 Test("terminator-admission: equal bytes cannot replace the captured runtime owner identity",
 	_HTRD_WithDisplayed.Bind(_HTRD_RetiredOwner))
+
+
+; A synthesized parent must not capture the independent root schema stamp or
+; bare user keys. The original AOT/foreign subject still has no parent header.
+_HTR_CurrentRootOwners(Bom, FinalNewline) {
+	RootBytes := 'root_owner = "keep root" # retain root comment`nroot_flag = true`nroot_count = 7`nroot_unknown.child = "keep dotted"`n'
+	Source := _CMJFixtureCurrentSource(RootBytes . _HTR_Source())
+	if !FinalNewline
+		Source := SubStr(Source, 1, StrLen(Source) - 1)
+	if Bom
+		Source := Chr(0xFEFF) . Source
+	Before := TOML_ParseDocument(Source)
+	AssertFalse(InStr(Source, '[hotstrings]`n'), "the real source must require a new parent declaration")
+	Plan := HotstringsTerminatorRecordPlan(Source, _HTR_Operation())
+	Parsed := TOML_ParseDocument(Plan.Content)
+	AssertEqual(ConfigMigrateCurrentVersion(), Parsed["_meta"]["schema_version"],
+		"the actual edited candidate retains its current root schema authority")
+	AssertFalse(Parsed["hotstrings"].Has("_meta"), "schema metadata never moves under the created parent")
+	for Key in ["_meta", "root_owner", "root_flag", "root_count", "root_unknown", "private", "foreign"]
+		AssertTrue(TOML_SameValue(Before[Key], Parsed[Key]), "the independent root/foreign owner survives: " . Key)
+	AssertContains(Plan.Content, RootBytes, "all original bare root bytes and comments remain exact")
+	AssertContains(Plan.Content, '[private]`ncredential = "keep"`n')
+	AssertContains(Plan.Content, '[[foreign.rows]]`nvalue = "never alter" # foreign comment')
+	AssertEqual(Bom ? Chr(0xFEFF) : "_", SubStr(Plan.Content, 1, 1), "BOM and first root metadata byte stay before any table")
+	AssertEqual(3, Parsed["hotstrings"]["terminators"].Length)
+	loop 2
+		AssertTrue(TOML_SameValue(Before["hotstrings"]["terminators"][A_Index],
+			Parsed["hotstrings"]["terminators"][A_Index]), "each original record and unknown metadata survive")
+	AssertEqual("section", Parsed["hotstrings"]["terminators"][3]["key"])
+	AssertEqual("§", Parsed["hotstrings"]["terminators"][3]["char"])
+}
+Test("terminator-records: new parent retains current root metadata and bare owners", _HTR_CurrentRootOwners.Bind(false, true))
+Test("terminator-records: new parent retains current root metadata without a final newline", _HTR_CurrentRootOwners.Bind(false, false))
+Test("terminator-records: new parent retains BOM before current root metadata", _HTR_CurrentRootOwners.Bind(true, true))
+Test("terminator-records: new parent retains BOM and unterminated foreign comment", _HTR_CurrentRootOwners.Bind(true, false))
