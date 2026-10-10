@@ -57,6 +57,12 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
         if sha256(source / relative) != expected:
             raise ValueError("The reviewed upstream source preimage changed: " + relative)
     patches = {
+        "cmd/cmd.go": (
+            "func RunServer(_ *cobra.Command, _ []string) error {\n",
+            "func RunServer(_ *cobra.Command, _ []string) (result error) {\n"
+            "\tdefer func() {\n\t\tif err := nativehttp.CloseListenerEvent(); result == nil && err != nil { result = err }\n\t}()\n"
+            "\tif err := nativehttp.PrepareListenerEvent(); err != nil { return err }\n",
+        ),
         "server/images.go": (
             "\treturn c.Do(req)\n",
             "\tif req.Method == http.MethodGet || req.Method == http.MethodHead {\n"
@@ -100,6 +106,11 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
                 raise ValueError("The reviewed upstream download request seams changed")
             text = text.replace("d.client.Do(req)", "nativehttp.Do(d.client, req)")
         if relative == "server/routes.go":
+            text = replace_once(
+                text,
+                "\terr = srvr.Serve(ln)\n",
+                "\tif err := nativehttp.PublishListenerBound(ln); err != nil { return err }\n\terr = srvr.Serve(ln)\n",
+            )
             old_pull = """	ch := make(chan any)
 	go func() {
 		defer close(ch)

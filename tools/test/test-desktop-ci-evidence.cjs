@@ -684,9 +684,10 @@ function checkManagedOllamaNative(body) {
 	assert.match(listener, /ManagedPTYWorkerTests/);
 	assert.match(listener, /Executed 4 tests, with 0 failures/);
 	assert.match(listener, /Executed 6 tests, with 0 failures/);
+	assert.match(listener, /Executed 14 tests, with 0 failures/);
 	assert.match(listener, /Executed 2 tests, with 0 failures/);
 	assert.match(listener, /ManagedNetworkBootstrapTests/);
-	assert.match(listener, /Executed 41 tests, with 0 failures/);
+	assert.match(listener, /Executed 49 tests, with 0 failures/);
 	assert.equal(pipeline.stepField(listener, 'continue-on-error'), null);
 	const receive = pipeline.step(
 		body,

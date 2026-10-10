@@ -67,6 +67,9 @@ class StandaloneCompilerControls(unittest.TestCase):
                 "CPOSIXCompatibility.h",
                 "OwnedProgramCompatibility.h",
                 "LoopbackListenerCompatibility.h",
+                "OwnedImageAliasCompatibility.h",
+                "OwnedSuspendedImageCompatibility.h",
+                "OwnedListenerEventCompatibility.h",
             ]:
                 relative = (
                     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name
@@ -77,6 +80,47 @@ class StandaloneCompilerControls(unittest.TestCase):
                     self.subject.source_hashes[relative],
                     hashlib.sha256(original).hexdigest(),
                 )
+            self.assertEqual(
+                {path.name for path in module.glob("*.h")},
+                {
+                    "CPOSIXCompatibility.h",
+                    "OwnedProgramCompatibility.h",
+                    "LoopbackListenerCompatibility.h",
+                    "OwnedImageAliasCompatibility.h",
+                    "OwnedSuspendedImageCompatibility.h",
+                    "OwnedListenerEventCompatibility.h",
+                },
+            )
+            self.assertIn(
+                '#include "OwnedListenerEventCompatibility.h"',
+                (module / "CPOSIXCompatibility.h").read_text(),
+            )
+            retained = {
+                str(path): (descriptor, expected)
+                for path, descriptor, _, expected in self.subject.outgoing_context._inputs
+            }
+            for name in (
+                "CPOSIXCompatibility.h",
+                "OwnedProgramCompatibility.h",
+                "LoopbackListenerCompatibility.h",
+                "OwnedImageAliasCompatibility.h",
+                "OwnedSuspendedImageCompatibility.h",
+                "OwnedListenerEventCompatibility.h",
+            ):
+                original = (
+                    ROOT
+                    / "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include"
+                    / name
+                )
+                for path in (original, module / name):
+                    self.assertIn(str(path), retained)
+                    descriptor, expected = retained[str(path)]
+                    self.assertEqual(expected, hashlib.sha256(path.read_bytes()).hexdigest())
+                    self.assertEqual(os.fstat(descriptor).st_ino, path.stat().st_ino)
+                    self.assertFalse(os.get_inheritable(descriptor))
+                    self.assertEqual(
+                        os.pread(descriptor, path.stat().st_size, 0), path.read_bytes()
+                    )
             self.assertEqual(arguments[arguments.index("-framework") + 1], "SystemConfiguration")
             raise CompilerBoundary()
 

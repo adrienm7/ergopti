@@ -127,21 +127,25 @@ helpers.describe("ollama_deps_checker: ownership is captured at claim time", fun
 	end)
 
 	helpers.it("the completion path verifies ownership before writing", function()
-		local src = helpers.read_driver_source("make_streaming_handler")
+		local src, source_error = helpers.read_driver_unit("local function finish_provisioning(daemon_ready)")
+		helpers.assert_true(src ~= nil and src ~= "", source_error or "the Ollama completion unit must be nonempty")
 		local code = src:gsub("%-%-[^\n]*", "")
 
-		-- Anchored on the Ollama checker's own readiness step. read_driver_source
-		-- concatenates every file naming the symbol, and the MLX checker sorts
-		-- first, so a generic anchor lands in the wrong module.
-		-- Anchored on the WRITE, not the label. The first occurrence of the key is
-		-- its entry in the PROGRESS_LABELS table, hundreds of lines above the
-		-- completion path — a lookback from there finds no guard and reports a
-		-- correctly-guarded file as broken.
-		local at = code:find('set_step, i18n.get("ollama.deps_step_ready")', 1, true)
+		-- Ordering belongs to this unit and this asynchronous completion callback.
+		-- Both keys must stay in the actual write: native readiness is distinct
+		-- from a verified external client with no daemon acquisition authority.
+		local finish_at = code:find("local function finish_provisioning(daemon_ready)", 1, true)
+		helpers.assert_true(finish_at ~= nil, "the provisioning completion callback must be locatable")
+		local write = 'set_step, i18n.get(daemon_ready and "ollama.deps_step_ready" or "ollama.deps_step_verified")'
+		local at = code:find(write, finish_at, true)
 		helpers.assert_true(at ~= nil, "the completion path must still report readiness")
+		helpers.assert_true(code:find("return finish_provisioning(false)", at, true) ~= nil,
+			"external client completion must not claim native server readiness")
+		helpers.assert_true(code:find("return finish_provisioning(true)", at, true) ~= nil,
+			"the supervised native completion must retain its ready outcome")
 
 		local ownership_at = code:find(
-			"local owns_active_window = active_ok and active == true and owns_window()", 1, true)
+			"local owns_active_window = active_ok and active == true and owns_window()", finish_at, true)
 		helpers.assert_true(ownership_at ~= nil and ownership_at < at,
 			"writing the ready step and 100%% must be gated on still owning the window. "
 				.. "is_active() proves only that SOME window is open, so an ungated write "
@@ -149,6 +153,13 @@ helpers.describe("ollama_deps_checker: ownership is captured at claim time", fun
 		local guarded_path = code:sub(ownership_at, at)
 		helpers.assert_true(guarded_path:find("if owns_active_window then", 1, true) ~= nil,
 			"the exact claim-time ownership result must dominate the readiness write")
+		helpers.assert_true(guarded_path:find("if not owner_is_current() then return false end", 1, true) ~= nil,
+			"the private bootstrap owner must remain current after window ownership lookup")
+		local progress_at = code:find("pcall(llm_progress.set_progress, 100)", at, true)
+		helpers.assert_true(progress_at ~= nil, "completion must retain the guarded progress write")
+		helpers.assert_true(code:sub(at + #write, progress_at):find(
+			"if not owner_is_current() then return false end", 1, true) ~= nil,
+			"cancellation between the step and progress writes must suppress stale progress")
 	end)
 
 	helpers.it("the ownership state is declared before the closures that use it", function()
