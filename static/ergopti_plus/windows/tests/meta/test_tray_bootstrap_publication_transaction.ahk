@@ -46,7 +46,7 @@ _TBPT_ColdRootHasOneTruthfulOwner() {
 	LlmBuild := _DriverFuncBody("LLM_Menu_Build")
 	Assert(LlmBuild != "", "LLM_Menu_Build must remain source-visible")
 	Assert(InStr(LlmBuild,
-		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot, true, true)") > 0
+		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)") > 0
 		&& InStr(LlmBuild, "A_TrayMenu.Add") == 0,
 		"the LLM builder must submit its detached child to the root coordinator and never publish an IA-only root")
 }

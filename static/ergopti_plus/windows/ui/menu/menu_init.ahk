@@ -91,8 +91,16 @@ BuildLanguageMenuDeferred() {
 }
 
 
-initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false) {
-	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
+initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false, PrebuiltLlm := unset) {
+	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache, _LLM_Menu_Handle
+	Builders := _MI_TopLevelBuilders()
+	if IsSet(PrebuiltLlm) {
+		if GlobalsOnly || !(PrebuiltLlm is Menu) || _LLM_Menu_Handle != PrebuiltLlm
+			throw Error("The caller-owned AI submenu cannot enter this root projection.")
+		; This invocation owns the detached child; default boot/root builders
+		; retain their original initialization and construction path.
+		Builders["llm"] := _MI_StagePrebuiltLlm.Bind(PrebuiltLlm)
+	}
 	TrayMenuStage_Begin()
 	try {
 	_TrayTitleCache := Map()
@@ -109,10 +117,10 @@ initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false) {
 	; of a tail read from the manifest — so the declared order reached half of
 	; the tray, and a reordered top level changed the other two drivers alone.
 	if GlobalsOnly {
-		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders(),
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Builders,
 			(Entry) => !Entry.Get("greyed_when_paused", false))
 	} else
-		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Builders)
 	BootProfile_Mark("MENU/initMenu: top level staged")
 	Published := TrayMenuStage_Publish(PublishAuthorizeFn)
 	return Published
@@ -312,6 +320,18 @@ _MI_StageLlm() {
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 }
 
+
+
+/** Attaches only the exact detached child already constructed by this caller. */
+_MI_StagePrebuiltLlm(Submenu) {
+	global _LLM_Menu_Handle, _LLM_Menu
+	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu || !(_LLM_Menu is Map)
+		throw Error("The caller-owned AI submenu was withdrawn before root staging.")
+	TrayMenuStage_AddFeature(t("menu.llm.title"), Submenu)
+	if _LLM_Menu["enabled"]
+		TrayMenuStage_Check(t("menu.llm.title"))
+	BootProfile_Mark("MENU/initMenu: caller-owned LLM tray projection")
+}
 
 ; ── 🤖 AI agent — its own top-level submenu (ui/menu/menu_llm/menu_agent.ahk),
 ; ticked while the agent is not off.
