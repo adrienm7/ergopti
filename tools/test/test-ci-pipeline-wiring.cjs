@@ -191,6 +191,19 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const MACOS_NATIVE_STEP_CONDITIONS = [
+	[MACOS_BOX, 'managed-ollama-native', 'Prepare genuine pinned Go toolchain', NOT_CANCELLED],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Acquire and verify genuine pinned upstream inputs',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Build and admit the actual native source asset',
+		NOT_CANCELLED
+	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
@@ -1878,11 +1891,15 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 			stepProblems
 		);
 	}
+	const scopedAcquisition =
+		rel === MACOS_BOX &&
+		job === 'managed-ollama-native' &&
+		name === 'Acquire and verify genuine pinned upstream inputs';
 	mustCatch(
 		`${job} ${name}: missing native evidence step`,
 		rel,
-		head,
-		`      - name: Omitted ${name}\n`,
+		scopedAcquisition ? from : head,
+		`      - name: Omitted ${name}\n` + (scopedAcquisition ? `        if: ${condition}\n` : ''),
 		stepProblems
 	);
 }
@@ -4646,6 +4663,38 @@ assert.match(siteWorkflow, /cp -r build\/\. "\$GHP\/\$DEPLOY_DIR\/"/, 'dev deplo
 	);
 	console.log(
 		'PASS: selected-release exact raw receiver controls=14; Darwin native receiving UNRUN by source models.'
+	);
+}
+
+// Producer diagnostics run after earlier refusals, but never after cancellation.
+// The existing condition loop also rejects removal, false, success and missing steps.
+for (const name of [
+	'Prepare genuine pinned Go toolchain',
+	'Acquire and verify genuine pinned upstream inputs',
+	'Build and admit the actual native source asset'
+]) {
+	const head = `      - name: ${name}\n`;
+	for (const changed of ['always()', 'failure()', '${{ !cancelled() && false }}']) {
+		mustCatch(
+			`native producer diagnostic ${name}: invalid condition ${changed}`,
+			MACOS_BOX,
+			head + '        if: ${{ !cancelled() }}\n',
+			head + `        if: ${changed}\n`,
+			stepProblems
+		);
+	}
+	const from = head + '        if: ${{ !cancelled() }}\n';
+	const source = rawSourceFiles.find((file) => file.rel === MACOS_BOX).text;
+	assert.equal(source.split(from).length - 1, 1, 'one exact native producer diagnostic step');
+	const swallowed = rawSourceFiles.map((file) =>
+		file.rel === MACOS_BOX
+			? { ...file, text: file.text.replace(from, from + '        continue-on-error: true\n') }
+			: file
+	);
+	assert.notDeepEqual(swallowed, rawSourceFiles);
+	assert.throws(
+		() => pipeline.validateRaw(swallowed),
+		/\[ci-full-default\].*failure must remain fatal/
 	);
 }
 

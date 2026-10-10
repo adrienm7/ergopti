@@ -6479,6 +6479,37 @@ this neutral cleanup completes no parent item.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 listener-bound startup event preparation. The pinned native producer
+connects to its guardian's private Unix listener immediately before the original
+HTTP Serve call. The guardian requires the original mapped peer, exact nonce and
+write EOF; LISTENER_BOUND does not grant authenticated API READY. The original
+22 owner and35 serve controls are retained. Canonical POSIX receiving passes
+28 owner and37 serve tests without skips; a new nonce-refusal test now accepts
+that same refusal at either original start or wait boundary. Actual pinned
+Go1.26.8 Linux Unix-peer receiving passes all6 added tests; native
+Darwin peer mapping, SDK49 and genuine pinned-daemon qualification remain UNRUN.
+The production qualification guard stays false. CI attempts the original native
+producer independently of earlier PAC/HTTP failures while retaining all fatal
+verdicts, catalogue admission, packaging and release conditions.
+
+The same serving tranche adds explicit caller-owned stdin cancellation. EOF
+wakes the original guardian selector and retirement path; borrowed FD0 is never
+closed by the helper. Unknown unregister/selector-close outcomes retain debt.
+Default untagged serving is unchanged. The original37 tests and assertions are
+preserved, with seven additional controls: private POSIX receiving passes7/7
+and44/44 without skips. Its unchanged original missing-flag and watcher-mutant
+controls refuse as expected. CI and the strict protocol collector require44;
+physical Darwin and real caller activation remain independent qualifications. Selected local formatting and portable Mac18165 pass; native
+Swift is deferred off macOS. Initial JS404/408 diagnoses source-input, Debug
+target and portable-C fixture mismatches plus the protected temporary-root
+refusal. Reviewed corrections preserve existing assertions; portable C3/3 and
+its original20 vectors, remap and release-input guards pass. A further frozen44
+Go-log policy mismatch is repaired with44 literal historical identities and one
+added refusal case; all45 pass, the independent old journal stays unchanged,
+and the strict collector requires45. Final JS407/408 leaves only the unchanged
+protected-temporary-root refusal; exact non-Git-root replay passes. The same
+native/driver postimages retain the18165-pass portable Mac receipt.
+
 2026-10-10 exact streaming-task retirement correction. Cancellation preserves
 the original ShellRunner slot and input while termination is pending. Cleanup
 requires that same handle's physical settlement receipt, including after a
@@ -6489,7 +6520,10 @@ of the7 new cases, and six causal mutants remain red. These controlled task
 ports do not qualify physical Hammerspoon/POSIX closure. Canonical selected
 format passes; Hammerspoon18165 and E2E101 pass with one original skip. JS has
 407 passes/1 protected-temporary-root failure; the unchanged uninstall fixture
-passes its exact non-Git-root replay. Hosted macOS receiving remains pending.
+passes its exact non-Git-root replay. Exact hosted manual38063990952 onf103568f7
+is whole terminal FAIL:7 successful,5 failed and5 skipped jobs. Core JS408 and
+portable Mac18165 pass; PAC/WPAD, independent HTTP and Homebrew remain red.
+Packaging, installation and Release are skipped; physical closure is unqualified.
 This is a bounded TODO62 retirement prerequisite, not complete daemon migration.
 
 2026-10-10 selected-release native receiving enrollment. A bounded new Mac

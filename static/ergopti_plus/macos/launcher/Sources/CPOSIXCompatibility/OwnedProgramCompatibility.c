@@ -148,6 +148,28 @@ ergopti_owned_program_observation ergopti_owned_program_prepared_identity(ergopt
 	};
 }
 
+// Observation remains derived from the original opaque native owner.
+ergopti_owned_program_observation ergopti_owned_program_active_identity(ergopti_owned_program *owner) {
+	if (owner == NULL || !owner->active || owner->cancelled || owner->retired
+		|| owner->leader_exited || owner->error_code != 0 || owner->monitor < 0
+		|| !owner->identity_valid || owner->leader <= 0) {
+		return (ergopti_owned_program_observation) { .error_code = EINVAL };
+	}
+	struct proc_bsdinfo info;
+	int error = program_bsd_info(owner->leader, &info);
+	if (error == 0 && (!program_identity_equal(owner->identity, program_identity_from_info(&info))
+		|| (info.pbi_status == SSTOP || info.pbi_status == SZOMB) || info.pbi_ppid != (uint32_t)getpid()
+		|| info.pbi_pgid != (uint32_t)owner->leader || getsid(owner->leader) != getpid()
+		|| info.pbi_uid != geteuid() || info.pbi_ruid != getuid()
+		|| info.pbi_start_tvusec >= 1000000)) { error = ESTALE; }
+	if (error != 0) { return (ergopti_owned_program_observation) { .error_code = error }; }
+	return (ergopti_owned_program_observation) {
+		.process_id = owner->leader, .process_group_id = (pid_t)info.pbi_pgid,
+		.start_seconds = info.pbi_start_tvsec, .start_microseconds = info.pbi_start_tvusec,
+		.nonlive = false
+	};
+}
+
 static int program_pid_compare(const void *first, const void *second) {
 	pid_t left = *(const pid_t *)first;
 	pid_t right = *(const pid_t *)second;

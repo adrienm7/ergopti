@@ -59,6 +59,24 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
+		'Prepare genuine pinned Go toolchain',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Acquire and verify genuine pinned upstream inputs',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Build and admit the actual native source asset',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
 		'Receive selected-release shell corpus and native guardian cancellation',
 		null
 	],
