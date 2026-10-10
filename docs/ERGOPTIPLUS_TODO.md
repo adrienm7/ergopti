@@ -8213,6 +8213,43 @@ controlled fixtures, not macOS qualification. Shared migration consent,
 authenticated readiness, Lua lifecycle consumption and retained serve cleanup
 authority remain software work; items 62, 16 and 38 remain open.
 
+2026-10-10 native daemon API readiness prerequisite. The optional
+`--acquire-readiness` path requires a caller nonce and authenticates the original
+accepted listener and same-session challenge through the shared pull admission
+policy before READY. Each helper is registered before resource acquisition;
+callback retirement, source/session withdrawal and partial child-constructor
+failure preserve exact ownership and the original absolute deadline. Uncertain
+helper closure retains debt and refuses READY or namespace retirement. All
+31 previous method bodies remain unchanged; 55 actual POSIX controls pass and
+two causal mutations fail. Native signing, catalogue and listener frames are
+controlled fixtures, not Darwin production qualification. The production guard
+stays false. Eventual listener readiness, shared migration consent, G4 lifecycle
+consumption and retained serve cleanup authority remain CODE; items 62, 16 and
+38 remain open.
+
+The exact composed source `9d5016143` is received by macOS-only manual CI
+38046195371, which ends in failure with six successful, six failed and five
+skipped jobs. Core JS passes 406/407; the remaining Windows retention-condition
+guard is independently reproduced on Dev. ARM64 SDK41 passes, while AMD64 has
+40 passing methods and one unexpected retained-image profile deadline; its
+cause remains unresolved. Both source10 cohorts pass. PAC14 retains two failing
+methods per architecture, independent HTTP retains three errors per architecture,
+and archive25 retains one Homebrew prerequisite failure. Package and installation
+are skipped. The new wire20/serve35 controls are not yet directly enrolled in the
+Mac native step. Reviewed workflow preparations and exact source recovery are in
+[the current Group 6 handover](handovers/2026-10-10-group6-release-network/README.md);
+shared custody, original-clock event/caller/cleanup CODE and genuine native
+acceptance remain required. No item is removed or qualified by these receipts.
+
+The retained-image test now preserves bounded diagnostics when its original
+five-second profile deadline fails. After the unchanged exact-peer terminate/wait,
+one nonblocking read captures at most 4096 bytes; only complete fixed native
+receipts are projected. Diagnostic EOF/close facts grant no descendant or
+namespace authority, and diagnostic refusal preserves the original deadline
+failure. All eighteen test methods in the file and the surrounding SDK41 cohort
+remain unchanged. The stage observed after termination can describe cancellation
+or cleanup; it does not prove the pre-timeout cause. Native receiving is pending.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
