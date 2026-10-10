@@ -9122,6 +9122,20 @@ Carbon classification, physical keys or installed release qualification.
   two missing Windows workflow retention conditions, outside this change.
   Native Linux CI and physical number-row input remain unqualified here.
 
+  The separate macOS read-only Carbon producer is now prepared with twelve
+  XCTest methods. Forty Caps/Shift levels use one aligned frozen layout copy,
+  a fresh UInt32 dead state per row and a final rejoin of the original selected
+  TIS data, bytes and keyboard type. Seven methods use genuine Carbon/TIS and
+  five exercise controlled protocol behavior; existing independent corpus
+  expectations remain intact. The final-byte test changes only its private
+  clone after translation and verifies the native layout remains unchanged.
+  Source review is clear;
+  SDK compilation, actual discovery/execution and causal native variants remain
+  unrun. Existing keyboard-source roles and shared launcher dispatch are unchanged;
+  the new role is not yet reachable from the launcher. No forced-mode, input,
+  modifier, permission or output authority is added. Native receiving and the
+  separately coordinated dispatch/transport remain software work before hardware.
+
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
   reconstruct/review lost runtime preparation. Never fall back from a refused
