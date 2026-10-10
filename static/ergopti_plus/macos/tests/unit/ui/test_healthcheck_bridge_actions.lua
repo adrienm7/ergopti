@@ -231,7 +231,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 
 	-- The report was also saved and revealed in Finder, which finished after
 	-- the browser opened and took the focus from the form (report-focus)
-	helpers.it("report completes its attachment, then opens the template-only form last (report-focus)", function()
+	helpers.it("report completes its attachment, then opens the stable-metadata form last (report-focus)", function()
 		as_jdoe(function()
 			local core, context = load_window()
 			core.show_window()
@@ -270,7 +270,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
 			helpers.assert_eq(#context.opened_urls, 1, "the bug form opens once")
 			local repo = core.config().repository
-			helpers.assert_eq(context.opened_urls[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml")
+			helpers.assert_eq(context.opened_urls[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=unknown&os=macos&driver=macos")
 			local encoded = context.opened_urls[1]:match("[?&]diagnostics=([^&]*)")
 			local diagnostics = encoded and encoded:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
 			helpers.assert_nil(diagnostics, "no query default can reset an edit")

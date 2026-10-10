@@ -149,11 +149,11 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		local url = calls.open_url[1]
 		helpers.assert_eq(query_value(url, "diagnostics"), nil,
 			"the form receives no query default that could reset an edit")
-		helpers.assert_eq(query_value(url, "os"), nil)
+		helpers.assert_eq(query_value(url, "os"), "macos")
 		local repo = documents().repository
-		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml"
-		helpers.assert_eq(url, prefix, "the canonical bug URL contains only its template")
-		helpers.assert_nil(query_value(url, "driver"))
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos"
+		helpers.assert_eq(url, prefix, "the canonical bug URL contains only stable host metadata")
+		helpers.assert_eq(query_value(url, "driver"), "macos")
 		helpers.assert_true(not url:find("jdoe", 1, true), "the URL carries no account name: " .. url)
 		helpers.assert_true(not url:find("%2FUsers%2F", 1, true), "the URL carries no home folder: " .. url)
 	end)
@@ -177,7 +177,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(#calls.copy[1] > templates.max_url_bytes, true, "the fixture exceeds the URL budget")
 		local url = calls.open_url[1]
 		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
-		helpers.assert_eq(query_value(url, "version"), nil, "identity stays in the attachment, not query defaults")
+		helpers.assert_eq(query_value(url, "version"), "2.4.0", "only validated host identity is prefilled")
 		local prefilled = query_value(url, "diagnostics")
 		helpers.assert_eq(prefilled, nil, "long output never prefills or resets the issue form")
 		helpers.assert_true(#url < 1200, "the editable URL stays short independently of report length")
@@ -379,13 +379,14 @@ helpers.describe("default attachment completion", function()
 	end)
 end)
 
-helpers.describe("template-only report URL", function()
-	helpers.it("template-only report URL keeps complete output local and accepts no query fields", function()
+helpers.describe("stable-metadata report URL", function()
+	helpers.it("stable-metadata report URL keeps complete output local and rejects page-derived query fields", function()
 		local result, calls = perform({ action = "report", text = REPORT,
-			fields = { diagnostics = "private query text", version = "2.4.0", os = "private host", driver = "foreign" } })
+			fields = { diagnostics = "private query text", title = "PRIVATE_TITLE", description = "PRIVATE_DESCRIPTION", reproduction = "PRIVATE_REPRODUCTION", version = "9.9.9", os = "private host", driver = "foreign" } })
 		helpers.assert_eq(result.ok, true)
 		local repo = documents().repository
-		helpers.assert_eq(calls.open_url[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml")
+		helpers.assert_eq(calls.open_url[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos")
+		for _, id in ipairs({ "title", "description", "reproduction", "diagnostics", "architecture" }) do helpers.assert_nil(query_value(calls.open_url[1], id)) end
 		helpers.assert_eq(calls.save[1].text, calls.copy[1])
 		helpers.assert_eq(calls.copy[1], approved_text(false))
 		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" })

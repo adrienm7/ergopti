@@ -15,7 +15,7 @@
 ---    policy. Free text, paths and unknown fields are excluded regardless of
 ---    the page or details checkbox. Only approved technical content leaves.
 --- 2. The clipboard and local attachment hold the complete approved report.
----    GitHub receives only the template selection; the browser opens
+---    Only stable host version, OS and driver metadata are prefilled. The browser opens
 ---    after attachment completion and reveal, without an automatic upload.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
 ---    that does not exist yet is created before it is opened; a file that does
@@ -146,23 +146,26 @@ local function save_and_reveal(effects, paths, name, text)
 	return path
 end
 
---- Reports on GitHub: copies the full report, then opens the bug form with
---- that same report prefilled. Nothing is saved and nothing is revealed: the
---- browser opening is the last side effect, so the form keeps the focus.
+--- Reports on GitHub: copies and saves the complete approved report, then
+--- reveals its local attachment before opening the bug form with stable host
+--- version, OS and driver fields. Editable fields stay outside the URL; the
+--- browser opens last and no attachment is uploaded automatically.
 --- @param effects table
 --- @param documents table { templates, repository, redaction }
---- @param action table { text, fields } The page's text and identity fields.
+--- @param action table Host-approved text and technical identity fields.
 --- @param redact function
+--- @param paths table Host-retained attachment directory.
 --- @return table
 local function report(effects, documents, action, redact, paths)
 	local text = redact(action.text)
-	-- First, and whole: the link may cut the report to fit GitHub's budget
+	-- Copy the complete reviewed report independently of its short metadata URL
 	if not effects.copy(text) then error("the clipboard refused the report") end
-	-- Save the complete reviewed document before opening its short issue form.
+	-- Complete the local attachment before opening the metadata-only issue form.
 	local path, err = save_and_reveal(effects, paths, action.name, text)
 	if not path then error(err) end
 	local fields = {}
-	-- Query defaults can reset edits in GitHub; only select the template.
+	-- Only the host-derived technical identity is stable enough to prefill.
+	for _, id in ipairs({ "version", "os", "driver" }) do fields[id] = action.fields[id] end
 	local report_field = documents.templates.templates.bug.report_field
 	if type(report_field) ~= "string" then error("the bug template names no report field") end
 	local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
