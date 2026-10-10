@@ -27,6 +27,7 @@ struct OwnedSuspendedImageRequest {
 	let outgoingWorker: String
 	let outgoingSHA256: String?
 	let bootstrap: ManagedNetworkBootstrapBinding?
+	let listenerEvent: Bool
 
 	private static func unsigned(_ value: Any?) -> UInt64? {
 		guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
@@ -46,9 +47,12 @@ struct OwnedSuspendedImageRequest {
 			"remaining_ms", "home", "models_path", "network_policy", "host", "proxy_url"]
 		let outgoingKeys: Set<String> = ["outgoing_worker", "outgoing_device", "outgoing_inode", "outgoing_sha256"]
 		let bootstrapKeys: Set<String> = ["bootstrap_path", "bootstrap_device", "bootstrap_inode", "store_mode", "store_cwd"]
+		let listenerKeys: Set<String> = ["listener_event"]
+		let permitted = [keys, keys.union(outgoingKeys), keys.union(bootstrapKeys), keys.union(outgoingKeys).union(bootstrapKeys)]
 		guard data.count <= 65_536,
 			let fields = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-			[keys, keys.union(outgoingKeys), keys.union(bootstrapKeys), keys.union(outgoingKeys).union(bootstrapKeys)].contains(Set(fields.keys)),
+			(permitted + permitted.map { $0.union(listenerKeys) }).contains(Set(fields.keys)),
+			fields["listener_event"] == nil || (fields["listener_event"] as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } == true,
 			unsigned(fields["version"]) == 1,
 			let device = decimal(fields["device"]), device <= UInt64(UInt32.max),
 			let inode = decimal(fields["inode"]), inode > 0,
@@ -128,7 +132,7 @@ struct OwnedSuspendedImageRequest {
 		if !proxy.isEmpty { environment["https_proxy"] = proxy }
 		return OwnedSuspendedImageRequest(executable: executable, arguments: arguments, device: device,
 			inode: inode, sessionPath: session, remainingMilliseconds: UInt32(remaining), environment: environment,
-			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256, bootstrap: bootstrap)
+			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256, bootstrap: bootstrap, listenerEvent: fields["listener_event"] != nil)
 	}
 
 	private static func validPath(_ value: String) -> Bool {
@@ -196,9 +200,16 @@ enum OwnedSuspendedImageGuardian {
 			}
 			return []
 		}
+		var listenerChannel: OpaquePointer?
 		func wait() {
-			var event = pollfd(fd: inputOpen ? STDIN_FILENO : -1, events: Int16(POLLIN), revents: 0)
-			_ = Darwin.poll(&event, 1, 20)
+			if let channel = listenerChannel {
+				var events = [pollfd(fd: inputOpen ? STDIN_FILENO : -1, events: Int16(POLLIN), revents: 0),
+					pollfd(fd: ergopti_owned_listener_event_descriptor(channel), events: Int16(POLLIN), revents: 0)]
+				_ = events.withUnsafeMutableBufferPointer { Darwin.poll($0.baseAddress, 2, 20) }
+			} else {
+				var event = pollfd(fd: inputOpen ? STDIN_FILENO : -1, events: Int16(POLLIN), revents: 0)
+				_ = Darwin.poll(&event, 1, 20)
+			}
 		}
 		guard let started = monotonic() else { return 70 }
 		var request: OwnedSuspendedImageRequest?
@@ -328,12 +339,31 @@ enum OwnedSuspendedImageGuardian {
 				&& (empty ? held.st_size == 0 : held.st_size > 0 && held.st_size <= ManagedNetworkBootstrapPolicy.maximumMetadataBytes)
 		}
 		guard bootstrapAdmitted(empty: true) else { _ = send("V1 REFUSED \(ESTALE)"); return 0 }
+		func refuseBeforeChild(_ error: Int32) -> Int32 {
+			_ = send("V1 REFUSED \(error)")
+			if listenerChannel != nil && !ergopti_owned_listener_event_destroy(&listenerChannel) {
+				// Native uncertainty keeps this guardian and exact original capabilities.
+				while listenerChannel != nil { _ = readLines(); wait() }
+			}
+			return 0
+		}
+		var childEnvironment = request.environment
+		if request.listenerEvent {
+			guard admissionRemaining() else { return refuseBeforeChild(ETIMEDOUT) }
+			let error = ergopti_owned_listener_event_create(&listenerChannel)
+			guard error == 0, let channel = listenerChannel,
+				let path = ergopti_owned_listener_event_path(channel), admissionRemaining() else {
+				return refuseBeforeChild(error == 0 ? ESTALE : error)
+			}
+			childEnvironment["ERGOPTI_OLLAMA_LISTENER_EVENT"] = String(sessionName.dropFirst(7).dropLast(5))
+			childEnvironment["ERGOPTI_OLLAMA_LISTENER_SOCKET"] = String(cString: path)
+		}
 		guard let argv = duplicateCStringVector([request.executable] + request.arguments) else {
-			_ = send("V1 REFUSED \(ENOMEM)"); return 0
+			return refuseBeforeChild(ENOMEM)
 		}
 		defer { for case let pointer? in argv { free(pointer) } }
-		guard let envp = duplicateCStringVector(request.environment.keys.sorted().map { $0 + "=" + request.environment[$0]! }) else {
-			_ = send("V1 REFUSED \(ENOMEM)"); return 0
+		guard let envp = duplicateCStringVector(childEnvironment.keys.sorted().map { $0 + "=" + childEnvironment[$0]! }) else {
+			return refuseBeforeChild(ENOMEM)
 		}
 		defer { for case let pointer? in envp { free(pointer) } }
 		var mutableArgv = argv; var mutableEnvp = envp; var owner: OpaquePointer?
@@ -342,7 +372,7 @@ enum OwnedSuspendedImageGuardian {
 				ergopti_owned_program_prepare(request.executable, args.baseAddress, env.baseAddress, &owner)
 			}
 		}
-		guard owner != nil else { _ = send("V1 REFUSED \(prepareError == 0 ? EPROTO : prepareError)"); return 0 }
+		guard owner != nil else { return refuseBeforeChild(prepareError == 0 ? EPROTO : prepareError) }
 		func remaining() -> UInt32? {
 			guard let now = monotonic(), now >= admissionStarted else { return nil }
 			let duration = now - admissionStarted
@@ -359,6 +389,7 @@ enum OwnedSuspendedImageGuardian {
 			return identity
 		}
 		var ready = false; var active = false; var pendingSent = false
+		var listenerBound = false
 		if prepareError == 0, sessionAdmitted(empty: true), bootstrapAdmitted(empty: true), let identity = imageAdmitted() {
 			ready = send("V1 IMAGE_READY \(identity.pid) \(identity.uid) \(identity.start_seconds) \(identity.start_microseconds) \(identity.device) \(identity.inode)")
 			if !ready { cancelled = true }
@@ -373,10 +404,29 @@ enum OwnedSuspendedImageGuardian {
 					if !active || !send("V1 ACTIVE") { cancelled = true }
 				} else { cancelled = true }
 			}
-			if !active && remaining() == nil { cancelled = true }
+			if request.listenerEvent && active && !listenerBound && !cancelled, let channel = listenerChannel {
+				guard remaining() != nil, sessionAdmitted(empty: false), bootstrapAdmitted(empty: false), outgoingAdmitted(), let budget = remaining() else {
+					cancelled = true; _ = ergopti_owned_program_cancel(retained); wait(); continue
+				}
+				let nonce = String(sessionName.dropFirst(7).dropLast(5))
+				let received = ergopti_owned_listener_event_receive(channel, retained, request.executable, alias,
+					request.device, request.inode, budget, nonce)
+				if received < 0 { cancelled = true }
+				if received == 1 {
+					listenerBound = remaining() != nil && sessionAdmitted(empty: false) && bootstrapAdmitted(empty: false) && outgoingAdmitted()
+					// Event is a startup prerequisite. Original accepted TCP/HMAC admission alone can supply READY.
+					if !listenerBound || !send("V1 LISTENER_BOUND " + nonce) { cancelled = true }
+				}
+			}
+			if (!active || (request.listenerEvent && !listenerBound)) && remaining() == nil { cancelled = true }
 			if cancelled { _ = ergopti_owned_program_cancel(retained) }
 			let receipt = ergopti_owned_program_poll(retained)
 			if receipt.retired && receipt.leader_exited && receipt.status_valid && receipt.error_code == 0 {
+				if listenerChannel != nil && !ergopti_owned_listener_event_destroy(&listenerChannel) {
+					cancelled = true
+					if !pendingSent { pendingSent = true; _ = send("V1 PENDING \(EIO)") }
+					wait(); continue
+				}
 				if ergopti_owned_program_destroy(&owner) {
 					var bootstrapClose: Int32 = 0
 					if bootstrapDescriptor >= 0 {

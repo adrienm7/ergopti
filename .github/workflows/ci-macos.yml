@@ -411,7 +411,7 @@ jobs:
           assert path.stat().st_size <= 1048576
           transcript = path.read_text(encoding='utf-8')
           expected = int(sys.argv[2])
-          assert expected in (5, 6, 8, 20, 35)
+          assert expected in (5, 6, 8, 20, 44)
           summaries = re.findall(r'^Ran ([0-9]+) tests? in [0-9]+(?:\.[0-9]+)?s$', transcript, re.MULTILINE)
           assert summaries == [str(expected)]
           assert len(re.findall(r'^Ran .*$', transcript, re.MULTILINE)) == 1
@@ -423,7 +423,7 @@ jobs:
           receive_controls tools/test/macos_bootstrap_tls_numeric_binding_test.py 8 "$ERGOPTI_OLLAMA_BUILD_ROOT/numeric-tls-controls.log"
           # Portable process peers; actual native listener qualification is separate.
           receive_controls tools/test/macos_native_ollama_api_test.py 20 "$ERGOPTI_OLLAMA_BUILD_ROOT/api-wire-controls.log"
-          receive_controls tools/diagnostics/macos_managed_ollama_serve_test.py 35 "$ERGOPTI_OLLAMA_BUILD_ROOT/serve-lifecycle-controls.log"
+          receive_controls tools/diagnostics/macos_managed_ollama_serve_test.py 44 "$ERGOPTI_OLLAMA_BUILD_ROOT/serve-lifecycle-controls.log"
         timeout-minutes: 5
       - name: Retain actual private-session and numeric TLS peer diagnostics
         if: always()
@@ -462,12 +462,12 @@ jobs:
           grep -Fq "Test Suite 'ManagedImageAliasTests' passed" "$transcript"
           grep -Fq 'Executed 4 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'OwnedSuspendedImageTests' passed" "$transcript"
-          grep -Fq 'Executed 6 tests, with 0 failures' "$transcript"
+          grep -Fq 'Executed 14 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedListenerPathIdentityTests' passed" "$transcript"
           grep -Fq 'Executed 2 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedNetworkBootstrapTests' passed" "$transcript"
-          test "$(grep -Fc 'Executed 6 tests, with 0 failures' "$transcript")" -eq 2
-          grep -Fq 'Executed 41 tests, with 0 failures' "$transcript"
+          test "$(grep -Fc 'Executed 6 tests, with 0 failures' "$transcript")" -eq 1
+          grep -Fq 'Executed 49 tests, with 0 failures' "$transcript"
         timeout-minutes: 10
       - name: Retain independent native SDK XCTest diagnostics
         if: always()
@@ -659,12 +659,15 @@ jobs:
           set -euo pipefail
           "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/test/macos_managed_ollama_explicit_stream_test.py
         timeout-minutes: 2
-      - uses: actions/setup-go@v5
+      - name: Prepare genuine pinned Go toolchain
+        if: ${{ !cancelled() }}
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ steps.ollama-toolchain.outputs.version }}
           check-latest: false
           cache: false
       - name: Acquire and verify genuine pinned upstream inputs
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -696,6 +699,8 @@ jobs:
               stream.write('\n')
           PY
       - name: Build and admit the actual native source asset
+        if: ${{ !cancelled() }}
+        id: ollama-native-build
         shell: bash
         run: |
           set -euo pipefail
@@ -719,6 +724,7 @@ jobs:
               --output "$ERGOPTI_OLLAMA_CATALOGUE"
           } 2>&1 | tee "$RUNNER_TEMP/managed-ollama-producer-build.log"
       - name: Receive actual native model create, pull, inference and retirement
+        if: ${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail

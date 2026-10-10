@@ -457,5 +457,81 @@ class ActualOwnerControls(unittest.TestCase):
         self.worker._operation = None
 
 
+@unittest.skipUnless(os.name == "posix", "Actual private POSIX process owners required")
+class ListenerEventControls(unittest.TestCase):
+    setUp = ActualOwnerControls.setUp
+    retire = ActualOwnerControls.retire
+    build = ActualOwnerControls.build
+    empty_session = ActualOwnerControls.empty_session
+    guardian = ActualOwnerControls.guardian
+
+    # Reuse the original fixture methods through composition, never inherit its
+    # test names into a second discovery cohort.
+    def run(self, result=None):
+        return unittest.TestCase.run(self, result)
+
+    def event_owner(self, event, *, start=True):
+        script = PEER.replace(
+            "print('V1 ACTIVE', flush=True)",
+            "print('V1 ACTIVE', flush=True)\n            "
+            + event.replace("NONCE", "session.name[7:-5]"),
+        )
+        with patch.dict(globals(), {"PEER": script}):
+            operation = self.guardian()
+        operation.request["listener_event"] = True
+        if start:
+            operation.start()
+        return operation
+
+    def test_listener_event_complete_nonce_precedes_retirement(self):
+        operation = self.event_owner("print('V1 LISTENER_BOUND', NONCE, flush=True)")
+        operation.wait_listener_bound()
+        self.assertTrue(operation.listener_bound)
+        self.assertFalse(operation.physically_retired)
+        self.assertTrue(operation.settle(timeout=5))
+        self.assertTrue(operation.physically_retired)
+
+    def test_listener_event_wrong_nonce_never_grants_observation(self):
+        operation = self.event_owner(
+            "print('V1 LISTENER_BOUND', '0' * 32, flush=True)", start=False
+        )
+        with self.assertRaises(OWNER.ImageRefusal):
+            operation.start()
+            operation.wait_listener_bound()
+        self.assertFalse(operation.listener_bound)
+        self.assertTrue(operation._protocol_debt)
+
+    def test_listener_event_missing_complete_lf_preserves_original_clock(self):
+        operation = self.event_owner(
+            "sys.stdout.write('V1 LISTENER_BOUND ' + NONCE); sys.stdout.flush()"
+        )
+        operation._startup_deadline = 0
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "deadline"):
+            operation.wait_listener_bound()
+        self.assertFalse(operation.listener_bound)
+        self.assertFalse(operation.physically_retired)
+
+    def test_listener_event_duplicate_frame_refuses_not_ready(self):
+        operation = self.event_owner("print('V1 LISTENER_BOUND', NONCE, flush=True)")
+        operation.wait_listener_bound()
+        with self.assertRaises(OWNER.ImageRefusal):
+            operation._parse(("V1 LISTENER_BOUND " + self.session.path.name[7:-5]).encode())
+        self.assertTrue(operation._protocol_debt)
+
+    def test_listener_event_without_optional_request_refuses(self):
+        operation = self.guardian()
+        operation.start()
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "state"):
+            operation.wait_listener_bound()
+        self.assertFalse(operation.listener_bound)
+
+    def test_listener_event_retirement_started_cannot_revive_daemon(self):
+        operation = self.event_owner("print('V1 LISTENER_BOUND', NONCE, flush=True)")
+        operation._retirement_started = True
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "state"):
+            operation.wait_listener_bound()
+        self.assertFalse(operation.physically_retired)
+
+
 if __name__ == "__main__":
     unittest.main()

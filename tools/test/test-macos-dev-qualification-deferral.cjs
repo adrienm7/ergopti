@@ -111,12 +111,12 @@ function admitNativeSdkSelector(mac) {
 		'          grep -Fq "Test Suite \'ManagedImageAliasTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 4 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'OwnedSuspendedImageTests\' passed" "$transcript"',
-		'          grep -Fq \'Executed 6 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq \'Executed 14 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedListenerPathIdentityTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 2 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedNetworkBootstrapTests\' passed" "$transcript"',
-		'          test "$(grep -Fc \'Executed 6 tests, with 0 failures\' "$transcript")" -eq 2',
-		'          grep -Fq \'Executed 41 tests, with 0 failures\' "$transcript"',
+		'          test "$(grep -Fc \'Executed 6 tests, with 0 failures\' "$transcript")" -eq 1',
+		'          grep -Fq \'Executed 49 tests, with 0 failures\' "$transcript"',
 		'        timeout-minutes: 10'
 	]) {
 		if (step.split('\n').filter((actual) => actual === line).length !== 1) return null;
@@ -631,7 +631,7 @@ for (const [name, token, replacement] of [
 	],
 	[
 		'sdk-wrong-suspended-census-is-red',
-		'Executed 6 tests, with 0 failures',
+		'Executed 14 tests, with 0 failures',
 		'Executed 5 tests, with 0 failures'
 	],
 	[
@@ -666,12 +666,12 @@ for (const [name, token, replacement] of [
 	],
 	[
 		'sdk-incomplete-network-bootstrap-census-is-red',
-		'          test "$(grep -Fc \'Executed 6 tests, with 0 failures\' "$transcript")" -eq 2',
+		'          test "$(grep -Fc \'Executed 6 tests, with 0 failures\' "$transcript")" -eq 1',
 		'          true'
 	],
 	[
 		'sdk-incomplete-total-is-red',
-		'Executed 41 tests, with 0 failures',
+		'Executed 49 tests, with 0 failures',
 		'Executed 34 tests, with 0 failures'
 	],
 	['sdk-ignored-swift-status-is-red', '          test "${statuses[0]}" -eq 0', '          true'],

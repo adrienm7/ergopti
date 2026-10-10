@@ -147,17 +147,30 @@ local function load_fixture(options)
 	package.loaded["adapters.task_lifecycle"] = nil
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.llm.ollama_binary"] = {
-		resolve = function() return "/fixture/ollama", nil, true end,
+		-- These existing daemon-ready cases model a native-owned source.
+		resolve = function() return "/fixture/ollama", nil, "native_managed" end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {
-		ensure_running = function()
+		ensure_running = function(transaction)
 			fixture.daemon_calls = fixture.daemon_calls + 1
+			if options.defer_daemon_ready == true then
+				fixture.daemon_transaction = transaction
+				return true
+			end
 			if options.daemon_start_throw == true then error("daemon start exploded") end
 			local committed = options.daemon_start_result
 			if committed == nil then committed = true end
 			fixture.daemon_live = committed == true
 			if options.pause_on_daemon_start == true then
 				fixture.pause_on_daemon_start_result = fixture.control.pause_all()
+			end
+			-- A committed start is acceptance only. Publish the controlled READY
+			-- observation through the same captured authorized transaction.
+			if committed == true and type(transaction) == "table"
+				and type(transaction.is_authorized) == "function"
+				and transaction.is_authorized() == true
+				and type(transaction.on_settled) == "function" then
+				transaction.on_settled(true)
 			end
 			return committed
 		end,
@@ -174,8 +187,16 @@ local function load_fixture(options)
 		end,
 	}
 	package.loaded["ui.download_window"] = {
-		is_active = function() return fixture.ui_active end,
-		session_id = function() return fixture.ui_session end,
+		is_active = function()
+			local active = fixture.ui_active
+			if fixture.active_query_hook then fixture.active_query_hook() end
+			return active
+		end,
+		session_id = function()
+			local session = fixture.ui_session
+			if fixture.session_query_hook then fixture.session_query_hook() end
+			return session
+		end,
 		show = function()
 			fixture.ui_calls = fixture.ui_calls + 1
 			fixture.ui_active = true
@@ -324,7 +345,11 @@ local function load_fixture(options)
 		control = {}
 		function control.is_paused() return fixture.paused end
 		function control.is_pause_transition_pending() return fixture.transition end
-		function control.get_pause_epoch() return fixture.epoch end
+		function control.get_pause_epoch()
+			local epoch = fixture.epoch
+			if fixture.epoch_query_hook then fixture.epoch_query_hook() end
+			return epoch
+		end
 		function control.register_pause_owner(name, owner)
 			fixture.owner_name = name
 			fixture.owner = owner
@@ -1196,6 +1221,233 @@ helpers.describe("Native official Ollama bootstrap receipt join", function()
 				helpers.assert_eq(fixture.checker.provisioning_idle(), true)
 				helpers.assert_eq(fixture.daemon_calls, 0)
 			end)
+		end)
+	end
+end)
+
+helpers.describe("Native migration caller context fences", function()
+	local function receiving(stage, callback)
+		helpers.with_stub_scope({ "adapters.managed_ollama_bootstrap" }, function()
+			local fixture = load_fixture({})
+			local binary = package.loaded["modules.llm.ollama_binary"]
+			binary.resolve = function() return "/fixture/ollama", nil, "app" end
+			binary.native_managed_install_dir = function() return "/fixture/native" end
+			fixture.context_current, fixture.native_ready = true, false
+			fixture.context_binds, fixture.input_binds, fixture.rollbacks = 0, 0, 0
+			fixture.native_marked = false
+			local function interrupt(at)
+				if stage == at then fixture.context_current = false end
+			end
+			local owner = {
+				executable = "/fixture/signed-helper", arguments = { "--managed-pty-worker", "1800000" },
+				bind_input = function(task)
+					fixture.input_binds = fixture.input_binds + 1
+					fixture.native_task = task
+					interrupt("input")
+					return true
+				end,
+				mark_start_attempted = function()
+					fixture.native_marked = true
+					interrupt("marker")
+					return true
+				end,
+				rollback = function()
+					fixture.rollbacks = fixture.rollbacks + 1
+					return not fixture.native_marked and (stage ~= "prepare_refusal" or fixture.cleanup_ready == true)
+				end,
+				settle = function() return fixture.native_ready end,
+			}
+			local context = {
+				is_current = function() return fixture.context_current end,
+				bind_environment = function(task)
+					fixture.context_binds = fixture.context_binds + 1
+					fixture.context_task = task
+					interrupt("environment")
+					return true
+				end,
+			}
+			package.loaded["adapters.managed_ollama_bootstrap"] = {
+				prepare = function()
+					interrupt("prepare")
+					return owner, stage ~= "prepare_refusal", context
+				end,
+			}
+			local lifecycle = package.loaded["adapters.task_lifecycle"]
+			local native, start = lifecycle.native, lifecycle.start
+			lifecycle.native = function(...)
+				local task = native(...)
+				interrupt("construct")
+				return task
+			end
+			lifecycle.start = function(...)
+				local accepted = start(...)
+				interrupt("start")
+				return accepted
+			end
+			fixture.timer_start_hook = function() interrupt("timer") end
+			local ok, failure = xpcall(callback, debug.traceback, fixture)
+			lifecycle.native, lifecycle.start = native, start
+			if not ok then error(failure, 0) end
+		end)
+	end
+
+	local function install(fixture)
+		return fixture.checker.install_native_for_selection({}, "/fixture/ollama", "app", "/fixture/native", nil)
+	end
+
+	for _, stage in ipairs({ "prepare", "construct", "environment", "input", "timer" }) do
+		helpers.it("(native-caller-context) refuses stale " .. stage .. " before original native start", function()
+			receiving(stage, function(fixture)
+				helpers.assert_eq(install(fixture), false)
+				for _, task in ipairs(fixture.tasks) do helpers.assert_eq(task.start_calls, 0) end
+				helpers.assert_eq(fixture.native_marked, false)
+				helpers.assert_true(fixture.rollbacks >= 1)
+				helpers.assert_true(fixture.checker.provisioning_idle())
+			end)
+		end)
+	end
+
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("(native-caller-deadline-debt) retains exact committed timer after stop " .. mode, function()
+			receiving("timer", function(fixture)
+				fixture.timer_stop_mode = mode
+				helpers.assert_eq(install(fixture), false)
+				helpers.assert_eq(#fixture.tasks, 1)
+				helpers.assert_eq(fixture.tasks[1].start_calls, 0)
+				helpers.assert_eq(fixture.native_marked, false)
+				helpers.assert_true(fixture.rollbacks >= 1)
+				local original = fixture.timers[#fixture.timers]
+				helpers.assert_eq(original.delay, 1800)
+				helpers.assert_true(original.stop_calls >= 1,
+					"currency withdrawal must attempt the exact already committed deadline")
+				helpers.assert_true(original.running_state)
+				helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+				local calls, timers = original.stop_calls, #fixture.timers
+				helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+				helpers.assert_eq(original.stop_calls, calls, "read-only admission cannot retry timer cleanup")
+				helpers.assert_eq(#fixture.timers, timers)
+				helpers.assert_eq(fixture.owner.pause(), false)
+				fixture.timer_stop_mode = "true"
+				helpers.assert_eq(fixture.owner.pause(), true)
+				helpers.assert_eq(original.running_state, false)
+				helpers.assert_true(fixture.checker.provisioning_idle())
+				helpers.assert_eq(#fixture.timers, timers, "original pause retires the same deadline")
+			end)
+		end)
+	end
+
+	helpers.it("(native-caller-marker-debt) cannot erase original owners after a failed post-marker fence", function()
+		receiving("marker", function(fixture)
+			helpers.assert_eq(install(fixture), false)
+			helpers.assert_true(fixture.native_marked)
+			helpers.assert_eq(fixture.tasks[1].start_calls, 0)
+			helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+			helpers.assert_eq(fixture.checker.install_native_for_selection({}, "/fixture/ollama", "app", "/fixture/native", nil), false)
+			fixture.native_ready = true
+			fixture.tasks[1]:complete(78)
+			helpers.assert_true(fixture.checker.provisioning_idle())
+			helpers.assert_eq(fixture.daemon_calls, 0)
+		end)
+	end)
+
+	helpers.it("(native-caller-start-debt) source replacement after start cannot commit or free exact child debt", function()
+		receiving("start", function(fixture)
+			helpers.assert_eq(install(fixture), false)
+			helpers.assert_eq(fixture.tasks[1].start_calls, 1)
+			helpers.assert_eq(fixture.tasks[1].terminate_calls, 1)
+			helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+			fixture.native_ready = true
+			fixture.tasks[1]:complete(143)
+			helpers.assert_true(fixture.checker.provisioning_idle())
+			helpers.assert_eq(fixture.daemon_calls, 0)
+		end)
+	end)
+	helpers.it("(native-caller-preflight-debt) read-only admission refuses exact partial preparation cleanup debt", function()
+		receiving("prepare_refusal", function(fixture)
+			helpers.assert_eq(install(fixture), false)
+			helpers.assert_eq(#fixture.tasks, 0)
+			helpers.assert_eq(fixture.native_marked, false)
+			helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+			local attempts = fixture.rollbacks
+			helpers.assert_eq(install(fixture), false)
+			helpers.assert_eq(fixture.rollbacks, attempts, "idle refusal never retries native owner cleanup")
+			helpers.assert_eq(fixture.owner.pause(), false)
+			fixture.cleanup_ready = true
+			helpers.assert_true(fixture.owner.pause())
+			helpers.assert_true(fixture.checker.provisioning_idle())
+		end)
+	end)
+
+end)
+
+helpers.describe("Official installation remains available without native daemon authority", function()
+	helpers.it("(ollama-official-client-install) completes an explicitly chosen stock download as client provisioning", function()
+		local fixture = load_fixture({})
+		local binary = package.loaded["modules.llm.ollama_binary"]
+		binary.resolve = function() return nil, "not installed", nil end
+		binary.managed_install_dir = function() return "/fixture/official" end
+		local completions = {}
+		helpers.assert_true(fixture.checker.install_for_selection(function(value) completions[#completions + 1] = value end))
+		helpers.assert_eq(#fixture.tasks, 1)
+		helpers.assert_eq(fixture.tasks[1].start_calls, 1)
+		fixture.tasks[1]:complete(0)
+		helpers.assert_eq(fixture.daemon_calls, 0, "successful stock installation never acquires foreign daemon authority")
+		helpers.assert_true(fixture.checker.is_ready())
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "pending")
+		helpers.assert_eq(#completions, 1)
+		helpers.assert_true(completions[1])
+	end)
+end)
+
+helpers.describe("Ollama asynchronous provisioning window currency", function()
+	for _, boundary in ipairs({ "unchanged", "inactive", "replacement", "active-query", "session-query", "epoch-query" }) do
+		helpers.it("refences final provisioning UI at " .. boundary, function()
+			local fixture = load_fixture({ defer_daemon_ready = true })
+			local completions = {}
+			helpers.assert_true(fixture.checker.check_and_install_deps(function(value)
+				completions[#completions + 1] = value
+			end))
+			local marker = "OLLAMA_INSTALLING\n"
+			fixture.tasks[1]:chunk(marker, "")
+			helpers.assert_true(fixture.ui_active)
+			fixture.tasks[1]:complete(0, marker, "")
+			helpers.assert_eq(fixture.daemon_calls, 1)
+			helpers.assert_eq(#completions, 0, "start acceptance is not the final daemon observation")
+			helpers.assert_eq(type(fixture.daemon_transaction.on_settled), "function")
+			local writes, hides, timers = fixture.ui_calls, fixture.ui_hide_calls, #fixture.timers
+			local function revoke()
+				fixture.active_query_hook, fixture.session_query_hook, fixture.epoch_query_hook = nil, nil, nil
+				fixture.epoch = fixture.epoch + 1
+				fixture.transition = true
+				helpers.assert_true(fixture.owner.pause())
+				fixture.transition = false
+				fixture.paused = true
+			end
+			if boundary == "inactive" then fixture.ui_active = false
+			elseif boundary == "replacement" then fixture.ui_session = fixture.ui_session + 1
+			elseif boundary == "active-query" then fixture.active_query_hook = revoke
+			elseif boundary == "session-query" then fixture.session_query_hook = revoke
+			elseif boundary == "epoch-query" then fixture.epoch_query_hook = revoke end
+			fixture.daemon_transaction.on_settled(true)
+			if boundary == "unchanged" then
+				helpers.assert_true(fixture.ui_calls > writes, "the exact original active window receives completion")
+				helpers.assert_eq(#fixture.timers, timers + 1, "only the original auto-hide is acquired")
+				helpers.assert_eq(#completions, 1)
+				helpers.assert_true(completions[1])
+				helpers.assert_true(fixture.checker.is_daemon_ready())
+			else
+				helpers.assert_eq(fixture.ui_calls, writes, "stale completion cannot write or hide a successor window")
+				helpers.assert_eq(fixture.ui_hide_calls, hides)
+				helpers.assert_eq(#fixture.timers, timers, "refusal cannot acquire a hide timer")
+				if boundary == "inactive" or boundary == "replacement" then
+					helpers.assert_eq(#completions, 1, "UI replacement does not revoke the current daemon verdict")
+					helpers.assert_true(completions[1])
+				else
+					helpers.assert_eq(#completions, 0, "revoked task authority cannot deliver a successful completion")
+				end
+			end
+			helpers.assert_eq(#fixture.tasks, 1, "completion cannot create a bootstrap successor")
 		end)
 	end
 end)

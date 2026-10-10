@@ -64,6 +64,24 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
+		'Prepare genuine pinned Go toolchain',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Acquire and verify genuine pinned upstream inputs',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Build and admit the actual native source asset',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
 		'Qualify actual selected number-row Carbon XCTest controls',
 		'${{ !cancelled() }}'
 	],
@@ -155,7 +173,7 @@ const FULL_STEPS = [
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
 		'Receive actual native model create, pull, inference and retirement',
-		null
+		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
 	],
 	['.github/workflows/ci-macos.yml', 'package-macos', 'Run reporter lifecycle self-tests', null],
 	[
@@ -400,6 +418,29 @@ function validateRaw(files) {
 		const job = jobs.find((entry) => entry.file === rel && entry.id === id);
 		const body = raw.step(job.body, name);
 		requireEqual(raw.stepField(body, 'if'), condition, `${id}/${name} full step condition`);
+		if (name === 'Build and admit the actual native source asset') {
+			requireEqual(
+				raw.stepField(body, 'id'),
+				'ollama-native-build',
+				'native producer exact build id'
+			);
+			const members = raw.steps(job.body);
+			requireEqual(
+				members.filter((member) => raw.stepField(member.body, 'id') === 'ollama-native-build')
+					.length,
+				1,
+				'native producer unique build id'
+			);
+			requireEqual(
+				members.findIndex((member) => member.name === name) <
+					members.findIndex(
+						(member) =>
+							member.name === 'Receive actual native model create, pull, inference and retirement'
+					),
+				true,
+				'native producer precedes model receiving'
+			);
+		}
 		if (name === 'Receive selected-release shell corpus and native guardian cancellation') {
 			requireEqual(raw.stepField(body, 'shell'), 'bash', 'selected-release receiver exact shell');
 			requireEqual(

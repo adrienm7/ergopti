@@ -271,6 +271,16 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.managed_ollama_bootstrap",
+		contract = { "prepare" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.managed_ollama_daemon",
+		contract = { "new", "prepare" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.native_python_probe",
 		contract = { "get", "cancel", "onSettled" },
 		wired    = true,

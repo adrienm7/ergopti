@@ -119,7 +119,8 @@ helpers.describe("ApiOllama.cancel_streaming", function()
 		helpers.assert_eq(ApiOllama.cancel_streaming(), false)
 		helpers.assert_eq(calls, 1)
 
-		task.terminate = function() calls = calls + 1; return true end
+		task.terminate = function() calls = calls + 1; return true, "settled" end
+		task.isSettled = function() return true end
 		helpers.assert_eq(ApiOllama.cancel_streaming(), true,
 			"a retained native capability must remain retryable")
 		helpers.assert_eq(calls, 2)
@@ -187,9 +188,15 @@ helpers.describe("ApiOllama run-loop safety", function()
 		local fn_body = source:match("local function ensure_ollama_running%([^\n]*%)\n(.-)\nend\n")
 		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
 
-		local has_spawn = fn_body:find("ShellRunner%.spawn") ~= nil
+		local has_prepare = fn_body:find("ManagedDaemon%.prepare") ~= nil
+		helpers.assert_true(has_prepare, "ensure_ollama_running must acquire its foreground daemon owner")
+		local transport = helpers.read_driver_source("function M.prepare(command, nonce, callbacks)")
+		helpers.assert_not_nil(transport, "the actual managed daemon transport must be locatable")
+		local has_spawn = transport:find("ShellRunner%.spawn") ~= nil
 		helpers.assert_true(has_spawn,
-			"ensure_ollama_running must use ShellRunner.spawn for async subprocess launch")
+			"ensure_ollama_running must use ShellRunner.spawn through its async foreground transport")
+		helpers.assert_true(transport:find('done, chunk, nil, true, true)', 1, true) ~= nil,
+			"the async foreground transport must retain private owned-protocol receipt delivery")
 	end)
 
 	helpers.it("module top-level never calls ShellRunner.exec directly", function()
@@ -215,38 +222,99 @@ end)
 
 
 helpers.describe("ApiOllama daemon startup ownership", function()
-	local ensure_impl = get_upvalue(ApiOllama.ensure_running, "ensure_ollama_running")
-	local shell_runner = ensure_impl and get_upvalue(ensure_impl, "ShellRunner") or nil
-	local scheduler = ensure_impl and get_upvalue(ensure_impl, "TimerScheduler") or nil
-	local binary_resolver = ensure_impl and get_upvalue(ensure_impl, "OllamaBinary") or nil
-	local original_resolve = binary_resolver and binary_resolver.resolve or nil
-	helpers.assert_not_nil(original_resolve,
-		"startup ownership tests must control the independent executable-resolution dependency")
-	-- This describe exercises task commitment, not filesystem discovery. The
-	-- bundled-path regression test drives the real resolver with executable and
-	-- non-executable fixtures; supplying one valid path here isolates ownership.
-	binary_resolver.resolve = function() return "/fixture/ollama", nil, true end
-
-	local function reset_startup_state()
-		helpers.assert_not_nil(ensure_impl, "the behavioral test must reach the real startup transaction")
-		for name, value in pairs({
-			_ollama_started = false,
-			_ollama_starting = false,
-			_ollama_start_generation = 0,
-			_ollama_start_resume_pending = false,
-			_ollama_start_cleanup_pending = false,
-			_ollama_start_pause_fenced = false,
-		}) do
-			helpers.assert_true(set_upvalue(ensure_impl, name, value), "missing startup state: " .. name)
-		end
-		helpers.assert_true(set_upvalue(ApiOllama.pause_warmup,
-			"_ollama_start_pause_in_progress", false),
-			"missing startup state: _ollama_start_pause_in_progress")
-		for _, name in ipairs({
-			"_ollama_kill_task", "_ollama_launch_timer", "_ollama_serve_task", "_ollama_ambiguous_task",
-		}) do
-			helpers.assert_true(set_upvalue(ensure_impl, name, nil), "missing startup owner: " .. name)
-		end
+	-- R15 has one foreground owner, not a stale-process kill and launch timer.
+	-- Keep the original refusal families while using the real API, daemon adapter,
+	-- shared receiver/lifecycle and ShellRunner over controlled native task ports.
+	local function with_startup(starts, callback)
+		helpers.with_stub_scope({
+			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
+			"core.llm.managed_ollama_daemon_receipt", "core.llm.managed_ollama_daemon_lifecycle",
+			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
+			"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
+			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
+			"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
+			"modules.shortcuts.script_control", "modules.llm.prediction_engine",
+		}, function()
+			local fixture = { tasks = {}, paused = false, nonce_index = 0 }
+			local nonces = { "0000000000000000000000000000f001", "0000000000000000000000000000f002" }
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.notifications"] = { notify = function() return true end }
+			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["adapters.http_client"] = { new = function()
+				return { cancel = function() return true end, isActive = function() return false end,
+					isSettled = function() return true end }
+			end }
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function() error("foreground startup must not acquire a launch timer") end,
+				cancel = function() return true end,
+			}
+			package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+			package.loaded["modules.llm.ollama_binary"] = {
+				resolve = function() return "/fixture/ollama", nil, "native_managed" end,
+			}
+			-- Command/source admission has separate tests. This boundary supplies an
+			-- independent fixed command and explicitly binds native kind and nonce.
+			package.loaded["modules.llm.ollama_server_command"] = { build = function(path, _, _, kind, nonce)
+				helpers.assert_eq(path, "/fixture/ollama")
+				helpers.assert_eq(kind, "native_managed")
+				helpers.assert_eq(nonce, nonces[fixture.nonce_index])
+				return "exec /fixture/native-owner --owned-stdin"
+			end }
+			package.loaded["modules.llm.parser"] = {}
+			package.loaded["modules.llm.profiles"] = {}
+			package.loaded["modules.llm.progressive_reveal"] = {}
+			package.loaded["modules.llm.api_common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,
+				OLLAMA_KEEP_ALIVE = "5m", get_retry_policy = function() return 1, 0, 0 end }
+			package.loaded["modules.shortcuts.script_control"] = {
+				is_paused = function() return fixture.paused end, get_pause_epoch = function() return 1 end,
+			}
+			local api = helpers.load_with_stubs("modules.llm.api_ollama", {
+				host = { uuid = function()
+					fixture.nonce_index = fixture.nonce_index + 1
+					local nonce = nonces[fixture.nonce_index]
+					helpers.assert_not_nil(nonce, "only the declared original and successor are admitted")
+					return nonce:sub(1, 8) .. "-" .. nonce:sub(9, 12) .. "-" .. nonce:sub(13, 16)
+						.. "-" .. nonce:sub(17, 20) .. "-" .. nonce:sub(21, 32)
+				end },
+				task = { new = function(executable, done, chunk, args)
+					helpers.assert_eq(executable, "/bin/sh")
+					helpers.assert_eq(args[1], "-c")
+					helpers.assert_eq(args[2], "exec /fixture/native-owner --owned-stdin")
+					helpers.assert_eq(type(chunk), "function", "the same native task must receive retirement frames")
+					local index = #fixture.tasks + 1
+					local task = { input_closes = 0, start_calls = 0, completed = false,
+						running = false, nonce = nonces[fixture.nonce_index] }
+					function task:start()
+						self.start_calls = self.start_calls + 1
+						self.running = true
+						local result = true
+						if starts[index] then result = starts[index]() end
+						if result ~= true then self.running = false end
+						return result
+					end
+					function task:closeInput() self.input_closes = self.input_closes + 1; return true end
+					function task:terminate() error("owned protocol cancellation must use original stdin EOF") end
+					function task:isRunning() return self.running end
+					function task.frame(role) return "ERGOPTI_MANAGED_DAEMON_V1 " .. task.nonce .. " " .. role .. "\n" end
+					function task.emit(bytes) return chunk(task, bytes, "") end
+					function task.complete(status, remainder)
+						task.running, task.completed = false, true
+						return done(status, remainder or "", "")
+					end
+					fixture.tasks[index] = task
+					return task
+				end },
+			})
+			local shell = require("adapters.shell_runner")
+			fixture.shell = shell
+			local ok, err = xpcall(function() callback(api, fixture) end, debug.traceback)
+			-- Retire controlled native objects even when an assertion fails; scoped
+			-- module restoration must not silently replace an uncompleted task.
+			for _, task in ipairs(fixture.tasks) do
+				if not task.completed then task.complete(78, task.frame("RETIRED 78")) end
+			end
+			if not ok then error(err, 0) end
+		end)
 	end
 
 	for _, case in ipairs({
@@ -255,28 +323,26 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		{ name = "throw", start = function() error("native start raised") end },
 	}) do
 		helpers.it("retries the stale-process task after start " .. case.name, function()
-			reset_startup_state()
-			local original_spawn = shell_runner.spawn
-			local spawn_calls = 0
-			local terminate_calls = 0
-			shell_runner.spawn = function()
-				spawn_calls = spawn_calls + 1
-				return {
-					start = spawn_calls == 1 and case.start or function() return true end,
-					terminate = function() terminate_calls = terminate_calls + 1; return true, "settled" end,
-				}
-			end
-
-			local ok, err = pcall(function()
-				helpers.assert_eq(ApiOllama.ensure_running(), false)
-				helpers.assert_eq(ApiOllama.ensure_running(), true,
-					"a refused launch must not poison the process-lifetime deduplication latch")
-				helpers.assert_eq(spawn_calls, 2, "the second demand must construct a fresh kill task")
-				helpers.assert_eq(terminate_calls, 1,
-					"every non-true start must revoke the ambiguous native capability before retry")
+			with_startup({ case.start }, function(api, fixture)
+				helpers.assert_eq(api.ensure_running(), false)
+				local original = fixture.tasks[1]
+				helpers.assert_not_nil(original)
+				helpers.assert_eq(original.input_closes, 1,
+					"every non-true start must request original-owner retirement exactly once")
+				helpers.assert_eq(fixture.shell._active_tasks[original], true)
+				helpers.assert_eq(api.ensure_running(), false, "accepted EOF is not physical retirement")
+				helpers.assert_eq(#fixture.tasks, 1, "no successor may overlap retained original custody")
+				original.emit(original.frame("RETIRED 78"))
+				helpers.assert_eq(api.ensure_running(), false, "RETIRED alone is not physical completion")
+				helpers.assert_eq(#fixture.tasks, 1)
+				original.complete(78)
+				helpers.assert_eq(fixture.shell._active_tasks[original], nil)
+				helpers.assert_true(api.startup_idle())
+				helpers.assert_eq(api.ensure_running(), true,
+					"a retired refused launch must not poison the process-lifetime deduplication latch")
+				helpers.assert_eq(#fixture.tasks, 2, "the second demand must construct one fresh foreground task")
+				helpers.assert_eq(original.start_calls, 1, "retry never restarts the original task")
 			end)
-			shell_runner.spawn = original_spawn
-			if not ok then error(err) end
 		end)
 	end
 
@@ -286,273 +352,133 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		{ name = "throw", start = function() error("serve start raised") end },
 	}) do
 		helpers.it("retries the full transaction after server start " .. case.name, function()
-			reset_startup_state()
-			local original_spawn = shell_runner.spawn
-			local original_after = scheduler.after
-			local spawn_calls = 0
-			local kill_done
-			local launch_server
-			local terminate_calls = 0
-			local settlements = {}
-			shell_runner.spawn = function(_, _, on_done)
-				spawn_calls = spawn_calls + 1
-				if spawn_calls == 1 then
-					kill_done = on_done
-					return { start = function() return true end, terminate = function() return true, "settled" end }
-				end
-				if spawn_calls == 2 then
-					return {
-						start = case.start,
-						terminate = function() terminate_calls = terminate_calls + 1; return true, "settled" end,
-					}
-				end
-				return { start = function() return true end, terminate = function() return true, "settled" end }
-			end
-			scheduler.after = function(_, callback)
-				local handle = { timer = {} }
-				launch_server = function()
-					handle.timer = nil
-					callback()
-				end
-				return handle, true
-			end
-
-			local ok, err = pcall(function()
-				helpers.assert_eq(ApiOllama.ensure_running({
-					is_authorized = function() return true end,
-					on_settled = function(committed, reason)
-						settlements[#settlements + 1] = { committed, reason }
-					end,
-				}), true)
-				helpers.assert_eq(type(kill_done), "function")
-				kill_done()
-				helpers.assert_eq(type(launch_server), "function")
-				launch_server()
-				helpers.assert_eq(#settlements, 1,
-					"a real nested start refusal must settle the supervised request once")
+			with_startup({ case.start }, function(api, fixture)
+				local settlements = {}
+				helpers.assert_eq(api.ensure_running({ is_authorized = function() return true end,
+					on_settled = function(committed, reason) settlements[#settlements + 1] = { committed, reason } end,
+				}), false)
+				helpers.assert_eq(#settlements, 1, "a real start refusal must settle the supervised request once")
 				helpers.assert_eq(settlements[1][1], false)
 				helpers.assert_true(tostring(settlements[1][2]):find("server task start", 1, true) ~= nil)
-				helpers.assert_eq(ApiOllama.ensure_running(), true,
-					"a failed nested serve launch must release the outer in-flight latch")
-				helpers.assert_eq(spawn_calls, 3, "retry must restart from stale-process cleanup")
-				helpers.assert_eq(terminate_calls, 1)
+				local original = fixture.tasks[1]
+				helpers.assert_eq(api.ensure_running(), false, "a failed start retains its exact cleanup owner")
+				helpers.assert_eq(#fixture.tasks, 1)
+				helpers.assert_eq(original.input_closes, 1)
+				original.complete(78, original.frame("RETIRED 78"))
+				helpers.assert_eq(#settlements, 1, "late retirement must not settle the waiter twice")
+				helpers.assert_eq(api.ensure_running(), true, "joined serve refusal must release the outer in-flight latch")
+				helpers.assert_eq(#fixture.tasks, 2, "retry begins one fresh foreground transaction")
 			end)
-			shell_runner.spawn = original_spawn
-			scheduler.after = original_after
-			if not ok then error(err) end
 		end)
 	end
 
 	helpers.it("settles a supervised start through the real pause boundary", function()
-		reset_startup_state()
-		local original_spawn = shell_runner.spawn
-		local spawn_calls = 0
-		local settlements = {}
-		local authorized = true
-		shell_runner.spawn = function()
-			spawn_calls = spawn_calls + 1
-			return {
-				start = function() return true end,
-				terminate = function() return true, "settled" end,
-			}
-		end
-
-		local ok, err = pcall(function()
-			helpers.assert_true(ApiOllama.ensure_running({
-				is_authorized = function() return authorized end,
-				on_settled = function(committed, reason)
-					settlements[#settlements + 1] = { committed, reason }
-				end,
+		with_startup({}, function(api, fixture)
+			local settlements = {}
+			local authorized = true
+			helpers.assert_true(api.ensure_running({ is_authorized = function() return authorized end,
+				on_settled = function(committed, reason) settlements[#settlements + 1] = { committed, reason } end,
 			}))
 			helpers.assert_eq(#settlements, 0)
-			authorized = false
-			helpers.assert_true(ApiOllama.pause_warmup())
+			authorized, fixture.paused = false, true
+			helpers.assert_eq(api.pause_warmup(), false, "pause retains original custody until native retirement")
 			helpers.assert_eq(#settlements, 1)
 			helpers.assert_eq(settlements[1][1], false)
 			helpers.assert_eq(settlements[1][2], "startup quiesced")
-			helpers.assert_eq(spawn_calls, 1,
-				"pause must settle the kill owner before any serve spawn")
+			local original = fixture.tasks[1]
+			helpers.assert_eq(original.input_closes, 1)
+			original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+			helpers.assert_eq(#settlements, 1, "stale READY cannot republish the paused request")
+			helpers.assert_eq(#fixture.tasks, 1, "pause cannot acquire a successor before exact join")
+			original.complete(78, original.frame("RETIRED 78"))
+			helpers.assert_eq(fixture.shell._active_tasks[original], nil)
+			helpers.assert_true(api.pause_warmup())
+			helpers.assert_eq(#fixture.tasks, 1, "a physically retired paused request cannot launch a successor")
 		end)
-		shell_runner.spawn = original_spawn
-		if not ok then error(err) end
 	end)
 
 	helpers.it("settles a supervised start only after native publication", function()
-		reset_startup_state()
-		local original_spawn = shell_runner.spawn
-		local original_after = scheduler.after
-		local spawn_calls = 0
-		local kill_done
-		local launch_server
-		local settled = {}
-		local authorized = true
-
-		shell_runner.spawn = function(_, _, on_done)
-			spawn_calls = spawn_calls + 1
-			if spawn_calls == 1 then kill_done = on_done end
-			return {
-				start = function() return true end,
-				terminate = function() return true, "settled" end,
-			}
-		end
-		scheduler.after = function(_, callback)
-			local handle = { timer = {} }
-			launch_server = function()
-				handle.timer = nil
-				callback()
-			end
-			return handle, true
-		end
-
-		local ok, err = pcall(function()
-			helpers.assert_true(ApiOllama.ensure_running({
-				is_authorized = function() return authorized end,
-				on_settled = function(committed, reason)
-					settled[#settled + 1] = { committed, reason }
-				end,
+		with_startup({}, function(api, fixture)
+			local settled = {}
+			helpers.assert_true(api.ensure_running({ is_authorized = function() return true end,
+				on_settled = function(committed, reason) settled[#settled + 1] = { committed, reason } end,
 			}))
-			helpers.assert_eq(#settled, 0,
-				"async admission is not proof that the daemon was published")
-			kill_done()
+			local original = fixture.tasks[1]
+			helpers.assert_eq(#settled, 0, "async admission is not proof that the daemon was published")
+			helpers.assert_eq(api.startup_idle(), false)
+			original.emit(original.frame("ACTIVE"))
 			helpers.assert_eq(#settled, 0)
-			launch_server()
+			local ready = original.frame("READY")
+			original.emit(ready:sub(1, 18))
+			helpers.assert_eq(#settled, 0, "a partial native frame cannot publish readiness")
+			original.emit(ready:sub(19))
 			helpers.assert_eq(#settled, 1)
 			helpers.assert_eq(settled[1][1], true)
-			helpers.assert_eq(spawn_calls, 2)
+			helpers.assert_eq(#fixture.tasks, 1, "publication belongs to the same sole foreground task")
+			helpers.assert_eq(fixture.shell._active_tasks[original], true, "READY does not retire the native task")
+			original.complete(0, original.frame("RETIRED 0"))
+			helpers.assert_eq(fixture.shell._active_tasks[original], nil)
+			helpers.assert_eq(#settled, 1)
 		end)
-		shell_runner.spawn = original_spawn
-		scheduler.after = original_after
-		if not ok then error(err) end
 	end)
 
 	helpers.it("fences a supervised start whose runtime authority is superseded", function()
-		reset_startup_state()
-		local original_spawn = shell_runner.spawn
-		local original_after = scheduler.after
-		local spawn_calls = 0
-		local kill_done
-		local launch_server
-		local settled = {}
-		local authorized = true
-
-		shell_runner.spawn = function(_, _, on_done)
-			spawn_calls = spawn_calls + 1
-			kill_done = on_done
-			return {
-				start = function() return true end,
-				terminate = function() return true, "settled" end,
-			}
-		end
-		scheduler.after = function(_, callback)
-			local handle = { timer = {} }
-			launch_server = function()
-				handle.timer = nil
-				callback()
-			end
-			return handle, true
-		end
-
-		local ok, err = pcall(function()
-			helpers.assert_true(ApiOllama.ensure_running({
-				is_authorized = function() return authorized end,
-				on_settled = function(committed, reason)
-					settled[#settled + 1] = { committed, reason }
-				end,
+		with_startup({}, function(api, fixture)
+			local settled = {}
+			local authorized = true
+			helpers.assert_true(api.ensure_running({ is_authorized = function() return authorized end,
+				on_settled = function(committed, reason) settled[#settled + 1] = { committed, reason } end,
 			}))
-			kill_done()
+			local original = fixture.tasks[1]
+			original.emit(original.frame("ACTIVE"))
 			authorized = false
-			launch_server()
-			helpers.assert_eq(spawn_calls, 1,
-				"a superseded backend must be fenced before the Ollama serve spawn")
+			original.emit(original.frame("READY"))
+			helpers.assert_eq(#fixture.tasks, 1, "a superseded backend cannot acquire a successor serve task")
 			helpers.assert_eq(#settled, 1)
 			helpers.assert_eq(settled[1][1], false)
+			helpers.assert_eq(api.startup_idle(), false)
+			helpers.assert_eq(api.ensure_running(), false, "cleanup retains the original superseded owner")
+			helpers.assert_eq(original.input_closes, 1)
+			original.complete(78, original.frame("RETIRED 78"))
+			helpers.assert_true(api.startup_idle())
+			helpers.assert_eq(#settled, 1, "stale physical completion cannot republish a business verdict")
+			helpers.assert_eq(#fixture.tasks, 1)
 		end)
-		shell_runner.spawn = original_spawn
-		scheduler.after = original_after
-		if not ok then error(err) end
 	end)
 
 	helpers.it("invalidates readiness when the current daemon exits", function()
-		reset_startup_state()
-		helpers.assert_true(set_upvalue(ApiOllama.is_ready, "_is_ready", true),
-			"the daemon-exit regression must seed the real readiness owner")
-		helpers.assert_true(set_upvalue(ApiOllama.reset_ready, "_warmup_gen", 41),
-			"the daemon-exit regression must seed the real warmup generation")
-		helpers.assert_true(set_upvalue(ApiOllama.warmup, "_warmup_active", true),
-			"the daemon-exit regression must seed the in-flight warmup owner")
-
-		local original_spawn = shell_runner.spawn
-		local original_after = scheduler.after
-		local spawn_calls = 0
-		local kill_done
-		local launch_server
-		local serve_done
-		local recovery_calls = 0
-		local original_recovery_owner = package.loaded["modules.llm.prediction_engine"]
-		package.loaded["modules.llm.prediction_engine"] = {
-			on_ollama_daemon_exit = function()
-				recovery_calls = recovery_calls + 1
-				return true
-			end,
-		}
-
-		shell_runner.spawn = function(_, _, on_done)
-			spawn_calls = spawn_calls + 1
-			if spawn_calls == 1 then
-				kill_done = on_done
-			else
-				serve_done = on_done
-			end
-			return {
-				start = function() return true end,
-				terminate = function() return true, "settled" end,
-			}
-		end
-		scheduler.after = function(_, callback)
-			local handle = { timer = {} }
-			launch_server = function()
-				handle.timer = nil
-				callback()
-			end
-			return handle, true
-		end
-
-		local ok, err = pcall(function()
-			helpers.assert_eq(ApiOllama.ensure_running(), true)
-			helpers.assert_eq(type(kill_done), "function")
-			kill_done()
-			helpers.assert_eq(type(launch_server), "function")
-			launch_server()
-			helpers.assert_eq(type(serve_done), "function")
-			helpers.assert_eq(ApiOllama.is_ready(), true)
-
-			serve_done()
-
-			helpers.assert_eq(ApiOllama.is_ready(), false,
-				"a dead daemon must invalidate the readiness verdict immediately")
-			helpers.assert_eq(get_upvalue(ApiOllama.reset_ready, "_warmup_gen"), 42,
+		with_startup({}, function(api, fixture)
+			helpers.assert_true(set_upvalue(api.is_ready, "_is_ready", true),
+				"the daemon-exit regression must seed the real readiness owner")
+			helpers.assert_true(set_upvalue(api.reset_ready, "_warmup_gen", 41),
+				"the daemon-exit regression must seed the real warmup generation")
+			helpers.assert_true(set_upvalue(api.warmup, "_warmup_active", true),
+				"the daemon-exit regression must seed the in-flight warmup owner")
+			local recovery_calls = 0
+			package.loaded["modules.llm.prediction_engine"] = { on_ollama_daemon_exit = function()
+				recovery_calls = recovery_calls + 1; return true
+			end }
+			helpers.assert_eq(api.ensure_running(), true)
+			local original = fixture.tasks[1]
+			original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+			helpers.assert_eq(api.is_ready(), true)
+			original.emit(original.frame("RETIRED 0"))
+			helpers.assert_eq(api.is_ready(), true, "RETIRED alone cannot demote a physically live daemon")
+			helpers.assert_eq(recovery_calls, 0)
+			original.complete(0)
+			helpers.assert_eq(api.is_ready(), false, "a dead daemon must invalidate the readiness verdict immediately")
+			helpers.assert_eq(get_upvalue(api.reset_ready, "_warmup_gen"), 42,
 				"daemon death must fence warmup responses from the dead server")
-			helpers.assert_eq(get_upvalue(ApiOllama.warmup, "_warmup_active"), false,
+			helpers.assert_eq(get_upvalue(api.warmup, "_warmup_active"), false,
 				"daemon death must release the stale warmup intent")
-			helpers.assert_eq(recovery_calls, 1,
-				"the current daemon must delegate exactly one recovery attempt")
-
-			helpers.assert_true(set_upvalue(ApiOllama.is_ready, "_is_ready", true))
-			serve_done()
-			helpers.assert_eq(ApiOllama.is_ready(), true,
-				"a duplicate stale completion must not demote a successor readiness verdict")
-			helpers.assert_eq(recovery_calls, 1,
-				"a duplicate stale completion must not request sibling recovery")
+			helpers.assert_eq(recovery_calls, 1, "the current daemon must delegate exactly one recovery attempt")
+			helpers.assert_true(set_upvalue(api.is_ready, "_is_ready", true))
+			original.complete(0)
+			helpers.assert_eq(api.is_ready(), true, "a duplicate stale completion must not demote a successor readiness verdict")
+			helpers.assert_eq(recovery_calls, 1, "a duplicate stale completion must not request sibling recovery")
 		end)
-		shell_runner.spawn = original_spawn
-		scheduler.after = original_after
-		package.loaded["modules.llm.prediction_engine"] = original_recovery_owner
-		if not ok then error(err) end
 	end)
-
-	binary_resolver.resolve = original_resolve
 end)
-
 
 helpers.describe("ApiOllama streaming task ownership", function()
 	local streaming_impl = get_upvalue(ApiOllama.fetch_batch, "post_and_parse_streaming")
@@ -575,9 +501,11 @@ helpers.describe("ApiOllama streaming task ownership", function()
 			local spawns, failures, terminations = 0, 0, 0
 			shell_runner.spawn = function()
 				spawns = spawns + 1
+				local settled = case.name == "false"
 				return {
 					start = case.start,
-					terminate = function() terminations = terminations + 1; return true end,
+					terminate = function() terminations = terminations + 1; settled = true; return true, "settled" end,
+					isSettled = function() return settled end,
 				}
 			end
 
@@ -604,7 +532,8 @@ helpers.describe("ApiOllama streaming task ownership", function()
 					on_done(0, "", "")
 					return true
 				end,
-				terminate = function() return true end,
+				terminate = function() return true, "settled" end,
+				isSettled = function() return true end,
 			}
 		end
 
@@ -637,7 +566,8 @@ helpers.describe("ApiOllama streaming task ownership", function()
 					on_done(28, "{}\n", "Operation timed out")
 					return true
 				end,
-				terminate = function() return true end,
+				terminate = function() return true, "settled" end,
+				isSettled = function() return true end,
 			}
 		end
 

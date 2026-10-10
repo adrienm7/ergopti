@@ -317,16 +317,16 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_owned_private_session_test.py', 5]);
 	cases.push(['tools/test/macos_bootstrap_tls_numeric_binding_test.py', 8]);
 	cases.push(['tools/test/owned_suspended_image_portable_test.py', 3]);
-	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 22]);
+	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 28]);
 	cases.push(['tools/diagnostics/macos_ollama_bootstrap_owner_test.py', 22]);
 	cases.push(['tools/diagnostics/macos_trusted_native_guardian_test.py', 10]);
 	cases.push(['tools/diagnostics/macos_guardian_retirement_order_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_test.py', 14]);
-	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 35]);
+	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 44]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_reader_test.py', 13]);
 	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 10]);
 	// Preserve the original 37 controls and add seven atomic-result receiving laws.
-	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 44]);
+	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 45]);
 } else {
 	process.stdout.write(
 		'SKIP actual POSIX process peers on Windows; Apple SDK receiving is separate.\n'
@@ -411,9 +411,9 @@ for (const [script, expectedCases, expectedAssertions] of [
 }
 // New command composers receive both candidate and canonical source roots.
 for (const [script, expectedCases, expectedAssertions] of [
-	['tools/test/managed_ollama_restart_envelope_test.lua', 5, 12],
+	['tools/test/managed_ollama_restart_envelope_test.lua', 5, 83],
 	['tools/test/managed_ollama_serve_command_test.lua', 7, 47],
-	['tools/test/managed_ollama_serve_kind_forwarding_test.lua', 6, 15],
+	['tools/test/managed_ollama_serve_kind_forwarding_test.lua', 6, 47],
 	['tools/test/managed_ollama_hint_task_test.lua', 29, 361]
 ]) {
 	const root = path.resolve(__dirname, '../..');

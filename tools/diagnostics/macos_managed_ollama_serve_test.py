@@ -1,6 +1,7 @@
 # tools/diagnostics/macos_managed_ollama_serve_test.py
 """Actual private serve composition over POSIX peers; native SDK/signing unrun."""
 
+import contextlib
 import hashlib
 import io
 import importlib.util
@@ -54,6 +55,8 @@ try:
             assert captured['store']['cwd'] == request['store_cwd']
             assert captured['store']['mode'] == request['store_mode']
             print('V1 ACTIVE', flush=True)
+            if request.get('listener_event') is True:
+                print('V1 LISTENER_BOUND', session.name[7:-5], flush=True)
         elif line == 'CANCEL\n' or line == '':
             child.terminate(); child.wait()
             print('V1 OUTGOING_CLOSED 0', flush=True)
@@ -899,6 +902,325 @@ if len(sys.argv) > 1 and sys.argv[1] in ('--managed-ollama-listener-probe', '--m
         finally:
             owner.session.path.write_bytes(original_bytes)
         self.assertTrue(owner.retire(5))
+
+
+@unittest.skipUnless(os.name == "posix", "Actual private POSIX process owners required")
+class ListenerBeforeAPIControls(unittest.TestCase):
+    setUp = ProductionServeControls.setUp
+    prepare = ProductionServeControls.prepare
+    retire = ProductionServeControls.retire
+    readiness_peer = ProductionServeControls.readiness_peer
+    readiness_payload = ProductionServeControls.readiness_payload
+
+    def test_listener_event_is_consumed_before_original_socket_helpers(self):
+        self.readiness_peer(prepare=False)
+        self.owner = self.subject.ServeOwner(
+            11434,
+            5,
+            60,
+            5,
+            listener_event=True,
+            register=lambda owner: setattr(self, "owner", owner),
+        )
+        self.owner.prepare().start()
+        self.readiness_payload(self.owner)
+        self.owner.acquire_readiness()
+        self.assertTrue(self.owner.operation.listener_bound)
+        self.assertTrue(self.owner._api_ready)
+        self.assertEqual(len(self.owner._api_responses), 2)
+        self.assertTrue(all(row["closed"] for row in self.owner._api_responses))
+        self.assertTrue(self.owner.retire(5))
+        self.assertFalse(self.owner._api_ready)
+
+    def test_expired_event_join_refuses_before_any_socket_helper_and_retains_daemon(self):
+        self.readiness_peer(prepare=False)
+        self.owner = self.subject.ServeOwner(
+            11434,
+            5,
+            60,
+            5,
+            listener_event=True,
+            register=lambda owner: setattr(self, "owner", owner),
+        )
+        self.owner.prepare().start()
+        self.readiness_payload(self.owner)
+        self.owner.operation._startup_deadline = 0
+        with self.assertRaises(self.subject.OWNER.ImageRefusal):
+            self.owner.acquire_readiness()
+        self.assertEqual(self.owner._api_responses, [])
+        self.assertFalse(self.owner._api_ready)
+        self.assertFalse(self.owner.operation.physically_retired)
+        self.assertTrue(self.owner.retire(5))
+
+
+@unittest.skipUnless(os.name == "posix", "Actual private POSIX process/file owners required")
+class CallerInputControls(unittest.TestCase):
+    setUp = ProductionServeControls.setUp
+    retire = ProductionServeControls.retire
+
+    @contextlib.contextmanager
+    def caller_pipe(self):
+        saved = os.dup(0)
+        reader, writer = os.pipe()
+        state = {"writer": writer}
+        try:
+            os.dup2(reader, 0)
+            os.close(reader)
+            reader = None
+            identity = os.fstat(0)
+            state["identity"] = (identity.st_dev, identity.st_ino)
+            yield state
+            actual = os.fstat(0)
+            self.assertEqual((actual.st_dev, actual.st_ino), state["identity"])
+        finally:
+            os.dup2(saved, 0)
+            os.close(saved)
+            if reader is not None:
+                os.close(reader)
+            if state["writer"] is not None:
+                os.close(state["writer"])
+
+    def close_caller(self, state):
+        descriptor = state["writer"]
+        self.assertIsNotNone(descriptor)
+        state["writer"] = None
+        os.close(descriptor)
+
+    def actual_cli(self, stream):
+        original = self.subject.ServeOwner
+
+        def acquire(*arguments, register, **options):
+            def capture(owner):
+                self.owner = owner
+                register(owner)
+
+            return original(*arguments, register=capture, **options)
+
+        with (
+            patch.object(self.subject, "NATIVE_PRODUCTION_QUALIFIED", True),
+            patch.object(self.subject, "ServeOwner", side_effect=acquire),
+            patch.object(sys, "stdout", stream),
+            patch.object(sys, "stderr", io.StringIO()) as diagnostic,
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "managed_ollama_serve.py",
+                    "--port",
+                    "11434",
+                    "--timeout",
+                    "5",
+                    "--idle-timeout",
+                    "60",
+                    "--retirement-timeout",
+                    "5",
+                    "--caller-nonce",
+                    "ab" * 16,
+                    "--owned-stdin",
+                ],
+            ),
+        ):
+            result = self.subject.main()
+        self.assertEqual(diagnostic.getvalue(), "Managed Ollama daemon admission refused.\n")
+        return result
+
+    def terminal_ack(self, stream, *, active):
+        prefix = "ERGOPTI_MANAGED_DAEMON_V1 " + "ab" * 16
+        expected = (prefix + " ACTIVE\n" if active else "") + prefix + " RETIRED 78\n"
+        self.assertEqual(stream.getvalue(), expected)
+        self.assertTrue(self.owner.operation.physically_retired)
+        self.assertIsNotNone(self.owner.operation.process.returncode)
+        self.assertIsNone(self.owner.operation._selector)
+        self.assertIsNone(self.owner.source_fd)
+        for resource in (
+            self.owner.alias,
+            self.owner.session,
+            self.owner.bootstrap,
+            self.owner.authority,
+        ):
+            self.assertFalse(resource._created)
+        self.assertEqual(self.binary.stat().st_nlink, 1)
+
+    def active_stream(self, callback):
+        fixture = self
+
+        class CompleteLineSink(io.StringIO):
+            def write(self, value):
+                result = super().write(value)
+                if self.getvalue() == "ERGOPTI_MANAGED_DAEMON_V1 " + "ab" * 16 + " ACTIVE\n":
+                    fixture.assertTrue(fixture.owner.operation.active)
+                    fixture.assertTrue(fixture.owner.authority._written)
+                    fixture.assertFalse(fixture.owner.operation.physically_retired)
+                    callback()
+                return result
+
+        return CompleteLineSink()
+
+    def test_owned_stdin_requires_literal_boolean_and_original_caller_binding(self):
+        for value, nonce in ((True, None), (1, "ab" * 16), (None, "ab" * 16), ("true", "ab" * 16)):
+            with self.subTest(value=value), patch.object(sys, "stdout", io.StringIO()) as stream:
+                with self.assertRaisesRegex(self.subject.ServeRefusal, "protocol"):
+                    self.subject.serve(11434, 5, 60, 5, caller_nonce=nonce, owned_stdin=value)
+                self.assertEqual(stream.getvalue(), "")
+                self.assertIsNone(self.owner)
+                self.assertEqual(self.native_calls, [])
+
+    def test_real_eof_before_prepare_refuses_without_native_acquisition(self):
+        with self.caller_pipe() as state:
+            self.close_caller(state)
+            stream = io.StringIO()
+            self.assertEqual(self.actual_cli(stream), 78)
+            self.assertTrue(self.owner.cancelled)
+            self.assertIsNone(self.owner.operation)
+            self.assertIsNone(self.owner.source_fd)
+            self.assertIsNone(self.owner.session)
+            self.assertEqual(self.native_calls, [])
+            self.assertEqual(
+                stream.getvalue(), "ERGOPTI_MANAGED_DAEMON_V1 " + "ab" * 16 + " RETIRED 78\n"
+            )
+
+    def test_complete_active_then_real_eof_retires_original_child_and_namespace(self):
+        with self.caller_pipe() as state:
+            stream = self.active_stream(lambda: self.close_caller(state))
+            self.assertEqual(self.actual_cli(stream), 78)
+            self.assertTrue(self.owner.cancelled)
+            self.terminal_ack(stream, active=True)
+
+    def test_real_eof_wakes_original_startup_selector_before_image_ready(self):
+        anchor = "    print('V1 IMAGE_READY', child.pid, os.geteuid(), '123', '456', request['device'], request['inode'], flush=True)\n"
+        source = self.launcher.read_text()
+        self.assertEqual(source.count(anchor), 1)
+        held = (
+            "    if mode.read_text() == 'caller_wait':\n"
+            "        assert sys.stdin.readline() in ('CANCEL\\n', '')\n"
+            "        child.terminate(); child.wait()\n"
+            "        print('V1 OUTGOING_CLOSED 0', flush=True)\n"
+            "        print('V1 BOOTSTRAP_CLOSED 0', flush=True)\n"
+            "        print('V1 RETIRED 143 1 1 0 0 0 0', flush=True)\n"
+            "        raise SystemExit(0)\n"
+        )
+        self.launcher.write_text(source.replace(anchor, held + anchor, 1))
+        (self.app / "mode").write_text("caller_wait")
+        with self.caller_pipe() as state:
+            original = self.subject.OWNER.selectors.DefaultSelector
+            original_register = original.register
+
+            def register(selector, fileobj, events, data=None):
+                result = original_register(selector, fileobj, events, data)
+                if data == "stdout":
+                    self.close_caller(state)
+                return result
+
+            with patch.object(original, "register", register):
+                stream = io.StringIO()
+                self.assertEqual(self.actual_cli(stream), 78)
+            self.assertTrue(self.owner.cancelled)
+            self.assertFalse(self.owner.operation.image_ready)
+            self.terminal_ack(stream, active=False)
+
+    def test_nonempty_caller_input_is_protocol_refusal_not_an_extra_command(self):
+        with self.caller_pipe() as state:
+            stream = self.active_stream(lambda: os.write(state["writer"], b"X"))
+            self.assertEqual(self.actual_cli(stream), 78)
+            self.assertTrue(self.owner.cancelled)
+            self.terminal_ack(stream, active=True)
+            self.assertNotIn("X", stream.getvalue())
+
+    def test_replaced_borrowed_pipe_refuses_and_still_drains_original_guardian(self):
+        with self.caller_pipe() as state:
+            alternate_reader, alternate_writer = os.pipe()
+            try:
+
+                def replace():
+                    os.dup2(alternate_reader, 0)
+                    actual = os.fstat(0)
+                    self.assertNotEqual((actual.st_dev, actual.st_ino), state["identity"])
+                    state["identity"] = (actual.st_dev, actual.st_ino)
+
+                stream = self.active_stream(replace)
+                self.assertEqual(self.actual_cli(stream), 78)
+                self.terminal_ack(stream, active=True)
+            finally:
+                os.close(alternate_reader)
+                os.close(alternate_writer)
+
+    def test_uncertain_original_selector_close_retains_debt_and_never_publishes_retired(self):
+        with self.caller_pipe() as state:
+            selector_type = self.subject.OWNER.selectors.DefaultSelector
+            original_close = selector_type.close
+            primary = OSError("independent original selector close uncertainty")
+            closes = []
+
+            def close(selector):
+                closes.append(selector)
+                original_close(selector)
+                raise primary
+
+            stream = self.active_stream(lambda: self.close_caller(state))
+            with patch.object(selector_type, "close", close):
+                self.assertEqual(self.actual_cli(stream), 78)
+            self.assertEqual(len(closes), 1)
+            self.assertEqual(
+                stream.getvalue(), "ERGOPTI_MANAGED_DAEMON_V1 " + "ab" * 16 + " ACTIVE\n"
+            )
+            self.assertFalse(self.owner.operation.physically_retired)
+            self.assertIs(self.owner.operation._close_debt, primary)
+            self.assertIs(self.owner._caller_input._close_error, primary)
+            self.assertIsNotNone(self.owner.source_fd)
+            self.assertTrue(self.owner.session._created)
+            self.assertFalse(self.owner.retire(5))
+            self.assertEqual(len(closes), 1)
+            self.assertIsNone(self.owner.operation.process.stdin)
+            self.assertIsNone(self.owner.operation.process.stdout)
+            self.assertIsNone(self.owner.operation.process.stderr)
+            self.assertIsNotNone(self.owner.operation.process.returncode)
+            # Test-owned destruction is separate from producer retirement. The
+            # original selector's actual close ran once and raised; never retry
+            # its uncertain descriptor or certify native guardian retirement.
+            # The remaining capabilities have never reached an OS close: their
+            # original owners stopped at the earlier physical-retirement guard.
+            # Capture/refence each still-held capability, remove its test handle
+            # before one OS close, and let the test-owned temporary root remove
+            # names. All original debt/retirement flags remain unchanged.
+            retained = []
+
+            def capture(holder, attribute):
+                descriptor = getattr(holder, attribute)
+                self.assertIsNotNone(descriptor)
+                observed = os.fstat(descriptor)
+                retained.append((holder, attribute, descriptor, observed))
+
+            capture(self.owner.operation._default_guardian, "_descriptor")
+            capture(self.owner, "source_fd")
+            for resource in (self.owner.authority, self.owner.bootstrap, self.owner.session):
+                capture(resource, "_file_fd")
+                capture(resource, "_directory_fd")
+            alias_descriptors = list(self.owner.alias._fds.items())
+            alias_identities = {key: os.fstat(descriptor) for key, descriptor in alias_descriptors}
+            for holder, attribute, descriptor, observed in retained:
+                self.assertEqual(getattr(holder, attribute), descriptor)
+                current = os.fstat(descriptor)
+                self.assertEqual(
+                    (current.st_dev, current.st_ino, current.st_mode),
+                    (observed.st_dev, observed.st_ino, observed.st_mode),
+                )
+                setattr(holder, attribute, None)
+                os.close(descriptor)
+            for key, descriptor in alias_descriptors:
+                self.assertEqual(self.owner.alias._fds[key], descriptor)
+                observed = alias_identities[key]
+                current = os.fstat(descriptor)
+                self.assertEqual(
+                    (current.st_dev, current.st_ino, current.st_mode),
+                    (observed.st_dev, observed.st_ino, observed.st_mode),
+                )
+                self.owner.alias._fds.pop(key)
+                os.close(descriptor)
+            self.assertFalse(self.owner.operation.physically_retired)
+            self.assertFalse(self.owner.operation._guardian_retirement_proven)
+            self.assertIs(self.owner.operation._close_debt, primary)
+            self.assertIs(self.owner._caller_input._close_error, primary)
+            self.owner = None
 
 
 if __name__ == "__main__":

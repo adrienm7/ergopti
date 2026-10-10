@@ -32,6 +32,7 @@ CATALOGUE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CATALOGUE)
 CAPABILITY = "ERGOPTI_OLLAMA_NATIVE_HTTP_V1"
 REVIEWED_PREIMAGES = {
+    "cmd/cmd.go": "e6ac73dca45ec039b45c640f2b29dca5a31561e6df514c10e37fe0281bedf627",
     "server/images.go": "517e83b75fa014fc3a3a9d23c316f71e10228e8d2f0c92323c627eb45e8d3887",
     "server/internal/client/ollama/registry.go": "6063de52240e9857334f8af210f71a3073b0b2bb8fac35c8df8b97494edf91c0",
     "x/transfer/download.go": "4cc3da8d3cbeac187eea3bd89dcc10a191fc3d8de53a7c5c5074ba30243be21a",

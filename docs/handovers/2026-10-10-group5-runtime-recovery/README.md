@@ -460,3 +460,15 @@ Source enrollment is preparation. Final selected merge/workflow gates and actual
 native execution remain required. No physical device, native PONG or original
 PONG/READY/exit-73 cause is qualified, and item 24 remains partial. No absent G6
 native closure or its larger test counts is imported into this candidate.
+
+## Subsequent published Dev receive
+
+The d92a72d5 Dev receive follows the separately published d7c349c9 checkpoint.
+It now includes the published managed-native compile dependency closure that
+was absent at the preceding enrollment snapshot. The automatic union retains
+the entire standalone lease165 job and the incoming managed-native job, including
+its declared larger cohorts, build identity, outcome guards and original budgets.
+The five lease sources and their 146 worker plus 19 observer identities remain
+unchanged. Fresh selected gates and actual ARM/Intel execution are required on
+this combined closure; these declarations provide no native result, physical
+input acceptance or attribution of the original PONG/READY/exit-73 incident.

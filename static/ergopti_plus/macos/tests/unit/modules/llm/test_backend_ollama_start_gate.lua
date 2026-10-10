@@ -29,7 +29,7 @@ local helpers = require("tests.helpers")
 --- @return table core
 --- @return table spy { starts, errors, resolves }
 --- @return function restore
-local function fixture(installed)
+local function fixture(installed, source_kind)
 	local core = helpers.load_with_stubs("modules.llm")
 	local api = package.loaded["modules.llm.api_ollama"]
 	local binary = package.loaded["modules.llm.ollama_binary"]
@@ -42,7 +42,12 @@ local function fixture(installed)
 	end
 	binary.resolve = function()
 		spy.resolves = spy.resolves + 1
-		if installed then return "/Applications/Ollama.app/Contents/Resources/ollama", nil, binary.SOURCE_APP end
+		if installed then
+			if source_kind == binary.SOURCE_NATIVE_MANAGED then
+				return "/fixture/native/ollama", nil, source_kind
+			end
+			return "/Applications/Ollama.app/Contents/Resources/ollama", nil, binary.SOURCE_APP
+		end
 		return nil, "no executable Ollama binary was found", nil
 	end
 	logger.error = function(tag, message, ...)
@@ -60,8 +65,8 @@ end
 --- Runs one case and always restores the spied owners.
 --- @param installed boolean
 --- @param body function(core, spy)
-local function with_fixture(installed, body)
-	local core, spy, restore = fixture(installed)
+local function with_fixture(installed, body, source_kind)
+	local core, spy, restore = fixture(installed, source_kind)
 	local ok, err = xpcall(body, debug.traceback, core, spy)
 	restore()
 	if not ok then error(err, 0) end
@@ -109,11 +114,11 @@ helpers.describe("llm-backend-ollama-start-gate", function()
 		end)
 	end)
 
-	helpers.it("with the AI on and Ollama installed, starts the daemon once", function()
+	helpers.it("with the AI on, accepts the external client identity without starting its daemon", function()
 		with_fixture(true, function(core, spy)
 			helpers.assert_true(core.set_runtime_llm_enabled(true))
 			helpers.assert_true(core.set_backend("ollama"))
-			helpers.assert_eq(spy.starts, 1)
+			helpers.assert_eq(spy.starts, 0, "a client selection never acquires an external daemon")
 		end)
 	end)
 
@@ -141,7 +146,7 @@ helpers.describe("llm-backend-ollama-start-gate", function()
 		end)
 	end)
 
-	helpers.it("an Ollama found by auto-detection starts once the AI is on and installed", function()
+	helpers.it("an external Ollama found by auto-detection stays a client with the AI on", function()
 		with_fixture(true, function(core, spy)
 			helpers.assert_true(core.set_runtime_llm_enabled(true))
 			-- Past the ten-second cache of a previous detection
@@ -151,7 +156,23 @@ helpers.describe("llm-backend-ollama-start-gate", function()
 			hs.http.__set_response(mlx_url, 404, "")
 			core.auto_detect_backend(function() end)
 			helpers.assert_eq(core.get_backend(), "ollama")
-			helpers.assert_eq(spy.starts, 1)
+			helpers.assert_eq(spy.starts, 0, "a client selection never acquires an external daemon")
 		end)
 	end)
+	helpers.it("(llm-backend-owned-start) admits the native foreground owner once with the AI on", function()
+		with_fixture(true, function(core, spy)
+			helpers.assert_true(core.set_runtime_llm_enabled(true))
+			helpers.assert_true(core.set_backend("ollama"))
+			helpers.assert_eq(core.get_backend(), "ollama")
+			helpers.assert_eq(spy.starts, 1)
+		end, "native_managed")
+	end)
+
+	helpers.it("(llm-backend-owned-off) never starts the native owner while the AI is off", function()
+		with_fixture(true, function(core, spy)
+			helpers.assert_true(core.set_backend("ollama"))
+			helpers.assert_eq(spy.starts, 0)
+		end, "native_managed")
+	end)
+
 end)

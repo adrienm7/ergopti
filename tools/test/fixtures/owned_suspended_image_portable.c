@@ -49,6 +49,19 @@ int ergopti_suspended_image_validate(const char *path, const ergopti_listener_id
  if (mode == 13) { struct timespec delay = {.tv_sec = 0, .tv_nsec = 20000000}; assert(nanosleep(&delay, NULL) == 0); }
  return 0;
 }
+// The appended production active-image entry point is linked, but its native
+// observations are outside this suspended-image cohort. Any call fails closed.
+ergopti_owned_program_observation ergopti_owned_program_active_identity(ergopti_owned_program *owner) {
+ (void)owner;
+ assert(0 && "Active image native observations are not enrolled in this cohort");
+ return (ergopti_owned_program_observation) {.error_code = ENOTSUP};
+}
+int ergopti_active_image_validate(const char *path, const ergopti_listener_identity *expected,
+ uint32_t remaining, ergopti_listener_identity *output) {
+ (void)path; (void)expected; (void)remaining; (void)output;
+ assert(0 && "Active image native mapping is not enrolled in this cohort");
+ return ENOTSUP;
+}
 int main(int argc, char **argv) {
  assert(argc == 2);
  char path[4096]; assert(snprintf(path, sizeof(path), "%s/image.XXXXXX", argv[1]) > 0);

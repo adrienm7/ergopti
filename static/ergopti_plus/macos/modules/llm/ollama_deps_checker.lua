@@ -677,7 +677,7 @@ end
 --- @param on_complete function|nil Called exactly once with the terminal result.
 --- @param replay_token table|nil Internal pause-owner replay capability.
 --- @return boolean accepted
-function M.check_and_install_deps(on_complete, replay_token)
+function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	-- Every call consumes the selection's grant, whatever path it takes: one
 	-- left behind by a selection that found Ollama would let a later plain
 	-- check download without the offer.
@@ -745,7 +745,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return settle_preflight_failure("Project root introuvable.")
 	end
 
-	local script_path = project_root .. "/static/ergopti_plus/macos/modules/llm/ensure-ollama-deps.sh"
+	local script_path = project_root .. "/static/ergopti_plus/macos/modules/llm/"
+		.. (native_choice and "ensure-ollama-native-deps.sh" or "ensure-ollama-deps.sh")
 	if not hs.fs.attributes(script_path, "mode") then
 		Logger.error(LOG, "Script ensure-ollama-deps.sh introuvable à %s — bootstrap aborted.", script_path)
 		return settle_preflight_failure("Script ensure-ollama-deps.sh introuvable.")
@@ -755,7 +756,16 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- into the folder that same resolver searches.
 	local resolved_bin, resolve_err, resolved_source = OllamaBinary.resolve()
 	local install_dir = nil
-	if resolved_bin then
+	if native_choice ~= nil then
+		-- Native migration has its own issued choice. The generic historical
+		-- download boolean cannot authorize this target or borrow its source.
+		if type(native_choice) ~= "table" or native_choice.source_path ~= (resolved_bin or "")
+			or native_choice.source_kind ~= resolved_source
+			or native_choice.native_target ~= OllamaBinary.native_managed_install_dir() then
+			return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+		end
+		install_dir = native_choice.native_target
+	elseif resolved_bin then
 		Logger.info(LOG, "Ollama executable found (%s): %s", tostring(resolved_source), resolved_bin)
 	else
 		-- Only a replayed download the user accepted may download again; a
@@ -792,8 +802,37 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- the signed guardian runs this exact pinned installer and returns its
 	-- physical closure receipt before provisioning or daemon acquisition.
 	local python_bin, python_state = PythonInterpreter.resolve()
-	local native_pty
-	if not python_bin then
+	local native_pty, native_context_current, native_bind_environment
+	local function native_context_admitted()
+		if native_choice == nil then return true end
+		if type(native_context_current) ~= "function"
+			or not _pause_controller.is_current(token, authorization) then return false end
+		local ok, current = pcall(native_context_current)
+		return ok == true and current == true
+			and _pause_controller.is_current(token, authorization)
+	end
+	if native_choice ~= nil then
+		if _native_pty_preflight_owner ~= nil then
+			if _native_pty_preflight_owner.rollback() ~= true then
+				return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+			end
+			_native_pty_preflight_owner = nil
+		end
+		local prepared, context
+		native_pty, prepared, context = require("adapters.managed_ollama_bootstrap").prepare(
+			native_choice.decision, native_choice.source_path, native_choice.source_kind,
+			native_choice.native_target, native_choice.model_store, BOOTSTRAP_TIMEOUT_SEC * 1000)
+		-- Capture the issued continuation immediately. Currency can refuse
+		-- acquisition, but cannot release or substitute this partial owner.
+		if type(context) == "table" then
+			native_context_current, native_bind_environment = context.is_current, context.bind_environment
+		end
+		if prepared ~= true or type(native_bind_environment) ~= "function"
+			or not native_context_admitted() then
+			if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
+			return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+		end
+	elseif not python_bin then
 		local NativePty = require("adapters.native_bootstrap_pty")
 		local environment = {
 			{ "PROJECT_ROOT", project_root .. "/static/ergopti_plus/macos" },
@@ -824,7 +863,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 			tostring(wrapper_error))
 		return settle_preflight_failure(i18n.get("ollama.deps_task_create_failed"))
 	end
-	if not _pause_controller.is_current(token, authorization) then
+	if not _pause_controller.is_current(token, authorization) or not native_context_admitted() then
 		PtyProcessGroup.remove(pty_wrapper_path)
 		if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
 		return settle_stale_intent()
@@ -848,8 +887,13 @@ function M.check_and_install_deps(on_complete, replay_token)
 	}
 	local task
 	local function owner_is_current()
-		return owner.authorized == true
-			and _pause_controller.is_current(owner.token, owner.authorization)
+		if owner.authorized ~= true then return false end
+		local admitted = _pause_controller.is_current(owner.token, owner.authorization)
+		-- Public admission queries can synchronously revoke this retained token.
+		-- Refence only captured in-memory custody after that callback boundary.
+		return admitted == true and owner.authorized == true
+			and owner.token == token and token.cancelled ~= true
+			and token.authorized == true and token.authorization == owner.authorization
 	end
 	local consume_stream = make_streaming_handler(owner_is_current)
 	local function process_terminal(exit_code, stdout, stderr)
@@ -925,21 +969,25 @@ function M.check_and_install_deps(on_complete, replay_token)
 			if not owner_is_current() then return false end
 		end
 
-		-- Daemon launch belongs exclusively to ApiOllama's already registered
-		-- lifecycle owner. The dependency checker never detaches a child process.
-		local daemon_ok, daemon_committed = xpcall(ApiOllama.ensure_running, debug.traceback)
+		local external_runtime = native_choice == nil and (install_dir ~= nil
+			or resolved_bin ~= nil and require("core.llm.ollama_runtime_choice").classify(resolved_source) == "foreign")
+		local function finish_provisioning(daemon_ready)
 		if not owner_is_current() then return false end
-		if not daemon_ok or daemon_committed ~= true then
-			return publish_failure("Démarrage du serveur Ollama impossible.", -1, "daemon")
-		end
-		_daemon_state = "ready"
+
+		_daemon_state = daemon_ready and "ready" or "pending"
 		_last_daemon_failure_message = nil
 
-		Logger.success(LOG, "Ollama binary ready and daemon start committed.")
+		Logger.success(LOG, "Ollama binary provisioned; daemon readiness=%s.", tostring(daemon_ready))
+		if not owner_is_current() then return false end
+		-- Native startup may settle after another operation replaces the window.
+		-- The earlier bootstrap observation cannot authorize these final writes.
+		local active_ok, active = pcall(llm_progress.is_active)
+		if not owner_is_current() then return false end
+		local owns_active_window = active_ok and active == true and owns_window()
 		if not owner_is_current() then return false end
 		local hide_committed = false
 		if owns_active_window then
-			pcall(llm_progress.set_step, i18n.get("ollama.deps_step_ready"))
+			pcall(llm_progress.set_step, i18n.get(daemon_ready and "ollama.deps_step_ready" or "ollama.deps_step_verified"))
 			if not owner_is_current() then return false end
 			pcall(llm_progress.set_progress, 100)
 			if not owner_is_current() then return false end
@@ -972,6 +1020,28 @@ function M.check_and_install_deps(on_complete, replay_token)
 			if hide_committed ~= true then _pause_controller.complete(token) end
 		end
 		return callbacks_delivered
+		end
+		if external_runtime then
+			-- Installation presence permits client reuse, not daemon ownership.
+			return finish_provisioning(false)
+		end
+		local daemon_ok, daemon_accepted = xpcall(function()
+			return ApiOllama.ensure_running({
+				is_authorized = owner_is_current,
+				on_settled = function(ready)
+					if not owner_is_current() then return end
+					if ready ~= true then
+						return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
+					end
+					return finish_provisioning(true)
+				end,
+			})
+		end, debug.traceback)
+		if not daemon_ok or daemon_accepted ~= true then
+			if owner_is_current() then return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon") end
+			return false
+		end
+		return true
 	end
 
 	local function process_settled_terminal(args)
@@ -1037,9 +1107,18 @@ function M.check_and_install_deps(on_complete, replay_token)
 	local task_executable, task_arguments = python_bin,
 		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "", python_bin }
 	if native_pty ~= nil then task_executable, task_arguments = native_pty.executable, native_pty.arguments end
-	task = TaskLifecycle.native("Ollama bootstrap", task_executable,
-		completion_callback, streaming_callback, task_arguments)
-	if task ~= nil and native_pty ~= nil and native_pty.bind_input(task) ~= true then task = nil end
+	if native_context_admitted() then
+		task = TaskLifecycle.native("Ollama bootstrap", task_executable,
+			completion_callback, streaming_callback, task_arguments)
+	end
+	if task ~= nil and native_choice ~= nil then
+		local bound, accepted = pcall(native_bind_environment, task)
+		if not bound or accepted ~= true or not native_context_admitted() then task = nil end
+	end
+	if task ~= nil and native_pty ~= nil then
+		if not native_context_admitted() or native_pty.bind_input(task) ~= true
+			or not native_context_admitted() then task = nil end
+	end
 
 	if not task then
 		owner.authorized = false
@@ -1079,7 +1158,12 @@ function M.check_and_install_deps(on_complete, replay_token)
 		terminate_task_owner(owner, "Ollama dependency bootstrap timeout")
 		return true
 	end, "Ollama dependency bootstrap deadline")
-	if deadline_committed ~= true then
+	if deadline_committed ~= true or not native_context_admitted() then
+		-- A committed deadline remains an original native owner after currency withdrawal.
+		-- Acquisition refusal keeps its existing cleanup debt without another attempt.
+		if deadline_committed == true then
+			cancel_owned_timer("deadline", "Ollama dependency bootstrap deadline")
+		end
 		owner.dispatching = false
 		owner.authorized = false
 		release_task_owner(owner)
@@ -1088,12 +1172,22 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return settle_preflight_failure(i18n.get("ollama.deps_failed"))
 	end
 
-	if native_pty ~= nil and native_pty.mark_start_attempted() ~= true then
+	if not native_context_admitted()
+		or (native_pty ~= nil and native_pty.mark_start_attempted() ~= true) then
 		owner.dispatching = false
 		owner.authorized = false
 		cancel_owned_timer("deadline", "Ollama dependency bootstrap deadline")
 		release_task_owner(owner)
 		if native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
+		return settle_preflight_failure(i18n.get("ollama.deps_task_start_failed"))
+	end
+	-- A failed post-marker fence keeps both original owners quarantined.
+	-- The PTY marker may no longer permit rollback; absence of start is not
+	-- permission to erase its receipt or task pin.
+	if not native_context_admitted() then
+		owner.dispatching = false
+		owner.authorized = false
+		cancel_owned_timer("deadline", "Ollama dependency bootstrap deadline")
 		return settle_preflight_failure(i18n.get("ollama.deps_task_start_failed"))
 	end
 	local started = TaskLifecycle.start(task, "Ollama bootstrap")
@@ -1121,7 +1215,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return false
 	end
 	owner.start_committed = true
-	if _pause_controller.commit(token) ~= true then
+	if not native_context_admitted() or _pause_controller.commit(token) ~= true
+		or not native_context_admitted() then
 		owner.dispatching = false
 		owner.authorized = false
 		cancel_owned_timer("deadline", "Ollama dependency bootstrap deadline")
@@ -1136,7 +1231,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		end
 		return false
 	end
-	_resume_intent = { kind = "task", download = install_dir ~= nil }
+	_resume_intent = { kind = "task", download = install_dir ~= nil and native_choice == nil }
 	owner.dispatching = false
 	for _, args in ipairs(owner.pending_streams) do
 		if not owner_is_current()
@@ -1200,7 +1295,8 @@ function M.is_task_running() return _task_running == true end
 --- A healthy success-window hide is independent UI work; refused cleanup remains debt.
 --- @return boolean idle
 function M.provisioning_idle()
-	if _task_running == true or _task_owner ~= nil or next(_active_tasks) ~= nil then return false end
+	if _task_running == true or _task_owner ~= nil or _native_pty_preflight_owner ~= nil
+		or next(_active_tasks) ~= nil then return false end
 	for slot, owner in pairs(_owned_timers) do
 		if slot ~= "hide" or owner.cancel_requested == true or owner.acquisition_valid ~= true
 			or owner.acquiring == true then return false end
@@ -1232,6 +1328,17 @@ function M.install_for_selection(on_complete)
 	local accepted = M.check_and_install_deps(on_complete)
 	if accepted ~= true then _install_granted = false end
 	return accepted
+end
+
+--- Installs the separately owned native runtime under this original task owner.
+--- Consent is a shared issued choice, consumed by the native preparation port.
+--- A stock grant or a paused replay never supplies that choice implicitly.
+function M.install_native_for_selection(decision, source_path, source_kind, native_target, model_store, on_complete)
+	if M.provisioning_idle() ~= true then return false end
+	return M.check_and_install_deps(on_complete, nil, {
+		decision = decision, source_path = source_path, source_kind = source_kind,
+		native_target = native_target, model_store = model_store,
+	}) == true
 end
 
 --- Resets a definitively-"failed" bootstrap back to "pending" so the tray
