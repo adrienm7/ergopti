@@ -79,4 +79,5 @@ ergopti_owned_program_receipt ergopti_owned_program_poll(ergopti_owned_program *
 // A failed destruction leaves the pointer and cleanup capability intact.
 bool ergopti_owned_program_destroy(ergopti_owned_program **owner);
 
+ergopti_owned_program_observation ergopti_owned_program_active_identity(ergopti_owned_program *owner);
 #endif

@@ -2,6 +2,40 @@
 
 local helpers = require("tests.helpers")
 
+-- These ports load the actual API, daemon lifecycle and shared fixed-frame
+-- receiver. Only their original physical task is controlled; manager probes,
+-- retry timers and descendant ownership remain the fixture's existing ports.
+-- This is source/model receiving, not native daemon or API authentication.
+local Foreground = assert(loadfile(helpers.driver_root()
+	.. "../../../tools/test/fixtures/managed_ollama_foreground_ports.lua"))()
+-- Match the original manager's literal loopback probe port; no native endpoint
+-- or daemon traffic is synthesized by these controlled task ports.
+Foreground.PORT = 11434
+local source_root = helpers.driver_root() .. "../../.."
+
+local function foreground_fixture(options)
+	local previous_path = package.path
+	local ok, daemon = xpcall(function()
+		return Foreground.new(source_root, source_root, options)
+	end, debug.traceback)
+	package.path = previous_path
+	if not ok then error(daemon, 0) end
+	return daemon
+end
+
+local function publish_daemon_ready(daemon)
+	local task = assert(daemon.tasks[1])
+	helpers.assert_true(task.owned)
+	helpers.assert_true(task.private)
+	helpers.assert_eq(daemon.calls[1][4], "native_managed",
+		"the actual API must classify the admitted foreground source before launch")
+	helpers.assert_eq(task.settled, false)
+	task.emit("ERGOPTI_MANAGED_DAEMON_V1 " .. Foreground.NONCE .. " ACTIVE\n")
+	task.emit("ERGOPTI_MANAGED_DAEMON_V1 " .. Foreground.NONCE .. " READY\n")
+	helpers.assert_eq(task.settled, false,
+		"READY publishes readiness while the original foreground lifetime stays owned")
+end
+
 local OWNED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
@@ -344,7 +378,7 @@ local function with_fixture(callback)
 				SG_NAMES = { "none", "script_pause_toggle" }, AX_NAMES = {},
 			}
 			for _, module_name in ipairs({
-				"modules.llm", "modules.llm.api_mlx", "modules.llm.api_ollama",
+				"modules.llm", "modules.llm.api_mlx",
 				"modules.llm.api_remote", "modules.llm.warmup_controller",
 			}) do
 				package.loaded[module_name] = {
@@ -352,6 +386,16 @@ local function with_fixture(callback)
 					resume_warmup = function() return true end,
 				}
 			end
+			native.daemon = foreground_fixture({
+				terminate = function()
+					if native.cancel_mode == "throw" then error("daemon terminate") end
+					if native.cancel_mode == "false" then return false, "refused" end
+					if native.cancel_mode == "nil" then return nil, "refused" end
+					return true, "pending"
+				end,
+			})
+			package.loaded["modules.llm.api_ollama"] = native.daemon.api
+
 			for _, module_name in ipairs({ "ui.wpm.wpm_menubar", "ui.wpm.wpm_widget" }) do
 				package.loaded[module_name] = {
 					is_running = function() return false end,
@@ -765,20 +809,20 @@ helpers.describe("HS-012 Ollama requirement descendants join ScriptControl pause
 				with_fixture(function(fixture)
 					dispatch(fixture, "startup")
 					fixture.native.commands[1].complete(1, "", "offline")
-					fixture.native.commands[2].complete(0, "", "")
+					publish_daemon_ready(fixture.native.daemon)
 					local retry = fixture.native.timers[#fixture.native.timers]
 					retry.fire_stop_mode = mode
 					retry:fire()
-					helpers.assert_eq(#fixture.native.commands, 2,
+					helpers.assert_eq(#fixture.native.commands, 1,
 						"a live fired timer cannot dispatch its readiness successor")
 					retry:fire()
-					helpers.assert_eq(#fixture.native.commands, 2,
+					helpers.assert_eq(#fixture.native.commands, 1,
 						"duplicate delivery remains cleanup-only")
 					retry:settle()
-					helpers.assert_eq(#fixture.native.commands, 3,
+					helpers.assert_eq(#fixture.native.commands, 2,
 						"exact timer settlement authorizes one retry probe")
 					retry.callback()
-					helpers.assert_eq(#fixture.native.commands, 3,
+					helpers.assert_eq(#fixture.native.commands, 2,
 						"late timer callback cannot dispatch a sibling probe")
 				end)
 		end)
@@ -796,24 +840,24 @@ helpers.describe("HS-012 Ollama requirement descendants join ScriptControl pause
 						fixture.reentrant_pause = fixture.script_control.pause_all()
 						handle.acquired_during_pause = true
 					end
-					fixture.native.commands[2].complete(0, "", "")
+					publish_daemon_ready(fixture.native.daemon)
 					local retry = fixture.native.timers[#fixture.native.timers]
 					helpers.assert_eq(fixture.reentrant_pause, true)
 					helpers.assert_eq(fixture.script_control.is_paused(), false)
 					helpers.assert_true(retry.timer ~= nil)
 					helpers.assert_eq(retry.cancel_calls, 1)
-					helpers.assert_eq(#fixture.native.commands, 2)
+					helpers.assert_eq(#fixture.native.commands, 1)
 
 					retry.cancel_mode = "true"
 					helpers.assert_true(fixture.script_control.pause_all())
 					helpers.assert_true(fixture.script_control.is_paused())
 					helpers.assert_eq(retry.timer, nil)
 					retry.callback()
-					helpers.assert_eq(#fixture.native.commands, 2,
+					helpers.assert_eq(#fixture.native.commands, 1,
 						"revoked acquisition cannot dispatch after settlement")
 					helpers.assert_true(fixture.script_control.resume_all())
 					helpers.assert_true(dispatch(fixture, "startup"))
-					helpers.assert_eq(#fixture.native.commands, 3,
+					helpers.assert_eq(#fixture.native.commands, 2,
 						"RESUME admits one fresh readiness operation")
 				end)
 		end)

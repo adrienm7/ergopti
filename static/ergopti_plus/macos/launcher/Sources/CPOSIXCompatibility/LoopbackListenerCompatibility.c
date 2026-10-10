@@ -277,6 +277,40 @@ int ergopti_suspended_image_validate(const char *executable,
 	return 0;
 }
 
+// Active mapped-image observation; this does not prove API readiness.
+int ergopti_active_image_validate(const char *executable,
+	const ergopti_listener_identity *expected, uint32_t remaining_ms,
+	ergopti_listener_identity *identity) {
+	if (identity == NULL) { return EINVAL; }
+	*identity = (ergopti_listener_identity) {0};
+	if (expected == NULL || executable == NULL || executable[0] != '/'
+		|| expected->pid <= 0 || expected->uid != geteuid()
+		|| expected->start_microseconds >= 1000000 || remaining_ms == 0) { return EINVAL; }
+	struct timespec started;
+	int error = monotonic(&started);
+	if (error != 0) { return error; }
+	struct proc_bsdinfo before, after;
+	if ((error = bsd_identity(expected->pid, &before)) != 0) { return error; }
+	if (before.pbi_start_tvsec != expected->start_seconds
+		|| before.pbi_start_tvusec != expected->start_microseconds
+		|| (before.pbi_status == SSTOP || before.pbi_status == SZOMB) || before.pbi_ppid != (uint32_t)getpid()
+		|| before.pbi_pgid != (uint32_t)expected->pid
+		|| getsid(expected->pid) != getpid()) { return ESTALE; }
+	if (expired(&started, remaining_ms)) { return ETIMEDOUT; }
+	if ((error = path_identity(expected->pid, executable, expected->device, expected->inode)) != 0) { return error; }
+	if ((error = executable_mapping(expected->pid, expected->device, expected->inode,
+		&started, remaining_ms)) != 0) { return error; }
+	if (expired(&started, remaining_ms)) { return ETIMEDOUT; }
+	if ((error = bsd_identity(expected->pid, &after)) != 0) { return error; }
+	if ((error = path_identity(expected->pid, executable, expected->device, expected->inode)) != 0) { return error; }
+	if (!same_process(&before, &after) || (after.pbi_status == SSTOP || after.pbi_status == SZOMB)
+		|| after.pbi_ppid != (uint32_t)getpid() || after.pbi_pgid != (uint32_t)expected->pid
+		|| getsid(expected->pid) != getpid()) { return ESTALE; }
+	if (expired(&started, remaining_ms)) { return ETIMEDOUT; }
+	*identity = *expected;
+	return 0;
+}
+
 int ergopti_listener_validate(int descriptor, const char *executable,
 	const ergopti_listener_identity *expected, uint32_t remaining_ms, ergopti_listener_identity *identity) {
 	if (expected == NULL || identity == NULL || executable == NULL || executable[0] != '/'
