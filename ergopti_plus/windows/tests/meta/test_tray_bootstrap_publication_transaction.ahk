@@ -46,10 +46,39 @@ _TBPT_ColdRootHasOneTruthfulOwner() {
 	LlmBuild := _DriverFuncBody("LLM_Menu_Build")
 	Assert(LlmBuild != "", "LLM_Menu_Build must remain source-visible")
 	Assert(InStr(LlmBuild,
-		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot, true, true)") > 0
+		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)") > 0
 		&& InStr(LlmBuild, "A_TrayMenu.Add") == 0,
 		"the LLM builder must submit its detached child to the root coordinator and never publish an IA-only root")
 }
 
 Test("tray bootstrap: cold publication stays non-empty, truthful, and root-owned (ahk-009-tray-bootstrap-publication)",
 	_TBPT_ColdRootHasOneTruthfulOwner)
+
+_TBPI_CompiledAuthorityPrecedesPublication() {
+	global _SharedDir
+	Source := _DriverSourceNoComments()
+	Assert(InStr(Source, "#Include ../../_shared/modules/menu/startup_tray_projection.ahk") > 0,
+		"the actual native helper must include the genuine generated shared owner")
+	ProjectionPath := _DriverProductionFileForSymbol("SharedStartupTrayProjection", _SharedDir)
+	Projection := _StripFullLineComments(FileRead(ProjectionPath, "UTF-8"))
+	Assert(Projection != "" && InStr(Projection, "SharedStartupTrayProjection(Locale)") > 0,
+		"the actual included generated shared owner must be readable and executable")
+	for Name in ["_InstallNativeStartupTray", "_InstallSafeBootstrapTray"] {
+		Body := _DriverFuncBody(Name)
+		Projected := InStr(Body, "_TrayBootstrapProjectedRows(")
+		CriticalPos := InStr(Body, 'Critical("On")')
+		Assert(Projected > 0 && CriticalPos > Projected,
+			"genuine immutable source admission must finish before native retirement")
+		Assert(InStr(Body, "_MM_GetManifestRoot(") == 0,
+			"startup must not infer emergency authority from the live loader's conflated false result")
+	}
+	Projected := _DriverFuncBody("_TrayBootstrapProjectedRows")
+	Assert(InStr(Projected, "SharedStartupTrayProjection(_I18nLocale)") > 0,
+		"the original locale owner selects the genuine compiled shared projection")
+	Assert(InStr(Projected, "MenuStartupSafeCommand") > 0,
+		"canonical command records retain the existing native capability class")
+	Assert(InStr(Projected, "_DriverReady :=") == 0 && InStr(Projected, "_DriverMenuReady :=") == 0,
+		"emergency source authority cannot grant configuration/input readiness")
+}
+
+Test("startup immutable authority: genuine compiled include and source admission precede native publication", _TBPI_CompiledAuthorityPrecedesPublication)

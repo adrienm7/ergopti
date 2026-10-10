@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 
 -- The menu modules ui/menu/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
@@ -111,14 +112,27 @@ end
 --- @return table tray, table ctx, table observed, table errors
 local function build_tray(on, extra)
 	local llm_item = nil
-	require("tests.support.llm_count_menu_fixture")(function(llm_menu, state)
+	-- Reachability requires the real activation fixture to own a ready transaction.
+	require("tests.support.llm_activation_fixture")("ollama", { true }, nil, function(_action, state, calls)
 		state.llm_enabled = on
-		llm_item = llm_menu.build_item()
+		local ManifestMenu = package.loaded["infra.manifest_menu"]
+		local previous_build = ManifestMenu.build
+		ManifestMenu.build = function(...)
+			local args = table.pack(...)
+			previous_build(table.unpack(args, 1, args.n))
+			return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.renderer" }, function()
+				return helpers.load_with_stubs("infra.manifest_menu").build(table.unpack(args, 1, args.n))
+			end)
+		end
+		local ok, detail = xpcall(function() llm_item = calls.handler.build_item() end, debug.traceback)
+		ManifestMenu.build = previous_build
+		if not ok then error(detail, 0) end
 	end)
 
 	local errors = {}
 	package.loaded["infra.logger"] = nil
 	local real_logger = require("infra.logger")
+	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	spy.error = function(module_name, fmt, ...)
 		local ok, text = pcall(string.format, fmt, ...)
@@ -127,7 +141,8 @@ local function build_tray(on, extra)
 	end
 	package.loaded["infra.logger"] = spy
 
-	local builder = helpers.load_with_stubs("ui.menu.builder")
+	helpers.load_with_stubs("ui.menu.builder")
+	CaptionFixture.install(require("infra.i18n"))
 	-- The provider rows the builders hand the renderer, before it drops what no
 	-- tray can use: an action on a row that opens a submenu is lost there.
 	local ManifestMenu = require("infra.manifest_menu")
@@ -184,6 +199,9 @@ local function build_tray(on, extra)
 	}
 	for key, value in pairs(extra or {}) do ctx[key] = value end
 	local actions = setmetatable({}, { __index = function() return function() end end })
+	-- The observing renderer port is installed before its actual native consumer imports it.
+	package.loaded["ui.menu.builder"] = nil
+	local builder = require("ui.menu.builder")
 	local ok, tray = pcall(builder.generate, ctx, mods, actions)
 	ManifestMenu.render_rows = render_rows
 	package.loaded["infra.logger"] = nil
@@ -219,7 +237,7 @@ local function top_row(tray, key)
 end
 
 
-helpers.describe("the real macOS tray: every category switch is reachable", function()
+helpers.describe("the real macOS tray: every category switch is reachable", CaptionFixture.scoped(function()
 
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("opens each feature submenu with its switch, ticked " .. tostring(posture), function()
@@ -240,6 +258,7 @@ helpers.describe("the real macOS tray: every category switch is reachable", func
 				helpers.assert_eq(first.title, i18n.get(category.switch),
 					category.title .. " submenu must open with its category switch")
 				helpers.assert_eq(type(first.fn), "function", category.title .. " switch must be clickable")
+				helpers.assert_eq(first.disabled == true, false, category.title .. " ready switch cannot be greyed")
 				helpers.assert_eq(first.checked, posture, category.title .. " switch is a checkbox showing the state")
 				checked = checked + 1
 			end
@@ -365,4 +384,4 @@ helpers.describe("the real macOS tray: every category switch is reachable", func
 		end)
 	end
 
-end)
+end))

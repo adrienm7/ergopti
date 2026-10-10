@@ -1011,6 +1011,7 @@
 	"menu.apps.encrypt_desc": "Encrypt files and folders",
 	"menu.apps.no_apps": "No applications found",
 	"menu.apps.title": "🛠️ Applications",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Console",
@@ -1126,6 +1127,7 @@
 	"menu.global.clean_unused_keys": "Clean config.toml",
 	"menu.global.starting": "Starting…",
 	"menu.global.setup_wizard": "Setup wizard…",
+	"menu.global.startup_bootstrap": "ErgoptiPlus — Starting…",
 	"menu.global.suspend": "⏸︎ Suspend",
 	"menu.configuration.title": "Configuration",
 	"menu.hotstrings.add_custom": "+ Add a custom expander…",
@@ -3282,5 +3284,8 @@
 	"healthcheck.problem.diagnostic_check": "Diagnostic check failed: %s.",
 	"healthcheck.export.privacy_notice": "This report shares only allowed technical facts. Logs, free text, paths and identifying details are excluded even when details are enabled. Local page tests are not included.",
 	"sg_actions.llm_translate_context": "🌐 Translate the current sentence [configurable]",
-	"menu.about.startup_other_command_reason": "Another startup command: Startup is configured for another command or installation. Keep its existing setting."
+	"menu.about.startup_other_command_reason": "Another startup command: Startup is configured for another command or installation. Keep its existing setting.",
+	"menu.llm.model_parent_with_health": "%sSelected model: %s",
+	"config.read_only.newer_schema": "This configuration was saved by a newer version of ErgoptiPlus. Your settings have been preserved. Update ErgoptiPlus, then reload it before changing settings.",
+	"menu.llm.save_unavailable": "Unavailable: resume ErgoptiPlus if paused, or open Diagnostics to check why settings cannot be saved."
 }

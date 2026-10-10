@@ -234,13 +234,18 @@ _MWS_NavigationArmsFirstPaint(MetricsDir, Paths) {
 		"the NavigationCompleted subscription must be retained for the window's life")
 }
 
-for Name, Fn in Map(
-		"warm-up publishes every sidecar in a background worker", _MWS_WarmPublishesEverySidecar,
-		"warm-up never replaces a running build or an open window", _MWS_WarmNeverReplacesARunningBuild,
-		"committed ingest re-arms one idle warm-up", _MWS_IdleIngestRearmsTheWarmUp,
-		"a sidecar on disk paints without a manifest build", _MWS_SidecarPaintsWithoutABuild,
-		"a sidecar paints while the warm-up still runs", _MWS_SidecarPaintsWhileWarmUpRuns,
-		"the warm-up terminal paints a window that deferred to it", _MWS_WarmTerminalPaintsAnOpenWindow,
-		"navigation completion arms the first paint", _MWS_NavigationArmsFirstPaint)
-	Test("metrics warm sidecar: " . Name . " (metrics-first-paint-waits-for-cold-build)",
-		_MWS_Isolated.Bind(Fn))
+/** Registers vectors without publishing global loop variables. */
+_MWS_RegisterWarmSidecarCases() {
+	local Name, Fn
+	for Name, Fn in Map(
+			"warm-up publishes every sidecar in a background worker", _MWS_WarmPublishesEverySidecar,
+			"warm-up never replaces a running build or an open window", _MWS_WarmNeverReplacesARunningBuild,
+			"committed ingest re-arms one idle warm-up", _MWS_IdleIngestRearmsTheWarmUp,
+			"a sidecar on disk paints without a manifest build", _MWS_SidecarPaintsWithoutABuild,
+			"a sidecar paints while the warm-up still runs", _MWS_SidecarPaintsWhileWarmUpRuns,
+			"the warm-up terminal paints a window that deferred to it", _MWS_WarmTerminalPaintsAnOpenWindow,
+			"navigation completion arms the first paint", _MWS_NavigationArmsFirstPaint)
+		Test("metrics warm sidecar: " . Name . " (metrics-first-paint-waits-for-cold-build)",
+			_MWS_Isolated.Bind(Fn))
+}
+_MWS_RegisterWarmSidecarCases()

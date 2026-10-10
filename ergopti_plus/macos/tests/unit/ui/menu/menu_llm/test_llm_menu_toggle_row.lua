@@ -64,10 +64,11 @@ helpers.describe("IA submenu on/off row", function()
 	helpers.it("keeps the switch drawn, greyed, while the script is paused", function()
 		local _, render_ctx = build_item(true, true)
 		local rows = render(render_ctx)
-		helpers.assert_eq(rows[1] and rows[1].title, "menu.llm.enable",
-			"the switch must stay in the IA submenu while paused rather than vanish")
+		helpers.assert_eq(rows[1] and rows[1].title, "menu.llm.enable — menu.llm.save_unavailable",
+			"the paused switch remains drawn with its declared unavailability reason")
 		helpers.assert_eq(rows[1].disabled, true, "and be greyed, since it cannot run its transaction")
-		helpers.assert_eq(rows[1].fn(), false, "a click that still reaches it is refused")
+		helpers.assert_nil(rows[1].fn, "the disabled native row carries no click callback")
+		helpers.assert_eq(render_ctx.commands.llm_toggle(), false, "a direct command that still reaches it is refused")
 	end)
 
 	helpers.it("ticks the same switch once the suggestions are on", function()
@@ -451,4 +452,173 @@ helpers.describe("actual outer IA parent reaches real tray transport", function(
 			if not ok then error(detail, 0) end
 		end)
 	end)
+end)
+-- These subjects retain actual template/native renderer results. They supply
+-- no hand-authored native row and restore the exact captured owner descriptors.
+local function with_download_projection(calls, callback)
+	local facade = package.loaded["infra.manifest_menu"]
+	local template, render = facade.template_rows, facade.render_rows
+	local root = facade.get_root()
+	local source = root.llm_download_shortcut_frame
+	local declaration, platforms = source[1], source[1].platforms
+	local old_id, old_i18n, old_platform = declaration.id, declaration.i18n, platforms[1]
+	local window_before = package.loaded["ui.download_window"]
+	local task_before = calls.root_deps.active_tasks.download
+	local focused, successor_focused = 0, 0
+	local captured = { template = template, render = render, root = root, source = source,
+		declaration = declaration, platforms = platforms }
+	local ok, detail = xpcall(function()
+		package.loaded["ui.download_window"] = { focus = function() focused = focused + 1 end }
+		calls.root_deps.active_tasks.download = true
+		callback(facade, captured, function() return focused, successor_focused end,
+			{ focus = function() successor_focused = successor_focused + 1 end })
+	end, debug.traceback)
+	package.loaded["infra.manifest_menu"] = facade
+	facade.template_rows, facade.render_rows = template, render
+	root.llm_download_shortcut_frame = source
+	source[1] = declaration
+	declaration.id, declaration.i18n, platforms[1] = old_id, old_i18n, old_platform
+	package.loaded["ui.download_window"] = window_before
+	calls.root_deps.active_tasks.download = task_before
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("Actual download native projection custody", function()
+	helpers.it("returns the actual completed command and retains the pre-projection focus owner", function()
+		with_activation("ollama", { true }, nil, function(_, _, calls)
+			with_download_projection(calls, function(facade, captured, counts, successor)
+				local rows, native
+				facade.template_rows = function(...)
+					rows = captured.template(...)
+					return rows
+				end
+				facade.render_rows = function(...)
+					native = captured.render(...)
+					package.loaded["ui.download_window"] = successor
+					return native
+				end
+				local item = calls.handler.build_download_item()
+				helpers.assert_type(native, "table")
+				helpers.assert_true(rawequal(item, native[1]), "return the actual renderer object, without native reallocation")
+				helpers.assert_true(rawequal(item.fn, rows[1].action), "retain the actual command callback identity")
+				helpers.assert_eq(item.title, "menu.llm.show_download_window")
+				helpers.assert_nil(item.disabled)
+				helpers.assert_nil(item.checked)
+				helpers.assert_nil(item.menu)
+				helpers.assert_eq(counts(), 0)
+				item.fn()
+				local focused, successor_focused = counts()
+				helpers.assert_eq(focused, 1)
+				helpers.assert_eq(successor_focused, 0)
+				helpers.assert_eq(calls.saves, 0)
+				helpers.assert_eq(calls.updates, 0)
+			end)
+		end)
+	end)
+
+	helpers.it("refuses a renderer withdrawn by the actual template before invoking its replacement", function()
+		with_activation("ollama", { true }, nil, function(_, _, calls)
+			with_download_projection(calls, function(facade, captured, counts)
+				local observed = 0
+				facade.template_rows = function(...)
+					local rows = captured.template(...)
+					facade.render_rows = function() observed = observed + 1 end
+					return rows
+				end
+				helpers.assert_nil(calls.handler.build_download_item())
+				helpers.assert_eq(observed, 0)
+				helpers.assert_eq(counts(), 0)
+				helpers.assert_eq(calls.root_deps.active_tasks.download, true)
+				helpers.assert_eq(calls.saves, 0)
+				helpers.assert_eq(calls.updates, 0)
+				helpers.assert_eq(calls.notifications, 0)
+				facade.template_rows, facade.render_rows = captured.template, captured.render
+				helpers.assert_type(calls.handler.build_download_item().fn, "function", "exact descriptor repair accepts genuine projection")
+			end)
+		end)
+	end)
+
+	for _, scenario in ipairs({ "facade", "array", "record", "platform" }) do
+		helpers.it("refuses custody withdrawal during the actual native projection: " .. scenario, function()
+			with_activation("ollama", { true }, nil, function(_, _, calls)
+				with_download_projection(calls, function(facade, captured, counts)
+					local native
+					local old_id, old_platform = captured.declaration.id, captured.platforms[1]
+					facade.render_rows = function(...)
+						native = captured.render(...)
+						if scenario == "facade" then package.loaded["infra.manifest_menu"] = nil
+						elseif scenario == "array" then captured.root.llm_download_shortcut_frame = nil
+						elseif scenario == "record" then captured.declaration.id = "missing_download_owner"
+						else captured.platforms[1] = "linux" end
+						return native
+					end
+					helpers.assert_nil(calls.handler.build_download_item())
+					helpers.assert_type(native, "table", "withdrawal follows actual native construction")
+					helpers.assert_type(native[1].fn, "function")
+					helpers.assert_eq(counts(), 0)
+					helpers.assert_eq(calls.root_deps.active_tasks.download, true)
+					helpers.assert_eq(calls.saves, 0)
+					helpers.assert_eq(calls.updates, 0)
+					helpers.assert_eq(calls.notifications, 0)
+					package.loaded["infra.manifest_menu"] = facade
+					captured.root.llm_download_shortcut_frame = captured.source
+					captured.declaration.id, captured.platforms[1] = old_id, old_platform
+					facade.render_rows = captured.render
+					helpers.assert_type(calls.handler.build_download_item().fn, "function", "source repair accepts the genuine native result")
+				end)
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("IA protected configuration admission", function()
+	for _, protect_before_build in ipairs({ true, false }) do
+		helpers.it("IA toggle refuses protected configuration before effects (protected-ai-toggle "
+			.. (protect_before_build and "build" or "stale") .. ")", function()
+			local Migrate = require("config_migrate")
+			local registry = assert(Migrate.load_registry(helpers.driver_root() .. "../_shared/core/config_schema/migrations.toml"))
+			local path = "/controlled/ergopti-protected-ai-" .. (protect_before_build and "build" or "stale") .. ".toml"
+			local source = "[_meta]\nschema_version = " .. (registry.current + 1) .. "\n[llm]\nenabled = true\n"
+			local function protect()
+				local outcome = Migrate.boot({
+					path = path, driver = "hs", registry = registry,
+					read = function(target) helpers.assert_eq(target, path); return source, "ok" end,
+					create_backup = function() error("future source cannot acquire a backup") end,
+					publish = function() error("future source cannot publish") end,
+				})
+				helpers.assert_eq(outcome.status, "newer", outcome.detail)
+				helpers.assert_eq(outcome.read_only, true)
+				return Migrate.read_only_reason(path)
+			end
+			local prior = package.loaded["ui.menu.menu_paths"]
+			package.loaded["ui.menu.menu_paths"] = { get = function(key)
+				helpers.assert_eq(key, "ConfigTomlPath")
+				return path
+			end }
+			local ok, failure = xpcall(function()
+				local reason
+				if protect_before_build then reason = protect() end
+				with_activation("mlx", { true }, nil, function(action, state, calls)
+					local ready = calls.render_ctx.state_getters.llm_toggle_ready
+					if not protect_before_build then
+						helpers.assert_eq(ready(), true, "the same captured callback was genuinely ready before protection")
+						reason = protect()
+					end
+					helpers.assert_eq(ready(), false)
+					helpers.assert_eq(action(), false)
+					helpers.assert_eq(state.llm_enabled, false)
+					helpers.assert_eq(calls.bootstrap, 0)
+					helpers.assert_eq(calls.requirements, 0)
+					helpers.assert_eq(calls.offers, 0)
+					helpers.assert_eq(calls.saves, 0)
+					helpers.assert_eq(calls.updates, 0)
+					helpers.assert_eq(calls.keymap_states, {})
+					helpers.assert_eq(Migrate.read_only_reason(path), reason, "refusal retains exact migration custody")
+				end)
+			end, debug.traceback)
+			package.loaded["ui.menu.menu_paths"] = prior
+			if not ok then error(failure, 0) end
+		end)
+	end
 end)

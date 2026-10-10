@@ -533,56 +533,78 @@ _Updater_AcquireChannelConfigBundle() {
 		_ConfigWriteTerminalRelease(Bundle)
 		return false
 	}
-	Bundle.UpdaterChannelRetained := false
-	Bundle.UpdaterChannelReleased := false
+	if !_Updater_ChannelConfigBundleReceipt(Bundle, "register") {
+		_ConfigWriteTerminalRelease(Bundle)
+		return false
+	}
 	return Bundle
 }
 
-_Updater_ChannelConfigBundleRetained(Bundle) {
-	if !(Bundle is Object)
-		return false
-	PreviousCritical := Critical("On")
-	try return Bundle.HasOwnProp("UpdaterChannelRetained")
-		&& Bundle.UpdaterChannelRetained
-	finally Critical(PreviousCritical)
-}
-
-_Updater_RetainChannelConfigBundle(Bundle, RetentionOwner) {
+; Retains at most one exact bundle graph. A successful release remains a local
+; late-callback acknowledgment only until another genuinely current bundle is
+; registered. No caller receives the mutable receipt, and it never substitutes
+; for native issuer authority or READY.
+_Updater_ChannelConfigBundleReceipt(Bundle, Operation := "inspect", RetentionOwner := 0) {
+	static Receipt := 0
 	global ConfigurationFile
-	if !(Bundle is Object) || !(RetentionOwner is Object)
+	if !(Bundle is Object) || !(Operation is String)
+		return false
+	if Operation !== "inspect" && Operation !== "retained"
+		&& Operation !== "register" && Operation !== "retain" && Operation !== "release"
+		return false
+	if Operation == "retain" && !(RetentionOwner is Object)
 		return false
 	PreviousCritical := Critical("On")
 	try {
-		; Validate the exact owner and publish its retention target atomically.
-		; Otherwise a terminal callback could release the bundle between the
-		; ownership probe and the deferred/recovery state's first reference.
-		if !(_ConfigWriteLeaseSelectOwner(Bundle,
+		ExactReceipt := (Receipt is Object) && Receipt.Bundle == Bundle
+		if Operation == "inspect"
+			return ExactReceipt
+		if Operation == "retained"
+			return ExactReceipt && Receipt.Retained
+		if Operation == "release" && ExactReceipt && Receipt.Released
+			return true
+		; A copied bundle can pass an old token-based selector. Exact public
+		; identity plus the native selector are both required for registration;
+		; the closed issuer additionally checks its private issued receipt.
+		State := _ConfigWriteLeaseState()
+		if !(State.terminal is Object) || State.terminal != Bundle
+			|| !(_ConfigWriteLeaseSelectOwner(Bundle,
 				ConfigurationFile) is Object)
 			return false
-		if Bundle.HasOwnProp("UpdaterChannelReleased")
-			&& Bundle.UpdaterChannelReleased
-			return false
-		Bundle.UpdaterChannelRetained := true
-		RetentionOwner.ConfigBundle := Bundle
-		return true
-	} finally Critical(PreviousCritical)
-}
-
-_Updater_ReleaseChannelConfigBundle(Bundle) {
-	if !(Bundle is Object)
-		return false
-	PreviousCritical := Critical("On")
-	try {
-		if Bundle.HasOwnProp("UpdaterChannelReleased")
-			&& Bundle.UpdaterChannelReleased
+		if ExactReceipt {
+			if Receipt.Released
+				return false
+		} else {
+			; Genuine current admission retires the old local graph. It does not
+			; manufacture a successful updater release for that predecessor.
+			Receipt := { Bundle: Bundle, Retained: false, Released: false }
+		}
+		if Operation == "register"
 			return true
+		if Operation == "retain" {
+			Receipt.Retained := true
+			RetentionOwner.ConfigBundle := Bundle
+			return true
+		}
 		Released := _ConfigWriteTerminalRelease(Bundle)
 		if Released {
-			Bundle.UpdaterChannelRetained := false
-			Bundle.UpdaterChannelReleased := true
+			Receipt.Retained := false
+			Receipt.Released := true
 		}
 		return Released
 	} finally Critical(PreviousCritical)
+}
+
+_Updater_ChannelConfigBundleRetained(Bundle) {
+	return _Updater_ChannelConfigBundleReceipt(Bundle, "retained")
+}
+
+_Updater_RetainChannelConfigBundle(Bundle, RetentionOwner) {
+	return _Updater_ChannelConfigBundleReceipt(Bundle, "retain", RetentionOwner)
+}
+
+_Updater_ReleaseChannelConfigBundle(Bundle) {
+	return _Updater_ChannelConfigBundleReceipt(Bundle, "release")
 }
 
 _Updater_RestorePrecommitCadence(FailureMessage := "", FailureErr := 0,

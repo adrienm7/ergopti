@@ -47,6 +47,10 @@ local WINDOW_TITLE_KEY = "onboarding.window_title"
 -- The generated catalogue of this driver, loaded by the first use.
 local _catalogue = nil
 
+-- This exact request owner outlives view disposal and daemon-state replacement.
+local _publication = nil
+local _finish_gate = require("onboarding_publication").callback_gate()
+
 local function dependency(state, field, module_name)
 	if type(state[field]) == "table" then return state[field] end
 	local ok, module = pcall(require, module_name)
@@ -250,16 +254,47 @@ end
 --- Restores the language and the folder the wizard changed before a failed write.
 --- @param authorities table
 --- @param snapshot table
-local function restore_snapshot(authorities, snapshot)
-	local function rollback(label, fn)
-		if not call_confirmed("rollback for " .. label, fn) then
+local function restore_snapshot(authorities, snapshot, phases, expected)
+	local settled = true
+	local function rollback(key, label, getter, before, fn)
+		if phases[key] == true then return end
+		local read_ok, actual = pcall(getter)
+		if not read_ok or actual ~= expected[key] and actual ~= before then
+			settled = false
+			Logger.error(LOG, "Onboarding rollback refused after an external %s change.", label)
+			return
+		end
+		-- A refused forward callback may have left this scalar unchanged. Only
+		-- the initial exact snapshot read can avoid an unnecessary inverse. Once
+		-- an inverse was attempted, its literal acknowledgement remains required.
+		if actual == before and phases[key] == nil then
+			phases[key] = true
+			return
+		end
+		phases[key] = false
+		local called, restored = pcall(fn)
+		if called and restored == true then
+			phases[key] = true
+		else
+			settled = false
 			Logger.error(LOG, "Onboarding rollback debt remains for %s.", label)
 		end
 	end
-	rollback("config directory", function()
+	rollback("directory", "config directory", authorities.config_paths.get_config_dir, snapshot.config_dir, function()
 		return authorities.config_paths.set_config_dir(snapshot.config_dir)
 	end)
-	rollback("locale", function() return authorities.i18n.set_locale(snapshot.locale) end)
+	rollback("locale", "locale", authorities.i18n.get_locale, snapshot.locale, function() return authorities.i18n.set_locale(snapshot.locale) end)
+	return settled
+end
+
+--- Retains the original scalar inverse after the exact native file phases.
+local function retain_snapshot_restore(authorities, snapshot, expected)
+	local phases = {}
+	if not _publication.compensate(function() return restore_snapshot(authorities, snapshot, phases, expected) end) then
+		Logger.error(LOG, "Onboarding cannot replace an outstanding scalar compensation owner.")
+		return false
+	end
+	return _publication.retry_restore()
 end
 
 --- Versions a config.toml the wizard is about to write: the boot migration ran
@@ -340,7 +375,11 @@ local function import_nav_layer(state, target_dir, keys)
 	return false
 end
 
-local function finish(state, answers)
+local function finish_owned(state, answers)
+	if _publication and _publication.ready() ~= true and _publication.can_retire() ~= true then
+		report_failure(state, "onboarding.error.write_failed")
+		return { done = false }
+	end
 	local authorities = {
 		i18n = dependency(state, "i18n", "infra.i18n"),
 		config_paths = dependency(state, "config_paths", "infra.config_paths"),
@@ -377,58 +416,111 @@ local function finish(state, answers)
 		return { done = false }
 	end
 
-	local snapshot = {
-		locale = authorities.i18n.get_locale(),
-		config_dir = authorities.config_paths.get_config_dir(),
-	}
-	for _, operation in ipairs({
-		{ "locale", function() return authorities.i18n.persist_locale(answers.locale) == true end,
-			"onboarding.error.locale_persist_failed" },
-		{ "config directory", function() return authorities.config_paths.set_config_dir(target_dir) end,
-			"paths_editor.save_failed" },
-	}) do
-		if not call_confirmed(operation[1], operation[2]) then
-			restore_snapshot(authorities, snapshot)
-			report_failure(state, operation[3])
-			return { done = false }
-		end
-	end
-
-	local committed, write_err = Answers.commit({
-		index = index,
-		operations = answers.operations,
-		manifest = authorities.manifest,
-		path = target_dir .. "/" .. CONFIG_FILE,
-		prepare = authorities.prepare,
-		write = function(path, batch) return authorities.writer.batch_write(path, batch) end,
-	})
-	if not committed then
-		Logger.error(LOG, "Onboarding config write failed: %s.", tostring(write_err))
-		restore_snapshot(authorities, snapshot)
+	local files = dependency(state, "file_system", "adapters.file_system")
+	if not files or type(files.read_with_status) ~= "function" then
 		report_failure(state, "onboarding.error.write_failed")
 		return { done = false }
 	end
-	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
-	if #tap_hold_keys > 0 and import_tap_holds(state, target_dir, tap_hold_keys) then
-		import_nav_layer(state, target_dir, tap_hold_keys)
-	end
-
-	local manager = webview(state)
-	if manager and type(manager.hide) == "function" then pcall(manager.hide, APP_NAME) end
-	-- Every module reads config.toml when it starts, so the daemon restarts on
-	-- the new file, as hs.reload() and the Windows Reload do.
-	local restarted = false
-	if type(state.restart) == "function" then
-		local ok, result = pcall(state.restart, "the setup wizard")
-		restarted = ok and result == true
-	end
-	if not restarted then
-		Logger.error(LOG, "The daemon could not restart on the new configuration; it applies at the next start.")
-		if type(state.notify_restart_required) == "function" then
-			pcall(state.notify_restart_required)
+	local native_write, native_read = authorities.writer.batch_write, files.read_with_status
+	local path_set, path_get = authorities.config_paths.set_config_dir, authorities.config_paths.get_config_dir
+	local locale_set, locale_get = authorities.i18n.set_locale, authorities.i18n.get_locale
+	local locale_persist = authorities.i18n.persist_locale
+	_publication = require("onboarding_publication").new({
+		files = files,
+		write = function(path, batch, source)
+			return native_write(path, batch, files, source)
+		end,
+		current = function()
+			return dependency(state, "writer", "toml_codec.writer") == authorities.writer
+				and dependency(state, "file_system", "adapters.file_system") == files
+				and dependency(state, "config_paths", "infra.config_paths") == authorities.config_paths
+				and dependency(state, "i18n", "infra.i18n") == authorities.i18n
+				and authorities.config_paths.set_config_dir == path_set and authorities.config_paths.get_config_dir == path_get
+				and authorities.i18n.set_locale == locale_set and authorities.i18n.get_locale == locale_get
+				and authorities.i18n.persist_locale == locale_persist
+				and authorities.writer.batch_write == native_write and files.read_with_status == native_read
+		end,
+	})
+	local publication = _publication
+	local claim = publication.begin()
+	if claim == nil then return { done = false } end
+	local function apply_answers()
+		local snapshot = {
+			locale = authorities.i18n.get_locale(),
+			config_dir = authorities.config_paths.get_config_dir(),
+		}
+		local expected = { directory = target_dir, locale = answers.locale }
+		for _, operation in ipairs({
+			{ "locale", function() return authorities.i18n.persist_locale(answers.locale) == true end,
+				"onboarding.error.locale_persist_failed" },
+			{ "config directory", function() return authorities.config_paths.set_config_dir(target_dir) end,
+				"paths_editor.save_failed" },
+		}) do
+			if not call_confirmed(operation[1], operation[2]) then
+				retain_snapshot_restore(authorities, snapshot, expected)
+				report_failure(state, operation[3])
+				return { done = false }
+			end
 		end
+
+		local committed, write_err = Answers.commit({
+			index = index,
+			operations = answers.operations,
+			manifest = authorities.manifest,
+			path = target_dir .. "/" .. CONFIG_FILE,
+			prepare = authorities.prepare,
+			write = _publication.write,
+		})
+		if not committed then
+			Logger.error(LOG, "Onboarding config write failed: %s.", tostring(write_err))
+			retain_snapshot_restore(authorities, snapshot, expected)
+			report_failure(state, "onboarding.error.write_failed")
+			return { done = false }
+		end
+		Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
+		if #tap_hold_keys > 0 and import_tap_holds(state, target_dir, tap_hold_keys) then
+			import_nav_layer(state, target_dir, tap_hold_keys)
+		end
+
+		local manager = webview(state)
+		if manager and type(manager.hide) == "function" then pcall(manager.hide, APP_NAME) end
+		-- Every module reads config.toml when it starts, so the daemon restarts on
+		-- the new file, as hs.reload() and the Windows Reload do.
+		local restarted = false
+		if type(state.restart) == "function" then
+			local ok, result = pcall(state.restart, "the setup wizard")
+			restarted = ok and result == true
+		end
+		if not restarted then
+			Logger.error(LOG, "The daemon could not restart on the new configuration; it applies at the next start.")
+			if type(state.notify_restart_required) == "function" then
+				pcall(state.notify_restart_required)
+			end
+		end
+		return { done = true, restarted = restarted }
 	end
-	return { done = true, restarted = restarted }
+	local called, result = xpcall(apply_answers, debug.traceback)
+	publication.finish(claim)
+	if not called then
+		Logger.error(LOG, "Onboarding commit refused after a native callback failure: %s.", tostring(result))
+		report_failure(state, "onboarding.error.write_failed")
+		return { done = false }
+	end
+	return result
+end
+
+--- Serializes validation as well as publication before any provider may reenter.
+local function finish(state, answers)
+	local claim = _finish_gate.enter()
+	if claim == nil then return { done = false } end
+	local called, result = xpcall(function() return finish_owned(state, answers) end, debug.traceback)
+	_finish_gate.leave(claim)
+	if not called then
+		Logger.error(LOG, "Onboarding finish refused after a native handler failure: %s.", tostring(result))
+		report_failure(state, "onboarding.error.write_failed")
+		return { done = false }
+	end
+	return result
 end
 
 local function pick_config_dir(state, current)
@@ -455,6 +547,14 @@ function M.on_message(payload, state)
 	end
 
 	local action = payload.action
+	if (action == "ready" or action == "loadExistingConfig") and _finish_gate.busy() then
+		return { pushed = false }
+	end
+	if (action == "ready" or action == "loadExistingConfig") and _publication
+		and _publication.ready() ~= true and _publication.can_retire() ~= true then
+		report_failure(state, "onboarding.error.write_failed")
+		return { pushed = false }
+	end
 	if action == "ready" then
 		local data = build_init_data(state)
 		if not data then return { pushed = false } end

@@ -364,6 +364,7 @@ global _IniCache := Map()
 global InDeadKeySequence := false
 global LayerEnabled := false
 global CapsWordEnabled := false
+global _HardwareCapsLockOn := false
 ; Mirrors the ErgoptiPlus.ahk pre-pump block, which owns the seed for every global a
 ; parse-time #HotIf reads (see LayerEnabled/CapsWordEnabled/TapHold above). It lives
 ; there rather than in hotstring_engine.ahk because that file's include position sits
@@ -815,10 +816,6 @@ LLM_Tooltip_FinalizeAcceptance(Lifecycle, Accepted) {
     if !IsObject(Lifecycle) or Lifecycle.Outcome != "claimed"
         return false
     Lifecycle.Outcome := Accepted ? "accepted" : "dismissed"
-    return true
-}
-
-LLM_Deps_IsReady() {
     return true
 }
 

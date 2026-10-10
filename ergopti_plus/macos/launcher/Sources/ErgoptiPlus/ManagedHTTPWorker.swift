@@ -105,8 +105,12 @@ struct ManagedWPADMetadata {
 enum ManagedProxyLookup {
 	static func routes(url: URL, budget: TimeInterval, maximumSelections: Int,
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
+		certificates: [SecCertificate] = [],
 		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
-		guard let settings = settingsProvider() else { return nil }
+		guard budget.isFinite, budget > 0 else { return nil }
+		let deadline = ProcessInfo.processInfo.systemUptime + budget
+		guard !ManagedPACSource.hasDebt, let settings = settingsProvider(),
+			ProcessInfo.processInfo.systemUptime < deadline else { return nil }
 		let dictionary = (settings as AnyObject) as? [String: Any]
 		let discoveryEnabled = (dictionary?[kCFNetworkProxiesProxyAutoDiscoveryEnable as String] as? NSNumber)?.boolValue == true
 		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
@@ -126,17 +130,16 @@ enum ManagedProxyLookup {
 				|| kind == kCFProxyTypeAutoConfigurationJavaScript as String
 		})
 		var routes: [[String: Any]] = []
-		let deadline = ProcessInfo.processInfo.systemUptime + budget
 		for candidate in candidates {
 			guard let kind = candidate[kCFProxyTypeKey as String] as? String else { return nil }
 			if kind == kCFProxyTypeAutoConfigurationURL as String {
 				guard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,
-					let expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline),
+					let expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline, certificates: certificates),
 					!expanded.isEmpty else { return nil }
 				routes.append(contentsOf: expanded)
 			} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {
 				guard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,
-					let expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline),
+					let expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline, certificates: certificates),
 					!expanded.isEmpty else { return nil }
 				routes.append(contentsOf: expanded)
 			} else if !hasNativePAC { routes.append(candidate) }
@@ -148,7 +151,7 @@ enum ManagedProxyLookup {
 		if discoveryEnabled,
 			!hasNativePAC {
 			guard let discovered = discover(url: url, deadline: deadline,
-				maximumSelections: maximumSelections, metadataProvider: discoveryMetadataProvider) else { return nil }
+				maximumSelections: maximumSelections, certificates: certificates, metadataProvider: discoveryMetadataProvider) else { return nil }
 			routes = discovered
 		}
 		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
@@ -202,19 +205,38 @@ enum ManagedProxyLookup {
 	}
 
 	static func discover(url: URL, deadline: TimeInterval, maximumSelections: Int,
+		certificates: [SecCertificate] = [],
 		metadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
+		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
 		let metadata = metadataProvider()
 		guard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),
 			!endpoints.isEmpty, endpoints.count <= maximumSelections else { return nil }
 		for endpoint in endpoints {
-			guard ProcessInfo.processInfo.systemUptime < deadline else { return nil }
-			if let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline),
+			guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
+			if let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline, certificates: certificates),
 				!result.isEmpty, result.count <= maximumSelections { return result }
 		}
 		return nil
 	}
 
-	static func evaluate(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval) -> [[String: Any]]? {
+	static func evaluate(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval,
+		certificates: [SecCertificate] = []) -> [[String: Any]]? {
+		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
+		let source: String
+		if let pacURL, script == nil {
+			guard let acquired = ManagedPACSource.load(pacURL, deadline: deadline, certificates: certificates) else { return nil }
+			source = acquired
+		} else if pacURL == nil, let script { source = script }
+		else { return nil }
+		guard ProcessInfo.processInfo.systemUptime < deadline,
+			let bound = try? ManagedPACSource.bind(source, url: url) else { return nil }
+		return evaluateNative(url: url, pacURL: nil, script: bound, deadline: deadline)
+	}
+
+	/// Keep the raw public framework boundary observable independently of the
+	/// production binding. This does not acquire a PAC through an owned session.
+	static func evaluateNative(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval) -> [[String: Any]]? {
+		guard ProcessInfo.processInfo.systemUptime < deadline else { return nil }
 		let result = ManagedPACResult()
 		var context = CFStreamClientContext(version: 0,
 			info: Unmanaged.passUnretained(result).toOpaque(), retain: nil, release: nil, copyDescription: nil)
@@ -298,7 +320,8 @@ enum ManagedProxyLookup {
 /// challenges are deliberately absent from the receiving protocol.
 func managedHTTPFailure(_ error: NSError) -> String {
 	guard error.domain == NSURLErrorDomain else { return "unavailable" }
-	switch error.code {
+	let code = error.code
+	switch code {
 	case NSURLErrorTimedOut: return "deadline"
 	case NSURLErrorCancelled: return "cancelled"
 	case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "offline"
@@ -306,11 +329,77 @@ func managedHTTPFailure(_ error: NSError) -> String {
 	case NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,
 		NSURLErrorServerCertificateHasUnknownRoot, NSURLErrorServerCertificateNotYetValid,
 		NSURLErrorSecureConnectionFailed, NSURLErrorClientCertificateRejected,
-		NSURLErrorClientCertificateRequired: return "certificate"
+		NSURLErrorClientCertificateRequired:
+		#if DEBUG
+		_ = fputs("# native_http_certificate_code domain=NSURLErrorDomain code=\(code)\n", stderr)
+		#endif
+		return "certificate"
 	case NSURLErrorUserAuthenticationRequired: return "unavailable"
 	case NSURLErrorCannotConnectToHost: return "connect"
 	default: return "unavailable"
 	}
+}
+
+/// Projects only closed native status facts from the already completed request.
+/// No trust evaluation, certificate text or private NSError payload is acquired.
+func managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [String: Any] {
+	precondition(additionalAnchorCount >= 0)
+	let cfNetworkDomain = kCFErrorDomainCFNetwork as String
+	var native = error
+	var seen = Set<ObjectIdentifier>()
+	var causes: [[String: Any]] = []
+	var termination = "complete"
+	while true {
+		guard seen.insert(ObjectIdentifier(native)).inserted else { termination = "cycle"; break }
+		guard causes.count < 8 else { termination = "depth"; break }
+		let domain: String
+		switch native.domain {
+		case NSURLErrorDomain: domain = "url"
+		case NSOSStatusErrorDomain: domain = "security"
+		case cfNetworkDomain: domain = "cfnetwork"
+		case NSPOSIXErrorDomain: domain = "posix"
+		default: domain = "other"
+		}
+		let code = domain == "other" ? nil : Int32(exactly: native.code)
+		var kind = "unknown"
+		if domain == "security", let code {
+			switch code {
+			case errSSLHostNameMismatch: kind = "hostname_mismatch"
+			case errSSLCertExpired: kind = "certificate_expired"
+			case errSSLCertNotYetValid: kind = "certificate_not_yet_valid"
+			case errSSLUnknownRootCert: kind = "unknown_root"
+			case errSSLXCertChainInvalid: kind = "certificate_chain_invalid"
+			default: break
+			}
+		} else if domain == "url", let code {
+			switch Int(code) {
+			case NSURLErrorServerCertificateUntrusted: kind = "certificate_untrusted"
+			case NSURLErrorServerCertificateHasBadDate: kind = "certificate_date_invalid"
+			case NSURLErrorServerCertificateNotYetValid: kind = "certificate_not_yet_valid"
+			case NSURLErrorServerCertificateHasUnknownRoot: kind = "unknown_root"
+			default: break
+			}
+		}
+		var cause: [String: Any] = ["domain": domain, "code": NSNull(), "kind": kind]
+		if let code { cause["code"] = Int(code) }
+		// These optional integers were delivered with the completed NSError.
+		// No SecTrust getter may trigger a new evaluation for this observation.
+		cause["stream_domain"] = NSNull()
+		cause["stream_code"] = NSNull()
+		if domain == "url" || domain == "cfnetwork" {
+			for (field, key) in [("stream_domain", "_kCFStreamErrorDomainKey"), ("stream_code", "_kCFStreamErrorCodeKey")] {
+				if let value = native.userInfo[key] as? NSNumber,
+					CFGetTypeID(value) != CFBooleanGetTypeID(),
+					let integer = Int32(exactly: value.doubleValue) { cause[field] = Int(integer) }
+			}
+		}
+		causes.append(cause)
+		guard let underlying = native.userInfo[NSUnderlyingErrorKey] else { break }
+		guard let next = underlying as? NSError else { termination = "unavailable"; break }
+		native = next
+	}
+	return ["version": 1, "trust_mode": additionalAnchorCount == 0 ? "native_default" : "added_anchors",
+		"additional_anchor_count": additionalAnchorCount, "causes": causes, "chain_termination": termination]
 }
 
 private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unchecked Sendable {
@@ -427,6 +516,14 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 
 	func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
 		if failure == nil, let error { failure = managedHTTPFailure(error as NSError) }
+		#if DEBUG
+		if failure == "certificate", let error = error as NSError?,
+			let bytes = try? JSONSerialization.data(withJSONObject:
+				managedHTTPTLSDiagnostic(error, additionalAnchorCount: certificates.count), options: [.sortedKeys]),
+			let text = String(data: bytes, encoding: .utf8) {
+			_ = fputs("# native_http_tls_failure \(text)\n", stderr)
+		}
+		#endif
 		if let error = error as NSError?, error.domain == NSURLErrorDomain,
 			error.code == NSURLErrorUserAuthenticationRequired, proxyAuthenticationObserved { failure = "proxy" }
 		if let error {
@@ -574,7 +671,7 @@ enum ManagedHTTPWorker {
 			if let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }
 			guard let selected = ManagedProxyLookup.routes(url: request.url,
 				budget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),
-				maximumSelections: maximumSelections, settingsProvider: settingsProvider,
+				maximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,
 				discoveryMetadataProvider: discoveryMetadataProvider)
 			else { return refuse(reason: "unavailable", status: 78, output: output) }
 			routes = selected

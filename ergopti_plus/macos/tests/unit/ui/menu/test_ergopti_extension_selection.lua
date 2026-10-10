@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 require("test.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
 
 --- Provides the real files beneath a shipped scanner root.
@@ -88,6 +89,8 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			local suffix_path = Packs.route("french_distancesreduction", nil)
 			helpers.assert_true(Keymap.load_toml("french_distancesreduction", suffix_path))
 			helpers.assert_true(Keymap.set_magic_key_source("KeyJ"))
+			CaptionFixture.install(require("infra.i18n"))
+			package.loaded["ui.menu.builder"] = nil
 			local Registry = require("modules.keymap.registry")
 			local Hotstrings = require("ui.menu.menu_hotstrings")
 			local Preferences = require("infra.preferences")

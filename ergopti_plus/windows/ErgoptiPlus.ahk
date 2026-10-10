@@ -206,6 +206,8 @@ if !_DriverIsDetachedWorker
 ; are still unset — assigning them here keeps the very first message pump
 ; well-formed.
 global CapsWordEnabled := False
+; Capture genuine hardware intent before any parse-time callback can run.
+global _HardwareCapsLockOn := GetKeyState("CapsLock", "T") ? true : false
 global LayerEnabled := False
 global TapHold := Map("keys", Map())
 ; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
@@ -612,6 +614,7 @@ BootProfile_Stamp("LLM defaults loaded")
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk
+#Include modules/llm/ollama_install_files_port.ahk
 #Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip/tooltip_llm.ahk
 #Include ui/menu/menu_llm/_index.ahk
@@ -675,6 +678,8 @@ if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
 ; the safe menu, never with AutoHotkey's default icon and stock items.
 A_IconHidden := false
+; Read-only construction precedes the wizard; the genuine migration stays below it.
+ConfigSchemaPrepareSource(ConfigurationFile)
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
 		; Reproduce that hazard without an interactive window: the suspend watchdog
@@ -901,7 +906,8 @@ try {
 }
 _HotstringExtensionPacks := HotstringExtensions_Prepare(Features,
 	HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir))
-_BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
+_BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml", &_BootConfigSnapshot)
+HotstringsTerminatorRecordsInitBoot(_BootConfigSnapshot)
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
@@ -1249,8 +1255,10 @@ ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overri
 LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])
-if ConfigFullStateCanPersist() {
-	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
+; This canonicalizer is optional once a terminal transition owns the old boot.
+; Recheck after refusal because schema admission and queue setup can yield.
+if !_ConfigWriteTerminalIsActive() && ConfigFullStateCanPersist() {
+	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false) && !_ConfigWriteTerminalIsActive()
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
 }
 

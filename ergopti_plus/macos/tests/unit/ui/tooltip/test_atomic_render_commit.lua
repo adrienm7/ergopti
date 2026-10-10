@@ -230,6 +230,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			local accepts = 0
 			local synthetic = require("adapters.synthetic_input")
 			local logger = require("infra.logger")
+			helpers.admit_logger_privacy(logger)
 			local previous_error = logger.error
 			local invalidation_logs = 0
 			context.tooltip.set_accept_callback(function() accepts = accepts + 1; return true end)

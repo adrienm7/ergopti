@@ -56,6 +56,7 @@ helpers.describe("adapters.wake_watcher", function()
 		local previous_logger = package.loaded["infra.logger"]
 		package.loaded["infra.logger"] = nil
 		local real_logger = require("infra.logger")
+		helpers.admit_logger_privacy(real_logger)
 		local spy = setmetatable({}, { __index = real_logger })
 		spy.error = function(_, fmt, ...)
 			local formatted, text = pcall(string.format, fmt, ...)

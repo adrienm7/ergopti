@@ -64,6 +64,7 @@ local function choose(parameter, clicked, refusal, picked)
 		i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
 	}))
 	package.loaded["infra.manifest_menu"] = {
+		group_receiver = renderer.group_receiver,
 		template_rows = renderer.template_rows,
 		get_root = function() return { gesture_slots = { ["2"] = { "tap_2" } } } end,
 		build = function(_, _, _, _, _, providers)
@@ -190,6 +191,7 @@ local function with_status_refresh(options, callback)
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["infra.deferred_work"] = {}
 		package.loaded["infra.manifest_menu"] = {
+			group_receiver = renderer.group_receiver,
 			template_rows = renderer.template_rows,
 			build = function(_, _, _, _, _, providers)
 				fixture.canonical = providers.system_gesture_status()

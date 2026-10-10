@@ -207,7 +207,7 @@ local function with_write_receipts(channel, refusal, body)
 		return file
 	end
 	local ok, err = xpcall(function()
-		helpers.assert_true(Sink.install(logger, { log_dir = dir }))
+		helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } }))
 		body(Sink, state, logger)
 	end, debug.traceback)
 	Sink.uninstall(logger)
@@ -322,7 +322,7 @@ local function with_repoint_receipts(case, body)
 	end
 	local ok, err = xpcall(function()
 		if case.mode ~= "none" then
-			helpers.assert_eq(Sink.install(logger, { log_dir = old }), case.mode ~= "stdout")
+			helpers.assert_eq(Sink.install(logger, { log_dir = old, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } }), case.mode ~= "stdout")
 		end
 		state.phase = "candidate"
 		state.target = case.mode == "same" and old or target
@@ -389,6 +389,27 @@ end)
 helpers.describe("logger sink — production wiring", function()
 	local raw   = read_file(DRIVER_ROOT .. "/ergopti_hotstrings.lua")
 	local entry = raw and strip_comment_lines(raw) or nil
+
+	helpers.it("linux-logger-privacy: boot refuses private admission failure without exposing its exception", function()
+		local block = entry and entry:match("(local privacy_admitted[^\n]*= pcall%b()%s*if not privacy_admitted.-\nend)")
+		helpers.assert_not_nil(block, "The actual bootstrap privacy admission block must be present")
+		local run = assert(load("return function(LoggerSink, Logger, io, os)\n" .. block .. "\nend"))()
+		for _, result in ipairs({ "true", "false", "throw", "refusal" }) do
+			local calls, exits, output = 0, {}, {}
+			run({ install = function()
+				calls = calls + 1
+				if result == "throw" then error("PRIVATE_BOOT_CANARY /home/PrivateUser", 0) end
+				if result == "refusal" then return false, "PRIVATE_REFUSAL_CANARY /home/PrivateUser" end
+				return result == "true"
+			end }, {}, { stderr = { write = function(_, text) output[#output + 1] = text end } },
+				{ exit = function(code) exits[#exits + 1] = code end })
+			helpers.assert_eq(calls, 1)
+			local refused = result == "throw" or result == "refusal"
+			helpers.assert_eq(exits, refused and { 1 } or {})
+			helpers.assert_eq(output, refused
+				and { "[logger_sink] Privacy initialization refused; daemon not started.\n" } or {})
+		end
+	end)
 
 	helpers.it("the entry point is readable", function()
 		helpers.assert_not_nil(entry, "ergopti_hotstrings.lua must be readable")
@@ -469,7 +490,7 @@ helpers.describe("logger sink — output reaches disk", function()
 		local date   = os.date("%Y-%m-%d")
 
 		cleanup(dir, date)
-		local active = Sink.install(Logger, { log_dir = dir })
+		local active = Sink.install(Logger, { log_dir = dir, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } })
 		helpers.assert_true(active, "the sink must report an active file sink for a writable dir")
 		helpers.assert_true(Sink.is_file_sink_active(), "is_file_sink_active() must agree")
 
@@ -491,7 +512,7 @@ helpers.describe("logger sink — output reaches disk", function()
 		local date   = os.date("%Y-%m-%d")
 
 		cleanup(dir, date)
-		Sink.install(Logger, { log_dir = dir })
+		Sink.install(Logger, { log_dir = dir, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } })
 
 		Logger.info("sink_test", "marker-plain")
 		Logger.error("sink_test", "marker-fatal")
@@ -516,7 +537,7 @@ helpers.describe("logger sink — output reaches disk", function()
 		local date   = os.date("%Y-%m-%d")
 
 		cleanup(dir, date)
-		Sink.install(Logger, { log_dir = dir })
+		Sink.install(Logger, { log_dir = dir, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } })
 		local armed = Logger.repeat_collapsing_enabled()
 		-- A second install is the documented idempotent no-op: it must not trip
 		-- the core's refusal of a second arming.
@@ -544,7 +565,7 @@ helpers.describe("logger sink — output reaches disk", function()
 		local date   = os.date("%Y-%m-%d")
 
 		cleanup(dir, date)
-		Sink.install(Logger, { log_dir = dir })
+		Sink.install(Logger, { log_dir = dir, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } })
 		Sink.uninstall(Logger)
 		Logger.info("sink_test", "marker-after-uninstall")
 
@@ -614,5 +635,248 @@ helpers.describe("logger sink — quoting parity with shell_runner", function()
 			helpers.assert_eq(Sink.shell_quote(value), Shell.quote(value),
 				"quoting must match shell_runner for: " .. value)
 		end
+	end)
+end)
+
+--- Runs the real install/sink with captured stdio and command dependencies.
+--- Policy bytes come from the canonical file; all writable handles are in memory.
+--- @param options table Controlled admission/channel failure.
+--- @param body function Receives the actual sink and observed port effects.
+local function with_private_log_sink(options, body)
+	local policy_path = require("infra.paths").shared("modules/diagnostics/redaction.json")
+	local policy = assert(read_file(policy_path))
+	local saved_open, saved_execute, saved_getenv = io.open, os.execute, os.getenv
+	local saved_stdout, saved_stderr = io.stdout, io.stderr
+	local names = { "infra.paths", "infra.config_paths", "infra.timings", "infra.logger_sink" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local state = { main = {}, errors = {}, console = {}, diagnostics = {}, commands = 0, policy_reads = 0,
+		policy_closes = 0, writable_opens = 0, environment_reads = 0 }
+	local logger = { enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
+	function logger.set_sink(callback) state.emit = callback end
+	local Sink = helpers.load_module("infra.logger_sink")
+	local DirectoryResolver = helpers.load_module("infra.config_paths")
+	state.account_home, state.directory_home = DirectoryResolver.account_home, DirectoryResolver.home
+	state.home_resolutions = 0
+	package.loaded["infra.paths"] = {
+		driver_root = function() return "/owned-driver" end,
+		shared_root_from = function(root)
+			helpers.assert_eq(root, "/owned-driver")
+			if options.missing_tree then return nil end
+			return "/owned-shared"
+		end,
+	}
+	package.loaded["infra.config_paths"] = {
+		get_logs_dir = function() return "/home/PrivateUser/logs" end,
+		account_home = function()
+			state.home_resolutions = state.home_resolutions + 1
+			return options.resolved_home or DirectoryResolver.account_home()
+		end,
+	}
+	package.loaded["infra.timings"] = { count = function() return 7 end }
+	os.getenv = function(name)
+		state.environment_reads = state.environment_reads + 1
+		if options.missing_identity then return nil end
+		if name == "HOME" then
+			if options.missing_home then return nil end
+			return "/home/PrivateUser"
+		end
+		if name == "USER" or name == "LOGNAME" then return "PrivateUser" end
+	end
+	os.execute = function() state.commands = state.commands + 1; return 0 end
+	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
+		flush = function() return true end }
+	io.stderr = { write = function(_, line) state.diagnostics[#state.diagnostics + 1] = line; return true end }
+	io.open = function(path, mode)
+		if mode == "rb" then
+			helpers.assert_eq(path, "/owned-shared/modules/diagnostics/redaction.json")
+			if options.missing_policy then return nil, "owned policy read refusal" end
+			return { read = function()
+				state.policy_reads = state.policy_reads + 1
+				return options.invalid_policy and "{}" or policy
+			end, close = function()
+				state.policy_closes = state.policy_closes + 1
+				return not options.policy_close_refused
+			end }
+		end
+		helpers.assert_eq(mode, "a")
+		helpers.assert_true(path:sub(1, #"/home/PrivateUser/logs/") == "/home/PrivateUser/logs/")
+		state.writable_opens = state.writable_opens + 1
+		if options.stdout_only then return nil, "PrivateUser cannot open /home/PrivateUser/logs" end
+		local channel = path:find("_errors_", 1, true) and "errors" or "main"
+		return { write = function(_, line)
+			if options.write_refused == channel then return nil, "PrivateUser write refused /home/PrivateUser/logs; password=secret12345" end
+			state[channel][#state[channel] + 1] = line
+			return true
+		end, flush = function() return true end, close = function() return true end }
+	end
+	local ok, err = xpcall(function() body(Sink, state, logger) end, debug.traceback)
+	Sink.uninstall(logger)
+	io.open, os.execute, os.getenv = saved_open, saved_execute, saved_getenv
+	io.stdout, io.stderr = saved_stdout, saved_stderr
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-logger-privacy", function()
+	helpers.it("linux-logger-privacy: captured home comes from the canonical account resolver", function()
+		with_private_log_sink({ resolved_home = "/home/CanonicalAccount" }, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), true)
+			helpers.assert_eq(state.home_resolutions, 1)
+			state.emit("PrivateUser failed /home/CanonicalAccount/cache; password=secret12345", "error")
+			helpers.assert_eq(state.console, { "<user> failed ~/cache; password=<secret>" })
+			helpers.assert_eq(state.home_resolutions, 1, "Identity is captured once, not resolved on emission")
+		end)
+	end)
+
+	helpers.it("linux-logger-privacy: missing account home refuses even when directory fallback exists", function()
+		with_private_log_sink({ missing_home = true }, function(Sink, state, logger)
+			helpers.assert_nil(state.account_home())
+			helpers.assert_eq(state.directory_home(), "/tmp", "Existing file-placement fallback remains available")
+			local accepted, refusal = pcall(Sink.install, logger)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_contains(refusal, "privacy identity unavailable")
+			helpers.assert_eq(state.policy_reads + state.policy_closes + state.commands + state.writable_opens, 0)
+			helpers.assert_eq(#state.console + #state.main + #state.errors + #state.diagnostics, 0)
+			helpers.assert_nil(state.emit)
+		end)
+	end)
+
+	helpers.it("linux-logger-privacy: invalid logger refuses without any raw diagnostic or output authority", function()
+		with_private_log_sink({}, function(Sink, state)
+			local accepted, reason = Sink.install({})
+			helpers.assert_eq(accepted, false)
+			helpers.assert_contains(reason, "logger_sink:")
+			helpers.assert_eq(state.commands + state.writable_opens, 0)
+			helpers.assert_eq(#state.console + #state.main + #state.errors + #state.diagnostics, 0)
+			helpers.assert_nil(state.emit)
+		end)
+	end)
+
+	helpers.it("linux-logger-privacy: canonical default admission protects all outputs and is captured before emissions", function()
+		with_private_log_sink({}, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), true)
+			helpers.assert_eq(state.policy_reads, 1)
+			helpers.assert_eq(state.policy_closes, 1)
+			local reads, commands, opens = state.environment_reads, state.commands, state.writable_opens
+			for _, variant in ipairs({ "error", "warn" }) do
+				state.emit("2026-10-10 [" .. variant .. "] PrivateUser failed /home/PrivateUser/cache; PrivateUser2; password=secret12345", variant)
+			end
+			for _, channel in ipairs({ "main", "errors", "console" }) do
+				helpers.assert_eq(#state[channel], 2)
+				for _, line in ipairs(state[channel]) do
+					helpers.assert_contains(line, "<user> failed ~/cache; PrivateUser2; password=<secret>")
+				end
+			end
+			helpers.assert_eq(state.policy_reads, 1, "No per-message policy read")
+			helpers.assert_eq(state.environment_reads, reads, "No per-message identity discovery")
+			helpers.assert_eq(state.commands, commands)
+			helpers.assert_eq(state.writable_opens, opens)
+		end)
+	end)
+
+	helpers.it("linux-logger-privacy: stdout-only failure still protects the direct diagnostic and emitted error", function()
+		with_private_log_sink({ stdout_only = true }, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), false)
+			helpers.assert_eq(#state.diagnostics, 1)
+			helpers.assert_contains(state.diagnostics[1], "under ~/logs")
+			state.emit("PrivateUser failure /home/PrivateUser/cache", "error")
+			helpers.assert_eq(state.console, { "<user> failure ~/cache" })
+			helpers.assert_eq(#state.main, 0)
+			helpers.assert_eq(#state.errors, 0)
+		end)
+	end)
+
+	for _, channel in ipairs({ "main", "errors" }) do
+		helpers.it("linux-logger-privacy: " .. channel .. " native refusal keeps the error but protects stderr", function()
+			with_private_log_sink({ write_refused = channel }, function(Sink, state, logger)
+				helpers.assert_eq(Sink.install(logger), true)
+				state.emit("ordinary technical error", "error")
+				helpers.assert_eq(#state.diagnostics, 1)
+				helpers.assert_contains(state.diagnostics[1], channel .. " write/flush failed: <user> write refused ~/logs; password=<secret>")
+				helpers.assert_contains(state.diagnostics[1], "channel retired")
+			end)
+		end)
+	end
+
+	for _, refusal in ipairs({ "missing_identity", "missing_tree", "missing_policy", "invalid_policy", "policy_close_refused" }) do
+		helpers.it("linux-logger-privacy: " .. refusal .. " refuses before any output or acquisition", function()
+			with_private_log_sink({ [refusal] = true }, function(Sink, state, logger)
+				local ok, err = pcall(Sink.install, logger)
+				helpers.assert_eq(ok, false)
+				helpers.assert_contains(tostring(err), "logger_sink:")
+				helpers.assert_eq(state.commands, 0)
+				helpers.assert_eq(state.writable_opens, 0)
+				helpers.assert_eq(#state.console + #state.main + #state.errors + #state.diagnostics, 0)
+				helpers.assert_nil(state.emit)
+			end)
+		end)
+	end
+
+	helpers.it("linux-logger-privacy: fixture identity is cloned and duplicate install retains the first admission", function()
+		with_private_log_sink({}, function(Sink, state, logger)
+			local identity = { home = "/home/PrivateUser", user = "PrivateUser" }
+			helpers.assert_eq(Sink.install(logger, { redaction_context = identity }), true)
+			local original = state.emit
+			identity.home, identity.user = "/foreign", "foreign"
+			helpers.assert_eq(Sink.install(logger, { redaction_context = {} }), true)
+			helpers.assert_eq(state.emit, original)
+			state.emit("PrivateUser /home/PrivateUser/cache", "error")
+			helpers.assert_eq(state.main, { "<user> ~/cache" })
+			helpers.assert_eq(state.policy_reads, 1)
+		end)
+	end)
+end)
+
+
+helpers.describe("linux-logger-privacy metadata", function()
+	helpers.it("linux-logger-privacy: actual core metadata survives account collisions and multiline message redaction", function()
+		local previous = package.loaded["logger"]
+		package.loaded["logger"] = nil
+		local Core = require("logger")
+		Core.timestamp_fn = function() return "2026-10-10 12:00:00:000" end
+		local ok, err = xpcall(function()
+			for _, user in ipairs({ "2026", "ERROR", "logger" }) do
+				with_private_log_sink({}, function(Sink, state, logger)
+					helpers.assert_eq(Sink.install(logger, { redaction_context = { home = "/home/" .. user, user = user } }), true)
+					Core.set_sink(state.emit)
+					local raw = Core.error("logger", "User %s failed\nsource /home/%s/cache; password=secret12345", user, user)
+					local marker = " [ERROR] [logger] "
+					local at = assert(raw:find(marker, 1, true), "The actual core's structured prefix is required")
+					local prefix = raw:sub(1, at + #marker - 1)
+					local expected = prefix .. "User <user> failed\nsource ~/cache; password=<secret>"
+					for _, channel in ipairs({ "main", "errors", "console" }) do
+						helpers.assert_eq(state[channel], { expected })
+					end
+					Core.set_sink(nil)
+				end)
+			end
+		end, debug.traceback)
+		Core.set_sink(nil)
+		package.loaded["logger"] = previous
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("linux-logger-privacy malformed metadata", function()
+	helpers.it("linux-logger-privacy: unformatted private prefixes cannot masquerade as core metadata", function()
+		with_private_log_sink({}, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), true)
+			local suffix = " [ERROR] [logger] password=secret12345"
+			local cases = {
+				{ "PrivateUser /home/PrivateUser" .. suffix, "<user> ~ [ERROR] [logger] password=<secret>" },
+				{ "PrivateUser 2026-10-10 12:00:00:000" .. suffix, "<user> 2026-10-10 12:00:00:000 [ERROR] [logger] password=<secret>" },
+				{ "/home/PrivateUser 2026-10-10 12:00:00" .. suffix, "~ 2026-10-10 12:00:00 [ERROR] [logger] password=<secret>" },
+			}
+			local expected = {}
+			for _, case in ipairs(cases) do
+				state.emit(case[1], "error")
+				expected[#expected + 1] = case[2]
+			end
+			for _, channel in ipairs({ "main", "errors", "console" }) do
+				helpers.assert_eq(state[channel], expected)
+			end
+		end)
 	end)
 end)

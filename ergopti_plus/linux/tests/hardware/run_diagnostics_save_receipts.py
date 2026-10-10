@@ -16,10 +16,16 @@ local function shared(path)
  local file = assert(io.open("../_shared/"..path, "rb"))
  local value = Json.decode(file:read("*a")); assert(file:close()); return value
 end
-local schema = shared("modules/diagnostics/schema.json")
-local rules = shared("modules/diagnostics/redaction.json")
-local notice = shared("data/locales/en.json")[schema.share_policy.notice_key]
-package.loaded["infra.i18n"] = {get=function(key) assert(key==schema.share_policy.notice_key);return notice end}
+local config = require("healthcheck.snapshot").load_config(function(path) return "../_shared/"..path end)
+local schema = config.schema
+local rules = config.redaction
+local catalogue = shared("data/locales/en.json")
+local notice = assert(catalogue[schema.share_policy.notice_key])
+package.loaded["infra.i18n"] = {get=function(key)
+ local value = catalogue[key]
+ assert(type(value)=="string", "fixture catalogue lacks declared key: "..key)
+ return value
+end}
 local baseline = os.getenv("ERGOPTI_REPORT_TEST_MODULE")
 local Report = baseline and assert(loadfile(baseline))() or require("ui.healthcheck.report")
 local directory = assert(os.getenv("ERGOPTI_REPORT_DIRECTORY"))

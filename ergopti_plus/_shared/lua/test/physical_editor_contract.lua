@@ -192,4 +192,233 @@ return function(helpers, Editor, Window, Model)
 			eq(captured, 0, "cancelled request must not cross terminal position emit")
 		end)
 	end)
+	helpers.describe("Optional physical position emission enrollment", function()
+		local function fixture()
+			local canonical = {}
+			local state = { native_calls = 0, emitted = 0, cancels = 0, active = nil }
+			local options = { model = Model, parameter_section = "gesture_parameters", positions = {},
+				catalogue = { is_assignable = function(action) return action == "none" end,
+					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+					split_action_parameter_key = function() end },
+				capture = function() return { assignments = {}, parameters = {} }, canonical end,
+				current = function(receipt) return rawequal(receipt, canonical) end,
+				commit = function() error("position observation cannot publish") end,
+				picker = function() return false end, label = function(action) return action end,
+				emit = function() return true end, position_field = "evdev",
+				position_available = function() return true end }
+			options.emit_position = function(packet)
+				state.emitted = state.emitted + 1; state.packet = packet; return true
+			end
+			options.capture_position = function(current, receive)
+				state.native_calls = state.native_calls + 1
+				state.current, state.receive, state.active = current, receive, {}
+				return state.active
+			end
+			options.cancel_position = function(token)
+				state.cancels = state.cancels + 1
+				return rawequal(token, state.active)
+			end
+			state.options, state.owner = options, Editor.new(options)
+			return state
+		end
+		helpers.it("missing emission port refuses advertisement and enrollment", function()
+			local s = fixture(); s.options.emit_position = nil
+			eq(s.owner.open().capture, false, "no emission port is offered")
+			eq(s.owner.capture_position({ request_id = 1 }), false, "missing emission port refuses request")
+			eq(s.native_calls, 0, "no native resource is acquired without emission")
+			eq(s.owner.close(), true, "unarmed session closes without native debt")
+			eq(s.cancels, 0, "no absent token is cancelled")
+		end)
+		helpers.it("noncallable emission ports refuse advertisement and enrollment", function()
+			for _, port in ipairs({ false, "not callable", {} }) do
+				local s = fixture(); s.options.emit_position = port
+				eq(s.owner.open().capture, false, "noncallable emission port is not offered")
+				eq(s.owner.capture_position({ request_id = 2 }), false, "noncallable emission port refuses request")
+				eq(s.native_calls, 0, "noncallable emission acquires no resource")
+				eq(s.owner.close(), true)
+			end
+		end)
+		helpers.it("complete emission port retains actual capture and exact retirement", function()
+			local s = fixture()
+			eq(s.owner.open().capture, true)
+			eq(s.owner.capture_position({ request_id = 3 }), true)
+			eq(s.native_calls, 1)
+			eq(s.receive({ native_code = 36, mods = {} }), true)
+			eq(s.emitted, 1); eq(s.packet.code, "KeyJ"); eq(s.packet.request_id, 3)
+			eq(s.owner.close(), true); eq(s.cancels, 1, "original token is retired")
+		end)
+		helpers.it("capture callback removal cannot advertise emission", function()
+			local s = fixture(); local original = s.options.capture
+			s.options.capture = function() s.options.emit_position = nil; return original() end
+			eq(s.owner.open().capture, false); eq(s.owner.capture_position({ request_id = 4 }), false)
+			eq(s.native_calls, 0); eq(s.owner.close(), true)
+		end)
+		helpers.it("availability callback removal cannot advertise emission", function()
+			local s = fixture()
+			s.options.position_available = function() s.options.emit_position = false; return true end
+			eq(s.owner.open().capture, false); eq(s.owner.capture_position({ request_id = 5 }), false)
+			eq(s.native_calls, 0); eq(s.owner.close(), true)
+		end)
+		helpers.it("last open currency callback removal cannot advertise emission", function()
+			local s = fixture(); local original = s.options.current; local last = false
+			s.options.position_available = function() last = true; return true end
+			s.options.current = function(receipt)
+				if last then s.options.emit_position = nil end
+				return original(receipt)
+			end
+			eq(s.owner.open().capture, false); eq(s.owner.capture_position({ request_id = 6 }), false)
+			eq(s.native_calls, 0); eq(s.owner.close(), true)
+		end)
+		helpers.it("intake currency callback removal refuses before native enrollment", function()
+			local s = fixture(); eq(s.owner.open().capture, true); local original = s.options.current
+			s.options.current = function(receipt) s.options.emit_position = nil; return original(receipt) end
+			eq(s.owner.capture_position({ request_id = 7 }), false)
+			eq(s.native_calls, 0); eq(s.cancels, 0); eq(s.owner.close(), true)
+		end)
+		helpers.it("post-enrollment currency removal retires the exact original token", function()
+			local s = fixture(); s.owner.open(); local original = s.options.capture_position
+			s.options.capture_position = function(current, receive)
+				local token = original(current, receive)
+				s.options.emit_position = nil
+				return token
+			end
+			eq(s.owner.capture_position({ request_id = 8 }), false)
+			eq(s.native_calls, 1); eq(s.cancels, 1); eq(s.current(), false)
+			eq(s.receive({ native_code = 36, mods = {} }), false); eq(s.emitted, 0)
+			eq(s.owner.close(), true); eq(s.cancels, 1)
+		end)
+		helpers.it("delivery currency callback removal never calls the removed emitter", function()
+			local s = fixture(); s.owner.open(); eq(s.owner.capture_position({ request_id = 9 }), true)
+			local original = s.options.current
+			s.options.current = function(receipt) s.options.emit_position = nil; return original(receipt) end
+			eq(s.receive({ native_code = 36, mods = {} }), false)
+			eq(s.current(), false, "existing native currency guard observes missing emission")
+			eq(s.emitted, 0); eq(s.owner.close(), true); eq(s.cancels, 1)
+		end)
+		helpers.it("callable replacement remains within the existing optional port contract", function()
+			local s = fixture(); s.owner.open(); local replacement_calls = 0
+			s.options.emit_position = function(packet) replacement_calls = replacement_calls + 1; return packet.code == "KeyJ" end
+			eq(s.owner.capture_position({ request_id = 10 }), true)
+			eq(s.receive({ native_code = 36, mods = {} }), true)
+			eq(replacement_calls, 1); eq(s.emitted, 0); eq(s.owner.close(), true)
+		end)
+		helpers.it("emission enrollment does not expand availability policy", function()
+			local s = fixture()
+			s.options.position_available = function() return false end
+			eq(s.owner.open().capture, false, "existing advertisement policy is retained")
+			eq(s.owner.capture_position({ request_id = 11 }), true, "existing intake policy is unchanged")
+			eq(s.owner.close(), true); eq(s.native_calls, 1); eq(s.cancels, 1)
+		end)
+	end)
+	helpers.describe("Selected message acknowledgement and label freshness", function()
+		local function fixture()
+			local state = { receipt = {}, writes = 0, emitted = 0, emit_result = true }
+			local options = { model = Model, parameter_section = "gesture_parameters", positions = {},
+				catalogue = { is_assignable = function(action) return action == "none" or action == "copy" end,
+					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+					split_action_parameter_key = function() end },
+				capture = function() return { assignments = {}, parameters = {} }, state.receipt end,
+				current = function(receipt) return rawequal(receipt, state.receipt) end,
+				commit = function(_, receipt)
+					eq(receipt, state.receipt, "publication uses the original captured source")
+					state.writes = state.writes + 1; return true
+				end,
+				picker = function(_, _, callback) state.callback = callback; return true end,
+				label = function(action) if state.on_label then state.on_label() end; return action end,
+				page_current = function() return true end, translate = function(key) return key end,
+				close = function() return true end }
+			local function selected(packet)
+				state.emitted, state.packet = state.emitted + 1, packet
+				if state.on_emit then state.on_emit() end
+				return state.emit_result
+			end
+			options.emit = selected
+			options.send = function(name, packet)
+				if name == "selected" then return selected(packet) end
+				state.message, state.result = name, packet; return true
+			end
+			state.options, state.owner = options, Editor.new(options)
+			return state
+		end
+		local function choose(state)
+			eq(type(state.owner.open()), "table", "actual editor captures the original source")
+			eq(state.owner.choose({ code = "KeyJ", mods = {}, request_id = 1 }), true)
+		end
+		helpers.it("true selected acknowledgement admits the exact editor and Window draft", function()
+			local s = fixture(); choose(s)
+			eq(s.callback("copy"), true); eq(s.emitted, 1); eq(s.writes, 0)
+			eq(s.owner.save(s.packet.token).committed, true); eq(s.writes, 1)
+			s = fixture(); local window = Window.new(s.options)
+			eq(window.receive({ action = "ready" }), true)
+			eq(window.receive({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 1 } }), true)
+			eq(s.callback("copy"), true); eq(s.emitted, 1); eq(s.writes, 0)
+			eq(window.receive({ action = "save", token = s.packet.token }), true)
+			eq(s.result.committed, true); eq(s.writes, 1); eq(window.close(), true)
+		end)
+		helpers.it("false nil and nonliteral selected acknowledgements never admit a savable draft", function()
+			for _, outcome in ipairs({ "false", "nil", "string", "table" }) do
+				local s = fixture(); choose(s)
+				if outcome == "false" then s.emit_result = false
+				elseif outcome == "nil" then s.emit_result = nil
+				elseif outcome == "string" then s.emit_result = "true"
+				else s.emit_result = {} end
+				eq(s.callback("copy"), false, "only literal true acknowledges delivery")
+				eq(s.emitted, 1); eq(s.owner.save(s.packet.token).committed, false); eq(s.writes, 0)
+				s.emit_result = true
+				eq(s.callback("copy"), true, "same current picker may retry the refused message")
+				eq(s.owner.save(s.packet.token).committed, true); eq(s.writes, 1)
+			end
+		end)
+		helpers.it("actual Window false selected transport refuses publication", function()
+			local s = fixture(); local window = Window.new(s.options)
+			eq(window.receive({ action = "ready" }), true)
+			eq(window.receive({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 1 } }), true)
+			s.emit_result = false; eq(s.callback("copy"), false)
+			eq(s.emitted, 1); eq(window.receive({ action = "save", token = s.packet.token }), true)
+			eq(s.result.committed, false); eq(s.writes, 0); eq(window.close(), true)
+		end)
+		helpers.it("throwing selected transport leaves no admitted draft", function()
+			local s = fixture(); choose(s)
+			s.on_emit = function() error("controlled selected transport refusal") end
+			eq(s.callback("copy"), false); eq(s.emitted, 1)
+			s.on_emit = nil
+			eq(s.owner.save(s.packet.token).committed, false); eq(s.writes, 0)
+		end)
+		helpers.it("throwing label leaves no emitted message or admitted draft", function()
+			local s = fixture(); choose(s)
+			s.on_label = function() error("controlled label refusal") end
+			eq(s.callback("copy"), false); eq(s.emitted, 0)
+			s.on_label = nil
+			eq(s.owner.save(1).committed, false, "unissued page token cannot publish")
+			eq(s.writes, 0)
+		end)
+		helpers.it("label source revocation prevents a stale selected message", function()
+			local s = fixture(); choose(s); local original = s.receipt
+			s.on_label = function() s.receipt = {} end
+			eq(s.callback("copy"), false); eq(s.emitted, 0, "label callback precedes the final pre-send source join")
+			s.on_label, s.receipt = nil, original
+			eq(s.owner.save(1).committed, false, "failed callback never admitted a draft")
+			eq(s.writes, 0)
+		end)
+		helpers.it("label page retirement prevents a stale selected message", function()
+			local s = fixture(); choose(s)
+			s.on_label = function() eq(s.owner.close(), true, "original page retires during label callback") end
+			eq(s.callback("copy"), false); eq(s.emitted, 0)
+			eq(s.owner.save(1).committed, false); eq(s.writes, 0)
+		end)
+		helpers.it("true transport with source revocation never admits the draft", function()
+			local s = fixture(); choose(s); local original = s.receipt
+			s.on_emit = function() s.receipt = {} end
+			eq(s.callback("copy"), false); eq(s.emitted, 1)
+			s.on_emit, s.receipt = nil, original
+			eq(s.owner.save(s.packet.token).committed, false, "ACK alone does not admit a revoked-source draft")
+			eq(s.writes, 0)
+		end)
+		helpers.it("selected transport cannot reenter Save before acknowledgement", function()
+			local s = fixture(); choose(s); local nested
+			s.on_emit = function() nested = s.owner.save(s.packet.token).committed end
+			eq(s.callback("copy"), true); eq(nested, false); eq(s.writes, 0)
+			eq(s.owner.save(s.packet.token).committed, true); eq(s.writes, 1)
+		end)
+	end)
 end

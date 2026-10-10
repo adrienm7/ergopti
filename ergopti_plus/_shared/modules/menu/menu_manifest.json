@@ -241,27 +241,73 @@
 	},
 	"top_level": [
 		{
+			"type": "group",
 			"id": "tap_holds",
+			"i18n": "menu.tapholds.title",
+			"rows": [],
+			"checked_when": [
+				"tapholds_enabled"
+			],
 			"greyed_when_paused": true
 		},
 		{
+			"type": "group",
 			"id": "shortcuts",
+			"i18n": "menu.shortcuts.title",
+			"rows": [],
+			"checked_when": [
+				"shortcuts_enabled"
+			],
 			"greyed_when_paused": true
 		},
 		{
+			"type": "group",
 			"id": "gestures",
+			"i18n": "menu.gestures.title",
+			"rows": [],
+			"checked_when": [
+				"gestures_enabled"
+			],
 			"greyed_when_paused": true
 		},
 		{
 			"id": "---"
 		},
 		{
+			"type": "group",
 			"id": "keyboard_layout",
+			"i18n": "menu.layout.title",
+			"rows": [],
+			"checked_when": [
+				"layout_enabled"
+			],
 			"greyed_when_paused": true
 		},
 		{
+			"type": "group",
 			"id": "hotstrings",
-			"greyed_when_paused": true
+			"i18n": "menu.hotstrings.title",
+			"rows": [],
+			"checked_when": [
+				"hotstrings_enabled"
+			],
+			"greyed_when_paused": true,
+			"caption_count_policy": {
+				"value_getter": "hotstrings_parent_total",
+				"present_getter": "hotstrings_parent_count_present",
+				"visibility": {
+					"ahk": "always",
+					"hs": "available",
+					"linux": "positive"
+				},
+				"style": {
+					"ahk": "space",
+					"hs": "space",
+					"linux": "decimal"
+				},
+				"format": "%s (%s)",
+				"maximum": 9007199254740991
+			}
 		},
 		{
 			"type": "group",
@@ -392,6 +438,7 @@
 			"disabled_when": [
 				"llm_toggle_ready"
 			],
+			"disabled_reason_key": "menu.llm.save_unavailable",
 			"category": "LLM"
 		},
 		{
@@ -2327,7 +2374,15 @@
 		},
 		{
 			"type": "list",
-			"id": "hotstring_extensions"
+			"id": "hotstring_extensions",
+			"status_rows": {
+				"none_installed": [
+					{
+						"type": "label",
+						"i18n": "menu.extensions.none_installed"
+					}
+				]
+			}
 		},
 		{
 			"type": "---",
@@ -6380,6 +6435,17 @@
 			"unavailable": "hide"
 		}
 	],
+	"linux_tap_holds_absent_parent": [
+		{
+			"type": "label",
+			"id": "tap_holds_absent_parent",
+			"i18n": "menu.tapholds.title",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"agent_linux_disabled_apps_frame": [
 		{
 			"type": "group",
@@ -6512,7 +6578,8 @@
 			"caption_getter": "agent_system_backend_current_caption",
 			"caption_format": "numbered",
 			"platforms": [
-				"linux"
+				"linux",
+				"ahk"
 			],
 			"unavailable": "hide"
 		}
@@ -6525,7 +6592,8 @@
 			"caption_getter": "agent_system_backend_current_caption",
 			"caption_format": "numbered",
 			"platforms": [
-				"linux"
+				"linux",
+				"ahk"
 			],
 			"unavailable": "hide"
 		}
@@ -6785,6 +6853,99 @@
 			"platforms": [
 				"hs",
 				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tray_startup_suspend": [
+		{
+			"type": "command",
+			"id": "suspend",
+			"i18n": "menu.global.suspend",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tray_startup_inert_frame": [
+		{
+			"type": "label",
+			"id": "startup_inert_status",
+			"i18n": "menu.global.startup_bootstrap",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"personal_info_editor_frame": [
+		{
+			"type": "command",
+			"id": "personal_info_editor_open",
+			"i18n": "menu.shortcuts.edit_personal_info",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"linux_tray_active_header": [
+		{
+			"type": "label",
+			"id": "linux_tray_active_header",
+			"i18n": "menu.builder.active_brand",
+			"caption_getter": "linux_tray_version",
+			"caption_layout": "prefix",
+			"caption_joiner": " — ",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"linux_tray_paused_header": [
+		{
+			"type": "command",
+			"id": "linux_tray_resume",
+			"i18n": "menu.builder.title_paused",
+			"caption_getter": "linux_tray_version",
+			"caption_layout": "prefix",
+			"caption_joiner": " — ",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"agent_windows_disabled_apps_command": [
+		{
+			"type": "command",
+			"id": "agent_disabled_apps",
+			"i18n": "menu.agent.disabled_apps",
+			"caption_getter": "agent_disabled_apps_count",
+			"caption_format": "numbered",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_model_parent_ahk": [
+		{
+			"type": "group",
+			"id": "llm_model",
+			"i18n": "menu.llm.model_parent_with_health",
+			"caption_getters": [
+				"llm_model_health_prefix",
+				"llm_model_current_caption"
+			],
+			"disabled_when": [
+				"llm_model_parent_ready"
+			],
+			"platforms": [
+				"ahk"
 			],
 			"unavailable": "hide"
 		}

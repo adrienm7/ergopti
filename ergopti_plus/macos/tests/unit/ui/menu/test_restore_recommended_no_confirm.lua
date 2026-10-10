@@ -79,7 +79,7 @@ local function gesture_commands(fixture)
 	local original_menu = package.loaded["ui.menu.menu_gestures"]
 	local original_dialog = package.loaded["infra.dialog_util"]
 	local commands
-	package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, context)
+	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, context)
 		commands = context.commands
 		return {}
 	end }
@@ -170,7 +170,7 @@ local function run_tap_hold_row(id)
 			return no
 		end }
 		package.loaded["infra.config_paths"] = { get = function() return "/remap/config_karabiner.toml" end }
-		package.loaded["infra.manifest_menu"] = { build = function(menu_key, _, _, _, context)
+		package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(menu_key, _, _, _, context)
 			if menu_key == "tap_holds_menu" then commands = context.commands end
 			return {}
 		end }

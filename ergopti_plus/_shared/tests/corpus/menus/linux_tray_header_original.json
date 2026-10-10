@@ -1,0 +1,131 @@
+{
+	"source_git": "616befd1c989d071bda0affd5d1f0f9cd3b1a146",
+	"original_header_source_sha256": "08f5a7decb35a0a74a343db74ca10e512a6b883d699725a321fe0eef55122e29",
+	"active_brand": "Ergopti",
+	"joiner": " — ",
+	"locales": {
+		"ar": {
+			"source_blob_sha256": "49a43a4e5e8bc9a4dd86cab35765c3d51ebb9f9d50e15e726adf5a2750104239",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"cs": {
+			"source_blob_sha256": "ae69e378764d682f98a7e12e368baf4f23a12516978f5008995f4af408261b8e",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"da": {
+			"source_blob_sha256": "2c1f8afed5c42eec5c7bb21c9ffd103faa4aa4484df6e29aeed14df554816cd5",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"de": {
+			"source_blob_sha256": "80d10af23e567a5a95a9504c4535217297f1ea0241d21fb0fed92860c1343ae2",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"en": {
+			"source_blob_sha256": "f0524e01b6d67090d41f692e76cecc755c9d671db9141464a1f024d2c5e55c66",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"es": {
+			"source_blob_sha256": "d11e4c8f606cb8762121f6c62998c6dd24bdb69cd01f8cfc9934b3d58a6a9c98",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"fr": {
+			"source_blob_sha256": "fd9c20cb55564549bc1a2b77df461cdfe96b19a20c9a243922068a722d72b5e8",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"he": {
+			"source_blob_sha256": "3423e4a81bdfbc89f3a369905e4fc1ef5c2bb6a5bc2f2f4142f8ec250b635955",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"hi": {
+			"source_blob_sha256": "0d2d956c80c6abfd99c6bfe998eae1a6556511364b4582a886351dc9c65bca5e",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"it": {
+			"source_blob_sha256": "6abad2961ed3160903bdcab39a3625d20d5f09efaee965c5d7d4e8720b08854b",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"ja": {
+			"source_blob_sha256": "5f8930b51a7e3471deeee2423631085f8e233cf04edf856f1217eaf407e69b9a",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"ko": {
+			"source_blob_sha256": "6c781b26090c10c27357f1eb29ae9ae53778ff2a5480c4e7214f997e10f78ee3",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"nl": {
+			"source_blob_sha256": "d5deebcba5c9487ed2fb4ddbffe4b7b8c2337621d07f54df660efdd0f814068a",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"no": {
+			"source_blob_sha256": "45f37d9496ce168172898556b5a56870c59fd07700936e84bd9ce33e413e4d1e",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"pl": {
+			"source_blob_sha256": "da89d3a827ea4cc92a643c32126bdde42f7b9c09cbca2dddb5f4edb758ffe5db",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"pt": {
+			"source_blob_sha256": "46618563bd3bf1070c470d7ecec9dc6160ee46fb29f7d059c72e0091f02f5b6f",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"ru": {
+			"source_blob_sha256": "0e86f7fd5576f6f32be349982f5b71e9fb217b2a05bdc23419a1319b4125a95c",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"sv": {
+			"source_blob_sha256": "bc4e4d5a3d141bc1292c1fd50cc2d60835ad18d7a02f84578d9657f80f69095e",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"tr": {
+			"source_blob_sha256": "ce3d7340cec81c44c6895e0cb2e53ae22917b76e2d60ef01503331d1af45463c",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"uk": {
+			"source_blob_sha256": "de15cbeb291e7dc601c62c6b10c9639eb51b79f75fb01883ef6aecca9d24dd89",
+			"paused_caption": "Ergopti+ ⏸"
+		},
+		"zh": {
+			"source_blob_sha256": "669630fd03a19e54287fa380baa7f39d411f71486698c2ff92c517852378eaf1",
+			"paused_caption": "Ergopti+ ⏸"
+		}
+	},
+	"versions": [
+		{
+			"input": "0.0.0-dev.12",
+			"formatted": "v0.0.0-dev.12",
+			"active_title": "Ergopti — v0.0.0-dev.12"
+		},
+		{
+			"input": "local",
+			"formatted": "local",
+			"active_title": "Ergopti — local"
+		},
+		{
+			"input": "unknown",
+			"formatted": "unknown",
+			"active_title": "Ergopti — unknown"
+		},
+		{
+			"input": "v1.2",
+			"formatted": "v1.2",
+			"active_title": "Ergopti — v1.2"
+		},
+		{
+			"input": "",
+			"formatted": "",
+			"active_title": "Ergopti — "
+		},
+		{
+			"input": "%s 50%",
+			"formatted": "%s 50%",
+			"active_title": "Ergopti — %s 50%"
+		}
+	],
+	"original_behavior": {
+		"active_disabled": true,
+		"active_action": "absent",
+		"checked": "absent",
+		"paused_action": "original on_toggle_pause wrapper",
+		"missing_resume_owner": "original error log and no action"
+	}
+}

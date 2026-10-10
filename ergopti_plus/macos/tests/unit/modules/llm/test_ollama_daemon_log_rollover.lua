@@ -155,6 +155,7 @@ helpers.describe("Ollama daemon log rollover", function()
 
 	helpers.it("routes the menu-owned daemon through the same runtime daily sink", function()
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local expected_port = 45679
 		local original_log = Logger.today_log_path
 		local previous_shell_runner = package.loaded["adapters.shell_runner"]
@@ -219,6 +220,7 @@ helpers.describe("Ollama daemon log rollover", function()
 
 	helpers.it("delegates fresh-install daemon launch to ApiOllama ownership", function()
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local original_log = Logger.today_log_path
 		local previous_progress = package.loaded["ui.download_window"]
 		local previous_api = package.loaded["modules.llm.api_ollama"]

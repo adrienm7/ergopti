@@ -406,3 +406,162 @@ helpers.describe("shared Linux standard-category empty status", function()
 		end)
 	end)
 end)
+
+
+-- Independent caption oracle comes from the original native marker's 21 locale files.
+local ExtensionEmptyCorpus = read_standard_empty_json(require("infra.paths").shared("tests/corpus/menus/linux_extension_empty_status.json"))
+
+local function with_extension_empty(callback, locale)
+	local old_builder = package.loaded["ui.menu.menu_builder"]
+	local binding, i18n = require("infra.manifest_menu"), require("infra.i18n")
+	local old_build, old_status, old_get, old_locale = binding.build, binding.status_rows, i18n.get, i18n.get_locale
+	local owner
+	for _, row in ipairs(binding.get_array(ExtensionEmptyCorpus.section)) do
+		if row.id == ExtensionEmptyCorpus.provider then
+			helpers.assert_nil(owner, "one actual extension provider declaration")
+			owner = row
+		end
+	end
+	assert(owner, "actual extension list required")
+	local old_statuses = owner.status_rows
+	local state = { loaded = false, data = nil, delivered = nil, writes = {} }
+	local ok, detail = xpcall(function()
+		local catalogue = read_standard_empty_json(require("infra.paths").shared("data/locales/" .. (locale or "en") .. ".json"))
+		i18n.get = function(key) return catalogue[key] or key end
+		i18n.get_locale = function() return locale or "en" end
+		binding.build = function(key, category, dynamic, builders, ctx, providers)
+			if key == ExtensionEmptyCorpus.section then
+				local provider = assert(providers[ExtensionEmptyCorpus.provider], "actual extension handler registered")
+				providers[ExtensionEmptyCorpus.provider] = function(...)
+					state.data = provider(...)
+					return state.data
+				end
+			end
+			local rows = old_build(key, category, dynamic, builders, ctx, providers)
+			if key == ExtensionEmptyCorpus.section then state.delivered = rows end
+			return rows
+		end
+		local module = helpers.load_module("ui.menu.menu_builder")
+		local function build()
+			state.data, state.delivered = nil, nil
+			local config = fake_config(state.loaded)
+			config.set_extension_sections_enabled = function(packs, sections, enabled)
+				state.writes[#state.writes + 1] = { packs = packs, sections = sections, enabled = enabled }
+				return true
+			end
+			local items = module.build({ config = config, _version = "9.9.9" })
+			local title = i18n.get("menu.hotstrings.title")
+			for _, row in ipairs(items or {}) do
+				if type(row.title) == "string" and row.title:sub(1, #title) == title then
+					helpers.assert_true(rawequal(row.menu, state.delivered), "completed Hotstrings rows reach the genuine public tray")
+					helpers.assert_type(state.data, "table", "actual extension handler returned its rows")
+					return row.menu
+				end
+			end
+			error("the public tray must publish Hotstrings")
+		end
+		callback(build, state, binding, owner, catalogue)
+	end, debug.traceback)
+	owner.status_rows = old_statuses
+	binding.build, binding.status_rows, i18n.get, i18n.get_locale = old_build, old_status, old_get, old_locale
+	package.loaded["ui.menu.menu_builder"] = old_builder
+	if not ok then error(detail, 0) end
+end
+
+local function count_extension_empty(rows, caption)
+	local count = 0
+	for _, row in ipairs(rows or {}) do
+		if row.title == caption then
+			count = count + 1
+			helpers.assert_eq(row.disabled, true)
+			helpers.assert_nil(row.fn)
+			helpers.assert_nil(row.menu)
+			helpers.assert_nil(row.checked)
+		end
+	end
+	return count
+end
+
+helpers.describe("shared Linux empty extension status", function()
+	for locale, expected in pairs(ExtensionEmptyCorpus.captions) do
+		helpers.it("(extension-empty-status) returns and publishes the original inert caption in " .. locale, function()
+			with_extension_empty(function(build, state, _, owner, catalogue)
+				helpers.assert_eq(catalogue[ExtensionEmptyCorpus.row.i18n], expected)
+				helpers.assert_eq(owner.status_rows[ExtensionEmptyCorpus.status], { ExtensionEmptyCorpus.row })
+				local rows = build()
+				helpers.assert_eq(state.data, { { label = expected, disabled = true } })
+				helpers.assert_eq(count_extension_empty(rows, expected), 1)
+				local header
+				for index, row in ipairs(rows) do
+					if row.title == require("infra.i18n").section("menu.extensions.header") then header = index end
+				end
+				helpers.assert_not_nil(header)
+				helpers.assert_eq(rows[header + 1].title, expected)
+				helpers.assert_eq(#state.writes, 0)
+			end, locale)
+		end)
+	end
+	for _, invalid in ipairs({ "missing_status", "missing_statuses", "empty", "command", "effectful_label" }) do
+		helpers.it("(extension-empty-status) refuses inert delivery after " .. invalid, function()
+			with_extension_empty(function(build, state, _, owner)
+				helpers.assert_eq(count_extension_empty(build(), ExtensionEmptyCorpus.captions.en), 1)
+				local bad = {
+					empty = {}, command = { { type = "command", id = "foreign", i18n = ExtensionEmptyCorpus.row.i18n } },
+					effectful_label = { { type = "label", i18n = ExtensionEmptyCorpus.row.i18n, action = function() state.writes[#state.writes + 1] = "forbidden" end } },
+				}
+				if invalid == "missing_statuses" then owner.status_rows = nil
+				else owner.status_rows = { [ExtensionEmptyCorpus.status] = bad[invalid] } end
+				helpers.assert_eq(count_extension_empty(build(), ExtensionEmptyCorpus.captions.en), 0)
+				helpers.assert_eq(state.data, {})
+				helpers.assert_eq(#state.writes, 0)
+			end)
+		end)
+	end
+	helpers.it("(extension-empty-status) consumes a changed actual declaration caption", function()
+		with_extension_empty(function(build, state, _, owner, catalogue)
+			local replacement = "menu.layout.none_installed"
+			owner.status_rows = { [ExtensionEmptyCorpus.status] = { { type = "label", i18n = replacement } } }
+			local rows = build()
+			helpers.assert_eq(state.data, { { label = catalogue[replacement], disabled = true } })
+			helpers.assert_eq(count_extension_empty(rows, catalogue[replacement]), 1)
+			helpers.assert_eq(count_extension_empty(rows, ExtensionEmptyCorpus.captions.en), 0)
+		end)
+	end)
+	helpers.it("(extension-empty-status) refuses a withdrawn status port without native fallback", function()
+		with_extension_empty(function(build, state, binding)
+			helpers.assert_eq(count_extension_empty(build(), ExtensionEmptyCorpus.captions.en), 1)
+			binding.status_rows = nil
+			helpers.assert_eq(count_extension_empty(build(), ExtensionEmptyCorpus.captions.en), 0)
+			helpers.assert_eq(state.data, {})
+			helpers.assert_eq(#state.writes, 0)
+		end)
+	end)
+	helpers.it("(extension-empty-status) retains installed order and genuine acknowledged callbacks", function()
+		with_extension_empty(function(build, state, _, owner)
+			state.loaded, owner.status_rows = true, nil
+			local rows = build()
+			helpers.assert_eq(#state.data, 1)
+			helpers.assert_eq(count_extension_empty(rows, ExtensionEmptyCorpus.captions.en), 0)
+			local extension = assert(row_starting(rows, string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")))
+			helpers.assert_eq(#extension.menu, 7)
+			helpers.assert_eq(extension.menu[4].title, "sfbsreduction (5)")
+			helpers.assert_eq(extension.menu[5].title, require("infra.i18n").get("category.rolls") .. " (7)")
+			helpers.assert_eq(extension.menu[7].title, "repeat_corrections (14)")
+			helpers.assert_eq(extension.menu[1].fn(), true)
+			helpers.assert_eq(extension.menu[2].fn(), true)
+			helpers.assert_eq(state.writes, {
+				{ packs = { "sfbsreduction", "rolls" }, sections = { { group = "magickey", section = "repeat_corrections" } }, enabled = true },
+				{ packs = { "sfbsreduction", "rolls" }, sections = { { group = "magickey", section = "repeat_corrections" } }, enabled = false },
+			})
+		end)
+	end)
+	helpers.it("(extension-empty-status) restores exact native owners after a failed scenario", function()
+		local binding, translator = require("infra.manifest_menu"), require("infra.i18n")
+		local before = { binding.build, binding.status_rows, translator.get, translator.get_locale, package.loaded["ui.menu.menu_builder"] }
+		local ok, detail = pcall(function() with_extension_empty(function(build) build(); error("extension empty sentinel", 0) end) end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(detail):find("extension empty sentinel", 1, true) ~= nil)
+		local after = { binding.build, binding.status_rows, translator.get, translator.get_locale, package.loaded["ui.menu.menu_builder"] }
+		for index = 1, 5 do helpers.assert_true(rawequal(before[index], after[index]), "restored actual owner " .. index) end
+	end)
+end)
