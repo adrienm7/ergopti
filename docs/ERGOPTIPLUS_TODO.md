@@ -3813,6 +3813,20 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-10 Homebrew unrelated-window scope continuation. The observer now
+excludes only a completely inspected, bounded window of the expected OS-agent
+PID with neither owned sender nor receiver identity. Partial identities,
+unreadable or malformed values, foreign PIDs and deadline refusals remain
+refused. The original target inspector, signatures, actions and clocks remain
+unchanged. All177 predecessor test bodies remain byte-identical;178 portable
+tests pass, including35 compiled CF/AX scope controls and six dispatch controls.
+These explicit ports do not qualify actual Accessibility/TCC or Homebrew.
+Manual38016257870 previously reached a qualified foreground requester but
+refused an unrelated OS window: archive24/25 passed, Brew failed and its six
+profile scenarios were not reached; package/install were skipped. Requalify
+actual native compilation, all25 archive cases, Brew6, final packaging and
+installed upgrade/relaunch on the corrected sources. Item36 stays open.
+
 2026-10-10 Homebrew requester startup continuation. The owned Automation
 observer now waits for an acknowledgement from the actual foreground sender
 instead of racing the sandbox wrapper's exec. A private exclusive file binds
