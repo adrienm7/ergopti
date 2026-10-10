@@ -655,6 +655,9 @@ local function with_private_log_sink(options, body)
 	local logger = { enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
 	function logger.set_sink(callback) state.emit = callback end
 	local Sink = helpers.load_module("infra.logger_sink")
+	local DirectoryResolver = helpers.load_module("infra.config_paths")
+	state.account_home, state.directory_home = DirectoryResolver.account_home, DirectoryResolver.home
+	state.home_resolutions = 0
 	package.loaded["infra.paths"] = {
 		driver_root = function() return "/owned-driver" end,
 		shared_root_from = function(root)
@@ -663,12 +666,21 @@ local function with_private_log_sink(options, body)
 			return "/owned-shared"
 		end,
 	}
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return "/home/PrivateUser/logs" end }
+	package.loaded["infra.config_paths"] = {
+		get_logs_dir = function() return "/home/PrivateUser/logs" end,
+		account_home = function()
+			state.home_resolutions = state.home_resolutions + 1
+			return options.resolved_home or DirectoryResolver.account_home()
+		end,
+	}
 	package.loaded["infra.timings"] = { count = function() return 7 end }
 	os.getenv = function(name)
 		state.environment_reads = state.environment_reads + 1
 		if options.missing_identity then return nil end
-		if name == "HOME" then return "/home/PrivateUser" end
+		if name == "HOME" then
+			if options.missing_home then return nil end
+			return "/home/PrivateUser"
+		end
 		if name == "USER" or name == "LOGNAME" then return "PrivateUser" end
 	end
 	os.execute = function() state.commands = state.commands + 1; return 0 end
@@ -707,6 +719,29 @@ local function with_private_log_sink(options, body)
 end
 
 helpers.describe("linux-logger-privacy", function()
+	helpers.it("linux-logger-privacy: captured home comes from the canonical account resolver", function()
+		with_private_log_sink({ resolved_home = "/home/CanonicalAccount" }, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), true)
+			helpers.assert_eq(state.home_resolutions, 1)
+			state.emit("PrivateUser failed /home/CanonicalAccount/cache; password=secret12345", "error")
+			helpers.assert_eq(state.console, { "<user> failed ~/cache; password=<secret>" })
+			helpers.assert_eq(state.home_resolutions, 1, "Identity is captured once, not resolved on emission")
+		end)
+	end)
+
+	helpers.it("linux-logger-privacy: missing account home refuses even when directory fallback exists", function()
+		with_private_log_sink({ missing_home = true }, function(Sink, state, logger)
+			helpers.assert_nil(state.account_home())
+			helpers.assert_eq(state.directory_home(), "/tmp", "Existing file-placement fallback remains available")
+			local accepted, refusal = pcall(Sink.install, logger)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_contains(refusal, "privacy identity unavailable")
+			helpers.assert_eq(state.policy_reads + state.policy_closes + state.commands + state.writable_opens, 0)
+			helpers.assert_eq(#state.console + #state.main + #state.errors + #state.diagnostics, 0)
+			helpers.assert_nil(state.emit)
+		end)
+	end)
+
 	helpers.it("linux-logger-privacy: invalid logger refuses without any raw diagnostic or output authority", function()
 		with_private_log_sink({}, function(Sink, state)
 			local accepted, reason = Sink.install({})
