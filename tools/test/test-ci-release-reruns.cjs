@@ -264,7 +264,18 @@ function runScript(script, cwd, env, prologue = '') {
 	fs.writeFileSync(output, '');
 	const result = spawnSync(BASH, ['--noprofile', '--norc', '-eo', 'pipefail', bashPath(file)], {
 		cwd,
-		env: { ...GIT_ENV, ...env, GITHUB_OUTPUT: bashPath(output) },
+		// Each synthetic release owns its policy context. A main CI caller must not
+		// lend this child another release's signature or qualification authority.
+		env: {
+			...GIT_ENV,
+			ERGOPTI_DEV_RELEASE_RELEASE: '',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: '',
+			ERGOPTI_DEV_RELEASE_CHANNEL: '',
+			ERGOPTI_DEV_RELEASE_TAG: '',
+			ERGOPTI_DEV_RELEASE_VERSION: '',
+			...env,
+			GITHUB_OUTPUT: bashPath(output)
+		},
 		encoding: 'utf8',
 		timeout: 60000
 	});
@@ -1272,6 +1283,35 @@ function createRelease(
 		state: JSON.parse(fs.readFileSync(stateFile, 'utf8'))
 	};
 }
+
+check('synthetic dev publication refuses inherited main-release policy authority', () => {
+	const injected = {
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+	};
+	const saved = Object.fromEntries(
+		Object.keys(injected).map((key) => [key, Object.getOwnPropertyDescriptor(GIT_ENV, key)])
+	);
+	try {
+		Object.assign(GIT_ENV, injected);
+		const result = createRelease('true');
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.equal(
+			result.state.isDraft,
+			false,
+			'The fully verified synthetic dev release publishes.'
+		);
+		assert.ok(result.calls.some((call) => call.includes('--draft=false')));
+	} finally {
+		for (const [key, descriptor] of Object.entries(saved)) {
+			if (descriptor) Object.defineProperty(GIT_ENV, key, descriptor);
+			else delete GIT_ENV[key];
+		}
+	}
+});
 
 check(
 	'full release fixtures admit the real policy with explicit false (release-full-default-policy)',
