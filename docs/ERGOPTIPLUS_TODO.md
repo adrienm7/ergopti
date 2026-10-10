@@ -5018,7 +5018,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 23, macOS 19, Linux 21, each
+  drivers still build (current baseline: Windows 23, macOS 18, Linux 19, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -6002,6 +6002,27 @@ duplicated declarations refuse detached construction. All original helper tests
 remain, with three registered native refusal/availability cases added. The
 actual census owner regenerates 23/19/21 sites; no independent legacy corpus or
 historical floor is regenerated. Native qualification of this slice is pending.
+
+The Linux dynamic-family boundaries and macOS common-TOML-category boundary now
+consume the same existing shared inert separator. Dense singleton admission
+refuses absent, empty, duplicated or nonseparator declarations before the
+affected category is published. Source order, native callbacks, family counts
+and leading/adjacent suppression remain unchanged. Both original bulk-checkbox
+test files remain byte-identical prefixes, with five registered controls added
+per driver. Source review passed. Complete focused modules pass 63/0 on both
+Linux Lua ABIs and 37/0 on macOS Lua 5.4. Exact old producers give 59/4 and
+33/4 respectively, with only the four added refusal controls failing. The
+additional macOS LuaJIT probe fails on unchanged Lua 5.4-only native input
+syntax and is not supported Hammerspoon qualification. The full selected run
+on 2026-10-10 completed nonzero: formatting passed; JS passed 404/406;
+portable macOS units passed 17,911 with 44 failures; Linux units passed 12,638
+with one failure. Linux E2E passed 189/189; portable macOS E2E passed
+67/101, failed 34, and reported one host-specific vector as skipped. The
+unchanged source-toolchain check subsequently passed, including the genuine clone, compiler, headers and ELF control, after verified
+storage recovery; the original clone refusal has no retained stderr diagnosis.
+The remaining macOS and Linux failures require final-source reconciliation
+with current dev and their owners. Platform CI and actual installed menu
+delivery remain unqualified. Neither TODO54 nor TODO81 is complete.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -7625,7 +7646,7 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 23, macOS 19 and Linux 21 rows are still built by the
+  Windows 23, macOS 18 and Linux 19 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated on 2026-10-09. The sites are of four kinds, and three need the
   manifest to say more than it can today:
@@ -7911,6 +7932,27 @@ duplicated declarations refuse detached construction. All original helper tests
 remain, with three registered native refusal/availability cases added. The
 actual census owner regenerates 23/19/21 sites; no independent legacy corpus or
 historical floor is regenerated. Native qualification of this slice is pending.
+
+The Linux dynamic-family boundaries and macOS common-TOML-category boundary now
+consume the same existing shared inert separator. Dense singleton admission
+refuses absent, empty, duplicated or nonseparator declarations before the
+affected category is published. Source order, native callbacks, family counts
+and leading/adjacent suppression remain unchanged. Both original bulk-checkbox
+test files remain byte-identical prefixes, with five registered controls added
+per driver. Source review passed. Complete focused modules pass 63/0 on both
+Linux Lua ABIs and 37/0 on macOS Lua 5.4. Exact old producers give 59/4 and
+33/4 respectively, with only the four added refusal controls failing. The
+additional macOS LuaJIT probe fails on unchanged Lua 5.4-only native input
+syntax and is not supported Hammerspoon qualification. The full selected run
+on 2026-10-10 completed nonzero: formatting passed; JS passed 404/406;
+portable macOS units passed 17,911 with 44 failures; Linux units passed 12,638
+with one failure. Linux E2E passed 189/189; portable macOS E2E passed
+67/101, failed 34, and reported one host-specific vector as skipped. The
+unchanged source-toolchain check subsequently passed, including the genuine clone, compiler, headers and ELF control, after verified
+storage recovery; the original clone refusal has no retained stderr diagnosis.
+The remaining macOS and Linux failures require final-source reconciliation
+with current dev and their owners. Platform CI and actual installed menu
+delivery remain unqualified. Neither TODO54 nor TODO81 is complete.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey

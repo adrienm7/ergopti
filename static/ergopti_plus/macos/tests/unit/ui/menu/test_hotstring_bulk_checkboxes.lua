@@ -373,3 +373,61 @@ helpers.describe("shared category file command", function()
 		end)
 	end)
 end)
+
+
+--- The actual common-category owner consumes a fresh genuine manifest renderer.
+local function with_common_section_frame(body)
+	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu", "ui.menu.menu_hotstrings",
+		"ui.menu.menu_hotstrings_custom", "ui.menu.menu_hotstrings_management" }, function()
+		local translator = require("infra.i18n")
+		local renderer = assert(require("menu.renderer").new({ platform = "hs",
+			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			json_decode = require("adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
+		}))
+		package.loaded["infra.manifest_menu"] = renderer
+		local hotstrings = require("ui.menu.menu_hotstrings")
+		local ctx = context(true, true)
+		ctx.keymap.get_sections = function() return {
+			{ name = "-" }, { name = "one", count = 1, description = "Independent One" },
+			{ name = "-" }, { name = "-" }, { name = "two", count = 2, description = "Independent Two" },
+		} end
+		local root = renderer.get_root()
+		assert(type(root) == "table" and type(root.hotstrings_parameter_boundary) == "table")
+		return body({ root = root, context = ctx,
+			build = function() return hotstrings.build_groups(ctx, nil, { group_counts = { alpha = 3 } }) end })
+	end)
+end
+
+helpers.describe("common hotstring sections consume the genuine shared boundary", function()
+	helpers.it("retains source order and suppresses old leading and duplicate separators", function()
+		with_common_section_frame(function(f)
+			local rows = f.build()
+			helpers.assert_eq(#rows, 1)
+			local children = assert(rows[1].submenu)
+			helpers.assert_eq(#children, 6)
+			helpers.assert_eq(children[4].title, "Independent One (1)")
+			helpers.assert_eq(children[5].title, "-")
+			helpers.assert_eq(children[6].title, "Independent Two (2)")
+			helpers.assert_nil(children[5].fn); helpers.assert_nil(children[5].menu)
+			helpers.assert_type(children[4].fn, "function"); helpers.assert_type(children[6].fn, "function")
+		end)
+	end)
+	for _, damage in ipairs({ "absent", "empty", "duplicate", "label" }) do
+		helpers.it("refuses " .. damage .. " boundary before common-category publication and recovers", function()
+			with_common_section_frame(function(f)
+				helpers.assert_eq(#f.build(), 1, "the genuine category exists before withdrawal")
+				local saved = f.root.hotstrings_parameter_boundary
+				local called, detail = xpcall(function()
+					if damage == "absent" then f.root.hotstrings_parameter_boundary = nil
+					elseif damage == "empty" then f.root.hotstrings_parameter_boundary = {}
+					elseif damage == "duplicate" then f.root.hotstrings_parameter_boundary = { { type = "---" }, { type = "---" } }
+					else f.root.hotstrings_parameter_boundary = { { type = "label", i18n = "common.cancel" } } end
+					helpers.assert_eq(f.build(), {}, "the old native separator cannot bypass declaration refusal")
+				end, debug.traceback)
+				f.root.hotstrings_parameter_boundary = saved
+				if not called then error(detail, 0) end
+				helpers.assert_eq(#f.build(), 1, "restoring the genuine shared declaration recovers construction")
+			end)
+		end)
+	end
+end)
