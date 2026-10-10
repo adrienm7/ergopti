@@ -9484,6 +9484,32 @@ and installation qualification are still required.
   establish the historical catalogue-stall cause, a consent grant or
   catalogue/invocation success.
 
+  The existing Apple Shortcuts adapter now rechecks query and invocation
+  currency after external identity, admission and capability observations.
+  Invalidated owners cannot publish catalogue choices, completion or refusal
+  callbacks; unknown constructor custody remains pending. The independent
+  controlled contract retains all 26 original cases and adds 30 cases: the
+  original adapter gives 30 PASS/26 FAIL, while the correction gives 56 PASS
+  on both LuaJIT and Lua 5.4. Five omitted-fence variants fail their affected
+  cases without breaking the original 26. These are software-owner controls,
+  not native catalogue, TCC, invocation or process-retirement qualification.
+
+  A separate prepared installed-target metadata diagnostic has independently
+  reviewed source and 34 successful portable filesystem controls
+  (19 reader + 15 retained-source/output cases). It uses fixed LaunchServices
+  bundle resolution, bounded retained Info.plist and explicitly declared raw
+  dictionary bytes, preserving the original 20-second capture, 65,536-byte
+  caps and native process owner. It starts no application, sends no AppleEvent
+  and grants no catalogue, TCC or invocation authority. Native Swift build,
+  installed-target resolution and metadata receiving remain UNRUN. Its guard
+  enrollment and native CI hunks await the shared-source writer window; the
+  exact preparation is retained separately and is not integrated. The planned
+  manual-only native matrix step follows all original job steps; it must not
+  suppress or waive their failures. Raw dictionary artifacts remain private.
+  Unresolved-target refusals and requested dictionary-key semantics cannot
+  identify the existing discovery stall or establish consent. Item106 remains
+  partial, with catalogue/invocation and final native acceptance still required.
+
   The signed Swift worker additionally exposes a fixed SDK permission
   observation for the Shortcuts read event with prompting disabled. Its
   OSStatus is diagnostic metadata, separate from catalogue and invocation
