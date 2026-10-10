@@ -1348,3 +1348,111 @@ _LSP_AssertOriginalNativePort(NativePort) {
 	for Method, Callback in Expected
 		AssertTrue(NativePort[Method] == Callback, "original native callback identity remains exact: " . Method)
 }
+
+; Observe actual source operations without replacing schema or snapshot producers.
+class _LSP_SourceOperationObserver {
+	__New(World, ReadIndex := 0, Kind := "") {
+		this.World := World
+		this.Owner := World.Owner
+		this.ReadIndex := ReadIndex
+		this.Kind := Kind
+		this.Reads := 0
+		this.FullAdmissions := 0
+		this.Mutated := false
+		this.Registry := ConfigMigrateShippedRegistry()
+		this.Step := this.Registry["steps"][1]
+		this.Reason := this.Step["reason"]
+		this.OriginalAdmit := LLM_Menu_ApiPrivateSourceOwner.Prototype.GetOwnPropDesc("_AdmitNonCritical").Call
+		this.OriginalSnapshot := LLM_Menu_ApiPrivateSourceOwner.Prototype.GetOwnPropDesc("_Snapshot").Call
+		AssertFalse(Object.Prototype.HasOwnProp.Call(this.Owner, "_AdmitNonCritical"))
+		AssertFalse(Object.Prototype.HasOwnProp.Call(this.Owner, "_Snapshot"))
+		this.Owner.DefineProp("_AdmitNonCritical", {Call: ObjBindMethod(this, "Admit")})
+		this.Owner.DefineProp("_Snapshot", {Call: ObjBindMethod(this, "Snapshot")})
+	}
+
+	Admit(Owner) {
+		global _LLM_Menu
+		this.FullAdmissions += 1
+		Accepted := this.OriginalAdmit.Call(Owner)
+		if this.Kind == "final_context" && this.FullAdmissions == 2 && Accepted {
+			_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+			this.Mutated := true
+		}
+		return Accepted
+	}
+
+	Snapshot(Owner, Path) {
+		global _LLM_Menu
+		this.Reads += 1
+		if this.Reads == this.ReadIndex && this.Kind != "final_context" {
+			switch this.Kind {
+				case "source":
+					Content := Path == this.World.ConfigPath
+						? StrReplace(this.World.ConfigImage, "native-active", "changed-active")
+						: StrReplace(this.World.ApiImage, "Original first", "Changed first")
+					AssertTrue(FSWriteDurable(Path, Content))
+				case "registry":
+					this.Step["reason"] := this.Reason . " changed"
+				case "context":
+					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+				case "future":
+					Content := StrReplace(this.World.ConfigImage,
+						"schema_version = " . ConfigMigrateCurrentVersion(),
+						"schema_version = " . (ConfigMigrateCurrentVersion() + 1))
+					AssertTrue(FSWriteDurable(this.World.ConfigPath, Content))
+				case "malformed":
+					AssertTrue(FSWriteDurable(this.World.ConfigPath,
+						this.World.ConfigImage . "schema_version = " . ConfigMigrateCurrentVersion() . "`n"))
+			}
+			this.Mutated := true
+		}
+		return this.OriginalSnapshot.Call(Owner, Path)
+	}
+
+	Restore() {
+		this.Step["reason"] := this.Reason
+		this.Owner.DeleteProp("_AdmitNonCritical")
+		this.Owner.DeleteProp("_Snapshot")
+	}
+}
+
+_LSP_SourceOperationBody(ReadIndex, Kind, World) {
+	; The joined fixture's authored source must satisfy the real current schema.
+	World.ConfigImage .= "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
+	World.Capture()
+	Observed := _LSP_SourceOperationObserver(World, ReadIndex, Kind)
+	try {
+		if Kind == "nominal" {
+			AssertTrue(World.Owner.Current(World.Receipt))
+			AssertEqual(4, Observed.Reads, "all four external snapshot fences remain active")
+			AssertEqual(2, Observed.FullAdmissions, "one source operation has full initial and final admission")
+		} else if Kind == "default_full" {
+			Held := World.Owner._Held(World.Receipt)
+			AssertTrue(World.Owner._NativeCurrent(Held))
+			AssertEqual(1, Observed.FullAdmissions, "default native checks outside the read operation remain fully admitted")
+			AssertEqual(0, Observed.Reads)
+		} else {
+			AssertFalse(World.Owner.Current(World.Receipt), "changed source, registry or context cannot mint currentness")
+			AssertTrue(Observed.Mutated, "the actual designated external-read or final-admission seam must execute")
+			if Kind == "registry" || Kind == "future" || Kind == "malformed" || Kind == "final_context"
+				AssertEqual(2, Observed.FullAdmissions, "persistent schema or registry refusal is rechecked at the final boundary")
+		}
+		AssertEqual(0, World.ApplyCalls, "read-only validation cannot publish RAM or initiate application")
+	} finally Observed.Restore()
+}
+
+_LSP_RegisterSourceOperationCases() {
+	local Kind, Index
+	for Kind in ["source", "registry", "context"]
+		loop 4 {
+			Index := A_Index
+			Test("Local source operation: " . Kind . " changes at snapshot " . Index . " (source-operation-boundary)",
+				_LSP_WithWorld.Bind(_LSP_SourceOperationBody.Bind(Index, Kind)))
+		}
+	for Kind in ["future", "malformed", "final_context", "nominal", "default_full"]
+		Test("Local source operation: " . Kind . " retains final admission (source-operation-boundary)",
+				_LSP_WithWorld.Bind(_LSP_SourceOperationBody.Bind((Kind == "nominal" || Kind == "default_full") ? 0 : 4, Kind)))
+}
+_LSP_RegisterSourceOperationCases()
