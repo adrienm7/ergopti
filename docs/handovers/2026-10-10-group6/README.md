@@ -23,18 +23,56 @@ and Release/Publish are actually skipped; Cold MLX passes. The owning lock was
 released after this terminal result. The feature remains for further code/CI
 work, not because any delivered commit is absent from Dev.
 
-The next source candidate explicitly selects SHA256 in the original private
+The `fe3da8332` source checkpoint explicitly selects SHA256 in the original private
 fixture leaf-signing command and observes only fixed native certificate codes
 on the original DEBUG certificate branch. Its strict complete-function inverse
 preserves the original whole-source hash and all397 original assertion lines.
 The unadmitted function and four source mutants still refuse. Full original and
 paired portable cohorts both pass52/52; original and pinned Linux live peers
 both pass3/3 with unchanged case identities and physically closed owners. The
-native signing algorithm, compiled DEBUG/release behavior and actual TLS cause
-remain unqualified. This is source adoption for subsequent native receiving;
-no primary certificate failure is claimed fixed.
+previous native signing algorithm and actual TLS cause remain unqualified.
+The subsequent DEBUG compilation and observations are recorded below; compiled
+release no-emission remains unexecuted. No primary certificate failure is claimed
+fixed.
 
-## Current source and validation
+### Native receiving of the TLS checkpoint
+
+Exact manual [38032632804](https://github.com/adrienm7/ergopti/actions/runs/38032632804)
+tests `fe3da8332dbc4905a19765501be1314cdfdef034` on the group's dedicated test
+branch. It is terminal FAIL:3 successful,7 failed and7 skipped jobs. Both actual
+architectures compile and pass41 SDK,10 PAC-source and6 native producer controls.
+Both original14-case cohorts retain12 passing methods/2 failing methods with14
+assertion failures and2 unexpected failures. Each real WPAD method emits two
+`NSURLErrorDomain` codes `-1202`. The privacy unit's synthetic `-1202` and the SDK
+negative control are explicitly excluded. The Wire method's request phase is
+unknown; buffered terminal certificate observations cannot be joined individually
+across stdout and stderr. These codes identify neither the detailed trust cause
+nor a primary fix. Independent HTTP receiving has3 errors per architecture.
+
+Archive receiving preserves24 passes/1 failure and the original30-second owned
+Automation admission refusal. Brew6 and private delivery3 are unexecuted;
+physical closure checkpoints are accepted or closed without retained debt.
+Core JS is403/406 and the stub is17,957/17,968. Cold MLX passes. Packaging,
+installation, E2E, tooltip and Release/Publish are actually skipped. The exact
+source-bound terminal receipt is `tls-fe3-ci-terminal.json`.
+
+The feature then merges latest Dev `c4e2368308b51de6d3147ec4f1e85083f38e20a9` in
+`d1703d302aa48f98b7e6e9f68957a3c68e69ce53`. This preserves the other owner's
+retained trust-removal deadline and fixture stderr correction. The merged wire
+fixture hashes `0577b05a0be8ea97980d15aad9bd27112e0293a2e515406b567cec2ac0936d80`;
+the earlier receipt's leaf source binding is historical, not qualification of
+this merged source. Requalify final sources before the next integration.
+
+`extra-ca-debug-source-only.tar.gz` preserves an unadopted proposal observing the
+existing extra-CA trust evaluation result. It has no native compilation or cause
+credit; the actual WPAD observations above reach the NSError mapper instead.
+Earlier HTTP403 download refusals are retained as access observations. Later
+fresh run archives and task artifacts download successfully without rewriting
+signed URLs or changing credentials. A setup draft adds the omitted
+`productionresultssa12.blob.core.windows.net` while preserving other network
+rules; it requires environment publication and is not claimed active.
+
+## Earlier source and validation
 
 The previous partial delivery is already in `origin/dev` at
 `591d59a942780465bca95956dc3cc9b2e960fa9e`. The following additional atomic commits
@@ -90,7 +128,8 @@ has not yet received native macOS qualification at this checkpoint.
 - TODO62: determine and repair the actual native TLS failure, then receive the
   original full-URL PAC/WPAD cases on both architectures. A leaf SHA256 pin is
   prepared, but the original leaf algorithm is unbound and its causal value is
-  unproved. The pin is now source-adopted and awaits native qualification.
+  unproved. The pin is source-adopted and compiled in the `fe3da8332` receiving,
+  while the original native positive requests still fail.
 - TODO62: complete managed Ollama migration. Shared consent must be consumed by
   the real native commit; authenticated READY/RETIRED observations must join the
   Lua lifecycle, active pull/stream/warmup retirement and qualified native
