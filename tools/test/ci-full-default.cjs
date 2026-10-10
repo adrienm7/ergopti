@@ -57,6 +57,18 @@ const JOBS = [
 ];
 const FULL_STEPS = [
 	[
+		'.github/workflows/ci-linux.yml',
+		'test-linux',
+		'Qualify actual LuaJIT XI2 ABI and property cookies',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-linux.yml',
+		'test-linux',
+		'Retain actual LuaJIT XI2 diagnostic evidence',
+		'always()'
+	],
+	[
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
 		'Prepare genuine pinned Go toolchain',
