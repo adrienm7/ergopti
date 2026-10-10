@@ -9356,10 +9356,10 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   boundary, adds 38 necessary saved-route omission controls, and still
   refuses public OneShot recommendations and CapsWord. The initial selected
   run failed only the obsolete blanket source assertion; the reviewed
-  stronger contract and complete JS rerun close that failure. Native saved-
-  Manager route execution remains unrun. Existing kernel132 exercises the direct OneShot callback,
-  so it is prerequisite regression proof only. The picker stays closed
-  until a genuine saved-configuration Manager supplement is qualified.
+  stronger contract and complete JS rerun close that failure. At that checkpoint,
+  native saved-Manager route execution was unrun; the hosted supplement below
+  now supplies separate saved-configuration evidence. Existing kernel132 tests
+  the direct OneShot callback. The picker stays closed pending its complete joins.
 
   The persistent Caps Word software tranche now uses the original cold
   native semantic constructor and separate physical input and output occurrence
@@ -9417,8 +9417,10 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   through the actual Manager and configuration publisher. Its registered
   guard preserves the original modifier cases, budgets and workflow envelope.
   This container lacks /dev/uinput and /dev/input: the real wrapper refuses
-  with exit 2 and zero scenarios/resources. Native execution is UNRUN;
-  hosted kernel CI and physical receiving remain required.
+  with exit 2 and zero scenarios/resources. Hosted CI38075470794 on
+  9e370a392 passes all 54 real-kernel saved-configuration checks across four
+  scenarios, following 132 input-owner and 81 modifier-custody checks. These
+  are controlled virtual keyboards; physical receiving remains unqualified.
 
   Current-Dev CI receiving preserves both original real-kernel prerequisites,
   their exact status/retirement enclosure and the saved-configuration subreaper
@@ -9426,9 +9428,12 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   context bindings preserve the qualification source; the six-minute deadline
   is unchanged. Eighteen workflow and twenty-three custody-envelope mutations
   are refused, including every original inverse. These portable controls grant
-  no new kernel execution or physical proof. The broader incoming pipeline
-  still has separate qualification/upload contract failures; the original Linux
-  cancellation assertions remain intact pending workflow-owner resolution.
+  no new kernel execution or physical proof. The original Linux cancellation
+  assertions remain intact. CI38075470794 qualifies 34 virtual X11 window cases
+  plus five native family cases and one external recovery. Its live daemon still
+  receives first-trigger "adn " instead of "ADN "; the cause remains unproved.
+  Linux packaging and its Flatpak/tarball component launches pass, while all
+  17 planned installed-matrix scenarios are unrun (one skipped placeholder job).
 
   The separately prepared XI2 borrowed-cookie consumer passes all 43 controlled
   cases on each Lua ABI, using the real probe and logger with modeled FFI ports.
@@ -9437,8 +9442,8 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   proves a genuine cookie or input/output delivery. The original full-family
   native supervisor refuses before allocation because this container does not
   expose `/proc/self/task/<pid>/children`, even with approved execution. Keep
-  that admission unchanged and qualify the three original native property
-  cookies in Linux CI. Runtime registry, actual FFI/cdata, installed provider
+  that admission unchanged; hosted native receiving is recorded below.
+  Runtime registry, actual FFI/cdata, installed provider
   closure and shared enrollment remain held software/native work. Exact sources,
   refusals and receiving reviews are saved in
   `handovers/2026-10-10-group3-native-preparations/`.
@@ -9455,10 +9460,41 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   attempt passes all 21 source controls and observes all three selector
   refusals, with exact input pins and raw statuses; this does not qualify C
   compilation or native property cookies.
-  Actual native cookies, Lua FFI/cdata and installed provider closure remain
-  unqualified here; registry enrollment and input/output authority stay held.
+  CI38075470794 now passes all three actual C/libXi property-cookie cases:
+  created, modified and deleted. Their guarded terminal receipt requires
+  fetched=freed=published=3, display closure and exact family/server retirement.
+  This non-input Xvfb experiment grants no native capture epoch or physical
+  input/output authority. Lua FFI/cdata, installed provider closure and runtime
+  registry enrollment remain unqualified; shared input/output authority stays held.
   Preserve the container's original preallocation refusal and keep items
   16 and 38 open for complete CI and physical-device acceptance.
+
+  The live-daemon fixture now requests one real separator before its first
+  word-only trigger, inside the original output-reader admission allowance.
+  Exact DOWN/UP, four KEY/SYN rows, terminal would-block and empty held-key
+  state are required on the same retained Reader. All original failure sites,
+  first adn input, ADN-space expectation and three-second observation remain.
+  Unknown preceding-text and privacy policies are unchanged. Source/syntax
+  review passes; native receiving remains UNRUN. This does not retroactively
+  identify the observed first miss or qualify physical input.
+
+  A separate LuaJIT borrowed-cookie diagnostic first requires the unchanged
+  original C3 receiving. All 43 modeled cookie cases on each Lua ABI and 15 portable
+  lifecycle controls retain their independent expectations. The proposed
+  native experiment requires 29 actual layout observations and three genuine
+  cdata property-cookie paths, followed by acknowledged Display/FD closure
+  through the original full-family owner. Those native cases remain UNRUN.
+  Its existing registered CI guard admits exact steps and seven typed evidence
+  files while retaining all original generic refusal loops and adding 21
+  independent artifact refusals. No registry/provider/ELF, field-signedness,
+  physical source epoch or input/output grant follows from these diagnostics.
+
+  Its observer and strict evidence retention follow every original unit-job
+  step. This permits independent native receiving after a separate runtime
+  acceptance failure without changing that failure, the original E2E
+  prerequisites or any release policy. Exact END ownership, 22 source
+  refusals and four placement refusals are required; native receiving remains
+  UNRUN until the source-specific hosted dispatch.
 
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
@@ -9493,6 +9529,16 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   prevent callback substitution. Linux XKB observations and output/modifier custody
   are prerequisites, not assignment authority. Active new physical delivery remains
   unavailable on Linux/macOS; fixed accent menus/defaults are not retired.
+
+  The Linux daemon E2E fixture now explicitly activates the real virtual
+  magic-replacement preference before selecting a repeat source. Enabling
+  mapping sections alone does not establish that precondition. Original
+  receipt/screen assertions remain unchanged: the isolated original inverse
+  gives no output, while both initially disabled and already-enabled real
+  preference paths give the exact expected three stars and dispatch receipts.
+  These isolated controls do not qualify the full E2E suite or native delivery;
+  the historical hosted/local difference remains separate from this proven
+  fixture admission correction.
 
   The Linux observer now captures an admitted physical position through the
   original Reader, Hook and source witness before remapping. Shared request
@@ -9541,6 +9587,14 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   fixtures per Lua driver now model the independently observed Window boolean
   acknowledgement instead of nil, retaining every original assertion. Final
   joined-source and native GUI delivery qualification remain required.
+
+  Publication refresh now rejoins the captured source and generation after
+  action-label callbacks. A saved assignment remains committed when source
+  revocation or session closure refuses its refreshed display; stale entries
+  are not returned. The actual Editor and Window contracts pass all 27 cases
+  on both Lua ABIs through the Linux and macOS wrappers, preserving all 24
+  original cases. The original source fails both new refusal cases. These are
+  controlled software checks; native GUI and physical delivery remain open.
 
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
@@ -9992,6 +10046,34 @@ and installation qualification are still required.
   establish the historical catalogue-stall cause, a consent grant or
   catalogue/invocation success.
 
+  The existing Apple Shortcuts adapter now rechecks query and invocation
+  currency after external identity, admission and capability observations.
+  Invalidated owners cannot publish catalogue choices, completion or refusal
+  callbacks; unknown constructor custody remains pending. The independent
+  controlled contract retains all 26 original cases and adds 30 cases: the
+  original adapter gives 30 PASS/26 FAIL, while the correction gives 56 PASS
+  on both LuaJIT and Lua 5.4. Five omitted-fence variants fail their affected
+  cases without breaking the original 26. These are software-owner controls,
+  not native catalogue, TCC, invocation or process-retirement qualification.
+
+  A separate installed-target metadata diagnostic now has independently
+  reviewed source and 34 successful portable filesystem controls
+  (19 reader + 15 retained-source/output cases), enrolled in the normal JS
+  suite with a dedicated npm command. It uses fixed LaunchServices bundle
+  resolution, bounded retained
+  Info.plist and explicitly declared raw dictionary bytes, preserving the
+  original 20-second capture, 65,536-byte caps and native process owner. It
+  starts no application, sends no AppleEvent and grants no catalogue, TCC or
+  invocation authority. Native Swift build, installed-target resolution and
+  metadata receiving remain UNRUN. The end-only native CI and pipeline
+  enrollment now request a separate manual-only observer on both native
+  architectures. Exact source/architecture checks and compiler/capture exits
+  remain mandatory. The matrix step follows all original job steps and cannot
+  suppress or waive their failures. Raw dictionary artifacts remain private.
+  Unresolved-target refusals and requested dictionary-key semantics cannot
+  identify the existing discovery stall or establish consent. Item106 remains
+  partial, with catalogue/invocation and final native acceptance still required.
+
   The signed Swift worker additionally exposes a fixed SDK permission
   observation for the Shortcuts read event with prompting disabled. Its
   OSStatus is diagnostic metadata, separate from catalogue and invocation
@@ -10178,8 +10260,23 @@ Carbon classification, physical keys or installed release qualification.
   selector chain: all 79 prior controls and blanket foreign-exclusion checks
   remain, with 30 additional controls. The three serial portable targets pass
   (193 default controls, the complete wiring guard and 15 focused controls).
-  Actual SDK, launcher CLI and installed receiving are still unrun; these
-  read-only prerequisites do not enable forced digits/symbols or input delivery.
+  The selected Carbon component has since compiled and executed on arm64 and
+  amd64 in manual run 38075470794/attempt 1 at 9e370a392: each passed all twelve
+  cases with zero failures and zero skips. Successful strict CI steps also
+  require seven exact TIS method/layout receipts and inner/outer source
+  restoration. Those raw diagnostic artifacts remain unread because both
+  retained downloads failed; the gates passed, without direct artifact receiving.
+  Causal native variants, launcher CLI and installed receiving remain unrun.
+  This component result does not enable forced digits/symbols or input delivery.
+
+  A later exact-source run, 38086232014 at 3c2a4bbb1, again passes all twelve
+  native cases on each architecture with zero failures or skips. Its genuine
+  retained artifacts are now received: seven US/French TIS rows on arm64 and
+  seven on amd64 pass the unchanged transport decoder, source-image checks,
+  retained-file census and original inner/outer restoration observations.
+  The earlier artifact-download refusals remain historical evidence. This
+  read-only receiving does not qualify physical keys, launcher CLI, installed
+  application launch or the forced digit/symbol runtime owner.
 
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
@@ -10340,6 +10437,15 @@ Carbon classification, physical keys or installed release qualification.
   successful historical and later hosted receipts. Wayland/unsupported geometry
   retains an explicit translated reason. Native Mac global product switching is
   not admitted by the isolated signed-Hammerspoon probe.
+
+  The Linux shared window policy now accepts decimal XIDs over the complete
+  unsigned 32-bit range already accepted in hexadecimal. This preserves
+  identity across xprop stacking and xdotool active/geometry/focus readbacks.
+  Three original pure policy cases plus 25 independent transport cases give
+  17 PASS/11 FAIL before and 28 PASS/0 FAIL after on both Lua runtimes.
+  Original adapter tests and signed coordinate/screen bounds remain intact;
+  overflow, malformed and mismatched IDs still refuse. Native high-bit XID
+  and final installed-driver acceptance remain UNRUN.
 
   The reviewed normal Mac79 product, shared switcher owner, input broker,
   native helper and bounded observer are now on this branch. All79 whole-source

@@ -191,6 +191,18 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const MACOS_NATIVE_STEP_CONDITIONS = [
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Observe installed Shortcuts Events metadata without launch',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain installed Shortcuts Events metadata diagnostic',
+		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
 	[MACOS_BOX, 'managed-ollama-native', 'Prepare genuine pinned Go toolchain', NOT_CANCELLED],
 	[
 		MACOS_BOX,
@@ -362,6 +374,8 @@ const STEP_CONDITIONS = [
 	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify three actual XI2 property cookies', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Retain actual XI2 property-cookie evidence', 'always()'],
+	[LINUX_BOX, 'test-linux', 'Qualify actual LuaJIT XI2 ABI and property cookies', NOT_CANCELLED],
+	[LINUX_BOX, 'test-linux', 'Retain actual LuaJIT XI2 diagnostic evidence', 'always()'],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[

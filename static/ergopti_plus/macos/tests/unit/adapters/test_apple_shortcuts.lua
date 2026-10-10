@@ -209,3 +209,267 @@ H.describe("chosen Apple Shortcut ownership", function()
 		assert_false(success)
 	end)
 end)
+
+H.describe("Independent terminal Apple Shortcut query currency", function()
+	for _, port in ipairs({ "identity", "qualified" }) do
+		H.it("terminal " .. port .. " invalidation cannot resurrect discovery", function()
+			local f = fixture(); local calls, result, invalidated = 0, nil, nil
+			H.assert_true(f.owner.discover(function(value) calls = calls + 1; result = value end))
+			local task = f.tasks[1]; f.reply(task)
+			H.assert_eq(calls, 0); H.assert_true(f.owner.pending())
+			if port == "identity" then
+				f.ports.identity = function()
+					invalidated = f.owner.invalidate()
+					return { executable = "/usr/bin/shortcuts", token = f.token }
+				end
+			else f.on_qualified = function() invalidated = f.owner.invalidate() end end
+			task.retire()
+			H.assert_true(task.physical); H.assert_true(invalidated); assert_false(f.owner.pending())
+			print("TERMINAL_REVOCATION", port, "calls", calls, "choices", result and #result.choices or 0)
+			H.assert_eq(calls, 0, "terminal observation invalidated the original query before publication")
+			H.assert_nil(result, "retired discovery never publishes fresh picker keys")
+		end)
+	end
+end)
+
+H.describe("Independent terminal Apple Shortcut invocation currency", function()
+	for _, port in ipairs({ "identity", "invocation", "cancellation", "admitted" }) do
+		H.it("terminal " .. port .. " invalidation cannot complete an invocation", function()
+			local f = fixture(); local initial = f.discover(); local calls, success, invalidated = 0, nil, nil
+			local task
+			H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function()
+				if port == "admitted" and task and task.physical and task.service then invalidated = f.owner.invalidate() end
+				return true
+			end, function(value) calls = calls + 1; success = value end))
+			f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire(); task = f.invocations[1]
+			H.assert_eq(calls, 0); H.assert_true(f.owner.pending())
+			if port == "identity" then
+				f.ports.identity = function()
+					if task.physical and task.service then invalidated = f.owner.invalidate() end
+					return { executable = "/usr/bin/shortcuts", token = f.token }
+				end
+			elseif port ~= "admitted" then
+				f.ports.qualified = function(role)
+					if role == port and task.physical and task.service then invalidated = f.owner.invalidate() end
+					return f.qualifications[role]
+				end
+			end
+			task.finish(true); task.retire(true)
+			H.assert_true(task.physical); H.assert_true(task.service); H.assert_true(invalidated)
+			assert_false(f.owner.pending())
+			print("TERMINAL_INVOCATION_REVOCATION", port, "calls", calls, "success", tostring(success))
+			H.assert_eq(calls, 0, "the invalidated invocation retains no business callback")
+			H.assert_nil(success)
+		end)
+	end
+	H.it("genuine current discovery and invocation retain terminal acknowledgements", function()
+		local f = fixture(); local initial = f.discover(); local calls, success, reason = 0, nil, nil
+		H.assert_eq(#initial.choices, 2); assert_false(f.owner.pending())
+		H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function() return true end,
+			function(value, why) calls = calls + 1; success, reason = value, why end))
+		f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire()
+		local task = f.invocations[1]; task.finish(true); task.retire(false)
+		H.assert_eq(calls, 0); H.assert_true(f.owner.pending())
+		task.retire(true); H.assert_eq(calls, 1); H.assert_true(success); H.assert_eq(reason, "completed")
+		H.assert_true(task.physical); H.assert_true(task.service); assert_false(f.owner.pending())
+		H.assert_eq(#f.tasks, 2); H.assert_eq(#f.invocations, 1)
+	end)
+end)
+
+H.describe("terminal Apple Shortcut refusal currency", function()
+	for _, port in ipairs({ "identity", "qualified" }) do
+		H.it("terminal refused " .. port .. " invalidation suppresses discovery", function()
+			local f, calls, value, reason, invalidated = fixture(), 0
+			H.assert_true(f.owner.discover(function(result, why) calls, value, reason = calls + 1, result, why end))
+			local task = f.tasks[1]; f.reply(task)
+			if port == "identity" then
+				f.ports.identity = function() invalidated = f.owner.invalidate(); return nil end
+			else
+				f.ports.qualified = function() invalidated = f.owner.invalidate(); return false end
+			end
+			task.retire()
+			H.assert_true(task.physical); H.assert_true(invalidated); assert_false(f.owner.pending())
+			H.assert_eq(calls, 0, "invalidated refusal has no current recipient")
+			H.assert_nil(value); H.assert_nil(reason)
+		end)
+	end
+	for _, port in ipairs({ "identity", "invocation", "cancellation", "admitted" }) do
+		H.it("terminal refused " .. port .. " invalidation suppresses invocation", function()
+			local f = fixture(); local initial = f.discover(); local task
+			local calls, value, reason, invalidated = 0
+			H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function()
+				if port == "admitted" and task and task.physical and task.service then
+					invalidated = f.owner.invalidate(); return false
+				end
+				return true
+			end, function(result, why) calls, value, reason = calls + 1, result, why end))
+			f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire(); task = f.invocations[1]
+			if port == "identity" then
+				f.ports.identity = function() invalidated = f.owner.invalidate(); return nil end
+			elseif port ~= "admitted" then
+				f.ports.qualified = function(role)
+					if role == port then invalidated = f.owner.invalidate(); return false end
+					return f.qualifications[role]
+				end
+			end
+			task.finish(true); task.retire(true)
+			H.assert_true(task.physical); H.assert_true(task.service); H.assert_true(invalidated)
+			assert_false(f.owner.pending()); H.assert_eq(calls, 0, "invalidated refusal has no current recipient")
+			H.assert_nil(value); H.assert_nil(reason)
+		end)
+	end
+	H.it("ordinary current refusals retain exact terminal failure delivery", function()
+		for _, port in ipairs({ "identity", "qualified" }) do
+			local f, calls, value, reason = fixture(), 0
+			H.assert_true(f.owner.discover(function(result, why) calls, value, reason = calls + 1, result, why end))
+			f.reply(f.tasks[1])
+			if port == "identity" then f.ports.identity = function() return nil end
+			else f.ports.qualified = function() return false end end
+			f.tasks[1].retire(); H.assert_true(f.tasks[1].physical); assert_false(f.owner.pending())
+			H.assert_eq(calls, 1); H.assert_nil(value); H.assert_eq(reason, "query_refused")
+		end
+		local f = fixture(); local initial = f.discover(); local task
+		local calls, value, reason = 0
+		H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function()
+			return not (task and task.physical and task.service)
+		end, function(result, why) calls, value, reason = calls + 1, result, why end))
+		f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire(); task = f.invocations[1]
+		task.finish(true); task.retire(false); H.assert_eq(calls, 0); H.assert_true(f.owner.pending())
+		task.retire(true); H.assert_true(task.physical); H.assert_true(task.service)
+		H.assert_eq(calls, 1); assert_false(value); H.assert_eq(reason, "admission_refused")
+		assert_false(f.owner.pending())
+	end)
+	for _, port in ipairs({ "identity", "invocation", "cancellation" }) do
+		H.it("native admission observes late " .. port .. " invalidation", function()
+			local f = fixture(); local initial = f.discover(); local calls, invalidated = 0
+			H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function() return true end,
+				function() calls = calls + 1 end))
+			f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire(); local task = f.invocations[1]
+			if port == "identity" then
+				f.ports.identity = function()
+					invalidated = f.owner.invalidate(); return { executable = "/usr/bin/shortcuts", token = f.token }
+				end
+			else
+				f.ports.qualified = function(role)
+					if role == port then invalidated = f.owner.invalidate() end
+					return f.qualifications[role]
+				end
+			end
+			local admitted_now = task.admitted()
+			H.assert_true(task.cancels > 0); H.assert_true(f.owner.pending())
+			task.finish(true); task.retire(false); H.assert_true(f.owner.pending()); task.retire(true)
+			H.assert_true(task.physical); H.assert_true(task.service); assert_false(f.owner.pending())
+			H.assert_eq(calls, 0); assert_false(invalidated)
+			assert_false(admitted_now)
+		end)
+	end
+end)
+
+H.describe("Apple Shortcut revalidation consumer currency", function()
+	for _, port in ipairs({ "identity", "invocation", "cancellation", "admitted" }) do
+		for _, ready in ipairs({ true, false }) do
+			H.it("revalidation " .. port .. " invalidation with " .. tostring(ready) .. " suppresses acquisition delivery", function()
+				local f = fixture(); local initial = f.discover(); local query_task, observing_terminal
+				local calls, value, reason, invalidated = 0
+				H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function()
+					if query_task and query_task.physical then
+						observing_terminal = true
+						if port == "admitted" then invalidated = f.owner.invalidate(); return ready end
+					end
+					return true
+				end, function(result, why) calls, value, reason = calls + 1, result, why end))
+				query_task = f.tasks[2]
+				if port == "identity" then
+					f.ports.identity = function()
+						if observing_terminal then invalidated = f.owner.invalidate(); if not ready then return nil end end
+						return { executable = "/usr/bin/shortcuts", token = f.token }
+					end
+				elseif port ~= "admitted" then
+					f.ports.qualified = function(role)
+						if observing_terminal and role == port then invalidated = f.owner.invalidate(); return ready end
+						return f.qualifications[role]
+					end
+				end
+				f.reply(query_task, { f.rows[1] }); query_task.retire()
+				H.assert_true(query_task.physical); H.assert_true(invalidated)
+				-- The original model may have already allocated a cancelled invocation.
+				for _, task in ipairs(f.invocations) do task.finish(true); task.retire(true) end
+				assert_false(f.owner.pending())
+				H.assert_eq(calls, 0, "invalidated revalidation has no current invocation recipient")
+				H.assert_nil(value); H.assert_nil(reason); H.assert_eq(#f.invocations, 0)
+			end)
+		end
+	end
+end)
+
+H.describe("Apple Shortcut acquisition refusal settlement", function()
+	H.it("current revalidation admission refusals deliver without invoking", function()
+		for _, port in ipairs({ "identity", "invocation", "cancellation", "admitted" }) do
+			local f = fixture(); local initial = f.discover(); local task, observing_terminal
+			local calls, value, reason = 0
+			H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function()
+				if task and task.physical then observing_terminal = true; return port ~= "admitted" end
+				return true
+			end, function(result, why) calls, value, reason = calls + 1, result, why end))
+			task = f.tasks[2]
+			if port == "identity" then
+				f.ports.identity = function()
+					if observing_terminal then return nil end
+					return { executable = "/usr/bin/shortcuts", token = f.token }
+				end
+			elseif port ~= "admitted" then
+				f.ports.qualified = function(role)
+					if observing_terminal and role == port then return false end
+					return f.qualifications[role]
+				end
+			end
+			f.reply(task, { f.rows[1] }); task.retire()
+			H.assert_true(task.physical); assert_false(f.owner.pending()); H.assert_eq(#f.invocations, 0)
+			H.assert_eq(calls, 1); assert_false(value); H.assert_eq(reason, "admission_refused")
+		end
+	end)
+	for _, result in ipairs({ "throw", "missing", "malformed" }) do
+		H.it("invalidated " .. result .. " invocation construction retains unknown debt without delivery", function()
+			local f = fixture(); local initial = f.discover(); local invalidated
+			local calls, value, reason = 0
+			local original_invoke = f.ports.invoke
+			f.ports.invoke = function(...)
+				original_invoke(...)
+				invalidated = f.owner.invalidate()
+				if result == "throw" then error("private constructor failure") end
+				if result == "malformed" then return {} end
+				return nil
+			end
+			H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function() return true end,
+				function(result_value, why) calls, value, reason = calls + 1, result_value, why end))
+			f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire()
+			H.assert_true(f.tasks[2].physical); assert_false(invalidated); H.assert_eq(#f.invocations, 1)
+			local task = f.invocations[1]; H.assert_eq(task.starts, 0)
+			H.assert_true(f.owner.pending()); assert_false(f.owner.invalidate())
+			task.finish(true); task.retire(true)
+			H.assert_true(task.physical); H.assert_true(task.service)
+			H.assert_true(f.owner.pending()); H.assert_eq(task.cancels, 0)
+			H.assert_eq(calls, 0, "invalidated unknown acquisition has no current recipient")
+			H.assert_nil(value); H.assert_nil(reason)
+		end)
+	end
+	H.it("current invalid invocation construction retains refusal and unknown debt", function()
+		for _, result in ipairs({ "throw", "missing", "malformed" }) do
+			local f = fixture(); local initial = f.discover(); local calls, value, reason = 0
+			local original_invoke = f.ports.invoke
+			f.ports.invoke = function(...)
+				original_invoke(...)
+				if result == "throw" then error("private constructor failure") end
+				if result == "malformed" then return {} end
+				return nil
+			end
+			H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function() return true end,
+				function(result_value, why) calls, value, reason = calls + 1, result_value, why end))
+			f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire()
+			H.assert_true(f.tasks[2].physical); H.assert_eq(#f.invocations, 1); H.assert_eq(f.invocations[1].starts, 0)
+			H.assert_eq(calls, 1); assert_false(value); H.assert_eq(reason, "transport_refused")
+			H.assert_true(f.owner.pending()); f.invocations[1].finish(true); f.invocations[1].retire(true)
+			H.assert_true(f.owner.pending()); H.assert_eq(calls, 1); assert_false(f.owner.invalidate())
+		end
+	end)
+end)

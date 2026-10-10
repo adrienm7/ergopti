@@ -14,7 +14,7 @@ end
 local function window_id(value)
 	if type(value) ~= "string" then return nil end
 	local digits = value:match("^0x([%da-fA-F]+)$")
-	local id = digits and tonumber(digits, 16) or integer(value)
+	local id = digits and tonumber(digits, 16) or (value:match("^%d+$") and tonumber(value))
 	if not id or id < 1 or id > 4294967295 then return nil end
 	return id
 end
