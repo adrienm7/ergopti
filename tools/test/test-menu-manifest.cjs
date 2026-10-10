@@ -13490,46 +13490,247 @@ console.log(
 			system + ': actual current backend caption binding'
 		);
 	}
-	const apps = 'agent_windows_disabled_apps_command';
-	assert.deepEqual(manifest[apps], [
+	const apps = 'agent_menu';
+	assert.equal(
+		Object.hasOwn(manifest, 'agent_windows_disabled_apps_command'),
+		false,
+		'the old singleton cannot compete with the actual main-menu authority'
+	);
+	const originalPrefix = [
 		{
-			type: 'command',
-			id: 'agent_disabled_apps',
-			i18n: 'menu.agent.disabled_apps',
-			caption_getter: 'agent_disabled_apps_count',
-			caption_format: 'numbered',
-			platforms: ['ahk'],
-			unavailable: 'hide'
-		}
-	]);
-	assert.equal(
-		nativeTemplateBinding(
-			source,
-			'.ahk',
-			apps,
-			'agent_disabled_apps',
+			type: 'choice',
+			id: 'agent_mode',
+			path: 'llm.agent_mode',
+			i18n: 'menu.agent.mode_title',
+			show_current_choice: true,
+			disabled_when: ['agent_mode_ready'],
+			choices: [
+				{ value: 'off', i18n: 'menu.agent.mode_off' },
+				{ value: 'action', i18n: 'menu.agent.mode_action' },
+				{ value: 'auto', i18n: 'menu.agent.mode_auto' }
+			]
+		},
+		{ type: '---' },
+		{ type: 'dynamic', id: 'agent_system1', i18n: 'menu.agent.system1' },
+		{ type: 'dynamic', id: 'agent_system2', i18n: 'menu.agent.system2' },
+		{ type: '---' }
+	];
+	const originalApps = {
+		type: 'dynamic',
+		id: 'agent_disabled_apps',
+		i18n: 'menu.agent.disabled_apps'
+	};
+	const appsCommand = {
+		type: 'command',
+		id: 'agent_disabled_apps',
+		i18n: 'menu.agent.disabled_apps',
+		caption_getter: 'agent_disabled_apps_count',
+		caption_format: 'numbered',
+		platforms: ['ahk'],
+		unavailable: 'hide'
+	};
+	assert.deepEqual(
+		manifest[apps],
+		[
+			...originalPrefix,
+			{ ...originalApps, platforms: ['hs', 'linux'], unavailable: 'hide' },
+			appsCommand
+		],
+		'all original siblings/order and the moved command metadata remain exact'
+	);
+	for (const platform of ['hs', 'linux'])
+		assert.deepEqual(
+			manifest[apps]
+				.filter((row) => !row.platforms || row.platforms.includes(platform))
+				.map(({ platforms, unavailable, ...row }) => row),
+			[...originalPrefix, originalApps],
+			platform + ': the original native-visible dynamic menu projection is preserved'
+		);
+	assert.deepEqual(
+		manifest[apps].filter((row) => !row.platforms || row.platforms.includes('ahk')),
+		[...originalPrefix, appsCommand],
+		'Windows receives one final command at the original apps position'
+	);
+	const renderer = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/infra/manifest_menu.ahk'),
+		'utf8'
+	);
+	const { nativeBuildCommandBinding } = require('../lib/menu-template-binding.cjs');
+	const commands =
+		'Map("agent_mode", _LLM_Agent_MenuSetMode, "agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker())';
+	const states =
+		'Map("llm.agent_mode", () => LLM_Agent_Setting("agent_mode"),\n' +
+		'\t\t\t"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount)';
+	for (const input of [commands, states])
+		assert.equal(
+			source.split(input).length - 1,
 			1,
-			nativeSources,
-			manifest,
-			'ahk'
-		),
-		true,
-		'actual picker callback binding'
-	);
-	assert.equal(
-		nativeTemplateBinding(
-			source,
-			'.ahk',
-			apps,
-			'agent_disabled_apps_count',
-			2,
-			nativeSources,
-			manifest,
-			'ahk'
-		),
-		true,
-		'actual native count binding'
-	);
+			'actual Build port has a unique executable preimage'
+		);
+	const swapped = source
+		.replace(commands, 'WITHDRAWN_BUILD_PORT')
+		.replace(states, commands)
+		.replace('WITHDRAWN_BUILD_PORT', states);
+	const receiverHeader =
+		'MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, ' +
+		'GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", ' +
+		'TargetMenu := unset, GroupDisabled := unset, DeclaredFrames := unset) {';
+	const builderHeader = 'LLM_Agent_MenuBuild() {';
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	function actualDefinition(text, header) {
+		assert.equal(text.split(header).length - 1, 1, 'actual definition has one exact preimage');
+		const start = text.indexOf(header);
+		const tokens = scriptTokens(text, '.ahk');
+		const open = tokens.findIndex(
+			(token) =>
+				token.start === start + header.length - 1 && token.kind === 'symbol' && token.value === '{'
+		);
+		assert.ok(open >= 0, 'the definition anchor is an actual lexical body');
+		let depth = 0;
+		for (let at = open; at < tokens.length; at++) {
+			if (tokens[at].kind !== 'symbol') continue;
+			if (tokens[at].value === '{') depth++;
+			if (tokens[at].value === '}' && --depth === 0) return text.slice(start, tokens[at].end);
+		}
+		assert.fail('the actual definition must have a complete body');
+	}
+	function sourceMutation(text, original, replacement) {
+		assert.equal(text.split(original).length - 1, 1, 'the actual mutation anchor is unique');
+		const at = text.indexOf(original);
+		const changed = text.slice(0, at) + replacement + text.slice(at + original.length);
+		const repaired = changed.slice(0, at) + original + changed.slice(at + replacement.length);
+		assert.notEqual(changed, text, 'the mutation is not vacuous');
+		assert.equal(repaired, text, 'the exact original source inverse is byte-equivalent');
+		return { changed, repaired };
+	}
+	const receiverDefinition = actualDefinition(renderer, receiverHeader);
+	const builderDefinition = actualDefinition(source, builderHeader);
+	const quotedReceiver =
+		'"' +
+		receiverDefinition.replaceAll('`', '``').replaceAll('"', '`"').replaceAll('\n', '`n') +
+		'"';
+	for (const [key, port] of [
+		['agent_disabled_apps', 1],
+		['agent_disabled_apps_count', 2]
+	]) {
+		const credits = (candidate, declarations = manifest, inputPort = port, receiving = renderer) =>
+			nativeBuildCommandBinding(
+				candidate,
+				'LLM_Agent_MenuBuild',
+				apps,
+				key,
+				inputPort,
+				[{ src: candidate }, { src: receiving }],
+				declarations
+			);
+		assert.equal(
+			credits(source),
+			true,
+			port === 1 ? 'actual picker callback binding' : 'actual native count binding'
+		);
+		for (const [candidate, reason] of [
+			[swapped, 'actual command/state Build arguments exchanged'],
+			[source.replaceAll(key, 'withdrawn_' + key), 'withdrawn actual registration'],
+			[
+				source.replaceAll('MenuRenderer_Build', 'Foreign.MenuRenderer_Build'),
+				'foreign receiving owner'
+			],
+			[
+				source
+					.replace('return MenuRenderer_Build', 'if false { return MenuRenderer_Build')
+					.replace(
+						'"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount))',
+						'"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount)) }'
+					),
+				'dead nested Build'
+			],
+			[source.replace('LLM_Agent_MenuBuild()', 'Unused_Agent_MenuBuild()'), 'unowned builder'],
+			[JSON.stringify(source), 'source as data'],
+			[
+				source
+					.split('\n')
+					.map((line) => '; ' + line)
+					.join('\n'),
+				'comment witness'
+			]
+		])
+			assert.equal(credits(candidate), false, reason + ': no actual main-menu port credit');
+		assert.equal(
+			credits(source, manifest, port === 1 ? 2 : 1),
+			false,
+			'command and state ports cannot exchange roles'
+		);
+		const withdrawn = structuredClone(manifest);
+		delete withdrawn[apps];
+		assert.equal(credits(source, withdrawn), false, 'withdrawn sole declaration refuses');
+		const duplicate = structuredClone(manifest);
+		duplicate[apps].push({ ...appsCommand });
+		assert.equal(credits(source, duplicate), false, 'duplicate visible command owner refuses');
+		for (const [replacement, reason] of [
+			[
+				receiverDefinition.replace(
+					receiverHeader,
+					receiverHeader.replace('MenuRenderer_Build(', 'WITHDRAWN_MenuRenderer_Build(')
+				),
+				'actual receiver definition withdrawn'
+			],
+			[receiverDefinition + '\n' + receiverDefinition, 'actual receiver definition duplicated'],
+			[
+				receiverDefinition
+					.split('\n')
+					.map((line) => '; ' + line)
+					.join('\n'),
+				'only a commented receiver declaration remains'
+			],
+			[quotedReceiver, 'only quoted receiver declaration data remains'],
+			[
+				'class Foreign {\n' + receiverDefinition + '\n}',
+				'only a foreign class member receiver remains'
+			]
+		]) {
+			const { changed, repaired } = sourceMutation(renderer, receiverDefinition, replacement);
+			assert.equal(
+				credits(source, manifest, port, changed),
+				false,
+				reason + ': no receiver credit'
+			);
+			assert.equal(
+				credits(source, manifest, port, repaired),
+				true,
+				reason + ': the same actual receiver definition repair restores credit'
+			);
+		}
+		for (const [original, replacement, reason] of [
+			[builderHeader, 'LLM_Agent_MenuBuild(ForeignContext) {', 'selected builder parameterized'],
+			[builderDefinition, 'if false {\n' + builderDefinition + '\n}', 'selected builder nested'],
+			[
+				builderDefinition,
+				builderDefinition + '\n' + builderDefinition,
+				'selected builder duplicated'
+			],
+			[port === 1 ? commands : states, '0', 'actual typed argument zeroed'],
+			[port === 1 ? commands : states, 'Map()', 'actual typed argument emptied'],
+			[port === 1 ? commands : states, 'UnownedRegistrationMap', 'actual typed argument unowned'],
+			[
+				port === 1 ? commands : states,
+				'Foreign.' + (port === 1 ? commands : states),
+				'actual typed Map constructor made foreign'
+			]
+		]) {
+			const { changed, repaired } = sourceMutation(source, original, replacement);
+			assert.equal(credits(changed), false, reason + ': no actual selected Build port credit');
+			assert.equal(
+				credits(repaired),
+				true,
+				reason + ': the same actual selected Build inverse restores credit'
+			);
+		}
+		assert.equal(
+			credits(source),
+			true,
+			'exact original source repair restores the same actual Build port'
+		);
+	}
 	console.log(
 		'Windows Agent: declared fixed provider captions retain 21 original locale projections and native ports.'
 	);

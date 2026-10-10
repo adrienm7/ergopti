@@ -682,26 +682,39 @@ _HTR_ForeignSource() {
 		}
 		return Digest
 	}
-	Port["hash"] := Hash
-	Fixture.options["port"] := Port
 	Bundle := 0, OnRefused := 0, Launches := 0
 	Launch(Success, Borrowed, Refused) {
 		Launches += 1, Bundle := Borrowed, OnRefused := Refused
 		return true
 	}
-	Fixture.options["reload"] := Launch
+	TeardownPrimary := false
 	try {
+		Port["hash"] := Hash
+		Fixture.options["port"] := Port
+		Fixture.options["reload"] := Launch
 		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 		AssertEqual(0, Launches, "a stale exact-source intent must refuse before reload admission")
 		Assert(Changed, "the actual native hash boundary must exercise the source race")
 		AssertEqual("refused", Receipt["status"])
 		AssertEqual(Foreign, FSReadUtf8Exact(Fixture.path), "a foreign source wins before any replacement")
+	} catch as Failure {
+		TeardownPrimary := Failure
+		throw Failure
 	} finally {
-		if HasMethod(OnRefused, "Call")
-			OnRefused.Call("controlled cleanup")
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
-		_ScopeOwnerCleanup(Fixture)
+		; The canonical callback is restored before any later cleanup can throw.
+		CleanupFailure := false
+		for Operation in [() => (Port["hash"] := NativeHash),
+			() => HasMethod(OnRefused, "Call") ? OnRefused.Call("controlled cleanup") : 0,
+			() => Bundle is Object ? _ConfigWriteTerminalRelease(Bundle) : 0,
+			() => _ScopeOwnerCleanup(Fixture)] {
+			try Operation.Call()
+			catch as Failure {
+				if !CleanupFailure
+					CleanupFailure := Failure
+			}
+		}
+		if !TeardownPrimary && CleanupFailure
+			throw CleanupFailure
 	}
 }
 Test("terminator-records: an independently changed source refuses the actual conditional WAL candidate", _HTR_ForeignSource)

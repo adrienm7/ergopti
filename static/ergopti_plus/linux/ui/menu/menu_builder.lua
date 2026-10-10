@@ -4573,9 +4573,11 @@ local function _build_language(ctx)
 				label   = i18n.display_name(code) .. " (" .. code .. ")",
 				checked = code == active,
 				action  = function()
-					if i18n.set_locale(cap) and type(ctx.on_menu_changed) == "function" then
-						ctx.on_menu_changed()
-					end
+					local committed = i18n.set_locale(cap)
+					-- GTK toggles before dispatch; a refused write still needs the
+					-- authoritative locale image to restore its current check.
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return committed
 				end,
 			}
 		end
