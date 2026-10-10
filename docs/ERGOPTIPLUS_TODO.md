@@ -9456,6 +9456,14 @@ test precondition failure, not a Lua defect or a successful permission grant.
   the complete suite remain unqualified. Other fixture corrections are still
   in progress. No stable publication is established by these bounded results.
 
+  CI 38008863714 completed 417 Swift cases: 416 passed and the native
+  bootstrap TLS/full-URL PAC/artifact-publication case failed. Its exact
+  method is covered by the existing macos-native-pac deferral; the other
+  nine bootstrap cases and all fourteen OwnedProgram cases remain mandatory.
+  Native bootstrap TLS/PAC and artifact-publication proof is still missing;
+  packaging success does not qualify it. Restore this method with the full
+  native PAC scope after correcting the fixture failure.
+
 - [x] **134.** Preserve the website custom domain during Pages deployments.
 
   The main deployment removed the prior gh-pages CNAME while the source had

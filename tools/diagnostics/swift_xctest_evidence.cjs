@@ -12,6 +12,13 @@ const path = require('node:path');
 
 const pacAdmissions = new WeakSet();
 
+/** The bootstrap transfer invokes the same native TLS/full-URL PAC fixture. */
+const pacMethods = Object.freeze({
+	ManagedBootstrapDownloadTests: Object.freeze([
+		'testActualNativeBootstrapTLSFullURLPACAndArtifactPublication'
+	])
+});
+
 /** Reuses the actual PAC method owner; the selected family is never a guessed regex. */
 function pacClasses() {
 	return Object.keys(require('./managed_http_pac_xctest_evidence.cjs').METHODS);
@@ -51,19 +58,31 @@ function pacSkipPattern(admission) {
 	rootPattern(admission);
 	if (admission === null || admission.mode !== 'deferred')
 		throw new Error('PAC execution may only be omitted under its active scope.');
-	return '^ErgoptiPlusTests[.](?:' + pacClasses().join('|') + ')/';
+	const methods = Object.entries(pacMethods).flatMap(([suite, names]) =>
+		names.map((name) => suite + '/' + name + '$')
+	);
+	return '^ErgoptiPlusTests[.](?:(?:' + pacClasses().join('|') + ')/|' + methods.join('|') + ')';
 }
 
 function isDeferredPacCase(name, admission) {
 	return (
 		admission !== null &&
 		admission.mode === 'deferred' &&
-		pacClasses().some(
+		(pacClasses().some(
 			(suite) =>
 				name.startsWith('-[ErgoptiPlusTests.' + suite + ' ') ||
 				name.startsWith('ErgoptiPlusTests.' + suite + '.') ||
 				name.startsWith('ErgoptiPlusTests.' + suite + '/')
-		)
+		) ||
+			Object.entries(pacMethods).some(([suite, methods]) =>
+				methods.some((method) =>
+					[
+						'-[ErgoptiPlusTests.' + suite + ' ' + method + ']',
+						'ErgoptiPlusTests.' + suite + '.' + method,
+						'ErgoptiPlusTests.' + suite + '/' + method
+					].includes(name)
+				)
+			))
 	);
 }
 
@@ -196,6 +215,7 @@ function evaluate(
 						status: 'deferred',
 						qualified: false,
 						classes: pacClasses(),
+						methods: pacMethods,
 						source_sha: admission.source_sha,
 						profile_id: admission.profile_id
 					}
