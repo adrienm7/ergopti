@@ -820,7 +820,10 @@ function M.update_private_status()
 	_state.is_fullscreen        = false
 	_state.session_document_path = nil
 
-	if not win then return end
+	if not win then
+		require_modifier_settlement()
+		return
+	end
 	observe_window_identity(win)
 
 	-- hs.window:isFullScreen() returns nil for a window that does not expose the
@@ -831,6 +834,13 @@ function M.update_private_status()
 	local native_title = win:title()
 	local title = native_title or ""
 	local now   = hs.timer.absoluteTime() / 1000000
+
+	-- Publish genuine classification before foreign metadata callbacks. A refused
+	-- shared swap retains denial and its existing pending cleanup debt.
+	if PrivateWindow.matches(title, get_private_keywords()) then
+		_state.is_private_window = true
+	end
+	require_modifier_settlement()
 
 	-- Log intra-app window switches (tab changes, new windows in the same app)
 	if _last_win_title and _last_win_title ~= title and _state.active_app_name then
@@ -853,9 +863,7 @@ function M.update_private_status()
 	-- function already has the title in hand on every window change.
 	_state.active_win_title = title
 
-	-- Check for private/incognito mode keywords in the window title
-	if PrivateWindow.matches(title, get_private_keywords()) then
-		_state.is_private_window = true
+	if _state.is_private_window then
 		Logger.debug(LOG, "Private browsing window detected in '%s'.", _state.active_app_name or "?")
 	end
 

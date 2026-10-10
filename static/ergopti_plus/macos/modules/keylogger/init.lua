@@ -1277,6 +1277,7 @@ end
 --- @param v boolean
 function M.set_private_filter_enabled(v)
 	CoreState.private_filter_enabled = (v ~= false)
+	assert(settle_context_modifiers(), "Private filter modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Private window filter: %s.", CoreState.private_filter_enabled and "on" or "off")
 end

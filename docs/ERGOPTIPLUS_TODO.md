@@ -3993,6 +3993,37 @@ overlap and other configuration writers remain separately unqualified. Native
 startup, installed capture, device acceptance and the watchdog exit73 cause
 remain open. This neither enables an owned producer nor completes WP3/TODO31.
 
+WP3 private-window interval receiving now uses the same init-owned settlement
+callback after genuine private-title classification, before metadata callbacks,
+and after both public private-filter policy assignments. A whole crossing hold
+is cancelled even when no physical event occurs during exclusion. Disabled
+private filtering preserves included 6000ms and fresh 1000ms durations; secure
+and private overlap stays excluded until both contexts allow logging. Twenty
+frozen additive controls drive the actual registered browser focus/title
+callbacks, real tracker/classifier, public setter and keylogger consumer with
+composed startup/native/persistence doubles. Lua5.4 receiving changes 106 passed
+and four semantic assertion failures before to 110 passed and no failures after;
+all 90 preceding controls pass. Omitting callback settlement gives 108 passed
+and two exact whole-interval failures; omitting public-setter settlement gives
+108 passed and two exact enable-transition failures. Sources return to their
+reviewed postimages after each omission.
+
+Selected verification passes formatting, 101 macOS E2E scenarios with no
+failures and one driver/host-specific skip, and 19,504 macOS Lua unit controls
+with no failures across 1643 modules. The JS gate retains 408 passed and one
+failed: the existing Windows pipeline guard lacks the two managed Ollama
+artifact STEP_CONDITIONS entries. The overall selected gate remains failed.
+All five frozen inputs remain byte-exact through the serial escalated run; the
+Linux child owner physically reaps 91 adopted descendants with no pending child
+or rescue. These receipts qualify software fixture receiving, not native macOS
+or hardware. The earlier secure-field failed overall JS outcome and fixture
+admission-replay evidence remain unchanged.
+
+Missing-window/native-read failure, reentrant classification, other configuration
+writers, malformed-debt physical release bookkeeping, native/installed/device
+acceptance and watchdog exit73 remain unqualified or open. No owned producer is
+activated; item31 and transverse16/38 remain open, and no TODO item is removed.
+
 WP3 remains partial. An explicitly initialized, dormant physical-capture session
 owner now composes the real accounting policy, delivery receiver and transport.
 It verifies the caller's pinned executable requirement asynchronously, waits for
