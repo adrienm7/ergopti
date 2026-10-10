@@ -12,12 +12,14 @@ const REPO = 'adrienm7/ergopti';
 const API_BASE = `https://api.github.com/repos/${REPO}`;
 const DL_BASE = `https://github.com/${REPO}/releases/download`;
 
-// In-memory cache so a single page load only hits the API once per channel.
+/** @typedef {{tag_name: string, prerelease: boolean, draft?: boolean, published_at: string, assets: Array<{name: string, browser_download_url: string}>}} GitHubRelease */
+
+// Cache the completed channel lookup; dev can require multiple release pages.
 /** @type {Record<string, {tag: string, assets: Record<string, string>} | null>} */
 const _cache = {};
 
 /**
- * Fetch all releases and return the most appropriate one for the current
+ * Fetch the appropriate GitHub endpoint for the current
  * channel (stable = latest non-prerelease, dev = latest prerelease).
  *
  * @param {'main'|'dev'} channel
@@ -27,20 +29,42 @@ async function fetchRelease(channel) {
 	if (channel in _cache) return _cache[channel];
 
 	try {
-		// /releases/latest only returns stable releases; fetching the list
-		// lets us pick the newest pre-release for the dev channel.
-		const res = await fetch(`${API_BASE}/releases?per_page=10`);
-		if (!res.ok) {
-			_cache[channel] = null;
-			return null;
+		/** @type {GitHubRelease | undefined} */
+		let release;
+		if (channel === 'dev') {
+			let newestPublished = -Infinity;
+			const seen = new Set();
+			for (let page = 1; ; page += 1) {
+				const res = await fetch(`${API_BASE}/releases?per_page=100&page=${page}`);
+				if (!res.ok) throw new Error('The release page was refused.');
+				/** @type {GitHubRelease[]} */
+				const payload = await res.json();
+				if (!Array.isArray(payload)) throw new Error('The release page is invalid.');
+				for (const candidate of payload) {
+					if (!candidate || typeof candidate.tag_name !== 'string' || seen.has(candidate.tag_name))
+						throw new Error('The release page contains invalid or repeated identities.');
+					seen.add(candidate.tag_name);
+					if (candidate.prerelease !== true || candidate.draft === true) continue;
+					if (typeof candidate.published_at !== 'string')
+						throw new Error('The prerelease publication date is invalid.');
+					const published = Date.parse(candidate.published_at);
+					if (!Number.isFinite(published))
+						throw new Error('The prerelease publication date is invalid.');
+					if (published > newestPublished) {
+						release = candidate;
+						newestPublished = published;
+					}
+				}
+				if (payload.length < 100) break;
+			}
+		} else {
+			// Stable selection belongs to GitHub independently of prerelease pages.
+			const res = await fetch(`${API_BASE}/releases/latest`);
+			if (!res.ok) throw new Error('The stable release was refused.');
+			release = await res.json();
 		}
-		/** @type {Array<{tag_name: string, prerelease: boolean, assets: Array<{name: string, browser_download_url: string}>}>} */
-		const releases = await res.json();
 
-		const release =
-			channel === 'dev' ? releases.find((r) => r.prerelease) : releases.find((r) => !r.prerelease);
-
-		if (!release) {
+		if (!release || (channel === 'main' && release.prerelease)) {
 			_cache[channel] = null;
 			return null;
 		}

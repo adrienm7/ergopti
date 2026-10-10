@@ -4,7 +4,7 @@ export function detectDev() {
 	if (typeof window === 'undefined') return false;
 
 	// Check if path starts with /dev
-	if (window.location.pathname.startsWith('/dev')) return true;
+	if (/^\/dev(?:\/|$)/.test(window.location.pathname)) return true;
 
 	// Check if on localhost
 	const host = window.location.hostname;
@@ -18,7 +18,7 @@ export function branchForInstall() {
 	if (typeof window === 'undefined') return 'main';
 
 	// If path explicitly indicates dev (deployed to /dev/), use dev
-	if (window.location.pathname.startsWith('/dev')) return 'dev';
+	if (/^\/dev(?:\/|$)/.test(window.location.pathname)) return 'dev';
 
 	// If running on localhost, attempt to determine the git branch
 	const host = window.location.hostname;

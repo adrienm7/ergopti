@@ -283,3 +283,19 @@ _FTI_BrightnessPeriodReadsTheSharedPolicy() {
 }
 Test("meta timers: brightness poll resolves only its explicit canonical shared period",
 	_FTI_BrightnessPeriodReadsTheSharedPolicy)
+
+_FTI_AutomationNativePeriodIsOneShot() {
+	Queue := _DriverFuncBody("_LLM_Automation_Queue")
+	Native := _DriverFuncBody("_LLM_Automation_NativeTimer")
+	Assert(Queue != "" && Native != "", "both actual automation timer boundaries must exist")
+	Assert(InStr(Queue, "TimerFn := _LLM_Automation_NativeTimer") > 0,
+		"the default producer must use the typed one-shot boundary")
+	Assert(InStr(Native, "if !(Period is Integer) || Period > 0") > 0,
+		"a positive or invalid period must refuse before native timer publication")
+	Assert(InStr(Native, "return SetTimer(Callback, -Abs(Period))") > 0,
+		"zero cancels the exact callback and every admitted nonzero period is a one-shot")
+	Assert(!_FTI_Inventory().Has("Callback"),
+		"the automation boundary must not acquire an opaque repeating timer exemption")
+}
+Test("meta timers: automation producer admits only cancellation and one-shot periods",
+	_FTI_AutomationNativePeriodIsOneShot)

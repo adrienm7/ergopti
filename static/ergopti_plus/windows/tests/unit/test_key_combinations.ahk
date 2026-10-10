@@ -696,9 +696,14 @@ _KCT_PairClearAvailability(Assigned) {
 		} finally Shown[1].Delete()
 	}
 }
-for Assigned in [false, true]
-	Test("key combinations: shared clear availability assigned=" . Assigned . " (key-combination-pair-menu)",
-		_KCT_PairClearAvailability.Bind(Assigned))
+/** Registers vectors without publishing a global loop variable. */
+_KCT_RegisterPairClearAvailability() {
+	local Assigned
+	for Assigned in [false, true]
+		Test("key combinations: shared clear availability assigned=" . Assigned . " (key-combination-pair-menu)",
+			_KCT_PairClearAvailability.Bind(Assigned))
+}
+_KCT_RegisterPairClearAvailability()
 
 ; The actual shared menu commands change only their native combination owner.
 ; Fresh disk slots deliberately differ from the runtime maps in the fixture.
@@ -1056,6 +1061,11 @@ _KCT_AltGrSuffixUnsetState(Missing) {
 			AssertFalse(_KeyCombinationTaken.Has("alt_gr"), "boot refusal leaves no pair claim")
 	}
 }
-for Missing in ["separator", "none", "holds", "catalogue", "taken", "layer"]
-	Test("key combinations: unset " . Missing . " refuses parse-time AltGr suffix ownership (altgr-suffix-layer-boot)",
-		_KCT_AltGrSuffixUnsetState.Bind(Missing))
+/** Registers vectors without publishing a global loop variable. */
+_KCT_RegisterAltGrUnsetCases() {
+	local Missing
+	for Missing in ["separator", "none", "holds", "catalogue", "taken", "layer"]
+		Test("key combinations: unset " . Missing . " refuses parse-time AltGr suffix ownership (altgr-suffix-layer-boot)",
+			_KCT_AltGrSuffixUnsetState.Bind(Missing))
+}
+_KCT_RegisterAltGrUnsetCases()

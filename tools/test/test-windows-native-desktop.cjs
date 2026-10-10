@@ -99,9 +99,32 @@ function checkWorkflow(body) {
 	assert.match(upload, /overwrite: true/);
 }
 
+/** Validate every retained wrapper before inspecting this raw native owner. */
+function admittedNativeWorkflow(files) {
+	const admitted = require('./ci-full-default.cjs').fromFiles(files);
+	const file = admitted
+		.rawFiles()
+		.find((entry) => entry.rel === '.github/workflows/ci-windows.yml');
+	const jobs = pipeline.jobsOfText(file.text, file.rel).filter((job) => job.id === 'test-ahk');
+	assert.equal(jobs.length, 1);
+	return jobs[0].body;
+}
+
 checkRunner(runner);
-const body = pipeline.job('test-ahk');
+const body = admittedNativeWorkflow(pipeline.files());
 checkWorkflow(body);
+for (const [before, after] of [
+	['  macos:', '  omitted-macos:'],
+	['  core:', '  omitted-core:']
+]) {
+	const files = pipeline.files();
+	const caller = files.find((file) => file.rel === '.github/workflows/ci.yml');
+	assert.equal(caller.text.split(before).length, 2);
+	const changed = files.map((file) =>
+		file === caller ? { ...file, text: file.text.replace(before, after) } : file
+	);
+	assert.throws(() => admittedNativeWorkflow(changed), /ambiguous\/missing job/);
+}
 const registrations = ['unit/test_console_window.ahk', 'unit/test_key_combinations.ahk'].map(
 	(file) =>
 		stripComments(
