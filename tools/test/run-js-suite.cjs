@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'native XI2 three-cookie CI preserves original family and source receipts',
+		cmd: process.execPath,
+		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],
+		repro: 'npm run test:linux-xi2-cookie-ci-contract'
+	},
+	{
 		name: 'macOS native PAC and WPAD qualification requires all twelve original cases',
 		cmd: process.execPath,
 		args: ['tools/test/test-macos-native-pac-qualification.cjs'],

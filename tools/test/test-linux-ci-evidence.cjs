@@ -1682,6 +1682,38 @@ const retainedQualifications = new Map([
 	]
 ]);
 function assertRetainedQualification(step) {
+	// This exact owned native receipt retains failures, independent of qualification.
+	if (step.name === 'Retain actual XI2 property-cookie evidence') {
+		assert.equal(pipeline.stepField(step.body, 'if'), 'always()');
+		assert.equal(pipeline.stepField(step.body, 'uses'), 'actions/upload-artifact@v4');
+		assert.equal(pipeline.stepField(step.body, 'run'), null);
+		assert.equal(pipeline.stepField(step.body, 'continue-on-error'), null);
+		assert.equal((step.body.match(/^        with:$/gm) ?? []).length, 1);
+		assert.deepStrictEqual(
+			[...step.body.matchAll(/^          ([a-z][a-z-]*):/gm)].map((match) => match[1]).sort(),
+			['if-no-files-found', 'name', 'path', 'retention-days']
+		);
+		// Read every actual mapping row, including quoted/merge/complex keys.
+		assert.deepStrictEqual(
+			step.body.split('\n').filter((line) => /^          \S/.test(line)),
+			[
+				'          name: linux-xi2-property-cookies-${{ github.sha }}-${{ github.run_attempt }}',
+				'          retention-days: 7',
+				'          path: |',
+				'          if-no-files-found: error'
+			]
+		);
+		assert.match(
+			step.body,
+			/^          name: linux-xi2-property-cookies-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}$/m
+		);
+		assert.match(step.body, /^          retention-days: 7$/m);
+		assert.match(
+			step.body,
+			/^          path: \|\n            \$\{\{ runner\.temp \}\}\/linux-xi2-property-cookies\n            \$\{\{ runner\.temp \}\}\/linux-xi2-property-cookies\.log\n          if-no-files-found: error$/m
+		);
+		return true;
+	}
 	const expected = retainedQualifications.get(step.name);
 	if (!expected) return false;
 	assert.equal(pipeline.stepField(step.body, 'if'), 'always()');
@@ -1692,6 +1724,131 @@ function assertRetainedQualification(step) {
 	assert.ok(step.body.includes('          path: ${{ runner.temp }}/' + expected[1] + '\n'));
 	assert.match(step.body, /^          if-no-files-found: warn$/m);
 	return true;
+}
+// Independent finite fixture: no generated artifact schema or count oracle.
+const xi2RetentionFixture = {
+	name: 'Retain actual XI2 property-cookie evidence',
+	body: [
+		'      - name: Retain actual XI2 property-cookie evidence',
+		'        if: always()',
+		'        uses: actions/upload-artifact@v4',
+		'        with:',
+		'          name: linux-xi2-property-cookies-${{ github.sha }}-${{ github.run_attempt }}',
+		'          retention-days: 7',
+		'          path: |',
+		'            ${{ runner.temp }}/linux-xi2-property-cookies',
+		'            ${{ runner.temp }}/linux-xi2-property-cookies.log',
+		'          if-no-files-found: error'
+	].join('\n')
+};
+assert.strictEqual(assertRetainedQualification(xi2RetentionFixture), true);
+const xi2ActualArtifacts = testLinuxSteps.filter(
+	(step) => step.name === 'Retain actual XI2 property-cookie evidence'
+);
+assert.strictEqual(
+	xi2ActualArtifacts.length,
+	1,
+	'exact owned native artifact must remain enrolled'
+);
+assert.strictEqual(assertRetainedQualification(xi2ActualArtifacts[0]), true);
+const xi2RetentionMutations = [
+	['success-only condition', 'if: always()', 'if: ${{ !cancelled() }}'],
+	['wrong upload version', 'actions/upload-artifact@v4', 'actions/upload-artifact@v3'],
+	['warn policy', 'if-no-files-found: error', 'if-no-files-found: warn'],
+	['ignore policy', 'if-no-files-found: error', 'if-no-files-found: ignore'],
+	['retention changed', 'retention-days: 7', 'retention-days: 8'],
+	['source name omitted', '${{ github.sha }}', 'unbound-source'],
+	['attempt name omitted', '${{ github.run_attempt }}', 'unbound-attempt'],
+	[
+		'foreign directory',
+		'            ${{ runner.temp }}/linux-xi2-property-cookies\n',
+		'            ${{ runner.temp }}/foreign\n'
+	],
+	['log omitted', '            ${{ runner.temp }}/linux-xi2-property-cookies.log\n', ''],
+	[
+		'extra path',
+		'          if-no-files-found: error',
+		'            ${{ runner.temp }}/extra\n          if-no-files-found: error'
+	],
+	['harness masquerade', '        with:', '        run: echo harness\n        with:'],
+	['continue-on-error', '        with:', '        continue-on-error: true\n        with:'],
+	['duplicate path key', '          path: |', '          path: duplicate\n          path: |'],
+	[
+		'extra with option',
+		'          retention-days: 7',
+		'          retention-days: 7\n          overwrite: true'
+	],
+	['scalar path', '          path: |', '          path: collapsed']
+];
+for (const [name, before, after] of xi2RetentionMutations) {
+	assert(xi2RetentionFixture.body.includes(before), 'fixture mutation must alter source: ' + name);
+	assert.throws(
+		() =>
+			assertRetainedQualification({
+				...xi2RetentionFixture,
+				body: xi2RetentionFixture.body.replace(before, after)
+			}),
+		undefined,
+		name
+	);
+}
+const quotedExtraRetention = {
+	...xi2RetentionFixture,
+	body: xi2RetentionFixture.body + "\n          'overwrite': true"
+};
+assert.throws(
+	() => assertRetainedQualification(quotedExtraRetention),
+	undefined,
+	'quoted extra with key'
+);
+const unknownRetention = {
+	...xi2RetentionFixture,
+	name: 'Unknown native artifact',
+	body: xi2RetentionFixture.body.replace(
+		'Retain actual XI2 property-cookie evidence',
+		'Unknown native artifact'
+	)
+};
+assert.strictEqual(assertRetainedQualification(unknownRetention), false);
+assert.throws(() =>
+	assert.doesNotMatch(pipeline.stepField(unknownRetention.body, 'if'), /\balways\(\)/)
+);
+// Keep the predecessor warn cohorts distinct from the new error-only receipt.
+for (const [name, artifact, file] of [
+	[
+		'Retain the source-bound linux-unit-suite qualification',
+		'assets-qualification-linux-unit-suite',
+		'stable-linux-unit-suite.json'
+	],
+	[
+		'Retain the source-bound linux-e2e-suite qualification',
+		'assets-qualification-linux-e2e-suite',
+		'stable-linux-e2e-suite.json'
+	],
+	[
+		'Retain the contained simultaneous qualification',
+		'assets-qualification-simultaneous-contained',
+		'stable-linux-simultaneous-native.json'
+	]
+]) {
+	const fixture = {
+		name,
+		body:
+			'      - name: ' +
+			name +
+			'\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: ' +
+			artifact +
+			'\n          path: ${{ runner.temp }}/' +
+			file +
+			'\n          if-no-files-found: warn\n'
+	};
+	assert.strictEqual(assertRetainedQualification(fixture), true);
+	assert.throws(() =>
+		assertRetainedQualification({
+			...fixture,
+			body: fixture.body.replace('if-no-files-found: warn', 'if-no-files-found: error')
+		})
+	);
 }
 for (const harness of testLinuxSteps.slice(unitAt + 1, recordAt)) {
 	if (assertRetainedQualification(harness)) continue;

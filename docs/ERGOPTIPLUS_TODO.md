@@ -8839,6 +8839,23 @@ mandatory.
   refusals and receiving reviews are saved in
   `handovers/2026-10-10-group3-native-preparations/`.
 
+  A source-reviewed seven-path CI tranche requests the three original native
+  XI2 property-cookie cases in a fatal, bounded Linux E2E step between the
+  existing X11-source and cursor-switch qualifications, with always-retained
+  source-bound evidence. The C oracle, ABI declarations, original full-family
+  supervisor, kernel peer binding, retirement predicates and native budgets
+  remain unchanged. Its bounded source guard retains the original positive
+  and 16 inverse controls and adds one harmless owned-fixture rename plus
+  three placement refusals; the closed receiving plan selects all 21 source
+  cases and three separate actual selector refusals. One isolated receiving
+  attempt passes all 21 source controls and observes all three selector
+  refusals, with exact input pins and raw statuses; this does not qualify C
+  compilation or native property cookies.
+  Actual native cookies, Lua FFI/cdata and installed provider closure remain
+  unqualified here; registry enrollment and input/output authority stay held.
+  Preserve the container's original preallocation refusal and keep items
+  16 and 38 open for complete CI and physical-device acceptance.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
