@@ -150,7 +150,10 @@ function validateNativeSources(source, worker) {
 		'session.stderr.isEmpty, session.decoder.buffered.isEmpty',
 		'guard packet["observation"] as? String == "native-returned"',
 		'let code = try XCTUnwrap(Int32(exactly: status.int64Value))',
-		'SDK_PERMISSION_OBSERVATION caller=native-test-product'
+		'SDK_PERMISSION_OBSERVATION caller=native-test-product',
+		'let observation = "SDK_PERMISSION_OBSERVATION caller=native-test-product',
+		'nonce=19 osstatus=\\(code)\\n"',
+		'try FileHandle.standardError.write(contentsOf: Data(observation.utf8))'
 	])
 		if (!body.includes(required)) throw new Error('SDK observation source contract refused.');
 	if (body.includes('permissionObservationPacket(') || body.includes('XCTSkip'))
@@ -257,7 +260,10 @@ function main(args, repository = path.resolve(__dirname, '../..')) {
 			mode: 0o600
 		});
 		console.log(
-			`::notice title=SDK permission metadata::complete=${receipt.complete} caller=native-test-product catalogue_qualified=false candidate=${receipt.source.candidate}`
+			`::notice title=SDK permission metadata::complete=${receipt.complete} caller=native-test-product catalogue_qualified=false candidate=${receipt.source.candidate}` +
+				` script_status=${receipt.script_status} capture_status=${receipt.capture_status}` +
+				` osstatus=${receipt.osstatus === null ? 'unavailable' : receipt.osstatus}` +
+				` errors=${receipt.errors.length === 0 ? 'none' : receipt.errors.join(',')}`
 		);
 		return receipt.complete ? 0 : 1;
 	} catch {

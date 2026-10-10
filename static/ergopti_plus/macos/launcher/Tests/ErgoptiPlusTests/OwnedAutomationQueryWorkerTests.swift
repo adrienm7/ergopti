@@ -401,9 +401,11 @@ final class OwnedAutomationQueryWorkerTests: XCTestCase {
 			XCTFail("Address failure does not observe the permission API.")
 			return
 		}
-		// A closed log retains the actual OSStatus without claiming another caller's consent.
-		print("SDK_PERMISSION_OBSERVATION caller=native-test-product target=shortcuts-events"
-			+ " event_class=core event_id=getd ask_user=0 nonce=19 osstatus=\(code)")
+		// Finish the diagnostic write before XCTest can publish this case's terminal frame.
+		// A failed write fails the case; another caller's consent remains unqualified.
+		let observation = "SDK_PERMISSION_OBSERVATION caller=native-test-product target=shortcuts-events"
+			+ " event_class=core event_id=getd ask_user=0 nonce=19 osstatus=\(code)\n"
+		try FileHandle.standardError.write(contentsOf: Data(observation.utf8))
 	}
 
 	func testPermissionObservationIsFixedAndSeparateFromBusinessRoles() throws {
