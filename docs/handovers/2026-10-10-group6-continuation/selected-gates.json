@@ -1,0 +1,58 @@
+{
+	"schema": 1,
+	"command": "TMPDIR=/tmp python /workspace/ergopti-subreaper.py node tools/test/verify-change.cjs",
+	"source_head": "d8dbcea2f3ff05a81e1441d513b6d7b26deac0f7",
+	"source_bindings": {
+		"static/ergopti_plus/macos/adapters/release_stage.sh": "c701f6409b961a43ac6485841d054be809908adb679a612fc94b1094cbc91545",
+		"static/ergopti_plus/macos/modules/updater/release_installer.lua": "5aa69cd31a9ce75f432583d7dae067101bfa9d594953155c5ee5bc4b0da16f0d",
+		"static/ergopti_plus/macos/tests/unit/modules/updater/test_release_installer.lua": "7462279ea276dd4dde36753fd76c743df66280df801257a6ffe3f2d4abba02a6",
+		"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "c27e4dbff31ea9bd328cafca6e5b79f1d6f19c2e7bfea6a7d11d82422c511f8a",
+		"tools/test/macos_native_http_receiving_facts_test.py": "fdcd83823d814455bf2dd148dcd2d3604a12c97ac7b6252f4e6efc95b02b81fc",
+		"tools/test/test-managed-ollama-protocol.cjs": "03b4cece650663f21b3ed3c14eef36b263e669ca0a745d8a92a690ed67a0aaec",
+		"tools/diagnostics/native_appleevent_consent.m": "f4ff5686d73d62c29708643dcb61b1b38770a13c492dbd530d79ba762e78b4b2",
+		"tools/diagnostics/macos_brew_archive_acceptance_test.py": "731e6ba90a2ecfdad4e5881313375253b7e8b302f1c578cb3ac459e272b5ca3c",
+		"tools/test/test-homebrew-cask.cjs": "b03915f82063e173876a968a393fd4d913ae4b73f61c051481da44593614fb05"
+	},
+	"exit": 1,
+	"raw_log_sha256": "020183f949df745953814d353ba165c2db7dcd2ed93165ffe87faad226c4bd66",
+	"raw_log_bytes": 3588452,
+	"format": "PASS",
+	"js": {
+		"pass": 402,
+		"fail": 4,
+		"total": 406,
+		"homebrew_guard": "PASS",
+		"managed_protocol_guard": "PASS",
+		"opaque_admission_guard": "PASS"
+	},
+	"hs_e2e": {
+		"pass": 101,
+		"fail": 0,
+		"skip": 1,
+		"credit": "controlled portable behavior, no actual macOS installation"
+	},
+	"hs": {
+		"modules": 1562,
+		"pass": 17957,
+		"fail": 11,
+		"same_predecessor_failure_names": true,
+		"predecessor_raw_sha256": "ac56a6eb4b2c0db0fff182a7ab8cc2868ee8acaf4dfa2512f4a04c2c1f3ac040",
+		"failure_names": [
+			"installs once on the first selection and never on re-selection",
+			"reinstalls a runtime removed after it was ready",
+			"rebuilds a broken runtime on the next selection, never before",
+			"deactivates a preview registration that reports throw",
+			"deactivates a preview registration that reports false",
+			"rolls back registry writes when the final sort explicitly refuses",
+			"rolls back registry ownership when reporter installation returns throw",
+			"rolls back registry ownership when reporter installation returns false",
+			"passes the magic key through and does not log completion",
+			"hands is_private = true to keymap.inject_dynamic",
+			"HS-034 rechecks the live factory gate at a real pending-model continuation"
+		]
+	},
+	"limits": "Whole gate failed. Four JS failures retain three incoming workflow failures plus foreign /tmp/.git uninstall preflight. The unchanged uninstall previously passed at canonical TMPDIR. Existing sealed receiving comparison owns attribution. No assertion changed; no whole native or package/install credit.",
+	"source_observation": "Review-bound worktree changes over source_head; all nine source hashes remain exact after their atomic commits.",
+	"evidence_archive_sha256": "14e9e87c8c9756402f38d954f7de7503256d0571d6ddf14970454f4f49cafcb9",
+	"compressed_log_sha256": "e2cd33396e0ff108ec266c096459417055cd82172c6b20d3f24a07dfeea662ae"
+}
