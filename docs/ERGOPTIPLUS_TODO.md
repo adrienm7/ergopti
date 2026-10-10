@@ -8744,6 +8744,17 @@ late-marker order; native Mac capture ordering remains unqualified. CI notices
 retain closed process/capture statuses and refusal codes without changing
 observation admission, worker retirement or deadlines.
 
+The exact integrated successor a81ded37/manual38011048513 now qualifies that
+SDK transport: one real case passes, zero fail or skip, process/capture0 and
+OSStatus-600. Its only nonce19 marker is inside the case before completion;
+the unchanged strict collector reports complete=true/errors=[] and all367
+source hashes match the tested Git commit independently. Original transport
+cause remains unknown. This native-test-product result grants no catalogue,
+consent or signed-app/osascript principal qualification. Whole manual CI fails
+other portable/native archive/model gates; packaging/install and Release are
+skipped. Preserve those separate requirements and the original20-second
+Shortcuts discovery deadline.
+
 The original-clock HealthCheck fixture now binds the independently recorded
 pre-watchdog clock and advances it during registration, instead of comparing
 with a later wall-clock read. All thirteen original cases remain; the other
@@ -8751,6 +8762,14 @@ twelve bodies are byte-exact. Controlled Lua5.4 reproduces old12/1 and new13/0;
 late-clock, zero and timeout forwarding refuse, and exact clock/scheduler
 restoration is observed on errors. The real probe source is unchanged; this
 adds no native AppleEvent, SDK transport or catalogue qualification.
+
+The installed-app virtual boot fixture now exports the same independently
+fixed geometry declaration already used by its unit fixture. Root remains the
+sole initialization owner; all range values, corpus expectations and original
+boot assertions stay unchanged. Fresh current-source receiving on c3464499e
+seals the product and staged inputs: old67/34 becomes new101/0, with the same
+one host-specific skip. This is modeled virtual E2E, not actual Hammerspoon,
+Carbon classification, physical keys or installed release qualification.
 
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
