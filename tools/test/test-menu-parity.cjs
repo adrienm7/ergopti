@@ -3834,6 +3834,76 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 			'actual Linux completed ' + kind + ' producer reaches the genuine tray'
 		);
 
+		// New schema protection changes only the genuine toggle admission branch.
+		const readonlyFile = 'linux/ui/menu/menu_builder.lua';
+		const readonlyBuilder = linuxAiSources[readonlyFile];
+		const readonlyControls = [
+			[
+				'\n\tlocal Preferences = require("infra.llm_preferences")',
+				'\n\tlocal Preferences = require("foreign.preferences")',
+				'foreign preference owner'
+			],
+			['and Preferences.admit() == true', 'and true', 'withdrawn persistence admission'],
+			['and Preferences.admit() == true', 'and Preferences.admit()', 'untyped admission'],
+			[
+				'ctx.paused ~= true and Preferences.admit()',
+				'true and Preferences.admit()',
+				'withdrawn pause fence'
+			],
+			[
+				'local function toggle_ready()',
+				'local function toggle_ready() return true end local function unused_toggle_ready()',
+				'predicate bypass'
+			],
+			[
+				'if not toggle_ready() then return false end',
+				'if false then return false end',
+				'withdrawn retained-click fence'
+			],
+			[
+				'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready',
+				'llm_ctx.state_getters["llm_toggle_ready"] = function() return true end',
+				'unbound row predicate'
+			],
+			[
+				'\n\tlocal Preferences = require("infra.llm_preferences")',
+				'\n\tlocal Preferences = require("infra.llm_preferences") Preferences.admit = function() return true end',
+				'mutated preference callback'
+			],
+			[
+				'\n\tlocal Preferences = require("infra.llm_preferences")',
+				'\n\tlocal Preferences = require("infra.llm_preferences") local Preferences = {}',
+				'shadowed preference owner'
+			],
+			[
+				'local function toggle_ready()',
+				'local toggle_ready = function() return true end local function toggle_ready()',
+				'shadowed predicate'
+			],
+			[
+				'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready',
+				'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready toggle_ready = function() return true end',
+				'rebound predicate'
+			],
+			[
+				'\n\tlocal Preferences = require("infra.llm_preferences")',
+				'\n\t-- local Preferences = require("infra.llm_preferences")',
+				'comment-only preference owner'
+			]
+		];
+		assert.equal(readonlyControls.length, 12, 'all read-only admission withdrawals are registered');
+		for (const [before, after, reason] of readonlyControls) {
+			assert.equal(readonlyBuilder.split(before).length - 1, 1, reason + ': actual source seam');
+			const changed = readonlyBuilder.replace(before, after);
+			assert.notEqual(changed, readonlyBuilder, reason + ': executable source changed');
+			assert.equal(
+				admits({ ...linuxAiSources, [readonlyFile]: changed }),
+				false,
+				reason + ': neither genuine native parent may acquire publication credit'
+			);
+			assert.equal(admits(), true, reason + ': restoring actual source restores admission');
+		}
+
 		// The adopted unavailable top row is an inert declaration projection, before Quit.
 		const builderFile = 'linux/ui/menu/menu_builder.lua';
 		const builder = linuxAiSources[builderFile];

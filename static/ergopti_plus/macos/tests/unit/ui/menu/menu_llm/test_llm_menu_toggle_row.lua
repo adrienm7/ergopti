@@ -569,3 +569,55 @@ helpers.describe("Actual download native projection custody", function()
 		end)
 	end
 end)
+
+
+helpers.describe("IA protected configuration admission", function()
+	for _, protect_before_build in ipairs({ true, false }) do
+		helpers.it("IA toggle refuses protected configuration before effects (protected-ai-toggle "
+			.. (protect_before_build and "build" or "stale") .. ")", function()
+			local Migrate = require("config_migrate")
+			local registry = assert(Migrate.load_registry(helpers.driver_root() .. "../_shared/core/config_schema/migrations.toml"))
+			local path = "/controlled/ergopti-protected-ai-" .. (protect_before_build and "build" or "stale") .. ".toml"
+			local source = "[_meta]\nschema_version = " .. (registry.current + 1) .. "\n[llm]\nenabled = true\n"
+			local function protect()
+				local outcome = Migrate.boot({
+					path = path, driver = "hs", registry = registry,
+					read = function(target) helpers.assert_eq(target, path); return source, "ok" end,
+					create_backup = function() error("future source cannot acquire a backup") end,
+					publish = function() error("future source cannot publish") end,
+				})
+				helpers.assert_eq(outcome.status, "newer", outcome.detail)
+				helpers.assert_eq(outcome.read_only, true)
+				return Migrate.read_only_reason(path)
+			end
+			local prior = package.loaded["ui.menu.menu_paths"]
+			package.loaded["ui.menu.menu_paths"] = { get = function(key)
+				helpers.assert_eq(key, "ConfigTomlPath")
+				return path
+			end }
+			local ok, failure = xpcall(function()
+				local reason
+				if protect_before_build then reason = protect() end
+				with_activation("mlx", { true }, nil, function(action, state, calls)
+					local ready = calls.render_ctx.state_getters.llm_toggle_ready
+					if not protect_before_build then
+						helpers.assert_eq(ready(), true, "the same captured callback was genuinely ready before protection")
+						reason = protect()
+					end
+					helpers.assert_eq(ready(), false)
+					helpers.assert_eq(action(), false)
+					helpers.assert_eq(state.llm_enabled, false)
+					helpers.assert_eq(calls.bootstrap, 0)
+					helpers.assert_eq(calls.requirements, 0)
+					helpers.assert_eq(calls.offers, 0)
+					helpers.assert_eq(calls.saves, 0)
+					helpers.assert_eq(calls.updates, 0)
+					helpers.assert_eq(calls.keymap_states, {})
+					helpers.assert_eq(Migrate.read_only_reason(path), reason, "refusal retains exact migration custody")
+				end)
+			end, debug.traceback)
+			package.loaded["ui.menu.menu_paths"] = prior
+			if not ok then error(failure, 0) end
+		end)
+	end
+end)

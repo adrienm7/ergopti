@@ -1589,3 +1589,99 @@ Test("config journal: post-boot direct nonversion no-op and writer refuse withou
 	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = "not-a-version"', true))
 Test("config journal: post-boot direct scalar metadata no-op and writer refuse without borrowing boot",
 	_CMJ_PostBootDirectPublication.Bind('_meta = true', true))
+
+
+
+
+
+; ==============================================
+; ==============================================
+; ======= 4/ Read-Only AI Menu Admission =======
+; ==============================================
+; ==============================================
+
+_CMJ_WithAiPersistenceState(Body) {
+	global ConfigurationFile, _LLM_Menu, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	Prior := Map("path", IsSet(ConfigurationFile), "menu", IsSet(_LLM_Menu),
+		"read", IsSet(_ConfigBootReadFailed), "rejected", IsSet(_ConfigBootRejectedOverrides))
+	if Prior["path"]
+		Prior["path_value"] := ConfigurationFile
+	if Prior["menu"]
+		Prior["menu_value"] := _LLM_Menu
+	if Prior["read"]
+		Prior["read_value"] := _ConfigBootReadFailed
+	if Prior["rejected"]
+		Prior["rejected_value"] := _ConfigBootRejectedOverrides
+	PriorSuspend := A_IsSuspended
+	Dir := _CMG_NewDir()
+	try {
+		Suspend(false)
+		ConfigurationFile := Dir . "\config.toml"
+		_LLM_Menu := Map("enabled", false)
+		_ConfigBootReadFailed := false
+		_ConfigBootRejectedOverrides := 0
+		return Body.Call(ConfigurationFile)
+	} finally {
+		try _CMJ_Cleanup(Dir, Dir . "\config.toml")
+		finally {
+			ConfigurationFile := Prior["path"] ? Prior["path_value"] : unset
+			_LLM_Menu := Prior["menu"] ? Prior["menu_value"] : unset
+			_ConfigBootReadFailed := Prior["read"] ? Prior["read_value"] : unset
+			_ConfigBootRejectedOverrides := Prior["rejected"] ? Prior["rejected_value"] : unset
+			Suspend(PriorSuspend)
+		}
+	}
+}
+
+_CMJ_NewerSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)
+		. '`n[layout]`nfuture_layout_owner = "retain exactly"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path), "observing an unknown destination does not construct it")
+	AssertFalse(ConfigMigrateBoot(Path, "known"))
+	Prepared := ConfigSchemaPrepareSource(Path)
+	AssertEqual("newer", Prepared["status"])
+	Result := ConfigMigrateBoot(Path)
+	AssertEqual("newer", Result["status"])
+	AssertEqual(1, Result["read_only"])
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertFalse(Getters["llm_enabled"].Call())
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "a paused-independent future-schema toggle is not clickable")
+	AssertEqual("newer", ConfigSchemaReadOnlyStatus(Path), "the actual retained classification remains observable without write permission")
+	AssertTrue(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters),
+		"the actual declaration renders protected AI activation disabled")
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the AI toggle", (Message, Options) => Messages.Push([Message, Options]),
+		"the boot configuration was not completely loaded"))
+	AssertEqual(1, Messages.Length)
+	AssertEqual(t("config.read_only.newer_schema"), Messages[1][1], "stale callers explain the actual retained newer schema")
+	AssertFalse(Messages[1][1] == "config.read_only.newer_schema", "the user sees localized guidance, not a raw key")
+	AssertEqual("error", Messages[1][2]["level"])
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "observation, menu rendering and failure reporting preserve every source byte")
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path), "diagnostic status and notification never grant permission")
+}
+Test("config journal: newer schema disables AI activation and explains update without changing settings (newer-schema-ai)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_NewerSchemaAiAdmission))
+
+_CMJ_CurrentSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("current", ConfigSchemaPrepareSource(Path)["status"])
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path))
+	AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertTrue(Getters["llm_toggle_ready"].Call(), "an admitted ordinary current configuration remains available")
+	AssertFalse(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters))
+	Suspend(true)
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "configuration readiness does not override suspension")
+	Suspend(false)
+	AssertTrue(Getters["llm_toggle_ready"].Call())
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the ordinary failure", (Message, Options) => Messages.Push(Message), "controlled write refusal"))
+	AssertEqual(t("dialog.bulk_toggle.save_failed"), Messages[1], "ordinary failure localization is unchanged")
+	AssertTrue(FSUtf8ExactMatches(Path, Source))
+}
+Test("config journal: current schema and pause retain ordinary AI menu and failure semantics (newer-schema-ai-current)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_CurrentSchemaAiAdmission))

@@ -369,3 +369,44 @@ helpers.describe("Linux shared slot picker and conditional clear frame", functio
 		end)
 	end)
 end)
+
+
+helpers.describe("Linux rendered AI source refusal", function()
+	helpers.it("disables the genuine toggle row and refuses a retained click after newer-schema boot (ai-readonly-admission)", function()
+		local Sandbox = require("test.config_unused_keys_contract").sandbox
+		local Migration = require("config_migrate")
+		local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
+		local source = '[_meta]\nschema_version = ' .. (registry.current + 1)
+			.. '\n[llm]\nenabled = false\n[private]\nkeep = "exact"\n'
+		Sandbox.with_config(source, function(path)
+			local saved = {}
+			for name, value in pairs(package.loaded) do saved[name] = value end
+			local ok, raised = pcall(function()
+				package.loaded["infra.config_paths"] = {
+					config = function() return path end,
+					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
+				}
+				package.loaded["infra.llm_preferences"] = nil
+				local llm, calls = fake_llm(false)
+				local changed = { count = 0 }
+				local before = submenu_of(build(llm, changed), "menu.llm.title")
+				helpers.assert_true(not before[1].disabled, "an unrefused owner initially admits this explicit action")
+				local retained = before[1].fn
+				helpers.assert_eq(type(retained), "function")
+				local boot = Migration.boot({ path = path, driver = "linux", registry = registry })
+				helpers.assert_eq(boot.status, "newer")
+				helpers.assert_eq(boot.read_only, true)
+				local rows = submenu_of(build(llm, changed), "menu.llm.title")
+				helpers.assert_eq(rows[1].disabled, true, "the shared renderer consumes actual source admission")
+				helpers.assert_eq(rows[1].checked, false, "refusal cannot invent consent")
+				helpers.assert_eq(retained(), false, "a previously captured click must recheck source permission")
+				helpers.assert_eq(calls.toggle, 0, "no engine mutation occurs after the writer refusal")
+				helpers.assert_eq(changed.count, 0, "no successful-state repaint is emitted")
+				helpers.assert_eq(Sandbox.read_bytes(path), source)
+			end)
+			for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+			for name, value in pairs(saved) do package.loaded[name] = value end
+			if not ok then error(raised, 0) end
+		end)
+	end)
+end)

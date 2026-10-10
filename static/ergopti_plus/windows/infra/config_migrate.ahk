@@ -1112,7 +1112,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	}
 
 	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned"
-			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure")
+			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure" || Request == "read_only_status")
 		throw ValueError("Unknown configuration journal request")
 	if !(FilePath is String) || FilePath == "" || !NativeLive()
 		return false
@@ -1126,6 +1126,20 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	Key := Native.key.Call(FilePath)
 	if Request == "known"
 		return Destinations.Has(Key)
+	if Request == "read_only_status" {
+		; Observation returns only the retained boot classification, never source
+		; bytes, a mutable journal row or preparation/write permission.
+		if !Destinations.Has(Key)
+			return ""
+		ObservedRow := Destinations[Key]
+		if !RegistryLive(ObservedRow) || ObservedRow.phase == "ready"
+				|| !ObservedRow.HasOwnProp("classification")
+			return ""
+		for Status in ["newer", "invalid", "unsupported"]
+			if ObservedRow.classification == Status
+				return Status
+		return ""
+	}
 	if Request == "consume_read_failure" {
 		if !Destinations.Has(Key)
 			return 0
@@ -1432,6 +1446,18 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 /** Read-only constructor handoff; actual migration keeps its later boot timing. */
 ConfigSchemaPrepareSource(Path) {
 	return ConfigMigrateBoot(Path, "prepare")
+}
+
+/**
+ * Observes a retained incompatible boot schema without opening or changing it.
+ * @param {String} Path Exact boot configuration destination.
+ * @returns {String} newer/invalid/unsupported, or empty when no such state exists.
+ */
+ConfigSchemaReadOnlyStatus(Path) {
+	try Status := ConfigMigrateBoot(Path, "read_only_status")
+	catch
+		return ""
+	return Status is String ? Status : ""
 }
 
 /** Captures only genuinely initialized fresh source permission before effects. */

@@ -3285,5 +3285,7 @@
 	"healthcheck.export.privacy_notice": "Ce rapport partage uniquement les faits techniques autorisés. Les logs, textes libres, chemins et informations identifiantes sont exclus, même lorsque les détails sont activés. Les tests locaux de la page ne sont pas inclus.",
 	"sg_actions.llm_translate_context": "🌐 Traduire la phrase actuelle [configurable]",
 	"menu.about.startup_other_command_reason": "Autre démarrage configuré : Le démarrage est configuré pour une autre commande ou installation. Son réglage est conservé.",
-	"menu.llm.model_parent_with_health": "%sModèle sélectionné : %s"
+	"menu.llm.model_parent_with_health": "%sModèle sélectionné : %s",
+	"config.read_only.newer_schema": "Cette configuration a été enregistrée par une version plus récente d’ErgoptiPlus. Vos réglages ont été préservés. Mettez ErgoptiPlus à jour, puis rechargez-le avant de modifier les réglages.",
+	"menu.llm.save_unavailable": "Indisponible : reprenez ErgoptiPlus s’il est en pause, ou ouvrez les diagnostics pour savoir pourquoi les réglages ne peuvent pas être enregistrés."
 }

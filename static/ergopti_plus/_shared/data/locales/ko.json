@@ -3285,5 +3285,7 @@
 	"healthcheck.export.privacy_notice": "이 보고서는 허용된 기술 정보만 공유합니다. 상세 정보를 켜도 로그, 자유 형식 텍스트, 경로 및 식별 정보는 제외됩니다. 로컬 페이지 테스트는 포함되지 않습니다.",
 	"sg_actions.llm_translate_context": "🌐 현재 문장 번역 [설정 가능]",
 	"menu.about.startup_other_command_reason": "다른 시작 명령: 시작이 다른 명령 또는 설치에 설정되어 있습니다. 기존 설정은 유지됩니다.",
-	"menu.llm.model_parent_with_health": "%s선택된 모델: %s"
+	"menu.llm.model_parent_with_health": "%s선택된 모델: %s",
+	"config.read_only.newer_schema": "이 구성은 더 최신 버전의 ErgoptiPlus에서 저장되었습니다. 설정은 그대로 보존되었습니다. 설정을 변경하기 전에 ErgoptiPlus를 업데이트하고 다시 불러오세요.",
+	"menu.llm.save_unavailable": "사용할 수 없음: ErgoptiPlus가 일시 중지되어 있다면 재개하거나, 진단을 열어 설정을 저장할 수 없는 이유를 확인하세요."
 }

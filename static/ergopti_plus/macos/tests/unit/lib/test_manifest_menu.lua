@@ -746,3 +746,50 @@ helpers.describe("fixed feature parents: actual Mac component owners (fixed-feat
 end)
 
 require("test.menu_top_level_separator_contract").register(helpers, "macos")
+
+
+helpers.describe("reasoned toggle presentation", function()
+	helpers.it("reasoned-toggle: disabled state names the reason and removes the command", function()
+		local document = [[{"reasoned_toggle":[{"type":"toggle","id":"power","category":"LLM","i18n":"contract.toggle","checked_when":["on"],"disabled_when":["ready"],"disabled_reason_key":"contract.reason"}]}]]
+		fixture.with_manifest(document, nil, function(Menu, manifest_path)
+			local translated = package.loaded["infra.i18n"]
+			local old_get = translated.get
+			translated.get = function(key)
+				if key == "contract.toggle" then return "AI suggestions" end
+				if key == "contract.reason" then return "Saving is unavailable: Keep this configuration." end
+				return old_get(key)
+			end
+			local ok, failure = xpcall(function()
+				local ready, calls = false, 0
+				local action = function() calls = calls + 1 end
+				local context = { commands = { power = action }, state_getters = {
+					on = function() return true end, ready = function() return ready end,
+				} }
+				local linux = assert(require("menu.renderer").new({ platform = "linux",
+					manifest_path = function() return manifest_path end,
+					json_decode = require("adapters.json_codec").decode, i18n = translated,
+					logger = helpers.make_logger_stub() }))
+				for _, renderer in ipairs({ Menu, linux }) do
+					ready = false
+					local before_calls = calls
+					local disabled = renderer.build("reasoned_toggle", "LLM", nil, nil, context)
+					helpers.assert_eq(#disabled, 1)
+					helpers.assert_eq(disabled[1].title, "AI suggestions — Saving is unavailable")
+					helpers.assert_eq(disabled[1].disabled, true)
+					helpers.assert_eq(disabled[1].checked, true)
+					helpers.assert_nil(disabled[1].fn, "a reasoned disabled switch has no delivery callback")
+					ready = true
+					local enabled = renderer.build("reasoned_toggle", "LLM", nil, nil, context)
+					helpers.assert_eq(enabled[1].title, "AI suggestions")
+					helpers.assert_nil(enabled[1].disabled)
+					helpers.assert_eq(enabled[1].checked, true)
+					helpers.assert_true(rawequal(enabled[1].fn, action))
+					enabled[1].fn()
+					helpers.assert_eq(calls, before_calls + 1)
+				end
+			end, debug.traceback)
+			translated.get = old_get
+			if not ok then error(failure, 0) end
+		end)
+	end)
+end)

@@ -3285,5 +3285,7 @@
 	"healthcheck.export.privacy_notice": "Este relatório partilha apenas dados técnicos permitidos. Registos, texto livre, caminhos e dados identificativos são excluídos mesmo com os detalhes ativados. Os testes locais da página não estão incluídos.",
 	"sg_actions.llm_translate_context": "🌐 Traduzir a frase atual [configurável]",
 	"menu.about.startup_other_command_reason": "Outro comando de arranque: O arranque está configurado para outro comando ou instalação. A configuração existente é mantida.",
-	"menu.llm.model_parent_with_health": "%sModelo selecionado: %s"
+	"menu.llm.model_parent_with_health": "%sModelo selecionado: %s",
+	"config.read_only.newer_schema": "Esta configuração foi guardada por uma versão mais recente do ErgoptiPlus. As suas definições foram preservadas. Atualize o ErgoptiPlus e recarregue-o antes de alterar as definições.",
+	"menu.llm.save_unavailable": "Indisponível: retome o ErgoptiPlus se estiver em pausa ou abra o Diagnóstico para verificar por que não é possível guardar as definições."
 }
