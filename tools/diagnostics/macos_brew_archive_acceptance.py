@@ -12,6 +12,7 @@ import argparse
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import math
 import os
 from pathlib import Path
 import plistlib
@@ -713,6 +714,60 @@ def _run_appleevent_sender(children, receiver, group, role, arguments, *, confin
         raise
 
 
+def _validate_command_timeout(packet):
+    """Closed observations only; these timings cannot authorize or extend a wait."""
+    keys = {
+        "schema",
+        "command",
+        "stage",
+        "budget_seconds",
+        "request_deadline_ns",
+        "started_ns",
+        "expired_ns",
+        "spent_ns",
+    }
+    require(type(packet) is dict and set(packet) == keys, "Unadmitted command timeout fields")
+    require(
+        type(packet["schema"]) is int and packet["schema"] == 1, "Unadmitted command timeout schema"
+    )
+    require(
+        type(packet["command"]) is str
+        and packet["command"] in ("permission-request", "consent-observer", "other"),
+        "Unadmitted command timeout identity",
+    )
+    require(
+        type(packet["stage"]) is str
+        and packet["stage"] in ("readiness", "ui-observer", "exit-wait"),
+        "Unadmitted command timeout stage",
+    )
+    budget = packet["budget_seconds"]
+    require(
+        type(budget) in (int, float) and 0 < budget <= 180 and math.isfinite(budget),
+        "Unadmitted command timeout budget",
+    )
+    limit = 2**64 - 1
+    for key in ("started_ns", "expired_ns", "spent_ns"):
+        require(
+            type(packet[key]) is int and 0 <= packet[key] <= limit,
+            "Unadmitted command timeout clock",
+        )
+    deadline = packet["request_deadline_ns"]
+    require(
+        deadline is None or (type(deadline) is int and 0 < deadline <= limit),
+        "Unadmitted command timeout request deadline",
+    )
+    require(
+        packet["command"] != "permission-request" or deadline is not None,
+        "Command timeout lost its original request deadline",
+    )
+    require(
+        packet["expired_ns"] >= packet["started_ns"]
+        and packet["spent_ns"] == packet["expired_ns"] - packet["started_ns"],
+        "Unadmitted command timeout duration",
+    )
+    return dict(packet)
+
+
 class PhaseEvidence:
     """Export constructed bounded facts, never fixture files or raw command streams."""
 
@@ -732,6 +787,7 @@ class PhaseEvidence:
         self.failed = False
         self.ownership_closed = False
         self.previous = None
+        self.first_timeout = None
         if directory is not None:
             require(
                 hasattr(os, "O_NOFOLLOW"),
@@ -752,6 +808,21 @@ class PhaseEvidence:
                 except OSError:
                     pass  # Preserve the acquisition refusal or interruption.
                 raise
+
+    def retain_timeout(self, fact, *, groups=()):
+        """Retain the first typed timeout through all later bounded checkpoints."""
+        try:
+            admitted = _validate_command_timeout(fact)
+            if getattr(self, "first_timeout", None) is None:
+                self.first_timeout = admitted
+            else:
+                _validate_command_timeout(self.first_timeout)
+            return self.record("command.timeout", status="refused", groups=groups)
+        except OwnedProcessInterrupted:
+            raise
+        except Exception:
+            self.failed = True
+            return False
 
     def record(
         self,
@@ -854,6 +925,9 @@ class PhaseEvidence:
                     and not packet["groups"][0]["closed"],
                     "Sender observation lost its exact unreaped receiver",
                 )
+            first_timeout = getattr(self, "first_timeout", None)
+            if first_timeout is not None:
+                packet["first_timeout"] = _validate_command_timeout(first_timeout)
             semantic = json.dumps(packet, sort_keys=True)
             if semantic == self.previous:
                 return not self.failed
@@ -1104,6 +1178,7 @@ class Children:
         self.groups = {}
         self.captures = {}
         self.capture_identities = {}
+        self._timeout_request_deadline_ns = None
 
     def record_debt(self, entry):
         """Repeated retirement attempts keep one diagnostic per exact owned resource."""
@@ -1182,6 +1257,29 @@ class Children:
         if request is not None:
             require(timeout == request.timeout, "Owned Automation request budget changed")
             require(request.remaining() > 0, "Owned Automation request exceeded deadline")
+        # Diagnostic samples never schedule native work. The opaque group-wait
+        # deadline is deliberately not reconstructed from a new timer.
+        timeout_started_ns = None
+        timeout_stage = "exit-wait"
+        timeout_deadline_ns = (
+            request.deadline_ns
+            if request is not None
+            else getattr(self, "_timeout_request_deadline_ns", None)
+        )
+        timeout_command = (
+            "permission-request"
+            if request is not None and request[-1] == "permission-request"
+            else "consent-observer"
+            if Path(arguments[0]) == self.root / "native-appleevent-consent"
+            else "other"
+        )
+        if self.evidence is not None and getattr(self.evidence, "descriptor", None) is not None:
+            try:
+                timeout_started_ns = time.monotonic_ns()
+            except OwnedProcessInterrupted:
+                raise  # No child/readiness input has yet been acquired.
+            except Exception:
+                pass  # Optional telemetry must not alter acquisition or its primary.
         readiness = None
         if request is not None and request.readiness_nonce is not None:
             require(after_start is not None, "Owned Automation readiness observer unavailable")
@@ -1201,8 +1299,18 @@ class Children:
             if request is not None:
                 require(request.remaining() > 0, "Owned Automation request exceeded deadline")
                 if after_start is not None:
+                    timeout_stage = "readiness" if readiness is not None else "ui-observer"
                     if readiness is None or readiness.wait(process):
-                        after_start(process, request.deadline_ns / 1_000_000_000)
+                        timeout_stage = "ui-observer"
+                        previous_timeout_deadline = getattr(
+                            self, "_timeout_request_deadline_ns", None
+                        )
+                        self._timeout_request_deadline_ns = request.deadline_ns
+                        try:
+                            after_start(process, request.deadline_ns / 1_000_000_000)
+                        finally:
+                            self._timeout_request_deadline_ns = previous_timeout_deadline
+                timeout_stage = "exit-wait"
                 remaining = request.remaining()
                 require(remaining > 0, "Owned Automation request exceeded deadline")
                 self.groups[process].wait_for_exit(remaining)
@@ -1210,11 +1318,38 @@ class Children:
             elif after_start is None:
                 self.groups[process].wait_for_exit(timeout)
             else:
+                original_after_start = after_start
+
+                def after_start(callback_process, callback_deadline):
+                    nonlocal timeout_stage
+                    timeout_stage = "ui-observer"
+                    result = original_after_start(callback_process, callback_deadline)
+                    timeout_stage = "exit-wait"
+                    return result
+
                 deadline = time.monotonic() + timeout
                 after_start(process, deadline)
                 self.groups[process].wait_for_exit(max(0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             failure = AdmissionError("Owned native command exceeded deadline")
+            if timeout_started_ns is not None:
+                try:
+                    expired_ns = time.monotonic_ns()
+                    self.evidence.retain_timeout(
+                        {
+                            "schema": 1,
+                            "command": timeout_command,
+                            "stage": timeout_stage,
+                            "budget_seconds": timeout,
+                            "request_deadline_ns": timeout_deadline_ns,
+                            "started_ns": timeout_started_ns,
+                            "expired_ns": expired_ns,
+                            "spent_ns": expired_ns - timeout_started_ns,
+                        },
+                        groups=[self.groups[child] for child in self.active],
+                    )
+                except BaseException:
+                    pass  # Preserve this exact primary; native retirement still runs below.
         except BaseException as error:
             failure = error
         finally:

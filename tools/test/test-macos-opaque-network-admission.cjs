@@ -1189,3 +1189,258 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 } finally {
 	fs.rmSync(temporary, { recursive: true, force: true });
 }
+
+// The actual POSIX corpus uses existing native owners. Portable shell cases do
+// not grant real macOS network, package, image or device acceptance.
+async function receiveSelectedReleaseCorpus() {
+	if (process.platform === 'win32') {
+		console.log(
+			'UNEXECUTED - macOS release-stage shell corpus requires Linux/Darwin POSIX cohort ownership; Windows updater is outside this corpus; no native credit'
+		);
+		return;
+	}
+	assert.ok(['linux', 'darwin'].includes(process.platform), 'supported POSIX cohort owner');
+	const { pythonExecutable } = require('../lib/python.cjs');
+	const { createHash } = require('node:crypto');
+	const { spawn } = require('node:child_process');
+	const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
+	const sources = new Map();
+	function captureSource(relative) {
+		const filename = path.join(root, relative);
+		const fact = fs.lstatSync(filename, { bigint: true });
+		assert.ok(fact.isFile() && !fact.isSymbolicLink() && fact.size <= 1024 * 1024);
+		const bytes = fs.readFileSync(filename);
+		if (sources.has(relative)) {
+			const held = sources.get(relative);
+			assert.equal(fact.dev, held.fact.dev);
+			assert.equal(fact.ino, held.fact.ino);
+			assert.equal(hash(bytes), held.sha256);
+			return held.bytes;
+		}
+		sources.set(relative, { filename, fact, bytes, sha256: hash(bytes) });
+		return bytes;
+	}
+	function revalidateSources() {
+		for (const source of sources.values()) {
+			const fact = fs.lstatSync(source.filename, { bigint: true });
+			assert.ok(fact.isFile() && !fact.isSymbolicLink());
+			assert.equal(fact.dev, source.fact.dev);
+			assert.equal(fact.ino, source.fact.ino);
+			assert.equal(hash(fs.readFileSync(source.filename)), source.sha256);
+		}
+	}
+	const diagnosticRelative = 'tools/diagnostics/macos_release_stage_route_test.py';
+	const stageRelative = 'static/ergopti_plus/macos/adapters/release_stage.sh';
+	captureSource(diagnosticRelative);
+	captureSource(stageRelative);
+	captureSource('tools/lib/python.cjs');
+	const interpreter = pythonExecutable();
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-release-owned-ci-'));
+	fs.chmodSync(directory, 0o700);
+	fs.mkdirSync(path.join(directory, 'cases'), { mode: 0o700 });
+	const receiptPath = path.join(directory, 'corpus.json');
+	const snapshot = path.join(directory, 'source');
+	function snapshotSource(relative) {
+		const bytes = captureSource(relative);
+		const filename = path.join(snapshot, relative);
+		fs.mkdirSync(path.dirname(filename), { recursive: true, mode: 0o700 });
+		fs.writeFileSync(filename, bytes, { flag: 'wx', mode: 0o600 });
+		return filename;
+	}
+	const diagnostic = snapshotSource(diagnosticRelative);
+	const stage = path.join(root, stageRelative);
+	let cancelled = false;
+	let guardian = null;
+	let phase = null;
+	let admitted = false;
+	const descriptors = [];
+	const cancel = () => {
+		cancelled = true;
+		if (phase) phase.requestActiveCancellation();
+		if (guardian && guardian.exitCode === null && guardian.signalCode === null) {
+			try {
+				guardian.kill('SIGTERM');
+			} catch {
+				// Cancellation remains failure; native closure is still mandatory.
+			}
+		}
+	};
+	process.on('SIGTERM', cancel);
+	process.on('SIGINT', cancel);
+	try {
+		if (process.platform === 'linux') {
+			phase = require(snapshotSource('tools/test/run-linux-managed-http-native.cjs'));
+			const ownerRelative = 'tools/build/stage-linux-network-runtime.py';
+			const owner = snapshotSource(ownerRelative);
+			const worker = snapshotSource('tools/test/run-linux-managed-http-phase.py');
+			snapshotSource('tools/lib/git_bash.py');
+			snapshotSource('tools/__init__.py');
+			const deadline = process.hrtime.bigint() + 120000000000n;
+			const received = await phase.ownPhase({
+				command: interpreter,
+				args: ['-B', diagnostic, stage, receiptPath],
+				env: process.env,
+				cwd: root,
+				work: directory,
+				label: 'corpus',
+				worker,
+				owner,
+				ownerSha: sources.get(ownerRelative).sha256,
+				kind: 'command',
+				budgetMs: 120000,
+				gateDeadline: deadline,
+				spawnChild: (_command, args, options) => spawn(interpreter, args, options)
+			});
+			assert.equal(received.error, null);
+			assert.equal(received.status, 0);
+			assert.equal(received.signal, null);
+			assert.equal(phase.hasRetainedPhases(), false);
+		} else {
+			const owner = snapshotSource('tools/diagnostics/macos_owned_process.py');
+			const closedPath = path.join(directory, 'native-closed.json');
+			for (const name of ['guardian.stdout', 'guardian.stderr']) {
+				descriptors.push({
+					fd: fs.openSync(path.join(directory, name), 'wx', 0o600),
+					state: 'open'
+				});
+			}
+			const received = await new Promise((resolve) => {
+				let refused = false;
+				guardian = spawn(
+					interpreter,
+					[
+						'-B',
+						owner,
+						'run',
+						closedPath,
+						'120',
+						'--',
+						interpreter,
+						'-B',
+						diagnostic,
+						stage,
+						receiptPath
+					],
+					{ cwd: root, env: process.env, stdio: ['ignore', descriptors[0].fd, descriptors[1].fd] }
+				);
+				guardian.once('spawn', () => {
+					if (cancelled) cancel();
+				});
+				guardian.once('error', () => {
+					refused = true;
+				});
+				guardian.once('close', (status, signal) => resolve({ status, signal, refused }));
+			});
+			for (const descriptor of descriptors) {
+				descriptor.state = 'closing';
+				fs.closeSync(descriptor.fd);
+				descriptor.state = 'closed';
+			}
+			assert.equal(received.refused, false);
+			assert.equal(received.status, 0);
+			assert.equal(received.signal, null);
+			const fact = fs.lstatSync(closedPath);
+			assert.ok(fact.isFile() && !fact.isSymbolicLink() && fact.size <= 1024);
+			assert.equal(fact.uid, process.getuid());
+			assert.equal(fact.mode & 0o777, 0o600);
+			assert.equal(fact.nlink, 1);
+			const closed = JSON.parse(fs.readFileSync(closedPath, 'utf8'));
+			assert.deepEqual(Object.keys(closed).sort(), [
+				'closed',
+				'exit_status',
+				'group_id',
+				'guardian_pid',
+				'schema',
+				'worker_pid'
+			]);
+			assert.equal(closed.schema, 1);
+			assert.equal(closed.guardian_pid, guardian.pid);
+			assert.ok(Number.isInteger(closed.worker_pid) && closed.worker_pid > 0);
+			assert.equal(closed.group_id, closed.worker_pid);
+			assert.equal(closed.closed, true);
+			assert.equal(closed.exit_status, 0);
+		}
+		assert.equal(cancelled, false);
+		revalidateSources();
+		for (const [relative, source] of sources) {
+			const filename = path.join(snapshot, relative);
+			if (fs.existsSync(filename)) assert.equal(hash(fs.readFileSync(filename)), source.sha256);
+		}
+		const fact = fs.lstatSync(receiptPath);
+		assert.ok(fact.isFile() && !fact.isSymbolicLink() && fact.size <= 1024 * 1024);
+		const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+		assert.deepEqual(Object.keys(receipt).sort(), [
+			'failures',
+			'kind',
+			'no_genuine_native_qualification',
+			'observations',
+			'script',
+			'script_sha256',
+			'version'
+		]);
+		assert.equal(receipt.version, 1);
+		assert.equal(receipt.kind, 'portable-authored-shell-only');
+		assert.equal(receipt.no_genuine_native_qualification, true);
+		assert.equal(receipt.script, fs.realpathSync(stage));
+		assert.equal(receipt.script_sha256, sources.get(stageRelative).sha256);
+		assert.deepEqual(receipt.failures, []);
+		assert.ok(Array.isArray(receipt.observations));
+		assert.equal(receipt.observations.length, 50);
+		assert.equal(new Set(receipt.observations.map((entry) => entry.name)).size, 50);
+		for (const observation of receipt.observations) {
+			assert.deepEqual(Object.keys(observation).sort(), [
+				'actual_calls',
+				'actual_rows',
+				'actual_status',
+				'errors',
+				'expected_calls',
+				'expected_status',
+				'name',
+				'stderr_hex',
+				'stdout_hex'
+			]);
+			assert.equal(typeof observation.name, 'string');
+			assert.ok(observation.name.length > 0);
+			assert.ok([0, 10, 21, 22, 25, 26, 27].includes(observation.expected_status));
+			assert.equal(observation.actual_status, observation.expected_status);
+			assert.deepEqual(observation.actual_calls, observation.expected_calls);
+			assert.deepEqual(observation.errors, []);
+		}
+		admitted = true;
+		for (const observation of receipt.observations) {
+			console.log(`ok - selected-release receipt ${observation.name} (portable shell only)`);
+		}
+	} finally {
+		for (const descriptor of descriptors) {
+			if (descriptor.state !== 'open') continue;
+			descriptor.state = 'closing';
+			try {
+				fs.closeSync(descriptor.fd);
+				descriptor.state = 'closed';
+			} catch {
+				descriptor.state = 'uncertain-close';
+				admitted = false;
+			}
+		}
+		if (descriptors.some((descriptor) => descriptor.state !== 'closed')) {
+			admitted = false;
+			throw new Error('Owned capture retirement refused');
+		}
+		if (admitted && !cancelled) fs.rmSync(directory, { recursive: true, force: true });
+		// Failure preserves all case inputs/captures. A live Linux phase keeps
+		// its original watcher, child and cancellation admission referenced.
+		if (!phase || !phase.hasRetainedPhases()) {
+			process.removeListener('SIGTERM', cancel);
+			process.removeListener('SIGINT', cancel);
+		}
+	}
+}
+
+(async () => {
+	await receiveSelectedReleaseCorpus();
+})().catch(() => {
+	console.error(
+		'FAIL - selected-release cohort capability, source, receipt or retirement refused; owned inputs retained'
+	);
+	process.exitCode = 1;
+});

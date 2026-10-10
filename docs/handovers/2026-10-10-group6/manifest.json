@@ -1,0 +1,40 @@
+{
+	"version": 1,
+	"feature_candidate": "1576dce4a7cead68d252829a4e1c461e08e7130f",
+	"dev_at_snapshot": "591d59a942780465bca95956dc3cc9b2e960fa9e",
+	"archives": {
+		"brew-capability-r3.tar.gz": {
+			"sha256": "350b39cb56880ff4c72037af443cc7b9436b6a0385c93a0087571a6024821751",
+			"bytes": 226776,
+			"regular_members": 19
+		},
+		"catalogue-r6-receiving.tar.gz": {
+			"sha256": "68809b99b8bcce54ac2f38d7710ad66198b7e92d07efcc8f41c7c0fcfe2bdc84",
+			"bytes": 135168,
+			"regular_members": 67
+		},
+		"followup-source-preparations.tar.gz": {
+			"sha256": "f682122fc6ca2a132c50ba16e19db9dc2425119cfbb1de5b088bf65b76792c6d",
+			"bytes": 183926,
+			"regular_members": 42
+		},
+		"original-preparations.tar.gz": {
+			"sha256": "507be224c1cfe686148b53e216de44abfc6d5814cb69ff93465e59742ecc3281",
+			"bytes": 633118,
+			"regular_members": 67
+		},
+		"receiving-source-preparations.tar.gz": {
+			"sha256": "691e966ea11fcbc07cb19acaf5599f8e3dfd9eb34244794deef2f95ae441efdb",
+			"bytes": 207330,
+			"regular_members": 101
+		}
+	},
+	"source_execution_during_snapshot": 0,
+	"todo_removed": [],
+	"limits": [
+		"Historical locators are provenance, not live authority",
+		"Never apply a saved patch before checking actual preimages and ownership",
+		"Superseded revisions are preserved as evidence only",
+		"An archived patch is not integrated or native-qualified functionality"
+	]
+}
