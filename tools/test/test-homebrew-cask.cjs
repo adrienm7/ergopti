@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 154 tests in /);
+	assert.match(result.stderr, /Ran 158 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -832,6 +832,36 @@ check('archive owners publish bounded typed phase evidence before native work', 
 	assert.match(writer, /testRefusedPublicationNeverReplacesAnUnclosedCheckpoint/);
 });
 
+// Bind the approved wrapper before checking the original mandatory native body.
+function nativeHttpFullBody(script) {
+	const prefix = [
+		'set -euo pipefail',
+		'receipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"',
+		'mkdir -p "$(dirname "$receipt")"',
+		'node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"',
+		'mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"',
+		'if [ "$mode" = deferred ]; then',
+		'    echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."',
+		'elif [ "$mode" = full ]; then',
+		''
+	].join('\n');
+	const suffix = 'else\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
+	assert.ok(script.startsWith(prefix), 'native HTTP requires the exact approved receipt prefix');
+	assert.ok(script.endsWith(suffix), 'unknown native HTTP dispositions remain fatal');
+	assert.strictEqual(script.split(prefix).length, 2);
+	assert.strictEqual(script.split(suffix).length, 2);
+	const body = script.slice(prefix.length, -suffix.length);
+	assert.ok(body.length > 100, 'the full native command body is nonempty');
+	return body
+		.split('\n')
+		.map((line) => {
+			if (line === '') return line;
+			assert.ok(line.startsWith('    '), 'native HTTP command stays inside the full branch');
+			return line.slice(4);
+		})
+		.join('\n');
+}
+
 check('shared native process ownership controls remain registered and mandatory', () => {
 	const result = spawnSync(
 		process.platform === 'win32' ? 'python' : 'python3',
@@ -860,7 +890,18 @@ check('shared native process ownership controls remain registered and mandatory'
 	]) {
 		const steps = workflow.jobs[job].steps.filter((step) => step.name === name);
 		assert.strictEqual(steps.length, 1, `${job} needs one actual native receiving owner`);
-		const script = steps[0].run;
+		const rawScript = steps[0].run;
+		const script = job === 'managed-ollama-native' ? nativeHttpFullBody(rawScript) : rawScript;
+		if (job === 'managed-ollama-native') {
+			for (const [before, after] of [
+				['--validate-scope-receipt "$receipt"', '--validate-scope-receipt "foreign"'],
+				['qualified=false; original command not executed.', 'qualified=true; command passed.'],
+				['    exit 1\nfi\n', '    exit 0\nfi\n']
+			]) {
+				assert.ok(rawScript.includes(before));
+				assert.throws(() => nativeHttpFullBody(rawScript.replace(before, after)));
+			}
+		}
 		assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
 		assert.strictEqual(script.split(command).length - 1, 1);
 		assert.ok(script.includes(`${command} || status=1\n`));
@@ -1277,7 +1318,10 @@ check('normal Automation consent stays explicitly scoped and independently admit
 	]) {
 		assert.equal(original[file].split(before).length - 1, 1, 'One independent scope mutation');
 		assert.throws(() =>
-			assertScopedConsent({ ...original, [file]: original[file].replace(before, after) })
+			assertScopedConsent({
+				...original,
+				[file]: original[file].replace(before, after)
+			})
 		);
 	}
 });
@@ -1423,6 +1467,103 @@ check(
 			helper,
 			/original_stderr, identity = appleevent_sender_identity_frame\(result.stderr\)/
 		);
+	}
+);
+
+check(
+	'passive identity facts retain the exact refused window and original action admission',
+	() => {
+		const ui = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_consent.m'),
+			'utf8'
+		);
+		// Mask C/Objective-C comments and literals before inspecting executable
+		// spelling. Line splicing precedes lexical boundaries as in C phase 2.
+		function executableSource(source) {
+			const joined = source.replace(/\\\r?\n/g, '');
+			let output = '',
+				at = 0;
+			while (at < joined.length) {
+				const start = at;
+				if (joined.startsWith('//', at)) {
+					const end = joined.indexOf('\n', at + 2);
+					at = end < 0 ? joined.length : end;
+				} else if (joined.startsWith('/*', at)) {
+					const end = joined.indexOf('*/', at + 2);
+					at = end < 0 ? joined.length : end + 2;
+				} else if (joined[at] === '"' || joined[at] === "'") {
+					const quote = joined[at++];
+					while (at < joined.length) {
+						if (joined[at] === '\\') at += Math.min(2, joined.length - at);
+						else if (joined[at++] === quote) break;
+					}
+				} else {
+					output += joined[at++];
+					continue;
+				}
+				output += joined.slice(start, at).replace(/[^\n]/g, ' ');
+			}
+			return output;
+		}
+		function assertPassive(source) {
+			source = executableSource(source);
+			const begin = source.indexOf('static id identity_attribute(');
+			const end = source.indexOf('static BOOL inspect_window(', begin);
+			assert.ok(begin >= 0 && end > begin);
+			const passive = source.slice(begin, end);
+			assert.match(passive, /arrayWithObject:\(__bridge id\)window/);
+			assert.match(passive, /identityDeadline - NSProcessInfo\.processInfo\.systemUptime/);
+			assert.match(passive, /MIN\(0\.1, remaining\)/);
+			assert.match(passive, /factIdentityNodes >= 256/);
+			assert.match(passive, /\[value length\] > 4096/);
+			assert.match(passive, /pending\.count \+ children\.count > 256/);
+			assert.doesNotMatch(
+				passive,
+				/AXUIElementPerformAction|AXUIElementCreateApplication|NSWorkspace|senderSeen|targetSeen|allowButtons|factCandidates|factMatches/
+			);
+			assert.match(
+				source,
+				/if \(firstButton && title == nil && titleError == kAXErrorAttributeUnsupported\)\s*observe_refused_identity\(window, sender, receiver\);\s*return NO;/
+			);
+			assert.match(source, /identityDeadline = NSProcessInfo\.processInfo\.systemUptime \+ 3;/);
+			assert.match(
+				source,
+				/if \(extendedLength > 0 && extendedLength < \(int\)sizeof\(extended\)\) \{/
+			);
+			assert.equal((source.match(/char (?:packet|extended)\[1024\]/g) || []).length, 2);
+		}
+		assertPassive(ui);
+		const activeInvocation = ui.match(
+			/if \(firstButton && title == nil && titleError == kAXErrorAttributeUnsupported\)\s*observe_refused_identity\(window, sender, receiver\);\s*return NO;/
+		);
+		assert.ok(activeInvocation, 'One genuine executable refusal sequence');
+		assert.equal(ui.split(activeInvocation[0]).length - 1, 1);
+		const literalInvocation = activeInvocation[0].replace(/\s+/g, ' ');
+		for (const hidden of [
+			`/* ${activeInvocation[0]} */\nreturn NO;`,
+			`NSString *lookalike = @${JSON.stringify(literalInvocation)};\nreturn NO;`,
+			`// removed diagnostic \\\n${literalInvocation}\nreturn NO;`
+		]) {
+			assert.throws(() => assertPassive(ui.replace(activeInvocation[0], hidden)));
+		}
+		const quotedMarkers = executableSource(
+			'id text = @"/* comment marker */ // still a string \\\"quote\\\"";\nactive(); // inactive();\n'
+		);
+		assert.match(quotedMarkers, /active\(\);/);
+		assert.doesNotMatch(quotedMarkers, /comment marker|still a string|inactive\(\)/);
+
+		for (const [before, after] of [
+			['MIN(0.1, remaining)', '3'],
+			['factIdentityNodes >= 256', 'factIdentityNodes >= 1024'],
+			[
+				'observe_refused_identity(window, sender, receiver);',
+				'observe_refused_identity(otherWindow, sender, receiver);'
+			],
+			['extendedLength < (int)sizeof(extended)', 'extendedLength < 8192']
+		]) {
+			assert.equal(ui.split(before).length - 1, 1);
+			assert.throws(() => assertPassive(ui.replace(before, after)));
+		}
 	}
 );
 

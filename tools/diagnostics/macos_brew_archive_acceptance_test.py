@@ -4763,5 +4763,117 @@ class ForegroundOriginalDeadlineControls(unittest.TestCase):
         self.assertNotIn("sleep(", body)
 
 
+class PassiveWindowIdentityControls(unittest.TestCase):
+    """Closed portable facts; these controls never claim native AX traversal."""
+
+    @staticmethod
+    def packet():
+        packet = RefusedButtonLabelFactControls().packet()
+        packet["identity"] = {
+            "schema": 1,
+            "sender": True,
+            "receiver": False,
+            "complete": True,
+            "nodes": 8,
+            "refusal": "none",
+            "error": 0,
+        }
+        return packet
+
+    def test_complete_and_partial_scalar_observations_preserve_original_refusal(self):
+        for sender, receiver in ((False, False), (True, False), (False, True), (True, True)):
+            packet = self.packet()
+            packet["identity"].update(sender=sender, receiver=receiver)
+            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+            self.assertEqual(packet["candidates"], 0)
+            self.assertEqual(packet["matches"], 0)
+            self.assertEqual(packet["first_error"], -25205)
+        for refusal in (
+            "deadline",
+            "timeout",
+            "node-limit",
+            "node-type",
+            "role",
+            "value",
+            "children",
+        ):
+            packet = self.packet()
+            packet["identity"].update(complete=False, refusal=refusal, error=-25212)
+            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+
+    def test_unadmitted_text_and_wrong_scalar_or_completion_cannot_enter_evidence(self):
+        for key, value in (
+            ("schema", True),
+            ("sender", 1),
+            ("receiver", "private receiver"),
+            ("complete", 1),
+            ("nodes", True),
+            ("nodes", 257),
+            ("nodes", -1),
+            ("error", True),
+            ("error", 2**31),
+            ("refusal", "private UI title"),
+            ("refusal", "deadline"),
+            ("complete", False),
+            ("nodes", 0),
+        ):
+            packet = self.packet()
+            packet["identity"][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(probe.AdmissionError):
+                probe._validate_owned_automation_ui_fact(packet)
+        for change in ("extra", "missing", "different-primary", "missing-button"):
+            packet = self.packet()
+            if change == "extra":
+                packet["identity"]["title"] = "private"
+            elif change == "missing":
+                del packet["identity"]["sender"]
+            elif change == "different-primary":
+                packet["first_error"] = -25212
+            else:
+                del packet["first_button"]
+            with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
+                probe._validate_owned_automation_ui_fact(packet)
+
+    def test_real_private_capture_keeps_primary_refusal_even_when_both_names_observed(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            evidence_dir = root / "evidence"
+            evidence_dir.mkdir(mode=0o700)
+            evidence = probe.PhaseEvidence(evidence_dir)
+            owner = probe.Children(root, evidence=evidence)
+            packet = self.packet()
+            packet["identity"]["receiver"] = True
+            primary = subprocess.CompletedProcess(
+                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+            )
+
+            def producer(arguments, **options):
+                self.assertEqual(options, {"check": False, "timeout": 2})
+                Path(arguments[-1]).write_text(json.dumps(packet, separators=(",", ":")))
+                return primary
+
+            owner.run = Mock(side_effect=producer)
+            try:
+                self.assertIs(
+                    probe._owned_automation_ui_run(
+                        owner, ["helper", "sender", "receiver", "73"], 2
+                    ),
+                    primary,
+                )
+                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
+                self.assertEqual(receipt["native_ui"], packet)
+                self.assertEqual(receipt["status"], "refused")
+                self.assertFalse(receipt["ownership_closed"])
+                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
+            finally:
+                evidence.close()
+
+    def test_legacy_projection_without_optional_identity_remains_exact(self):
+        packet = self.packet()
+        del packet["identity"]
+        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+        self.assertLess(len(json.dumps(self.packet(), separators=(",", ":")).encode()), 1024)
+
+
 if __name__ == "__main__":
     unittest.main()

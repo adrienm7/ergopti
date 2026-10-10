@@ -777,7 +777,9 @@ _ArtifactQueuedTlsFailureFactControls() {
 	AssertEqual(12, Fact["received"])
 	AssertEqual(1, Fact["pending"])
 	AssertEqual(Raw, _ArtifactQueuedTlsFailureFact("Private unrelated exception text`r`n" . Raw . "`r`n")["frame"], "only the complete closed row can be published")
+	AssertEqual(StrLen(Raw) + 1, StrLen(Raw . Chr(0)), "the negative fixture contains an actual terminal NUL")
 	for Bad in [Raw . "`n" . Raw, Raw . " secret=x", "prefix " . Raw, Raw . Chr(0),
+		Chr(0) . Raw, "private" . Chr(0) . "`n" . Raw, Raw . "`n" . Chr(0) . "private",
 		StrReplace(Raw, "case=6", "case=7"), StrReplace(Raw, "phase=closed", "phase=private"),
 		StrReplace(Raw, "code=10054", "code=010054"), StrReplace(Raw, "code=10054", "code=+10054"),
 		StrReplace(Raw, "code=10054", "code=2147483648"), StrReplace(Raw, "hresult=-2146232800", "hresult=-2147483649"),

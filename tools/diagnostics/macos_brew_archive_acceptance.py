@@ -1536,7 +1536,8 @@ def _validate_owned_automation_ui_fact(packet):
         "first_error",
     }
     require(
-        type(packet) is dict and set(packet) in (keys, keys | {"first_button"}),
+        type(packet) is dict
+        and set(packet) in (keys, keys | {"first_button"}, keys | {"first_button", "identity"}),
         "Unadmitted Automation UI fact fields",
     )
     require(
@@ -1763,6 +1764,49 @@ def _validate_owned_automation_ui_fact(packet):
                     ),
                     "Refused button label type and family disagree",
                 )
+    if "identity" in packet:
+        identity = packet["identity"]
+        require(
+            packet["first_attribute"] == "button-title"
+            and packet["first_type"] == "absent"
+            and packet["first_error"] == -25205
+            and type(identity) is dict
+            and set(identity)
+            == {"schema", "sender", "receiver", "complete", "nodes", "refusal", "error"},
+            "Unadmitted passive window identity fields or original refusal",
+        )
+        require(
+            type(identity["schema"]) is int
+            and identity["schema"] == 1
+            and all(type(identity[key]) is bool for key in ("sender", "receiver", "complete"))
+            and type(identity["nodes"]) is int
+            and 0 <= identity["nodes"] <= 256
+            and type(identity["error"]) is int
+            and -(2**31) <= identity["error"] < 2**31
+            and type(identity["refusal"]) is str
+            and identity["refusal"]
+            in {
+                "none",
+                "deadline",
+                "timeout",
+                "node-limit",
+                "node-type",
+                "role",
+                "value",
+                "children",
+            },
+            "Unadmitted passive window identity scalar facts",
+        )
+        require(
+            (
+                identity["complete"]
+                and identity["refusal"] == "none"
+                and identity["error"] == 0
+                and identity["nodes"] > 0
+            )
+            or (not identity["complete"] and identity["refusal"] != "none"),
+            "Passive window completion and refusal disagree",
+        )
     return dict(packet)
 
 

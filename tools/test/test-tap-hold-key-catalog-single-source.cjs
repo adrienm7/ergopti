@@ -334,8 +334,8 @@ if (
 }
 
 // Linux owns ordered taps/holds. The native wrapper is source-fenced and
-// composed through the same tap-hold catalogue; simultaneous chords and native
-// state-only tap actions are not declared by this admission.
+// composed through the same tap-hold catalogue. The separately checked
+// simultaneous branch must retain the original source/input/publication owners.
 const manifest = TOML.parse(
 	read(path.join(SP, '_shared/modules/features/manifest.toml')).replace(
 		/^\[\[features\.([^\]]+)\]\]$/gm,
@@ -474,9 +474,12 @@ function savedLinuxOneShotClosure(sources) {
 		!/M\.(?:capture_input_owner|input_owner_current|arm_one_shot|arm_caps_word)\s*\(/.test(
 			bodies.frame
 		) &&
-		hook.includes(
+		(hook.includes(
 			'local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text" }'
-		) &&
+		) ||
+			hook.includes(
+				'local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text", "capture_buffered_input", "buffered_input_current", "buffered_input_view", "retire_buffered_input" }'
+			)) &&
 		hook.includes(
 			'for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do original_input_hook_ports[name] = rawget(M, name) end'
 		) &&
@@ -532,6 +535,67 @@ function savedLinuxOneShotClosure(sources) {
  * @param {string[]} sources Manager, wrapper, owner, menu, Hook and bootstrap source bytes.
  * @returns {boolean} Exact ordered Linux admission, never a chord claim.
  */
+const linuxCombinationScope = stripLineComments(
+	read(path.join(SP, 'linux/infra/key_combinations_scope.lua')),
+	'.lua'
+);
+const linuxCombinationPolicy = stripLineComments(
+	read(path.join(SP, '_shared/lua/tap_hold/key_combinations.lua')),
+	'.lua'
+);
+/** Checks the declared Linux mode only with its original pending-input consumer. */
+function simultaneousLinuxAdmission(
+	declaration,
+	sources,
+	scope = linuxCombinationScope,
+	policy = linuxCombinationPolicy
+) {
+	const [manager, wrapper, owner, menu, hook] = sources;
+	const settings = declaration.feature_records.filter((item) => item.section_path === 'mod_combos');
+	const delay = settings.find((item) => item.id === 'simultaneous_threshold_ms');
+	const symmetric = settings.find((item) => item.id === 'symmetric');
+	const rows = declaration.menu.key_combinations_group.filter((item) =>
+		['combo_symmetric', 'combo_timings', 'copy_tap_to_combo'].includes(item.id)
+	);
+	const third = declaration.scopes.key_combinations.dynamic_defaults.find(
+		(item) => item.prefix === 'mod_combos.config'
+	);
+	return (
+		rows.length === 3 &&
+		rows.every((item) => item.platforms?.join(',') === 'hs,linux') &&
+		delay?.platforms?.join(',') === 'linux' &&
+		delay.type === 'number' &&
+		delay.default === 100 &&
+		delay.recommended === 100 &&
+		symmetric?.platforms?.join(',') === 'linux' &&
+		symmetric.type === 'boolean' &&
+		symmetric.default === false &&
+		symmetric.recommended === false &&
+		third?.depth === 2 &&
+		third.suffix === 'combo' &&
+		third.default === 'none' &&
+		third.recommended === 'none' &&
+		manager.includes('_buffered_ports') &&
+		manager.includes('_hook == _native_hook') &&
+		owner.includes('Features.default_for==original_default') &&
+		owner.includes('buffered_settings[configured]') &&
+		owner.includes('options.files == nil and options.route == nil') &&
+		owner.includes('action~=\"one_shot_shift\"') &&
+		owner.includes('action~=\"caps_word\"') &&
+		wrapper.includes('buffered_settings_current') &&
+		wrapper.includes('buffer_request') &&
+		hook.includes('capture_buffered_input') &&
+		hook.includes('_publish_source_transaction') &&
+		scope.includes('pcall(parameters.stop_programs)') &&
+		scope.includes('transaction.apply("key_combinations_chord","configured")') &&
+		scope.includes('tap_section=Shared.TAP_SECTION') &&
+		scope.includes('release_delivery_fence(owner)') &&
+		policy.includes('options.tap_section == nil or options.tap_section == M.TAP_SECTION') &&
+		menu.includes('render.commands["copy_tap_to_combo"]') &&
+		menu.includes('Scope.set_chord_settings(') &&
+		menu.includes('pairs.chord_pair(pair)')
+	);
+}
 function orderedLinuxAdmission(declaration, sources) {
 	const [manager, wrapper, owner, menu] = sources;
 	const row = declaration.menu.shortcuts_menu.find((item) => item.id === 'key_combinations');
@@ -543,9 +607,10 @@ function orderedLinuxAdmission(declaration, sources) {
 		row?.platforms?.join(',') === 'ahk,hs,linux' &&
 		row.reason_key === 'platform_reason.remap_engine_is_per_driver' &&
 		capsWord?.recommended_per_platform?.linux === 'none' &&
-		declaration.menu.key_combinations_group
+		(declaration.menu.key_combinations_group
 			.filter((item) => ['combo_symmetric', 'combo_timings', 'copy_tap_to_combo'].includes(item.id))
-			.every((item) => item.platforms?.join(',') === 'hs') &&
+			.every((item) => item.platforms?.join(',') === 'hs') ||
+			simultaneousLinuxAdmission(declaration, sources)) &&
 		manager.includes('require("platform.remap.key_combination_engine")') &&
 		manager.includes('CombinationEngine.new(') &&
 		manager.includes('.engine_options(') &&
@@ -701,6 +766,53 @@ for (const locale of locales) {
 	) {
 		errors.push(`${locale.name} lacks the combination mode availability reason`);
 	}
+}
+
+// New mode admission rejects each lost source/receiver/publisher boundary.
+if (
+	manifest.menu.key_combinations_group.some(
+		(item) => item.id === 'combo_symmetric' && item.platforms?.includes('linux')
+	)
+) {
+	if (!simultaneousLinuxAdmission(manifest, linuxSources))
+		errors.push('Linux simultaneous mode lacks its declared original receiving/publication owners');
+	for (const [index, token] of [
+		[0, '_buffered_ports'],
+		[1, 'buffered_settings_current'],
+		[1, 'buffer_request'],
+		[2, 'Features.default_for==original_default'],
+		[2, 'buffered_settings[configured]'],
+		[2, 'options.files == nil and options.route == nil'],
+		[4, 'capture_buffered_input'],
+		[3, 'Scope.set_chord_settings('],
+		[3, 'pairs.chord_pair(pair)']
+	]) {
+		const changed = linuxSources.slice();
+		changed[index] = changed[index].split(token).join('OMITTED_CHORD_BOUNDARY');
+		if (simultaneousLinuxAdmission(manifest, changed))
+			errors.push(`Simultaneous mode accepted omitted original owner: ${token}`);
+	}
+	for (const token of [
+		'pcall(parameters.stop_programs)',
+		'transaction.apply("key_combinations_chord","configured")',
+		'tap_section=Shared.TAP_SECTION',
+		'release_delivery_fence(owner)'
+	]) {
+		if (
+			simultaneousLinuxAdmission(
+				manifest,
+				linuxSources,
+				linuxCombinationScope.split(token).join('OMITTED_SCOPE_BOUNDARY')
+			)
+		)
+			errors.push(`Simultaneous mode accepted omitted publisher: ${token}`);
+	}
+	const altered = structuredClone(manifest);
+	altered.feature_records.find(
+		(item) => item.section_path === 'mod_combos' && item.id === 'symmetric'
+	).default = true;
+	if (simultaneousLinuxAdmission(altered, linuxSources))
+		errors.push('Linux symmetry may not borrow another platform default');
 }
 
 // ==========================

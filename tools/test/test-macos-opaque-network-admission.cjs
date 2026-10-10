@@ -404,6 +404,27 @@ assert.ifError(luaAdmission.error);
 assert.equal(luaAdmission.status, 0, luaAdmission.stderr || luaAdmission.stdout);
 assert.equal(luaAdmission.stdout, 'Lua 5.4', 'standard Lua 5.4 must acknowledge its receiving ABI');
 const bash = bashExecutable();
+function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
+	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const owner = shellPath(ownerRoot);
+	const networkSource = fs.readFileSync(path.join(macos, 'modules/llm/network_env.lua'), 'utf8');
+	const receiver = path.join(ownerRoot, 'platform/network/native_http.py');
+	const admitted = fs.existsSync(receiver) ? [owner + '/platform/network/native_http.py'] : [];
+	const source = [
+		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		`local admitted = ${JSON.stringify(admitted).replace(/\[/g, '{').replace(/\]/g, '}')}`,
+		'package.loaded["adapters.file_system"] = { exists = function(p) for _, v in ipairs(admitted) do if p == v then return true end end return false end }',
+		`local Network = assert(load(${JSON.stringify(networkSource)}, ${JSON.stringify('@' + owner + '/modules/llm/network_env.lua')}))()`,
+		`Network.policy_path = function() return ${JSON.stringify(shellPath(fixturePolicy))} end`,
+		`local prelude, detail = Network.bootstrap_prelude("BOOTSTRAP", ${JSON.stringify(shellPath(interpreter))})`,
+		'assert(prelude, detail); io.write(prelude)'
+	].join('; ');
+	const generated = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	assert.ifError(generated.error);
+	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+	return generated.stdout;
+}
 function emittedPrelude(fixturePolicy) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
@@ -800,6 +821,137 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'exec wrapper remains in original physical slot'
 	);
 	console.log('ok - actual script boundary ownership');
+	// The interpreter is a closed recording boundary, not native authentication.
+	// The emitted production prelude still calls the existing _resolve_worker
+	// owner; its native identity tests independently cover that admission.
+	const bootstrapRoot = path.join(
+		temporary,
+		'Bootstrap.app/Contents/Resources/static/ergopti_plus/macos'
+	);
+	fs.mkdirSync(path.join(bootstrapRoot, 'platform/network'), { recursive: true });
+	fs.mkdirSync(path.join(bootstrapRoot, 'modules/llm'), { recursive: true });
+	fs.copyFileSync(
+		path.join(root, 'static/ergopti_plus/macos/platform/network/native_http.py'),
+		path.join(bootstrapRoot, 'platform/network/native_http.py')
+	);
+	fs.writeFileSync(
+		path.join(bootstrapRoot, 'modules/llm/managed_bootstrap_http.py'),
+		'# receiver-owned presence control\n'
+	);
+	const nativeCalls = path.join(temporary, 'native-admission-calls');
+	const nativeInterpreter = path.join(temporary, 'native-admission-interpreter');
+	fs.writeFileSync(
+		nativeInterpreter,
+		`#!/bin/bash\n[ "$1" = -c ] || exit 64\n` +
+			`case "$2" in *'s.loader.exec_module(m); m._resolve_worker()'*) ;; *) exit 64 ;; esac\n` +
+			`[ "$3" = ${quote(shellPath(path.join(bootstrapRoot, 'platform/network/native_http.py')))} ] || exit 64\n` +
+			`printf 'called\n' >> ${quote(shellPath(nativeCalls))}\n[ -f "$3" ] || exit 78\nexit "\${NATIVE_ADMISSION_CODE:-0}"\n`
+	);
+	const executable = spawnSync(bash, ['-c', `chmod +x ${quote(shellPath(nativeInterpreter))}`], {
+		encoding: 'utf8',
+		timeout: 10000
+	});
+	assert.ifError(executable.error);
+	assert.equal(executable.status, 0, executable.stderr || executable.stdout);
+
+	const bootstrapCases = [
+		{
+			id: 'missing-receiver-explicit-retained',
+			missing: true,
+			launcher: '/owned/ErgoptiPlus',
+			env: { HTTPS_PROXY: 'http://chosen.invalid:3129' },
+			code: 0,
+			calls: 0,
+			child: true
+		},
+		{
+			id: 'missing-receiver-native-refusal',
+			missing: true,
+			launcher: '/owned/ErgoptiPlus',
+			code: 78,
+			calls: 1,
+			child: false
+		},
+		{ id: 'native-pac-admission', launcher: '/owned/ErgoptiPlus', code: 0, calls: 1, child: true },
+		{
+			id: 'native-identity-refusal-no-fallback',
+			launcher: '/owned/ErgoptiPlus',
+			nativeCode: 1,
+			code: 78,
+			calls: 1,
+			child: false
+		},
+		{ id: 'manual-pac-refusal', launcher: '', code: 78, calls: 0, child: false },
+		{
+			id: 'explicit-route-retained',
+			launcher: '/owned/ErgoptiPlus',
+			env: { HTTPS_PROXY: 'http://chosen.invalid:3129' },
+			code: 0,
+			calls: 0,
+			child: true
+		},
+		{
+			id: 'lowercase-route-retained',
+			launcher: '/owned/ErgoptiPlus',
+			env: { https_proxy: 'http://lower.invalid:3129', HTTPS_PROXY: 'http://upper.invalid:3129' },
+			code: 0,
+			calls: 0,
+			child: true
+		}
+	];
+	fs.writeFileSync(
+		fixturePolicy,
+		actualPolicy +
+			"\nopaque_system_proxy_snapshot() { printf '%s\\n' '<dictionary> {' ' ProxyAutoConfigEnable : 1' '}'; }\n"
+	);
+	for (const vector of bootstrapCases) {
+		fs.writeFileSync(nativeCalls, '');
+		const receiver = path.join(bootstrapRoot, 'platform/network/native_http.py');
+		if (vector.missing) fs.renameSync(receiver, receiver + '.held');
+		const bootstrapPrelude = emittedBootstrapPrelude(
+			fixturePolicy,
+			bootstrapRoot,
+			nativeInterpreter
+		);
+		const received = spawnSync(
+			bash,
+			[
+				'-c',
+				`export ERGOPTI_LAUNCHER_EXECUTABLE=${quote(vector.launcher)} NATIVE_ADMISSION_CODE=${vector.nativeCode || 0}; ` +
+					fixturePosixEnvironment(
+						bootstrapPrelude + "printf '__BOOTSTRAP_CHILD_STARTED__\\n'",
+						vector.env
+					)
+			],
+			{ env: fixtureHostEnvironment(), encoding: 'utf8', timeout: 10000 }
+		);
+		if (vector.missing) fs.renameSync(receiver + '.held', receiver);
+		assert.ifError(received.error);
+		assert.equal(
+			received.status,
+			vector.code,
+			`${vector.id}: exact terminal status: ${received.stderr}`
+		);
+		assert.equal(
+			fs.readFileSync(nativeCalls, 'utf8'),
+			'called\n'.repeat(vector.calls),
+			`${vector.id}: interpreter admission calls`
+		);
+		assert.equal(
+			received.stdout,
+			vector.child ? '__BOOTSTRAP_CHILD_STARTED__\n' : '',
+			`${vector.id}: downstream child admission`
+		);
+		assert.ok(
+			received.stderr.includes(
+				vector.child
+					? '__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted\n'
+					: `__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:${vector.calls ? 'unavailable' : 'verified'}:unavailable\n`
+			),
+			vector.id
+		);
+		console.log(`ok - ${vector.id}`);
+	}
 } finally {
 	fs.rmSync(temporary, { recursive: true, force: true });
 }

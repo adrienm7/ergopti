@@ -34,6 +34,7 @@ on:
       - 'static/ergopti/**'
       - 'static/img/**'
       - 'static/layouts/**'
+      - 'static/CNAME'
       - 'static/favicon.ico'
       - 'static/version.json'
       # Build config
@@ -98,7 +99,9 @@ jobs:
       - name: Build SvelteKit site
         env:
           BASE_PATH: ${{ steps.target.outputs.base_path }}
-        run: npm run build
+        run: |
+          npm run build
+          cmp -- static/CNAME build/CNAME
 
       - name: Deploy to GitHub Pages
         # Updates ONLY the target subdirectory on gh-pages (root for main,

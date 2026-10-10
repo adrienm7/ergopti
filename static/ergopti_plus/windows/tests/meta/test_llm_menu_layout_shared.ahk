@@ -233,7 +233,9 @@ Test("llm-menu-layout-shared: true canonical groups require executable native so
 
 ; Withdraw each current row's declared route without deriving expected types.
 _LMLS_CurrentRowTypeWithdrawalControls() {
+	_LMLS_ManifestMatchesCanonical()
 	Rows := _LMLS_ManifestRows()
+	AssertEqual(7, Rows.Length, "all current Windows settings rows enter the route controls")
 	_LMLS_CurrentInventoryPolicy(Rows)
 	AssertEqual(_LMLS_Canonical().Length, Rows.Length, "all current Windows settings rows enter the route controls")
 	_LMLS_CurrentRowTypesPolicy(Rows)

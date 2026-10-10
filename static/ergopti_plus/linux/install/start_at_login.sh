@@ -24,6 +24,13 @@ fi
 DESKTOP_FILE="$CONFIG_ROOT/autostart/$DESKTOP_NAME"
 
 if [ "$ACTION" = status ]; then
+	# Report a real conflicting command without acquiring it for replacement.
+	if [ -f "$DESKTOP_FILE" ] && ! grep -Fxq "Exec=$LAUNCHER --tray" "$DESKTOP_FILE" \
+		&& ! grep -Fxq "Exec=$LAUNCHER --session-start --tray" "$DESKTOP_FILE" \
+		&& ! grep -Fxq "$(ergopti_desktop_exec "$LAUNCHER")" "$DESKTOP_FILE"; then
+		printf 'other\n'
+		exit 0
+	fi
 	if [ -f "$DESKTOP_FILE" ] && grep -Eq '^(Hidden=true|X-GNOME-Autostart-enabled=false)$' "$DESKTOP_FILE"; then
 		printf 'disabled\n'
 	elif systemctl --user is-enabled --quiet ergopti-hotstrings.service 2>/dev/null; then

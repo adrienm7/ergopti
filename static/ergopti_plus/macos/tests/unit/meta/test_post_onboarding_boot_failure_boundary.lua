@@ -22,7 +22,7 @@ local BOUNDARY_CALL =
 local FAILURE_GUARD = "if post_onboarding_boot_ok ~= true then"
 local FAILURE_EXIT =
 	"emergency_exit_after_runtime_failure(\"boot\", post_onboarding_boot_error)"
-local BODY_FATAL = "error(\"VS Code caret bridge setup did not commit\")"
+local BODY_FATAL = "error(\"menu.start did not commit\")"
 
 -- Required contracts, independently named rather than inferred from production counts.
 local REQUIRED_FATAL_MESSAGES = {
@@ -35,8 +35,6 @@ local REQUIRED_FATAL_MESSAGES = {
 	"keymap.start did not commit",
 	"karabiner.init did not commit",
 	"menu.start did not commit",
-	"infra.vscode_bridge.stop_server is unavailable",
-	"VS Code caret bridge setup did not commit",
 	"file-watcher startup did not commit",
 }
 
@@ -162,6 +160,10 @@ local function boundary_is_exact(source)
 
 	local root_owner_at = source:find(FIRST_INPUT_OWNER, 1, true)
 	local fatal_count, messages = count_bare_error_calls(body)
+	if messages["VS Code caret bridge setup did not commit"]
+		or messages["infra.vscode_bridge.stop_server is unavailable"] then
+		return false, fatal_count, "retired bridge cannot become a startup prerequisite"
+	end
 	local total_post_owner_fatals = root_owner_at
 		and count_bare_error_calls(source:sub(root_owner_at)) or 0
 	for _, message in ipairs(REQUIRED_FATAL_MESSAGES) do
@@ -221,7 +223,7 @@ helpers.describe("root boot has one bounded post-onboarding failure boundary", f
 			FAILURE_EXIT .. "\n\treturn\nend",
 			FAILURE_EXIT .. "\nend")
 		local non_fatal_gate = replace_plain(root_source, BODY_FATAL,
-			"Logger.error(LOG, \"VS Code caret bridge setup did not commit\")")
+			"Logger.error(LOG, \"menu.start did not commit\")")
 		local moved_gate = replace_plain(root_source, BODY_FATAL, "do end")
 		moved_gate = replace_plain(moved_gate, BOUNDARY_END,
 			BOUNDARY_END .. "\n" .. BODY_FATAL)
@@ -246,6 +248,41 @@ helpers.describe("root boot has one bounded post-onboarding failure boundary", f
 			helpers.assert_eq(boundary_is_exact(commented), false, "comment is not a fatal gate")
 		end)
 	end
+
+
+	helpers.it("rejects either retired bridge gate becoming a startup prerequisite", function()
+		helpers.assert_true(boundary_is_exact(root_source))
+		for _, message in ipairs({ "VS Code caret bridge setup did not commit",
+			"infra.vscode_bridge.stop_server is unavailable" }) do
+			local revived = replace_plain(root_source, BOUNDARY_END,
+				'error("' .. message .. '")\n' .. BOUNDARY_END)
+			helpers.assert_eq(boundary_is_exact(revived), false,
+				"retired capability cannot restore a mandatory startup gate")
+		end
+	end)
+	helpers.it("retains the exact loaded legacy bridge cleanup before current startup", function()
+		local before = root_source:sub(1, assert(root_source:find(BOUNDARY_DECLARATION, 1, true)) - 1)
+		local function cleanup_is_exact(source)
+			local start = source:find('name = "vscode-bridge"', 1, true)
+			local finish = start and source:find('\n\t\t},', start, true)
+			if not finish or count_plain(source, 'name = "vscode-bridge"') ~= 1 then return false end
+			source = source:sub(start, finish - 1)
+			return count_plain(source, 'local module = package.loaded["infra.vscode_bridge"]') == 1
+				and count_plain(source, 'error("infra.vscode_bridge.stop_server is unavailable")') == 1
+				and source:find('if module == nil then return true end', 1, true) ~= nil
+				and source:find('if type(module) ~= "table" or type(module.stop_server) ~= "function" then', 1, true) ~= nil
+				and source:find('return module.stop_server()', 1, true) ~= nil
+		end
+		helpers.assert_true(cleanup_is_exact(before), "retirement must preserve the existing loaded-owner cleanup")
+		for _, target in ipairs({ 'local module = package.loaded["infra.vscode_bridge"]',
+			'error("infra.vscode_bridge.stop_server is unavailable")', 'return module.stop_server()',
+			'if module == nil then return true end',
+			'if type(module) ~= "table" or type(module.stop_server) ~= "function" then' }) do
+			local start = assert(before:find('name = "vscode-bridge"', 1, true))
+			helpers.assert_eq(cleanup_is_exact(replace_plain(before, target, "do end", start)), false,
+				"withdrawing a loaded-owner cleanup obligation must refuse")
+		end
+	end)
 
 	helpers.it("ignores diagnostics and quoted or commented fatal-looking text", function()
 		local count = count_bare_error_calls([=[

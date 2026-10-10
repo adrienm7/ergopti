@@ -186,10 +186,15 @@ helpers.describe("F-HIGH-30: exact temporary fast-header composition", function(
 			helpers.assert_true(flags_stub(harness.step_name))
 		end
 	end)
+	-- Bind refusal to the name-field guard, not an unrelated exception. The
+	-- shared assertion helper prefixes source location and appends the false value.
 	helpers.it("arbitrary disabling or overbroad conditions are refused", function()
 		for _, condition in ipairs({ "false", "true", "always()", "${{ !inputs.fast_prerelease || true }}", "${{ !inputs.fast_prerelease && false }}" }) do
-			local ok = pcall(locate_harness, fixture("  e2e-hs:\n    if: " .. condition .. "\n"))
+			local ok, reason = pcall(locate_harness, fixture("  e2e-hs:\n    if: " .. condition .. "\n"))
 			helpers.assert_eq(ok, false, "an unadmitted job condition must not hide the mandatory name")
+			helpers.assert_true(type(reason) == "string" and #reason > 0, "condition refusal must have a string reason")
+			helpers.assert_eq(reason:match("^.-:%d+: (.-) — actual: false$"),
+				"the harness job must open with its name: field")
 		end
 	end)
 	helpers.it("a duplicated condition or foreign job cannot acquire this prelude", function()
@@ -197,13 +202,21 @@ helpers.describe("F-HIGH-30: exact temporary fast-header composition", function(
 			"  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n    if: ${{ !inputs.fast_prerelease }}\n",
 			"  other-hs:\n    if: ${{ !inputs.fast_prerelease }}\n",
 		}) do
-			helpers.assert_eq(pcall(locate_harness, fixture(header)), false)
+			local accepted, reason = pcall(locate_harness, fixture(header))
+			helpers.assert_eq(accepted, false)
+			helpers.assert_true(type(reason) == "string" and #reason > 0, "prelude refusal must have a string reason")
+			helpers.assert_eq(reason:match("^.-:%d+: (.-) — actual: false$"),
+				"the harness job must open with its name: field")
 		end
 	end)
 	helpers.it("the exact prelude never substitutes for a job name", function()
 		local src = fixture("  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n")
 		src = src:gsub("    name: 'E2E tests %(stubbed%)'\n", "")
-		helpers.assert_eq(pcall(locate_harness, src), false)
+		local accepted, reason = pcall(locate_harness, src)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_true(type(reason) == "string" and #reason > 0, "missing-name refusal must have a string reason")
+		helpers.assert_eq(reason:match("^.-:%d+: (.-) — actual: false$"),
+			"the harness job must open with its name: field")
 	end)
 	helpers.it("the same label predicates reject overclaimed fast-header coverage", function()
 		local header = "  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n"

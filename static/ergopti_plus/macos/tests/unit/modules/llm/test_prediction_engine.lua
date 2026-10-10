@@ -1115,3 +1115,125 @@ helpers.describe("prediction_engine: turning the AI preview off tears the state 
 	end)
 
 end)
+
+
+
+
+
+-- =================================================
+-- =================================================
+-- ======= 10/ Backend label acknowledgement =======
+-- =================================================
+-- =================================================
+
+--- Drives the real panel, bridge and engine with inert external boundaries.
+--- @param target string Backend selected while AI is off.
+--- @param refuse_menu boolean Refuses the first API menu publication.
+--- @param body function Assertions receiving the actual action and snapshots.
+local function with_backend_label_composition(target, refuse_menu, body)
+	local names = {
+		"modules.llm", "infra.i18n", "infra.logger", "infra.manifest_menu",
+		"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
+		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
+		"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
+		"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
+		"infra.deferred_work", "modules.llm.backend_detector",
+	}
+	helpers.with_fresh_modules(names, function()
+		local previous_label = read_upvalue(PE.set_llm_backend_name, "llm_backend_label")
+		local previous_execute, previous_hs_execute = os.execute, hs.execute
+		local record = { runtime = "mlx", persisted = "mlx", stops = 0,
+			models = 0, installs = 0, commands = 0, menus = 0, errors = {} }
+		local state = { llm_backend = "mlx", llm_enabled = false,
+			llm_model_mlx = "mlx-model", llm_model_ollama = "ollama-model" }
+		local function accepted() return true end
+		local ok, err = xpcall(function()
+			package.loaded["modules.llm"] = {
+				DEFAULT_STATE = {},
+				get_backend = function() return record.runtime end,
+				set_backend = function(value) record.runtime = value; return true end,
+				load_api_entries = accepted,
+			}
+			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, message) record.errors[#record.errors + 1] = message end
+			package.loaded["infra.logger"] = logger
+			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
+			local checker = require("tests.support.runtime_checker_stub")({
+				check_and_install_deps = function() record.installs = record.installs + 1; return true end,
+			})
+			package.loaded["modules.llm.mlx_deps_checker"] = checker
+			package.loaded["modules.llm.ollama_deps_checker"] = checker
+			os.execute = function() record.commands = record.commands + 1; return true end
+			hs.execute = function() return "arm64" end
+			local bridge = load_real_setting_bridge()
+			bridge.set_llm_backend_name("MLX 🚀")
+			local Panel = require("ui.menu.menu_llm.backend_panel")
+			local _, rows = Panel.build({
+				state = state, keymap = bridge, paused = false,
+				models_mgr = { stop_mlx_server_if_needed = function(done, opts)
+					helpers.assert_eq(opts.kind, "backend")
+					record.stops = record.stops + 1
+					return done()
+				end },
+				get_display_model_name = function(name) return name end,
+				switch_model = function() record.models = record.models + 1; return true end,
+				disable_model = accepted,
+				save_prefs = function() record.persisted = state.llm_backend; return true end,
+				reset_llm_health_status = accepted,
+				WarmupCtrl = { warmup = accepted },
+				update_menu = function()
+					record.menus = record.menus + 1
+					if refuse_menu then refuse_menu = false; return false end
+					return true
+				end,
+			})
+			local action = rows[target == "ollama" and 2 or 3].action
+			helpers.assert_eq(type(action), "function", "off-state choice must remain actionable")
+			body(action, record, state, function()
+				return read_upvalue(PE.set_llm_backend_name, "llm_backend_label")
+			end)
+		end, debug.traceback)
+		os.execute, hs.execute = previous_execute, previous_hs_execute
+		PE.set_llm_backend_name(previous_label)
+		if not ok then error(err, 0) end
+	end)
+end
+
+helpers.describe("backend label: real panel bridge engine acknowledgement", function()
+	for _, target in ipairs({ "ollama", "api" }) do
+		helpers.it("commits " .. target .. " while AI is off through the real label setter", function()
+			with_backend_label_composition(target, false, function(action, record, state, label)
+				helpers.assert_eq(action(), true, "exact real setter acknowledgement must publish the choice")
+				helpers.assert_eq(state.llm_backend, target)
+				helpers.assert_eq(record.runtime, target)
+				helpers.assert_eq(record.persisted, target)
+				helpers.assert_eq(label(), target == "ollama" and "Ollama 🦙" or "API 🌐")
+				helpers.assert_eq(record.stops, 1, "selection still requires the exact old server stop")
+				helpers.assert_eq(record.installs, 0)
+				helpers.assert_eq(record.commands, 0)
+				helpers.assert_eq(record.errors, {})
+			end)
+		end)
+	end
+
+	helpers.it("acknowledges real label compensation before retrying a refused API successor", function()
+		with_backend_label_composition("api", true, function(action, record, state, label)
+			helpers.assert_eq(action(), false, "a real successor refusal must still be refused")
+			helpers.assert_eq(state.llm_backend, "mlx")
+			helpers.assert_eq(record.runtime, "mlx")
+			helpers.assert_eq(record.persisted, "mlx")
+			helpers.assert_eq(label(), "MLX 🚀", "the exact engine label must be compensated")
+			helpers.assert_true(#record.errors > 0, "the rejected successor remains visible")
+			record.errors = {}
+			helpers.assert_eq(action(), true, "settled compensation must permit the next owned attempt")
+			helpers.assert_eq(state.llm_backend, "api")
+			helpers.assert_eq(record.runtime, "api")
+			helpers.assert_eq(record.persisted, "api")
+			helpers.assert_eq(label(), "API 🌐")
+			helpers.assert_eq(record.commands, 0)
+			helpers.assert_eq(record.installs, 0)
+			helpers.assert_eq(record.errors, {})
+		end)
+	end)
+end)

@@ -3281,5 +3281,6 @@
 	"healthcheck.summary.scope": "De resultaten gelden alleen voor de vastgelegde controles. Geïsoleerde testsuites zijn niet uitgevoerd.",
 	"healthcheck.problem.diagnostic_check": "Diagnostische controle mislukt: %s.",
 	"healthcheck.export.privacy_notice": "Dit rapport deelt alleen toegestane technische gegevens. Logboeken, vrije tekst, paden en identificerende gegevens blijven uitgesloten, ook als details zijn ingeschakeld. Lokale paginatests zijn niet opgenomen.",
-	"sg_actions.llm_translate_context": "🌐 Huidige zin vertalen [instelbaar]"
+	"sg_actions.llm_translate_context": "🌐 Huidige zin vertalen [instelbaar]",
+	"menu.about.startup_other_command_reason": "Andere opstartopdracht: Opstarten is ingesteld voor een andere opdracht of installatie. De bestaande instelling blijft behouden."
 }
