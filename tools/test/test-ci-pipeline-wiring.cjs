@@ -286,6 +286,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
 	[
 		MACOS_BOX,
+		'package-macos',
+		'Retain source-bound package native qualification receipt',
+		'always()'
+	],
+	[
+		MACOS_BOX,
 		'cold-bootstrap-native',
 		'Receive actual official cold Ollama without stock Python',
 		"${{ !cancelled() && steps.cold-app.outcome == 'success' }}"
