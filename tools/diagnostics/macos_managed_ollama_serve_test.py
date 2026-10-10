@@ -87,6 +87,7 @@ class ProductionServeControls(unittest.TestCase):
             "_shared/python/managed_ollama_bootstrap.py",
             "_shared/python/managed_ollama_daemon_authority.py",
             "_shared/python/managed_ollama_runtime.py",
+            "_shared/python/managed_ollama_pull.py",
             "_shared/python/managed_source_alias.py",
             "_shared/python/network_proxy_policy.py",
             "_shared/modules/network/proxy_policy.json",
@@ -99,6 +100,7 @@ class ProductionServeControls(unittest.TestCase):
         for relative in (
             "macos/platform/source_alias_owner.py",
             "macos/platform/network/native_http.py",
+            "macos/platform/network/native_ollama_api.py",
             "macos/modules/llm/managed_ollama_runtime.py",
             "macos/modules/llm/managed_bootstrap_http.py",
         ):
@@ -574,6 +576,329 @@ class ProductionServeControls(unittest.TestCase):
         self.assertFalse(self.owner.alias._created)
         self.assertFalse(self.owner.alias._fds)
         self.assertEqual(self.binary.stat().st_nlink, 1)
+
+    def readiness_peer(self, mode="good", *, prepare=True):
+        """Real helper processes with modeled wire/socket evidence, never Darwin credit."""
+        payload = self.app / "api-fixture.json"
+        role_peer = r"""
+import hashlib, hmac, json, pathlib, struct, sys, time
+if len(sys.argv) > 1 and sys.argv[1] in ('--managed-ollama-listener-probe', '--managed-ollama-api-worker'):
+    request = json.loads(sys.stdin.buffer.readline())
+    fixture = json.loads((pathlib.Path(__file__).parents[2] / 'api-fixture.json').read_text())
+    session, identity = fixture['session'], fixture['listener']
+    mode = fixture['mode']
+    def frame(tag, value):
+        value = value if isinstance(value, bytes) else json.dumps(value).encode()
+        raw = tag + value
+        sys.stdout.buffer.write(struct.pack('>I', len(raw)) + raw)
+        sys.stdout.buffer.flush()
+    if mode == 'wait':
+        time.sleep(60)
+    if mode == 'foreign':
+        identity['pid'] += 1
+    if request.get('method'):
+        assert request['method'] == 'GET' and request['path'] == '/api/ergopti-native-http-admission'
+        headers = dict(request['headers'])
+        assert 'X-Ergopti-Native-Operation' not in headers
+        challenge = headers['X-Ergopti-Native-Challenge']
+        value = {'version':1, 'capability':'ERGOPTI_OLLAMA_NATIVE_HTTP_V1',
+                 'pid':identity['pid'], 'source_commit':session['source_commit'],
+                 'asset_sha256':session['asset_sha256'], 'binary_sha256':session['binary_sha256'],
+                 'device':session['device'], 'inode':session['inode'], 'port':session['port'],
+                 'lease_id':hashlib.sha256(session['token'].encode()).hexdigest()}
+        body = json.dumps(value, separators=(',', ':')).encode()
+        signature = hmac.new(session['token'].encode(),
+            b'ERGOPTI_NATIVE_RESPONSE_V1\n' + challenge.encode() + b'\n' + body,
+            hashlib.sha256).hexdigest()
+        if mode == 'wrong-hmac':
+            signature = '0' * 64
+        frame(b'H', {'version':1, 'status':200, 'headers':[['X-Ergopti-Native-Proof', signature]]})
+        frame(b'D', body)
+    frame(b'C', {'version':1, 'success':True, 'reason':'complete', 'listener':identity})
+    raise SystemExit(0)
+"""
+        self.launcher.write_text("#!" + sys.executable + "\n" + role_peer + PEER)
+        self.launcher.chmod(0o755)
+        if not prepare:
+            return
+        owner = self.prepare().start()
+        self.readiness_payload(owner, mode)
+        return owner
+
+    def readiness_payload(self, owner, mode="good"):
+        (self.app / "api-fixture.json").write_text(
+            json.dumps(
+                {
+                    "session": owner.session.data,
+                    "listener": owner.operation.listener,
+                    "mode": mode,
+                }
+            )
+        )
+
+    def test_readiness_uses_original_listener_session_and_closes_both_helpers(self):
+        owner = self.readiness_peer()
+        original_deadline = owner.deadline
+        self.assertIs(owner.acquire_readiness(), owner)
+        self.assertTrue(owner._api_ready)
+        self.assertTrue(owner._api_admission.admitted)
+        self.assertFalse(owner._api_admission.submitted)
+        self.assertEqual(owner._api_admission.listener, owner.operation.listener)
+        self.assertEqual(owner.deadline, original_deadline)
+        self.assertEqual(len(owner._api_responses), 2)
+        for record in owner._api_responses:
+            self.assertTrue(record["closed"])
+            response = record["response"]
+            self.assertEqual(response._absolute, original_deadline)
+            self.assertEqual(response._process.returncode, 0)
+            self.assertTrue(response._process.stdout.closed)
+            self.assertTrue(response._process.stdin.closed)
+        self.assertTrue(owner.retire(5))
+        self.assertTrue(owner.operation.physically_retired)
+
+    def test_readiness_foreign_listener_never_sends_session_request(self):
+        owner = self.readiness_peer("foreign")
+        with self.assertRaises(self.subject.AUTHORITY.POLICY.AuthorityRefusal):
+            owner.acquire_readiness()
+        self.assertFalse(owner._api_ready)
+        self.assertEqual(len(owner._api_responses), 1)
+        self.assertTrue(owner._api_responses[0]["closed"])
+        self.assertTrue(owner.retire(5))
+
+    def test_readiness_wrong_hmac_never_grants_ready_and_retires_real_helpers(self):
+        owner = self.readiness_peer("wrong-hmac")
+        with self.assertRaises(self.subject.PULL.POLICY.RuntimeRefusal):
+            owner.acquire_readiness()
+        self.assertFalse(owner._api_ready)
+        self.assertFalse(owner._api_admission.admitted)
+        self.assertEqual(len(owner._api_responses), 2)
+        self.assertTrue(all(value["closed"] for value in owner._api_responses))
+        self.assertTrue(owner.retire(5))
+
+    def test_readiness_expired_serve_clock_cannot_be_renewed(self):
+        owner = self.readiness_peer()
+        original_deadline = owner.deadline
+        with patch.object(self.subject.time, "monotonic", return_value=original_deadline):
+            with self.assertRaises(self.subject.ServeRefusal) as raised:
+                owner.acquire_readiness()
+        self.assertEqual(str(raised.exception), "deadline")
+        self.assertEqual(owner._api_responses, [])
+        self.assertFalse(owner._api_ready)
+        self.assertEqual(owner.deadline, original_deadline)
+        self.assertTrue(owner.retire(5))
+
+    def test_readiness_cancelled_before_acquisition_keeps_original_daemon_for_retirement(self):
+        owner = self.readiness_peer()
+        owner.cancelled = True
+        with self.assertRaises(self.subject.ServeRefusal) as raised:
+            owner.acquire_readiness()
+        self.assertEqual(str(raised.exception), "cancelled")
+        self.assertEqual(owner._api_responses, [])
+        self.assertFalse(owner.operation.physically_retired)
+        self.assertTrue(owner.retire(5))
+
+    def test_readiness_close_uncertainty_is_retained_and_never_retried(self):
+        owner = self.readiness_peer()
+        original = self.subject.API.ENGINE.NativeHTTPResponse.close
+        primary = RuntimeError("independent helper close uncertainty")
+        calls = []
+
+        def close(response):
+            calls.append(response)
+            original(response)
+            raise primary
+
+        with patch.object(self.subject.API.ENGINE.NativeHTTPResponse, "close", close):
+            with self.assertRaises(RuntimeError) as raised:
+                owner.acquire_readiness()
+        self.assertIs(raised.exception, primary)
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(owner._api_ready)
+        self.assertFalse(owner.retire(5))
+        self.assertFalse(owner.retire(5))
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(owner.alias._created)
+        self.assertIsNotNone(owner.source_fd)
+        # The injected refusal occurred after genuine closure. Explicit fixture
+        # evidence discharges only fixture debt so our native peer is not orphaned.
+        record = owner._api_responses[0]
+        self.assertTrue(record["response"]._closed)
+        self.assertEqual(record["response"]._process.returncode, 0)
+        record["closed"] = True
+        owner._cleanup_debt = None
+        self.assertTrue(owner.retire(5))
+
+    def test_readiness_registration_reentry_retains_daemon_and_refuses_publication(self):
+        owner = self.readiness_peer()
+        original = owner._register_api_response
+        observations = []
+
+        def register(response):
+            accepted = original(response)
+            observations.append(owner.retire(5))
+            return accepted
+
+        with patch.object(owner, "_register_api_response", side_effect=register):
+            with self.assertRaises(self.subject.API.ENGINE.NativeHTTPError) as raised:
+                owner.acquire_readiness()
+        self.assertEqual(raised.exception.reason, "protocol")
+        self.assertIsNotNone(owner._retirement_deadline)
+        self.assertEqual(observations, [False])
+        self.assertFalse(owner._api_ready)
+        self.assertTrue(owner._api_responses[0]["closed"])
+        self.assertTrue(owner.retire(5))
+
+    def test_optional_readiness_requires_caller_binding_before_any_owner_acquisition(self):
+        with patch.object(self.subject, "ServeOwner") as owner:
+            with self.assertRaises(self.subject.ServeRefusal):
+                self.subject.serve(11434, 5, 60, 5, acquire_readiness=True)
+            owner.assert_not_called()
+        self.assertFalse(self.subject.NATIVE_PRODUCTION_QUALIFIED)
+
+    def test_optional_cli_publishes_ready_only_after_original_socket_session_join(self):
+        self.readiness_peer(prepare=False)
+        fixture = self
+        original_constructor = self.subject.ServeOwner
+        original_start = original_constructor.start
+
+        def acquire(*args, register, **kwargs):
+            def capture(owner):
+                fixture.owner = owner
+                register(owner)
+
+            return original_constructor(*args, register=capture, **kwargs)
+
+        def start(owner):
+            result = original_start(owner)
+            fixture.readiness_payload(owner)
+            return result
+
+        class ReadyAcknowledgmentStream(io.StringIO):
+            def write(self, value):
+                count = super().write(value)
+                expected = (
+                    "ERGOPTI_MANAGED_DAEMON_V1 " + "ef" * 16 + " ACTIVE\n"
+                    "ERGOPTI_MANAGED_DAEMON_V1 " + "ef" * 16 + " READY\n"
+                )
+                if self.getvalue() == expected:
+                    fixture.assertTrue(fixture.owner._api_admission.admitted)
+                    fixture.assertTrue(fixture.owner._api_ready)
+                    fixture.assertTrue(all(row["closed"] for row in fixture.owner._api_responses))
+                    fixture.owner.cancelled = True
+                return count
+
+        stream = ReadyAcknowledgmentStream()
+        error = io.StringIO()
+        argv = [
+            "managed_ollama_serve.py",
+            "--port",
+            "11434",
+            "--timeout",
+            "5",
+            "--idle-timeout",
+            "60",
+            "--retirement-timeout",
+            "5",
+            "--caller-nonce",
+            "ef" * 16,
+            "--acquire-readiness",
+        ]
+        with (
+            patch.object(self.subject, "NATIVE_PRODUCTION_QUALIFIED", True),
+            patch.object(original_constructor, "start", start),
+            patch.object(self.subject, "ServeOwner", side_effect=acquire),
+            patch.object(sys, "stdout", stream),
+            patch.object(sys, "stderr", error),
+            patch.object(sys, "argv", argv),
+        ):
+            self.assertEqual(self.subject.main(), 78)
+        self.assertEqual(error.getvalue(), "Managed Ollama daemon admission refused.\n")
+        self.assertEqual(
+            stream.getvalue(),
+            "ERGOPTI_MANAGED_DAEMON_V1 " + "ef" * 16 + " ACTIVE\n"
+            "ERGOPTI_MANAGED_DAEMON_V1 " + "ef" * 16 + " READY\n"
+            "ERGOPTI_MANAGED_DAEMON_V1 " + "ef" * 16 + " RETIRED 78\n",
+        )
+        self.assertFalse(self.owner._api_ready)
+        self.assertTrue(self.owner.operation.physically_retired)
+        self.assertIsNone(self.owner.source_fd)
+        self.assertTrue(all(row["closed"] for row in self.owner._api_responses))
+
+    def test_readiness_rejects_changed_original_helper_before_any_api_child(self):
+        owner = self.readiness_peer()
+        original_bytes = self.launcher.read_bytes()
+        # This is a genuine changed named/held file, not an injected trust result.
+        self.launcher.write_bytes(original_bytes + b"\n# independent changed helper bytes\n")
+        try:
+            with self.assertRaises(RuntimeError) as raised:
+                owner.acquire_readiness()
+            self.assertEqual(str(raised.exception), "helper")
+            self.assertFalse(owner._api_ready)
+            self.assertEqual(owner._api_responses, [])
+            self.assertFalse(owner.operation.physically_retired)
+        finally:
+            self.launcher.write_bytes(original_bytes)
+        self.assertTrue(owner.retire(5))
+
+    def test_readiness_resolver_helper_mutation_refuses_before_api_child(self):
+        owner = self.readiness_peer()
+        original_bytes = self.launcher.read_bytes()
+        original_resolve = self.subject.API.ENGINE._resolve_worker
+        observations = []
+
+        def resolve():
+            executable = original_resolve()
+            self.launcher.write_bytes(original_bytes + b"\n# changed during actual resolver seam\n")
+            observations.append(executable)
+            return executable
+
+        try:
+            with patch.object(self.subject.API.ENGINE, "_resolve_worker", side_effect=resolve):
+                with self.assertRaises(RuntimeError) as raised:
+                    owner.acquire_readiness()
+            self.assertEqual(str(raised.exception), "helper")
+            self.assertEqual(observations, [str(self.launcher)])
+            self.assertFalse(owner._api_ready)
+            self.assertEqual(len(owner._api_responses), 1)
+            response = owner._api_responses[0]["response"]
+            self.assertIsNone(response._process)
+            self.assertIsNone(response._selector.get_map())
+            self.assertTrue(response._closed)
+            self.assertTrue(owner._api_responses[0]["closed"])
+            self.assertFalse(owner.operation.physically_retired)
+        finally:
+            self.launcher.write_bytes(original_bytes)
+        self.assertTrue(owner.retire(5))
+
+    def test_readiness_resolver_session_mutation_refuses_before_api_child(self):
+        owner = self.readiness_peer()
+        original_bytes = owner.session.path.read_bytes()
+        original_resolve = self.subject.API.ENGINE._resolve_worker
+        observations = []
+
+        def resolve():
+            executable = original_resolve()
+            owner.session.path.write_bytes(original_bytes + b" ")
+            observations.append(executable)
+            return executable
+
+        try:
+            with patch.object(self.subject.API.ENGINE, "_resolve_worker", side_effect=resolve):
+                with self.assertRaises(self.subject.OWNER.ImageRefusal) as raised:
+                    owner.acquire_readiness()
+            self.assertEqual(str(raised.exception), "session")
+            self.assertEqual(observations, [str(self.launcher)])
+            self.assertFalse(owner._api_ready)
+            self.assertEqual(len(owner._api_responses), 1)
+            response = owner._api_responses[0]["response"]
+            self.assertIsNone(response._process)
+            self.assertIsNone(response._selector.get_map())
+            self.assertTrue(response._closed)
+            self.assertTrue(owner._api_responses[0]["closed"])
+            self.assertFalse(owner.operation.physically_retired)
+        finally:
+            owner.session.path.write_bytes(original_bytes)
+        self.assertTrue(owner.retire(5))
 
 
 if __name__ == "__main__":
