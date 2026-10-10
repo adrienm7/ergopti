@@ -534,7 +534,7 @@ local function open_editor_impl()
 	end
 	local webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
-		title       = i18n.get("menu.paths.window_title"),
+		app_id      = "paths_editor",
 		style_masks = style_masks,
 		usercontent = uc,
 		assets_dir    = ASSETS_DIR,
