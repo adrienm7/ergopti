@@ -901,7 +901,8 @@ try {
 }
 _HotstringExtensionPacks := HotstringExtensions_Prepare(Features,
 	HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir))
-_BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
+_BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml", &_BootConfigSnapshot)
+HotstringsTerminatorRecordsInitBoot(_BootConfigSnapshot)
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
