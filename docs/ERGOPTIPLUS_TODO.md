@@ -4653,6 +4653,10 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   retaining the original native-owner checks. Retired-Script consumers and
   final-source native/installed qualification remain separate follow-ups.
 
+Windows source contracts now follow the actual configuration-writer gateway
+and its exclusive admitted atomic publication branch. Original assertions and
+negative controls remain; AHK execution of these contracts is pending.
+
 The Windows native configuration-journal successor is now composed against
 current dev with the newer AI include preserved. It uses configuration-specific
 admitted native operations while preserving the nine generic file operations.
