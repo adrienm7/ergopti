@@ -324,3 +324,32 @@ format check, and the complete focused pipeline guard passes again. A new exact
 manual macOS run remains required before native qualification.
 TODO36/62 remain open, including actual native SDK/network and installed-device
 acceptance; the production guard is unchanged and false.
+
+## Strict native listener stderr receiving
+
+Exact manual [38068916521](https://github.com/adrienm7/ergopti/actions/runs/38068916521)
+on `544976fa5ff515fa22a7299bd1231daf213bd7f4` is whole terminal FAIL:
+7 successful,5 failed and5 skipped jobs. Core408, properties27, portable Mac18165,
+stubbed E2E101 with one original skip, and native tooltip captures pass. Both
+SDK49 cohorts execute43 passes and6 failures, all at the same new helper's
+initially-empty stderr optional read. The nonoptional Foundation read preserves
+strict empty-Data equality, original process/status/stdout assertions, all case
+bodies and original owner/wait/closure order. The same API already compiles and
+runs in the unchanged native API/bootstrap subjects. Corrected49 receiving
+remains UNRUN; passing process/frame assertions on the earlier source do not
+qualify a complete failed case.
+
+Both actual Darwin Go journals execute54 passing entries (36 methods and18
+subtests), including all six new Unix-peer controls, with zero failures/skips.
+Their original process owners are closed; escaped-session management remains
+outside that receipt. Genuine producer, catalogue27 and staging pass. Small Go
+journal/owner receipts were read through bounded HTTP206 ZIP members; the full
+117/119MB artifact ZIP hashes were not independently recomputed. The aggregate
+native qualification remains false. Actual model receiving, packaging,
+installation and Release are skipped; PAC/HTTP and Homebrew remain failed.
+
+The next exact manual
+[38071396989](https://github.com/adrienm7/ergopti/actions/runs/38071396989) tests
+`39424e21e1eefda70430d76a704553304bd75cda` on macOS, with model receiving now
+bound to successful native build. It still carries the historical stderr helper;
+its whole result and any model qualifications must be reported separately.

@@ -6523,6 +6523,20 @@ still require Windows validation; the historical full suite remains failed.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 native listener fixture EOF correction. Exact manual38068916521
+on544976fa5 is whole terminal7 successful/5 failed/5 skipped jobs. Both actual
+SDK49 cohorts execute43 passing and6 failing tests; every new failure is the
+same helper's initially-empty stderr optional read (nil versus Data()). Its
+nonoptional Foundation read now retains exact empty-Data equality, all original
+case bodies, status/frame checks, waits and closure order. Existing native API
+and bootstrap tests already use that API. This source-reviewed correction still
+requires actual corrected49-case receiving; no assertion or verdict is waived.
+Native Go54 (36 methods/18 subtests), including all six new Unix-peer controls,
+passes on both Darwin architectures with closed original process owners; native
+producer/catalogue27/staging also pass. Actual model receiving, packaging,
+installation and Release are skipped. PAC/HTTP and Homebrew remain failed
+independently. Items36/62 and the false production guard remain open.
+
 2026-10-10 actual model receiving dependency. The original native build has
 one fixed step identity; model create/pull/inference/retirement runs only after
 that exact build succeeds and cancellation is absent. Earlier independent
