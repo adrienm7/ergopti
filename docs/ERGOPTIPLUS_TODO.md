@@ -4662,6 +4662,12 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   retaining the original native-owner checks. Retired-Script consumers and
   final-source native/installed qualification remain separate follow-ups.
 
+Four ordinary Windows full-save fixture families now declare the shipped
+schema 12, rather than obsolete schema 11 that prevented their genuine boot.
+Only eight handwritten schema numbers change; all semantic byte/tree
+expectations, retired-key cleanup and refusal assertions remain intact.
+Native post-fix publication remains pending.
+
 The native writer reports closed schema-capture and unchanged-source admission
 refusals through the existing logger. The original full-save case retains its
 assertions and observes only its actual failed result; its first refusal cause
