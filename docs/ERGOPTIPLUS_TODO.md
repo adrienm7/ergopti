@@ -6479,6 +6479,23 @@ this neutral cleanup completes no parent item.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 selected-release native receiving enrollment. A bounded new Mac
+matrix step now runs the frozen50 shell-corpus vectors and original guardian
+SIGTERM/SIGINT controls independently of the failing archive prerequisite. Its
+always-retained evidence and mandatory raw-command/condition guards are additive;
+fourteen independent omissions reject dropped or weakened enrollment. The two
+new receiving tools preserve the original50 corpus, native guardian and120-second
+clock. Twenty-five controlled Linux POSIX wrapper checks are separately enrolled
+in the normal JS registry; they are synthetic envelope/refusal controls, not
+Darwin50 or native network acceptance. All407 previous entries and481 scripts
+stay intact; the Linux registry adds one entry, with Windows/Darwin unchanged.
+Root Windows guards and direct Mac55 receiving are preserved. Actual25 pass
+in Linux; selected formatting passes and407/408 JS checks pass, with only the
+unchanged protected-temporary-root uninstall fixture failing. Its exact replay
+in a non-Git temporary root passes. Darwin50, native cancellation and final
+package/install outcomes remain pending. No
+production guard, original assertion or item36/62/16/38 closure changes.
+
 2026-10-10 direct Mac helper receiving enrollment. The existing Group6 native
 receiving step now adds APIwire20 and serve35 beside its unchanged private-session5
 and numeric-TLS8. Exactly three body spans add the calls, strict count allowlist
