@@ -65,10 +65,8 @@ _AWU_WriterBody(Name) {
 	if (Name != "TOML_BatchWrite")
 		return _DriverFuncBody(Name)
 	Wrapper := _DriverFuncBody(Name)
-	Assert(Wrapper != ""
-		&& InStr(Wrapper,
-			'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
-		"TOML_BatchWrite must still route to the checked implementation in write mode")
+	Assert(_AWU_TomlWrapperForwardsAdmission(Wrapper),
+		"TOML_BatchWrite must return the exact eight-argument write call with retained admission")
 	return _DriverFuncBody("_TOML_BatchWriteImpl")
 }
 
@@ -210,3 +208,28 @@ Test("atomic-write: prefetch stages are complete before publication",
 	_AWU_PrefetchStageIsDurableAndExact)
 Test("atomic-write: KLPF_WriteAtomic publishes and leaves no scratch behind",
 	_AWU_PrefetchWriteRoundTrip)
+
+
+; Admit only the full executable wrapper, including its result and native predicate.
+_AWU_TomlWrapperForwardsAdmission(Wrapper) {
+	Code := _StripFullLineComments(Wrapper)
+	return RegExMatch(Code,
+		'^\s*TOML_BatchWrite\(Path,\s*Updates,\s*ExactSectionPrefixes\s*:=\s*\[\],\s*AdmissionFn\s*:=\s*0\)\s*\{\s*'
+		. 'return\s+_TOML_BatchWriteImpl\(Path,\s*Updates,\s*ExactSectionPrefixes,\s*"write",\s*,\s*,\s*false,\s*AdmissionFn\)\s*\}\s*$') != 0
+}
+
+_AWU_NativeWrapperAdmissionMutations() {
+	Wrapper := _DriverFuncBody("TOML_BatchWrite")
+	AssertTrue(_AWU_TomlWrapperForwardsAdmission(Wrapper), "the actual wrapper returns its captured native write status")
+	for Mutant in [StrReplace(Wrapper, ", AdmissionFn)", ", 0)"),
+		StrReplace(Wrapper, '"write", , , false', '"build", , , false'),
+		StrReplace(Wrapper, '"write", , , false', '"write", Source, , false'),
+		StrReplace(Wrapper, '"write", , , false', '"write", , , true'),
+		StrReplace(Wrapper, "return _TOML_BatchWriteImpl", "Ignored := _TOML_BatchWriteImpl"),
+		StrReplace(Wrapper, "return _TOML_BatchWriteImpl", "; return _TOML_BatchWriteImpl"),
+		StrReplace(Wrapper, "AdmissionFn := 0", "AdmissionFn := 1")] {
+		Assert(Mutant !== Wrapper, "every withdrawal changes the actual executable wrapper")
+		AssertFalse(_AWU_TomlWrapperForwardsAdmission(Mutant), "mode/source/admission/result withdrawal cannot pass as an equivalent wrapper")
+	}
+}
+Test("atomic-write: exact native wrapper refuses admission, source and result withdrawals", _AWU_NativeWrapperAdmissionMutations)
