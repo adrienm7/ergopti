@@ -638,6 +638,85 @@ check('main: fixes and chores only bump the patch version', () => {
 	releases(mainBump('patch-only', ['fix: a bug', 'chore: tidy']), 'v1.2.4');
 });
 
+check('main: an explicit patch trailer classifies the publication commit', () => {
+	releases(
+		mainBump('explicit-patch', [
+			'feat: improve diagnostics',
+			'chore(release): publish\n\nRelease-As: 1.2.4'
+		]),
+		'v1.2.4'
+	);
+});
+
+check('main: an older patch request does not override a later publication commit', () => {
+	releases(
+		mainBump('old-patch-request', [
+			'feat: improve diagnostics\n\nRelease-As: 1.2.4',
+			'fix: next change'
+		]),
+		'v1.3.0'
+	);
+});
+
+check('main: invalid, duplicate and non-next patch requests refuse publication', () => {
+	for (const [index, value] of [
+		'1.2.3',
+		'1.2.5',
+		'1.3.0',
+		'v1.2.4',
+		'1.2.04',
+		'$(exit 99)',
+		'1.2.4\nRelease-As: 1.2.4'
+	].entries()) {
+		const result = mainBump(`invalid-patch-${index}`, [`fix: a change\n\nRelease-As: ${value}`]);
+		assert.notEqual(result.status, 0, `request ${index} must fail`);
+		assert.match(result.stderr, /Release-As must name the next patch/);
+		assert.equal(result.outputs.release, undefined);
+	}
+});
+
+check('main: an empty explicit patch trailer refuses publication', () => {
+	const result = mainBump('empty-patch-request', ['fix: change\n\nRelease-As:']);
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /Release-As must name the next patch/);
+	assert.equal(result.outputs.release, undefined);
+});
+
+check('main: an empty duplicate cannot disappear through command substitution', () => {
+	const result = mainBump('empty-duplicate-request', [
+		'feat: change\n\nRelease-As: 1.2.4\nRelease-As:'
+	]);
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /Release-As must name the next patch/);
+	assert.equal(result.outputs.release, undefined);
+});
+
+check('main: a patch request cannot conceal a breaking change', () => {
+	const result = mainBump('breaking-patch-request', [
+		'feat!: remove an API',
+		'chore(release): publish\n\nRelease-As: 1.2.4'
+	]);
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /cannot override a breaking change/);
+	assert.equal(result.outputs.release, undefined);
+});
+
+check('main: rerunning a published explicit patch never publishes it again', () => {
+	const work = repository('published-explicit-patch', 'main');
+	git(work, 'tag', 'v1.2.3', commit(work, 'chore: base'));
+	const source = commit(work, 'feat: improve diagnostics\n\nRelease-As: 1.2.4');
+	git(work, 'tag', 'v1.2.4', source);
+	noRelease(plan(work, source, 'refs/heads/main'), /already part of v1\.2\.4/);
+});
+
+check('dev: a stable patch request never changes the prerelease series', () => {
+	const work = repository('dev-explicit-patch', 'dev');
+	releases(
+		plan(work, commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4'), 'refs/heads/dev'),
+		'v0.0.0-dev.1'
+	);
+});
+
 // The glob also matches tags no run publishes; only the series counts, both
 // for "already published" and for the next number.
 check('a tag outside the series, even one the glob matches, does not count as published', () => {
