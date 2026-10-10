@@ -997,7 +997,7 @@ local function _clear_derived_device_rows(db, device_id)
 	end)
 	if not ok then
 		_rollback_sqlite(db, "Data.sql outbox clear")
-		Logger.error(LOG, "Cannot clear derived rows for device %s: %s.", device_id:sub(1, 8), tostring(err))
+		Logger.error(LOG, "Cannot clear derived device rows: %s.", tostring(err))
 		return false
 	end
 	return true
@@ -1113,7 +1113,7 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 			else
 				Aggregator.reset_ngram_ctx()
 			end
-			Logger.error(LOG, "Aggregate recovery failed for device %s: %s.", replay_device_id:sub(1, 8), tostring(replay_err))
+			Logger.error(LOG, "Device aggregate recovery failed: %s.", tostring(replay_err))
 			return false
 		end
 	end
