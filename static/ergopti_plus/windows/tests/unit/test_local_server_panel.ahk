@@ -646,7 +646,7 @@ _LSPB_JoinedView() {
 		AssertEqual(0, Fixture.Native.Jobs.Count)
 		Observation := Map("checks", 0)
 		Fixture.World.Owner.DefineProp("Current", {Call: _LSPB_Current.Bind(Observation)})
-		Rows := Fixture.Panel.Rows()
+		Rows := _LSPV_PreparedRows(Fixture)
 		AssertTrue(Rows is Array && Rows.Length > 0)
 		AssertTrue(Fixture.Panel.LastSnapshot is Map)
 		AssertTrue(Observation["checks"] <= 8,
@@ -754,8 +754,8 @@ _LSPD_Nominal() {
 	Fixture := _LSPD_Fixture()
 	try {
 		RowsStarted := DllCall("Kernel32\GetTickCount64", "UInt64")
-		Rows := Fixture.Panel.Rows()
-		FileAppend("# DEFERRED_DISCOVERY_ROWS elapsed_ms=" .
+		Rows := _LSPV_DiscoveryRows(Fixture)
+		FileAppend("# DEFERRED_DISCOVERY_SETUP elapsed_ms=" .
 			(DllCall("Kernel32\GetTickCount64", "UInt64") - RowsStarted) . "`n", "*")
 		AssertTrue(Rows is Array && Rows.Length > 0)
 		AssertEqual(0, Fixture.RescanCalls, "row construction cannot enter managed discovery")
@@ -781,7 +781,7 @@ _LSPD_Nominal() {
 		AssertEqual(1, Fixture.Publications.Length, "the original controller must publish the controlled replies")
 		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
 		AssertEqual(0, Fixture.RepairTimers.Count)
-		AssertTrue(Fixture.Panel.Rows() is Array)
+		AssertTrue(_LSPV_PreparedRows(Fixture) is Array)
 		AssertTrue(Fixture.Panel.LastSnapshot is Map)
 		AssertEqual(2, Fixture.Panel.LastSnapshot["results"]["lmstudio"]["models"].Length)
 	} finally Fixture.Dispose()
@@ -793,7 +793,7 @@ _LSPD_Refusal(Kind) {
 	Fixture := _LSPD_Fixture()
 	WasSuspended := A_IsSuspended
 	try {
-		Fixture.Panel.Rows()
+		_LSPV_DiscoveryRows(Fixture)
 		Record := Fixture.Panel.Discovery
 		AssertTrue(Record is Map)
 		global _DriverReady
@@ -830,13 +830,13 @@ _LSPD_TimerReentry() {
 	Fixture := _LSPD_Fixture()
 	try {
 		Fixture.ArmRetirement := true
-		Fixture.Panel.Rows()
+		AssertTrue(Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()))
 		AssertFalse(Fixture.ArmRetirement, "the actual timer arm port must reenter retirement")
 		AssertEqual(0, Fixture.RescanCalls)
 		AssertEqual(0, Fixture.Requests.Length)
 		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
 		AssertEqual(0, Fixture.RepairTimers.Count)
-		Fixture.Panel.Rows()
+		AssertTrue(Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()))
 		Record := Fixture.Panel.Discovery
 		AssertTrue(Record is Map)
 		Fixture.RefuseRepairStop := true
@@ -860,7 +860,7 @@ _LSPD_ArmRefusal() {
 	Fixture := _LSPD_Fixture()
 	try {
 		Fixture.ArmFailure := "refuse"
-		Fixture.Panel.Rows()
+		AssertThrows(() => Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()))
 		AssertEqual(0, Fixture.RescanCalls)
 		AssertEqual(0, Fixture.Requests.Length)
 		AssertEqual(0, Fixture.Publications.Length)
@@ -878,7 +878,7 @@ Test("local nonblocking discovery: timer arm refusal cannot publish queued succe
 _LSPD_CoalescenceSource() {
 	Fixture := _LSPD_Fixture()
 	try {
-		Fixture.Panel.Rows()
+		_LSPV_DiscoveryRows(Fixture)
 		Prior := Fixture.Panel.Discovery
 		AssertTrue(Prior is Map)
 		AssertTrue(Fixture.Panel._QueueDiscovery(Prior["source"]))
@@ -907,3 +907,179 @@ _LSPD_CoalescenceSource() {
 	}
 }
 Test("local nonblocking discovery: coalescence retains the admitted source image", _LSPD_CoalescenceSource)
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 6/ Deferred View Preparation ===========
+; ===============================================
+; ===============================================
+
+/** Delivers only an actually armed private preparation with genuine ready owner. */
+_LSPV_DrivePreparation(Fixture) {
+	Record := Fixture.Panel.Preparation
+	if !(Record is Map) || !Fixture.RepairTimers.Has(ObjPtr(Record["timer"]))
+		return false
+	global _DriverReady, _LLM_MenuBuildCoordinator
+	HadReady := IsSet(_DriverReady), HadCoordinator := IsSet(_LLM_MenuBuildCoordinator)
+	Ready := HadReady ? _DriverReady : false
+	Coordinator := HadCoordinator ? _LLM_MenuBuildCoordinator : 0
+	try {
+		_DriverReady := true
+		_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(() => true, () => false)
+		Fixture.Panel._RepairTick(Record)
+		return true
+	} finally {
+		_DriverReady := HadReady ? Ready : unset
+		_LLM_MenuBuildCoordinator := HadCoordinator ? Coordinator : unset
+	}
+}
+
+_LSPV_DiscoveryRows(Fixture) {
+	Rows := Fixture.Panel.Rows()
+	_LSPV_DrivePreparation(Fixture)
+	return Rows
+}
+
+_LSPV_PreparedRows(Fixture) {
+	Fixture.Panel.Rows()
+	_LSPV_DrivePreparation(Fixture)
+	return Fixture.Panel.Rows()
+}
+
+class _LSPV_Fixture extends _LSPD_Fixture {
+	__New() {
+		super.__New()
+		this.CaptureCalls := 0
+		this.World.Owner.DefineProp("Capture", {Call: ObjBindMethod(this, "ObserveCapture")})
+	}
+
+	ObserveCapture(Owner, Args*) {
+		this.CaptureCalls += 1
+		return LLM_Menu_ApiPrivateSourceOwner.Prototype.Capture.Call(Owner, Args*)
+	}
+
+	Dispose() {
+		if this.World.Owner.HasOwnProp("Capture")
+			this.World.Owner.DeleteProp("Capture")
+		super.Dispose()
+	}
+}
+
+_LSPV_Nominal() {
+	Fixture := _LSPV_Fixture()
+	try {
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		Rows := Fixture.Panel.Rows()
+		FileAppend("# DEFERRED_VIEW_ROWS elapsed_ms=" .
+			(DllCall("Kernel32\GetTickCount64", "UInt64") - Started) . "`n", "*")
+		AssertTrue(Rows is Array && Rows.Length > 0)
+		AssertEqual(0, Fixture.CaptureCalls, "Rows must not read or classify the private source")
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertFalse(Fixture.Panel.LastSnapshot is Map)
+		Record := Fixture.Panel.Preparation
+		AssertTrue(Record is Map)
+		Fixture.Panel.Rows()
+		AssertTrue(Fixture.Panel.Preparation == Record)
+		AssertEqual(1, Fixture.ArmCalls, "repeated builds must not reset an owned pending one-shot")
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.CaptureCalls, "startup false cannot enter preparation")
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		_DriverReady := true
+		_LLM_MenuBuildCoordinator.Active := true
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.CaptureCalls, "active build cannot enter preparation")
+		_LLM_MenuBuildCoordinator.Active := false
+		Fixture.Panel._RepairTick(Record)
+		AssertTrue(Fixture.CaptureCalls > 0)
+		AssertEqual(0, Fixture.RescanCalls, "preparation cannot confuse queued discovery with a result")
+		AssertTrue(Fixture.Panel.Discovery is Map)
+		Fixture.Panel._RepairTick(Fixture.Panel.Discovery)
+		AssertEqual(1, Fixture.Publications.Length)
+		_LSPV_PreparedRows(Fixture)
+		AssertTrue(Fixture.Panel.LastSnapshot is Map)
+		AssertTrue(Fixture.Panel.View is Map)
+		AssertEqual(Fixture.Order.Length, Fixture.Panel.View["receipts"].Count)
+		for Id, Receipt in Fixture.Panel.View["receipts"]
+			AssertTrue(Fixture.Native.IsCurrent(Receipt))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally Fixture.Dispose()
+}
+Test("local deferred view: Rows is I/O free and exact ready tick prepares original receipts", _LSPV_Nominal)
+
+_LSPV_Refusal(Kind) {
+	Fixture := _LSPV_Fixture()
+	WasSuspended := A_IsSuspended
+	try {
+		Fixture.Panel.Rows()
+		Record := Fixture.Panel.Preparation
+		AssertTrue(Record is Map)
+		global _DriverReady
+		_DriverReady := true
+		switch Kind {
+			case "pause": Suspend(true)
+			case "transition": Fixture.Transition("resume")
+			case "cancel": AssertTrue(Fixture.Panel.Retire(false))
+		}
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.CaptureCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertFalse(Fixture.Panel.PreparedRows is Array)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally {
+		Suspend(WasSuspended)
+		Fixture.Dispose()
+	}
+}
+
+_LSPV_RegisterRefusals() {
+	local Kind
+	for Kind in ["pause", "transition", "cancel"]
+		Test("local deferred view: " Kind " refuses exact pending preparation", _LSPV_Refusal.Bind(Kind))
+}
+_LSPV_RegisterRefusals()
+
+_LSPV_StopRefusal() {
+	Fixture := _LSPV_Fixture()
+	try {
+		Fixture.Panel.Rows()
+		Record := Fixture.Panel.Preparation
+		Fixture.RefuseRepairStop := true
+		AssertThrows(() => Fixture.Panel.Retire(false))
+		Arms := Fixture.ArmCalls
+		AssertThrows(() => Fixture.Panel._RepairTick(Record))
+		AssertEqual(Arms, Fixture.ArmCalls)
+		AssertEqual(0, Fixture.CaptureCalls)
+		AssertTrue(Fixture.Panel.RepairRecords.Get(ObjPtr(Record), 0) == Record)
+		Fixture.RefuseRepairStop := false
+		AssertTrue(Fixture.Panel.Retire(false))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally Fixture.Dispose()
+}
+Test("local deferred view: refused timer retirement retains debt without retry", _LSPV_StopRefusal)
+
+_LSPV_ConsumptionFence() {
+	Fixture := _LSPV_Fixture()
+	try {
+		_LSPV_DiscoveryRows(Fixture)
+		global _DriverReady
+		_DriverReady := true
+		Fixture.Panel._RepairTick(Fixture.Panel.Discovery)
+		Fixture.Panel.Rows()
+		_LSPV_DrivePreparation(Fixture)
+		Prepared := Fixture.Panel.PreparedRows
+		AssertTrue(Prepared is Array && Fixture.Panel.PreparedOwner is Map)
+		Captures := Fixture.CaptureCalls
+		Fixture.Transition("resume")
+		Rows := Fixture.Panel.Rows()
+		AssertTrue(Rows is Array && Rows != Prepared,
+			"a changed lifecycle cannot consume the old actionable prepared array")
+		AssertEqual(Captures, Fixture.CaptureCalls, "refused consumption cannot move source work back to Rows")
+		AssertFalse(Fixture.Panel.PreparedOwner is Map)
+	} finally Fixture.Dispose()
+}
+Test("local deferred view: lifecycle replacement refuses prepared row consumption", _LSPV_ConsumptionFence)
