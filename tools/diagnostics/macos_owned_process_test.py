@@ -395,6 +395,21 @@ class OwnedProcessControls(unittest.TestCase):
 
 class PrivilegedLeaderControls(unittest.TestCase):
     def setUp(self):
+        # These are recording waitid observations, not host process facts.
+        # Keep their complete protocol local to each modeled case and restore it.
+        constants = patch.multiple(
+            owner.os,
+            P_PID=1,
+            WEXITED=4,
+            WNOHANG=1,
+            WNOWAIT=32,
+            CLD_EXITED=11,
+            CLD_KILLED=12,
+            CLD_DUMPED=13,
+            create=True,
+        )
+        constants.start()
+        self.addCleanup(constants.stop)
         self.native = owner.NativeProcessGroups.__new__(owner.NativeProcessGroups)
         self.leader = 73136
         self.terminal = SimpleNamespace(
@@ -528,6 +543,59 @@ class PrivilegedLeaderControls(unittest.TestCase):
         with self.assertRaisesRegex(owner.OwnedProcessError, "exact reserved group leader"):
             self.native.privileged_terminal_identity(self.leader, 87236)
         self.waiting_mock.assert_not_called()
+
+
+class PrivilegedLeaderFixtureLifetimeControls(unittest.TestCase):
+    """Recording constants do not qualify or escape the modeled case lifetime."""
+
+    def test_wait_observation_constants_restore_assigned_and_missing_host_values(self):
+        expected = {
+            "P_PID": 1,
+            "WEXITED": 4,
+            "WNOHANG": 1,
+            "WNOWAIT": 32,
+            "CLD_EXITED": 11,
+            "CLD_KILLED": 12,
+            "CLD_DUMPED": 13,
+        }
+        original = {
+            name: (hasattr(owner.os, name), getattr(owner.os, name, None)) for name in expected
+        }
+        try:
+            for assigned in (False, True):
+                for throws in (False, True):
+                    with self.subTest(assigned=assigned, throws=throws):
+                        for name in expected:
+                            if assigned:
+                                setattr(owner.os, name, 791)
+                            elif hasattr(owner.os, name):
+                                delattr(owner.os, name)
+                        case = PrivilegedLeaderControls(
+                            "test_cross_uid_reserved_zombie_is_positively_identified_and_live_child_preserved"
+                        )
+                        observed_failure = None
+                        try:
+                            case.setUp()
+                            self.assertEqual(
+                                {name: getattr(owner.os, name) for name in expected}, expected
+                            )
+                            if throws:
+                                raise RuntimeError("owned recording case failed")
+                        except RuntimeError as failure:
+                            observed_failure = failure
+                        finally:
+                            case.doCleanups()
+                        self.assertEqual(observed_failure is not None, throws)
+                        for name in expected:
+                            self.assertEqual(hasattr(owner.os, name), assigned)
+                            if assigned:
+                                self.assertEqual(getattr(owner.os, name), 791)
+        finally:
+            for name, (present, value) in original.items():
+                if present:
+                    setattr(owner.os, name, value)
+                elif hasattr(owner.os, name):
+                    delattr(owner.os, name)
 
 
 if __name__ == "__main__":
