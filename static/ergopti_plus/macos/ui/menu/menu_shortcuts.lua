@@ -619,7 +619,7 @@ function M.build(ctx)
 		local prefix = script_control.SCRIPT_BINDING_PREFIX
 
 		local function get_label(act, slot_id)
-			if not act or act == "-" or act == "--" then return "-" end
+			if not act then return "-" end
 			if act:match("^#") then return act:sub(2) end
 			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
 				local binding = slot_id and act ~= "none" and type(prefix) == "string"
@@ -637,9 +637,7 @@ function M.build(ctx)
 			local sub = {}
 			for _, act in ipairs(actions) do
 				local label = get_label(act, slot_id)
-				if label == "-" then
-					table.insert(sub, { separator = true })
-				elseif act:match("^#") then
+				if act:match("^#") then
 					table.insert(sub, { label = i18n.decorate_section(label), disabled = true })
 				else
 					table.insert(sub, {
