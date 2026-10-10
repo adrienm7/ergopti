@@ -69,6 +69,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
+      - name: Observe synthetic lease diagnostic directory admission
+        id: lease-store-admission-observation
+        continue-on-error: true
+        shell: bash
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          xcrun swiftc -parse-as-library -o "$RUNNER_TEMP/lease-store-admission-probe" \
+              tools/diagnostics/LeaseStoreAdmissionProbe.swift
+          "$RUNNER_TEMP/lease-store-admission-probe"
+
       - name: Run scoped item 36 evidence controls
         run: node tools/test/test-macos-dev-qualification-deferral.cjs
       - uses: actions/setup-python@v5
@@ -170,6 +181,17 @@ jobs:
             ${{ runner.temp }}/swift-launcher-evidence/sdk-permission-xctest.log
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/*.json
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/helper/*.json
+      - name: Require completed synthetic lease diagnostic directory admission
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          ERGOPTI_LEASE_ADMISSION_OUTCOME: ${{ steps.lease-store-admission-observation.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$ERGOPTI_LEASE_ADMISSION_OUTCOME" != success ]; then
+            echo "::error::Synthetic lease diagnostic directory admission did not complete successfully."
+            exit 1
+          fi
 
   # Native producer and receiving run independently of the Brew/package branch.
   # Both advertised architectures are mandatory even for unpublished manual CI.

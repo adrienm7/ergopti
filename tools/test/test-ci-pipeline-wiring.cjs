@@ -256,6 +256,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[MACOS_BOX, 'item36-native', 'Retain scoped item 36 native diagnostics', 'always()'],
 	[
 		MACOS_BOX,
+		'item36-native',
+		'Require completed synthetic lease diagnostic directory admission',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
 		'managed-ollama-native',
 		'Qualify actual explicit curl stream ownership',
 		'${{ !cancelled() }}'

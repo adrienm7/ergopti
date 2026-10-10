@@ -3627,8 +3627,15 @@ and restoration/debt assertions remain mandatory.
   units finish 19,408/11 and virtual E2E101/101; the eleven previous unit failures
   and three workflow findings remain, with no new menu failure. Reload request
   acceptance is not completed reload; no owned runtime or exit73 fix is claimed.
-  Native installed, reload and physical qualification remain unrun. TODO31 and
-  transverse items16/38 remain open.
+  A separate scoped CI preflight observes native path admission and directory
+  metadata using 24 closed technical fields. Its early observation retains the
+  original archive opportunity and upload; a strict final verdict rejects any
+  incomplete probe. Composed receiving preserves format461 and virtual E2E101;
+  units19,412/11 and JS405/3 retain exactly the previous failure names. The Swift
+  source guard passes; all19 original pipeline findings remain unchanged.
+  Native execution, production retention and lease cause remain
+  unqualified. Native installed, reload and physical qualification remain unrun.
+  TODO31 and transverse items16/38 remain open.
   About 30-40 agent-days plus maintainer
   hardware time.
 

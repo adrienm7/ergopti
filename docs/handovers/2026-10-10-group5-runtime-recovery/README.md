@@ -67,3 +67,31 @@ these portable receipts.
 Native installed Hammerspoon, actual Darwin filesystem locking, process reload,
 architecture, packaging, installation and physical input remain unrun for this
 tranche. TODO31 and transverse items16/38 remain open.
+
+## Native admission observation
+
+A standalone native probe uses a fresh private synthetic directory and bounded
+create, rename and remove observations. Its closed 24-field record exposes only
+technical states and counts, with no paths, tokens, arguments, key content, host
+names or proxy information. Production retention and next-record observation
+are explicitly unrun in that record. Synthetic namespace cuts do not provide an
+atomic inode-conditioned filesystem operation or physical retirement evidence.
+
+The manual macOS item36 job observes the probe before its original archive
+controls. Probe refusal still permits their existing opportunity and exact upload,
+then a strict final verdict fails the job unless the observation completed. The
+original upload, SDK controls, archive expectations and runtime budgets remain
+unchanged. Coupled source guards reject a counterfeit upload or arbitrary
+continued step. Independent source receiving preserves all 32 negative controls
+and the 19 original external pipeline findings; native compilation and execution
+remain unrun until the targeted manual workflow completes.
+
+Actual composed receiving after the current Dev591d59a network successors keeps
+format461 and virtual E2E101/101 with one separate host skip. Units finish
+19,412 passed/11 failed and JavaScript405 passed/3 failed, retaining exactly the
+previous failure names. The standalone Swift source guard passes, and all19
+original external pipeline findings remain byte-exact. The overall selected
+gate is still failed. The four-path source-only patch applies to current Dev
+without the unintegrated native-owner chain; its received postimages differ from
+the feature branch. Independent source review preserves the original upload and
+budgets. Native compilation, operation and budget fit remain unrun.

@@ -39,7 +39,8 @@
  *    job waiting on the three lanes through its implicit `success()` (no status
  *    function), and ci.yml calling the lane that holds the Swift steps. No step
  *    of the pipeline may set `continue-on-error` beyond the report-only AHK
- *    annotator, and the launch verdict step must run the gate script.
+ *    annotator and the exact synthetic observation coupled to its fatal outcome
+ *    verdict. The launch verdict step must run the gate script.
  * 3. Requires the test step to capture line-buffered XCTest output and reject a
  *    missing successful suite summary, even when `swift test` itself exits 0.
  * 4. Reads the workflows through tools/test/ci-pipeline.cjs, which throws on a
@@ -579,17 +580,293 @@ for (const [id, condition] of Object.entries(ALLOWED_JOB_IFS)) {
 	);
 }
 // The same holds one level down: a gating step with continue-on-error turns its
-// own failure green, and its job then gates nothing. Only the report-only AHK
-// annotator may set it; the step before it remains the gate.
+// own failure green, and its job then gates nothing. The report-only AHK
+// annotator follows its gate; a synthetic observation instead requires its
+// independently fatal outcome verdict, without forgiving any original gate.
+// A continued synthetic observation is admitted only with its exact finite
+// command and a fatal terminal verdict. The outcome remains failure even when
+// the observation's conclusion permits the original archive controls to run.
+const SYNTHETIC_LEASE_OBSERVATION = 'Observe synthetic lease diagnostic directory admission';
+const SYNTHETIC_LEASE_VERDICT = 'Require completed synthetic lease diagnostic directory admission';
+const SYNTHETIC_LEASE_OBSERVATION_TEXT = [
+	`      - name: ${SYNTHETIC_LEASE_OBSERVATION}`,
+	'        id: lease-store-admission-observation',
+	'        continue-on-error: true',
+	'        shell: bash',
+	'        timeout-minutes: 1',
+	'        run: |',
+	'          set -euo pipefail',
+	'          xcrun swiftc -parse-as-library -o "$RUNNER_TEMP/lease-store-admission-probe" \\',
+	'              tools/diagnostics/LeaseStoreAdmissionProbe.swift',
+	'          "$RUNNER_TEMP/lease-store-admission-probe"'
+].join('\n');
+const SYNTHETIC_LEASE_VERDICT_TEXT = [
+	`      - name: ${SYNTHETIC_LEASE_VERDICT}`,
+	'        if: ${{ !cancelled() }}',
+	'        shell: bash',
+	'        env:',
+	'          ERGOPTI_LEASE_ADMISSION_OUTCOME: ${{ steps.lease-store-admission-observation.outcome }}',
+	'        run: |',
+	'          set -euo pipefail',
+	'          if [ "$ERGOPTI_LEASE_ADMISSION_OUTCOME" != success ]; then',
+	'            echo "::error::Synthetic lease diagnostic directory admission did not complete successfully."',
+	'            exit 1',
+	'          fi'
+].join('\n');
+
+const SYNTHETIC_LEASE_RETENTION_TEXT = [
+	'      - name: Retain scoped item 36 native diagnostics',
+	'        if: always()',
+	'        uses: actions/upload-artifact@v4',
+	'        with:',
+	'          name: item36-native-diagnostics-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+	'          retention-days: 7',
+	'          if-no-files-found: warn',
+	'          path: |',
+	'            ${{ runner.temp }}/swift-launcher-evidence/item36-*.json',
+	'            ${{ runner.temp }}/swift-launcher-evidence/item36-xctest.log',
+	'            ${{ runner.temp }}/swift-launcher-evidence/sdk-permission-*.json',
+	'            ${{ runner.temp }}/swift-launcher-evidence/sdk-permission-xctest.log',
+	'            ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/*.json',
+	'            ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/helper/*.json'
+].join('\n');
+
+/**
+ * Refuse an uncoupled observation or any drift of its exact command/verdict.
+ * @param {string} text Complete source workflow.
+ * @param {string} rel Owning workflow path.
+ * @returns {string[]} Failed synthetic admission boundaries.
+ */
+function syntheticLeaseAdmissionFailures(text, rel = MACOS_BOX) {
+	const problems = [];
+	const scoped = pipeline.jobsOfText(text, rel).filter((job) => job.id === 'item36-native');
+	if (rel !== MACOS_BOX || scoped.length !== 1) return ['exact manual macOS scope'];
+	const job = scoped[0].body;
+	if (
+		pipeline.field(job, 'if') !==
+			"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}" ||
+		pipeline.field(job, 'continue-on-error') !== null ||
+		pipeline.needsOf(job).length !== 0
+	)
+		problems.push('independent fatal manual job');
+	const steps = pipeline.steps(job);
+	const observations = steps.filter((step) => step.name === SYNTHETIC_LEASE_OBSERVATION);
+	const verdicts = steps.filter((step) => step.name === SYNTHETIC_LEASE_VERDICT);
+	const retentions = steps.filter(
+		(step) => step.name === 'Retain scoped item 36 native diagnostics'
+	);
+	if (retentions.length !== 1 || retentions[0].body.trimEnd() !== SYNTHETIC_LEASE_RETENTION_TEXT)
+		problems.push('exact original scoped diagnostics upload owner');
+	if (observations.length !== 1 || verdicts.length !== 1)
+		return [...problems, 'unique observation and verdict'];
+	const observation = observations[0];
+	const verdict = verdicts[0];
+	if (observation.body.trimEnd() !== SYNTHETIC_LEASE_OBSERVATION_TEXT)
+		problems.push('exact continued 60-second observation');
+	if (verdict.body.trimEnd() !== SYNTHETIC_LEASE_VERDICT_TEXT)
+		problems.push('fatal not-cancelled success-only outcome verdict');
+	if (
+		steps.indexOf(observation) !== 2 ||
+		pipeline.stepField(steps[1].body, 'uses') !== 'actions/setup-node@v4' ||
+		steps[3].name !== 'Run scoped item 36 evidence controls'
+	)
+		problems.push('early observation preserves original archive admission');
+	if (steps.at(-1) !== verdict || steps.at(-2) !== retentions[0])
+		problems.push('terminal verdict follows original diagnostics');
+	return problems;
+}
+
+const syntheticLeaseFailureStart = failures.length;
+const syntheticLeaseWorkflow = pipeline.file(MACOS_BOX);
+const syntheticLeaseFailures = syntheticLeaseAdmissionFailures(syntheticLeaseWorkflow);
+for (const failure of syntheticLeaseFailures)
+	check(false, `(synthetic-lease-admission) ${failure}`);
+
+// Every mutant changes the actual enrolled workflow at one asserted preimage.
+// The literal command and outcome policy above remain independent expectations.
+const syntheticLeaseMutants = [
+	['missing observation', SYNTHETIC_LEASE_OBSERVATION_TEXT, ''],
+	['missing verdict', SYNTHETIC_LEASE_VERDICT_TEXT, ''],
+	[
+		'duplicate observation',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT + '\n' + SYNTHETIC_LEASE_OBSERVATION_TEXT
+	],
+	[
+		'duplicate verdict',
+		SYNTHETIC_LEASE_VERDICT_TEXT,
+		SYNTHETIC_LEASE_VERDICT_TEXT + '\n' + SYNTHETIC_LEASE_VERDICT_TEXT
+	],
+	...['false', 'success()', 'always()', '${{ !cancelled() && false }}'].map((condition) => [
+		`skippable or cancelled verdict ${condition}`,
+		SYNTHETIC_LEASE_VERDICT_TEXT,
+		SYNTHETIC_LEASE_VERDICT_TEXT.replace('if: ${{ !cancelled() }}', `if: ${condition}`)
+	]),
+	[
+		'forgiven verdict',
+		SYNTHETIC_LEASE_VERDICT_TEXT,
+		SYNTHETIC_LEASE_VERDICT_TEXT.replace(
+			'        shell: bash',
+			'        continue-on-error: true\n        shell: bash'
+		)
+	],
+	[
+		'conclusion instead of outcome',
+		SYNTHETIC_LEASE_VERDICT_TEXT,
+		SYNTHETIC_LEASE_VERDICT_TEXT.replace('.outcome }}', '.conclusion }}')
+	],
+	[
+		'swallowed verdict',
+		SYNTHETIC_LEASE_VERDICT_TEXT,
+		SYNTHETIC_LEASE_VERDICT_TEXT.replace('exit 1', 'exit 0')
+	],
+	[
+		'skipped outcome accepted',
+		SYNTHETIC_LEASE_VERDICT_TEXT,
+		SYNTHETIC_LEASE_VERDICT_TEXT.replace('!= success', '!= skipped')
+	],
+	[
+		'missing strict outcome branch',
+		SYNTHETIC_LEASE_VERDICT_TEXT,
+		SYNTHETIC_LEASE_VERDICT_TEXT.replace(
+			'if [ "$ERGOPTI_LEASE_ADMISSION_OUTCOME" != success ]; then',
+			'if false; then'
+		)
+	],
+	[
+		'observation id drift',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT.replace(
+			'id: lease-store-admission-observation',
+			'id: unknown-observation'
+		)
+	],
+	[
+		'missing continuation',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT.replace('        continue-on-error: true\n', '')
+	],
+	[
+		'skipped observation',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT.replace(
+			'        shell: bash',
+			'        if: false\n        shell: bash'
+		)
+	],
+	...['0', '2', '${{ inputs.timeout }}'].map((budget) => [
+		`observation budget ${budget}`,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT.replace('timeout-minutes: 1', `timeout-minutes: ${budget}`)
+	]),
+	[
+		'compile failure swallowed',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT.replace(
+			'tools/diagnostics/LeaseStoreAdmissionProbe.swift',
+			'tools/diagnostics/LeaseStoreAdmissionProbe.swift || true'
+		)
+	],
+	[
+		'probe failure swallowed',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT + ' || true'
+	],
+	[
+		'errexit disabled',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT.replace('set -euo pipefail', 'set +e')
+	],
+	[
+		'different source',
+		SYNTHETIC_LEASE_OBSERVATION_TEXT,
+		SYNTHETIC_LEASE_OBSERVATION_TEXT.replace('LeaseStoreAdmissionProbe.swift', 'Unknown.swift')
+	],
+	['missing original retention', SYNTHETIC_LEASE_RETENTION_TEXT, ''],
+	[
+		'duplicate original retention',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT + '\n' + SYNTHETIC_LEASE_RETENTION_TEXT
+	],
+	[
+		'counterfeit retention action',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT.replace(
+			'uses: actions/upload-artifact@v4',
+			'uses: actions/checkout@v4'
+		)
+	],
+	[
+		'skipped retention',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT.replace('if: always()', 'if: false')
+	],
+	[
+		'forgiven retention',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT.replace(
+			'        uses:',
+			'        continue-on-error: true\n        uses:'
+		)
+	],
+	[
+		'retention path drift',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT.replace('sdk-permission-*.json', 'unknown.json')
+	],
+	[
+		'retention artifact name drift',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT.replace(
+			'name: item36-native-diagnostics-',
+			'name: unknown-diagnostics-'
+		)
+	],
+	[
+		'retention days drift',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT.replace('retention-days: 7', 'retention-days: 0')
+	],
+	[
+		'retention absence policy drift',
+		SYNTHETIC_LEASE_RETENTION_TEXT,
+		SYNTHETIC_LEASE_RETENTION_TEXT.replace('if-no-files-found: warn', 'if-no-files-found: ignore')
+	]
+];
+for (const [name, before, after] of syntheticLeaseMutants) {
+	check(
+		syntheticLeaseWorkflow.split(before).length === 2,
+		`(synthetic-lease-admission) mutation preimage must be unique: ${name}`
+	);
+	check(
+		syntheticLeaseAdmissionFailures(syntheticLeaseWorkflow.replace(before, after)).length > 0,
+		`(synthetic-lease-admission) guard missed ${name}`
+	);
+}
+check(
+	syntheticLeaseAdmissionFailures(syntheticLeaseWorkflow, BOX_FILES.windows).length > 0,
+	'(synthetic-lease-admission) observation exception must not migrate to another OS'
+);
+if (failures.length === syntheticLeaseFailureStart)
+	console.log(
+		'[OK] Synthetic lease observation couples exact finite command to fatal terminal outcome verdict; native execution remains unrun.'
+	);
+
 const ALLOWED_STEP_CONTINUE_ON_ERROR = { 'Annotate AHK results': 'true' };
 for (const entry of pipeline.files()) {
 	for (const pipelineJob of pipeline.jobs(entry.rel)) {
 		for (const pipelineStep of pipeline.steps(pipelineJob.body)) {
 			const value = pipeline.stepField(pipelineStep.body, 'continue-on-error');
 			check(
-				value === null || ALLOWED_STEP_CONTINUE_ON_ERROR[pipelineStep.name] === value,
+				value === null ||
+					ALLOWED_STEP_CONTINUE_ON_ERROR[pipelineStep.name] === value ||
+					(value === 'true' &&
+						entry.rel === MACOS_BOX &&
+						pipelineJob.id === 'item36-native' &&
+						pipelineStep.name === SYNTHETIC_LEASE_OBSERVATION &&
+						syntheticLeaseFailures.length === 0),
 				`${entry.rel}: step "${pipelineStep.name}" of job \`${pipelineJob.id}\` sets continue-on-error: ${value}; ` +
-					'only the report-only "Annotate AHK results" may'
+					'only the report-only "Annotate AHK results" or the exact synthetic observation coupled to its fatal outcome verdict may'
 			);
 		}
 	}
