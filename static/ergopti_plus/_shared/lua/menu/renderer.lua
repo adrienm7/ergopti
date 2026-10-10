@@ -192,6 +192,56 @@ local function read_caption_values(item, getters, i18n)
 	return caption_values(i18n.get(item.i18n), values)
 end
 
+-- Count decoration is declared around a translated caption, never supplied as a native label.
+local function translated_count_policy(item)
+	local policy = item.caption_count_policy
+	if item.type ~= "group" or type(item.id) ~= "string" or item.id == ""
+		or type(item.i18n) ~= "string" or item.i18n == "" or type(policy) ~= "table" or getmetatable(policy) ~= nil
+		or item.caption_source ~= nil or item.caption_format ~= nil or item.caption_getter ~= nil
+		or item.caption_getters ~= nil or item.caption_layout ~= nil or item.caption_joiner ~= nil
+		or item.caption_count_getter ~= nil or item.caption_count_format ~= nil or item.label_prefix ~= nil then return nil end
+	local fields = { value_getter = true, present_getter = true, visibility = true, style = true, format = true, maximum = true }
+	local count = 0
+	for key in next, policy do if not fields[key] then return nil end; count = count + 1 end
+	if count ~= 6 or type(policy.value_getter) ~= "string" or policy.value_getter == ""
+		or type(policy.present_getter) ~= "string" or policy.present_getter == ""
+		or type(policy.maximum) ~= "number" or policy.maximum ~= policy.maximum
+		or policy.maximum < 0 or policy.maximum > 2^53 - 1 or policy.maximum % 1 ~= 0
+		or type(policy.format) ~= "string" or policy.format:find("[%z\1-\31\127]")
+		or utf8_length(policy.format) == nil or caption_values(policy.format, { "", "" }) == nil then return nil end
+	for _, field in ipairs({ "visibility", "style" }) do
+		local map = policy[field]
+		if type(map) ~= "table" or getmetatable(map) ~= nil then return nil end
+		local size = 0
+		for key, value in next, map do
+			if key ~= "ahk" and key ~= "hs" and key ~= "linux" then return nil end
+			if field == "visibility" and value ~= "always" and value ~= "available" and value ~= "positive" then return nil end
+			if field == "style" and value ~= "space" and value ~= "decimal" then return nil end
+			size = size + 1
+		end
+		if size ~= 3 then return nil end
+	end
+	return policy
+end
+
+local function read_translated_count_caption(item, getters, i18n, platform)
+	local policy = translated_count_policy(item)
+	if not policy or type(getters) ~= "table" or type(getters[policy.value_getter]) ~= "function"
+		or type(getters[policy.present_getter]) ~= "function" or policy.style[platform] == nil then return nil end
+	local title = i18n.get(item.i18n)
+	if type(title) ~= "string" or title == "" or title == item.i18n
+		or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	local value_ok, total = pcall(getters[policy.value_getter])
+	local present_ok, present = pcall(getters[policy.present_getter])
+	if not value_ok or not present_ok or type(present) ~= "boolean" or type(total) ~= "number"
+		or total ~= total or total < 0 or total > policy.maximum or total % 1 ~= 0 then return nil end
+	local visible = policy.visibility[platform]
+	if visible ~= "always" and (not present or (visible == "positive" and total == 0)) then return title end
+	local text = total == 0 and "0" or string.format("%.0f", total)
+	if policy.style[platform] == "space" then text = text:reverse():gsub("(%d%d%d)", "%1 "):reverse():gsub("^ ", "") end
+	return caption_values(policy.format, { title, text })
+end
+
 -- Used only to report a malformed `new()` call, which by definition happens
 -- before an injected logger exists.
 local BootLogger = require("logger.shim")
@@ -1147,6 +1197,7 @@ function M.new(deps)
 					Logger.error(LOG, "Invalid inert caption layout in '%s' — rows refused.", key)
 					return nil
 				end
+				if item.caption_count_policy ~= nil and not translated_count_policy(item) then return nil end
 				if item.caption_format ~= nil and is_for_platform(item) and read_numbered_caption(item, getters, i18n) == nil then return nil end
 				if item.caption_source ~= nil and is_for_platform(item) and read_native_caption(item, getters) == nil then return nil end
 				if item.caption_getters ~= nil then
@@ -1272,6 +1323,10 @@ function M.new(deps)
 						if not row then return nil end
 					elseif item.type == "group" and (type(children[item.id]) == "table" or type(children[item.id]) == "function") then
 						local title
+						if item.caption_count_policy ~= nil then
+							title = read_translated_count_caption(item, getters, i18n, platform)
+							if title == nil then return nil end
+						end
 						if item.caption_format ~= nil then
 							title = read_numbered_caption(item, getters, i18n)
 							if title == nil then return nil end
@@ -1478,6 +1533,7 @@ function M.new(deps)
 				goto continue
 			end
 
+			if item.caption_count_policy ~= nil and not translated_count_policy(item) then goto continue end
 			local t = item.type
 
 			if t == "---" then
@@ -1646,6 +1702,10 @@ function M.new(deps)
 					goto continue
 				end
 				local label = i18n.get(i18n_key)
+				if item.caption_count_policy ~= nil then
+					label = read_translated_count_caption(item, getters, i18n, platform)
+					if label == nil then goto continue end
+				end
 				if item.caption_format ~= nil then
 					label = read_numbered_caption(item, getters, i18n)
 					if label == nil then goto continue end
@@ -1923,6 +1983,106 @@ function M.new(deps)
 	end
 
 
+	--- Captures only the existing top-level declaration's inert boundaries.
+	--- The second return is the exact source array: native loops must not infer
+	--- ownership from a separately decoded or cached copy of that declaration.
+	--- @return function|nil receive, table|nil declared
+	function R.top_level_separator_receiver()
+		local root = get_manifest_root()
+		local declared = type(root) == "table" and rawget(root, "top_level")
+		if type(root) ~= "table" or getmetatable(root) ~= nil or type(declared) ~= "table"
+			or getmetatable(declared) ~= nil or #declared == 0 or getmetatable(R) ~= nil then return nil end
+		for index in next, declared do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #declared then return nil end
+		end
+		-- Admit every nested source before platform iteration can observe it.
+		local source = reasoned_group_snapshot(declared)
+		if not source then return nil end
+		local quit, tail_boundary, record_owners = nil, nil, {}
+		for index = 1, #declared do
+			local row = rawget(declared, index)
+			if type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "id")) ~= "string" then return nil end
+			if record_owners[row] then return nil end
+			record_owners[row] = true
+			if row.id == "---" then
+				for field in next, row do
+					if field ~= "id" and field ~= "type" and field ~= "platforms" and field ~= "reason_key"
+						and field ~= "unavailable" then return nil end
+				end
+				if (row.type ~= nil and row.type ~= "---") or (row.unavailable ~= nil and row.unavailable ~= "hide")
+					or (row.reason_key ~= nil and (type(row.reason_key) ~= "string" or row.reason_key == "")) then return nil end
+				local allowed = rawget(row, "platforms")
+				if allowed ~= nil then
+					if type(allowed) ~= "table" or getmetatable(allowed) ~= nil or #allowed == 0 then return nil end
+					local seen, count = {}, 0
+					for key, token in next, allowed do
+						if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #allowed
+							or (token ~= "ahk" and token ~= "hs" and token ~= "linux") or seen[token] then return nil end
+						seen[token], count = true, count + 1
+					end
+					if count ~= #allowed then return nil end
+				end
+				if is_for_platform(row) then tail_boundary = index end
+			elseif row.id == "quit" and is_for_platform(row) then
+				if quit ~= nil or row.type ~= "command" or type(row.i18n) ~= "string" or row.i18n == "" then return nil end
+				quit = { row = row, boundary = tail_boundary }
+			end
+		end
+		local owner = rawget(R, "top_level_separator_receiver")
+		local render_owner = rawget(R, "render_rows")
+		if not source or type(owner) ~= "function" or type(render_owner) ~= "function" then return nil end
+		local function current()
+			return getmetatable(R) == nil and rawget(R, "top_level_separator_receiver") == owner
+				and rawget(R, "render_rows") == render_owner
+				and get_manifest_root() == root and rawget(root, "top_level") == declared and reasoned_group_current(source)
+		end
+		if not current() then return nil end
+		return function(row)
+			if not current() then return nil end
+			if row == "current" then return true end
+			if row == "linux_quit_last" then
+				if platform ~= "linux" or not quit or quit.boundary == nil then return nil end
+				row = rawget(declared, quit.boundary)
+			end
+			if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
+			local matches = 0
+			for _, entry in ipairs(declared) do if rawequal(row, entry) then matches = matches + 1 end end
+			if matches ~= 1 or rawget(row, "id") ~= "---" or not is_for_platform(row) then return nil end
+			-- Shared inert projection; normalization remains the existing renderer's.
+			return { separator = true }
+		end, declared
+	end
+
+	--- Captures one canonical parent before its actual native child producer runs.
+	--- @param manifest_key string Existing canonical menu section.
+	--- @param row_id string Identified group to receive the completed child.
+	--- @return function|nil receiver No native state is read during admission.
+	function R.group_receiver(manifest_key, row_id)
+		local root, rows = get_manifest_root(), get_menu_def(manifest_key)
+		local selected, matches = nil, 0
+		for _, item in ipairs(rows) do
+			if type(item) ~= "table" or getmetatable(item) ~= nil then return nil end
+			if item.id == row_id then selected, matches = item, matches + 1 end
+		end
+		if type(row_id) ~= "string" or row_id == "" or matches ~= 1 or selected.type ~= "group"
+			or not is_for_platform(selected) or type(selected.i18n) ~= "string" or selected.i18n == ""
+			or (selected.caption_count_policy ~= nil and not translated_count_policy(selected)) then return nil end
+		local source = reasoned_group_snapshot(rows)
+		local owner = rawget(R, "group_row")
+		if not source or type(owner) ~= "function" or getmetatable(R) ~= nil then return nil end
+		return function(child, getters)
+			if type(child) ~= "table" or type(getters) ~= "table" then return nil end
+			local state, child_source = reasoned_group_snapshot(getters), reasoned_group_snapshot(child)
+			if not state or not child_source or getmetatable(R) ~= nil or rawget(R, "group_row") ~= owner
+				or get_manifest_root() ~= root or get_menu_def(manifest_key) ~= rows or not reasoned_group_current(source) then return nil end
+			local row = owner(manifest_key, row_id, child, getters)
+			if not row or get_manifest_root() ~= root or get_menu_def(manifest_key) ~= rows
+				or not reasoned_group_current(source) or not reasoned_group_current(state) or not reasoned_group_current(child_source)
+				or rawget(R, "group_row") ~= owner then return nil end
+			return row
+		end
+	end
+
 	--- Supplies one declared parent around an already completed native subtree.
 	--- @param manifest_key string Owning shared menu declaration.
 	--- @param row_id string Unique declared group identity.
@@ -1948,7 +2108,10 @@ function M.new(deps)
 		getters = getters or {}
 		local label = i18n.get(selected.i18n)
 		local caption_key = rawget(selected, "caption_getter")
-		if selected.caption_format ~= nil then
+		if selected.caption_count_policy ~= nil then
+			label = read_translated_count_caption(selected, getters, i18n, platform)
+			if label == nil then return nil end
+		elseif selected.caption_format ~= nil then
 			label = read_numbered_caption(selected, getters, i18n)
 			if label == nil then return nil end
 		elseif selected.caption_source ~= nil then

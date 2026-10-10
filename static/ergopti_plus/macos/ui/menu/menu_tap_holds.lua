@@ -1094,6 +1094,8 @@ function M.build(ctx)
 		return nil
 	end
 
+	local receive = ManifestMenu.group_receiver("top_level", "tap_holds")
+	if not receive then return nil end
 	local enabled = karabiner.get_enabled()
 	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
 		and karabiner.get_tap_holds_enabled() == true
@@ -1151,11 +1153,8 @@ function M.build(ctx)
 	-- `submenu`, not `items`: ManifestMenu.build returns rows it has ALREADY
 	-- materialised. Handed over as `items`, the tray render dropped every one of
 	-- them and the submenu opened empty on the real menu bar.
-	return {
-		label   = i18n.get("menu.tapholds.title"),
-		checked = tap_holds_on or nil,
-		submenu = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers),
-	}
+	local children = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
+	return receive(children, { tapholds_enabled = function() return tap_holds_on or nil end })
 end
 
 --- Switches the Tap-Holds feature, persists it, then redeploys the rules.

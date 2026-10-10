@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 local output_fixture = require("tests.support.toml_output_fixture")
 
 local Answers = require("onboarding_answers")
@@ -221,7 +222,7 @@ local function with_wizard(answer, scenario)
 	helpers.with_stub_scope({
 		"infra.preferences", "adapters.file_system", "infra.fs_dir",
 		"ui.menu.menu_state", "ui.menu.builder", "ui.menu.menu_hotstrings", "ui.menu.keymap_lifecycle",
-		"infra.notifications",
+		"infra.notifications", "infra.i18n", "infra.manifest_menu",
 	}, function()
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		local Preferences = helpers.load_with_stubs("infra.preferences")
@@ -240,6 +241,8 @@ local function with_wizard(answer, scenario)
 				local fh = assert(io.open(path, "w"))
 				fh:close()
 			end
+			CaptionFixture.install(require("infra.i18n"))
+			package.loaded["ui.menu.builder"] = nil
 			local world = {
 				path = path, hotfiles = hotfiles, groups = groups,
 				Preferences = Preferences,

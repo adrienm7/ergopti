@@ -188,6 +188,64 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 			);
 			controls++;
 		}
+		if (platform === 'ahk') {
+			const callerFile = files[platform][2],
+				caller = sources[callerFile];
+			const refusal =
+				'if !Receiver\n\t\tthrow Error("The declared hotstrings feature parent was refused before native construction.")';
+			const publication = '_MI_StageDeclaredFeature(Receiver, HotstringsMenu, Map(';
+			assert.equal(caller.split(refusal).length - 1, 1, 'exact original preconstruction refusal');
+			assert.equal(caller.split(publication).length - 1, 1, 'exact actual declared publication');
+			const movedRefusal = caller
+				.replace(refusal, '')
+				.replace(publication, refusal + '\n' + publication);
+			assert.equal(
+				admits({ ...sources, [callerFile]: movedRefusal }),
+				false,
+				'a guard moved after native construction has no before-build refusal credit'
+			);
+			controls++;
+			const transports = [
+				[
+					'if !Receiver\n\t\tthrow Error("The declared hotstrings feature parent was refused before native construction.")',
+					'if !Receiver && false\n\t\tthrow Error("The declared hotstrings feature parent was refused before native construction.")'
+				],
+				[
+					'Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")',
+					'Receiver := MenuRenderer_GroupReceiver("top_level", "shortcuts")'
+				],
+				[
+					'_MI_StageDeclaredFeature(Receiver, HotstringsMenu, Map(',
+					'_MI_StageDeclaredFeature(Receiver, Menu(), Map('
+				],
+				[
+					'Row := Receiver.Call(Child, Getters)',
+					'Row := Map("submenu", Child, "label", "foreign")'
+				],
+				['Row.Get("submenu", false) != Child', 'false'],
+				[
+					'TrayMenuStage_AddFeature(Row["label"], Child)',
+					'TrayMenuStage_AddFeature(Row["label"], Menu())'
+				],
+				['if Row.Get("checked", false)', 'if false'],
+				['finally MenuDispatcher_PruneMenu(Child)', 'finally ForeignPrune(Child)']
+			];
+			for (const [before, after] of transports) {
+				assert.equal(
+					caller.split(before).length - 1,
+					1,
+					'exact declared native transport preimage'
+				);
+				const changed = caller.replace(before, after);
+				assert.equal(
+					admits({ ...sources, [callerFile]: changed }),
+					false,
+					'withdrawn declared parent/result/checked/refusal transport has no owner credit'
+				);
+				assert.equal(admits(), true, 'exact original native transport inverse restores ownership');
+				controls++;
+			}
+		}
 		if (platform !== 'ahk') {
 			assert.equal(
 				admits({
@@ -198,6 +256,51 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 				'canonical native renderer import is necessary'
 			);
 			controls++;
+		}
+		if (platform !== 'ahk') {
+			const actual = sources[languageFile];
+			for (const [before, after, reason] of [
+				[
+					'group_receiver("top_level", "hotstrings")',
+					'group_receiver("top_level", "shortcuts")',
+					'foreign declared feature parent'
+				],
+				[
+					platform === 'hs'
+						? 'receive(hotstrings_menu,'
+						: 'receive(items, { hotstrings_enabled = function()',
+					platform === 'hs' ? 'receive({},' : 'receive({}, { hotstrings_enabled = function()',
+					'actual completed Hotstrings child discarded'
+				],
+				[
+					'local rendered = separator_render(',
+					'local rendered = Foreign.render_rows(',
+					'captured root renderer withdrawn'
+				],
+				[
+					'rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
+					'true',
+					'native facade custody withdrawn'
+				],
+				[
+					platform === 'hs'
+						? 'local receive, declared = separator_factory()'
+						: 'local declared = ManifestMenu.get_array("top_level")',
+					platform === 'hs'
+						? 'local receive, declared = separator_factory()\n declared, ignored = {}, nil'
+						: 'local declared = ManifestMenu.get_array("top_level")\n declared, ignored = {}, nil',
+					'actual declared array first-variable multiassignment poisoned'
+				]
+			]) {
+				assert.equal(actual.split(before).length - 1, 1, reason + ': exact actual source preimage');
+				assert.equal(
+					admits({ ...sources, [languageFile]: actual.replace(before, after) }),
+					false,
+					reason
+				);
+				assert.equal(admits(), true, reason + ': genuine source inverse restores');
+				controls++;
+			}
 		}
 		assert.equal(admits(), true, 'exact source survives every independent negative control');
 	}
@@ -366,7 +469,16 @@ function verifyPublicationGraphCounterexamples(base, manifest) {
 		true,
 		'actual complete producer-to-publication graph'
 	);
-	for (const control of publicationCases) {
+	const livePublicationCases = publicationCases.map((control) =>
+		control.name === 'returned-native-hotstrings-child-discarded'
+			? {
+					...control,
+					before: 'return receive(items, { hotstrings_enabled = function()',
+					after: 'return receive({}, { hotstrings_enabled = function()'
+				}
+			: control
+	);
+	for (const control of livePublicationCases) {
 		assert.equal(
 			source.split(control.before).length - 1,
 			1,

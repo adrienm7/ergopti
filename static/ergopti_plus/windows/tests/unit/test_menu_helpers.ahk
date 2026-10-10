@@ -64,3 +64,46 @@ TestMH_SeparatorSkipped() {
 }
 Test("menu_helpers: '-' separator entries do not affect disambiguation counting (duplicate-personal-section-desc-menu-mistarget)",
 	TestMH_SeparatorSkipped)
+
+
+; Shared boundaries retain the existing native source order and fail closed.
+_MH_SharedSectionBoundary() {
+	Row := _HS_DeclaredSectionBoundary()
+	AssertTrue(Row is Map, "the actual shared boundary renders provider data")
+	AssertTrue(Row.Get("separator", false), "the original boundary remains a separator")
+	AssertFalse(Row.Has("action"), "a boundary has no click command")
+	AssertFalse(Row.Has("submenu"), "a boundary has no borrowed child")
+}
+Test("menu_helpers: hotstring sections consume the shared inert boundary", _MH_SharedSectionBoundary)
+
+_MH_WithdrawnSectionBoundary() {
+	Root := _MR_GetManifestRoot()
+	AssertTrue(Root is Map, "the actual menu root must load")
+	AssertTrue(Root.Has("hotstrings_parameter_boundary"), "the existing declaration must be present")
+	Saved := Root["hotstrings_parameter_boundary"]
+	try {
+		Root.Delete("hotstrings_parameter_boundary")
+		AssertThrows(_HS_DeclaredSectionBoundary, "withdrawn boundary must refuse detached construction")
+	} finally {
+		Root["hotstrings_parameter_boundary"] := Saved
+	}
+	AssertTrue(_HS_DeclaredSectionBoundary().Get("separator", false), "restoring the genuine declaration restores construction")
+}
+Test("menu_helpers: a withdrawn shared section boundary refuses construction", _MH_WithdrawnSectionBoundary)
+
+_MH_MalformedSectionBoundary() {
+	Root := _MR_GetManifestRoot()
+	AssertTrue(Root is Map, "the actual menu root must load")
+	AssertTrue(Root.Has("hotstrings_parameter_boundary"), "the existing declaration must be present")
+	Saved := Root["hotstrings_parameter_boundary"]
+	try {
+		Root["hotstrings_parameter_boundary"] := []
+		AssertThrows(_HS_DeclaredSectionBoundary, "an empty boundary must refuse construction")
+		Root["hotstrings_parameter_boundary"] := [Map("type", "---"), Map("type", "---")]
+		AssertThrows(_HS_DeclaredSectionBoundary, "duplicate boundaries must refuse construction")
+	} finally {
+		Root["hotstrings_parameter_boundary"] := Saved
+	}
+	AssertTrue(_HS_DeclaredSectionBoundary().Get("separator", false), "a refused proposal cannot retire the genuine declaration")
+}
+Test("menu_helpers: empty and duplicated shared boundaries refuse construction", _MH_MalformedSectionBoundary)

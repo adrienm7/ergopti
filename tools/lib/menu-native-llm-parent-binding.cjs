@@ -90,9 +90,15 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 		positions(builder, 'load_top_level =').length ||
 		positions(builder, 'local require').length ||
 		positions(builder, 'require =').length ||
-		rootPositions(loadTop, 'local data = load_manifest()').length !== 1 ||
-		positions(loadTop, 'data =').length !== 1 ||
-		rootPositions(loadTop, 'for _, entry in ipairs(data.top_level) do').length !== 1 ||
+		!(
+			(rootPositions(loadTop, 'local data = load_manifest()').length === 1 &&
+				positions(loadTop, 'data =').length === 1 &&
+				rootPositions(loadTop, 'for _, entry in ipairs(data.top_level) do').length === 1) ||
+			(rootPositions(loadTop, 'local receive, declared = separator_factory()').length === 1 &&
+				positions(loadTop, 'declared =').length === 1 &&
+				rootPositions(loadTop, 'for _, entry in ipairs(declared) do').length === 1 &&
+				declaredFacadeOwner(builder, { lex, positions, rootPositions, body }))
+		) ||
 		!one(loadTop, '::continue::') ||
 		!nativeTopLevelProjection(loadTop, lex)
 	)
@@ -111,13 +117,213 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 		!one(llmRoute, 'local ok_b, llm_item = pcall(ctx.llm_handler.build_item)') ||
 		!one(llmRoute, 'return llm_item and { llm_item } or {}') ||
 		!one(generate, 'for _, entry in ipairs(load_top_level()) do') ||
-		!one(generate, 'for _, row in ipairs(builders[id]() or {}) do') ||
+		!(
+			one(generate, 'for _, row in ipairs(builders[id]() or {}) do') ||
+			declaredChildrenPublication(generate, builder, { lex, positions, rootPositions, body, one })
+		) ||
 		!one(generate, 'table.insert(items, row)') ||
-		!one(generate, 'local rendered = ManifestMenu.render_rows(items, "top_level")') ||
+		!(
+			one(generate, 'local rendered = ManifestMenu.render_rows(items, "top_level")') ||
+			declaredChildrenPublication(generate, builder, { lex, positions, rootPositions, body, one })
+		) ||
 		rootPositions(generate, 'return rendered').length !== 1
 	)
 		return false;
 	return true;
+}
+
+/** The actual declared native root retains its original facade, source and renderer cohort. */
+function declaredMacTopLevelPublication(builderSource) {
+	if (typeof builderSource !== 'string') return false;
+	const parser = luaPublicationParser();
+	const { lex, positions, rootPositions, body } = parser;
+	const builder = lex(builderSource);
+	if (
+		!builder ||
+		rootPositions(builder, 'local ManifestMenu = require("infra.manifest_menu")').length !== 1 ||
+		rootPositions(builder, 'ManifestMenu =').length !== 1 ||
+		positions(builder, 'local require').length ||
+		positions(builder, 'require =').length ||
+		positions(builder, 'load_manifest =').length ||
+		positions(builder, 'load_top_level =').length
+	)
+		return false;
+	const loadRoot = body(builder, 'local function load_manifest()');
+	const loadTop = body(builder, 'local function load_top_level()');
+	const generate = body(builder, 'function M.generate(ctx, menu_mods, actions)');
+	const rootRead = lex('return ManifestMenu.get_root()');
+	return !!(
+		loadRoot &&
+		loadTop &&
+		generate &&
+		rootRead &&
+		isDeepStrictEqual(
+			loadRoot.tokens.map((t) => [t.kind, t.value]),
+			rootRead.tokens.map((t) => [t.kind, t.value])
+		) &&
+		rootPositions(loadTop, 'local receive, declared = separator_factory()').length === 1 &&
+		positions(loadTop, 'declared =').length === 1 &&
+		rootPositions(loadTop, 'for _, entry in ipairs(declared) do').length === 1 &&
+		nativeTopLevelProjection(loadTop, lex) &&
+		declaredChildrenPublication(generate, builder, parser)
+	);
+}
+
+const DECLARED_NATIVE_FACADE_LOCALS = {
+	separator_modules: 'package.loaded',
+	separator_factory:
+		'type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")',
+	separator_render: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")',
+	separator_array: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")',
+	separator_root: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")'
+};
+
+const LINUX_HEADER_VERSION_SOURCE =
+	'local function _version_text(version)\n\tlocal v = tostring(version)\n\tif v:match("^%d") then return "v" .. v end\n\treturn v\nend';
+const LINUX_HEADER_LOCALS = {
+	header_template: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")',
+	header_command: 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")'
+};
+const LINUX_HEADER_FACADE_SOURCE =
+	'local function header_facade_current()\n\treturn separator_facade_current()\n\t\tand type(header_template) == "function" and rawget(ManifestMenu, "template_rows") == header_template\n\t\tand type(header_command) == "function" and rawget(ManifestMenu, "command_row") == header_command\nend';
+const LINUX_HEADER_BUILDER_SOURCE =
+	'local function _build_header(ctx)\n\tif not header_facade_current() then return nil end\n\tlocal root = separator_root()\n\tif not header_facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil then return nil end\n\tlocal active = separator_array("linux_tray_active_header")\n\tif not header_facade_current() or getmetatable(root) ~= nil then return nil end\n\tlocal paused = separator_array("linux_tray_paused_header")\n\tif not header_facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil then return nil end\n\tlocal captured = {}\n\tlocal projected, projected_fields\n\tfor key, rows in next, { linux_tray_active_header = active, linux_tray_paused_header = paused } do\n\t\tif type(rows) ~= "table" or getmetatable(rows) ~= nil or rawget(root, key) ~= rows then return nil end\n\t\tfor index in next, rows do if index ~= 1 then return nil end end\n\t\tlocal record = rawget(rows, 1)\n\t\tif type(record) ~= "table" or getmetatable(record) ~= nil then return nil end\n\t\tlocal fields = {}\n\t\tfor name, value in next, record do\n\t\t\tif name ~= "type" and name ~= "id" and name ~= "i18n" and name ~= "caption_getter"\n\t\t\t\tand name ~= "caption_layout" and name ~= "caption_joiner" and name ~= "platforms"\n\t\t\t\tand name ~= "unavailable" then return nil end\n\t\t\tfields[name] = value\n\t\tend\n\t\tlocal expected_kind = key == "linux_tray_active_header" and "label" or "command"\n\t\tlocal expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or "linux_tray_resume"\n\t\tif rawget(record, "type") ~= expected_kind or rawget(record, "id") ~= expected_id\n\t\t\tor type(rawget(record, "i18n")) ~= "string" or rawget(record, "i18n") == ""\n\t\t\tor rawget(record, "caption_getter") ~= "linux_tray_version"\n\t\t\tor rawget(record, "caption_layout") ~= "prefix" or rawget(record, "caption_joiner") ~= " \u2014 "\n\t\t\tor rawget(record, "unavailable") ~= "hide" then return nil end\n\t\tlocal platforms = rawget(record, "platforms")\n\t\tif type(platforms) ~= "table" or getmetatable(platforms) ~= nil\n\t\t\tor rawget(platforms, 1) ~= "linux" then return nil end\n\t\tfor index in next, platforms do if index ~= 1 then return nil end end\n\t\tcaptured[key] = { rows = rows, record = record, fields = fields, platforms = platforms }\n\tend\n\tif captured.linux_tray_active_header == nil or captured.linux_tray_paused_header == nil then return nil end\n\n\tlocal function current()\n\t\tif not header_facade_current() or separator_root() ~= root or getmetatable(root) ~= nil then return false end\n\t\tfor key, snapshot in next, captured do\n\t\t\tlocal rows, record, platforms = snapshot.rows, snapshot.record, snapshot.platforms\n\t\t\tif not header_facade_current() or separator_array(key) ~= rows or rawget(root, key) ~= rows\n\t\t\t\tor getmetatable(rows) ~= nil or rawget(rows, 1) ~= record or getmetatable(record) ~= nil\n\t\t\t\tor rawget(record, "platforms") ~= platforms or getmetatable(platforms) ~= nil\n\t\t\t\tor rawget(platforms, 1) ~= "linux" then return false end\n\t\t\tfor index in next, rows do if index ~= 1 then return false end end\n\t\t\tfor index in next, platforms do if index ~= 1 then return false end end\n\t\t\tfor name, value in next, snapshot.fields do if rawget(record, name) ~= value then return false end end\n\t\t\tfor name in next, record do if snapshot.fields[name] == nil then return false end end\n\t\tend\n\t\tif projected ~= nil then\n\t\t\tif getmetatable(projected) ~= nil then return false end\n\t\t\tfor name, value in next, projected_fields do if rawget(projected, name) ~= value then return false end end\n\t\t\tfor name in next, projected do if projected_fields[name] == nil then return false end end\n\t\tend\n\t\treturn header_facade_current()\n\tend\n\n\tlocal version = _version_text(ctx._version or Version.VERSION)\n\tlocal is_paused = ctx.paused == true\n\tif not current() then return nil end\n\tlocal ok, rows = pcall(function()\n\t\tif is_paused then\n\t\t\treturn ManifestMenu.template_rows("linux_tray_paused_header", { ["linux_tray_resume"] = function()\n\t\t\t\tif type(ctx.on_toggle_pause) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent \u2014 the script stays paused.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_toggle_pause()\n\t\t\tend },\n\t\t\t\t{ ["linux_tray_version"] = function() return version end }, {})\n\t\tend\n\t\treturn ManifestMenu.template_rows("linux_tray_active_header", {},\n\t\t\t{ ["linux_tray_version"] = function() return version end }, {})\n\tend)\n\tif not ok or not current() or type(rows) ~= "table" or getmetatable(rows) ~= nil then return nil end\n\tfor index in next, rows do if index ~= 1 then return nil end end\n\tlocal row = rawget(rows, 1)\n\tif type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "label")) ~= "string"\n\t\tor rawget(row, "label") == "" then return nil end\n\tfor name in next, row do\n\t\tif name ~= "label" and (is_paused and name ~= "action" or not is_paused and name ~= "disabled") then return nil end\n\tend\n\tif is_paused then\n\t\tif type(rawget(row, "action")) ~= "function" then return nil end\n\telseif rawget(row, "disabled") ~= true then return nil end\n\tprojected, projected_fields = row, {}\n\tfor name, value in next, row do projected_fields[name] = value end\n\tif not current() then return nil end\n\treturn row, current\nend\n';
+
+/** The two genuine header templates retain their actual source and callback receiving chain. */
+function declaredLinuxHeaderOwner(unit) {
+	if (!unit) return false;
+	const { lex, positions, rootPositions, body } = luaPublicationParser();
+	const fragments = Object.entries(LINUX_HEADER_LOCALS).map(
+		([name, value]) => 'local ' + name + ' = ' + value
+	);
+	fragments.push(
+		LINUX_HEADER_VERSION_SOURCE,
+		LINUX_HEADER_FACADE_SOURCE,
+		LINUX_HEADER_BUILDER_SOURCE
+	);
+	const allowed = new Set();
+	for (const fragment of fragments) {
+		const found = positions(unit, fragment);
+		if (found.length !== 1) return false;
+		const wanted = scriptTokens(fragment, '.lua');
+		for (let offset = 0; offset < wanted.length; offset++) allowed.add(found[0] + offset);
+	}
+	for (const [signature, expected] of [
+		['local function _version_text(version)', LINUX_HEADER_VERSION_SOURCE],
+		['local function header_facade_current()', LINUX_HEADER_FACADE_SOURCE],
+		['local function _build_header(ctx)', LINUX_HEADER_BUILDER_SOURCE]
+	]) {
+		const actual = body(unit, signature),
+			pinned = body(lex(expected), signature);
+		if (
+			rootPositions(unit, signature).length !== 1 ||
+			!actual ||
+			!pinned ||
+			!isDeepStrictEqual(
+				actual.tokens.map((t) => [t.kind, t.value]),
+				pinned.tokens.map((t) => [t.kind, t.value])
+			)
+		)
+			return false;
+	}
+	const call = positions(unit, 'local header, header_current = _build_header(ctx)');
+	if (call.length !== 1) return false;
+	const callTokens = scriptTokens('local header, header_current = _build_header(ctx)', '.lua');
+	for (let offset = 0; offset < callTokens.length; offset++) allowed.add(call[0] + offset);
+	const protectedNames = new Set([
+		...Object.keys(LINUX_HEADER_LOCALS),
+		'header_facade_current',
+		'_build_header',
+		'_version_text'
+	]);
+	for (let index = 0; index < unit.tokens.length; index++)
+		if (
+			unit.tokens[index].kind === 'identifier' &&
+			protectedNames.has(unit.tokens[index].value) &&
+			!allowed.has(index)
+		)
+			return false;
+	return true;
+}
+
+/** The actual imported raw facade and its named functions retain custody of root projection. */
+function declaredFacadeOwner(builder, parser) {
+	const { lex, positions, rootPositions, body } = parser;
+	for (const [name, expression] of [
+		['separator_modules', 'package.loaded'],
+		[
+			'separator_factory',
+			'type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")'
+		],
+		['separator_render', 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")'],
+		['separator_array', 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")'],
+		['separator_root', 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")']
+	])
+		if (
+			rootPositions(builder, 'local ' + name + ' = ' + expression).length !== 1 ||
+			positions(builder, name + ' =').length !== 1
+		)
+			return false;
+	const actual = body(builder, 'local function separator_facade_current()');
+	const expected = lex(`
+		return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
+			and rawget(package, "loaded") == separator_modules
+			and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+			and type(separator_factory) == "function" and rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory
+			and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
+			and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
+			and type(separator_root) == "function" and rawget(ManifestMenu, "get_root") == separator_root
+	`);
+	return (
+		actual &&
+		expected &&
+		rootPositions(builder, 'local function separator_facade_current()').length === 1 &&
+		positions(builder, 'separator_facade_current =').length === 0 &&
+		isDeepStrictEqual(
+			actual.tokens.map((t) => [t.kind, t.value]),
+			expected.tokens.map((t) => [t.kind, t.value])
+		)
+	);
+}
+
+/** Children finish before the retained render owner, with the actual cohort checked on both sides. */
+function declaredChildrenPublication(generate, builder, parser) {
+	const { one, positions } = parser;
+	return (
+		declaredFacadeOwner(builder, parser) &&
+		one(
+			generate,
+			`local children = builders[id]() or {}
+			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
+			for _, row in ipairs(children) do`
+		) &&
+		positions(generate, 'children =').length === 1 &&
+		one(
+			generate,
+			`if not separator_facade_current() or type(_top_level_separator_receiver) ~= "function"
+			or not _top_level_separator_receiver("current") then return {} end
+		local rendered = separator_render(items, "top_level")
+		if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end`
+		) &&
+		parser.rootPositions(generate, 'rendered =').length === 1 &&
+		positions(generate, 'rendered =').every(
+			(at) =>
+				generate.scopes[at] === 0 ||
+				(generate.tokens[at - 1]?.value === 'local' &&
+					[...generate.closes].some(
+						([start, end]) =>
+							start < at &&
+							at < end &&
+							generate.tokens[start]?.kind === 'identifier' &&
+							generate.tokens[start]?.value === 'function'
+					))
+		) &&
+		one(
+			generate,
+			`if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
+		return rendered`
+		)
+	);
 }
 
 /** Exact executable bodies for the retained historical and disabled-row projections.
@@ -161,8 +367,52 @@ function nativeTopLevelProjection(unit, lex) {
 		table.insert(result, projected)`,
 		`		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`
 	);
+	const declared = `
+	if not separator_facade_current() then return {} end
+	if _top_level_cache then
+		if type(_top_level_separator_receiver) ~= "function" or not _top_level_separator_receiver("current") then return {} end
+		return _top_level_cache
+	end
+	_top_level_separator_receiver = nil
+	local receive, declared = separator_factory()
+	if not separator_facade_current() then return {} end
+	if not receive or type(declared) ~= "table" then
+		Logger.error(LOG, "Failed to load top_level from manifest — the tray has no row.")
+		return {}
+	end
+	local result = {}
+	for _, entry in ipairs(declared) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
+		if type(entry.platforms) == "table" then
+			local for_hs = false
+			for _, p in ipairs(entry.platforms) do
+				if p == "hs" then for_hs = true; break end
+			end
+			if not for_hs then goto continue end
+		end
+		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)
+		::continue::
+	end
+	if not separator_facade_current() or not receive("current") then return {} end
+	Logger.debug(LOG, "Top level loaded from manifest (%d item(s)).", #result)
+	_top_level_cache, _top_level_separator_receiver = result, receive
+	return _top_level_cache`;
+	// Retain the prior direct append obligation on this captured declaration,
+	// including the exact canonical record needed by the separator receiver.
+	const declaredHistorical = declared.replace(
+		`		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)`,
+		`		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry })`
+	);
 	const shape = (value) => value.tokens.map((token) => [token.kind, token.value]);
-	return [historical, current].some((text) => {
+	return [historical, current, declared, declaredHistorical].some((text) => {
 		const expected = lex(text);
 		return expected && isDeepStrictEqual(shape(unit), shape(expected));
 	});
@@ -322,6 +572,18 @@ function closedModuleExport(unit, lex, rootPositions) {
 			if (name.value === 'ok_mm') {
 				at = take(at, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")');
 			} else {
+				if (Object.hasOwn(LINUX_HEADER_LOCALS, name.value)) {
+					if (!declaredLinuxHeaderOwner(unit)) return false;
+					at = take(at, 'local ' + name.value + ' = ' + LINUX_HEADER_LOCALS[name.value]);
+					if (at === null) return false;
+					continue;
+				}
+				if (Object.hasOwn(DECLARED_NATIVE_FACADE_LOCALS, name.value)) {
+					if (!declaredFacadeOwner(unit, luaPublicationParser())) return false;
+					at = take(at, 'local ' + name.value + ' = ' + DECLARED_NATIVE_FACADE_LOCALS[name.value]);
+					if (at === null) return false;
+					continue;
+				}
 				if (tokens[at + 2]?.value !== '=') return false;
 				const value = tokens[at + 3];
 				if (value?.value === 'require') {
@@ -460,7 +722,7 @@ function closedOwnerReferences(unit, names, bootGuard = false) {
 
 /** Keeps sibling renderer ports under their existing lexical owners, without native-frame credit. */
 function closedSiblingRendererBindings(unit) {
-	const { positions, rootPositions } = luaPublicationParser();
+	const { positions, rootPositions, body } = luaPublicationParser();
 	const imports = {
 		NumberRowPolicy: 'layout.number_row_policy',
 		MagicKeySourceRows: 'keymap.magic_key_source',
@@ -495,6 +757,40 @@ function closedSiblingRendererBindings(unit) {
 		const wanted = scriptTokens(pattern, '.lua');
 		for (const start of positions(unit, pattern)) optionPorts.add(start + wanted.length - 1);
 	}
+	const personalInfoAlias =
+		require('./menu-native-personal-info-binding.cjs').retainedPersonalInfoManifestAliasOffset(
+			unit.text
+		);
+	const rawFacadePorts = new Set();
+	if (declaredFacadeOwner(unit, luaPublicationParser())) {
+		for (const fragment of [
+			...Object.entries(DECLARED_NATIVE_FACADE_LOCALS).map(
+				([name, value]) => 'local ' + name + ' = ' + value
+			),
+			body(unit, 'local function separator_facade_current()').text
+		]) {
+			const wanted = scriptTokens(fragment, '.lua');
+			const matches = positions(unit, fragment);
+			if (matches.length !== 1) return false;
+			for (const start of matches)
+				for (let offset = 0; offset < wanted.length; offset++)
+					if (wanted[offset].value === 'ManifestMenu') rawFacadePorts.add(start + offset);
+		}
+	}
+	if (declaredLinuxHeaderOwner(unit)) {
+		for (const fragment of [
+			...Object.entries(LINUX_HEADER_LOCALS).map(
+				([name, value]) => 'local ' + name + ' = ' + value
+			),
+			LINUX_HEADER_FACADE_SOURCE
+		]) {
+			const wanted = scriptTokens(fragment, '.lua'),
+				found = positions(unit, fragment);
+			if (found.length !== 1) return false;
+			for (let offset = 0; offset < wanted.length; offset++)
+				if (wanted[offset].value === 'ManifestMenu') rawFacadePorts.add(found[0] + offset);
+		}
+	}
 	const boot = positions(
 		unit,
 		'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end'
@@ -528,7 +824,8 @@ function closedSiblingRendererBindings(unit) {
 		if (before === '(' && unit.tokens[at - 2]?.value === 'type' && next === ')') continue;
 		if ((before === 'not' && ['then', 'or'].includes(next)) || ['and', 'or'].includes(next))
 			continue;
-		if (optionPorts.has(at)) continue;
+		if (optionPorts.has(at) || rawFacadePorts.has(at)) continue;
+		if (personalInfoAlias >= 0 && unit.tokens[at].start === personalInfoAlias) continue;
 		if (before === '(' && localPorts.includes(unit.tokens[at - 2]?.value)) continue;
 		if (
 			before === '(' &&
@@ -1450,9 +1747,145 @@ function closedPublicationCalls(unit, role, builder) {
 	return isDeepStrictEqual(found, expected);
 }
 
+/** Closed declared Linux root protocol, with the same native handlers and Quit-last policy.
+ * This additive executable template retains the historical direct-source branch below.
+ * All native control paths, receiver checks, array identity and render output are mandatory;
+ * comments/formatting are inert. It does not supply runtime or physical-input authority.
+ */
+function declaredLinuxNativeTray(unit, builder) {
+	if (!unit || !builder || !declaredFacadeOwner(builder, luaPublicationParser())) return false;
+	const { lex, body, rootPositions, positions } = luaPublicationParser();
+	const expected = `
+	if not separator_facade_current() then return {} end
+	local ctx = type(ctx) == "table" and ctx or {}
+	local rows = {}
+
+	rows[#rows + 1] = _build_header(ctx)
+
+	local builders = {
+		["keyboard_layout"] = _build_layouts,
+		["hotstrings"]      = _build_hotstrings,
+		["llm"]             = _build_llm,
+		["agent"]           = _build_agent,
+		["metrics"]         = _build_metrics,
+		["shortcuts"]       = _build_shortcuts,
+		["tap_holds"]       = _build_tap_holds,
+		["gestures"]        = _build_gestures,
+		["configuration"]   = _build_configuration,
+		["language"]        = _build_language,
+		["about"]           = _build_about,
+		["reload"]          = _build_reload,
+		["quit"]            = _build_quit,
+		["debug"]           = _build_debug,
+	}
+
+	if not separator_facade_current() then return {} end
+	local declared = ManifestMenu.get_array("top_level")
+	if not separator_facade_current() then return {} end
+	local receive_separator, source_rows = separator_factory()
+	if not separator_facade_current() or type(receive_separator) ~= "function"
+		or type(declared) ~= "table" or not rawequal(declared, source_rows) then
+		Logger.error(LOG, "The canonical top-level boundary source is unavailable.")
+		return {}
+	end
+	if #declared == 0 then
+		Logger.error(LOG, "The manifest declares no top-level row — the tray would be empty.")
+		return {}
+	end
+
+	local quit_row = nil
+
+	for _, row in ipairs(declared) do
+		if not separator_facade_current() or not receive_separator("current") then return {} end
+		if type(row) == "table" then
+			local id = row.id
+			if id == "---" then
+				if _row_is_for_linux(row) then
+					local boundary = receive_separator(row)
+					if not boundary then return {} end
+					rows[#rows + 1] = boundary
+				end
+			elseif _row_is_for_linux(row) then
+				local build = builders[id]
+				if not build then
+					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+				elseif row.disabled == true then
+					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
+						disabled_reason_key = row.reason_key }
+				elseif id == "quit" then
+					quit_row = build(ctx)
+				elseif ctx.paused == true and row.greyed_when_paused == true then
+					rows[#rows + 1] = _grey_for_pause(build(ctx))
+				else
+					rows[#rows + 1] = build(ctx)
+				end
+			end
+		end
+		if not separator_facade_current() or not receive_separator("current") then return {} end
+	end
+
+	if quit_row then
+		local boundary = receive_separator("linux_quit_last")
+		if not boundary then return {} end
+		rows[#rows + 1] = boundary
+		rows[#rows + 1] = quit_row
+	else
+		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")
+	end
+
+	if not separator_facade_current() or not receive_separator("current") then return {} end
+	local rendered = separator_render(rows, "top_level")
+	if not separator_facade_current() or not receive_separator("current") then return {} end
+	return rendered`;
+	const headerExpected = expected
+		.replace(
+			'rows[#rows + 1] = _build_header(ctx)',
+			'local header, header_current = _build_header(ctx) if not header or type(header_current) ~= "function" or not header_current() then return {} end rows[#rows + 1] = header'
+		)
+		.replace(
+			'if not separator_facade_current() or not receive_separator("current") then return {} end\n\tlocal rendered = separator_render(rows, "top_level")\n\tif not separator_facade_current() or not receive_separator("current") then return {} end',
+			'if not separator_facade_current() or not receive_separator("current") or not header_current() then return {} end\n\tlocal rendered = separator_render(rows, "top_level")\n\tif not separator_facade_current() or not receive_separator("current") or not header_current() then return {} end'
+		);
+	const shape = (value) => value?.tokens.map((t) => [t.kind, t.value]);
+	// The original historical inert-row absence remains an independent supported route.
+	const historical = expected.replace(
+		/elseif row\.disabled == true then\s+rows\[#rows \+ 1\] = \{ label = i18n_safe\(row\.i18n\), disabled = true,\s+disabled_reason_key = row\.reason_key \}/,
+		''
+	);
+	const headerHistorical = headerExpected.replace(
+		/elseif row\.disabled == true then\s+rows\[#rows \+ 1\] = \{ label = i18n_safe\(row\.i18n\), disabled = true,\s+disabled_reason_key = row\.reason_key \}/,
+		''
+	);
+	const headerProtocol =
+		isDeepStrictEqual(shape(unit), shape(lex(headerExpected))) ||
+		isDeepStrictEqual(shape(unit), shape(lex(headerHistorical)));
+	if (headerProtocol && !declaredLinuxHeaderOwner(builder)) return false;
+	if (
+		!headerProtocol &&
+		!isDeepStrictEqual(shape(unit), shape(lex(expected))) &&
+		!isDeepStrictEqual(shape(unit), shape(lex(historical)))
+	)
+		return false;
+	const caption = body(builder, 'function i18n_safe(key)');
+	return (
+		rootPositions(builder, 'function i18n_safe(key)').length === 1 &&
+		!positions(builder, 'local i18n_safe').length &&
+		!positions(builder, 'i18n_safe =').length &&
+		isDeepStrictEqual(
+			shape(caption),
+			shape(
+				lex(
+					'local ok, i18n = pcall(require, "infra.i18n") if ok and i18n and type(i18n.get) == "function" then local val = i18n.get(key) if val and val ~= key then return val end end return key'
+				)
+			)
+		)
+	);
+}
+
 /** Requires each executable outer branch/loop to be a declared publication/refusal route. */
 function closedNativeControl(unit, role, builder) {
 	if (!unit || !closedNativeReads(unit, role === 'tray')) return false;
+	if (role === 'tray' && declaredLinuxNativeTray(unit, builder)) return true;
 	const { rootPositions, positions } = luaPublicationParser();
 	for (const at of unit.closes.keys())
 		if (['do', 'while', 'repeat'].includes(unit.tokens[at]?.value)) return false;
@@ -1690,6 +2123,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			'rawget',
 			'rawequal',
 			'getmetatable',
+			'package',
 			'require'
 		])
 			if (
@@ -1704,18 +2138,22 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 	const tray = body(builder, 'function M.build(ctx)');
 	if (!closedNativeDispatch(builder, tray)) return false;
 	const caller = body(builder, 'local function _build_' + kind + '(ctx)');
+	const declaredTray = declaredLinuxNativeTray(tray, builder);
 	if (
 		!tray ||
 		!caller ||
 		!closedNativeControl(tray, 'tray', builder) ||
 		!one(tray, '["' + kind + '"] = _build_' + kind + ',') ||
 		positions(builder, '_build_' + kind + ' =').length ||
-		!one(tray, 'local declared = ManifestMenu and ManifestMenu.get_array("top_level") or {}') ||
+		!(
+			one(tray, 'local declared = ManifestMenu and ManifestMenu.get_array("top_level") or {}') ||
+			declaredTray
+		) ||
 		!one(tray, 'for _, row in ipairs(declared) do') ||
 		!one(tray, 'local build = builders[id]') ||
 		!one(tray, 'rows[#rows + 1] = build(ctx)') ||
 		!one(tray, 'rows[#rows + 1] = _grey_for_pause(build(ctx))') ||
-		!one(tray, 'return ManifestMenu.render_rows(rows, "top_level")')
+		!(one(tray, 'return ManifestMenu.render_rows(rows, "top_level")') || declaredTray)
 	)
 		return false;
 	const terminal = (unit, statement) => {
@@ -1725,7 +2163,8 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			starts[0] + scriptTokens(statement, '.lua').length === unit.tokens.length
 		);
 	};
-	if (!terminal(tray, 'return ManifestMenu.render_rows(rows, "top_level")')) return false;
+	if (!terminal(tray, 'return ManifestMenu.render_rows(rows, "top_level")') && !declaredTray)
+		return false;
 	if (kind === 'agent') {
 		const producer = body(agent, 'function M.build(ctx, dialogs)');
 		if (!closedNativeReads(producer)) return false;
@@ -1823,8 +2262,459 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 	return true;
 }
 
+/** The actual Layout module completes its declared subtree before the canonical native parent receives it. */
+function fixedNativeParentBindingEvents(unit, name) {
+	const tokens = unit.tokens,
+		depths = unit.scopes,
+		tables = [],
+		fields = new Set();
+	for (let at = 0; at < tokens.length; at++) {
+		if (tokens[at].kind === 'symbol' && tokens[at].value === '{') tables.push(depths[at]);
+		else if (tokens[at].kind === 'symbol' && tokens[at].value === '}') tables.pop();
+		// All immediate constructor identifiers are data expression reads,
+		// including values before another field's comma/key/equals. Nested
+		// function bodies have a deeper scope and retain binding admission.
+		else if (tables.length && tables.at(-1) === depths[at] && tokens[at].kind === 'identifier')
+			fields.add(at);
+	}
+	// After a tracked bare variable, parse the remaining Lua assignment lvalues.
+	// Arguments, comparisons and data references cannot finish this grammar.
+	const symbol = (at, value) => tokens[at]?.kind === 'symbol' && tokens[at].value === value;
+	const balancedEnd = (start) => {
+		const closing = { '(': ')', '[': ']', '{': '}' },
+			stack = [];
+		for (let at = start; at < tokens.length; at++) {
+			if (tokens[at].kind !== 'symbol') continue;
+			if (closing[tokens[at].value]) stack.push(closing[tokens[at].value]);
+			else if ([')', ']', '}'].includes(tokens[at].value)) {
+				if (stack.pop() !== tokens[at].value) return null;
+				if (stack.length === 0) return at + 1;
+			}
+		}
+		return null;
+	};
+	const lvalueEnd = (start) => {
+		let at = start,
+			assignable = false;
+		const keywords = new Set([
+			'and',
+			'break',
+			'do',
+			'else',
+			'elseif',
+			'end',
+			'false',
+			'for',
+			'function',
+			'goto',
+			'if',
+			'in',
+			'local',
+			'nil',
+			'not',
+			'or',
+			'repeat',
+			'return',
+			'then',
+			'true',
+			'until',
+			'while'
+		]);
+		if (tokens[at]?.kind === 'identifier' && !keywords.has(tokens[at].value)) {
+			at++;
+			assignable = true;
+		} else if (symbol(at, '(')) at = balancedEnd(at);
+		else return null;
+		if (at === null) return null;
+		while (at < tokens.length) {
+			if (symbol(at, '.')) {
+				if (tokens[at + 1]?.kind !== 'identifier' || keywords.has(tokens[at + 1].value))
+					return null;
+				at += 2;
+				assignable = true;
+			} else if (symbol(at, '[')) {
+				at = balancedEnd(at);
+				if (at === null) return null;
+				assignable = true;
+			} else if (symbol(at, '(') || symbol(at, '{')) {
+				at = balancedEnd(at);
+				if (at === null) return null;
+				assignable = false;
+			} else if (tokens[at]?.kind === 'string') {
+				at++;
+				assignable = false;
+			} else if (symbol(at, ':')) {
+				if (tokens[at + 1]?.kind !== 'identifier' || keywords.has(tokens[at + 1].value))
+					return null;
+				at += 2;
+				if (symbol(at, '(') || symbol(at, '{')) at = balancedEnd(at);
+				else if (tokens[at]?.kind === 'string') at++;
+				else return null;
+				if (at === null) return null;
+				assignable = false;
+			} else break;
+		}
+		return assignable ? at : null;
+	};
+	const assignmentAfter = (start) => {
+		let after = start + 1;
+		while (symbol(after, ',')) {
+			after = lvalueEnd(after + 1);
+			if (after === null) return false;
+		}
+		return symbol(after, '=') && !symbol(after + 1, '=');
+	};
+	const events = new Map();
+	const add = (at, kind) => {
+		const event = events.get(at) || new Set();
+		event.add(kind);
+		events.set(at, event);
+	};
+	for (let at = 0; at < tokens.length; at++) {
+		if (
+			tokens[at].kind !== 'identifier' ||
+			tokens[at].value !== name ||
+			fields.has(at) ||
+			['.', ':', '['].includes(tokens[at - 1]?.value)
+		)
+			continue;
+		if (assignmentAfter(at)) add(at, 'assignment');
+		let before = at - 1;
+		while (tokens[before]?.value === ',' && tokens[before - 1]?.kind === 'identifier') before -= 2;
+		if (tokens[before]?.value === 'local') add(at, 'local');
+		if (tokens[at - 1]?.value === 'function' && tokens[at + 1]?.value === '(') add(at, 'function');
+	}
+	for (let at = 0; at < tokens.length; at++) {
+		if (tokens[at].kind !== 'identifier' || ['.', ':'].includes(tokens[at - 1]?.value)) continue;
+		if (tokens[at].value === 'function') {
+			let opening = at + 1;
+			while (tokens[opening] && tokens[opening].value !== '(') opening++;
+			for (
+				let parameter = opening + 1;
+				tokens[parameter] && tokens[parameter].value !== ')';
+				parameter++
+			) {
+				if (tokens[parameter].kind === 'identifier' && tokens[parameter].value === name)
+					add(parameter, 'parameter');
+			}
+		} else if (tokens[at].value === 'for') {
+			for (
+				let variable = at + 1;
+				tokens[variable] && !['=', 'in', 'do'].includes(tokens[variable].value);
+				variable++
+			) {
+				if (tokens[variable].kind === 'identifier' && tokens[variable].value === name)
+					add(variable, 'iterator');
+			}
+		}
+	}
+	return events;
+}
+
+function nativeMacLayoutTopLevelPublication(builderSource, layoutSource, manifest) {
+	if (
+		!manifest ||
+		typeof manifest !== 'object' ||
+		!Array.isArray(manifest.top_level) ||
+		!require('./menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
+			layoutSource,
+			'layout_native_parent',
+			manifest.layout_native_parent
+		) ||
+		!declaredMacTopLevelPublication(builderSource)
+	)
+		return false;
+	const parents = manifest.top_level?.filter((row) => row.id === 'keyboard_layout');
+	if (
+		!isDeepStrictEqual(parents, [
+			{
+				type: 'group',
+				id: 'keyboard_layout',
+				i18n: 'menu.layout.title',
+				rows: [],
+				checked_when: ['layout_enabled'],
+				greyed_when_paused: true
+			}
+		])
+	)
+		return false;
+	const { lex, body, positions } = luaPublicationParser();
+	const whole = lex(builderSource),
+		generate = body(whole, 'function M.generate(ctx, menu_mods, actions)');
+	const stage = body(generate, '["keyboard_layout"] = function()');
+	const module = body(generate, 'local function module_rows(key, arg)');
+	const expectedStage = lex(
+		'\n\t\t\tlocal receive = ManifestMenu.group_receiver("top_level", "keyboard_layout")\n\t\t\tif not receive then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")\n\t\t\tlocal original = #rows == 1 and rawget(rows, 1) or nil\n\t\t\tlocal submenu = type(original) == "table" and getmetatable(original) == nil\n\t\t\t\tand rawget(original, "submenu") or nil\n\t\t\tif type(submenu) ~= "table" then return {} end\n\t\t\t-- macOS owns a system input source, so the existing parent has no enable tick.\n\t\t\tlocal parent = receive(submenu, { layout_enabled = function() return nil end })\n\t\t\treturn parent and { parent } or {}\n\t\t'
+	);
+	const collector = body(generate, 'local function collect(label, fn, arg)');
+	const expectedCollector = lex(
+		'\t\tlocal rows = {}\n\t\tlocal result = Logger.build(LOG, label, fn, arg)\n\t\tif result then\n\t\t\tif type(result) == "table" and result[1] ~= nil then\n\t\t\t\t-- Result is a list (build_groups)\n\t\t\t\tfor _, it in ipairs(result) do rows[#rows + 1] = it end\n\t\t\telse\n\t\t\t\trows[#rows + 1] = result\n\t\t\tend\n\t\t\tLogger.debug(LOG, string.format("Component \'%s\' added successfully.", label))\n\t\telse\n\t\t\tLogger.warn(LOG, string.format("Component \'%s\' missing or in error \u2014 ignored.", label))\n\t\tend\n\t\treturn rows'
+	);
+	const expectedModule = lex(
+		'local mod = menu_mods[key]\n\t\tif type(mod) ~= "table" or type(mod.build) ~= "function" then\n\t\t\tLogger.warn(LOG, "Menu module \'%s\' missing \u2014 its row is not drawn.", key)\n\t\t\treturn {}\n\t\tend\n\t\treturn collect(key .. ".build", mod.build, arg or ctx)'
+	);
+	const same = (a, b) =>
+		!!a &&
+		!!b &&
+		isDeepStrictEqual(
+			a.tokens.map((t) => [t.kind, t.value]),
+			b.tokens.map((t) => [t.kind, t.value])
+		);
+	// The finished actual dispatch table and its adjacent loop are one receiving cohort.
+	// Only its original local construction and the two real loop reads may mention it.
+	const dispatchDeclaration = positions(generate, 'local builders = {');
+	const dispatchCheck = positions(generate, 'elseif type(builders[id]) ~= "function" then');
+	const dispatchCall = positions(generate, 'local children = builders[id]() or {}');
+	const loop = positions(generate, 'for _, entry in ipairs(load_top_level()) do');
+	const expectedDispatch = scriptTokens(
+		'\tlocal builders = {\n\t\t["keyboard_layout"] = function()\n\t\t\tlocal receive = ManifestMenu.group_receiver("top_level", "keyboard_layout")\n\t\t\tif not receive then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")\n\t\t\tlocal original = #rows == 1 and rawget(rows, 1) or nil\n\t\t\tlocal submenu = type(original) == "table" and getmetatable(original) == nil\n\t\t\t\tand rawget(original, "submenu") or nil\n\t\t\tif type(submenu) ~= "table" then return {} end\n\t\t\t-- macOS owns a system input source, so the existing parent has no enable tick.\n\t\t\tlocal parent = receive(submenu, { layout_enabled = function() return nil end })\n\t\t\treturn parent and { parent } or {}\n\t\tend,\n\t\t["hotstrings"]      = function() return build_hotstrings_rows(ctx, menu_mods) end,\n\t\t["llm"]             = function()\n\t\t\tif type(ctx.llm_handler) ~= "table" or type(ctx.llm_handler.build_item) ~= "function" then\n\t\t\t\tLogger.warn(LOG, "LLM handler missing or incomplete \u2014 AI component ignored.")\n\t\t\t\treturn {}\n\t\t\tend\n\t\t\tLogger.debug(LOG, "Building AI component\u2026")\n\t\t\tlocal ok_b, llm_item = pcall(ctx.llm_handler.build_item)\n\t\t\tif not ok_b then\n\t\t\t\tLogger.error(LOG, string.format("Error building AI component: %s.", tostring(llm_item)))\n\t\t\t\treturn {}\n\t\t\tend\n\t\t\tLogger.debug(LOG, "AI component added successfully.")\n\t\t\treturn llm_item and { llm_item } or {}\n\t\tend,\n\t\t["agent"]           = function()\n\t\t\t-- The AI agent\'s settings share the AI menu\'s transaction owner, so\n\t\t\t-- its handler builds this row too.\n\t\t\tif type(ctx.llm_handler) ~= "table" or type(ctx.llm_handler.build_agent_item) ~= "function" then\n\t\t\t\tLogger.warn(LOG, "LLM handler missing or incomplete \u2014 AI agent component ignored.")\n\t\t\t\treturn {}\n\t\t\tend\n\t\t\tlocal ok_b, agent_item = pcall(ctx.llm_handler.build_agent_item)\n\t\t\tif not ok_b then\n\t\t\t\tLogger.error(LOG, string.format("Error building the AI agent component: %s.", tostring(agent_item)))\n\t\t\t\treturn {}\n\t\t\tend\n\t\t\treturn agent_item and { agent_item } or {}\n\t\tend,\n\t\t["metrics"]         = function() return module_rows("keylogger") end,\n\t\t-- The shortcuts submodule surfaces the edit-shortcuts callback, so it gets\n\t\t-- the actions on top of the context.\n\t\t["shortcuts"]       = function()\n\t\t\treturn module_rows("shortcuts", setmetatable({ actions = actions }, { __index = ctx }))\n\t\tend,\n\t\t["tap_holds"]       = function() return module_rows("tap_holds") end,\n\t\t["gestures"]        = function() return module_rows("gestures") end,\n\t\t["apps"]            = function() return module_rows("apps") end,\n\t\t["configuration"]   = function()\n\t\t\tlocal root, top, section, parent, fields = configuration_source(ManifestMenu, "hs")\n\t\t\tif root == nil then return {} end\n\t\t\t-- Every row is `type = "command"` in the manifest: labels, order and\n\t\t\t-- the separators are declared, and this file supplies only what each\n\t\t\t-- row does. Read once, so the pause gate below can tell the rows apart\n\t\t\t-- by the handler they carry. The global scope\'s restore and clear open\n\t\t\t-- the menu, like every settings menu\'s.\n\t\t\tlocal restore = actions.reset_defaults\n\t\t\tlocal clear = actions.clear_to_system\n\t\t\tlocal clean = actions.clean_unused_keys\n\t\t\tlocal cfg_ctx = {}\n\t\t\tfor key, value in pairs(ctx or {}) do cfg_ctx[key] = value end\n\t\t\tcfg_ctx.commands = {\n\t\t\t\t["scope_restore"]       = restore,\n\t\t\t\t["scope_clear"]         = clear,\n\t\t\t\t["clean_unused_keys"]   = clean,\n\t\t\t\t["config_folder"]       = actions.open_paths,\n\t\t\t\t["setup_wizard"]        = actions.show_setup_wizard,\n\t\t\t}\n\t\t\tcfg_ctx.state_getters = {}\n\t\t\tfor key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end\n\t\t\t-- \u00ab Ergopti uses Karabiner \u00bb and \u00ab Remove Ergopti from Karabiner \u00bb\n\t\t\t-- need the remap owner; without it the renderer skips both rows.\n\t\t\tif type(ctx.karabiner) == "table" then\n\t\t\t\tlocal switch_commands, switch_getters = require("ui.menu.remap_switch")\n\t\t\t\t\t.rows(ctx.karabiner, ctx.updateMenu)\n\t\t\t\tfor id, fn in pairs(switch_commands) do cfg_ctx.commands[id] = fn end\n\t\t\t\tfor id, fn in pairs(switch_getters) do cfg_ctx.state_getters[id] = fn end\n\t\t\tend\n\t\t\t-- Pause owns the bindings axis for the whole pause window: pause_all()\n\t\t\t-- snapshots what was running and resume_all() restores that snapshot.\n\t\t\t-- A row that rewrites the configuration in between is either discarded\n\t\t\t-- on resume or breaks the \u00ab pause = tout \u00e9teint \u00bb invariant, so those\n\t\t\t-- three are greyed AND stripped of their handler: a disabled row whose\n\t\t\t-- fn survives still fires the moment the greying is rendered wrong\n\t\t\t-- somewhere else. The rows that only open a window stay live.\n\t\t\tlocal pause_gated = {}\n\t\t\t-- pairs, not ipairs: an unregistered command is nil, and ipairs would\n\t\t\t-- stop there and leave the rows after it ungated.\n\t\t\tfor _, fn in pairs({ restore = restore, clear = clear, clean = clean }) do\n\t\t\t\t-- An unregistered command draws no row, so it has nothing to gate.\n\t\t\t\tif type(fn) == "function" then pause_gated[fn] = true end\n\t\t\tend\n\t\t\tlocal rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)\n\t\t\tif not configuration_dense(rows, true) then return {} end\n\t\t\tif ctx.paused then\n\t\t\t\tfor _, row in ipairs(rows) do\n\t\t\t\t\tif row.fn ~= nil and pause_gated[row.fn] then\n\t\t\t\t\t\trow.disabled = true\n\t\t\t\t\t\trow.fn = nil\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\t\t\tlocal current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "hs")\n\t\t\tif not rawequal(root, current_root) or not rawequal(top, current_top)\n\t\t\t\tor not rawequal(section, current_section) or not rawequal(parent, current_parent)\n\t\t\t\tor not configuration_parent_unchanged(parent, fields) then return {} end\n\t\t\tlocal row = ManifestMenu.group_row("top_level", "configuration", rows, cfg_ctx.state_getters)\n\t\t\treturn row and { row } or {}\n\t\tend,\n\t\t["language"]        = function()\n\t\t\t-- The locale rows reach the tray through the manifest\'s `language_menu`.\n\t\t\t-- They were the same twenty-one entries on every driver, from the same\n\t\t\t-- shared catalogue, and nothing described the menu holding them.\n\t\t\tif type(i18n.build_language_menu_items) ~= "function" then return {} end\n\t\t\tlocal ok_locales, locales = pcall(i18n.build_language_menu_items)\n\t\t\tif not ok_locales then return {} end\n\t\t\tlocal admitted = ManifestMenu.template_rows("language_menu", {}, {}, {\n\t\t\t\t["locales"] = function() return locales end,\n\t\t\t})\n\t\t\tif not admitted then return {} end\n\t\t\tlocal rendered = ManifestMenu.render_rows(admitted, "language_menu")\n\t\t\tlocal parent = ManifestMenu.group_row("top_level", "language", rendered, {})\n\t\t\treturn parent and { parent } or {}\n\t\tend,\n\t\t["about"]           = function()\n\t\t\tif type(menu_mods.about) ~= "table" or type(menu_mods.about.build) ~= "function" then\n\t\t\t\tLogger.warn(LOG, "About module missing \u2014 its row is not drawn.")\n\t\t\t\treturn {}\n\t\t\tend\n\t\t\t-- The actions carry startup and the uninstall transaction, whose row closes it.\n\t\t\tlocal ok_a, about_item = pcall(menu_mods.about.build, ctx, actions)\n\t\t\tif not ok_a then\n\t\t\t\tLogger.error(LOG, "Error building the About submenu: %s.", tostring(about_item))\n\t\t\t\treturn {}\n\t\t\tend\n\t\t\treturn about_item and { about_item } or {}\n\t\tend,\n\t\t["reload"]          = function()\n\t\t\tlocal row = ManifestMenu.command_row("top_level", "reload", { reload = actions.reload })\n\t\t\tif not row then return {} end\n\t\t\treturn { row }\n\t\tend,\n\t\t["quit"]            = function()\n\t\t\tlocal row = ManifestMenu.command_row("top_level", "quit", { quit = actions.quit })\n\t\t\tif not row then return {} end\n\t\t\treturn { row }\n\t\tend,\n\t\t["debug"]           = function()\n\t\t\tlocal root, top, section, parent, fields = debug_source(ManifestMenu, "hs")\n\t\t\tif root == nil then return {} end\n\t\t\t-- The manifest declares every row of this submenu and the shared\n\t\t\t-- renderer places them; this file supplies only what each one does.\n\t\t\tlocal active_level_name\n\t\t\tfor level, severity in pairs(Logger.LEVELS) do\n\t\t\t\tif Logger.current_level == severity then active_level_name = level; break end\n\t\t\tend\n\t\t\tlocal healthcheck = require("ui.healthcheck")\n\t\t\tlocal dbg_ctx = {}\n\t\t\tfor key, value in pairs(ctx or {}) do dbg_ctx[key] = value end\n\t\t\tdbg_ctx.commands = {\n\t\t\t\t["console"]        = actions.open_console,\n\t\t\t\t["log_level"]      = actions.set_log_level,\n\t\t\t\t["open_logs"]      = actions.open_logs,\n\t\t\t\t["open_today_log"] = actions.open_today_log,\n\t\t\t\t["open_error_log"] = actions.open_error_log,\n\t\t\t\t["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,\n\t\t\t\t["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,\n\t\t\t\t["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,\n\t\t\t\t["show_error_dialog"] = actions.toggle_error_dialog,\n\t\t\t}\n\t\t\tdbg_ctx.state_getters = {}\n\t\t\tfor key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end\n\t\t\tdbg_ctx.state_getters["script.log_level"] = function() return active_level_name end\n\t\t\tdbg_ctx.state_getters["error_dialog_enabled"] = function()\n\t\t\t\treturn require("ui.error_dialog").is_enabled()\n\t\t\tend\n\t\t\tlocal debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {})\n\t\t\tif not debug_dense(debug_items, true) then return {} end\n\t\t\tlocal current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "hs")\n\t\t\tif not rawequal(root, current_root) or not rawequal(top, current_top)\n\t\t\t\tor not rawequal(section, current_section) or not rawequal(parent, current_parent)\n\t\t\t\tor not debug_parent_unchanged(parent, fields) then return {} end\n\t\t\tlocal row = ManifestMenu.group_row("top_level", "debug", debug_items, dbg_ctx.state_getters)\n\t\t\treturn row and { row } or {}\n\t\tend,\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do',
+		'.lua'
+	);
+	const allowedDispatchNames = new Set([
+		dispatchDeclaration[0] + 1,
+		dispatchCheck[0] + 3,
+		dispatchCall[0] + 3
+	]);
+	if (
+		dispatchDeclaration.length !== 1 ||
+		dispatchCheck.length !== 1 ||
+		dispatchCall.length !== 1 ||
+		loop.length !== 1 ||
+		dispatchDeclaration[0] + expectedDispatch.length !==
+			loop[0] + scriptTokens('for _, entry in ipairs(load_top_level()) do', '.lua').length ||
+		!isDeepStrictEqual(
+			generate.tokens
+				.slice(dispatchDeclaration[0], dispatchDeclaration[0] + expectedDispatch.length)
+				.map((t) => [t.kind, t.value]),
+			expectedDispatch.map((t) => [t.kind, t.value])
+		) ||
+		generate.tokens.some(
+			(token, at) =>
+				token.kind === 'identifier' && token.value === 'builders' && !allowedDispatchNames.has(at)
+		)
+	)
+		return false;
+	const unwritten = (name) => {
+		const definitions = positions(generate, 'local function ' + name + '(');
+		const events = fixedNativeParentBindingEvents(generate, name);
+		return (
+			definitions.length === 1 &&
+			events.size === 1 &&
+			events.has(definitions[0] + 2) &&
+			events.get(definitions[0] + 2).has('function')
+		);
+	};
+	return (
+		same(stage, expectedStage) &&
+		same(module, expectedModule) &&
+		same(collector, expectedCollector) &&
+		unwritten('module_rows') &&
+		unwritten('collect')
+	);
+}
+
+/** The genuine missing-engine branch publishes its declared inert leaf through the actual tray root. */
+function nativeLinuxTapHoldAbsentPublication(builderSource, manifest) {
+	if (
+		typeof builderSource !== 'string' ||
+		!manifest ||
+		typeof manifest !== 'object' ||
+		!isDeepStrictEqual(manifest.linux_tap_holds_absent_parent, [
+			{
+				type: 'label',
+				id: 'tap_holds_absent_parent',
+				i18n: 'menu.tapholds.title',
+				platforms: ['linux'],
+				unavailable: 'hide'
+			}
+		]) ||
+		!Array.isArray(manifest.top_level) ||
+		manifest.top_level.filter((row) => row.id === 'tap_holds' && row.type === 'group').length !== 1
+	)
+		return false;
+	const { lex, body, positions, rootPositions } = luaPublicationParser();
+	const whole = lex(builderSource);
+	if (
+		!whole ||
+		!closedModuleExport(whole, lex, rootPositions) ||
+		!closedSiblingRendererBindings(whole)
+	)
+		return false;
+	const root = body(whole, 'function M.build(ctx)');
+	const stage = body(whole, 'local function _build_tap_holds(ctx)');
+	const expected = lex(
+		'local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "tap_holds")\n\tif not receive then return nil end\n\tlocal th = ctx.tap_holds\n\tif not th then\n\t\tlocal declared = ManifestMenu.template_rows("linux_tap_holds_absent_parent", {}, {}, {})\n\t\tif not declared or #declared ~= 1 then return nil end\n\t\treturn declared[1]\n\tend'
+	);
+	if (
+		!stage ||
+		!expected ||
+		!declaredLinuxNativeTray(root, whole) ||
+		positions(whole, '_build_tap_holds =').length ||
+		stage.tokens.length < expected.tokens.length
+	)
+		return false;
+	return expected.tokens.every(
+		(token, at) => stage.tokens[at].kind === token.kind && stage.tokens[at].value === token.value
+	);
+}
+
+/** Requires the actual exported Linux root and its closed captured-renderer protocol. */
+function declaredLinuxTopLevelPublication(builderSource) {
+	const { lex, body, rootPositions } = luaPublicationParser();
+	let whole = lex(builderSource);
+	if (!whole) return false;
+	// A fresh, unused plain constructor only reads retained local values. It
+	// cannot invoke, mutate or escape a renderer owner. Keep the entire native
+	// publication protocol pinned after excluding this inert leading statement.
+	const signature = 'function M.build(ctx)',
+		build = rootPositions(whole, signature);
+	if (build.length === 1) {
+		const tokens = whole.tokens,
+			symbol = (at, value) => tokens[at]?.kind === 'symbol' && tokens[at].value === value,
+			start = build[0] + scriptTokens(signature, '.lua').length,
+			reads = new Set(['separator_render', 'ManifestMenu', 'ctx']),
+			keywords = new Set([
+				'and',
+				'break',
+				'do',
+				'else',
+				'elseif',
+				'end',
+				'false',
+				'for',
+				'function',
+				'goto',
+				'if',
+				'in',
+				'local',
+				'nil',
+				'not',
+				'or',
+				'repeat',
+				'return',
+				'then',
+				'true',
+				'until',
+				'while'
+			]),
+			name = tokens[start + 1];
+		if (
+			tokens[start]?.kind === 'identifier' &&
+			tokens[start].value === 'local' &&
+			name?.kind === 'identifier' &&
+			name.value !== '_ENV' &&
+			!keywords.has(name.value) &&
+			!reads.has(name.value) &&
+			symbol(start + 2, '=') &&
+			symbol(start + 3, '{') &&
+			tokens.filter((token) => token.kind === 'identifier' && token.value === name.value).length ===
+				1
+		) {
+			let at = start + 4,
+				fields = 0;
+			while (!symbol(at, '}')) {
+				if (tokens[at]?.kind === 'identifier' && symbol(at + 1, '=')) {
+					if (keywords.has(tokens[at].value)) break;
+					at += 2;
+				}
+				if (tokens[at]?.kind !== 'identifier' || !reads.has(tokens[at].value)) break;
+				at++;
+				fields++;
+				if (symbol(at, ',') || symbol(at, ';')) at++;
+				else if (!symbol(at, '}')) break;
+			}
+			if (fields > 0 && symbol(at, '}')) {
+				const end = symbol(at + 1, ';') ? at + 1 : at;
+				whole = lex(
+					builderSource.slice(0, tokens[start].start) + builderSource.slice(tokens[end].end)
+				);
+			}
+		}
+	}
+	return (
+		!!whole &&
+		closedModuleExport(whole, lex, rootPositions) &&
+		closedSiblingRendererBindings(whole) &&
+		declaredLinuxNativeTray(body(whole, signature), whole)
+	);
+}
+
+/** The actual exported Linux root composes both guarded physical header frames. */
+function nativeLinuxHeaderPublication(builderSource, manifest, platform) {
+	if (platform !== 'linux' || typeof builderSource !== 'string') return false;
+	// Snapshot only ordinary own data descriptors; native rawget/plain custody
+	// cannot be supplied by getters, inherited fields or custom container methods.
+	const ordinary = (value, array = false) => {
+		if (!value || typeof value !== 'object' || Array.isArray(value) !== array) return null;
+		const prototype = Object.getPrototypeOf(value);
+		if (
+			array ? prototype !== Array.prototype : prototype !== Object.prototype && prototype !== null
+		)
+			return null;
+		const descriptors = Object.getOwnPropertyDescriptors(value),
+			data = Object.create(null);
+		for (const key of Reflect.ownKeys(descriptors)) {
+			if (typeof key !== 'string' || !Object.hasOwn(descriptors[key], 'value')) return null;
+			data[key] = descriptors[key].value;
+		}
+		if (array) {
+			if (!Number.isSafeInteger(data.length) || data.length < 0) return null;
+			if (Object.keys(data).length !== data.length + 1) return null;
+			for (let index = 0; index < data.length; index++)
+				if (!Object.hasOwn(data, String(index))) return null;
+		}
+		return data;
+	};
+	const root = ordinary(manifest);
+	if (!root) return false;
+	const topLevel = ordinary(root.top_level, true);
+	if (!topLevel || topLevel.length === 0) return false;
+	const records = new Set();
+	for (let index = 0; index < topLevel.length; index++) {
+		const record = ordinary(topLevel[index]);
+		if (!record || typeof record.id !== 'string' || records.has(topLevel[index])) return false;
+		records.add(topLevel[index]);
+	}
+	if (!declaredLinuxTopLevelPublication(builderSource)) return false;
+	const { lex } = luaPublicationParser();
+	if (!declaredLinuxHeaderOwner(lex(builderSource))) return false;
+	for (const [section, type, id] of [
+		['linux_tray_active_header', 'label', 'linux_tray_active_header'],
+		['linux_tray_paused_header', 'command', 'linux_tray_resume']
+	]) {
+		const rows = ordinary(root[section], true);
+		if (!rows || rows.length !== 1) return false;
+		const row = ordinary(rows[0]);
+		if (!row || typeof row.i18n !== 'string' || row.i18n === '') return false;
+		const platforms = ordinary(row.platforms, true);
+		if (!platforms || platforms.length !== 1 || platforms[0] !== 'linux') return false;
+		if (
+			!isDeepStrictEqual(
+				{ ...row, platforms: [platforms[0]] },
+				{
+					type,
+					id,
+					i18n: row.i18n,
+					caption_getter: 'linux_tray_version',
+					caption_layout: 'prefix',
+					caption_joiner: ' — ',
+					platforms: ['linux'],
+					unavailable: 'hide'
+				}
+			)
+		)
+			return false;
+	}
+	return true;
+}
+
 module.exports = {
 	nativeLlmParentPublication,
 	nativeLinuxAiParentPublication,
-	nativeTopLevelProjection
+	nativeMacLayoutTopLevelPublication,
+	nativeLinuxTapHoldAbsentPublication,
+	nativeTopLevelProjection,
+	declaredMacTopLevelPublication,
+	declaredLinuxTopLevelPublication,
+	nativeLinuxHeaderPublication
 };

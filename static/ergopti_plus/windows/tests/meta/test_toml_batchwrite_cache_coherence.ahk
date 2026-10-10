@@ -33,7 +33,7 @@ _TBCC_DeepCopyPresent() {
 	Assert(Wrapper != "" && Seg != "",
 		"TOML_BatchWrite and its shared implementation must exist")
 	Assert(InStr(Wrapper,
-		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , false, AdmissionFn)') > 0,
 		"the public writer must delegate to the implementation whose cache isolation is checked below")
 
 	; The parsed Map must be cloned before any mutation so that candidate
@@ -54,7 +54,7 @@ _TBCC_FailurePathsInvalidateCache() {
 	Assert(Wrapper != "" && Seg != "",
 		"TOML_BatchWrite and its shared implementation must exist")
 	Assert(InStr(Wrapper,
-		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , false, AdmissionFn)') > 0,
 		"cache invalidation must be checked on the implementation reached by the public writer")
 
 	; Count distinct cache-invalidation blocks inside the function body.

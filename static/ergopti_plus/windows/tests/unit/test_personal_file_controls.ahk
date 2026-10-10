@@ -34,7 +34,9 @@ _PFC_Fixture(FixtureRootSpelling := "temp") {
 	Assert(FSWriteDurable(Fixture.file, Fixture.content))
 	Fixture.source := '[category_enabled]`nhotstrings = true`n[private]`ncredential = "keep"`n'
 		. '[hotstrings.modules.' . TOML_RenderKey(Fixture.descriptor["id"]) . ']`nquiet = false`n'
+	Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 	Assert(FSWriteDurable(Fixture.path, Fixture.source))
+	AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "the actual dynamic personal-file configuration remains admitted by its genuine native boot owner")
 	ScriptInformation := Fixture.savedInfo.Clone()
 	ScriptInformation["PersonalHotstringsDir"] := Fixture.root
 	ScriptInformation["PersonalTomlPath"] := Fixture.root . "\personal_hotstrings.toml"

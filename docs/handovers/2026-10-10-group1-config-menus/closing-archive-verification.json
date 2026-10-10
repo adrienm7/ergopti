@@ -1,0 +1,8 @@
+{
+	"utc": "2026-10-10T09:53:47.474390+00:00",
+	"file": "closing-source-and-software-receipts.tar.gz",
+	"sha256": "d522fb145e30eac4d55edacffee2444fad6b4bb932eb14b00f197a7ab4a16a08",
+	"bytes": 3554925,
+	"members_verified": 142,
+	"outcomes": "See exact source-specific receipts; no final native CI success claimed."
+}

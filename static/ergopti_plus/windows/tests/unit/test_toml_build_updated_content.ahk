@@ -699,7 +699,7 @@ _TBUI_ConfigInlineFullSaveAdmission(Path) {
 	}
 }
 _TBUI_ConfigInlineFullSaveAdmissionProbe() {
-	_FMS_WithSource("config_writer_inline_admission", '[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
+	_FMS_WithSource("config_writer_inline_admission", '_meta.schema_version = 11`n[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
 		_TBUI_ConfigInlineFullSaveAdmission)
 }
 Test("toml config document writer: native full-save probe retains strict refusal and observes exact semantic no-op", _TBUI_ConfigInlineFullSaveAdmissionProbe)
