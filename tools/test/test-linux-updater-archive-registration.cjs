@@ -3,6 +3,7 @@
 /** Independent mandatory archive/source-control registration and receipt refusals. */
 'use strict';
 const assert = require('node:assert/strict');
+const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const Pipeline = require('./ci-pipeline.cjs');
@@ -112,12 +113,12 @@ function validateWorkflow(text) {
 		assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 		assert.equal(Pipeline.stepField(step, 'timeout-minutes'), timeout);
 	}
-	assert.deepEqual(Pipeline.runOf(Pipeline.step(body, ARCHIVE)), [
+	assertLinuxQualifiedRun(Pipeline.runOf(Pipeline.step(body, ARCHIVE)), [
 		'set -euo pipefail',
 		'export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"',
 		'env -u PKG_CONFIG_SYSROOT_DIR -u ERGOPTI_MANAGED_NATIVE_GIO_SYSROOT npm run --silent test:linux:updater-archive-native | tee "$RUNNER_TEMP/linux-updater-archive-native.log"'
 	]);
-	assert.deepEqual(Pipeline.runOf(Pipeline.step(body, SOURCE)), [
+	assertLinuxQualifiedRun(Pipeline.runOf(Pipeline.step(body, SOURCE)), [
 		'set -euo pipefail',
 		'npm run --silent test:linux:archive-source-controls | tee "$RUNNER_TEMP/linux-archive-source-controls.log"'
 	]);

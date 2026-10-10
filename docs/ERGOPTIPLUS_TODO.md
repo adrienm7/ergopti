@@ -7578,6 +7578,43 @@ Independent reviews approve these sources; exact-source Windows qualification
 and E2E/package/install remain required. No item or transversal requirement is
 removed.
 
+The latest partial delivery is integrated without squash at `1046dda11`.
+Its actual Linux GIO/curl48 controls pass with all original seven phases
+physically closed. The final three-OS manual37999625086 is terminal in failure, with Release
+skipped. Its genuine Windows manifest admits10725 passes/one unrelated timer
+inventory failure; corrected native source44, the closed diagnostic, updater8
+and selected component27 pass. Current Mac trust restoration and Brew
+Automation prerequisites still refuse. A narrow follow-up binds the approved
+linux-e2e-suite disposition wrapper around each independently fixed native
+command in the package/network/archive/digest/temporary-file registration
+guards. Deferred branches explicitly grant no qualification; unknown modes
+fail. Original native bodies, clocks, receipt/cleanup assertions and refusal
+controls remain mandatory. This guard correction does not qualify any
+deferred or unexecuted native component, finish62 or remove16/38.
+
+Container requalification on the same integrated production source now passes
+all six selected Linux native/source gates: temporary updater63 product checks
+(including48 original ownership/allocation checks across both ABIs), archive
+pipeline3 cases/15 checks with install/rollback, source archive26 controls,
+actual runtime4 groups, retained FD digest12 checks, and staged AppDir7 groups
+plus2 actual kernel-census controls. Each successful native owner closes its
+original physical phases; no product skip receives credit. The pinned Lua54
+vendor has22 passes/one independently declared optional union skip. Earlier
+missing-prerequisite and ENOSPC launches remain failed/unqualified, including
+retained metadata/closure debt; their namespaces are preserved. Private dconf
+cache, authentic tool/SDK activation and explicit native luv paths are saved
+additively for the next container. Full selected verification still has
+incoming CI wrapper/evidence guard failures and must not be called green.
+
+The final canonical-TMPDIR JS body reports400/406 passes: four incoming
+CI wrapper/evidence guards fail, plus source-toolchain and drift-copy ENOSPC
+failures. Both unchanged ENOSPC subjects pass in fresh scoped /tmp runs after
+storage recovery, including the genuine clone/C/header/ELF control and all four
+original drift mutations with exact edited-byte preservation. Reconnection
+interrupted the JS guardian; its missing final closure receipt remains
+unqualified. These separate passes do not turn the whole selected suite green.
+No assertion, original command or independent expected corpus is weakened.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete

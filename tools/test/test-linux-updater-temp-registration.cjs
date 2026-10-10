@@ -3,6 +3,7 @@
 /** Independent mandatory source registration checks; never grants native runtime credit. */
 'use strict';
 const assert = require('node:assert/strict');
+const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const Pipeline = require('./ci-pipeline.cjs');
@@ -90,7 +91,7 @@ function mandatory(text) {
 		assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 		assert.equal(Pipeline.stepField(step, 'working-directory'), null);
 		assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '22');
-		assert.deepEqual(Pipeline.runOf(step), [
+		assertLinuxQualifiedRun(Pipeline.runOf(step), [
 			'set -euo pipefail',
 			'export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"',
 			'npm run --silent test:linux:updater-temp-native -- --fixture ' +
