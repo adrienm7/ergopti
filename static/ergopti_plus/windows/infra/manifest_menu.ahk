@@ -461,7 +461,8 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 			; here instead of rendering an empty submenu.
 			TargetMenu.Add(Label, Row["submenu"])
 		} else if (Row.Has("action") and (Row["action"] is Func
-				or Row["action"] is MenuStartupUiCommand) and !Greyed) {
+				or Row["action"] is MenuStartupUiCommand
+				or Row["action"] is MenuStartupRepeatableToggleCommand) and !Greyed) {
 			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"])
 			if RequireTracking && Tracked != 1
 				throw Error("Native leaf command registration was refused")
@@ -1456,7 +1457,14 @@ MenuRenderer_AppendCommand(TargetMenu, ManifestKey, CommandId, Commands, StateGe
 ; @returns {Integer} 1 when the row was drawn, 0 otherwise.
 _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	Row := _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters)
-	return Row is Map ? _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1) : 0
+	if !(Row is Map)
+		return 0
+	Id := _MR_Get(Item, "id"), CmdId := _MR_Get(Item, "command")
+	if CmdId == ""
+		CmdId := Id
+	if Row.Has("action") && ManifestKey == "llm_menu" && Id == "llm_toggle" && CmdId == "llm_toggle"
+		Row["action"] := MenuStartupRepeatableToggleCommand(Id, Row["action"])
+	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
 }
 
 ; Projects the category switch through its declared state and static reason.
