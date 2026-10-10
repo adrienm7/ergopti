@@ -191,6 +191,18 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const MACOS_NATIVE_STEP_CONDITIONS = [
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Observe installed Shortcuts Events metadata without launch',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain installed Shortcuts Events metadata diagnostic',
+		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
 	[MACOS_BOX, 'managed-ollama-native', 'Prepare genuine pinned Go toolchain', NOT_CANCELLED],
 	[
 		MACOS_BOX,
