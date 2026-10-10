@@ -168,6 +168,42 @@ class StandaloneCompilerControls(unittest.TestCase):
         self.fixture._command.assert_not_called()
 
 
+class PayloadDependencyControls(unittest.TestCase):
+    def test_original_redirect_policy_is_copied_and_hash_bound_before_bootstrap_download(self):
+        with tempfile.TemporaryDirectory(prefix="ergopti-ollama-payload-") as directory:
+            root = Path(directory)
+            catalogue = root / "fixture-catalogue.json"
+            catalogue.write_text('{"fixture":"payload-only-no-install"}\n', encoding="utf-8")
+            subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+            subject.root = ROOT
+            subject.source_hashes = {}
+            subject.options = SimpleNamespace(catalogue=catalogue)
+            payload = subject.payload(root / "OwnedPayload.app")
+            relative = "static/ergopti_plus/_shared/data/http/redirect_policy.json"
+            original = ROOT / relative
+            copied = payload / "_shared/data/http/redirect_policy.json"
+            self.assertEqual(copied.read_bytes(), original.read_bytes())
+            self.assertEqual(
+                subject.source_hashes[relative], hashlib.sha256(original.read_bytes()).hexdigest()
+            )
+            runtime = RECEIVING.load(
+                "payload_only_ollama_runtime",
+                payload / "macos/modules/llm/managed_ollama_runtime.py",
+            )
+            self.assertEqual(runtime.BOOTSTRAP.REDIRECT_POLICY, copied)
+            request = Mock(side_effect=AssertionError("payload prerequisite cannot reach network"))
+            output = root / "must-not-be-created"
+            # A deliberately invalid digest reaches the real policy read, then
+            # refuses before file acquisition or any native request constructor.
+            with self.assertRaises(runtime.BOOTSTRAP.BootstrapFailure) as refused:
+                runtime.BOOTSTRAP.download(
+                    "https://payload.invalid/input", output, "invalid", 1, 10, 1, request=request
+                )
+            self.assertEqual(refused.exception.reason, "integrity")
+            request.assert_not_called()
+            self.assertFalse(output.exists())
+
+
 class RetainedSourceControls(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

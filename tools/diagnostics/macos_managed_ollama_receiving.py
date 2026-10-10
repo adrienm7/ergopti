@@ -346,6 +346,7 @@ class Receiver:
     def payload(self, app):
         payload = app / "Contents/Resources/static/ergopti_plus"
         relatives = [
+            "_shared/data/http/redirect_policy.json",
             "_shared/modules/network/proxy_policy.json",
             "_shared/python/network_proxy_policy.py",
             "_shared/modules/llm/managed_ollama_runtime.json",
