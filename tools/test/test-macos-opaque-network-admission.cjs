@@ -359,7 +359,12 @@ function emittedOwners(fixturePolicy, python, binary) {
 		`local packet = require("tests.support.opaque_network_owner_fixture").capture(Network, ${JSON.stringify(shellPath(python))}, ${JSON.stringify(shellPath(binary))}, receiver)`,
 		'io.write(require("json").encode(packet))'
 	].join('; ');
-	const generated = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	const generated = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
+		cwd: root,
+		encoding: 'utf8',
+		timeout: 10000,
+		input: source
+	});
 	assert.ifError(generated.error);
 	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 	return JSON.parse(generated.stdout);
@@ -374,7 +379,12 @@ function receiveOwners(fixturePolicy, bytes, code, mode, owner) {
 		`local result = require("tests.support.opaque_network_owner_fixture").receive(Network, bytes, ${code}, ${mode ? JSON.stringify(mode) : 'nil'}, receiver, ${owner ? JSON.stringify(owner) : 'nil'})`,
 		'io.write(require("json").encode(result))'
 	].join('; ');
-	const received = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	const received = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
+		cwd: root,
+		encoding: 'utf8',
+		timeout: 10000,
+		input: source
+	});
 	assert.ifError(received.error);
 	assert.equal(received.status, 0, received.stderr || received.stdout);
 	return JSON.parse(received.stdout);
@@ -391,7 +401,12 @@ function receivePhase(chunks, code) {
 		`local receipt = phase.finish(${code})`,
 		'io.write(Json.encode({ has_receipt = receipt ~= nil, receipt = receipt or {} }))'
 	].join('; ');
-	const received = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	const received = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
+		cwd: root,
+		encoding: 'utf8',
+		timeout: 10000,
+		input: source
+	});
 	assert.ifError(received.error);
 	assert.equal(received.status, 0, received.stderr || received.stdout);
 	return JSON.parse(received.stdout);
@@ -436,7 +451,12 @@ function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 		`local prelude, detail = Network.bootstrap_prelude("BOOTSTRAP", ${JSON.stringify(shellPath(interpreter))})`,
 		'assert(prelude, detail); io.write(prelude)'
 	].join('; ');
-	const generated = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	const generated = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
+		cwd: root,
+		encoding: 'utf8',
+		timeout: 10000,
+		input: source
+	});
 	assert.ifError(generated.error);
 	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 	return generated.stdout;
@@ -451,7 +471,12 @@ function emittedPrelude(fixturePolicy) {
 		'local prelude, detail = Network.opaque_prelude("TEST")',
 		'assert(prelude, detail); io.write(prelude)'
 	].join('; ');
-	const generated = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	const generated = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
+		cwd: root,
+		encoding: 'utf8',
+		timeout: 10000,
+		input: source
+	});
 	assert.ifError(generated.error);
 	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 	return generated.stdout;
@@ -465,7 +490,12 @@ function emittedManagedPrelude(fixturePolicy) {
 		'local prelude, detail = Network.managed_http_prelude("MLX")',
 		'assert(prelude, detail); io.write(prelude)'
 	].join('; ');
-	const generated = spawnSync(lua, ['-e', source], { cwd: root, encoding: 'utf8', timeout: 10000 });
+	const generated = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
+		cwd: root,
+		encoding: 'utf8',
+		timeout: 10000,
+		input: source
+	});
 	assert.ifError(generated.error);
 	assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 	return generated.stdout;
