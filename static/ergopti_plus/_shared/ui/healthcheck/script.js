@@ -42,29 +42,86 @@
 	var pendingExport = null;
 	var sharedText = null;
 
+	/** Invalid observations refuse sharing without disabling cleanup or local display. */
+	function pageObservations() {
+		try {
+			return Model.pageCheckObservations(state.snapshot.diagnostic_checks, state.config.schema);
+		} catch (_) {
+			setStatus(t('healthcheck.probe.error', 'invalid_page_observations'), 'fail');
+			return null;
+		}
+	}
+
 	function requestExport(action) {
 		if (pendingExport) return;
 		if (exportSequence >= state.config.schema.report.export_sequence_max)
 			throw new Error('The export sequence is exhausted');
-		pendingExport = { action: action, sequence: ++exportSequence, snapshot: state.snapshot };
-		post({ action: 'export_snapshot', export_sequence: exportSequence });
+		var observations = pageObservations();
+		if (!observations) return;
+		pendingExport = {
+			action: action,
+			sequence: ++exportSequence,
+			snapshot: state.snapshot,
+			checks: JSON.stringify(observations)
+		};
+		post({
+			action: 'export_snapshot',
+			export_sequence: exportSequence,
+			generated_at: state.snapshot.generated_at,
+			snapshot_revision: state.snapshot.export_revision,
+			page_checks: observations.results
+		});
+	}
+
+	/** Host encoders may reorder keys; normalize only the exact closed envelope. */
+	function hostPageObservations(value) {
+		if (
+			!value ||
+			typeof value !== 'object' ||
+			Array.isArray(value) ||
+			value.source !== 'installed_page_reported' ||
+			value.qualification !== 'unqualified' ||
+			Object.keys(value).sort().join(',') !== 'qualification,results,source'
+		)
+			return null;
+		try {
+			return Model.pageCheckObservations(value.results, state.config.schema);
+		} catch (_) {
+			return null;
+		}
 	}
 
 	function completeExport(message) {
 		var request = pendingExport;
 		if (!request || message.export_sequence !== request.sequence) return;
 		pendingExport = null;
+		var currentChecks = pageObservations();
+		var hostChecks = hostPageObservations(
+			message.snapshot && message.snapshot.page_check_observations
+		);
+		if (!currentChecks || !hostChecks) return;
 		if (
 			!isTrue(message.ok) ||
 			!message.snapshot ||
 			typeof message.share_text !== 'string' ||
 			state.snapshot !== request.snapshot ||
 			message.snapshot.driver !== request.snapshot.driver ||
-			message.snapshot.generated_at !== request.snapshot.generated_at
+			message.snapshot.generated_at !== request.snapshot.generated_at ||
+			message.snapshot.export_revision !== request.snapshot.export_revision ||
+			JSON.stringify(currentChecks) !== request.checks ||
+			JSON.stringify(hostChecks) !== request.checks
 		)
 			return;
-		message.snapshot.diagnostic_checks = state.snapshot.diagnostic_checks;
-		state.snapshot = message.snapshot;
+		// Keep the actual check owner alive; replacing it would abandon pending callbacks.
+		var checks = state.snapshot.diagnostic_checks;
+		Object.keys(state.snapshot).forEach(function (key) {
+			if (
+				key !== 'diagnostic_checks' &&
+				!Object.prototype.hasOwnProperty.call(message.snapshot, key)
+			)
+				delete state.snapshot[key];
+		});
+		Object.assign(state.snapshot, message.snapshot, { diagnostic_checks: checks });
 		sharedText = message.share_text;
 		render();
 		if (request.action === 'copy') post({ action: 'copy', text: exportText() });
@@ -193,9 +250,13 @@
 	 * @returns {string}
 	 */
 	function exportText() {
-		return sharedText !== null
-			? sharedText
-			: Model.formatShareable(state.snapshot, state.config.schema, t);
+		if (sharedText !== null) return sharedText;
+		var observations = pageObservations();
+		if (!observations) return '# Export refused\n\ninvalid_page_observations';
+		var preview = Object.assign({}, state.snapshot, {
+			page_check_observations: observations
+		});
+		return Model.formatShareable(preview, state.config.schema, t);
 	}
 
 	/**
