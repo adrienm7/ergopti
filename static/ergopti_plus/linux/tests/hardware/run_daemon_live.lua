@@ -326,15 +326,17 @@ local function read_output(seconds)
 	return table.concat(text), table.concat(trail, " "), alt_chords
 end
 
-type_text("adn ")
+-- Startup focus admission deliberately forgets any unobserved suffix. Type a
+-- real separator rather than treating the fixture's empty field as engine proof.
+type_text(" adn ")
 local got, trail = read_output(3)
 print(string.format("  the desktop received %q", got))
 print("  key events: " .. trail)
 local failures = {}
-if got == "ADN " then
-	print("  ok   typing \"adn \" on the keyboard reached the desktop as \"ADN \"")
+if got == " ADN " then
+	print("  ok   typing \" adn \" on the keyboard reached the desktop as \" ADN \"")
 else
-	failures[#failures + 1] = "expected \"ADN \""
+	failures[#failures + 1] = "expected \" ADN \""
 end
 
 
