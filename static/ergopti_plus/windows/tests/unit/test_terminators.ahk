@@ -670,13 +670,16 @@ Test("terminator-records: genuine WAL commit retains pending ownership until rel
 Test("terminator-records: genuine refused reload rolls back exact bytes and permits an admitted retry", _HTR_WalLifecycle.Bind(true))
 
 _HTR_ForeignSource() {
-	Fixture := _ScopeOwnerFixture()
-	Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
-	Port := ConfigTransitionProductionPort(), NativeHash := Port["hash"]
-	Changed := false, Foreign := _HTR_Source() . '# independently changed source`n'
+	Fixture := _ScopeOwnerFixture(_HTR_Source())
+	NativePort := ConfigTransitionProductionPort(), NativeHash := NativePort["hash"]
+	; A never-issued callback copy models the race without revoking native IO.
+	Port := NativePort.Clone()
+	AssertFalse(ConfigTransitionProductionPort(Port), "the race callback copy grants no native authority")
+	HashCalls := 0, Changed := false, Foreign := Fixture.source . '# independently changed source`n'
 	Hash(Content) {
+		HashCalls += 1
 		Digest := NativeHash.Call(Content)
-		if !Changed && Content == _HTR_Source() {
+		if !Changed && Content == Fixture.source {
 			Changed := true
 			Assert(FSWriteDurable(Fixture.path, Foreign))
 		}
@@ -693,6 +696,7 @@ _HTR_ForeignSource() {
 	try {
 		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 		AssertEqual(0, Launches, "a stale exact-source intent must refuse before reload admission")
+		Assert(HashCalls > 0, "the retained native hash callback must execute before race refusal")
 		Assert(Changed, "the actual native hash boundary must exercise the source race")
 		AssertEqual("refused", Receipt["status"])
 		AssertEqual(Foreign, FSReadUtf8Exact(Fixture.path), "a foreign source wins before any replacement")
@@ -701,10 +705,33 @@ _HTR_ForeignSource() {
 			OnRefused.Call("controlled cleanup")
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
-		_ScopeOwnerCleanup(Fixture)
+		try AssertTrue(ConfigTransitionProductionPort(NativePort), "the race fixture retains the exact canonical native image")
+		finally _ScopeOwnerCleanup(Fixture)
 	}
 }
 Test("terminator-records: an independently changed source refuses the actual conditional WAL candidate", _HTR_ForeignSource)
+
+; Tampering is refused even for an issued identity; restoration preserves custody.
+_HTR_NativePortMutationCustody() {
+	Port := ConfigTransitionProductionPort(), NativeHash := Port["hash"]
+	try {
+		Port["hash"] := (*) => false
+		AssertFalse(ConfigTransitionProductionPort(Port), "an issued identity cannot authorize a changed callback")
+		AssertThrows(_ConfigTransitionRuntimePort.Bind(Port), "revoked native IO must not become a custom port")
+		AssertThrows(ConfigTransitionProductionPort, "the shared constructor must refuse the changed image")
+	} finally Port["hash"] := NativeHash
+	AssertTrue(ConfigTransitionProductionPort(Port), "restoration retains the original native identity")
+	Assert(Port == ConfigTransitionProductionPort(), "restoration must not mint replacement authority")
+}
+Test("terminator-records: issued native mutation refuses and restores exact custody", _HTR_NativePortMutationCustody)
+
+_HTR_NativePortIntact() {
+	Port := ConfigTransitionProductionPort()
+	AssertTrue(ConfigTransitionProductionPort(Port), "prior terminator fixtures retain the canonical native image")
+	Assert(Port["hash"] == CryptoSha256, "the original native hash callback remains installed")
+	Assert(Port == ConfigTransitionProductionPort(), "the next constructor observes the same admitted identity")
+}
+Test("terminator-records: following fixture observes intact canonical native ownership", _HTR_NativePortIntact)
 
 _HTR_TerminalBarrier() {
 	Fixture := _ScopeOwnerFixture()
