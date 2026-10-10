@@ -132,7 +132,7 @@ _HCShare_Cell(Value) {
 _HCShare_Table(Rows, Title := "") {
 	if !Rows.Length
 		return ""
-	Text := (Title == "" ? "" : "## " . t(Title) . "`n`n") . "| | |`n| --- | --- |`n"
+	Text := (Title == "" ? "" : "## " . Title . "`n`n") . "| | |`n| --- | --- |`n"
 	for Row in Rows
 		Text .= Row . "`n"
 	return Text
@@ -162,12 +162,12 @@ _HCShare_Readable(Safe, Schema) {
 			Label := Key
 			for Field in Section.Get("fields", [])
 				if Field["id"] == Key {
-					Label := t("healthcheck.field." . Key)
+					Label := _HCShare_English(Schema, "healthcheck.field." . Key)
 					break
 				}
 			_HCShare_Rows(Data[Key], Policy["sections"]["fields"][Id]["fields"][Key], Label, Rows)
 		}
-		TableText := _HCShare_Table(Rows, "healthcheck.section." . Id)
+		TableText := _HCShare_Table(Rows, _HCShare_English(Schema, "healthcheck.section." . Id))
 		if TableText != ""
 			Text .= "`n" . TableText
 	}
@@ -175,8 +175,16 @@ _HCShare_Readable(Safe, Schema) {
 	for Key in ["probes", "retired_probes"]
 		if Safe.Has(Key)
 			_HCShare_Rows(Safe[Key], Policy[Key], Key, Rows)
-	TableText := _HCShare_Table(Rows, "healthcheck.deep_tests.probe_inventory")
+	TableText := _HCShare_Table(Rows, _HCShare_English(Schema, "healthcheck.deep_tests.probe_inventory"))
 	return Text . (TableText == "" ? "" : "`n" . TableText)
+}
+
+/** Resolves an export label without changing or falling back to UI locale. */
+_HCShare_English(Schema, Key) {
+	Strings := Schema.Get("export_strings", 0)
+	if !(Strings is Map) || !Strings.Has(Key) || !(Strings[Key] is String) || Strings[Key] == ""
+		throw Error("English export label unavailable: " . Key)
+	return Strings[Key]
 }
 
 /** Builds file and issue-form content only from the host-retained snapshot. */
@@ -184,12 +192,15 @@ HealthCheck_ShareDocument(Snapshot, Schema) {
 	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema)
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
-	Text := "# ErgoptiPlus diagnostics`n`n" . t(Schema["share_policy"]["notice_key"])
+	Text := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
 		. "`n`ndriver-suites: not_run`npage-model-checks: not_collected`n`n" . _HCShare_Readable(Safe, Schema)
 		. "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
 	Name := Schema["report"]["name_prefix"] . Safe["driver"] . "-"
 		. RegExReplace(Safe.Get("generated_at", "unknown"), "[^A-Za-z0-9_.-]", "_") . Schema["report"]["name_suffix"]
-	return Map("snapshot", Safe, "text", Text, "name", Name,
+	Summary := "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.`n"
+		. "Driver: " . Safe["driver"] . "`nVersion: " . Versions.Get("ergopti_version", "unknown")
+		. "`nCommit: " . Versions.Get("commit", "unknown") . "`nDriver suites: NOT_RUN"
+	return Map("snapshot", Safe, "text", Text, "name", Name, "summary", Summary,
 		"fields", Map("driver", Safe["driver"], "version", Versions.Get("ergopti_version", "unknown"), "os", Safe["driver"]))
 }
 
@@ -311,18 +322,21 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 ; opening is the last side effect, so the form keeps the focus.
 ; @param Action {Map} { text, fields } The page's text and identity fields.
 ; @throws {Error} When the clipboard or the browser refuses.
-_HCReport_Report(Effects, Config, Action, Rules, Context) {
+_HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
 	; First, and whole: the link may cut the report to fit GitHub's budget
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
+	; The complete reviewed document stays in a local attachment, never the URL.
+	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
 	Fields := Map()
 	for Id, Value in Action["fields"]
 		Fields[Id] := Value
-	Fields[Config["templates"]["templates"]["bug"]["report_field"]] := Text
+	Fields[Config["templates"]["templates"]["bug"]["report_field"]] := Action["summary"]
 	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
 	if !Effects["open_url"].Call(Url)
 		throw Error("The browser could not be opened.")
+	return Path
 }
 
 ; Performs one action of the diagnostics page, already validated.
@@ -350,6 +364,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 			Action["text"] := Document["text"]
 			Action["fields"] := Document["fields"]
 			Action["name"] := Document["name"]
+			Action["summary"] := Document["summary"]
 		}
 		switch Name {
 			case "copy":
@@ -359,7 +374,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"],
 					Action["text"])
 			case "report":
-				_HCReport_Report(Effects, Config, Action, Rules, Context)
+				Outcome["path"] := _HCReport_Report(Effects, Config, Action, Rules, Context, Paths)
 			case "open_path":
 				Id := Action["id"]
 				if !Paths.Has(Id)

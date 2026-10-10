@@ -108,7 +108,11 @@ end
 
 --- Formats only detached approved leaves, using the driver's existing catalogue.
 local function readable(safe, schema)
-	local translate = require("infra.i18n").get
+	local function translate(key)
+		local value = schema.export_strings and schema.export_strings[key]
+		assert(type(value) == "string" and value ~= "", "English export label unavailable: " .. key)
+		return value
+	end
 	local policy, lines, rows = schema.share_policy.projection.fields, {}, {}
 	local keys = {}
 	for key in pairs(safe) do
@@ -155,10 +159,15 @@ end
 --- @return table { text, fields, name, snapshot }
 function M.document(snapshot, schema, notice)
 	local safe = M.snapshot(snapshot, schema)
+	notice = schema.export_strings and schema.export_strings[schema.share_policy.notice_key]
+	assert(type(notice) == "string" and notice ~= "", "English export notice unavailable")
 	local versions = safe.sections and safe.sections.versions or {}
 	local stamp = safe.generated_at or "unknown"
 	return {
 		snapshot = safe,
+		summary = "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.\n"
+			.. "Driver: " .. safe.driver .. "\nVersion: " .. (versions.ergopti_version or "unknown")
+			.. "\nCommit: " .. (versions.commit or "unknown") .. "\nDriver suites: NOT_RUN",
 		text = "# ErgoptiPlus diagnostics\n\n" .. notice
 			.. "\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n" .. readable(safe, schema)
 			.. "\n```json\n" .. Json.encode(safe) .. "\n```\n",

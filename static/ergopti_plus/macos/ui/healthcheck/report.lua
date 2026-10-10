@@ -153,18 +153,21 @@ end
 --- @param action table { text, fields } The page's text and identity fields.
 --- @param redact function
 --- @return table
-local function report(effects, documents, action, redact)
+local function report(effects, documents, action, redact, paths)
 	local text = redact(action.text)
 	-- First, and whole: the link may cut the report to fit GitHub's budget
 	if not effects.copy(text) then error("the clipboard refused the report") end
+	-- Save the complete reviewed document before opening its short issue form.
+	local path, err = save_and_reveal(effects, paths, action.name, text)
+	if not path then error(err) end
 	local fields = {}
 	for id, value in pairs(action.fields) do fields[id] = redact(value) end
 	local report_field = documents.templates.templates.bug.report_field
 	if type(report_field) ~= "string" then error("the bug template names no report field") end
-	fields[report_field] = text
+	fields[report_field] = action.summary
 	local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
 	if not effects.open_url(url) then error("the browser could not be opened") end
-	return {}
+	return { path = path }
 end
 
 --- Performs one action of the diagnostics page, already validated.
@@ -184,7 +187,7 @@ function M.perform(action, paths, documents, context, overrides, snapshot)
 			local document = Share.document(snapshot, documents.schema,
 				require("infra.i18n").get(documents.schema.share_policy.notice_key))
 			assert(action.text == document.text, "Diagnostic sharing preview is stale or invalid")
-			action = { action = action.action, text = document.text, fields = document.fields, name = document.name }
+			action = { action = action.action, text = document.text, fields = document.fields, name = document.name, summary = document.summary }
 		end
 		if action.action == "copy" then
 			if not effects.copy(redact(action.text)) then error("the clipboard refused the report") end
@@ -194,7 +197,7 @@ function M.perform(action, paths, documents, context, overrides, snapshot)
 			if not path then error(err) end
 			return { path = path }
 		elseif action.action == "report" then
-			return report(effects, documents, action, redact)
+			return report(effects, documents, action, redact, paths)
 		elseif action.action == "open_path" then
 			local path = paths[action.id]
 			if type(path) ~= "string" or path == "" then error("the path " .. action.id .. " is unknown") end

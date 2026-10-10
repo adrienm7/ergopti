@@ -1123,6 +1123,13 @@
 	/** The local preview uses the same closed projection as the host's output. */
 	function formatShareable(snapshot, schema, t) {
 		var safe = shareSnapshot(snapshot, schema);
+		// Export translation never consults or changes the active page locale.
+		t = function (key) {
+			var value = schema.export_strings && schema.export_strings[key];
+			if (typeof value !== 'string' || !value)
+				throw new Error('English export label unavailable: ' + key);
+			return value;
+		};
 		return (
 			'# ErgoptiPlus diagnostics\n\n' +
 			t(schema.share_policy.notice_key) +
