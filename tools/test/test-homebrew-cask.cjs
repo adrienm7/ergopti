@@ -848,6 +848,18 @@ check('archive owners publish bounded typed phase evidence before native work', 
 
 // Bind the approved wrapper before checking the original mandatory native body.
 function nativeHttpFullBody(script) {
+	// The narrow v1.0.1 wrapper keeps owned-process and client-only outside
+	// the optional wire branch; only this complete closed shell image is admitted.
+	const currentWrapper =
+		'set -euo pipefail\nreceipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nprofile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile "$receipt")"\nif [ "$mode" = deferred ] && [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then\n    echo "[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false."\n    exit 0\nfi\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nif [ "$mode" = deferred ]; then\n    test "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes\n    echo "[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n';
+	if (script.includes('--validate-scope-receipt-profile')) {
+		assert.strictEqual(
+			script,
+			currentWrapper,
+			'native HTTP requires its exact profile-bound wrapper'
+		);
+		return 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nexit "$status"\n';
+	}
 	const prefix = [
 		'set -euo pipefail',
 		'receipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"',
@@ -907,13 +919,16 @@ check('shared native process ownership controls remain registered and mandatory'
 		const rawScript = steps[0].run;
 		const script = job === 'managed-ollama-native' ? nativeHttpFullBody(rawScript) : rawScript;
 		if (job === 'managed-ollama-native') {
+			const legacyScript =
+				'set -euo pipefail\nreceipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."\nelif [ "$mode" = full ]; then\n    set -euo pipefail\n    status=0\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\n    exit "$status"\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
+			assert.strictEqual(nativeHttpFullBody(legacyScript), script);
 			for (const [before, after] of [
 				['--validate-scope-receipt "$receipt"', '--validate-scope-receipt "foreign"'],
 				['qualified=false; original command not executed.', 'qualified=true; command passed.'],
 				['    exit 1\nfi\n', '    exit 0\nfi\n']
 			]) {
-				assert.ok(rawScript.includes(before));
-				assert.throws(() => nativeHttpFullBody(rawScript.replace(before, after)));
+				assert.ok(legacyScript.includes(before));
+				assert.throws(() => nativeHttpFullBody(legacyScript.replace(before, after)));
 			}
 		}
 		assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
@@ -1580,6 +1595,47 @@ check(
 		}
 	}
 );
+
+check('profile-bound native HTTP routing preserves mandatory owners and closed refusals', () => {
+	const workflow = require('yaml').parse(
+		fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+	);
+	const script = workflow.jobs['managed-ollama-native'].steps.find(
+		(step) => step.name === 'Receive actual independent managed HTTP native clients'
+	).run;
+	const full = nativeHttpFullBody(script);
+	for (const command of [
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1',
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1',
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1'
+	])
+		assert.strictEqual(full.split(command).length - 1, 1);
+	for (const [before, after] of [
+		['--validate-scope-receipt-profile "$receipt"', '--validate-scope-receipt-profile "foreign"'],
+		[
+			'stable-v1-20261009-macos-native-deferred',
+			'stable-v1-0-1-20261010-three-macos-native-scopes'
+		],
+		['test "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes', 'true'],
+		[
+			'native_http_receiving_test.py --client-only || status=1',
+			'native_http_receiving_test.py --client-only || true'
+		],
+		[
+			'macos_owned_process_native_test.py || status=1',
+			'macos_owned_process_native_test.py || true'
+		],
+		[
+			'native_http_wire_client_receiving.py || status=1',
+			'native_http_wire_client_receiving.py || true'
+		],
+		['qualified=false.', 'qualified=true.'],
+		['    exit 1\nfi\nexit "$status"', '    exit 0\nfi\nexit "$status"']
+	]) {
+		assert.ok(script.includes(before));
+		assert.throws(() => nativeHttpFullBody(script.replace(before, after)));
+	}
+});
 
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);
