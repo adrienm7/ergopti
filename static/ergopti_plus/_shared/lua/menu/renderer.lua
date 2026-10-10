@@ -1564,12 +1564,23 @@ function M.new(deps)
 					Logger.error(LOG, "No command '%s' for the '%s' category switch — its submenu has no way to "
 						.. "turn it on or off.", tostring(cmd_id), manifest_key)
 				else
+					local reason = item.disabled_reason_key
+					if reason ~= nil and (type(reason) ~= "string" or reason == "") then
+						Logger.error(LOG, "Invalid disabled reason for toggle '%s' — skipped.", toggle_id)
+						goto continue
+					end
+					local disabled = R.resolve_disabled_when(manifest_key, toggle_id, getters)
+					local title = i18n.get(i18n_key)
+					if disabled and reason ~= nil then
+						title = title .. " — " .. reason_head(i18n.get(reason))
+						fn = nil
+					end
 					flush_sep()
 					table.insert(result, {
-						title    = i18n.get(i18n_key),
+						title    = title,
 						fn       = fn,
 						checked  = R.resolve_checked_when(manifest_key, toggle_id, getters),
-						disabled = R.resolve_disabled_when(manifest_key, toggle_id, getters) or nil,
+						disabled = disabled or nil,
 					})
 					item_count = item_count + 1
 				end

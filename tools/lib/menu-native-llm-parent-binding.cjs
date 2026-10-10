@@ -1252,7 +1252,7 @@ function closedProducerCalls(unit, role) {
 				}
 			: role === 'llm'
 				? {
-						require: 1,
+						require: closedLlmReadOnlyToggle(unit) ? 2 : 1,
 						'NativeParent.begin': 1,
 						'ManifestMenu.template_rows': 1,
 						'ManifestMenu.render_rows': 1,
@@ -1584,6 +1584,56 @@ function closedCompletedChildFlow(unit, role) {
 	return valid;
 }
 
+/** The read-only toggle branch retains its exact preference owner, predicate and callback. */
+function closedLlmReadOnlyToggle(caller) {
+	if (!caller) return false;
+	const { positions, rootPositions, body, lex } = luaPublicationParser();
+	const fragments = [
+		'local Preferences = require("infra.llm_preferences")',
+		'local function toggle_ready() return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true end',
+		'llm_ctx.commands["llm_toggle"] = function() if not toggle_ready() then return false end if llm.toggle then llm.toggle(ctx.on_menu_changed) end if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end',
+		'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready'
+	];
+	const permitted = new Set(),
+		starts = [];
+	for (const fragment of fragments) {
+		const found =
+			starts.length === 0 ? rootPositions(caller, fragment) : positions(caller, fragment);
+		if (found.length !== 1) return false;
+		starts.push(found[0]);
+		scriptTokens(fragment, '.lua').forEach((token, offset) => {
+			if (token.kind === 'identifier' && ['Preferences', 'toggle_ready'].includes(token.value))
+				permitted.add(found[0] + offset);
+		});
+	}
+	if (
+		!starts.every((start, index) => index === 0 || starts[index - 1] < start) ||
+		rootPositions(caller, fragments[0]).length !== 1 ||
+		rootPositions(caller, 'local function toggle_ready()').length !== 1
+	)
+		return false;
+	const predicate = body(caller, 'local function toggle_ready()');
+	const expected = lex(
+		'return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true'
+	);
+	if (
+		!predicate ||
+		!isDeepStrictEqual(
+			predicate.tokens.map((t) => [t.kind, t.value]),
+			expected.tokens.map((t) => [t.kind, t.value])
+		)
+	)
+		return false;
+	return caller.tokens.every(
+		(token, at) =>
+			token.kind !== 'identifier' ||
+			!['Preferences', 'toggle_ready'].includes(token.value) ||
+			// Earlier deferred helpers own independent preferences locals before this binding exists.
+			(token.value === 'Preferences' && at < starts[0]) ||
+			permitted.has(at)
+	);
+}
+
 /** The LLM child context exposes only its genuine command/getter registrations and exact copy routes. */
 function closedLlmContext(caller) {
 	const { positions } = luaPublicationParser();
@@ -1596,7 +1646,9 @@ function closedLlmContext(caller) {
 		'llm_ctx.state_getters = {}',
 		'llm_ctx.state_getters[key] = value',
 		'llm_ctx.state_getters["llm_enabled"] = function() return enabled end',
-		'llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end',
+		closedLlmReadOnlyToggle(caller)
+			? 'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready'
+			: 'llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end',
 		'llm_ctx[key] = value',
 		'ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)'
 	];
@@ -2249,7 +2301,9 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 				tokenShape(nativeCommand),
 				tokenShape(
 					lex(
-						'if type(llm.toggle) ~= "function" then return false end if llm.toggle then llm.toggle(ctx.on_menu_changed) end if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end'
+						closedLlmReadOnlyToggle(caller)
+							? 'if not toggle_ready() then return false end if llm.toggle then llm.toggle(ctx.on_menu_changed) end if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end'
+							: 'if type(llm.toggle) ~= "function" then return false end if llm.toggle then llm.toggle(ctx.on_menu_changed) end if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end'
 					)
 				)
 			)

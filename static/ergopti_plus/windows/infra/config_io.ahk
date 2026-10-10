@@ -20,6 +20,11 @@
 ; loses. NotifyFn is injectable so behavioural tests can count the signal
 ; without displaying a real TrayTip.
 ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
+	global ConfigurationFile
+	NewerSchema := IsSet(ConfigurationFile) && (ConfigurationFile is String)
+		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
+	if NewerSchema
+		Detail := "the startup configuration uses a newer schema; update ErgoptiPlus and reload before changing settings"
 	if (Detail != "") {
 		try LoggerError("Config", "Could not persist {1}: {2}.", Context, Detail)
 	} else if StateUnchanged {
@@ -27,7 +32,8 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 	} else {
 		try LoggerError("Config", "Could not fully persist {1}.", Context)
 	}
-	MessageKey := StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed"
+	MessageKey := NewerSchema ? "config.read_only.newer_schema"
+		: (StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed")
 	; Failure reporting is a backstop, never a second failure source. Translation,
 	; an injected UI seam, or the native notifier can each throw while the driver
 	; is already handling a refused write. Preserve the false status and the

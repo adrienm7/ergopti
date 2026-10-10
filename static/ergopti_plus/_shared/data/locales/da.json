@@ -3285,5 +3285,7 @@
 	"healthcheck.export.privacy_notice": "Denne rapport deler kun tilladte tekniske oplysninger. Logfiler, fri tekst, stier og identificerende oplysninger udelades, også med detaljer aktiveret. Lokale sidetest medtages ikke.",
 	"sg_actions.llm_translate_context": "🌐 Oversæt den aktuelle sætning [kan tilpasses]",
 	"menu.about.startup_other_command_reason": "Anden startkommando: Opstart er indstillet til en anden kommando eller installation. Den eksisterende indstilling bevares.",
-	"menu.llm.model_parent_with_health": "%sValgt model: %s"
+	"menu.llm.model_parent_with_health": "%sValgt model: %s",
+	"config.read_only.newer_schema": "Denne konfiguration blev gemt af en nyere version af ErgoptiPlus. Dine indstillinger er bevaret. Opdater ErgoptiPlus, og genindlæs det, før du ændrer indstillinger.",
+	"menu.llm.save_unavailable": "Ikke tilgængelig: genoptag ErgoptiPlus, hvis det er sat på pause, eller åbn Diagnostik for at se, hvorfor indstillingerne ikke kan gemmes."
 }

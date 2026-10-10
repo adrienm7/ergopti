@@ -116,8 +116,7 @@ LLM_Menu_BuildSubmenu() {
 
 	Commands := _LLM_ScopeCommands()
 	Commands["llm_toggle"] := LLM_Menu_OnToggle
-	StateGetters := Map("llm_enabled", () => _LLM_Menu["enabled"],
-		"llm_toggle_ready", () => !A_IsSuspended)
+	StateGetters := _LLM_Menu_StateGetters()
 	WarningRows := []
 	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {
 		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
@@ -166,6 +165,13 @@ LLM_Menu_BuildSubmenu() {
 	if IsObject(SavedHandle)
 		_LLM_Menu_Handle := SavedHandle
 	return StagedHandle
+}
+
+/** Captures readers; backend availability never grants configuration write readiness. */
+_LLM_Menu_StateGetters() {
+	global _LLM_Menu
+	return Map("llm_enabled", () => _LLM_Menu["enabled"],
+		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist())
 }
 
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.

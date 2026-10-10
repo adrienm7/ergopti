@@ -1413,18 +1413,26 @@ local function create_menu(deps)
 				-- exists, the switch cannot run its transaction: the row is greyed
 				-- through the declared `llm_toggle_ready` key and a click is refused
 				-- with a log line, rather than the row vanishing from the submenu.
+				local function configuration_writable()
+					local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+					return type(path) == "string" and path ~= ""
+						and require("config_migrate").read_only_reason(path) == nil
+				end
 				local toggle_ready = not paused
+					and configuration_writable()
 					and activation_requirement_owner ~= nil
 					and type(models_mgr.pause_requirements) == "function"
 					and activation_controller.is_registered()
 				local function refuse_toggle()
 						Logger.warn(LOG, "IA switch refused: %s.", paused and "the script is paused"
+							or not configuration_writable() and "the configuration is protected from writes"
 							or "the activation owner is not ready")
 						return false
 				end
 				--- Runs one switch transaction.
 				--- @param opts table|nil Explicit service repair intent from the error's buttons.
 				local function run_toggle(opts)
+						if not configuration_writable() then return refuse_toggle() end
 						if repair_pending then return false end
 						local install_consented = type(opts) == "table" and opts.install_ollama == true
 						activation_generation = activation_generation + 1
@@ -1948,7 +1956,7 @@ local function create_menu(deps)
 										},
 										state_getters = {
 												llm_enabled      = function() return state.llm_enabled == true end,
-												llm_toggle_ready = function() return toggle_ready == true end,
+												llm_toggle_ready = function() return toggle_ready == true and configuration_writable() end,
 										},
 								}
 								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}

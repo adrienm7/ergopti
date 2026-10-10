@@ -13,7 +13,7 @@
  *     form of its translated reason (the text before its first colon).
  * A restricted row without the field is hidden, as before the field existed.
  * A row its `disabled_when` greys where it is drawn can say why in the same
- * form (`disabled_reason_key`, on a command or identified labelled group row): the Uninstall row of a local
+ * form (`disabled_reason_key`, on a command, check, toggle or identified labelled group row): the Uninstall row of a local
  * version run from source. One rule for both, which differ only in how the
  * condition is evaluated.
  *
@@ -21,7 +21,7 @@
  *   1. Every declaration is one of the two values, on a row whose platforms
  *      leave some platform out; a hidden row has no reason_key; a greyed row
  *      has an i18n label and a reason_key; a disabled_reason_key sits on a
- *      command row or an identified group with an i18n label and the disabled_when that greys it
+ *      command/check/toggle row or an identified group with an i18n label and the disabled_when that greys it
  *      (the generator refuses the same).
  *   2. Every greyed row's reason opens with a short head in every locale, so
  *      the stand-in label stays narrow on every tray.
@@ -71,9 +71,9 @@ function rowErrors(where, row) {
 	if (row.disabled_reason_key !== undefined) {
 		if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
 			errors.push(`${where}: disabled_reason_key must name a locale key.`);
-		if (row.type !== 'command' && row.type !== 'check' && row.type !== 'group')
+		if (!['command', 'check', 'toggle', 'group'].includes(row.type))
 			errors.push(
-				`${where}: disabled_reason_key is read on command/check rows or identified labelled groups.`
+				`${where}: disabled_reason_key is read on command/check/toggle rows or identified labelled groups.`
 			);
 		if (
 			row.type === 'group' &&
@@ -125,8 +125,9 @@ function rowErrors(where, row) {
 	assert.equal(rowErrors('f', { ...base, unavailable: 'greyed' }).length, 1);
 	const drawn = { type: 'command', id: 'y', i18n: 'menu.y', disabled_when: ['installed_build'] };
 	assert.deepEqual(rowErrors('f', { ...drawn, disabled_reason_key: 'r' }), []);
+	assert.deepEqual(rowErrors('f', { ...drawn, type: 'toggle', disabled_reason_key: 'r' }), []);
 	assert.equal(rowErrors('f', { ...drawn, disabled_reason_key: '' }).length, 1);
-	assert.equal(rowErrors('f', { ...drawn, type: 'toggle', disabled_reason_key: 'r' }).length, 1);
+	assert.equal(rowErrors('f', { ...drawn, type: 'label', disabled_reason_key: 'r' }).length, 1);
 	assert.equal(
 		rowErrors('f', { ...drawn, disabled_when: undefined, disabled_reason_key: 'r' }).length,
 		1
@@ -151,10 +152,13 @@ function rowErrors(where, row) {
 	};
 	assert.equal(classifyMenuRow(check, 'startup'), 'unclassified');
 	assert.deepEqual(rowErrors('startup', check), []);
+	const toggle = { ...check, type: 'toggle', category: 'LLM' };
+	assert.equal(classifyMenuRow(toggle, 'startup'), 'unclassified');
+	assert.deepEqual(rowErrors('startup', toggle), []);
 	for (const bad of [
 		{ ...check, disabled_when: undefined },
 		{ ...check, i18n: undefined },
-		{ ...check, type: 'toggle' },
+		{ ...check, type: 'label' },
 		{ ...check, disabled_reason_key: '' }
 	]) {
 		assert.throws(() => classifyMenuRow(bad, 'startup'));
@@ -369,7 +373,10 @@ console.log(
 		[{ unavailable: 'grey', reason_key: '' }, /greyed row needs its reason_key/],
 		[{ unavailable: 'grey', reason_key: 'r', i18n: '' }, /greyed row needs an i18n label/],
 		[{ disabled_reason_key: 'r', disabled_when: [] }, /needs the disabled_when/],
-		[{ disabled_reason_key: 'r', disabled_when: ['ready'], type: 'toggle' }, /command\/check rows/]
+		[
+			{ disabled_reason_key: 'r', disabled_when: ['ready'], type: 'label' },
+			/command\/check\/toggle rows/
+		]
 	])
 		assert.throws(() => availability.classifyMenuRow({ ...base, ...patch }, 'hand'), message);
 
