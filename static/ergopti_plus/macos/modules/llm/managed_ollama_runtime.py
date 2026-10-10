@@ -273,6 +273,10 @@ def runtime_request(
     )
 
 
+class MissingReleaseCatalogue(POLICY.RuntimeRefusal):
+    """Closed missing-metadata result from the original installer input read."""
+
+
 def inputs():
     if sys.platform != "darwin":
         raise POLICY.RuntimeRefusal("unavailable")
@@ -281,7 +285,10 @@ def inputs():
         raise POLICY.RuntimeRefusal("unavailable")
     host = "macos-" + architecture
     contract_bytes = (SHARED / "modules/llm/managed_ollama_runtime.json").read_bytes()
-    catalogue_bytes = (SHARED / "modules/llm/managed_ollama_release.json").read_bytes()
+    try:
+        catalogue_bytes = (SHARED / "modules/llm/managed_ollama_release.json").read_bytes()
+    except FileNotFoundError as error:
+        raise MissingReleaseCatalogue("missing-catalogue") from error
     contract, asset = POLICY.select_asset(contract_bytes, catalogue_bytes, host)
     return contract_bytes, catalogue_bytes, host, contract, asset
 
@@ -551,6 +558,9 @@ if __name__ == "__main__":
                 deadline,
             )
         print(answer)
+    except MissingReleaseCatalogue:
+        print("OLLAMA_MANAGED_CATALOGUE_MISSING", file=sys.stderr)
+        raise SystemExit(78)
     except (
         POLICY.RuntimeRefusal,
         BOOTSTRAP.BootstrapFailure,
