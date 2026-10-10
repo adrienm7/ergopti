@@ -14,7 +14,9 @@ final class LeaseDiagnosticNextObservationTests: XCTestCase {
 	}
 
 	private func fixture(_ body: (URL) throws -> Void) throws {
-		let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+		let nativeRoot = try XCTUnwrap(Darwin.realpath(FileManager.default.temporaryDirectory.path, nil))
+		defer { Darwin.free(nativeRoot) }
+		let directory = URL(fileURLWithPath: String(cString: nativeRoot), isDirectory: true)
 			.appendingPathComponent("lease-next-" + UUID().uuidString, isDirectory: true)
 		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
 			attributes: [.posixPermissions: NSNumber(value: 0o700)])

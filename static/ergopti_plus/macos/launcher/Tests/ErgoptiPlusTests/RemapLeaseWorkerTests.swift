@@ -7082,7 +7082,9 @@ extension KarabinerLeaseWorkerTests {
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
 extension KarabinerLeaseWorkerTests {
 	private func withDiagnosticDirectory(_ body: (URL, URL) throws -> Void) throws {
-		let parent = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+		let nativeRoot = try XCTUnwrap(Darwin.realpath(FileManager.default.temporaryDirectory.path, nil))
+		defer { Darwin.free(nativeRoot) }
+		let parent = URL(fileURLWithPath: String(cString: nativeRoot), isDirectory: true)
 			.appendingPathComponent("lease-store-test-" + UUID().uuidString, isDirectory: true)
 		try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false,
 			attributes: [.posixPermissions: 0o700])

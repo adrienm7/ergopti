@@ -61,8 +61,12 @@ struct RemapLeaseDiagnosticStore {
 	private func sameIdentity(_ left: stat, _ right: stat, includeContentMetadata: Bool) -> Bool {
 		guard left.st_dev == right.st_dev, left.st_ino == right.st_ino,
 			left.st_mode == right.st_mode, left.st_uid == right.st_uid,
-			left.st_gid == right.st_gid, left.st_nlink == right.st_nlink
+			left.st_gid == right.st_gid
 		else { return false }
+		// Directory entry mutations may change nlink while retaining the same vnode.
+		if includeContentMetadata || (left.st_mode & S_IFMT) != S_IFDIR {
+			guard left.st_nlink == right.st_nlink else { return false }
+		}
 		if !includeContentMetadata { return true }
 		return left.st_size == right.st_size
 			&& left.st_mtimespec.tv_sec == right.st_mtimespec.tv_sec

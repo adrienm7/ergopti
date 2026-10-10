@@ -3633,8 +3633,18 @@ and restoration/debt assertions remain mandatory.
   incomplete probe. Composed receiving preserves format461 and virtual E2E101;
   units19,412/11 and JS405/3 retain exactly the previous failure names. The Swift
   source guard passes; all19 original pipeline findings remain unchanged.
-  Native execution, production retention and lease cause remain
-  unqualified. Native installed, reload and physical qualification remain unrun.
+  Manual run38021918215 at2e148b05 completes with a failed overall verdict;
+  the native probe and its strict outcome check pass. It observes an ancestor
+  alias from Foundation's temporary-root normalization, while a fresh URL from
+  native realpath opens correctly. Creating/removing an owned entry changes
+  directory link count despite unchanged immutable identity. A reviewed fix
+  preserves all regular-file and strict-directory link checks, excluding only
+  mutable counts from non-strict directory identity cuts. Two trusted fixture
+  roots use native realpath; all146 worker and19 observer test bodies and
+  assertions remain unchanged. The native job executes archive24/1 plus one
+  separate SDK control; it does not execute these165 cases or production
+  retention/next-record APIs. Final corrected receiving remains pending.
+  The user lease exit73 cause, installed reload and physical input stay unproved.
   TODO31 and transverse items16/38 remain open.
   About 30-40 agent-days plus maintainer
   hardware time.

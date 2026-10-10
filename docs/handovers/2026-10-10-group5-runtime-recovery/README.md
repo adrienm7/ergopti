@@ -95,3 +95,29 @@ gate is still failed. The four-path source-only patch applies to current Dev
 without the unintegrated native-owner chain; its received postimages differ from
 the feature branch. Independent source review preserves the original upload and
 budgets. Native compilation, operation and budget fit remain unrun.
+
+## Diagnostic store identity correction
+
+Manual run38021918215 tests exact source2e148b057967c3774f9b659ab15105923a198732
+and finishes with an overall failure. The native admission probe and its strict
+final outcome check pass. Its closed observation proves that Foundation's
+temporary-root normalization preserves an ancestor alias rejected by the native
+open, whereas a fresh URL from Darwin realpath preserves the admitted path.
+Directory link count changes2→3→2 across owned creation/removal while immutable
+identity remains equal. No personal or corporate fields enter this observation.
+
+The three-path correction preserves device, inode, mode, owner and group checks.
+It preserves link-count equality for every regular-file identity cut and every
+strict directory cut; only non-strict directory identity ignores mutable link
+count. The two trusted fixture-root constructors use native realpath and a fresh
+URL. Deliberate alias refusals remain untouched. Independent exact forward and
+inverse review preserves all146 worker and19 observer method bodies and every
+original assertion. The frozen source-policy control changes5/2 to7/0; this is
+source analysis, not Swift or native execution.
+
+The completed native job runs archive24 passed/1 failed of25 cases plus one
+separate passing SDK control. It does not run the worker/observer165 cases or
+canonical retention/next-record APIs. Packaging, installation and release jobs
+are skipped in the overall failed run; no release is published. Native receiving
+of the corrected store remains pending. This correction qualifies neither the
+user's watchdog exit73 cause nor physical input, readiness or retirement.
