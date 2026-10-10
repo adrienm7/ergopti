@@ -929,6 +929,148 @@ helpers.describe("HS-274 held modifier actual secure callback (wp3)", function()
 			assert_events(scenario, { { "modifier_press", 55 }, { "modifier_press", 55 }, { "modifier_hold", 55 } })
 		end)
 	end)
+
+	-- Frozen pending-release controls; no product implementation or native evidence.
+	local function with_pending_release_clock(body)
+		with_secure_callback(function(scenario, context)
+			local timer, clock = _G.hs.timer, 1000000000
+			local original_clock = timer.absoluteTime
+			timer.absoluteTime = function() return clock end
+			local ok, failure = xpcall(function()
+				body(scenario, context, function(ms) clock = ms * 1000000 end)
+			end, debug.traceback)
+			timer.absoluteTime = original_clock
+			if not ok then error(failure, 0) end
+		end)
+	end
+
+	for _, malformed in ipairs({
+		{ name = "unrelated held timestamp corruption", field = "modifier_down_at", value = "invalid" },
+		{ name = "unrelated marker corruption", field = "modifier_suppressed_releases", value = false },
+	}) do
+		helpers.it("(wp3-pending-release) " .. malformed.name, function()
+			with_pending_release_clock(function(scenario, context, at)
+				local keylogger = package.loaded["modules.keylogger.init"]
+				at(1000); scenario.flags_changed(55, { cmd = true })
+				scenario.state[malformed.field][54] = malformed.value
+				context.secure()
+				helpers.assert_eq(keylogger.context_allows_logging(), false)
+				helpers.assert_eq(keylogger.may_persist(), false)
+				at(3000); scenario.flags_changed(55, {})
+				helpers.assert_eq(#scenario.system_events, 1, "Pending release cannot credit excluded telemetry")
+				helpers.assert_eq(scenario.state[malformed.field][54], malformed.value,
+					"Observed release cannot repair unrelated malformed debt")
+				helpers.assert_eq(keylogger.context_allows_logging(), false)
+				helpers.assert_eq(keylogger.may_persist(), false)
+				-- Only this explicit fixture owner repairs its injected unrelated entry.
+				scenario.state[malformed.field][54] = nil
+				raw_ordinary_callback(scenario, context, true)
+				at(8000); scenario.flags_changed(55, { cmd = true })
+				at(9000); scenario.flags_changed(55, {})
+				local actual = {}
+				for _, event in ipairs(scenario.system_events) do
+					actual[#actual + 1] = { event.action, event.keycode, event.hold_ms }
+				end
+				helpers.assert_eq(actual, {
+					{ "modifier_press", 55 }, { "modifier_press", 55 }, { "modifier_hold", 55, 1000 },
+				}, "Known physical release before repair must not invert the fresh pair")
+			end)
+		end)
+	end
+
+	for _, refused in ipairs({
+		{ name = "invalid release flags preserve known held timestamp", key = 55, flags = { cmd = "invalid" } },
+		{ name = "unknown physical key preserves known held timestamp", key = 999, flags = {} },
+	}) do
+		helpers.it("(wp3-pending-release) " .. refused.name, function()
+			with_pending_release_clock(function(scenario, context, at)
+				local keylogger = package.loaded["modules.keylogger.init"]
+				at(1000); scenario.flags_changed(55, { cmd = true })
+				local timestamp = scenario.state.modifier_down_at[55]
+				scenario.state.modifier_down_at[54] = "invalid"
+				context.secure()
+				at(3000); scenario.flags_changed(refused.key, refused.flags)
+				helpers.assert_eq(scenario.state.modifier_down_at[55], timestamp)
+				helpers.assert_eq(scenario.state.modifier_down_at[54], "invalid")
+				helpers.assert_eq(keylogger.context_allows_logging(), false)
+				helpers.assert_eq(keylogger.may_persist(), false)
+				helpers.assert_eq(#scenario.system_events, 1)
+				scenario.state.modifier_down_at[54] = nil
+				raw_ordinary_callback(scenario, context, true)
+				scenario.flags_changed(55, {})
+				helpers.assert_eq(#scenario.system_events, 1, "Refusal retains the genuine crossing release debt")
+			end)
+		end)
+	end
+
+	-- Independent hostile native-getter port; no product callback or source rewritten.
+	helpers.it("(wp3-pending-release) native getter owner replacement preserves pending debt without foreign equality", function()
+		with_pending_release_clock(function(scenario, context, at)
+			local keylogger = package.loaded["modules.keylogger.init"]
+			at(1000); scenario.flags_changed(55, { cmd = true })
+			local held, suppressed = scenario.state.modifier_down_at, scenario.state.modifier_suppressed_releases
+			local timestamp = rawget(held, 55)
+			helpers.assert_eq(type(timestamp), "number")
+			rawset(held, 54, "invalid")
+			context.secure()
+			helpers.assert_eq(keylogger.context_allows_logging(), false)
+			local handler
+			for index = 1, 200 do
+				local name, value = debug.getupvalue(scenario.flags_changed, index)
+				if name == nil then break end
+				if name == "handle_key" then handler = value; break end
+			end
+			helpers.assert_eq(type(handler), "function", "Use the existing fixture's exact production event handler")
+			local equality_calls, getter_calls = 0, 0
+			local equality = function() equality_calls = equality_calls + 1; return true end
+			local held_meta, suppressed_meta = { __eq = equality }, { __eq = equality }
+			local foreign_held = setmetatable({ [55] = 42, [54] = "foreign" }, held_meta)
+			local foreign_suppressed = setmetatable({ [54] = false }, suppressed_meta)
+			local event = {
+				getType = function() return _G.hs.eventtap.event.types.flagsChanged end,
+				getKeyCode = function() return 55 end,
+				getProperty = function() return 0 end,
+				getFlags = function()
+					getter_calls = getter_calls + 1
+					scenario.state.modifier_down_at = foreign_held
+					scenario.state.modifier_suppressed_releases = foreign_suppressed
+					return {}
+				end,
+			}
+			local called, failure = xpcall(function()
+				at(3000); handler(event)
+				-- Old conservative omission can refuse before reading any getter.
+				-- It is safe but does not qualify the replacement-getter observation.
+				print("WP3_OWNER_GETTER_CALLBACK_OBSERVED " .. getter_calls)
+				helpers.assert_true(getter_calls == 0 or getter_calls == 1)
+				helpers.assert_eq(equality_calls, 0, "Foreign owner equality cannot be called for ownership proof")
+				helpers.assert_eq(rawget(held, 55), timestamp, "Foreign replacement cannot cancel captured owner's interval")
+				helpers.assert_eq(rawget(held, 54), "invalid")
+				helpers.assert_eq(#scenario.system_events, 1)
+				helpers.assert_eq(keylogger.context_allows_logging(), false)
+				helpers.assert_eq(keylogger.may_persist(), false)
+				helpers.assert_eq(rawget(foreign_held, 55), 42)
+				helpers.assert_eq(rawget(foreign_held, 54), "foreign")
+				helpers.assert_eq(rawget(foreign_suppressed, 54), false)
+				helpers.assert_true(rawequal(getmetatable(foreign_held), held_meta))
+				helpers.assert_true(rawequal(getmetatable(foreign_suppressed), suppressed_meta))
+				local held_count, suppressed_count = 0, 0
+				for _ in next, foreign_held do held_count = held_count + 1 end
+				for _ in next, foreign_suppressed do suppressed_count = suppressed_count + 1 end
+				helpers.assert_eq(held_count, 2)
+				helpers.assert_eq(suppressed_count, 1)
+				if getter_calls == 1 then
+					helpers.assert_true(rawequal(scenario.state.modifier_down_at, foreign_held))
+					helpers.assert_true(rawequal(scenario.state.modifier_suppressed_releases, foreign_suppressed))
+				end
+			end, debug.traceback)
+			-- Only this fixture owner restores its injected state; no product repair proof.
+			scenario.state.modifier_down_at, scenario.state.modifier_suppressed_releases = held, suppressed
+			rawset(held, 55, timestamp); rawset(held, 54, nil)
+			if not called then error(failure, 0) end
+		end)
+	end)
+
 end)
 
 -- Frozen independent policy vectors; transcribed from EXPECTATIONS-BEFORE.json.

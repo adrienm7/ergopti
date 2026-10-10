@@ -4108,6 +4108,27 @@ whole configuration atomicity and
 other writers remain unqualified; no lease73 cause or complete privacy proof is
 claimed. No owned producer is enabled and no TODO item is removed.
 
+WP3 pending-denial receiving now preserves a proven release of a different,
+valid held modifier while an unrelated malformed entry keeps settlement denied.
+Only a known modifier with an empty, plain physical flag set can retire its
+exact retained timestamp; nonempty flags, malformed values, unknown keys and
+replaced owners remain conservative. Raw identity checks reject reentrant
+native-getter replacement without invoking foreign equality. This emits no
+press or hold during denial and does not clear unrelated debt or admit logging.
+Actual receiving passes all 122 cases; omitting the correction reproduces the
+two frozen fresh-1000ms failures (120 passed), and the rejected equality-based
+proposal fails the separately frozen getter invariant (121 passed). All 117
+original cases pass in their unchanged relative order. The corrected source
+actually observes the getter callback; the old conservative omission does not.
+Selected verification passes formatting (466 files), strict conventions,
+101 macOS E2E cases with one original skip, and all 19,735 macOS Lua unit
+cases across 1644 modules. Required JS remains RED at 408 passed and one
+failed: the unchanged shared Layout whole-dispatch receiver under G1 custody.
+The overall required verdict remains failed; native execution remains zero.
+Native event-tap/AX delivery, other-held nonempty flag release, installed capture,
+whole configuration policy and device acceptance remain unqualified. WP3/item31
+and the initial PONG/READY/exit73 cause remain open; no TODO item is removed.
+
 WP3 remains partial. An explicitly initialized, dormant physical-capture session
 owner now composes the real accounting policy, delivery receiver and transport.
 It verifies the caller's pinned executable requirement asynchronously, waits for

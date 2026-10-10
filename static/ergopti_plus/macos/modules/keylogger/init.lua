@@ -675,13 +675,39 @@ local function handle_key(event_obj)
 			return
 		end
 
-		-- Refused settlement retains malformed debt until its actual owner retries.
-		if _modifier_context_pending then return end
+		-- Pending denial must not lose a proven release of an unrelated valid hold.
+		-- An empty physical flag set proves release without guessing a side from
+		-- aggregate flags. Nonempty or malformed flags retain the original debt.
+		local modifier_transition = evt_type == hs.eventtap.event.types.flagsChanged
+		if _modifier_context_pending then
+			if modifier_transition then
+				local keycode = event_obj:getKeyCode()
+				local held, suppressed = CoreState.modifier_down_at, CoreState.modifier_suppressed_releases
+				if MODIFIER_KEYCODES[keycode] and type(held) == "table" and type(suppressed) == "table"
+					and getmetatable(held) == nil and getmetatable(suppressed) == nil then
+					local down_at = rawget(held, keycode)
+					if type(down_at) == "number" and down_at >= 0 and down_at < math.huge
+						and down_at == down_at and rawget(suppressed, keycode) == nil then
+						local flags = event_obj:getFlags()
+						-- Getter callbacks can replace the owner; mutate only the exact
+						-- still-pending plain tables and value that admitted this read.
+						if type(flags) == "table" and getmetatable(flags) == nil and next(flags) == nil
+							and _modifier_context_pending == true
+							and rawequal(CoreState.modifier_down_at, held) and rawequal(CoreState.modifier_suppressed_releases, suppressed)
+							and getmetatable(held) == nil and getmetatable(suppressed) == nil
+							and rawget(held, keycode) == down_at and rawget(suppressed, keycode) == nil then
+							rawset(held, keycode, nil)
+						end
+					end
+				end
+			end
+			return
+		end
 
 		-- A known physical crossing release must retire its marker even while
 		-- pause/privacy excludes telemetry. It emits no press or hold and cannot
 		-- borrow a timestamp from the source that observed its original press.
-		if evt_type == hs.eventtap.event.types.flagsChanged then
+		if modifier_transition then
 			local keycode = event_obj:getKeyCode()
 			if CoreState.modifier_suppressed_releases[keycode] then
 				CoreState.modifier_suppressed_releases[keycode] = nil

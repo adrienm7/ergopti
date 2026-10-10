@@ -342,3 +342,44 @@ AFTER19/0 requirements. They model Swift transcripts/exit files and a declared
 foreign-UID port; no actual Swift child or hardware ran. Shared workflow
 adoption still preserves current owners and requires exact final 146+19 source
 binding before a native dispatch.
+
+## Pending privacy debt: observed unrelated modifier release
+
+The keylogger keeps denied accounting when a different modifier entry is
+malformed, but now retires a valid observed release with an empty, plain native
+flag table. It retains the same current owner maps and timestamp across the
+getter, compares them with raw identity, and mutates only that timestamp.
+Unrelated malformed debt, suppression, logging denial and all original privacy
+and source-admission policies stay intact. Other held modifiers yield nonempty
+flags and remain conservatively denied; this is a bounded software correction.
+
+Four independently frozen controls retain the original 117-case ordered
+subsequence. Actual original-source receiving gives 119 passed and two genuine
+fresh-1000ms assertion failures. Its erroneous append-after-117 metadata remains
+unchanged beside the independent correction: those four cases occupy zero-based
+positions 90–93. A separately frozen hostile-getter case occupies position 94.
+Actual approved-source receiving passes 122/0 with getter observation 1; the
+whole production omission gives 120/2 with getter observation 0 (replacement
+scenario unobserved). The rejected equality-based proposal gives 121/1 with
+observation 1 and the exact foreign-equality invariant failure. All original
+117 cases pass in every variant. The approved source/test bytes return after
+each variant; raw output, statuses, counts, source hashes and child-retirement
+receipts are retained outside the checkout in
+`/workspace/ergopti-group5-work/wp3-pending-release-receiving`.
+
+The real consumer and registered secure callback use modeled native AX/event
+ports. This does not qualify native event-tap delivery, physical acceptance,
+other-held nonempty flags, complete privacy/configuration policy, or installed
+capture, and does not establish the initial PONG/READY/exit73 cause. The prior
+234-path gate retains its shared Layout-receiver JS failure under G1 custody;
+this tranche does not change that proof or native165 shared workflow paths.
+Selected verification passes formatting for 466 files, strict conventions,
+all 101 macOS E2E cases with one original driver/host skip, and 19,735 macOS
+Lua unit cases across 1644 modules. Required JS executes on the unchanged
+production/test inputs and retains 408 passed and one failed: the unchanged
+Layout whole-dispatch receiver at test-menu-parity.cjs:4014 under G1 custody.
+Documentation counts were updated afterward and separately checked for
+format, conventions and diff integrity. The overall required verdict remains
+RED. All gate-frozen inputs, HEAD and index
+stay exact through the serial runs; the JS child owner reaps 90 adopted
+children with no pending child or rescue. Native execution remains 0.
