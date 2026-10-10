@@ -824,6 +824,7 @@ function M.consume(detail, opts)
 	local hit = physical_hit or contextual_match(detail, opts) or match(detail, opts.only_script == true)
 	if not hit or hit.held_back or _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
 	local generation = _dispatch_generation
+	local admission_reader, decision_reader = opts.admission, M.magic_editor_decision
 	if opts.defer(function()
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
 		if hit.physical then
@@ -831,15 +832,29 @@ function M.consume(detail, opts)
 			local source = physical_source_generation()
 			if source ~= hit.source_generation or not physical_current(hit) then return end
 		end
-		if hit.decision then
-			local admission = opts.admission()
-			local current = M.magic_editor_decision(admission)
-			if not MagicEditor.can_deliver(hit.decision, { source_generation = current.source_generation,
-				configuration_generation = _dispatch_generation, action = current.action,
-				master = admission.master, paused = admission.paused, inhibited = admission.inhibited }) then return end
+		local function contextual_current()
+			local function owner_current()
+				return _configuration_owner == nil and generation == _dispatch_generation
+					and opts.admission == admission_reader and M.magic_editor_decision == decision_reader
+			end
+			if not owner_current() then return false end
+			local called, admission = pcall(admission_reader)
+			if not called or type(admission) ~= "table" or not owner_current() then return false end
+			local resolved, current = pcall(decision_reader, admission)
+			if not resolved or type(current) ~= "table" or not owner_current() then return false end
+			-- Source resolution invokes native collaborators after the first gate read.
+			local reread, live = pcall(admission_reader)
+			if not reread or type(live) ~= "table" then return false end
+			return owner_current() and current.active == true
+				and MagicEditor.can_deliver(hit.decision, { source_generation = current.source_generation,
+					configuration_generation = _dispatch_generation, action = current.action,
+					master = live.master, paused = live.paused, inhibited = live.inhibited })
 		end
+		if hit.decision and not contextual_current() then return end
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
-		fire(hit, hit.physical and function() return physical_current(hit) end or nil)
+		-- Logging and lazy executor loading can reenter after the first live check.
+		fire(hit, hit.physical and function() return physical_current(hit) end
+			or hit.decision and contextual_current or nil)
 	end) ~= true then
 		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
 		return false, nil

@@ -1,0 +1,9 @@
+{
+	"schema": 1,
+	"scope": "SOURCE_RECOVERY_ONLY; native authority and qualification are not restored",
+	"archive": "source-recovery.tar.gz",
+	"bytes": 520878,
+	"sha256": "9b6319ddd1a923e2a90e55539cdbe0a420cecf617068087417fa995f1680f2df",
+	"inventory_sha256": "de7138ca1a02c795d9ded3130322f25ccb2fa70143a506c002b677fd876ed37c",
+	"members": 105
+}

@@ -91,6 +91,15 @@ class WireReceiving(unittest.TestCase):
         self.addCleanup(patch.stopall)
         patch.object(self.api.ENGINE, "_resolve_worker", return_value=str(self.peer)).start()
         patch.object(self.api.ENGINE.subprocess, "Popen", side_effect=spawn).start()
+        fixture_children = self.children
+
+        class RetainedPopen(original):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                fixture_children.append(self)
+
+        self.original_popen = original
+        patch.object(self.api.ENGINE, "_ROLE_POPEN", RetainedPopen, create=True).start()
         patch.dict(
             os.environ, ERGOPTI_PEER_RECEIPT=str(self.receipt), ERGOPTI_PEER_MODE="good"
         ).start()
@@ -219,6 +228,351 @@ class WireReceiving(unittest.TestCase):
             self.assertEqual(response.read(), b'{"status":"success"}\n')
         self.assertIsNotNone(self.children[0].returncode)
         self.assertFalse(response._complete)
+
+    def test_role_registers_before_selector_and_physically_closes_original_child(self):
+        retained = []
+        original_selector = self.api.ENGINE.selectors.DefaultSelector
+
+        def selector():
+            self.assertEqual(len(retained), 1)
+            self.assertIsNone(retained[0]._selector)
+            self.assertIsNone(retained[0]._process)
+            return original_selector()
+
+        def register(response):
+            retained.append(response)
+            return True
+
+        with patch.object(self.api.ENGINE.selectors, "DefaultSelector", side_effect=selector):
+            self.assertEqual(
+                self.api.discover(
+                    "/private/verified/ollama", "123", "456", 11434, 2, 1, register=register
+                ),
+                IDENTITY,
+            )
+        self.assertTrue(retained[0]._closed)
+        self.assertEqual(retained[0]._process.returncode, 0)
+        self.assertTrue(retained[0]._process.stdin.closed)
+        self.assertTrue(retained[0]._process.stdout.closed)
+
+    def test_registration_refusal_acquires_no_selector_or_process(self):
+        retained = []
+
+        def register(response):
+            retained.append(response)
+            return False
+
+        with patch.object(self.api.ENGINE.selectors, "DefaultSelector") as selector:
+            with self.assertRaises(self.api.ENGINE.NativeHTTPError):
+                self.api.discover(
+                    "/private/verified/ollama", "123", "456", 11434, 2, 1, register=register
+                )
+            selector.assert_not_called()
+        self.assertEqual(len(retained), 1)
+        self.assertTrue(retained[0]._closed)
+        self.assertEqual(self.children, [])
+
+    def test_expired_original_absolute_deadline_never_acquires_native_child(self):
+        retained = []
+        with patch.object(self.api.ENGINE.selectors, "DefaultSelector") as selector:
+            with self.assertRaises(self.api.ENGINE.NativeHTTPError) as raised:
+                self.api.discover(
+                    "/private/verified/ollama",
+                    "123",
+                    "456",
+                    11434,
+                    2,
+                    1,
+                    register=lambda value: retained.append(value) is None,
+                    absolute_deadline=1.0,
+                )
+            selector.assert_not_called()
+        self.assertEqual(raised.exception.reason, "deadline")
+        self.assertEqual(self.children, [])
+        self.assertTrue(retained[0]._closed)
+
+    def test_original_progress_refusal_retains_exact_exception_before_acquisition(self):
+        primary = RuntimeError("independent cancellation identity")
+        retained = []
+
+        def progress():
+            raise primary
+
+        with patch.object(self.api.ENGINE.selectors, "DefaultSelector") as selector:
+            with self.assertRaises(RuntimeError) as raised:
+                self.api.discover(
+                    "/private/verified/ollama",
+                    "123",
+                    "456",
+                    11434,
+                    2,
+                    1,
+                    register=lambda value: retained.append(value) is None,
+                    absolute_deadline=1000000000000.0,
+                    progress=progress,
+                )
+            selector.assert_not_called()
+        self.assertIs(raised.exception, primary)
+        self.assertEqual(self.children, [])
+        self.assertTrue(retained[0]._closed)
+
+    def test_registration_close_reentry_never_acquires_a_successor_child(self):
+        retained = []
+
+        def register(response):
+            retained.append(response)
+            response.close()
+            return True
+
+        try:
+            with patch.object(
+                self.api.ENGINE.selectors,
+                "DefaultSelector",
+                wraps=self.api.ENGINE.selectors.DefaultSelector,
+            ) as selector:
+                with self.assertRaises(self.api.ENGINE.NativeHTTPError):
+                    self.api.discover(
+                        "/private/verified/ollama", "123", "456", 11434, 2, 1, register=register
+                    )
+                selector.assert_not_called()
+            self.assertEqual(len(retained), 1)
+            self.assertTrue(retained[0]._closed)
+            self.assertIsNone(retained[0]._selector)
+            self.assertIsNone(retained[0]._process)
+            self.assertEqual(self.children, [])
+        finally:
+            # The exact no-fence mutant can acquire after our close callback.
+            # Cleanup uses only these fixture-owned resources; no retry against
+            # an uncertain production close or guessed child identity occurs.
+            for response in retained:
+                if response._selector is not None:
+                    response._selector.close()
+                process = response._process
+                if process is not None:
+                    if process.poll() is None:
+                        process.kill()
+                    process.wait()
+                    for stream in (process.stdin, process.stdout):
+                        if stream is not None and not stream.closed:
+                            stream.close()
+
+    def test_progress_close_return_refuses_before_selector_or_child(self):
+        retained = []
+
+        def progress():
+            retained[0].close()
+
+        with patch.object(self.api.ENGINE.selectors, "DefaultSelector") as selector:
+            with self.assertRaises(self.api.ENGINE.NativeHTTPError) as raised:
+                self.api.discover(
+                    "/private/verified/ollama",
+                    "123",
+                    "456",
+                    11434,
+                    2,
+                    1,
+                    register=lambda response: retained.append(response) is None,
+                    progress=progress,
+                )
+            selector.assert_not_called()
+        self.assertEqual(raised.exception.reason, "protocol")
+        self.assertTrue(retained[0]._closed)
+        self.assertIsNone(retained[0]._selector)
+        self.assertIsNone(retained[0]._process)
+        self.assertEqual(self.children, [])
+
+    def test_resolution_source_withdrawal_refuses_before_child(self):
+        retained, selectors = [], []
+        primary = RuntimeError("independent post-resolution source withdrawal")
+        state = {"withdrawn": False}
+        original_selector = self.api.ENGINE.selectors.DefaultSelector
+
+        def selector():
+            owned = original_selector()
+            selectors.append(owned)
+            return owned
+
+        def resolve():
+            state["withdrawn"] = True
+            return str(self.peer)
+
+        def progress():
+            if state["withdrawn"]:
+                raise primary
+
+        with patch.object(self.api.ENGINE, "_resolve_worker", side_effect=resolve):
+            with patch.object(self.api.ENGINE.selectors, "DefaultSelector", side_effect=selector):
+                with self.assertRaises(RuntimeError) as raised:
+                    self.api.discover(
+                        "/private/verified/ollama",
+                        "123",
+                        "456",
+                        11434,
+                        2,
+                        1,
+                        register=lambda response: retained.append(response) is None,
+                        progress=progress,
+                    )
+        self.assertIs(raised.exception, primary)
+        self.assertTrue(state["withdrawn"])
+        self.assertEqual(len(selectors), 1)
+        self.assertIs(retained[0]._selector, selectors[0])
+        self.assertIsNone(selectors[0].get_map())
+        self.assertTrue(retained[0]._closed)
+        self.assertIsNone(retained[0]._process)
+        self.assertEqual(self.children, [])
+
+    def test_post_resolution_progress_close_refuses_successor_process(self):
+        retained = []
+        state = {"resolved": False}
+
+        def resolve():
+            state["resolved"] = True
+            return str(self.peer)
+
+        def progress():
+            if state["resolved"]:
+                retained[0].close()
+
+        with patch.object(self.api.ENGINE, "_resolve_worker", side_effect=resolve):
+            with self.assertRaises(self.api.ENGINE.NativeHTTPError) as raised:
+                self.api.discover(
+                    "/private/verified/ollama",
+                    "123",
+                    "456",
+                    11434,
+                    2,
+                    1,
+                    register=lambda response: retained.append(response) is None,
+                    progress=progress,
+                )
+        self.assertEqual(raised.exception.reason, "protocol")
+        self.assertTrue(retained[0]._closed)
+        self.assertIsNone(retained[0]._selector.get_map())
+        self.assertIsNone(retained[0]._process)
+        self.assertEqual(self.children, [])
+
+    def test_real_child_then_constructor_error_retains_and_reaps_exact_child(self):
+        retained, created = [], []
+        primary = RuntimeError("independent after-real-child construction failure")
+        original = self.original_popen
+        fixture_children = self.children
+
+        class InterruptedPopen(original):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                created.append(self)
+                fixture_children.append(self)
+                self.assert_retained = retained[0]._process is self
+                raise primary
+
+        with patch.object(self.api.ENGINE, "_ROLE_POPEN", InterruptedPopen):
+            with self.assertRaises(RuntimeError) as raised:
+                self.api.discover(
+                    "/private/verified/ollama",
+                    "123",
+                    "456",
+                    11434,
+                    2,
+                    1,
+                    register=lambda response: retained.append(response) is None,
+                )
+        self.assertIs(raised.exception, primary)
+        self.assertEqual(len(created), 1)
+        self.assertTrue(created[0].assert_retained)
+        self.assertIs(retained[0]._process, created[0])
+        self.assertTrue(created[0]._child_created)
+        self.assertIsNotNone(created[0].poll())
+        self.assertEqual(created[0].wait(), created[0].returncode)
+        self.assertTrue(created[0].stdin.closed)
+        self.assertTrue(created[0].stdout.closed)
+        self.assertTrue(retained[0]._closed)
+
+    def test_incomplete_constructor_without_child_retains_unknown_debt_and_primary(self):
+        retained, allocated = [], []
+        primary = RuntimeError("independent pre-child construction failure")
+        original = self.original_popen
+
+        class IncompletePopen(original):
+            def __init__(self, *args, **kwargs):
+                allocated.append(self)
+                raise primary
+
+        with patch.object(self.api.ENGINE, "_ROLE_POPEN", IncompletePopen):
+            with self.assertRaises(RuntimeError) as raised:
+                self.api.discover(
+                    "/private/verified/ollama",
+                    "123",
+                    "456",
+                    11434,
+                    2,
+                    1,
+                    register=lambda response: retained.append(response) is None,
+                )
+        self.assertIs(raised.exception, primary)
+        self.assertEqual(len(allocated), 1)
+        self.assertIs(retained[0]._process, allocated[0])
+        self.assertFalse(getattr(allocated[0], "_child_created", False))
+        self.assertFalse(retained[0]._closed)
+        self.assertIsNone(retained[0]._selector.get_map())
+        self.assertEqual(self.children, [])
+        with self.assertRaises(self.api.ENGINE.NativeHTTPError) as refused:
+            retained[0].close()
+        self.assertEqual(refused.exception.reason, "unavailable")
+        self.assertFalse(retained[0]._closed)
+
+    def test_pre_acquire_close_return_refuses_without_successor_child(self):
+        retained, calls = [], []
+
+        def pre_acquire():
+            calls.append(retained[0])
+            retained[0].close()
+
+        with self.assertRaises(self.api.ENGINE.NativeHTTPError) as raised:
+            self.api.discover(
+                "/private/verified/ollama",
+                "123",
+                "456",
+                11434,
+                2,
+                1,
+                register=lambda response: retained.append(response) is None,
+                pre_acquire=pre_acquire,
+            )
+        self.assertEqual(raised.exception.reason, "protocol")
+        self.assertEqual(calls, retained)
+        self.assertTrue(retained[0]._closed)
+        self.assertIsNone(retained[0]._selector.get_map())
+        self.assertIsNone(retained[0]._process)
+        self.assertEqual(self.children, [])
+
+    def test_pre_acquire_runs_once_before_real_child_not_during_reads(self):
+        retained, calls = [], []
+
+        def pre_acquire():
+            self.assertIsNone(retained[0]._process)
+            self.assertFalse(retained[0]._closed)
+            calls.append(retained[0])
+
+        self.assertEqual(
+            self.api.discover(
+                "/private/verified/ollama",
+                "123",
+                "456",
+                11434,
+                2,
+                1,
+                register=lambda response: retained.append(response) is None,
+                pre_acquire=pre_acquire,
+            ),
+            IDENTITY,
+        )
+        self.assertEqual(calls, retained)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(retained[0]._process.returncode, 0)
+        self.assertTrue(retained[0]._process.stdin.closed)
+        self.assertTrue(retained[0]._process.stdout.closed)
+        self.assertTrue(retained[0]._closed)
 
 
 if __name__ == "__main__":
