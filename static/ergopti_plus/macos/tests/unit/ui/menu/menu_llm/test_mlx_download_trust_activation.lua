@@ -12,6 +12,46 @@ local receiver = require("tests.support.mlx_truststore_fixture")
 local support = require("tests.support.mlx_download_fixture")
 
 helpers.describe("MLX downloader system trust admission", function()
+	helpers.it("admits the managed receiver before emitting the native downloader", function()
+		local calls = 0
+		local network = {
+			managed_http_prelude = function(tag)
+				helpers.assert_eq(tag, "MLX")
+				calls = calls + 1
+				return "# qualified managed MLX receiver", nil
+			end,
+			opaque_prelude = function() error("Managed MLX must not require opaque PAC admission") end,
+		}
+		support.with_fixture({network_env = network}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			helpers.assert_eq(calls, 1)
+			local launchers = 0
+			for path, body in pairs(fixture.controls.files) do
+				if path:match("%.sh$") then
+					launchers = launchers + 1
+					local runtime = assert(body:find("PYTHON_BIN=", 1, true))
+					local admission = assert(body:find("# qualified managed MLX receiver", 1, true))
+					helpers.assert_true(runtime < admission, "The receiver uses the pinned interpreter")
+				end
+			end
+			helpers.assert_eq(launchers, 1)
+		end)
+	end)
+
+	helpers.it("refuses missing managed admission without an opaque fallback or child", function()
+		local network = {
+			managed_http_prelude = function() return nil, "native receiver unavailable" end,
+			opaque_prelude = function() error("A managed refusal must not start an opaque client") end,
+		}
+		support.with_fixture({network_env = network}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), false)
+			support.assert_cancelled(fixture, "network_policy_missing")
+			helpers.assert_eq(#fixture.controls.tasks.launcher, 0)
+			helpers.assert_eq(fixture.records.server_starts, 0)
+			helpers.assert_eq(fixture.records.successes, 0)
+		end)
+	end)
+
 	helpers.it("captures the actual emitted source and exact published exit owner", function()
 		local packet = receiver.capture()
 		helpers.assert_type(packet.source, "string")

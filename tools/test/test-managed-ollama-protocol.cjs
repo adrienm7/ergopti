@@ -13,8 +13,10 @@ const cases = [
 	['tools/test/managed_ollama_pull_test.py', 8]
 ];
 if (process.platform !== 'win32') {
+	// Real files and CLI; modeled host admission grants no native macOS credit.
+	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 8]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 51]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 52]);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 16]);
 	cases.push(['tools/test/managed_ollama_sessions_test.py', 11]);
