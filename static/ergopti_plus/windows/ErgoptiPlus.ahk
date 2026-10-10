@@ -675,6 +675,8 @@ if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
 ; the safe menu, never with AutoHotkey's default icon and stock items.
 A_IconHidden := false
+; Read-only construction precedes the wizard; the genuine migration stays below it.
+ConfigSchemaPrepareSource(ConfigurationFile)
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
 		; Reproduce that hazard without an interactive window: the suspend watchdog

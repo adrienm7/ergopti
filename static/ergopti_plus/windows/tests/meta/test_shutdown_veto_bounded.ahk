@@ -163,3 +163,20 @@ _SVB_ForcedExitReleasesHeldInput() {
 
 Test("lifecycle: a forced exit still releases OS-held input (lifecycle-shutdown-veto-unbounded)",
 	_SVB_ForcedExitReleasesHeldInput)
+
+_SVB_PrivateConfigDebtRetentionIsSharedAndNarrow() {
+	Refusal := _StripFullLineComments(_DriverFuncBody("_LifecycleRefuseShutdown"))
+	Assert(Refusal != "", "the actual common shutdown refusal must remain readable")
+	AssertContains(Refusal, "_ConfigFullSavePublicationDebtNeedsRetention.Call()")
+	AssertContains(Refusal, "RequireNativeRetirement || NativeStopPending || ConfigIntentPending")
+	Assert(InStr(Refusal, "ConfigIntentPending :=") < InStr(Refusal, "_LifecycleShutdownVetoAttempts += 1"), "the actual common refusal consults genuine debt before any sibling may exhaust the budget")
+	Predicate := _StripFullLineComments(_DriverFuncBody("_ConfigFullSavePublicationDebtNeedsRetention"))
+	Assert(Predicate != "", "native mandatory intent retention must have an actual producer")
+	AssertContains(Predicate, "State.terminal_required_generation > State.settled_generation")
+	AssertContains(Predicate, "State.requested_generation > State.settled_generation")
+	AssertContains(Predicate, "_ConfigSchemaEntrySelected(State.bound_path)")
+	AssertContains(Predicate, "_ConfigPublicationHasRecoveryDebt(State.bound_path)")
+	AssertContains(Refusal, "Honored := LifecycleShutdownVetoHonored()", "the general shutdown ceiling remains the original policy")
+	AssertContains(Refusal, "return 0", "outside genuine retained mandatory debt the original forced escape remains")
+}
+Test("lifecycle: every sibling retains only genuine mandatory configuration publication debt (config-full-save-debt-shutdown)", _SVB_PrivateConfigDebtRetentionIsSharedAndNarrow)

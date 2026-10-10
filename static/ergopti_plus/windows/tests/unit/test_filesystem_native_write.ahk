@@ -159,3 +159,64 @@ _FSNW_AtomicMoveReceipt(Mode) {
 
 for Mode in ["missing-parent", "missing-source", "success", "invalid"]
 	Test("filesystem: atomic move receipt " . Mode . " (filesystem-native-write)", _FSNW_AtomicMoveReceipt.Bind(Mode))
+
+
+_FSNativeGuardRetainsActualStage(Status) {
+	Root := A_Temp . "\ergopti-final-admission-" . A_TickCount . "-" . Random(1, 999999)
+	DirCreate(Root)
+	Stage := Root . "\stage.tmp", Target := Root . "\target.toml"
+	try {
+		AssertTrue(FSWriteDurable(Stage, "candidate`n"))
+		AssertTrue(FSWriteDurable(Target, "original`n"))
+		PreviousCritical := A_IsCritical
+		AssertFalse(FSConfigAtomicMoveReplace(Stage, Target, &NativeError, () => Status))
+		AssertEqual(0, NativeError, "no Win32 receipt is fabricated when strict admission refuses before MoveFileExW")
+		AssertEqual(PreviousCritical, A_IsCritical)
+		AssertTrue(FSUtf8ExactMatches(Stage, "candidate`n"), "native refusal retains the actual owned stage")
+		AssertTrue(FSUtf8ExactMatches(Target, "original`n"), "native refusal retains complete actual target bytes")
+		AssertFalse(FSNativeAcknowledge(() => Status))
+		AssertEqual(PreviousCritical, A_IsCritical)
+	} finally DirDelete(Root, true)
+}
+Test("filesystem native guard: integer zero refuses actual rename and noop", _FSNativeGuardRetainsActualStage.Bind(0))
+Test("filesystem native guard: integer two refuses actual rename and noop", _FSNativeGuardRetainsActualStage.Bind(2))
+Test("filesystem native guard: string one refuses actual rename and noop", _FSNativeGuardRetainsActualStage.Bind("1"))
+
+_FSNativeGuardExceptionRestoresInterruption() {
+	OriginalCritical := A_IsCritical
+	Throwing() {
+		throw Error("independent native admission refusal")
+	}
+	try {
+		Critical(17)
+		AssertFalse(FSNativeAcknowledge(Throwing))
+		AssertEqual(17, A_IsCritical, "the actual noop span restores inherited interruption state")
+	} finally Critical(OriginalCritical)
+}
+Test("filesystem native guard: exceptions refuse and restore native interruption state", _FSNativeGuardExceptionRestoresInterruption)
+
+_FSNativeGuardActuallyPublishes() {
+	Root := A_Temp . "\ergopti-final-admission-positive-" . A_TickCount . "-" . Random(1, 999999)
+	DirCreate(Root)
+	Stage := Root . "\stage.tmp", Target := Root . "\target.toml"
+	Checks := 0, GuardCritical := 0
+	Guard() {
+		Checks += 1
+		GuardCritical := A_IsCritical
+		return 1
+	}
+	try {
+		AssertTrue(FSWriteDurable(Stage, "candidate`n"))
+		AssertTrue(FSWriteDurable(Target, "original`n"))
+		OriginalCritical := A_IsCritical
+		AssertTrue(FSConfigAtomicMoveReplace(Stage, Target, &NativeError, Guard))
+		AssertEqual(1, Checks)
+		AssertTrue(GuardCritical > 0, "the accepted guard runs in the same actual native rename span")
+		AssertEqual(OriginalCritical, A_IsCritical)
+		AssertFalse(FileExist(Stage))
+		AssertTrue(FSUtf8ExactMatches(Target, "candidate`n"))
+		AssertTrue(FSNativeAcknowledge(Guard))
+		AssertEqual(2, Checks)
+	} finally DirDelete(Root, true)
+}
+Test("filesystem native guard: actual acknowledged rename consumes the verified stage", _FSNativeGuardActuallyPublishes)

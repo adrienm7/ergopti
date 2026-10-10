@@ -1,8 +1,10 @@
 ﻿; tests/unit/test_hotstrings_scope.ahk
 
 ; Real files, admitted publication and recovery; only replacement launch is a port.
-_HotstringsScopeFixture(PersonalCount := 1) {
-	Fixture := _ScopeOwnerFixture()
+_HotstringsScopeFixture(PersonalCount := 1, InitialSuffix := "") {
+	Assert(InitialSuffix is String, "the scope cohort's extra current-schema preferences precede genuine native boot")
+	Source := '[category_enabled]`nhotstrings = true`n[hotstrings]`npreview_ai_enabled = true`n[hotstrings.personal.words]`nenabled = true`ntime_activation_seconds = 4`n[private]`ncredential = "keep"`n'
+	Fixture := _ScopeOwnerFixture(Source . InitialSuffix)
 	Fixture.overrides := Fixture.directory . "\hotstrings_config.toml"
 	Fixture.overrideSource := '[autocorrection]`ndelay = 3.5`nunknown = "keep"`n[autocorrection.words]`npriority = 5`n[__global__]`nword_delimiters = "!"`nunknown = "keep"`n[foreign]`ndelay = 9`n'
 	Fixture.personalSource := '[_meta]`ndelay = 2.5`ndescription = "Keep corpus"`nunknown = "keep"`n[_meta.sections.words]`nshow_tooltip = false`nunknown = "keep"`n[[words]]`n"abc" = "replacement"`n'
@@ -15,7 +17,6 @@ _HotstringsScopeFixture(PersonalCount := 1) {
 		Fixture.catalogue.Push({ Key: "personal:personal" . A_Index, Path: Path, IsPersonal: true, IsExtension: false })
 	}
 	Assert(FSWriteDurable(Fixture.overrides, Fixture.overrideSource))
-	Fixture.source := '[category_enabled]`nhotstrings = true`n[hotstrings]`npreview_ai_enabled = true`n[hotstrings.personal.words]`nenabled = true`ntime_activation_seconds = 4`n[private]`ncredential = "keep"`n'
 	Assert(FSWriteDurable(Fixture.path, Fixture.source))
 	Fixture.options["override_path"] := Fixture.overrides
 	Fixture.options["personal_path"] := Fixture.personal[1]
@@ -166,15 +167,18 @@ _HotstringsScopeRecoveryDebt() {
 	global _ConfigTransitionRetainedBarrier
 	PriorRetained := _ConfigTransitionRetainedBarrier
 	Fixture := _HotstringsScopeFixture()
-	Bundle := 0, RefuseMove := false
+	Bundle := 0, Handle := -1
 	Port := ConfigTransitionProductionPort()
-	Move(Source, Destination) {
-		return RefuseMove ? false : FSAtomicMoveReplace(Source, Destination)
-	}
-	Port["move_replace"] := Move
+	AssertTrue(ConfigTransitionProductionPort(Port), "this rollback subject retains the actual native port owner")
 	Launch(_Success, Borrowed, _Refused) {
 		Bundle := Borrowed
-		RefuseMove := true
+		AssertFalse(FSUtf8ExactMatches(Fixture.path, Fixture.source), "the actual native journal published before physical rollback denial")
+		; Share read/write but deny deletion: the real native replacement must fail.
+		Handle := DllCall("kernel32\CreateFileW", "Str", Fixture.path,
+			"UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3,
+			"UInt", 0x00000080, "Ptr", 0, "Ptr")
+		AssertTrue(Handle != -1, "the real Windows non-delete-sharing handle must be acquired")
+		AssertTrue(ConfigTransitionProductionPort(Port), "physical sharing denial does not mutate native callbacks")
 		return false
 	}
 	Fixture.options["port"] := Port
@@ -186,14 +190,25 @@ _HotstringsScopeRecoveryDebt() {
 			Assert(_ConfigWriteLeaseSelectOwner(Bundle, Path) is Object)
 			Assert(!_ConfigWriteLeaseTryAcquire(Path, "must remain blocked"))
 		}
-		RefuseMove := false
+		AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"), "the real sharing denial must close before native recovery")
+		Handle := -1
+		AssertTrue(ConfigTransitionProductionPort(Port), "the same genuine native port admits exact recovery")
 		Recovered := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
 		Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
 		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
 		AssertEqual(FSReadUtf8Exact(Fixture.overrides), Fixture.overrideSource)
 		AssertEqual(FSReadUtf8Exact(Fixture.personal[1]), Fixture.personalSource)
 	} finally {
+		if Handle != -1 {
+			AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"), "fixture failure must close its genuine native handle")
+			Handle := -1
+		}
 		try {
+			if Bundle is Object {
+				Resolution := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
+				AssertTrue(ConfigTransitionResultIs(Resolution, "absent") || ConfigTransitionResultIs(Resolution, "recovered_old"),
+					"fixture retirement resolves real native WAL debt before releasing its actual owner")
+			}
 			if Bundle is Object
 				_ConfigWriteTerminalRelease(Bundle)
 		} finally {
