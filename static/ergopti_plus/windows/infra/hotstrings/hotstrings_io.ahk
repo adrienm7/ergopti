@@ -142,7 +142,8 @@ _ParseGlobalKey(Path, KeyName) {
 ; otherwise the engine default ``HOTSTRINGS_DEFAULT_WORD_DELIMITERS``.
 HotstringsGetWordDelimiters() {
 		global _HotstringsWordDelimiters, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-		return (_HotstringsWordDelimiters != "") ? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+		return HotstringsTerminatorRecordString((_HotstringsWordDelimiters != "")
+				? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
 }
 
 ; Persist a new word-delimiter string and publish it to the live engine only
@@ -161,7 +162,8 @@ HotstringsSetWordDelimiters(Delimiters, WriterFn := 0, ReplaceFn := 0) {
 ; box, matching macOS).
 HotstringsGetConsumedDelimiters() {
 		global _HotstringsConsumedDelimiters, HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
-		return (_HotstringsConsumedDelimiters != "") ? _HotstringsConsumedDelimiters : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+		return HotstringsTerminatorRecordString((_HotstringsConsumedDelimiters != "")
+				? _HotstringsConsumedDelimiters : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS, true)
 }
 
 ; Persist a new consumed-delimiter string and publish the effective catalogue
@@ -284,10 +286,8 @@ _HotstringsPublishDelimiterCandidate(WordCandidate, ConsumedCandidate) {
 		global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 		_HotstringsWordDelimiters := WordCandidate
 		_HotstringsConsumedDelimiters := ConsumedCandidate
-		HSE_WORD_TERMINATORS := (WordCandidate != "")
-				? WordCandidate : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-		HSE_CONSUMED_DELIMITERS := (ConsumedCandidate != "")
-				? ConsumedCandidate : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+		HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
+		HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
 		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 				HSE_AdvanceRuntimeDecisionGeneration()
 		return 1
