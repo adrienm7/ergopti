@@ -12,8 +12,9 @@ local Features = require("infra.manifest_reader")
 local ModuleSource = require("module_source_identity")
 local ModuleDirectory = require("module_source_directory")
 local original_debug_info = debug.getinfo
+local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
- "modules/shortcuts/key_combinations.lua","platform/remap/tap_hold_manager.lua",ModuleDirectory.capture())
+ "modules/shortcuts/key_combinations.lua","platform/remap/tap_hold_manager.lua",module_directory)
 
 local original_default, original_find = Features.default_for, Features.find_entry_by_path
 local declarations = {}
@@ -230,7 +231,7 @@ function M.new(options)
 		local observe=type(manager)=="table" and rawget(manager,"managed_pair_options_current") or nil
 		local source=type(observe)=="function" and original_debug_info(observe,"S").source or nil
 		if options.files == nil and options.route == nil and configured.chords and type(observe)=="function"
-			and ModuleSource.same(source,manager_source) then
+			and ModuleSource.same(source,manager_source,module_directory) then
 			local captured, revision, fields, maps = state, generation, {}, {}
 			for name,value in pairs(configured) do
 				fields[name]=value
