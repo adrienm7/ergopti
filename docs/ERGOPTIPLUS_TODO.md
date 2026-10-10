@@ -3762,9 +3762,13 @@ The shared AutoHotkey keyboard identity rule now matches the existing Lua policy
   their source-fenced whole-list persistence owners. Restart, refusal and
   unowned-neighbor preservation have callable regression coverage. Changed
   lists normalize to inline TOML; standalone comments remain preserved.
-  Windows currently consumes native delimiter strings rather than custom
-  record lists; the missing record consumer/editor is an explicit PC
-  implementation step below, alongside native qualification.
+  Windows now consumes and edits the canonical record lists as well as native
+  delimiter strings. Commit `254b4c6770` adds boot admission, source-fenced
+  Add/Delete/toggle and displayed-owner validation. Twenty pure registered
+  cases and entrypoint compilation pass on Windows. Hosted CI `38018626491`
+  subsequently passes all 32 registered cases on source `cb5ad8f3d2`, including
+  the twelve WAL/modal controls. The overall AHK suite has five other failures;
+  actual menu/save/restart acceptance remains open, so this item stays partial.
 
 The measured-delay native fixture now isolates the real corpus metadata
 cache from the earlier resolution-cascade double and restores the exact
@@ -3785,8 +3789,8 @@ unknown nested fields in each admitted record and normalizes only its owned
 label/consume defaults. Untouched valid neighbors, standalone comments and
 foreign array-of-table siblings survive the actual preference writer. The same
 five cases fail against the original replay. Linux already merges untouched
-stored records; Windows manages delimiter strings in its existing override
-transaction instead of projecting custom record fields.
+stored records. The Windows record path is now implemented as described above;
+its native transaction qualification remains separate from these Lua receipts.
 
 The shared writer intentionally replaces a changed array-of-table list with an
 inline list. Its inline record comments normalize with that rewritten value;
@@ -3808,8 +3812,8 @@ the original planner and now pass through the real catalogue, preference lease
 and source-fenced writer, including publication refusal and explicit retry.
 The selected source gate passed 5,002 Linux unit cases and 176 E2E scenarios;
 strict conventions passed. The unchanged macOS repair-owner module passed its
-19 existing portable tests. Windows uses delimiter strings through its existing
-native override transaction; no custom-record migration was invented.
+19 existing portable tests. These earlier receipts cover the Lua changes;
+the later Windows record implementation still requires its native acceptance.
 Explicit cleanup and the reader's first-usable policy are unchanged. An otherwise
 valid duplicate retained after removal may become admitted on a later reload.
 Complete three-OS native qualification remains pending, so item 34 stays partial.

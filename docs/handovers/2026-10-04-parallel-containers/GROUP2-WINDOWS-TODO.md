@@ -40,11 +40,14 @@ item 22 remains out of scope.
 - [ ] Qualify the actual Windows delimiter-string owner first: handwritten
       `__global__.word_delimiters` and `consumed_delimiters` in
       `hotstrings_config.toml`, native Add/Delete/toggle, save and restart.
-      Windows currently has no `[[hotstrings.terminators]]` record consumer.
-- [ ] Implement the missing Windows custom-record consumer/editor for the shared
-      handwritten `[[hotstrings.terminators]]` contract before closing TODO34.
-      Keep native input in the Windows adapter and shared admission/list policy
-      centralized. Replay independently authored record lists through native
+      Keep this legacy path distinct from canonical record qualification below.
+- [ ] Qualify the Windows custom-record consumer/editor implemented in
+      `254b4c6770` for the shared handwritten `[[hotstrings.terminators]]`
+      contract. Hosted CI `38018626491` on `cb5ad8f3d2` passes all 32 registered
+      cases, including the twelve WAL/modal controls. The full AHK suite has
+      five other failures; actual menu/save/restart acceptance remains open.
+      Native input stays in the Windows adapter and shared admission/list policy
+      stays centralized. Replay independently authored record lists through native
       Add/Delete/toggle, save and restart; preserve unknown neighbors and metadata.
       Refused disk or runtime publication must restore the prior admitted
       definition/runtime and allow an acknowledged retry. Do not count native
