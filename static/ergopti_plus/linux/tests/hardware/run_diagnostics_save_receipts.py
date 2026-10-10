@@ -16,8 +16,9 @@ local function shared(path)
  local file = assert(io.open("../_shared/"..path, "rb"))
  local value = Json.decode(file:read("*a")); assert(file:close()); return value
 end
-local schema = shared("modules/diagnostics/schema.json")
-local rules = shared("modules/diagnostics/redaction.json")
+local config = require("healthcheck.snapshot").load_config(function(path) return "../_shared/"..path end)
+local schema = config.schema
+local rules = config.redaction
 local catalogue = shared("data/locales/en.json")
 local notice = assert(catalogue[schema.share_policy.notice_key])
 package.loaded["infra.i18n"] = {get=function(key)
