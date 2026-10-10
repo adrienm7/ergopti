@@ -1071,3 +1071,37 @@ _HTRD_RetiredOwner() {
 }
 Test("terminator-admission: equal bytes cannot replace the captured runtime owner identity",
 	_HTRD_WithDisplayed.Bind(_HTRD_RetiredOwner))
+
+
+_HTR_RootOwnerImage() {
+	for Prefix in ["", Chr(0xFEFF)] {
+		Source := Prefix . '_meta.schema_version = 7`nroot_owner = { keep = "exact", nested = { n = 9 } }`n' . _HTR_Source()
+		Before := TOML_ParseDocument(Source)
+		Plan := HotstringsTerminatorRecordPlan(Source, Map("mode", "upsert", "record",
+			Map("key", "section", "char", "§", "label", "Section", "consume", TOML_Bool(false))))
+		After := TOML_ParseDocument(Plan.Content)
+		AssertTrue(TOML_SameValue(Before["_meta"], After["_meta"]), "root schema metadata remains outside the new hotstrings parent")
+		AssertTrue(TOML_SameValue(Before["root_owner"], After["root_owner"]), "an independent root owner retains every typed leaf")
+		AssertTrue(TOML_SameValue(Before["private"], After["private"]))
+		AssertTrue(TOML_SameValue(Before["foreign"], After["foreign"]))
+		AssertEqual(3, After["hotstrings"]["terminators"].Length)
+		AssertEqual(Prefix == "" ? false : true, SubStr(Plan.Content, 1, 1) == Chr(0xFEFF))
+	}
+	Minimal := '[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true'
+	for Source in [Minimal, Minimal . '`n# retained final trivia'] {
+		Removed := HotstringsTerminatorRecordPlan(Source, Map("mode", "remove", "key", "currency"))
+		AssertEqual(0, TOML_ParseDocument(Removed.Content)["hotstrings"]["terminators"].Length,
+			"an empty retained image still admits one explicit empty parent")
+		if InStr(Source, "# retained final trivia")
+			AssertContains(Removed.Content, "# retained final trivia", "retained trivia is not discarded by parent insertion")
+	}
+	RootOnly := 'root_owner = { keep = "exact" }'
+	RootPlan := HotstringsTerminatorRecordPlan(RootOnly, Map("mode", "upsert", "record",
+		Map("key", "section", "char", "§", "label", "Section", "consume", TOML_Bool(false))))
+	RootAfter := TOML_ParseDocument(RootPlan.Content)
+	AssertTrue(TOML_SameValue(TOML_ParseDocument(RootOnly)["root_owner"], RootAfter["root_owner"]),
+		"a root-only image without a terminal newline retains its independent owner")
+	AssertEqual(1, RootAfter["hotstrings"]["terminators"].Length)
+
+}
+Test("terminator-records: a new parent preserves independent root owners and BOM", _HTR_RootOwnerImage)
