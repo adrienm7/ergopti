@@ -154,7 +154,15 @@ class ServeOwner:
     """
 
     def __init__(
-        self, port, timeout, idle_timeout, retirement_timeout, *, register, listener_event=False
+        self,
+        port,
+        timeout,
+        idle_timeout,
+        retirement_timeout,
+        *,
+        register,
+        listener_event=False,
+        log_directory=None,
     ):
         if (
             type(port) is not int
@@ -167,6 +175,14 @@ class ServeOwner:
             raise ServeRefusal("protocol")
         if type(listener_event) is not bool:
             raise ServeRefusal("protocol")
+        if log_directory is not None and (
+            type(log_directory) is not str
+            or not log_directory.startswith("/")
+            or "\0" in log_directory
+            or any(value in ("", ".", "..") for value in log_directory[1:].split("/"))
+        ):
+            raise ServeRefusal("protocol")
+        self._log_directory = log_directory
         self._listener_event = listener_event
         self.port, self.idle_timeout = port, idle_timeout
         self.retirement_timeout = retirement_timeout
@@ -323,6 +339,8 @@ class ServeOwner:
                 "host": "127.0.0.1:" + str(self.port),
                 **self.bootstrap.fields(),
             }
+            if self._log_directory is not None:
+                public["log_directory"] = self._log_directory
             if self._listener_event:
                 public["listener_event"] = True
 
@@ -566,7 +584,14 @@ class ServeOwner:
             if "stdout" in self.operation._eof and self.operation._retired is None:
                 raise ServeRefusal("protocol")
         status = self.operation._retired[0] if self.operation._retired is not None else 78
-        return status if self.retire(retirement_timeout) else 78
+        if not self.retire(retirement_timeout):
+            return 78
+        if self._log_directory is not None and self.operation.log_write_errno != 0:
+            # Known write failure is a business refusal, not unknown native debt.
+            # The original serve() exception path publishes failed RETIRED only
+            # after this original physical owner and namespace retirement joins.
+            raise ServeRefusal("logging")
+        return status
 
 
 def serve(
@@ -578,6 +603,7 @@ def serve(
     caller_nonce=None,
     acquire_readiness=False,
     owned_stdin=False,
+    log_directory=None,
 ):
     # The caller binding is public randomness, never the daemon session token.
     # Only this native owner may project its authenticated lifecycle to stdout.
@@ -620,6 +646,7 @@ def serve(
         retirement_timeout,
         register=lambda value: None,
         listener_event=acquire_readiness,
+        log_directory=log_directory,
     )
 
     def cancelled(signum, frame):
@@ -678,6 +705,7 @@ def main():
     parser.add_argument("--caller-nonce")
     parser.add_argument("--acquire-readiness", action="store_true")
     parser.add_argument("--owned-stdin", action="store_true")
+    parser.add_argument("--log-directory")
     arguments = parser.parse_args()
     if not 1024 <= arguments.port <= 65535 or any(
         not math.isfinite(value) or value <= 0
@@ -693,6 +721,7 @@ def main():
             caller_nonce=arguments.caller_nonce,
             acquire_readiness=arguments.acquire_readiness,
             owned_stdin=arguments.owned_stdin,
+            log_directory=arguments.log_directory,
         )
     except Exception:
         print("Managed Ollama daemon admission refused.", file=sys.stderr)
