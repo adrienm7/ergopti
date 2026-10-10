@@ -6,6 +6,34 @@ TODO36 and62 remain open. No item is removed; transversal16/38 and the deliberat
 exclusion of22 remain unchanged. This checkpoint preserves reviewed partial work
 and recoverable preparations. It does not claim that only device tests remain.
 
+## Integrated checkpoint and native TLS continuation
+
+The five source/checkpoint commits below are now integrated without squash in
+Dev `01955e89affc3674ff44e72b78db936a2a48d4fd`. Exact manual
+[38030504308](https://github.com/adrienm7/ergopti/actions/runs/38030504308) is
+terminal FAIL:3 successful,7 failed and7 skipped jobs. Core JS executes403
+passes/3 failures of406; the Hammerspoon stub executes17,957 passes/11 failures
+of17,968. Both architectures pass41 SDK,10 PAC-source and6 native producer
+controls. Both original14-case cohorts produce12 passing methods/2 failing
+methods. ARM observes two certificate reasons; Intel instead refuses in the
+fixture's initial shared read and observes no certificate reason. Do not carry
+the earlier run's Intel observations forward. Archive24/25 and the owned
+Automation deadline remain unresolved. Packaging, installation, E2E, tooltip
+and Release/Publish are actually skipped; Cold MLX passes. The owning lock was
+released after this terminal result. The feature remains for further code/CI
+work, not because any delivered commit is absent from Dev.
+
+The next source candidate explicitly selects SHA256 in the original private
+fixture leaf-signing command and observes only fixed native certificate codes
+on the original DEBUG certificate branch. Its strict complete-function inverse
+preserves the original whole-source hash and all397 original assertion lines.
+The unadmitted function and four source mutants still refuse. Full original and
+paired portable cohorts both pass52/52; original and pinned Linux live peers
+both pass3/3 with unchanged case identities and physically closed owners. The
+native signing algorithm, compiled DEBUG/release behavior and actual TLS cause
+remain unqualified. This is source adoption for subsequent native receiving;
+no primary certificate failure is claimed fixed.
+
 ## Current source and validation
 
 The previous partial delivery is already in `origin/dev` at
@@ -62,7 +90,7 @@ has not yet received native macOS qualification at this checkpoint.
 - TODO62: determine and repair the actual native TLS failure, then receive the
   original full-URL PAC/WPAD cases on both architectures. A leaf SHA256 pin is
   prepared, but the original leaf algorithm is unbound and its causal value is
-  unproved. It remains inactive.
+  unproved. The pin is now source-adopted and awaits native qualification.
 - TODO62: complete managed Ollama migration. Shared consent must be consumed by
   the real native commit; authenticated READY/RETIRED observations must join the
   Lua lifecycle, active pull/stream/warmup retirement and qualified native
@@ -102,10 +130,18 @@ temporary directory; refuse links, absolute paths and parent traversal.
 | `receiving-source-preparations.tar.gz` | Catalogue R5 and receiving, actual native CI receipts, inactive leaf digest pin and DEBUG native error-code proposal. R5 test bookkeeping is superseded by R6. |
 | `catalogue-r6-receiving.tar.gz`        | Canonical owned temporary-root test correction, independent review, three physically closed root receiving receipts and final local gate record.               |
 
+The additional `tls-code-inverse-receiving.tar.gz`,
+`tls-code-full52-receiving.tar.gz` and `tls-leaf-live3-receiving.tar.gz` preserve
+the reviewed exact inverse and actual portable receiving for the next source
+candidate. Their independent reviews and the integrated terminal result are
+retained beside the archives. `source-review.json` belongs to the original
+five-archive checkpoint; its manifest binding is historical, not a review of
+the additional archives.
+
 The DEBUG certificate-code proposal observes only fixed codes on the original
-certificate branch. It still needs exact inverse enrollment in historical
-source guards and actual Swift compilation before adoption. Neither it nor the
-leaf digest proposal repairs or proves the native trust cause. An archived patch
+certificate branch. Its exact inverse enrollment is now adopted after portable
+receiving; actual Swift compilation remains required. Neither it nor the leaf
+digest proposal repairs or proves the native trust cause. An archived patch
 is never integrated or qualified functionality. Recheck current preimages,
 independent review, missing validation and shared ownership before applying it.
 
