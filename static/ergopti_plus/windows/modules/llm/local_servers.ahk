@@ -481,6 +481,103 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		} finally Critical(PreviousCritical)
 	}
 
+	/** Builds detached display data and ordinary action receipts in one fenced read. */
+	CaptureView(Source) {
+		PreviousCritical := Critical("Off")
+		try return this._CaptureViewNonCritical(Source)
+		finally Critical(PreviousCritical)
+	}
+
+	_CaptureViewNonCritical(Source) {
+		if !HasMethod(this.Options.Get("entries_bound", 0), "Call")
+			throw TypeError("A local display view requires the native batch entry owner.")
+		if !this._Admitted()
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			Stamp := Map("view", this.ViewGeneration, "configuration", this.ConfigurationGeneration,
+				"models", this.ModelGeneration, "rescan", this.RescanGeneration,
+				"controller", this.Controller.Generation, "cache", this.Cache)
+		} finally Critical(PreviousCritical)
+		Entries := this._Call("entries_bound", this.Order, Source)
+		if !(Entries is Map) || Entries.Get("source", 0) != Source
+			return false
+		Targets := this._DisplayTargets(Entries["entries"])
+		Cache := Stamp["cache"], CacheCurrent := false
+		if Cache is Map {
+			CacheEntries := this._Call("entries_bound", this.Order, Cache["source"])
+			if CacheEntries is Map {
+				CacheTargets := this._DisplayTargets(CacheEntries["entries"])
+				CacheCurrent := Cache["configuration"] == Stamp["configuration"]
+				for Id in this.Order
+					if !this._SameTarget(Cache["targets"][Id], CacheTargets[Id])
+						CacheCurrent := false
+			}
+		}
+		Sweeping := this.Controller.IsSweeping()
+		Stale := !Sweeping && (!CacheCurrent || Cache["generation"] != Stamp["controller"] || this.Controller.IsStale())
+		Results := CacheCurrent ? this._CopyResults(Cache["results"]) : Map()
+		Receipts := Map(), Views := Map(), Detected := []
+		for Id in this.Order {
+			Verdict := Results.Get(Id, 0)
+			Models := Verdict is Map ? Verdict["models"].Clone() : []
+			if Verdict is Map && !(Verdict["status"] == "down")
+				Detected.Push(Id)
+			Receipt := {}
+			Receipts[Id] := Receipt
+			Views[ObjPtr(Receipt)] := Map("receipt", Receipt, "source", Source, "target", Targets[Id],
+				"view", Stamp["view"] + 1, "configuration", Stamp["configuration"],
+				"models_generation", Stamp["models"], "models", Models, "cache", CacheCurrent ? Cache : 0)
+		}
+		; No source permission is cached. Both origins remain fully checked after
+		; every yielding projection/copy, before the short identity-only claim.
+		if !this._Admitted() || !this._True("source_current", Source)
+				|| (CacheCurrent && !this._True("source_current", Cache["source"]))
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || A_IsSuspended || this.ViewGeneration != Stamp["view"]
+					|| this.ConfigurationGeneration != Stamp["configuration"] || this.ModelGeneration != Stamp["models"]
+					|| this.RescanGeneration != Stamp["rescan"] || this.Controller.Generation != Stamp["controller"]
+					|| this.Cache != Cache || this.Controller.IsSweeping() != Sweeping
+				return false
+			CurrentTargets := this._DisplayTargets(Entries["entries"])
+			for Id in this.Order
+				if !this._SameTarget(Targets[Id], CurrentTargets[Id])
+					return false
+			if Stale
+				return Map("stale", true)
+			this.ViewGeneration := Stamp["view"] + 1
+			this.Views := Views
+			return Map("stale", false, "source", Source, "entries", Entries, "receipts", Receipts,
+				"results", Results, "detected", Detected, "sweeping", Sweeping,
+				"view", this.ViewGeneration, "configuration", Stamp["configuration"], "models", Stamp["models"],
+				"cache", Cache, "rescan", Stamp["rescan"], "controller", Stamp["controller"])
+		} finally Critical(PreviousCritical)
+	}
+
+	_DisplayTargets(Entries) {
+		if !(Entries is Map) || Entries.Count != this.Order.Length
+			throw TypeError("The native display entry batch is incomplete.")
+		Targets := Map()
+		for Id in this.Order {
+			Entry := Entries.Get(Id, -1), Server := this.Servers[Id]
+			if Entry is Map {
+				if !(Entry.Get("Id", 0) is String) || !(Entry.Get("Provider", "") == Id)
+						|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
+						|| !(Entry.Get("Model", 0) is String)
+					throw TypeError("The native display entry is outside its provider.")
+				Targets[Id] := Map("id", Id, "entry_id", Entry["Id"],
+					"base_url", Entry["BaseUrl"] == "" ? Server["base_url"] : Entry["BaseUrl"], "token", Entry["Token"])
+			} else if (Entry is Integer) && Entry == 0 {
+				Fields := this.Pending.Get(Id, Map())
+				Targets[Id] := Map("id", Id, "entry_id", "", "base_url", Fields.Get("base_url", Server["base_url"]),
+					"token", Fields.Get("token", ""))
+			} else throw TypeError("The native display entry lacks a typed absence verdict.")
+		}
+		return Targets
+	}
+
 	/** Rechecks the exact private source, native target and ordered model view. */
 	IsCurrent(Receipt, Model := "") {
 		PreviousCritical := Critical("Off")

@@ -1343,6 +1343,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"source_current", ObjBindMethod(this, "Current"),
 			"entry", ObjBindMethod(this, "Entry"),
 			"entry_bound", ObjBindMethod(this, "EntryBound"),
+			"entries_bound", ObjBindMethod(this, "EntriesBound"),
 			"admit", ObjBindMethod(this, "Admit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
@@ -1509,6 +1510,40 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !this.Current(Receipt)
 			throw Error("The private API source authority changed during resolution.")
 		return Detached
+	}
+
+	/** Returns one detached provider batch fenced by the same originating source. */
+	EntriesBound(ProviderIds, Receipt) {
+		PreviousCritical := Critical("Off")
+		try {
+			global _LLM_Menu_ApiPrivateAuthorityGeneration
+			Held := this._Held(Receipt)
+			if !(Held is Map)
+				return false
+			if !(ProviderIds is Array) || ProviderIds.Length == 0
+				throw TypeError("Private API entry projection requires a provider batch.")
+			CapturedIds := ProviderIds.Clone()
+			Seen := Map()
+			for Id in CapturedIds {
+				if !(Id is String) || !Held["servers"].Has(Id) || Seen.Has(Id)
+					throw ValueError("Private API entry projection refuses an unknown or duplicate provider.")
+				Seen[Id] := true
+			}
+			Authority := _LLM_Menu_ApiPrivateAuthorityGeneration
+			if !this.Current(Receipt)
+				return false
+			Entries := Map()
+			for Id in CapturedIds {
+				Entry := this._EntryFrom(Held, Id)
+				Entries[Id] := Entry is Map ? LLM_Menu_DeepClone(Entry) : 0
+			}
+			Projection := Map("source", Receipt, "entries", Entries, "backend", Held["backend"],
+				"active_id", Held["active_id"], "menu_owner", Held["menu"], "authority", Authority)
+			if !this.Current(Receipt) || this._Held(Receipt) != Held
+					|| _LLM_Menu_ApiPrivateAuthorityGeneration != Authority
+				return false
+			return Projection
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Applies exact configured fields through the existing joint WAL and native lifecycle. */
