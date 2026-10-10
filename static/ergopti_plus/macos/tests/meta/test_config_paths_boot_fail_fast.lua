@@ -153,7 +153,15 @@ helpers.describe("root boot: config-path initialization is fail-fast", function(
 			"Logger.error(LOG, CONFIG_PATH_BOOT_FAILURE)")
 		local invisible = replace_plain(source,
 			"BootFatal.report(stage, detail, message)", "false")
-		local non_terminal = replace_plain(source, "os.exit(1)", "return")
+		local abort_at = assert(source:find(PRE_RUNTIME_ABORT, 1, true))
+		local config_at = assert(source:find('local config_paths       = require("infra.config_paths")', abort_at, true))
+		local abort_body = source:sub(abort_at, config_at - 1)
+		local _, exits = abort_body:gsub("os%.exit%(1%)", "")
+		helpers.assert_eq(exits, 1, "The exact pre-runtime abort owns one terminal exit")
+		local non_terminal = source:sub(1, abort_at - 1)
+			.. replace_plain(abort_body, "os.exit(1)", "return") .. source:sub(config_at)
+		helpers.assert_eq(non_terminal:sub(1, abort_at - 1), source:sub(1, abort_at - 1),
+			"The privacy refusal exit remains independent of the config-path mutant")
 		local commented_call = replace_plain(source, CONFIG_FAILURE_CALL,
 			"-- " .. CONFIG_FAILURE_CALL)
 		local block_commented_call = replace_plain(source, CONFIG_FAILURE_CALL,
