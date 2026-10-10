@@ -1,0 +1,63 @@
+{
+	"schema": 1,
+	"result": "ACK_SAVED_LINUX_LIVE3_NONREGRESSION_AND_EXACT_ONE_FLAG_SOURCE",
+	"actual_receipt_sha256": "4d31c33393ebbdb826ce8a7ca535b7d3dc645c1183e3e6a776f6df9fb136262a",
+	"actual_results_sha256": "b581edb3cc19a07d9fb702cf995d53e79b4ce598192f9701da2e6d0ddf90ee94",
+	"source_packet": "/tmp/group6-wire-leaf-sha256-4e9-kxr2b817",
+	"patch_sha256": "bc73be0b9aa07498d6a260f0d0f0082456648601a4d368cdbc78a2bca4ce1ef1",
+	"inverse_sha256": "777b238da2d7c3945a3eed94f69cfcc00c32fcc1c7183fc0d67b225f600f2067",
+	"preimage_sha256": "c27e4dbff31ea9bd328cafca6e5b79f1d6f19c2e7bfea6a7d11d82422c511f8a",
+	"candidate_sha256": "b75587753ccaea788cbc82e4e3b7bf2d27fd0eb699353ea9f71fb98ec65a08e0",
+	"prior_independent_source_ACK": {
+		"path": "/tmp/group6-independent-leaf-digest-source-review-xtuc973p/SOURCE-ACK.json",
+		"sha256": "73e7b4fa2279b50b14df0a26c10bd2cfcf13bf059e3544c1d149ba4db0e79b17"
+	},
+	"current_and_private_source_tool_library_identity_bindings_verified": 24,
+	"actual_file_hash_size_refs_verified": 18,
+	"unchanged_original_3_case_source_sha256": "00983af19b68a9be537387aa9efcceefcb9fe679346195192e47926b30ed11f3",
+	"identical_original_3_case_identities": true,
+	"whole_single_sha256_flag_inverse_exact": true,
+	"phases": [
+		{
+			"label": "original",
+			"pid": 686670,
+			"status": 0,
+			"pass": 3,
+			"fail": 0,
+			"error": 0,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "cc2cc7caa5e0da06ca5ef12b203a297e21f148e9dc000d5e41a6e2e9390979dd"
+		},
+		{
+			"label": "explicit-sha256",
+			"pid": 686726,
+			"status": 0,
+			"pass": 3,
+			"fail": 0,
+			"error": 0,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "5bbbd5a144d25eff058880d876b67c43d4ce295febea6e993c6afa61a2fb1000"
+		}
+	],
+	"normal_original_phase_budget_seconds": 60,
+	"original_receiver_clock_seconds": 120,
+	"archive": {
+		"path": "/workspace/scratch/group6-wire-leaf-live3-20261010/private-source-and-live3-receiving.tar.gz",
+		"sha256": "3cdc81fbcceae7a5908e114848b23adc3092a2ff5721a28b833f5f946fe35cd8",
+		"safe_regular_files": 32,
+		"safe_directories": 35,
+		"no_links_or_unsafe_paths": true
+	},
+	"blocking_findings": [],
+	"limits": [
+		"No reviewer execution/import/parser/test/native/crypto/formatter or main/index/ref/CI mutation.",
+		"Only explicit fixture leaf x509 -req -sha256 argument added. Original CA/CSR/certificate constraints/SAN/EKU/trust domains/TLS/owners/15s cleanup/assertions unchanged; no expected digest or historical source guard update.",
+		"Both-green Linux original/candidate actual3/3 is nonregression, not reproduced repair. Original Linux may already sign SHA256. No original Apple CLI/libcrypto/leaf signature algorithm or genuine Darwin TLS evidence established.",
+		"Native14/SDK41 and original Python receiving on the next explicit candidate require root native qualification. Native red-green-red same-owner inverse and actual algorithm difference are necessary for any future digest-cause claim.",
+		"No macOS algorithm, trust/certificate cause/fix, serving/full migration or whole suite qualification. Pin remains inactive in current main at this review."
+	]
+}
