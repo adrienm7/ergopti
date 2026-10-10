@@ -200,6 +200,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      # This independent Darwin job executes the frozen portable corpus through
+      # the original native guardian even when another archive/PAC step fails.
+      - name: Receive selected-release shell corpus and native guardian cancellation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/diagnostics/macos_release_stage_native_receiving.cjs \
+            --output "$RUNNER_TEMP/native-selected-release-$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE"
+
+      - name: Retain selected-release native ownership receiving
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selected-release-native-ownership-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/native-selected-release-${{ matrix.architecture }}
+
       - name: Admit the canonical native toolchain and public inputs
         id: ollama-toolchain
         shell: bash
@@ -292,7 +310,7 @@ jobs:
           assert path.stat().st_size <= 1048576
           transcript = path.read_text(encoding='utf-8')
           expected = int(sys.argv[2])
-          assert expected in (5, 6, 8)
+          assert expected in (5, 6, 8, 20, 35)
           summaries = re.findall(r'^Ran ([0-9]+) tests? in [0-9]+(?:\.[0-9]+)?s$', transcript, re.MULTILINE)
           assert summaries == [str(expected)]
           assert len(re.findall(r'^Ran .*$', transcript, re.MULTILINE)) == 1
@@ -302,6 +320,9 @@ jobs:
           }
           receive_controls tools/diagnostics/macos_owned_private_session_test.py 5 "$ERGOPTI_OLLAMA_BUILD_ROOT/private-session-controls.log"
           receive_controls tools/test/macos_bootstrap_tls_numeric_binding_test.py 8 "$ERGOPTI_OLLAMA_BUILD_ROOT/numeric-tls-controls.log"
+          # Portable process peers; actual native listener qualification is separate.
+          receive_controls tools/test/macos_native_ollama_api_test.py 20 "$ERGOPTI_OLLAMA_BUILD_ROOT/api-wire-controls.log"
+          receive_controls tools/diagnostics/macos_managed_ollama_serve_test.py 35 "$ERGOPTI_OLLAMA_BUILD_ROOT/serve-lifecycle-controls.log"
         timeout-minutes: 5
       - name: Retain actual private-session and numeric TLS peer diagnostics
         if: always()
@@ -314,6 +335,8 @@ jobs:
           path: |
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/private-session-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/api-wire-controls.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/serve-lifecycle-controls.log
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
         shell: bash
         run: |
