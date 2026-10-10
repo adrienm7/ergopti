@@ -271,7 +271,7 @@ _LLM_Menu_PrivacyWrite(Expected, Key, Path, Updates, WriterFn := 0) {
 		return false
 	if HasMethod(WriterFn, "Call")
 		return WriterFn.Call(Path, Owned, Content, 1)
-	return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)
+	return TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)
 }
 
 LLM_Menu_SetBackend(id) {
@@ -499,7 +499,7 @@ _LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	if HasMethod(WriterFn, "Call")
 		return WriterFn.Call(Path, Owned, Content, 1)
-	return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)
+	return TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)
 }
 
 LLM_Menu_SetIndent(lvl, Expected := 0) {
@@ -524,7 +524,7 @@ _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	; This choice owns one presentation leaf, so unrelated external settings
 	; remain byte-owned by their existing source instead of the RAM full collector.
-	return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned) : TOML_BatchWrite(Path, Owned)
+	return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned) : TOML_ConfigBatchWrite(Path, Owned)
 }
 
 
