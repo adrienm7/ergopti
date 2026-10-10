@@ -41,18 +41,32 @@ print("[PASS] test_init_boot_logger_format")
 helpers.describe("boot privacy admission", function()
 	helpers.it("mac-logger-privacy: actual bootstrap refuses unavailable policy before later dependencies", function()
 		local source = assert(helpers.read_driver_source("Logger.initialize_privacy(raw)"))
+		helpers.assert_true(source:find("assert(io.open(logger_shared_root", 1, true) == nil,
+			"Privacy file acquisition belongs to its bootstrap adapter, not root orchestration")
+		local adapter = assert(helpers.read_driver_source("function M.read_privacy_policy(shared_root)"))
 		local block = assert(source:match("%-%- Admit canonical privacy.-(do\n.-\nend)\nlocal Storage"), "Actual privacy boot is required")
 		local run = assert(load("local logger_shared_root, Logger = ...\n" .. block .. "\nreturn true", "owned privacy boot", "t",
 			{ pcall = pcall, assert = assert, type = type, print = function() end, io = {} }))
 		for _, mode in ipairs({ "accepted", "open", "read", "close", "identity", "report_refused", "report_throw", "require_throw", "console_throw" }) do
 			local observed = { closes = 0, initialized = 0, notices = {}, reports = {}, exits = {} }
-			local env = { pcall = pcall, assert = assert, type = type,
+			local logger
+			local env
+			env = { pcall = pcall, assert = assert, type = type,
 				print = function(text)
 					if mode == "console_throw" then error("PRIVATE_CONSOLE_REFUSAL") end
 					observed.notices[#observed.notices + 1] = text
 				end,
 				os = { exit = function(code) observed.exits[#observed.exits + 1] = code end },
 				require = function(name)
+					if name == "adapters.boot_journal" then
+						return assert(load(adapter, "actual boot journal", "t", {
+							assert = assert, type = type, pcall = pcall, io = env.io,
+							require = function(module)
+								helpers.assert_eq(module, "infra.logger")
+								return logger
+							end,
+						}))()
+					end
 					helpers.assert_eq(name, "adapters.boot_fatal")
 					if mode == "require_throw" then error("PRIVATE_REPORT_IMPORT_REFUSAL") end
 					return { report = function(...)
@@ -70,7 +84,7 @@ helpers.describe("boot privacy admission", function()
 						return "owned policy"
 					end, close = function() observed.closes = observed.closes + 1; return mode ~= "close" end }
 				end } }
-			local logger = { initialize_privacy = function(raw)
+			logger = { initialize_privacy = function(raw)
 				observed.initialized = observed.initialized + 1
 				helpers.assert_eq(observed.closes, 1, "Read ownership is retired before privacy commit")
 				helpers.assert_eq(raw, "owned policy")
