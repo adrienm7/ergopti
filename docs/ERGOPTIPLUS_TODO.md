@@ -3564,6 +3564,22 @@ the original two-failure prediction discrepancy. These Lua controls model
 native task callbacks and do not qualify native task execution, device input,
 initial PONG/READY/exit-73 recovery or the complete release pipeline.
 
+A cold startup retained by user pause now requests the existing serialized
+liveness probe before reporting retained success. In the matching initial
+paused mode, queued PAUSE is settled locally without a worker write, so that
+path previously waited for the recurring heartbeat. Ordinary RESUME renewal,
+generic controller startup, budgets and retirement authority stay unchanged.
+Actual composed software controls give 20 passed/six semantic failures before,
+26 passed after, and the same six failures when the correction is omitted.
+The first scaffold gave 19 passed/seven setup refusals and supplies no causal
+credit. Accepted probe submission does not await native PONG; modeled task and
+timer ports do not establish native timing or the initial exit-73 cause.
+The probe precedes paused-enable persistence: refusal leaves the preference
+off. Owner loss during a successful commit hook refuses before global cleanup
+and retains compensating OFF and exact teardown. The existing ACK timer starts
+before synchronous persistence; native timing remains unqualified.
+Item 24 remains partial.
+
 Composed Dev9c software verification passes 19,730 macOS Lua cases,
 13,022 Linux Lua cases, 101 macOS E2E scenarios with one existing skip,
 193 Linux E2E scenarios and 53 owned Xvfb/libxkbcommon checks. The full

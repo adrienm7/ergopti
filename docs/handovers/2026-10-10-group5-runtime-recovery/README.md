@@ -397,3 +397,47 @@ key-up/off/pause/revocation predicates, compile the new ordinary Swift test,
 enable capture, or establish the initial PONG/READY/exit73 cause. Selected
 source verification follows this actual receiving; native qualification
 remains pending.
+
+## Cold startup retained by user pause
+
+The existing retained-pause initializer requests a serialized first liveness
+probe before its public success callback. A matching initial paused mode
+settles queued PAUSE without writing a command to the worker; unlike ordinary
+RESUME, that path does not itself renew the worker silence budget. The change
+keeps generic controller startup, recurring timer ownership, deadlines,
+retirement and successor refusal unchanged. Literal accepted submission is
+required and its captured paused token is rechecked; native PONG is not awaited.
+
+The first scaffold attempted public regeneration while already paused and
+received seven setup refusals beside 19 original passes. That raw receipt is
+retained without semantic credit. The corrected scaffold admits unpaused public
+regeneration, queues actual pause while STARTING, and delivers modeled READY to
+the same worker/token. All original 19 controls pass in every variant. Actual
+receiving gives 20 passed/six genuine semantic failures before, 26 passed after,
+and identical 20/6 output when the production correction is omitted. The cleanup
+successor refusal already passed before and is not counted as a new regression.
+Frozen callback ordering, exact ACK/heartbeat handle custody and one-false-callback
+refusal witnesses remain unchanged.
+
+The real initializer and controller use modeled native task, input and timer
+ports. These results establish bounded software ordering, not native PONG,
+wall-clock timing, task/device acceptance or the initial PONG/READY/exit-73 cause.
+Selected verification follows this receiving; no native completion is claimed.
+
+The initial required Lua run retained 19,741 passes and one legacy paused-enable
+failure because its controller fixture omitted the existing refresh API. The
+additive accepted-request model now records its initialized fixed owner and
+refuses non-live or explicitly rejected requests; it supplies no native PONG.
+Every original assertion remains unchanged. A refused initial request now
+precedes paused-enable persistence and leaves its preference off. A successful
+commit hook that loses ownership is checked before global cleanup and retains
+the original compensating OFF and exact teardown. The existing ACK clock starts
+before synchronous persistence; long hook latency may still fail closed, and
+native timing is unqualified.
+
+Final focused receiving passes all 14 legacy transaction and 26 composed cold
+controls. The full production omission restores 20/6 cold results; removing only
+the post-hook owner check restores 13/1 legacy results. Original source, setup
+refusals, the failed required Lua run and the intermediate 12/1 focused result
+remain preserved beside these successor receipts. Final selected verification
+uses the unchanged approved production/tests and this six-file scope.

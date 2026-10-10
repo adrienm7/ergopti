@@ -260,8 +260,15 @@ local function load_remap(options)
 		end,
 	}
 
+	-- Optional composition uses the genuine controller with its disclosed task/timer ports.
+	if options.controller then
+		package.loaded["platform.remap.lease_controller"] = options.controller
+	end
+
 	local remap = helpers.load_with_stubs("platform.remap", {
 		execute = function() return "", true end,
+		host = options.controller_host,
+		settings = options.controller_settings,
 		keycodes = {
 			inputSourceChanged = noop,
 			currentLayout = function() return "ABC" end,
@@ -468,5 +475,189 @@ helpers.describe("lease-bound input activation transaction", function()
 		helpers.assert_eq(#calls.stop_exact, 0)
 		helpers.assert_true(calls.public_results[1].ok)
 		helpers.assert_eq(calls.public_results[1].reason, "ready-paused-by-user-intent")
+	end)
+end)
+
+
+-- The scheduling/CLI edges below are modeled ports, never native receipt authority.
+-- Both production owners execute; only their existing input/persistence ports vary.
+helpers.describe("cold retained paused lease liveness", function()
+	local support = require("tests.support.lease_controller_fixture")
+	local function compose(run)
+		return support.with_fixture(function(load)
+			local controller, ctx = load()
+			local remap, calls = load_remap({ controller = controller, shortcuts_paused = false,
+				controller_host = hs.host, controller_settings = hs.settings })
+			local worker
+			calls.success_observations = {}
+			helpers.assert_true(calls.regenerate(function(ok, reason)
+				if ok == true and reason == "ready-paused-by-user-intent" then
+					calls.success_observations[#calls.success_observations + 1] = {
+						input_count = #worker.inputs, first_input = worker.inputs[1],
+						token = controller.token(), phase = controller.status(),
+					}
+				end
+			end))
+			worker = ctx.spawns[1]
+			helpers.assert_eq(worker.args[1], "--karabiner-lease-worker")
+			helpers.assert_eq(worker.args[5], "2", "the actual fresh generation starts PAUSED")
+			local captured = controller.token()
+			helpers.assert_true(type(captured) == "string")
+			helpers.assert_eq(controller.status(), "starting")
+			helpers.assert_eq(#worker.inputs, 0)
+			-- Public regeneration must enter before the later user pause intent.
+			calls.set_shortcuts_paused(true)
+			helpers.assert_true(controller.pause())
+			helpers.assert_eq(controller.token(), captured)
+			helpers.assert_eq(controller.status(), "starting")
+			helpers.assert_eq(#worker.inputs, 0, "queued PAUSE cannot fabricate pre-READY input")
+			return run(controller, ctx, calls, captured, worker, remap)
+		end)
+	end
+
+	local function successor(controller, ctx, captured)
+		helpers.assert_true(controller.stop_exact(captured, "controlled-owner-replacement"))
+		helpers.assert_true(controller.start_paused())
+		local worker, index
+		for n, candidate in ipairs(ctx.spawns) do
+			if candidate.args[1] == "--karabiner-lease-worker" then worker, index = candidate, n end
+		end
+		helpers.assert_true(worker ~= nil)
+		ctx.chunk(index, "READY\n")
+		helpers.assert_true(controller.token() ~= captured)
+		return worker
+	end
+
+	local function no_retained_success(calls)
+		helpers.assert_eq(#calls.public_results, 1, "refusal must settle its actual public callback")
+		helpers.assert_true(calls.public_results[1].ok == false)
+		for _, result in ipairs(calls.public_results) do
+			helpers.assert_true(result.ok ~= true,
+				"a refused captured refresh cannot publish retained PAUSED success")
+		end
+	end
+
+	helpers.it("refreshes the genuine cold paused input slot before retained success", function()
+		compose(function(controller, ctx, calls, captured, worker)
+			ctx.chunk(1, "READY\n")
+			helpers.assert_eq(#worker.inputs, 1)
+			helpers.assert_eq(worker.inputs[1], "PING 1\n")
+			helpers.assert_eq(#calls.success_observations, 1)
+			local observed = calls.success_observations[1]
+			helpers.assert_eq(observed.input_count, 1)
+			helpers.assert_eq(observed.first_input, "PING 1\n")
+			helpers.assert_eq(observed.token, captured)
+			helpers.assert_eq(observed.phase, "paused")
+			helpers.assert_eq(#calls.public_results, 1)
+			helpers.assert_true(calls.public_results[1].ok)
+			helpers.assert_eq(calls.public_results[1].reason, "ready-paused-by-user-intent")
+			helpers.assert_eq(controller.token(), captured)
+			helpers.assert_eq(controller.status(), "paused")
+			helpers.assert_eq(#calls.bind_attempts, 0)
+			helpers.assert_eq(calls.gesture_starts, 0)
+			helpers.assert_eq(calls.classifier_refreshes, 0)
+			helpers.assert_eq(#calls.resume_callbacks, 0)
+			local ack, heartbeat, ack_count, heartbeat_count = nil, nil, 0, 0
+			for _, timer in ipairs(ctx.timers) do
+				if not timer.cancelled and not timer.fired then
+					if timer.repeating and timer.delay == 5 then
+						heartbeat, heartbeat_count = timer, heartbeat_count + 1
+					elseif not timer.repeating and timer.delay == 3.75 then
+						ack, ack_count = timer, ack_count + 1
+					end
+				end
+			end
+			helpers.assert_eq(ack_count, 1)
+			helpers.assert_eq(heartbeat_count, 1)
+			ctx.chunk(1, "PONG 1\n")
+			helpers.assert_true(ack.cancelled)
+			helpers.assert_true(not heartbeat.cancelled and not heartbeat.fired)
+			local retained_heartbeat, live_ack_count = nil, 0
+			for _, timer in ipairs(ctx.timers) do
+				if not timer.cancelled and not timer.fired then
+					if timer.repeating and timer.delay == 5 then retained_heartbeat = timer end
+					if not timer.repeating and timer.delay == 3.75 then
+						live_ack_count = live_ack_count + 1
+					end
+				end
+			end
+			helpers.assert_true(rawequal(retained_heartbeat, heartbeat))
+			helpers.assert_eq(live_ack_count, 0)
+			helpers.assert_eq(controller.status(), "paused")
+			helpers.assert_eq(#worker.inputs, 1)
+		end)
+	end)
+
+	helpers.it("serializes retained pause refresh with an actual in-flight heartbeat", function()
+		compose(function(controller, ctx, calls, _, worker)
+			local refresh = controller.refresh_liveness
+			controller.refresh_liveness = function()
+				helpers.assert_true(refresh())
+				return refresh()
+			end
+			ctx.chunk(1, "READY\n")
+			helpers.assert_eq(#worker.inputs, 1)
+			helpers.assert_eq(worker.inputs[1], "PING 1\n")
+			helpers.assert_true(calls.public_results[1].ok)
+		end)
+	end)
+
+	helpers.it("refuses a successor created during retained-pause cleanup", function()
+		compose(function(controller, ctx, calls, captured)
+			local bridge = package.loaded["modules.keylogger.kc_bridge"]
+			local clear = bridge.clear_managed_set
+			local once, replacement = false, nil
+			bridge.clear_managed_set = function()
+				local result = clear()
+				if not once then once = true; replacement = successor(controller, ctx, captured) end
+				return result
+			end
+			ctx.chunk(1, "READY\n")
+			helpers.assert_true(once and replacement ~= nil)
+			helpers.assert_eq(#replacement.inputs, 0)
+			no_retained_success(calls)
+		end)
+	end)
+
+	helpers.it("refuses identity lost after an actual accepted refresh", function()
+		compose(function(controller, ctx, calls, captured)
+			local refresh = controller.refresh_liveness
+			local replacement
+			controller.refresh_liveness = function()
+				local result = refresh()
+				replacement = successor(controller, ctx, captured)
+				return result
+			end
+			ctx.chunk(1, "READY\n")
+			helpers.assert_true(replacement ~= nil)
+			helpers.assert_eq(#replacement.inputs, 0)
+			no_retained_success(calls)
+		end)
+	end)
+
+	helpers.it("refuses retained success after a genuine task input rejection", function()
+		compose(function(controller, ctx, calls, _, worker)
+			ctx.next_input_result = false
+			ctx.chunk(1, "READY\n")
+			helpers.assert_true(controller.status() ~= "paused")
+			no_retained_success(calls)
+			for _, line in ipairs(worker.inputs) do helpers.assert_true(line ~= "RESUME\n") end
+		end)
+	end)
+
+	helpers.it("contains a retained-pause refresh boundary throw", function()
+		compose(function(controller, ctx, calls)
+			controller.refresh_liveness = function() error("controlled-refresh-refusal") end
+			ctx.chunk(1, "READY\n")
+			no_retained_success(calls)
+		end)
+	end)
+
+	helpers.it("requires literal true rather than a foreign truthy refresh result", function()
+		compose(function(controller, ctx, calls)
+			controller.refresh_liveness = function() return {} end
+			ctx.chunk(1, "READY\n")
+			no_retained_success(calls)
+		end)
 	end)
 end)
