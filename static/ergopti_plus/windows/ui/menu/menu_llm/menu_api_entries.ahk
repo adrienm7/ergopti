@@ -1416,10 +1416,10 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			return false
 		try {
 			ConfigImage := this._Snapshot(Held["config_path"])
-			if !(ConfigImage is Map) || !this._NativeCurrent(Held)
+			if !(ConfigImage is Map) || !this._NativeContextCurrent(Held)
 				return false
 			ApiImage := this._Snapshot(Held["api_path"])
-			if !(ApiImage is Map) || !this._NativeCurrent(Held)
+			if !(ApiImage is Map) || !this._NativeContextCurrent(Held)
 				return false
 			if ApiImage["present"] {
 				if !_LLM_Menu_ApiSourceOwned(ApiImage["content"])

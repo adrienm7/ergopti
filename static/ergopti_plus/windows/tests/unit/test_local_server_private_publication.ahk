@@ -1456,3 +1456,38 @@ _LSP_RegisterSourceOperationCases() {
 				_LSP_WithWorld.Bind(_LSP_SourceOperationBody.Bind((Kind == "nominal" || Kind == "default_full") ? 0 : 4, Kind)))
 }
 _LSP_RegisterSourceOperationCases()
+
+; The same read-boundary contract also applies to initial source acquisition.
+_LSP_CaptureOperationBody(ReadIndex, Kind, World) {
+	World.ConfigImage .= "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
+	Observed := _LSP_SourceOperationObserver(World, ReadIndex, Kind)
+	try {
+		Receipt := World.Owner.Capture()
+		if Kind == "nominal" {
+			AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+			AssertEqual(6, Observed.Reads, "capture retains its two acquisitions and four external image rechecks")
+			AssertEqual(4, Observed.FullAdmissions, "capture avoids repeating full admission after each initial read")
+		} else {
+			AssertFalse(Receipt is LLM_Menu_ApiPrivateSourceReceipt,
+				"source, registry or context replacement cannot issue initial authority")
+			AssertTrue(Observed.Mutated, "the designated initial-read mutation must actually execute")
+		}
+		AssertEqual(0, World.ApplyCalls)
+	} finally Observed.Restore()
+}
+
+_LSP_RegisterCaptureOperationCases() {
+	local Kind, Index
+	Test("Local capture operation: nominal bounded full admission (capture-operation-boundary)",
+		_LSP_WithWorld.Bind(_LSP_CaptureOperationBody.Bind(0, "nominal")))
+	for Kind in ["source", "context", "registry", "future"]
+		loop 2 {
+			Index := A_Index
+			Test("Local capture operation: " . Kind . " changes at initial snapshot " . Index . " (capture-operation-boundary)",
+				_LSP_WithWorld.Bind(_LSP_CaptureOperationBody.Bind(Index, Kind)))
+		}
+}
+_LSP_RegisterCaptureOperationCases()
+
