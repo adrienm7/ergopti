@@ -2973,7 +2973,7 @@ static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
 	ErgoptiNav_DispatchResult result;
 	ErgoptiNav_TerminalCaptureSnapshot before, after;
-	ErgoptiNav_TerminalRouteSnapshot head, next;
+	ErgoptiNav_TerminalRouteSnapshot head, next, owned_head, observed_head;
 	ErgoptiOutput_Key key, stale, next_key;
 	ErgoptiOutput_Unit units[4], expected_suffix[3];
 	ErgoptiReplay_Route route;
@@ -2996,6 +2996,7 @@ static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
 	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &head) == 0);
 	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 1, &next) == 0);
+	memcpy(&owned_head, &head, sizeof(owned_head));
 	memset(&key, 0xA5, sizeof(key)); stale = key;
 	/* The production-default guard cannot be opened through any public argument. */
 	TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
@@ -3070,6 +3071,8 @@ static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 	TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, 3) == 0);
 	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after) == 0);
 	TEST_ASSERT(name, after.queued == 4 && after.replayed == 0);
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &observed_head) == 0);
+	TEST_ASSERT(name, memcmp(&owned_head, &observed_head, sizeof(owned_head)) == 0);
 	TEST_ASSERT(name, ErgoptiNav_ConsumeTerminalOutput(TEST_OWNER_A, &key) == 0);
 	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after) == 0);
 	TEST_ASSERT(name, after.queued == 3 && after.replayed == 1);
@@ -3121,7 +3124,7 @@ static bool TestTerminalOutputCustodyPreservesFaultDebt(void)
 	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
 	ErgoptiNav_DispatchResult result;
 	ErgoptiNav_TerminalCaptureSnapshot receipt;
-	ErgoptiNav_TerminalRouteSnapshot head;
+	ErgoptiNav_TerminalRouteSnapshot head, observed_head;
 	ErgoptiOutput_Key key;
 	ErgoptiOutput_Unit units[2];
 	ErgoptiReplay_Route route;
@@ -3162,6 +3165,8 @@ static bool TestTerminalOutputCustodyPreservesFaultDebt(void)
 	TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A, &key,
 		units, 2, &count, &attempt) == 0);
 	TEST_ASSERT(name, count == 1 && units[0].utf16 == 0x78 && units[0].key_up == 1);
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &observed_head) == 0);
+	TEST_ASSERT(name, memcmp(&head, &observed_head, sizeof(head)) == 0);
 	TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, 1) == 0);
 	TEST_ASSERT(name, ErgoptiNav_ConsumeTerminalOutput(TEST_OWNER_A, &key) == 0);
 	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &receipt) == 0);

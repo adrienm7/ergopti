@@ -3159,7 +3159,7 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_INVALID_STATE;
 	}
-	candidate = g_nav_state.terminal_output;
+	memcpy(&candidate, &g_nav_state.terminal_output, sizeof(candidate));
 	status = candidate.initialized ? ERGOPTI_OUTPUT_OK
 		: ErgoptiOutput_Initialize(&candidate, owner);
 	if (status == ERGOPTI_OUTPUT_OK)
@@ -3167,7 +3167,7 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
 			&g_nav_state.terminal_routes, &g_nav_state.terminal_events[0].route,
 			text, length, 1, &key);
 	if (status == ERGOPTI_OUTPUT_OK) {
-		g_nav_state.terminal_output = candidate;
+		memcpy(&g_nav_state.terminal_output, &candidate, sizeof(g_nav_state.terminal_output));
 		*out_key = key;
 	}
 	LeaveCriticalSection(&g_nav_state.lock);
@@ -3222,13 +3222,13 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ConsumeTerminalOutput(
 	EnterCriticalSection(&g_nav_state.lock);
 	status = NavCheckTerminalOutputLocked(&g_nav_state, owner, key);
 	if (status == ERGOPTI_NAV_STATUS_OK) {
-		candidate = g_nav_state.terminal_output;
+		memcpy(&candidate, &g_nav_state.terminal_output, sizeof(candidate));
 		status = NavTerminalOutputStatus(ErgoptiOutput_Consume(&candidate, owner, key, &edge));
 		if (status == ERGOPTI_NAV_STATUS_OK) {
 			if (memcmp(&edge, &g_nav_state.terminal_events[0].route.event, sizeof(edge)) != 0)
 				status = ERGOPTI_NAV_STATUS_INVALID_STATE;
 			else {
-				g_nav_state.terminal_output = candidate;
+				memcpy(&g_nav_state.terminal_output, &candidate, sizeof(g_nav_state.terminal_output));
 				NavConsumeTerminalReplayLocked(&g_nav_state, 1);
 				++g_nav_state.terminal_replayed;
 			}
