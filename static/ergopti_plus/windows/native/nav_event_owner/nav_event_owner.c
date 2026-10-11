@@ -86,6 +86,8 @@ typedef struct NavTerminalKeyEdge {
 	uint8_t key_up;
 	uint8_t extended;
 	uint8_t reserved[2];
+	uint64_t sequence;
+	ErgoptiReplay_Snapshot route;
 } NavTerminalKeyEdge;
 
 /** Injectable SendInput boundary shared by production and hook-free tests. */
@@ -145,6 +147,14 @@ typedef struct NavState {
 	NavHeldKey held_keys[NAV_HELD_KEY_CAPACITY];
 	NavInjectedModifierHold injected_modifiers[
 		NAV_INJECTED_MODIFIER_CAPACITY];
+	ErgoptiReplay_State terminal_routes;
+	uint64_t terminal_next_sequence;
+	uint64_t terminal_clock_epoch;
+	uint32_t terminal_clock_tick;
+	uint8_t terminal_clock_started;
+	uint8_t terminal_caps_uncertain;
+	uint8_t terminal_modifiers_uncertain;
+	uint8_t terminal_routes_uncertain;
 	uint64_t terminal_token;
 	uint8_t terminal_release_active;
 	uint8_t terminal_replay_modifiers_lr;
@@ -160,6 +170,7 @@ static INIT_ONCE g_nav_init_once = INIT_ONCE_STATIC_INIT;
 static NavState g_nav_state;
 #if defined(ERGOPTI_NAV_TESTING)
 /* Deterministic OS modifier snapshot; disabled means "every key reported down". */
+static uint32_t g_nav_test_hook_time;
 static uint8_t g_nav_test_os_modifiers_enabled;
 static uint8_t g_nav_test_os_modifiers;
 #endif
@@ -305,6 +316,17 @@ static void NavResetSemanticStateLocked(NavState *state)
 	state->staged_profile_plan_generation = 0;
 	state->next_profile_plan_generation = 0;
 	state->next_receipt_sequence = 0;
+	memset(&state->terminal_routes, 0, sizeof(state->terminal_routes));
+	state->terminal_next_sequence = 0;
+	state->terminal_clock_epoch = 0;
+	state->terminal_clock_tick = 0;
+	state->terminal_clock_started = 0;
+#if defined(ERGOPTI_NAV_TESTING)
+	g_nav_test_hook_time = 0;
+#endif
+	state->terminal_caps_uncertain = 0;
+	state->terminal_modifiers_uncertain = 0;
+	state->terminal_routes_uncertain = 0;
 	state->terminal_token = 0;
 	state->terminal_release_active = 0;
 	state->terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
@@ -801,6 +823,33 @@ static bool NavHasTerminalDebtLocked(const NavState *state)
 
 
 /**
+ * Lifts a DWORD native event time without accepting a backwards/late-wrap edge.
+ * Adjacent admitted times must be less than half a DWORD clock apart. A longer
+ * ambiguous gap refuses recipe qualification while raw FIFO capture continues.
+ */
+static bool NavLiftTerminalClockLocked(NavState *state, uint32_t tick, uint64_t *timestamp)
+{
+	*timestamp = state->terminal_clock_epoch + tick;
+	if (state->terminal_clock_started) {
+		if (tick < state->terminal_clock_tick) {
+			if (state->terminal_clock_tick - tick <= 0x80000000u)
+				return false;
+			state->terminal_clock_epoch += 0x100000000ull;
+			*timestamp = state->terminal_clock_epoch + tick;
+		} else if (tick - state->terminal_clock_tick > 0x80000000u) {
+			if (state->terminal_clock_epoch >= 0x100000000ull)
+				*timestamp -= 0x100000000ull;
+			return false;
+		}
+	}
+	state->terminal_clock_tick = tick;
+	state->terminal_clock_started = 1;
+	return true;
+}
+
+
+
+/**
  * Captures one physical keyboard edge before navigation sees it.
  *
  * AHK SendEvent input and native replay input are injected and therefore pass
@@ -812,13 +861,68 @@ static bool NavCaptureTerminalEventLocked(
 	const KBDLLHOOKSTRUCT *event)
 {
 	NavTerminalKeyEdge *edge;
-	bool key_up;
-	if (!NavHasTerminalDebtLocked(state)
-			|| event == NULL
-			|| (event->flags & LLKHF_INJECTED) != 0)
+	ErgoptiReplay_Event incoming;
+	ErgoptiReplay_Snapshot snapshot;
+	uint32_t index;
+	bool key_up, clock_valid;
+	if (event == NULL
+			|| (event->flags & (LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED)) != 0)
 		return false;
 	if (message != WM_KEYDOWN && message != WM_SYSKEYDOWN
 			&& message != WM_KEYUP && message != WM_SYSKEYUP)
+		return false;
+	key_up = message == WM_KEYUP || message == WM_SYSKEYUP;
+	memset(&incoming, 0, sizeof(incoming));
+	incoming.vk = (uint16_t)event->vkCode;
+	incoming.scan = (uint16_t)(event->scanCode & 0xFFu);
+	if ((event->flags & LLKHF_EXTENDED) != 0 && incoming.scan != 0)
+		incoming.scan |= 0x100u;
+	incoming.origin = ERGOPTI_REPLAY_PHYSICAL;
+	incoming.source_id = 1;
+	incoming.key_up = key_up ? 1 : 0;
+	clock_valid = NavLiftTerminalClockLocked(state, event->time, &incoming.timestamp);
+	if (!key_up) {
+		for (index = 0; index < ERGOPTI_REPLAY_MAX_HELD_KEYS; ++index) {
+			const ErgoptiReplay_Hold *hold = &state->terminal_routes.holds[index];
+			if (hold->active && hold->origin == incoming.origin
+					&& hold->source_id == incoming.source_id
+					&& ((incoming.scan != 0 && hold->scan == incoming.scan)
+						|| (incoming.scan == 0 && hold->scan == 0
+							&& hold->vk == incoming.vk))) {
+				incoming.repeat = 1;
+				break;
+			}
+		}
+	}
+	/* Observe authentic edges outside capture too: a held modifier can predate
+	 * the capture, and its physical up can follow successful FIFO release. */
+	if (!clock_valid) {
+		memset(&snapshot, 0, sizeof(snapshot));
+		snapshot.status = ERGOPTI_REPLAY_STALE_EVENT;
+	} else if (state->terminal_routes.initialized) {
+		ErgoptiReplay_Step(&state->terminal_routes, state->terminal_routes.owner,
+			&incoming, &snapshot);
+	} else {
+		memset(&snapshot, 0, sizeof(snapshot));
+		snapshot.status = ERGOPTI_REPLAY_NOT_INITIALIZED;
+	}
+	/* Caps toggles are not LR modifiers. Until a fresh authoritative neutral
+	 * registration, no character recipe can pretend its Caps axis was captured. */
+	if (!key_up && event->vkCode == VK_CAPITAL)
+		state->terminal_caps_uncertain = 1;
+	if (clock_valid && (state->terminal_caps_uncertain || state->terminal_modifiers_uncertain)
+			&& snapshot.route.kind != ERGOPTI_REPLAY_MODIFIER
+			&& snapshot.route.kind != ERGOPTI_REPLAY_PREFIX)
+		snapshot.status = ERGOPTI_REPLAY_UNSUPPORTED;
+	if (state->terminal_routes_uncertain && snapshot.status == ERGOPTI_REPLAY_OK
+			&& snapshot.route.kind != ERGOPTI_REPLAY_MODIFIER
+			&& snapshot.route.kind != ERGOPTI_REPLAY_PREFIX)
+		snapshot.status = ERGOPTI_REPLAY_UNSUPPORTED;
+	if (!key_up && snapshot.status != ERGOPTI_REPLAY_OK)
+		state->terminal_routes_uncertain = 1;
+	/* Even rejected/uninitialized recipes retain the exact authenticated edge. */
+	snapshot.event = incoming;
+	if (!NavHasTerminalDebtLocked(state))
 		return false;
 	if (state->terminal_queued >= ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY) {
 		state->terminal_phase = ERGOPTI_NAV_TERMINAL_FAULTED;
@@ -826,13 +930,14 @@ static bool NavCaptureTerminalEventLocked(
 		state->last_os_error = ERROR_NOT_ENOUGH_MEMORY;
 		return true;
 	}
-	key_up = message == WM_KEYUP || message == WM_SYSKEYUP;
 	edge = &state->terminal_events[state->terminal_queued++];
 	memset(edge, 0, sizeof(*edge));
-	edge->vk = (uint16_t)event->vkCode;
+	edge->vk = incoming.vk;
 	edge->sc = (uint16_t)(event->scanCode & 0xFFu);
-	edge->key_up = key_up ? 1 : 0;
+	edge->key_up = incoming.key_up;
 	edge->extended = (event->flags & LLKHF_EXTENDED) != 0 ? 1 : 0;
+	edge->sequence = ++state->terminal_next_sequence;
+	memcpy(&edge->route, &snapshot, sizeof(edge->route));
 	return true;
 }
 
@@ -2789,6 +2894,125 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SetSuspended(
 
 
 
+/** Registers event-time metadata without altering the raw replay contract. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_RegisterTerminalRoutes(
+	uint64_t owner, uint64_t generation, uint64_t layout_id,
+	const ErgoptiReplay_Route *routes, uint32_t route_count)
+{
+	int32_t status;
+	uint32_t index;
+	uint8_t observed_modifiers = 0;
+	ErgoptiReplay_State candidate = ERGOPTI_REPLAY_STATE_INIT;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_REPLAY_NOT_INITIALIZED;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (NavHasTerminalDebtLocked(&g_nav_state)) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_TERMINAL_ROUTE_BUSY;
+	}
+	if (!g_nav_state.terminal_routes.initialized) {
+		status = ErgoptiReplay_Initialize(&candidate, owner);
+		if (status == ERGOPTI_REPLAY_OK)
+			status = ErgoptiReplay_Register(&candidate, owner, generation,
+				layout_id, routes, route_count);
+		if (status == ERGOPTI_REPLAY_OK)
+			g_nav_state.terminal_routes = candidate;
+	} else {
+		status = ErgoptiReplay_Register(&g_nav_state.terminal_routes, owner,
+			generation, layout_id, routes, route_count);
+	}
+	if (status == ERGOPTI_REPLAY_OK) {
+		g_nav_state.terminal_caps_uncertain = 0;
+		g_nav_state.terminal_routes_uncertain = 0;
+		for (index = 0; index < ERGOPTI_REPLAY_MAX_HELD_KEYS; ++index) {
+			const ErgoptiReplay_Hold *hold = &g_nav_state.terminal_routes.holds[index];
+			if (hold->active && hold->status != ERGOPTI_REPLAY_OK)
+				g_nav_state.terminal_routes_uncertain = 1;
+			if (hold->active && hold->origin == ERGOPTI_REPLAY_PHYSICAL
+					&& hold->route.kind == ERGOPTI_REPLAY_MODIFIER)
+				observed_modifiers |= hold->route.effective_modifiers_lr;
+		}
+		/* OS polling can only refuse unknown startup state. It must never
+		 * manufacture physical provenance or choose a character recipe. */
+		g_nav_state.terminal_modifiers_uncertain =
+			(NavOsModifierStateLocked() & (uint8_t)~observed_modifiers) != 0;
+	}
+	LeaveCriticalSection(&g_nav_state.lock);
+	return status;
+}
+
+
+
+/** Provides an atomic debt-free lifetime census for the retained AHK models. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ListTerminalHeldRecipes(
+	uint64_t owner, uint64_t *out_recipes, uint32_t capacity, uint32_t *out_count)
+{
+	uint64_t ids[ERGOPTI_REPLAY_MAX_HELD_KEYS];
+	uint32_t count = 0, index, existing;
+	if (owner == 0 || out_count == NULL || capacity > ERGOPTI_REPLAY_MAX_HELD_KEYS
+			|| (capacity != 0 && out_recipes == NULL))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (g_nav_state.terminal_routes.owner != owner) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	}
+	if (NavHasTerminalDebtLocked(&g_nav_state)) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_BUSY;
+	}
+	for (index = 0; index < ERGOPTI_REPLAY_MAX_HELD_KEYS; ++index) {
+		const ErgoptiReplay_Hold *hold = &g_nav_state.terminal_routes.holds[index];
+		if (!hold->active || hold->route.recipe_id == 0)
+			continue;
+		for (existing = 0; existing < count; ++existing)
+			if (ids[existing] == hold->route.recipe_id)
+				break;
+		if (existing == count)
+			ids[count++] = hold->route.recipe_id;
+	}
+	*out_count = count;
+	if (count > capacity) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	}
+	if (count != 0)
+		memcpy(out_recipes, ids, count * sizeof(ids[0]));
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Reads the exact FIFO suffix without acknowledging any SendInput prefix. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
+	uint64_t token, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot)
+{
+	if (token == 0 || out_snapshot == NULL)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (g_nav_state.terminal_token != token) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	}
+	if (index >= g_nav_state.terminal_queued) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_NOT_FOUND;
+	}
+	out_snapshot->token = token;
+	out_snapshot->sequence = g_nav_state.terminal_events[index].sequence;
+	memcpy(&out_snapshot->route, &g_nav_state.terminal_events[index].route,
+		sizeof(out_snapshot->route));
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
 /** Implements ErgoptiNav_BeginTerminalCapture. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
 	uint64_t token)
@@ -3382,6 +3606,19 @@ static LRESULT NavTestPassOriginal(void *context)
 
 
 
+/** Supplies a native DWORD clock through the actual capture test boundary. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetHookTime(uint32_t time)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	EnterCriticalSection(&g_nav_state.lock);
+	g_nav_test_hook_time = time;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
 /** Implements the hook-free raw-event test seam. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookDispatch(
 	const ErgoptiNav_TestEvent *event,
@@ -3412,6 +3649,7 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookDispatch(
 	message = event->kind == ERGOPTI_NAV_EVENT_UP ? WM_KEYUP : WM_KEYDOWN;
 
 	EnterCriticalSection(&g_nav_state.lock);
+	native_event.time = g_nav_test_hook_time;
 	if (NavCaptureTerminalEventLocked(
 			&g_nav_state, message, &native_event)) {
 		memset(out_result, 0, sizeof(*out_result));
@@ -3484,6 +3722,7 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 	message = event->kind == ERGOPTI_NAV_EVENT_UP ? WM_KEYUP : WM_KEYDOWN;
 
 	EnterCriticalSection(&g_nav_state.lock);
+	native_event.time = g_nav_test_hook_time;
 	if (NavCaptureTerminalEventLocked(
 			&g_nav_state, message, &native_event)) {
 		memset(out_result, 0, sizeof(*out_result));

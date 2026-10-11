@@ -637,12 +637,15 @@ $buildDir = Join-Path $repoRoot "static\ergopti_plus\windows\build\native\nav_ev
 $vendorDir = Join-Path $repoRoot "static\ergopti_plus\windows\vendor"
 $sourcePath = Join-Path $sourceDir "nav_event_owner.c"
 $editorSourcePath = Join-Path $sourceDir "editor_replace.c"
+$replaySourcePath = Join-Path $sourceDir "replay_route_core.c"
+$replayTestSourcePath = Join-Path $sourceDir "replay_route_core_test.c"
 $headerPath = Join-Path $sourceDir "nav_event_owner.h"
 $definitionPath = Join-Path $sourceDir "nav_event_owner.def"
 $testSourcePath = Join-Path $sourceDir "nav_event_owner_test.c"
 $editorTestSourcePath = Join-Path $sourceDir "editor_replace_test.c"
 $cmakePath = Join-Path $sourceDir "CMakeLists.txt"
 $testExePath = Join-Path $buildDir "ergopti_nav_event_owner_test.exe"
+$replayTestExePath = Join-Path $buildDir "ergopti_replay_route_core_test.exe"
 $buildDllPath = Join-Path $buildDir "ergopti_nav_owner.dll"
 $vendorDllPath = Join-Path $vendorDir "ergopti_nav_owner.dll"
 $manifestPath = Join-Path $vendorDir "ergopti_nav_owner.manifest.json"
@@ -650,7 +653,7 @@ $manifestSchemaVersion = 1
 $vendorDllRelativePath = "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll"
 $buildScriptRelativePath = "tools/build/build_windows_nav_owner.ps1"
 
-foreach ($requiredSource in @($sourcePath, $editorSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
+foreach ($requiredSource in @($sourcePath, $editorSourcePath, $replaySourcePath, $replayTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
 	if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
 		throw "Required native source is missing: $requiredSource"
 	}
@@ -696,6 +699,7 @@ $dllRecipeArguments = $commonCompilerRecipeFlags + @(
 	"/LD",
 	"{source_dir}\nav_event_owner.c",
 	"{source_dir}\editor_replace.c",
+	"{source_dir}\replay_route_core.c",
 	"/link",
 	"/DEF:{source_dir}\nav_event_owner.def",
 	"/OUT:{build_dir}\ergopti_nav_owner.dll",
@@ -725,12 +729,22 @@ New-Item -ItemType Directory -Force -Path $vendorDir | Out-Null
 
 Push-Location $buildDir
 try {
+	$replayTestArguments = $commonCompilerFlags + @(
+		$replaySourcePath,
+		$replayTestSourcePath,
+		"/Fe:$replayTestExePath",
+		"/link"
+	) + $commonLinkerFlags
+	Invoke-CheckedNative -Label "Compiling the event-time replay route core test" -Executable "cl.exe" -Arguments $replayTestArguments
+	Invoke-CheckedNative -Label "Running the event-time replay route core test" -Executable $replayTestExePath -Arguments @()
+
 	$testArguments = $commonCompilerFlags + @(
 		"/DERGOPTI_NAV_TESTING=1",
 		$testSourcePath,
 		$editorTestSourcePath,
 		$sourcePath,
 		$editorSourcePath,
+		$replaySourcePath,
 		"/Fe:$testExePath",
 		"/link"
 	) + $commonLinkerFlags

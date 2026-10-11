@@ -2582,6 +2582,260 @@ static bool TestTerminalCaptureReplaysExactPhysicalEdges(void)
 
 
 
+/** Proves immutable event recipes follow the exact acknowledged FIFO suffix. */
+static bool TestTerminalRouteSnapshotsRetainExactSuffix(void)
+{
+	const char *name = "terminal route snapshots retain exact suffix (todo49-route-fifo)";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TerminalRouteSnapshot snapshots[6];
+	ErgoptiNav_TerminalRouteSnapshot peek;
+	ErgoptiNav_TestEvent output[8];
+	ErgoptiNav_TerminalCaptureSnapshot capture;
+	ErgoptiReplay_Route routes[4];
+	uint64_t generation = 0;
+	uint32_t output_count = 0;
+	uint32_t retained_count = 0;
+	uint64_t retained[ERGOPTI_REPLAY_MAX_HELD_KEYS];
+	uint32_t index;
+	uint8_t mask = 0, passed = 0, ordered = 0;
+	const uint16_t vks[6] = { 'A', 'A', 'A', VK_LSHIFT, 'B', 'B' };
+	const uint16_t scans[6] = { 0x1E, 0x1E, 0x1E, 0x2A, 0x30, 0x30 };
+	const uint8_t kinds[6] = {
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP
+	};
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	memset(routes, 0, sizeof(routes));
+	routes[0].recipe_id = 1100;
+	routes[0].route_id = 1;
+	routes[0].code = VK_LSHIFT;
+	routes[0].axis = ERGOPTI_REPLAY_VK;
+	routes[0].kind = ERGOPTI_REPLAY_MODIFIER;
+	routes[0].effective_modifiers_lr = ERGOPTI_REPLAY_LSHIFT;
+	routes[1].recipe_id = 2200;
+	routes[1].route_id = 2;
+	routes[1].code = 0x1E;
+	routes[1].axis = ERGOPTI_REPLAY_SCAN;
+	routes[1].kind = ERGOPTI_REPLAY_CHARACTER;
+	routes[2] = routes[1];
+	routes[2].recipe_id = 3300;
+	routes[2].route_id = 3;
+	routes[2].required_modifiers = ERGOPTI_REPLAY_SHIFT;
+	/* Even a supplied Caps text declaration cannot bypass its missing axis. */
+	routes[3].recipe_id = 4400;
+	routes[3].route_id = 4;
+	routes[3].code = VK_CAPITAL;
+	routes[3].axis = ERGOPTI_REPLAY_VK;
+	routes[3].kind = ERGOPTI_REPLAY_CHARACTER;
+	/* Invalid first registration cannot acquire lifecycle ownership. */
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_B, 1, 11,
+		NULL, 1) == ERGOPTI_REPLAY_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11,
+		routes, 4) == ERGOPTI_REPLAY_OK);
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_B, 2, 11,
+		routes, 4) == ERGOPTI_REPLAY_OWNER_MISMATCH);
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	/* Event-time ownership starts before capture, independently of OS polling. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LSHIFT, 0x2A,
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
+		retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, retained_count == 1 && retained[0] == 1100);
+	retained[0] = 9999;
+	TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
+		retained, 0, &retained_count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, retained_count == 1 && retained[0] == 9999);
+	TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_B,
+		retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count)
+		== ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
+		retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count)
+		== ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 2, 12,
+		routes, 4) == ERGOPTI_NAV_TERMINAL_ROUTE_BUSY);
+	for (index = 0; index < 6; ++index) {
+		TEST_ASSERT(name, TestHookFlow(name, vks[index], scans[index], kinds[index],
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+		TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+		TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, index,
+			&snapshots[index]) == ERGOPTI_NAV_STATUS_OK);
+		TEST_ASSERT(name, snapshots[index].token == TEST_OWNER_B);
+		TEST_ASSERT(name, snapshots[index].sequence == index + 1);
+		TEST_ASSERT(name, snapshots[index].route.event.source_id == 1);
+		TEST_ASSERT(name, snapshots[index].route.event.scan == scans[index]);
+		TEST_ASSERT(name, snapshots[index].route.event.origin == ERGOPTI_REPLAY_PHYSICAL);
+		TEST_ASSERT(name, snapshots[index].route.observed_generation == 1);
+		TEST_ASSERT(name, snapshots[index].route.observed_layout_id == 11);
+	}
+	for (index = 0; index < 3; ++index) {
+		TEST_ASSERT(name, snapshots[index].route.status == ERGOPTI_REPLAY_OK);
+		TEST_ASSERT(name, snapshots[index].route.route.recipe_id == 3300);
+		TEST_ASSERT(name, snapshots[index].route.modifiers_lr_before == ERGOPTI_REPLAY_LSHIFT);
+		TEST_ASSERT(name, snapshots[index].route.route_generation == 1);
+		TEST_ASSERT(name, snapshots[index].route.route_layout_id == 11);
+	}
+	TEST_ASSERT(name, snapshots[1].route.event.repeat == 1);
+	TEST_ASSERT(name, snapshots[2].route.event.key_up == 1);
+	TEST_ASSERT(name, snapshots[3].route.modifiers_lr_before == ERGOPTI_REPLAY_LSHIFT);
+	TEST_ASSERT(name, snapshots[3].route.modifiers_lr_after == 0);
+	TEST_ASSERT(name, snapshots[4].route.status == ERGOPTI_REPLAY_UNREGISTERED);
+	TEST_ASSERT(name, snapshots[5].route.status == ERGOPTI_REPLAY_UNREGISTERED);
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_A, 0, &peek)
+		== ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 6, &peek)
+		== ERGOPTI_NAV_STATUS_NOT_FOUND);
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, NULL)
+		== ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT, 1, output, 8, &output_count)
+		== ERGOPTI_NAV_STATUS_OS_ERROR);
+	TEST_ASSERT(name, output_count == 1);
+	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &capture)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, capture.queued == 5 && capture.replayed == 1);
+	for (index = 0; index < 5; ++index) {
+		TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, index, &peek)
+			== ERGOPTI_NAV_STATUS_OK);
+		TEST_ASSERT(name, memcmp(&peek, &snapshots[index + 1], sizeof(peek)) == 0);
+	}
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT, UINT32_MAX, output, 8, &output_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, output_count == 5);
+	TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
+		retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, retained_count == 0);
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &peek)
+		== ERGOPTI_NAV_STATUS_NOT_FOUND);
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 2, 12,
+		routes, 4) == ERGOPTI_REPLAY_OK);
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 2, 12,
+		routes, 4) == ERGOPTI_REPLAY_STALE_REGISTRATION);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestHookFlow(name, VK_CAPITAL, 0x3A,
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E,
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 1, &peek)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, peek.route.status == ERGOPTI_REPLAY_UNSUPPORTED);
+	TEST_ASSERT(name, peek.route.event.vk == 'A');
+	TEST_ASSERT(name, peek.route.route.recipe_id == 2200);
+	TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E,
+		ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, VK_CAPITAL, 0x3A,
+		ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, output_count == 4);
+	/* A missing prefix/dead/tap route cannot silently select a later base recipe. */
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 3, 12,
+		routes, 4) == ERGOPTI_REPLAY_OK);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestHookFlow(name, 'B', 0x30,
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E,
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 1, &peek)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, peek.route.status == ERGOPTI_REPLAY_UNSUPPORTED);
+	TEST_ASSERT(name, peek.route.route.recipe_id == 2200);
+	TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E,
+		ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, 'B', 0x30,
+		ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, output_count == 4);
+	/* An OS bit may veto unknown startup state but cannot supply provenance. */
+	{
+		const uint16_t unknown_modifiers[1] = { VK_LMENU };
+		TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, unknown_modifiers, 1)
+			== ERGOPTI_NAV_STATUS_OK);
+	}
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 4, 12,
+		routes, 4) == ERGOPTI_REPLAY_OK);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E,
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &peek)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, peek.route.status == ERGOPTI_REPLAY_UNSUPPORTED);
+	TEST_ASSERT(name, peek.route.modifiers_lr_before == 0);
+	TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E,
+		ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, output_count == 2);
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	/* Clock wrap is real unsigned time; late and backwards edges stay explicit. */
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11,
+		routes, 4) == ERGOPTI_REPLAY_OK);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+		== ERGOPTI_NAV_STATUS_OK);
+	{
+		const uint32_t times[5] = { UINT32_MAX - 1u, 1u, UINT32_MAX, 2u, 1u };
+		const uint64_t lifted[5] = {
+			0xFFFFFFFEull, 0x100000001ull, 0xFFFFFFFFull,
+			0x100000002ull, 0x100000001ull
+		};
+		const uint16_t clock_vks[5] = { 'A', 'A', 'B', 'B', 'B' };
+		const uint16_t clock_scans[5] = { 0x1E, 0x1E, 0x30, 0x30, 0x30 };
+		const uint8_t clock_edges[5] = {
+			ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_EVENT_DOWN,
+			ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP
+		};
+		for (index = 0; index < 5; ++index) {
+			TEST_ASSERT(name, ErgoptiNav_TestSetHookTime(times[index])
+				== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, TestHookFlow(name, clock_vks[index], clock_scans[index],
+				clock_edges[index], ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+				&result, &mask, &passed, &ordered));
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, index, &peek)
+				== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, peek.route.event.timestamp == lifted[index]);
+			if (index == 2 || index == 4)
+				TEST_ASSERT(name, peek.route.status == ERGOPTI_REPLAY_STALE_EVENT);
+		}
+	}
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, output_count == 5);
+	return true;
+}
+
+
+
 /** Rejects a replay marker when Win32 reports lower-integrity injection. */
 static bool TestTerminalReplayCannotPromoteLowerIntegrity(void)
 {
@@ -3913,6 +4167,8 @@ int main(int argc, char **argv)
 			TestStopDrainBalancesConsumedHolds},
 		{"terminal capture replays exact physical edges",
 			TestTerminalCaptureReplaysExactPhysicalEdges},
+		{"terminal route snapshots retain exact suffix (todo49-route-fifo)",
+			TestTerminalRouteSnapshotsRetainExactSuffix},
 		{"terminal replay cannot promote lower integrity (todo49-replay-provenance)",
 			TestTerminalReplayCannotPromoteLowerIntegrity},
 		{"terminal replay retains effective modifiers (todo49-replay-modifiers)",
