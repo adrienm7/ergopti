@@ -298,7 +298,9 @@ jobs:
           $qualificationProfile = node -e "const q=require('./tools/ci/dev-release-qualification.cjs'); const p=q.resolveQualificationProfile(q.environmentContext()); if(p)process.stdout.write(p.id)"
           if ($LASTEXITCODE -ne 0) { throw "Qualification policy refused." }
           $qualificationArgument = if ($qualificationProfile) { " --qualification-profile=$qualificationProfile" } else { "" }
-          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"$qualificationArgument" -NoNewWindow -PassThru
+          $stdoutFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-suite.stdout.log'
+          $stderrFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-suite.stderr.log'
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"$qualificationArgument" -NoNewWindow -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -307,6 +309,9 @@ jobs:
           }
           $proc.WaitForExit()
           $exit = $proc.ExitCode
+          if (Test-Path -LiteralPath $stderrFile) {
+              Get-Content -LiteralPath $stderrFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
+          }
           if ($null -eq $exit) {
               Write-Host "::error::AHK native process exit receipt is unavailable."
               exit 2
@@ -435,6 +440,8 @@ jobs:
           name: windows-ahk-execution-manifest
           path: |
             ${{ runner.temp }}/windows-ahk-execution-manifest.json
+            ${{ runner.temp }}/windows-ahk-suite.stdout.log
+            ${{ runner.temp }}/windows-ahk-suite.stderr.log
             ${{ runner.temp }}/windows-qualification.json
             ${{ runner.temp }}/windows-ahk-isolated-*.json
             ${{ runner.temp }}/ergopti-ahk-menu-lifecycle-*/**
@@ -559,7 +566,9 @@ jobs:
           # FileAppend owns an exclusive handle; read the transcript only after exit.
           # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
           # hanging on an undismissable modal dialog in the headless runner.
-          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
+          $stdoutFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-e2e.stdout.log'
+          $stderrFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-e2e.stderr.log'
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
           while (-not $proc.HasExited) {
@@ -567,6 +576,9 @@ jobs:
           }
           $proc.WaitForExit()
           $exit = $proc.ExitCode
+          if (Test-Path -LiteralPath $stderrFile) {
+              Get-Content -LiteralPath $stderrFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
+          }
           if ($null -eq $exit) {
               Write-Host "::error::AHK native process exit receipt is unavailable."
               exit 2
@@ -587,6 +599,16 @@ jobs:
         run: |
           node tools/test/validate-ahk-e2e-manifest.cjs --input "$env:GITHUB_WORKSPACE/static/ergopti_plus/windows/tests/e2e/test_results.txt"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Retain E2E native streams
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ahk-e2e-native-streams
+          path: |
+            ${{ runner.temp }}/windows-ahk-e2e.stdout.log
+            ${{ runner.temp }}/windows-ahk-e2e.stderr.log
+          if-no-files-found: warn
 
   # ─────────────────────────────────────────────────
   # 3) Build the executable once; sign releases
