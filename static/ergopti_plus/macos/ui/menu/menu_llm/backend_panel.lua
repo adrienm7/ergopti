@@ -620,7 +620,7 @@ function M.build(ctx)
 						"MLX No Model successor", disable_model) then
 						return false
 					end
-					return true
+					return publish_backend_menu(debt)
 				end)
 				if committed and state.llm_enabled ~= false then
 					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
@@ -671,7 +671,7 @@ function M.build(ctx)
 						"Ollama No Model successor", disable_model) then
 						return false
 					end
-					return true
+					return publish_backend_menu(debt)
 				end
 				if state.llm_backend == "mlx" then
 					return leave_mlx("ollama", finish_ollama_switch)
