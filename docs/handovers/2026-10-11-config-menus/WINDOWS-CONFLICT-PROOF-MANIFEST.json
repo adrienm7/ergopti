@@ -1,0 +1,218 @@
+{
+	"schema": 1,
+	"source_sha": "fa3e520105d9057fd5ba55248b0b930eae5e0883",
+	"composed_source_sha": "d4ce0491e34a16727bd735c264d9075a2bf5f9ec",
+	"integrated_runtime_sha": "a2b1fb4be16ff88b9bab755841d744960512b89e",
+	"personal_native_run": 38130526545,
+	"integrated_native_run": 38132674726,
+	"integrated_run_verdict": "Owned by the linked exact-SHA manual run; no personal verdict substituted.",
+	"archive": "windows-genuine-source-conflict-qualified-proof.tar.gz",
+	"sha256": "c7f57725fc3a26a1aa122c588c4360c48cb7c24501bcb4f094326aa0c9ad3298",
+	"bytes": 3567094,
+	"members": 39,
+	"uncompressed_bytes": 12452201,
+	"limits": [
+		"All six Group1 TODO remain partial.",
+		"Original sandbox EROFS failure and untouched raw log bytes are retained.",
+		"Personal native conflict1306PASS;1981PASS/0FAIL/9140withoutterminal; full native/installation unqualified.",
+		"Native registry optimization diagnostics remain HOLD/unrun and are not source changes.",
+		"Current source reproductions need reviewed relocation; private historical absolute paths are not execution instructions."
+	],
+	"files": [
+		{
+			"path": "local-gates/RESUMED-GENUINE-SOURCE-CONFLICT-SELECTED-OCT11.json",
+			"bytes": 1117326,
+			"sha256": "f3428832593d039c8abf7ed1a4a28cd5f4a338b32d4e848ed4467f2f28aa1ffe"
+		},
+		{
+			"path": "local-gates/RESUMED-GENUINE-SOURCE-CONFLICT-SELECTED-OCT11.log",
+			"bytes": 153233,
+			"sha256": "77f177017a000d74e69e875640bb857b43eb9bd3ed363a79068e404c7d462390"
+		},
+		{
+			"path": "local-gates/RESUMED-GENUINE-SOURCE-CONFLICT-SELECTED-PERMITTED-OCT11.json",
+			"bytes": 1117326,
+			"sha256": "85ce87d9d8164f5dbd2f88eddabfe207e672b8bdaf163959df3977b64c2daefc"
+		},
+		{
+			"path": "local-gates/RESUMED-GENUINE-SOURCE-CONFLICT-SELECTED-PERMITTED-OCT11.log",
+			"bytes": 39747,
+			"sha256": "bf246bb028efcc726fd8c0090123639abfaebc263717d50318edcce850a0383c"
+		},
+		{
+			"path": "local-gates/RESUMED-GENUINE-SOURCE-CONFLICT-SPELLING-DELTA-SELECTED-OCT11.json",
+			"bytes": 1117424,
+			"sha256": "4f2d84e39e330a4a3b80ac91d62f70c369bbac201148e8b4819e0b0ee654af96"
+		},
+		{
+			"path": "local-gates/RESUMED-GENUINE-SOURCE-CONFLICT-SPELLING-DELTA-SELECTED-OCT11.log",
+			"bytes": 886,
+			"sha256": "1301fbe3fd8624567d93456b32f12c1bcf2a292cfde31283a478757dce2821cb"
+		},
+		{
+			"path": "local-gates/RESUMED-INCOMING-SHORTCUT-SELECTED-OCT11.json",
+			"bytes": 1117424,
+			"sha256": "e6f96bdbb09b2bdc09931104d3e5f387c146a2561a124fa3b0a20eeb305d9824"
+		},
+		{
+			"path": "local-gates/RESUMED-INCOMING-SHORTCUT-SELECTED-OCT11.log",
+			"bytes": 3626879,
+			"sha256": "982c49e47f260bc8e597259c6daa754dfec5b568187d6c176bf5c561adcd61d1"
+		},
+		{
+			"path": "native-windows/ACTUAL-WINDOWS-NATIVE-CASE-AND-COVERAGE.json",
+			"bytes": 1666,
+			"sha256": "44deb259352f78120034ff93921481cb19b221d2fad9b87464752b826941cd0e"
+		},
+		{
+			"path": "native-windows/TERMINAL-ACCOUNTING.json",
+			"bytes": 398,
+			"sha256": "ddf7826ed71650111457c760477c65e9bcf7dc863d3c09e8d3673015622afb83"
+		},
+		{
+			"path": "native-windows/TERMINAL-JOBS.json",
+			"bytes": 38836,
+			"sha256": "fcc51dfb1fbd18e20aab0574856a72a156a42d869047e55fe13608d15638ec27"
+		},
+		{
+			"path": "native-windows/TERMINAL-RUN.json",
+			"bytes": 13958,
+			"sha256": "95be4a9802e396d009a36fa00f254a357300ef3b80727579df30a1352815e854"
+		},
+		{
+			"path": "native-windows/WHOLE-RUN-LOGS.zip",
+			"bytes": 1019760,
+			"sha256": "e22c8b0b06f13c789aea522e456ab4e749079287de783ec9022e1abdfb137267"
+		},
+		{
+			"path": "native-windows/WINDOWS-21_Run AHK test suite.txt",
+			"bytes": 2714747,
+			"sha256": "f71dc1682161d19e121acad5fd5e4cf4188426ab2dff35a04fbf64e5221e272e"
+		},
+		{
+			"path": "native-windows/WINDOWS-27_Publish AHK execution manifest.txt",
+			"bytes": 3404,
+			"sha256": "d0020ee747880d0f2fd50cff4d9bc67974ad953defe7a30efadf076b1bf4a870"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/CURRENT-NATIVE-PHASE-ACCOUNTING.json",
+			"bytes": 3782,
+			"sha256": "291e5cce21f93c65b24800923e9d189a90729a32f7a1289d2b558db5cad60d8a"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/FREEZE.json",
+			"bytes": 525,
+			"sha256": "9bf544dee177a8e022dd15c80f61100d5a44594cb1fa64e79708d8c6ff08c67c"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/INDEPENDENT-NESTED-GLOBAL-SOURCE-CHECK.json",
+			"bytes": 1957,
+			"sha256": "02e04f02a50e9e8beace728187ebae681b8cda7997b84f3f97b26692b2448e30"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 3703,
+			"sha256": "bb201c16c2ad12da7565ef5af3360c277c0756d6ccc894d8a282654013a35745"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/README.md",
+			"bytes": 2912,
+			"sha256": "1e7b270e52fc423539a84b6e2e28c59d83b91c0584904f69673c2e3d40072ac2"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 5146,
+			"sha256": "0ad9fecc3ccd136fb2d71780ac19dda3fe22ae9568610372d77b023ca0f75972"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/SOURCE.patch",
+			"bytes": 9185,
+			"sha256": "afff8005c54bc6b84b4b5e3263899923715110069bdb74f9453b7784d2dbc4f6"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/V2-TO-V3.patch",
+			"bytes": 2566,
+			"sha256": "eaa24d628d9a1276c64e0634e13e959b299daa4b3a4af7d0032f1f80e0f92273"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/postimage/static/ergopti_plus/windows/tests/unit/test_terminators.ahk",
+			"bytes": 66864,
+			"sha256": "3771d0fe60c5ba2c49029b96ba80bfa6eb91596ad53fcf3691abc16c15d33668"
+		},
+		{
+			"path": "packets/terminator-genuine-native-detached-source-conflict-source-v3-retirement-ack-20261011/preimage/static/ergopti_plus/windows/tests/unit/test_terminators.ahk",
+			"bytes": 60839,
+			"sha256": "2a3a18c0ee6e344c6e8744d930439a0482637d0d592cd7e860b76beea47e2424"
+		},
+		{
+			"path": "packets/terminator-native-conflict-enumerated-root-spelling-source-successor-v1-20261011/FREEZE.json",
+			"bytes": 724,
+			"sha256": "8ce8e38efa9fc9c12beb3de5a066e8915a8c29bdcf365fa463064d55be78d4dc"
+		},
+		{
+			"path": "packets/terminator-native-conflict-enumerated-root-spelling-source-successor-v1-20261011/README.md",
+			"bytes": 1138,
+			"sha256": "541050e01365160530abbc6bbb81ef60a59befc9a8ed59e9a60d60ab72af7628"
+		},
+		{
+			"path": "packets/terminator-native-conflict-enumerated-root-spelling-source-successor-v1-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 1251,
+			"sha256": "783ca4c7995e4197b63f3da6f18a7dd0ad00254ba403af520a69869a44be2ed0"
+		},
+		{
+			"path": "packets/terminator-native-conflict-enumerated-root-spelling-source-successor-v1-20261011/SOURCE-SAFETY-REVIEW.json",
+			"bytes": 853,
+			"sha256": "7f90b7a868bb7c5dba1a38ce0844f1a99103a29f2190e45e76873add6a9a650d"
+		},
+		{
+			"path": "packets/terminator-native-conflict-enumerated-root-spelling-source-successor-v1-20261011/SOURCE.patch",
+			"bytes": 588,
+			"sha256": "fc571424f983c31734f214ec06354b44ae4b96b1ab727ef121ffb0a0ee76867b"
+		},
+		{
+			"path": "packets/terminator-native-conflict-enumerated-root-spelling-source-successor-v1-20261011/postimage/static/ergopti_plus/windows/tests/unit/test_terminators.ahk",
+			"bytes": 66886,
+			"sha256": "9c727f427faf89268bae057c8d9288a7865425517822df465b00a7d051c08747"
+		},
+		{
+			"path": "packets/terminator-native-conflict-enumerated-root-spelling-source-successor-v1-20261011/preimage/static/ergopti_plus/windows/tests/unit/test_terminators.ahk",
+			"bytes": 66864,
+			"sha256": "3771d0fe60c5ba2c49029b96ba80bfa6eb91596ad53fcf3691abc16c15d33668"
+		},
+		{
+			"path": "qualified-source/static/ergopti_plus/windows/tests/unit/test_terminators.ahk",
+			"bytes": 66886,
+			"sha256": "9c727f427faf89268bae057c8d9288a7865425517822df465b00a7d051c08747"
+		},
+		{
+			"path": "receipts/RESUMED-GENUINE-SOURCE-CONFLICT-WINDOWS-DISPATCH-OCT11.json",
+			"bytes": 628,
+			"sha256": "4c17bdd1bcf0a030fab0ae583597633676261cad4ee205a4e37c3a5fc1c513d6"
+		},
+		{
+			"path": "receipts/RESUMED-INCOMING-SHORTCUT-OCT11-PUBLISHED.json",
+			"bytes": 671,
+			"sha256": "572e64b15e0b9aad662dbc3da0144c368f90136c7e3b9ad29e7c495d9feb4691"
+		},
+		{
+			"path": "receipts/RESUMED-SOURCE-CONFLICT-FINAL-INTEGRATED-DISPATCH-OCT11.json",
+			"bytes": 1220,
+			"sha256": "c1ba545203cca4794ae169a72dbe8cb6966068d3d993e90d790db01efd77bbb1"
+		},
+		{
+			"path": "receipts/RESUMED-SOURCE-CONFLICT-OCT11-PUBLISHED.json",
+			"bytes": 577,
+			"sha256": "2e8f4e136da70b668dc8c922a47764ec0b01fce9daebf2734350c0d528ea0f03"
+		},
+		{
+			"path": "receipts/RESUMED-SOURCE-CONFLICT-SPELLING-OCT11-PROJECTION.json",
+			"bytes": 1076,
+			"sha256": "58d306e3eea274409683dbc76082b0c8e0128c3776cb891d717bf953679f716e"
+		},
+		{
+			"path": "receipts/WINDOWS-REGISTRY-IMMUTABLE-WITNESS-FINAL-FEASIBILITY-20261011.json",
+			"bytes": 2346,
+			"sha256": "8d1c6b413a2fb8c79b180bb92fdc71ac5e7622566dac9bb6fa00550626d43397"
+		}
+	]
+}
