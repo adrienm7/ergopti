@@ -838,3 +838,49 @@ system certificate setup/restoration, PAC/WPAD/managed model receiving, package
 and installation need macOS continuation. Windows SSPI/Schannel/NTLM, physical
 retirement, packaging and installation remain the maintainer-PC continuation.
 Production native qualification guards stay unchanged. No release is made.
+
+## Integrated bounded permission-history correction
+
+2026-10-11 integrated permission-history correction. Exact manual38106361453
+on2e4d798e executes25 archive cases:24 pass, one Homebrew case fails, none
+skip. Sparkle wrong-key preservation, valid retry and relaunch pass; the separate
+no-prompt SDK case passes without granting fixture consent. The fresh artifact
+contains65 complete first traversals of seven nodes without either exact name
+match. Both fixture owners close without helper debt. The original Automation
+prompt deadline remains the primary refusal; the six Brew scenarios are unrun.
+
+The permission stage is unknown because the256-record history filled before
+its final observation and later checkpoints overwrote it. The correction carries
+the first strictly validated, copied worker fact into subsequent bounded
+checkpoints. It changes no API call, process, deadline, consent or acceptance
+law. All203 original controls remain exact;205 portable controls pass without
+skips. Both new controls fail against the exact predecessor. Corrected native
+receiving, ordinary consent, Brew6 and full package/install remain required;
+item36 stays open.
+
+2026-10-11 integrated component receiving. Exact2e4d manual38106361453
+actually passes SDK49, daily7, logger42 and sourcePAC10 on both architectures.
+Both PAC14 runs have12 passes and two failures. Fresh cold MLX/official Ollama
+artifacts qualify27 source pins, signed bundle identity and physical ownership
+closure; daemon/model remain not-executed. Both native HTTP trust setups and model
+setups still refuse. Whole CI finishes with7 successful jobs,5 failed and5
+skipped, none cancelled; Release, package and install actually skip. These component
+results do not turn the incomplete whole native lane into a pass. The unrelated
+late permission-history correction retains the existing network production
+guards and Windows/macOS continuation steps; item62 remains open.
+
+The first permission fact is diagnostic context only. A before-call marker does
+not prove API entry or blocking; no retained marker does not prove nonexecution.
+The observed late-fact omission is a software diagnostic defect, distinct from
+the unresolved Automation consent cause. Manual38106361453 is left uninterrupted
+while the source correction is prepared on the same owned feature branch. Its
+whole verdict and corrected exact-SHA native validation are still pending.
+Windows native SSPI/Schannel/NTLM, physical retirement and package/install remain
+maintainer-PC steps; macOS consent and trust/restoration require continuation.
+No item is removed, including transversal16/38; withdrawn22 is not implemented.
+
+Manual38106361453 subsequently reaches whole terminal failure with7 successful
+jobs,5 failed and5 skipped, none cancelled. Release, package and install actually
+skip. Both native architectures retain actual HTTP/model trust setup refusals;
+corrected permission-history native receiving is still not-executed. The selected
+source correction gates must finish before its atomic commit and integration.
