@@ -528,3 +528,31 @@ Remaining requirements include genuine source-bound native clocks, TLS trust
 and restoration, PAC14/SDK49 on both architectures, ordinary Automation consent,
 Brew6, Windows/enterprise receiving and E2E/packaging/installation. Items36/62
 and transversal16/38 remain open;22 stays intentionally excluded.
+
+## Current-source Windows updater fixtures
+
+The two admitted-configuration fixture leaves are adopted under Root
+custody6110743845. The [immutable source proposal](windows-updater-current-source-proposal.tar.gz)
+retains both complete preimages/postimages, literal whole inverses, all167
+original function bodies and693 lexical assertion calls. The nine previously
+reported failing callbacks preserve129 assertions. Ten original registrations
+construct the real current scope fixture and restore the selected path; the
+one added future-schema case requires refusal before the injected writer.
+These textual checks are not AHK parser or native receiving.
+
+No production configuration/updater guard, global-clock allowance or original
+assertion changes. Source-pinned original23, complete native unit/E2E,
+packaging/installation and enterprise receiving remain required. The old42
+claim is not transferred. The separate official Dev8d6 full-suite receipt has
+2052 terminal passes and9081 nonterminal cases; their1252498.451ms recorded
+passing durations consume94.886% of the original1320000ms watchdog before
+runner overhead. This does not establish a permanent scope12 hang, and these
+fixture leaves do not alter that earlier owner. Items36/62 and16/38 stay open.
+
+The preceding conflict-free no-ff merge684225cf32a76db9f43a426673a9caa302ed77e2
+receives published4260 and current Dev8d6. Its complete selected gate exits0:
+format386, AHK encoding1894, JS412, Hammerspoon18599/1571 modules and
+Linux13254/520 modules pass. All77 source hashes, HEAD, merge parent and logical
+index remain exact. Windows unit/parse/E2E and native Swift are explicitly
+deferred, not passing. Four exact-SHA automatic-run censuses are empty after
+publication. No official CI ref, lock or manual run is moved or cancelled.

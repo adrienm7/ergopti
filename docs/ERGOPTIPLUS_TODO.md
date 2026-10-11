@@ -4068,6 +4068,19 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-11 current-source Windows updater fixture correction. Ten original
+callback registrations now construct an admitted current configuration through
+the original scope fixture and restore the selected path before cleanup. All167
+original function bodies and the nine affected callbacks'129 assertions remain;
+one additive real future-schema control requires refusal before writer effects.
+Root custody6110743845 and the complete source inverse are retained in the
+[reviewed proposal](handovers/2026-10-11-group6-cloud/windows-updater-current-source-proposal.tar.gz).
+This is source adoption, not native acceptance: original23, complete Windows
+unit/E2E/package/install receiving remain unrun on this successor. The separate
+Dev8d6 scope12 nonterminal case and global-watchdog budget pressure are not
+repaired by these two fixture leaves. No assertion or timeout is relaxed;
+item36 stays open.
+
 2026-10-11 replacement-container receiving checkpoint. The official `5f7` archive
 ZIP/log and all 400 archive/403 SDK source pins are independently authenticated.
 Archive25 has 24 passes, one original Homebrew refusal and zero skips. The
