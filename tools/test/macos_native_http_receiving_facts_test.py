@@ -2722,6 +2722,191 @@ class CleanupCommandMilestoneControls(unittest.TestCase):
                 self.assertEqual(fact["version"], 1)
                 self.assertEqual(fact["action"], "security_cleanup")
 
+    def test_cleanup_elapsed_clock_is_passive_and_deadline_clock_is_unchanged(self):
+        modes = (
+            "success",
+            "timeout",
+            "clock_refused",
+            "timeout_clock_refused",
+            "clock_regressed",
+            "print_refused",
+            "acquire_refused",
+            "timeout_retirement_refused",
+            "disabled",
+        )
+        for mode in modes:
+            with self.subTest(mode=mode):
+                fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+                fixture.command_file_debt = []
+                fixture.native_groups = object()
+                primary = subprocess.TimeoutExpired("private-timing-marker", 15)
+                process = SimpleNamespace(stdin=io.BytesIO(), returncode=None)
+                owner = SimpleNamespace(process=process, reaped=False)
+                events = []
+
+                def acquire(arguments, native, register, **ports):
+                    events.append("acquire")
+                    self.assertIs(native, fixture.native_groups)
+                    if mode == "acquire_refused":
+                        raise primary
+                    register(owner)
+                    return owner
+
+                def wait(budget):
+                    events.append("wait")
+                    self.assertTrue(process.stdin.closed)
+                    self.assertEqual(budget, 12.0)
+                    if mode.startswith("timeout"):
+                        raise primary
+
+                def retire():
+                    events.append("retire")
+                    if mode == "timeout_retirement_refused":
+                        return False
+                    owner.reaped = True
+                    process.returncode = 0
+                    return True
+
+                owner.wait_for_exit, owner.settle = wait, retire
+                fixture.groups = SimpleNamespace(acquire_owned=acquire)
+                samples = [index * 10_000_000 for index in range(8)]
+                if "clock_refused" in mode:
+                    samples[2] = RuntimeError("private-clock-detail")
+                elif mode == "clock_regressed":
+                    samples[3] = samples[2] - 1
+                observed = io.StringIO()
+                failure = result = None
+                with (
+                    mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=io.BytesIO),
+                    mock.patch.object(
+                        WIRE.time, "monotonic", side_effect=[100.0, 103.0]
+                    ) as deadline,
+                    mock.patch.object(WIRE.time, "perf_counter_ns", side_effect=samples) as clock,
+                    mock.patch.object(
+                        WIRE.subprocess, "Popen", side_effect=AssertionError("No child")
+                    ) as popen,
+                    contextlib.redirect_stderr(observed),
+                ):
+                    printer = (
+                        mock.patch(
+                            "builtins.print", side_effect=RuntimeError("private-print-detail")
+                        )
+                        if mode == "print_refused"
+                        else contextlib.nullcontext()
+                    )
+                    with printer:
+                        try:
+                            result = fixture._command(
+                                ["private-timing-marker"],
+                                deadline=115.0,
+                                security_failure_observation=mode != "disabled",
+                            )
+                        except BaseException as caught:
+                            failure = caught
+                    self.assertEqual(deadline.call_count, 1 if mode == "acquire_refused" else 2)
+                    popen.assert_not_called()
+                    if mode == "disabled":
+                        clock.assert_not_called()
+                refused = mode.startswith("timeout") or mode == "acquire_refused"
+                if refused:
+                    self.assertIs(failure, primary)
+                    self.assertIsNone(result)
+                else:
+                    self.assertIsNone(failure)
+                    self.assertEqual(result, (0, b""))
+                self.assertEqual(fixture.command_file_debt, [])
+                self.assertEqual(
+                    events,
+                    ["acquire"] if mode == "acquire_refused" else ["acquire", "wait", "retire"],
+                )
+                if mode == "disabled":
+                    self.assertIsNone(fixture.command_milestone_fact)
+                    continue
+                fact = fixture.command_milestone_fact
+                self.assertIn("timing", fact)
+                timing = fact["timing"]
+                invalid_clock = "clock_refused" in mode or mode == "clock_regressed"
+                self.assertEqual(timing["observed"], not invalid_clock)
+                for stage in ("acquisition", "input_close", "wait", "retirement"):
+                    self.assertEqual(
+                        timing[stage + "_elapsed_ms"],
+                        None
+                        if invalid_clock or (mode == "acquire_refused" and stage != "acquisition")
+                        else 10.0,
+                    )
+                self.assertEqual(
+                    timing["wait_budget_ms"],
+                    None if invalid_clock or mode == "acquire_refused" else 12000.0,
+                )
+                self.assertEqual(
+                    fact["phase"],
+                    "settle"
+                    if mode == "timeout_retirement_refused"
+                    else "deadline"
+                    if refused
+                    else "complete",
+                )
+                self.assertEqual(
+                    fact["failure_phase"],
+                    "acquire" if mode == "acquire_refused" else "wait" if refused else None,
+                )
+                self.assertEqual(
+                    fact["retirement_result"],
+                    "not_acquired"
+                    if mode == "acquire_refused"
+                    else "refused"
+                    if mode == "timeout_retirement_refused"
+                    else "acknowledged",
+                )
+                self.assertNotIn("private-", observed.getvalue())
+                if mode != "print_refused":
+                    self.assertEqual(
+                        json.loads(
+                            observed.getvalue().removeprefix("# native_http_security_milestones ")
+                        ),
+                        fact,
+                    )
+
+    def test_cleanup_clock_control_interrupt_preserves_cancellation_before_acquisition(self):
+        for interrupt in (KeyboardInterrupt("private-control"), SystemExit(19)):
+            with self.subTest(kind=type(interrupt).__name__):
+                fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+                fixture.command_file_debt = []
+                fixture.native_groups = object()
+                acquire = mock.Mock(side_effect=AssertionError("No child after cancellation"))
+                fixture.groups = SimpleNamespace(acquire_owned=acquire)
+                streams = [io.BytesIO(), io.BytesIO()]
+                observed = io.StringIO()
+                with (
+                    mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=streams),
+                    mock.patch.object(WIRE.time, "monotonic", return_value=100.0) as deadline,
+                    mock.patch.object(WIRE.time, "perf_counter_ns", side_effect=interrupt) as clock,
+                    mock.patch.object(
+                        WIRE.subprocess, "Popen", side_effect=AssertionError("No child")
+                    ) as popen,
+                    contextlib.redirect_stderr(observed),
+                ):
+                    with self.assertRaises(type(interrupt)) as caught:
+                        fixture._command(
+                            ["private-control"],
+                            deadline=115.0,
+                            security_failure_observation=True,
+                        )
+                    self.assertIs(caught.exception, interrupt)
+                    acquire.assert_not_called()
+                    popen.assert_not_called()
+                    self.assertEqual(clock.call_count, 1)
+                    self.assertEqual(deadline.call_count, 1)
+                self.assertTrue(all(stream.closed for stream in streams))
+                self.assertEqual(fixture.command_file_debt, [])
+                fact = fixture.command_milestone_fact
+                self.assertEqual(fact["phase"], "acquire")
+                self.assertEqual(fact["failure_phase"], "acquire")
+                self.assertFalse(fact["child_acquired"])
+                self.assertFalse(fact["wait_entered"])
+                self.assertEqual(fact["retirement_result"], "not_acquired")
+                self.assertNotIn("private-control", observed.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
