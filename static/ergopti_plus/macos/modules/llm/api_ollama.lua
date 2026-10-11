@@ -87,6 +87,7 @@ local _ollama_start_pause_fenced = false
 -- exact slots are not terminal until the outer start frame returns and is
 -- revalidated, so PAUSE/RESUME must refuse cleanup while this depth is non-zero.
 local _ollama_start_acquisition_depth = 0
+local _ollama_server_retirement_depth = 0
 local _ollama_launch_cleanup_observers = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
@@ -609,6 +610,31 @@ function M.stop_warmup()
 	return quiesce_warmup()
 end
 
+--- Retires only this module's original foreground daemon, including a published
+--- READY owner. External servers never acquire a handle here. EOF is a request;
+--- the exact RETIRED receipt and native completion remain required for release.
+--- @return boolean settled True only when the retained daemon owners are joined.
+function M.stop_owned_server()
+	if _ollama_server_retirement_depth > 0 then return false end
+	_ollama_server_retirement_depth = _ollama_server_retirement_depth + 1
+	local ok, settled = xpcall(function()
+		local generation = _ollama_start_generation
+		_ollama_start_generation = generation + 1
+		_ollama_start_resume_pending = false
+		_ollama_starting = false
+		_ollama_started = false
+		_ollama_start_cleanup_pending = true
+		M.reset_ready()
+		settle_ollama_start_transaction(generation, false, "owned server retirement")
+		local warmup_settled = M.stop_warmup()
+		local daemon_settled = settle_ollama_start_cleanup()
+		return warmup_settled == true and daemon_settled == true
+	end, debug.traceback)
+	_ollama_server_retirement_depth = _ollama_server_retirement_depth - 1
+	if not ok then Logger.error(LOG, "Owned Ollama server retirement failed: %s.", tostring(settled)) end
+	return ok == true and settled == true
+end
+
 --- Quiesces one in-flight warmup while retaining its exact pre-pause intent.
 --- @return boolean settled
 function M.pause_warmup()
@@ -650,6 +676,7 @@ local STREAM_TMPFILE_CLEANUP_SEC = 70
 -- @return boolean accepted True when a daemon is running or one launch attempt
 -- was committed to native async ownership.
 local function ensure_ollama_running(options)
+	if _ollama_server_retirement_depth > 0 then return false end
 	if _ollama_ambiguous_task ~= nil then _ollama_start_cleanup_pending = true end
 	if _ollama_start_cleanup_pending == true
 		and settle_ollama_start_cleanup() ~= true then
@@ -858,7 +885,8 @@ end
 --- An acknowledged published daemon is stable ownership, not cleanup debt.
 --- @return boolean idle
 function M.startup_idle()
-	return _ollama_start_acquisition_depth == 0 and _ollama_starting ~= true
+	return _ollama_start_acquisition_depth == 0 and _ollama_server_retirement_depth == 0
+		and _ollama_starting ~= true
 		and _ollama_start_transaction == nil and _ollama_start_cleanup_pending ~= true
 		and _ollama_start_resume_pending ~= true and not has_pending_ollama_start_owner()
 end
