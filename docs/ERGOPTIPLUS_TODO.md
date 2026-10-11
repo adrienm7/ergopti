@@ -9674,6 +9674,17 @@ The personal-hotstring section caption and check policy now come from the shared
   no native cohort proof; Windows PowerShell and actual desktop requalification
   of this receiving successor remain unrun.
 
+  The retained-pair repeat/deferred-tap path now joins the existing live
+  category gate before effect admission. Modifier/layer acquisition also checks
+  after the genuine resolver/duration logging callbacks, where category
+  publication can reenter before a refused Reload completes. Previously held
+  press suppression and UP ownership remain; completed hold outcomes are not
+  rewritten. All240 original assertions remain, with12 additive registered
+  callback/repeat/revocation cases and five prepared guard-omission controls.
+  This is a bounded caller repair, not raw AltGr provenance, simultaneous input
+  or a native modifier-owner qualification. Actual AHK syntax/unit/E2E and
+  Windows native/compiled/installed receiving remain unrun in this container.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
