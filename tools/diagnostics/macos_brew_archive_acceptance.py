@@ -959,6 +959,7 @@ class PhaseEvidence:
         self.ownership_closed = False
         self.previous = None
         self.first_timeout = None
+        self.first_permission_worker = None
         if directory is not None:
             require(
                 hasattr(os, "O_NOFOLLOW"),
@@ -1106,6 +1107,13 @@ class PhaseEvidence:
                     "Permission worker observation cannot grant consent or closure",
                 )
                 packet["permission_worker"] = _validate_permission_worker_fact(permission_worker)
+                if getattr(self, "first_permission_worker", None) is None:
+                    self.first_permission_worker = dict(packet["permission_worker"])
+            first_permission_worker = getattr(self, "first_permission_worker", None)
+            if first_permission_worker is not None:
+                packet["first_permission_worker"] = _validate_permission_worker_fact(
+                    first_permission_worker
+                )
             first_timeout = getattr(self, "first_timeout", None)
             if first_timeout is not None:
                 packet["first_timeout"] = _validate_command_timeout(first_timeout)
