@@ -14,7 +14,6 @@ import shutil
 import signal
 import stat
 import sys
-import tempfile
 import unittest
 from unittest import mock
 
@@ -215,170 +214,81 @@ class RealNativeClientReceiving(unittest.TestCase):
         cls.receiving_workers = []
         cls.root = None
         try:
-            cls.root = Path(tempfile.mkdtemp(prefix="ergopti-native-client-app-"))
-            os.chmod(cls.root, 0o700)
-            cls.app = cls.root / "OwnedNativeHTTPFixture.app"
-            contents = cls.app / "Contents"
-            executable = contents / "MacOS/ErgoptiPlus"
-            executable.parent.mkdir(parents=True)
-            cls.resources = contents / "Resources"
-            payload = cls.resources / "static/ergopti_plus"
-            native = payload / "macos/platform/network"
-            native.mkdir(parents=True)
-            shared = payload / "_shared/python"
-            shared.mkdir(parents=True)
-            contract = payload / "_shared/modules/network/proxy_policy.json"
-            contract.parent.mkdir(parents=True)
-            shutil.copy2(
-                ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json",
-                contract,
+            build_spec = importlib.util.spec_from_file_location(
+                "owned_native_http_build",
+                Path(__file__).with_name("native_http_fixture_builder.py"),
             )
-            shutil.copy2(
-                ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py",
-                shared,
-            )
-            for name in ("native_http.py", "managed_http.py"):
-                shutil.copy2(MAC / "platform/network" / name, native)
-            source = MAC / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-            pac_source = source.with_name("ManagedPACSource.swift")
-            certificate_source = source.with_name("ManagedCertificateAuthorities.swift")
-            bootstrap_source = source.with_name("ManagedBootstrapPolicy.generated.swift")
-            fixture_source = Path(__file__).with_name("native_http_fixture_main.swift")
-            compatibility_headers = MAC / "launcher/Sources/CPOSIXCompatibility/include"
-            compatibility_sources = tuple(
-                compatibility_headers / name
-                for name in (
-                    "CPOSIXCompatibility.h",
-                    "OwnedProgramCompatibility.h",
-                    "LoopbackListenerCompatibility.h",
-                    "OwnedImageAliasCompatibility.h",
-                    "OwnedSuspendedImageCompatibility.h",
-                    "OwnedListenerEventCompatibility.h",
-                )
-            )
-            # Retain exact compiler inputs in the private packet. A concurrent edit
-            # refuses qualification, even if swiftc itself returned success.
-            observed = {
-                str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in (
-                    source,
-                    pac_source,
-                    certificate_source,
-                    bootstrap_source,
-                    fixture_source,
-                    *compatibility_sources,
-                    MAC / "platform/network/native_http.py",
-                    MAC / "platform/network/managed_http.py",
-                    ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py",
-                    ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json",
-                )
-            }
-            worker_copy = cls.root / source.name
-            pac_copy = cls.root / pac_source.name
-            certificate_copy = cls.root / certificate_source.name
-            bootstrap_copy = cls.root / bootstrap_source.name
-            main_copy = cls.root / fixture_source.name
-            swift_inputs = (
-                (source, worker_copy),
-                (pac_source, pac_copy),
-                (certificate_source, certificate_copy),
-                (bootstrap_source, bootstrap_copy),
-                (fixture_source, main_copy),
-            )
-            for original, copied in swift_inputs:
-                shutil.copy2(original, copied)
-            # SwiftPM supplies this real Clang module to the release launcher.
-            # Standalone receiving must import the identical public C headers,
-            # including the explicit public macOS DHCP declarations.
-            compatibility_module = cls.root / "CPOSIXCompatibility"
-            compatibility_module.mkdir(mode=0o700)
-            for header in compatibility_sources:
-                destination = compatibility_module / header.name
-                shutil.copy2(header, destination)
-                relative = str(header.relative_to(ROOT))
-                if hashlib.sha256(destination.read_bytes()).hexdigest() != observed[relative]:
-                    raise RuntimeError("Native compatibility source changed before compilation")
-            (compatibility_module / "module.modulemap").write_text(
-                "module CPOSIXCompatibility {\n"
-                '  umbrella header "CPOSIXCompatibility.h"\n'
-                "  export *\n"
-                "}\n",
-                encoding="utf-8",
-            )
-            for original, copied in swift_inputs:
-                if (
-                    hashlib.sha256(copied.read_bytes()).hexdigest()
-                    != observed[str(original.relative_to(ROOT))]
-                ):
-                    raise RuntimeError("Native Swift source changed before compilation")
-            cls.fixture._command(
-                [
-                    "/usr/bin/xcrun",
-                    "swiftc",
-                    "-parse-as-library",
-                    "-D",
-                    "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",
-                    "-I",
-                    str(compatibility_module),
-                    "-framework",
-                    "SystemConfiguration",
-                    str(worker_copy),
-                    str(pac_copy),
-                    str(certificate_copy),
-                    str(bootstrap_copy),
-                    str(main_copy),
-                    "-o",
-                    str(executable),
-                ],
-                timeout=60,
-            )
-            for original, copied in swift_inputs:
-                if (
-                    hashlib.sha256(copied.read_bytes()).hexdigest()
-                    != observed[str(original.relative_to(ROOT))]
-                ):
-                    raise RuntimeError("Native Swift source changed during compilation")
-            for relative, digest in observed.items():
-                if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != digest:
-                    raise RuntimeError("Native receiving source changed during compilation")
-            cls.fixture._command(["/usr/bin/codesign", "--force", "--sign", "-", str(executable)])
-            cls.fixture._command(["/usr/bin/codesign", "--verify", "--strict", str(executable)])
-            cls.fixture.trust_query_executable = executable
+            builder = importlib.util.module_from_spec(build_spec)
+            build_spec.loader.exec_module(builder)
+            cls.build = builder.OwnedFixtureBuild(cls.fixture)
+            cls.root = cls.build.root
+            cls.build.build()
             cls.fixture.authorization_observation = True
-            identity = executable.stat()
-            (cls.root / "source-receipt.json").write_text(
-                json.dumps(
-                    {
-                        "version": 1,
-                        "source_hashes": observed,
-                        "binary_sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
-                        "device": identity.st_dev,
-                        "inode": identity.st_ino,
-                    }
-                ),
-                encoding="utf-8",
-            )
-            cls.environment = {
-                "ERGOPTI_LAUNCHER_EXECUTABLE": str(executable),
-                "ERGOPTI_LAUNCHER_DEVICE": str(identity.st_dev),
-                "ERGOPTI_LAUNCHER_INODE": str(identity.st_ino),
-            }
+            cls.app = cls.build.app
+            cls.resources = cls.build.resources
+            native = cls.build.native
+            cls.environment = cls.build.environment
             module_spec = importlib.util.spec_from_file_location(
                 "actual_native_managed_http", native / "managed_http.py"
             )
             cls.managed = importlib.util.module_from_spec(module_spec)
             module_spec.loader.exec_module(cls.managed)
             cls.httpx = httpx
-        except BaseException:
-            cls.fixture.close()
+        except BaseException as primary:
+            root_refusal = None
             if cls.root is not None:
-                shutil.rmtree(cls.root)
+                try:
+                    cls.build._root_owned()
+                except BaseException as failure:
+                    root_refusal = failure
+            close_failure = None
+            try:
+                cls.fixture.close()
+            except BaseException as failure:
+                close_failure = failure
+            if cls.root is not None and root_refusal is None and close_failure is None:
+                try:
+                    cls._root_removal_admitted()
+                    shutil.rmtree(cls.root)
+                except BaseException as failure:
+                    root_refusal = failure
+            # These are retained failure facts, never a second process owner.
+            cls.root_cleanup_failures = [
+                failure for failure in (close_failure, root_refusal) if failure is not None
+            ]
+            if cls.root_cleanup_failures:
+                raise primary from cls.root_cleanup_failures[0]
             raise
 
     @classmethod
+    def _root_removal_admitted(cls):
+        # Bounded pathname identity admission, not an atomic deletion proof.
+        cls.build._root_owned()
+        if (
+            cls.fixture.closed is not True
+            or cls.fixture.command_group_debt
+            or cls.fixture.command_file_debt
+            or cls.fixture.trust_attempted
+            or cls.fixture.keychain_created
+            or cls.fixture.receiving_facts()["active"]
+        ):
+            raise RuntimeError("Native fixture build root cleanup remains unsettled")
+        if any(not worker_receiving_facts(value)["settled"] for value in cls.receiving_workers):
+            raise RuntimeError("Native fixture receiving child remains unsettled")
+
+    @classmethod
     def tearDownClass(cls):
+        root_refusal = None
+        try:
+            cls.build._root_owned()
+        except BaseException as failure:
+            root_refusal = failure
         try:
             cls.fixture.close()
+        except BaseException as primary:
+            if root_refusal is not None:
+                raise primary from root_refusal
+            raise
         finally:
             # Observe the unchanged restoration outcome, including refusal.
             # Printing never pays a cleanup debt or replaces its primary error.
@@ -399,6 +309,9 @@ class RealNativeClientReceiving(unittest.TestCase):
                 )
             except (OSError, ValueError):
                 pass
+        if root_refusal is not None:
+            raise root_refusal
+        cls._root_removal_admitted()
         receipt = json.loads((cls.root / "source-receipt.json").read_text())
         for relative, digest in receipt["source_hashes"].items():
             if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != digest:
@@ -416,6 +329,7 @@ class RealNativeClientReceiving(unittest.TestCase):
             for worker in cls.receiving_workers
         ):
             raise RuntimeError("Native fixture stage receipt closure remains unsettled")
+        cls._root_removal_admitted()
         shutil.rmtree(cls.root)
         if all(worker_receiving_facts(value)["settled"] for value in cls.receiving_workers):
             cls.receiving_workers.clear()

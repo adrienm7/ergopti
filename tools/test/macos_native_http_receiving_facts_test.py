@@ -824,11 +824,80 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
         self.assertIn("defer { lock.unlock() }", fixture)
         self.assertNotIn("lock.lock()", fixture)
         self.assertIn("FixtureHTTPObservation.owner?.mark(stage)", fixture)
-        compiler = (SUPPORT / "native_http_wire_client_receiving.py").read_text(encoding="utf-8")
-        self.assertIn(
-            '"-D",\n                    "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",',
-            compiler,
+        import ast
+
+        compiler = ast.parse(
+            (SUPPORT / "native_http_fixture_builder.py").read_text(encoding="utf-8")
         )
+        builder = next(
+            node
+            for node in compiler.body
+            if isinstance(node, ast.ClassDef) and node.name == "OwnedFixtureBuild"
+        )
+        build = next(
+            node
+            for node in builder.body
+            if isinstance(node, ast.FunctionDef) and node.name == "build"
+        )
+        compiler_calls = [
+            node
+            for node in ast.walk(build)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and ast.unparse(node.func) == "self._command"
+            and node.args
+            and isinstance(node.args[0], ast.List)
+            and len(node.args[0].elts) >= 5
+            and isinstance(node.args[0].elts[0], ast.Constant)
+            and node.args[0].elts[0].value == "/usr/bin/xcrun"
+        ]
+        self.assertEqual(len(compiler_calls), 1)
+        self.assertEqual(
+            [node.value for node in compiler_calls[0].args[0].elts[:5]],
+            [
+                "/usr/bin/xcrun",
+                "swiftc",
+                "-parse-as-library",
+                "-D",
+                "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",
+            ],
+        )
+        caller = ast.parse(
+            (SUPPORT / "native_http_wire_client_receiving.py").read_text(encoding="utf-8")
+        )
+        receiving = next(
+            node
+            for node in caller.body
+            if isinstance(node, ast.ClassDef) and node.name == "RealNativeClientReceiving"
+        )
+        bootstrap = next(
+            node
+            for node in receiving.body
+            if isinstance(node, ast.FunctionDef) and node.name == "setUpClass"
+        )
+        calls = [node for node in ast.walk(bootstrap) if isinstance(node, ast.Call)]
+        fixed_loads = [
+            node
+            for node in calls
+            if ast.unparse(node.func) == "importlib.util.spec_from_file_location"
+        ]
+        self.assertEqual(
+            [(ast.unparse(node.args[0]), ast.unparse(node.args[1])) for node in fixed_loads],
+            [
+                (
+                    "'owned_native_http_build'",
+                    "Path(__file__).with_name('native_http_fixture_builder.py')",
+                ),
+                ("'actual_native_managed_http'", "native / 'managed_http.py'"),
+            ],
+        )
+        for expression in (
+            "importlib.util.module_from_spec(build_spec)",
+            "build_spec.loader.exec_module(builder)",
+            "builder.OwnedFixtureBuild(cls.fixture)",
+            "cls.build.build()",
+        ):
+            self.assertEqual(sum(ast.unparse(node) == expression for node in calls), 1)
 
 
 class NativeAdminTrustObservationTests(unittest.TestCase):
@@ -3847,6 +3916,31 @@ def r2_guard_constructor_literal_setup(self):
 
 NativeTimedAddCaptureObservationTests.setUp = r2_guard_constructor_literal_setup
 NativeTimedAddCancellationTests.setUp = r2_guard_constructor_literal_setup
+
+
+# Fixed-path independent-builder portable enrollment. The exact selector refuses
+# missing/extra controls; no native clock/factory role is activated by these tests.
+NATIVE_FIXTURE_BUILD_CONTROLS = load(
+    "native_http_fixture_builder_controls",
+    ROOT / "tools/test/macos_native_http_fixture_builder_controls.py",
+)
+(
+    NativeFixtureBuilderControls,
+    NativeFixtureAdmissionControls,
+    NativeFixtureAliasDuringReadControls,
+) = NATIVE_FIXTURE_BUILD_CONTROLS.enrolled_cases()
+
+
+# Fixed-path caller root ownership receiving: original native test bodies remain
+# unchanged; these software controls confer no native execution qualification.
+NATIVE_CLIENT_ROOT_CONTROLS = load(
+    "native_http_client_root_controls",
+    ROOT / "tools/test/macos_native_http_client_root_controls.py",
+)
+(
+    NativeClientRootReplacementControls,
+    NativeClientRootCleanupControls,
+) = NATIVE_CLIENT_ROOT_CONTROLS.enrolled_cases()
 
 
 if __name__ == "__main__":

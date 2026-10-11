@@ -6951,6 +6951,43 @@ is separate and absent. Model,
 package/install, Windows-PC and enterprise acceptance remain required. See the
 [cloud continuation](handovers/2026-10-11-group6-cloud/README.md). Item 62 stays open.
 
+2026-10-11 independent signed callee/root ownership. R2 is published in6e4e7724
+with actual format379, JS410 and Lua18599/zero failures, stable eight-path fence.
+The next client slice centralizes its original18-input signed recipe, retains
+compile60/sign15/verify15 and the same process owner, and makes source/image
+verification mandatory before optional trust query observation. Acquired-file
+hardlink and actual caller foreign-root controls fail before correction.
+Corrected cleanup preserves the exact primary and foreign root; original
+cleanup still runs with physical child/capture/trust/keychain debt gates.
+Unchanged33 and new7 permanent cases bring the normal census to143. First
+physical136 has135 passes/one relocated-source assertion failure; the reviewed
+predicate checks actual compiler and fixed caller route, retaining all prior
+causal assertions and every other original103 body. Wrong macro/loader mutants
+fail assertions. Physical alphabetical143 passes, zero failures/errors/skips.
+Parent preimages/full inverses/60 safe members and physical18-input closure
+are received. This is portable software evidence; native compile/sign/Security
+were modeled. Swift45 factory remains held. Actual clients, trust/restore,
+source-bound clocks, PAC14/SDK49 both architectures, model, E2E/package/install
+and managed-network/device receiving remain required. Item62 and16/38 stay open.
+
+The first actual selected builder gate fails README formatting and two
+JavaScript checks (408 passes/two failures); Lua18599 passes with zero failures.
+Its thirteen owned files, HEAD and index remain exact. The physical143 owner
+did not cover the separate ten-case standalone diagnostic owner, whose old
+inline compiler instrumentation now errors; four PAC Source assertions also
+require relocation to the actual builder. Failed raw evidence is retained in
+the cloud handover. Their behavioral obligations and mutation sensitivity
+remain required before this slice can be committed. Item62 stays open.
+
+The bounded successor preserves all ten diagnostic identities, command census
+and cleanup semantics, relocating only actual staging/root hooks and four
+genuine refusal messages. Original10 reproduces ten errors; corrected10 passes
+with zero failures/errors/skips. Seven omission/no-op controls fail their
+intended assertions, including actual modified-copy and PAC argv cases.
+Root releases only the four stale PAC recipe predicates; all other PAC checks,
+SourcePAC10/402 and the independent native14 corpus remain exact. The final
+selected gate and genuine native clients/signing/trust are still required.
+
 2026-10-11 integrated component receiving. Exact2e4d manual38106361453
 actually passes SDK49, daily7, logger42 and sourcePAC10 on both architectures.
 Both PAC14 runs have12 passes and two failures. Fresh cold MLX/official Ollama

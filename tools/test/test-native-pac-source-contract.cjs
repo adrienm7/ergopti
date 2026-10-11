@@ -206,14 +206,126 @@ check('isolated-native-source-session-preserves-enterprise-hostname-trust', () =
 });
 
 check('standalone-native-producers-copy-hash-and-compile-the-source-owner', () => {
-	const wire = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'),
-		'utf8'
+	// Follow the actual centralized recipe and its fixed caller; comments and
+	// obsolete inline local names confer no copy/hash/compile evidence.
+	const recipe = spawnSync(
+		pythonExecutable(),
+		[
+			'-I',
+			'-B',
+			'-c',
+			String.raw`
+import ast
+from pathlib import Path
+import sys
+
+support = Path(sys.argv[1]) / "static/ergopti_plus/macos/tests/support"
+builder = ast.parse((support / "native_http_fixture_builder.py").read_bytes())
+caller = ast.parse((support / "native_http_wire_client_receiving.py").read_bytes())
+
+def unique(nodes):
+    values = list(nodes)
+    assert len(values) == 1, "actual source owner must be unique"
+    return values[0]
+
+def expression(node):
+    return ast.unparse(node)
+
+def function(tree, owner, name):
+    cls = unique(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == owner)
+    return unique(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == name)
+
+def assignment(nodes, target):
+    return unique(n for n in nodes if isinstance(n, ast.Assign)
+                  and [expression(t) for t in n.targets] == [target])
+
+mac = assignment(builder.body, "MAC")
+assert ast.literal_eval(mac.value) == "static/ergopti_plus/macos/"
+swift_inputs = assignment(builder.body, "SWIFT_INPUTS").value
+assert isinstance(swift_inputs, ast.BinOp) and isinstance(swift_inputs.op, ast.Add)
+assert isinstance(swift_inputs.left, ast.Call) and expression(swift_inputs.left.func) == "tuple"
+generator = unique(swift_inputs.left.args)
+assert isinstance(generator, ast.GeneratorExp)
+assert expression(generator.elt) == "MAC + 'launcher/Sources/ErgoptiPlus/' + name"
+loop = unique(generator.generators)
+assert expression(loop.target) == "name" and not loop.ifs and not loop.is_async
+assert ast.literal_eval(loop.iter) == (
+    "ManagedHTTPWorker.swift", "ManagedPACSource.swift",
+    "ManagedCertificateAuthorities.swift", "ManagedBootstrapPolicy.generated.swift",
+)
+assert expression(swift_inputs.right) == "(MAC + 'tests/support/native_http_fixture_main.swift',)"
+
+stage = function(builder, "OwnedFixtureBuild", "_stage")
+assert expression(assignment(stage.body, "content").value) == "_source(original)"
+assert expression(assignment(stage.body, "target").value) == "self.root / relative"
+unique(n for n in stage.body if isinstance(n, ast.Expr)
+       and expression(n.value) == "target.write_bytes(content)")
+assert expression(assignment(stage.body, "self.source_hashes[original]").value) == "_digest(content)"
+assert expression(assignment(stage.body, "self.staged_hashes[str(relative)]").value) == "_digest(content)"
+assert isinstance(stage.body[-1], ast.Return) and expression(stage.body[-1].value) == "target"
+
+verify = function(builder, "OwnedFixtureBuild", "_verify_sources")
+source_loop = unique(n for n in verify.body if isinstance(n, ast.For)
+                    and expression(n.iter) == "self.source_hashes.items()")
+staged_loop = unique(n for n in verify.body if isinstance(n, ast.For)
+                    and expression(n.iter) == "self.staged_hashes.items()")
+for loop, comparison in (
+    (source_loop, "_digest(_source(relative)) != digest"),
+    (staged_loop, "_digest(regular_bytes(path)[0]) != digest"),
+):
+    refused = unique(n for n in loop.body if isinstance(n, ast.If)
+                     and expression(n.test) == comparison)
+    assert any(isinstance(n, ast.Raise) for n in refused.body)
+
+build = function(builder, "OwnedFixtureBuild", "build")
+assert expression(assignment(build.body, "swift").value) == (
+    "[self._stage(path, Path(path).name) for path in SWIFT_INPUTS]"
+)
+compiler = unique(n for n in build.body if isinstance(n, ast.Expr)
+                 and isinstance(n.value, ast.Call)
+                 and expression(n.value.func) == "self._command"
+                 and n.value.args and isinstance(n.value.args[0], ast.List)
+                 and isinstance(n.value.args[0].elts[0], ast.Constant)
+                 and n.value.args[0].elts[0].value == "/usr/bin/xcrun")
+arguments = compiler.value.args[0].elts
+assert [ast.literal_eval(n) for n in arguments[:5]] == [
+    "/usr/bin/xcrun", "swiftc", "-parse-as-library", "-D",
+    "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",
+]
+unique(n for n in arguments if isinstance(n, ast.Starred)
+       and expression(n.value) == "map(str, swift)")
+assert {k.arg: ast.literal_eval(k.value) for k in compiler.value.keywords} == {"timeout": 60}
+checks = [n.lineno for n in build.body if isinstance(n, ast.Expr)
+          and expression(n.value) == "self._verify_sources()"]
+assert any(line < compiler.lineno for line in checks)
+assert any(line > compiler.lineno for line in checks)
+
+setup = function(caller, "RealNativeClientReceiving", "setUpClass")
+body = unique(n for n in setup.body if isinstance(n, ast.Try)).body
+spec = assignment(body, "build_spec")
+assert expression(spec.value.func) == "importlib.util.spec_from_file_location"
+assert [expression(a) for a in spec.value.args] == [
+    "'owned_native_http_build'", "Path(__file__).with_name('native_http_fixture_builder.py')",
+]
+module = assignment(body, "builder")
+assert expression(module.value) == "importlib.util.module_from_spec(build_spec)"
+load = unique(n for n in body if isinstance(n, ast.Expr)
+              and expression(n.value) == "build_spec.loader.exec_module(builder)")
+owned = assignment(body, "cls.build")
+assert expression(owned.value) == "builder.OwnedFixtureBuild(cls.fixture)"
+consume = unique(n for n in body if isinstance(n, ast.Expr)
+                 and expression(n.value) == "cls.build.build()")
+assert spec.lineno < module.lineno < load.lineno < owned.lineno < consume.lineno
+print("PAC_CENTRAL_RECIPE_AND_FIXED_CALLER=PASS")
+`,
+			root
+		],
+		{ cwd: root, encoding: 'utf8', timeout: 10000 }
 	);
-	assert.match(wire, /pac_source = source\.with_name\("ManagedPACSource\.swift"\)/);
-	assert.match(wire, /for path in \([\s\S]*?source,\s+pac_source,\s+certificate_source,/);
-	assert.match(wire, /\(pac_source, pac_copy\)/);
-	assert.match(wire, /"swiftc",[\s\S]*?str\(pac_copy\),/);
+	assert.equal(recipe.status, 0, recipe.stderr || recipe.stdout);
+	assert.equal(recipe.signal, null);
+	assert.equal(recipe.error, undefined);
+	assert.equal(recipe.stdout.trim(), 'PAC_CENTRAL_RECIPE_AND_FIXED_CALLER=PASS');
 	const model = fs.readFileSync(
 		path.join(root, 'tools/diagnostics/macos_managed_ollama_receiving.py'),
 		'utf8'

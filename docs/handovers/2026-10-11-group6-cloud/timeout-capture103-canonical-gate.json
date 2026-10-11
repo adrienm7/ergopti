@@ -1,0 +1,31 @@
+{
+	"exit": 0,
+	"seconds": 1129.094,
+	"before_and_after_fence_equal": true,
+	"head": "2c076c37bf58c4f70541fd3be2e70ecfc2d85034",
+	"logical_index_tree": "3f6496f18b82e1cf021207ff5c5474886ad25a59",
+	"source_sha256": {
+		"docs/ERGOPTIPLUS_TODO.md": "f382da999a6b0f522679646af1a7e636e694ae4ecb11e846aa4ea1d1e0172492",
+		"docs/handovers/2026-10-11-group6-cloud/README.md": "7494aeb3b1e71a952346b5277c7fe9b57e1147e538ead69f0d5f9922b541ee06",
+		"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "54fc39d4d7d322711337091aea490c44795da7e5fe022d01800ace1201915d9d",
+		"tools/test/macos_native_http_receiving_facts_test.py": "3f9d04684b5e3c72f362bdc2aabf59ef10475d2402482ab1bde72121316addc1",
+		"tools/test/test-managed-ollama-protocol.cjs": "8e557928fd734473713a7912b62e91ee8b4fa23a47e86fb9aaa4e3fa605a7768",
+		"docs/handovers/2026-10-11-group6-cloud/command-guard90-canonical-gate.json": "5fe445b349343d572cd50a822a8bdcc0da04610cf5e8abc8e54badf8486a8802",
+		"docs/handovers/2026-10-11-group6-cloud/timeout-capture103-portable-proposal.json": "34b71f1e6f2a75eceb2cdff2d7e00844ed840a2bab66d32e9946030985d59a04",
+		"docs/handovers/2026-10-11-group6-cloud/timeout-capture103-portable-proposal.tar.gz": "bff7ce33da58df8d86036e0f33c260560a68c55b282816b8f61ed5854cf830e0"
+	},
+	"log_sha256": "fad4cf89b19d226014b5659414263ea496d2c71c1a4dee4015a36c9ceefc3074",
+	"log_bytes": 3622368,
+	"published_commit": "6e4e7724b67173529449c6b326f963d51d4fd7be",
+	"all_eight_committed_blobs_match_gate": true,
+	"qualification": "PUBLISHED_R2_PORTABLE_SELECTED_GATE_ALL_PASS_NO_NATIVE_CREDIT",
+	"format_files": 379,
+	"js_checks": 410,
+	"hs_pass": 18599,
+	"hs_fail": 0,
+	"hs_modules": 1571,
+	"compressed_log": "timeout-capture103-canonical-gate.log.gz",
+	"compressed_log_bytes": 516856,
+	"compressed_log_sha256": "c7397aa0469b082b5307ad12a2b1f054655ac72852207caac0ecc3975bd814fd",
+	"raw_transcript_encoding": "Original bytes retained; negative UTF-8 corpus logger emits invalid suffix bytes."
+}

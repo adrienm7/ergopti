@@ -330,3 +330,92 @@ that evidence. Native Darwin clocks, same-CA visibility, HTTP/model trust setup
 and restoration, PAC14 on both architectures, packaging/installation, ordinary
 Automation consent, Brew6 and enterprise/Windows-PC acceptance remain unrun
 for this successor. Items36/62 and transversal16/38 remain open.
+
+## Published R2 and independent signed callee ownership
+
+Commit `6e4e7724b67173529449c6b326f963d51d4fd7be` publishes settled stderr
+receiving and the canonical allocator setup repair. Its actual selected gate
+passes format379, JS410 and Hammerspoon18,599/zero failures across1,571 modules;
+all eight source hashes, HEAD and logical index stayed exact. The
+[gate binding](timeout-capture103-canonical-gate.json) retains the complete raw
+log compressed without altering its intentional negative UTF-8 corpus bytes.
+Every committed blob matches the gate. Dev documentation is received through
+`ed6ba402ddef9b3f38f7a5ca23c37bc57fb082c7`, with native code pins unchanged.
+Four exact-SHA all-event automatic censuses are empty after each push.
+No manual run is cancelled, and no native credit is inferred.
+
+The next independent-client slice centralizes its existing signed Swift recipe
+in one test-only builder. It binds all18 source inputs,15 staged inputs and
+fixed module-map bytes to one private root and signed image. Mandatory
+source/image verification precedes optional trust-query observation. Original
+compile60/sign15/verify15 limits and the original process owner remain. The
+Swift factory and45-second startup role are held and unactivated.
+
+Actual POSIX controls expose an acquired-file hardlink and an actual caller
+cleanup defect. A same-name foreign root was deleted after build refusal;
+that predecessor counter fails one assertion. The corrected caller retains
+the foreign root and exact initial exception while attempting original fixture
+cleanup. Deletion requires original identity, closed state and settled
+child/capture/trust/keychain/receiving-worker debt. Seven permanent controls
+cover replacement, ordinary cleanup, actual open-FD debt and primary precedence.
+All exact outer descriptors/names retire. This bounded pathname admission is
+not an atomic concurrent-deletion proof.
+
+The first physical canonical136 has135 passes/one assertion failure, zero
+errors/skips: an old source check expected the relocated compiler argv inline.
+Its reviewed replacement checks the actual compiler recipe and fixed caller
+loader/build route. All preceding causal-stage assertions and every other
+original103 function remain exact. Wrong-macro and wrong-loader-path mutations
+fail assertions. Unchanged33 and new7 controls bring the actual alphabetical
+census to143: all pass, zero failures/errors/skips, in45.411seconds. Six selector
+mutations refuse missing/extra/foreign controls. Parent receiving checks all60
+safe regular members, exact seven-path preimages, whole forward/inverse and
+physical18-input closure.
+
+[The builder/root capsule](native-client-builder143-portable-proposal.tar.gz)
+and [its binding](native-client-builder143-portable-proposal.json) preserve
+all distinct red/green receipts and explicit provenance exceptions. Historical
+private103 used candidate objects with live source-read paths and declaration
+order; its qualification is limited accordingly. Original native test methods,
+script and fixture command/close/trust bodies remain exact. Native compiler,
+signing and Security are modeled in these controls. Actual Mac clients,
+same-CA trust/restore, source-bound clock receiving, PAC14/SDK49 both architectures,
+ordinary consent/Brew6, E2E, packaging, installation and enterprise acceptance
+remain required. Items36/62 and16/38 stay open;22 is excluded.
+
+The actual first selected builder gate fails: README formatting differs,
+JavaScript has408 passes/two failures, and Hammerspoon has18,599 passes/zero
+failures across1,571 modules. The13-path source/HEAD/index fence stays exact.
+[Its failed receipt](native-client-builder143-first-gate.json) and
+[unaltered raw log](native-client-builder143-first-gate.log.gz) remain retained.
+The physical143 owner did not execute the separate ten-case
+`StandaloneSwiftDependencies` diagnostic owner. Its compiler port, mutation
+instrumentation and partial source fixture still assume the removed inline
+recipe; all ten error in the selected gate. The other JavaScript failure is
+four PAC recipe assertions at the old wire-receiver address. A successor must
+relocate those controls to the actual builder, preserve their behavioral
+obligations and demonstrate genuine mutation failures. No native compiler,
+signature, trust or whole-gate success is inferred from the earlier143 pass.
+
+Root custody6110169035 releases only the four obsolete PAC recipe predicates.
+The prospective diagnostic repair retains all ten identities and every command
+census/cleanup predicate. Five complete testcase bodies remain exact; one root
+acquisition hook follows the real builder while its four assertion ASTs remain
+exact. Four mutation cases follow actual staging and its genuine refusal
+message. The fixed independent18-input fixture is authored separately from the
+builder. Physical original10 reproduces ten errors; corrected10 passes without
+failures/errors/skips. Seven omission/no-op controls fail assertions, including
+two actual diagnostic cases proving modified staged bytes cannot reach the
+compiler and the PAC source cannot disappear from its argv. All original PAC
+checks outside the relocated span, including the three following managed-Ollama
+recipe assertions, remain exact. The first private PAC harness omitted an
+unchanged model input and errored; that failed receipt is preserved separately.
+Focused owning-case receiving is not the full JavaScript suite. Native compiler,
+signing, trust and the Swift45 factory remain unqualified.
+
+[The corrective contract capsule](native-client-builder143-contract-relocation.tar.gz)
+and [its source binding](native-client-builder143-contract-relocation.json)
+retain the final review, exact failed/positive raw receipts and whole two-path
+inverse. Parent receiving verifies all48 safe regular members and the exact
+live postimages. The immutable physical143 capsule remains separately retained;
+the correction grants no native or full-suite credit.
