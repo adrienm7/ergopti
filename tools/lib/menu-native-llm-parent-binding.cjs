@@ -543,7 +543,9 @@ function closedModuleExport(unit, lex, rootPositions) {
 			: null;
 	};
 	let at = 0,
-		builds = 0;
+		builds = 0,
+		headerOwner,
+		facadeOwner;
 	while (at < tokens.length) {
 		const start = at;
 		if (
@@ -573,13 +575,13 @@ function closedModuleExport(unit, lex, rootPositions) {
 				at = take(at, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")');
 			} else {
 				if (Object.hasOwn(LINUX_HEADER_LOCALS, name.value)) {
-					if (!declaredLinuxHeaderOwner(unit)) return false;
+					if (!(headerOwner ??= declaredLinuxHeaderOwner(unit))) return false;
 					at = take(at, 'local ' + name.value + ' = ' + LINUX_HEADER_LOCALS[name.value]);
 					if (at === null) return false;
 					continue;
 				}
 				if (Object.hasOwn(DECLARED_NATIVE_FACADE_LOCALS, name.value)) {
-					if (!declaredFacadeOwner(unit, luaPublicationParser())) return false;
+					if (!(facadeOwner ??= declaredFacadeOwner(unit, luaPublicationParser()))) return false;
 					at = take(at, 'local ' + name.value + ' = ' + DECLARED_NATIVE_FACADE_LOCALS[name.value]);
 					if (at === null) return false;
 					continue;
