@@ -24,6 +24,13 @@
 			"sha256": "87eb501d18390676f8f811ba3a7237a7b1e51d566c410fbe085fea487d7e1295",
 			"bytes": 2123102,
 			"members": 115
+		},
+		{
+			"path": "final-composed-wizard-v8-browse-v6-closing-proof.tar.gz",
+			"sha256": "3b176231fe266af8dae2d02bc0f5267e8edb0229af6bb5dd3e3c9ff49c35382b",
+			"bytes": 3149725,
+			"members": 132,
+			"member_manifest": "COMPOSED-PROOF-MANIFEST.json"
 		}
 	]
 }

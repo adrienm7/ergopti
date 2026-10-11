@@ -1,0 +1,1134 @@
+{
+	"status": "FROZEN_ORIGINAL_CURRENT_NATIVE_AND_SELECTED_PROOFS",
+	"archive": "final-composed-wizard-v8-browse-v6-closing-proof.tar.gz",
+	"archive_sha256": "3b176231fe266af8dae2d02bc0f5267e8edb0229af6bb5dd3e3c9ff49c35382b",
+	"compressed_bytes": 3149725,
+	"member_count": 132,
+	"member_bytes": 16205131,
+	"members": [
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ADDED-WORKER-SOURCE.lua",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ADDED-WORKER-SOURCE.lua",
+			"bytes": 6383,
+			"sha256": "8fa9f6c78fbe9959d91ac8acf836684c44a015836d28d95e0fe6bdebd82c054d",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/COMPOSED-PIN-FORWARDING.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/COMPOSED-PIN-FORWARDING.json",
+			"bytes": 970,
+			"sha256": "9f99f67c1473413a6aed05096e4246fd461e487405332a2de17174637b516521",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/FREEZE.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/FREEZE.json",
+			"bytes": 1546,
+			"sha256": "b9a4840e7a51511b491e5e39ec6176661014fcd125d2027cbd1c2bd734398b93",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-EXPECTATIONS.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-EXPECTATIONS.json",
+			"bytes": 91241,
+			"sha256": "56f2d6d5bf0682220f082fe720c2201fef9ef2d9f99848e224d40d13d6209738",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-SOURCE-CLOSURE.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-SOURCE-CLOSURE.json",
+			"bytes": 90282,
+			"sha256": "5b5164a60a9ecf820407871f9f8cfbc59fc07c7aac5408db96e49db343f1c298",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-SOURCE-PROPOSAL.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-SOURCE-PROPOSAL.json",
+			"bytes": 2058,
+			"sha256": "5d51a762cdb8690c8bf82220fbc13eaa38fbddf15f0435023b634ca66f510db2",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-run-private-wizard.py",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-run-private-wizard.py",
+			"bytes": 22466,
+			"sha256": "4d468723b08f3d2a0ede8c12e6e0702a88d6c8edfd3269a12425d0cb73a85d0a",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-wizard-native-worker.lua",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/ORIGINAL-wizard-native-worker.lua",
+			"bytes": 11076,
+			"sha256": "c278925ccbc2581e224567108946a1e4b2c8be5ce3d3c44b8810b69943a24a1e",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/README.md",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/README.md",
+			"bytes": 5930,
+			"sha256": "be2f3a355713b920acb42e9c533eefccc8a33b54aeec5809e15ae7b1841af535",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/SOURCE-CLOSURE.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/SOURCE-CLOSURE.json",
+			"bytes": 95496,
+			"sha256": "830be3a771815b8ad871526fe3d04b21f602c199429a9d2925179d3bbcb73f4c",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 8528,
+			"sha256": "fd3dcc97b322991f2ba05d7196f68035e3f4ff4081b7769889b130468a5eaad0",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/SOURCE.patch",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/SOURCE.patch",
+			"bytes": 13033,
+			"sha256": "25c234a1d1bfd6595a017a60c4e9ca0230ef783f710076a0dd3bf84ce1c9f0dd",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/V5-DELTA.patch",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/V5-DELTA.patch",
+			"bytes": 1283,
+			"sha256": "c31738f0067c05df203ac7e3b1bdd3cc0f8a58da934af4afbe6636e791c2ff13",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/run-private-wizard.py",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/run-private-wizard.py",
+			"bytes": 25905,
+			"sha256": "73fbe35b33808c5aafa5d0513f66b1f55bec7323f1222004d6895b67731394dc",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/wizard-native-worker.lua",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/wizard-native-worker.lua",
+			"bytes": 17432,
+			"sha256": "a079b534adb4a0678eccefe3ecef0086732ac85676b585e0b6d744c2948ab87f",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ACTOR-LIFECYCLE-DELTA.patch",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ACTOR-LIFECYCLE-DELTA.patch",
+			"bytes": 8537,
+			"sha256": "9ea48056dcddd58f276e47e8a515d2a1a15419f66b7fd3de5e334d57ba561177",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/COMPOSED-PIN-FORWARDING.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/COMPOSED-PIN-FORWARDING.json",
+			"bytes": 970,
+			"sha256": "9f99f67c1473413a6aed05096e4246fd461e487405332a2de17174637b516521",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/DEPENDENCIES.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/DEPENDENCIES.json",
+			"bytes": 23162,
+			"sha256": "cdc882ba69bf7b485064289621d3d0ac00c7c9d88c436e56219f122b17e22cf9",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/FREEZE.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/FREEZE.json",
+			"bytes": 3235,
+			"sha256": "4e5923e7a2d2b13549104e917f7be258a8c15bd678d889f6aedc27eefa948460",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ISOLATION-CAUSE-AND-PRESERVATION.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ISOLATION-CAUSE-AND-PRESERVATION.json",
+			"bytes": 3006,
+			"sha256": "78870fecf8a89942a0299d61d7d4d0756ab06c1f4d586fd4ef15a1aaee291295",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ORACLE-FROZEN-FIRST.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ORACLE-FROZEN-FIRST.json",
+			"bytes": 158,
+			"sha256": "f399674f3d5955c95b6d3c1ff8e7e56c3a71d3ea5ac161734ba837cd32114bdc",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ORIGINAL-BROWSE-EXPECTATIONS.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ORIGINAL-BROWSE-EXPECTATIONS.json",
+			"bytes": 1670,
+			"sha256": "40bc1248e9a06cd277f5f4f09bceda7278ec1de4b92b9f92016b988a430003e1",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/README.md",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/README.md",
+			"bytes": 7862,
+			"sha256": "2c894b0cad8beb6e8df75ed920a59c68a1b7ecca7f3680a45bf1cb92b897dc7e",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ROOT-CANDIDATE-LEDGER-RECONCILIATION.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/ROOT-CANDIDATE-LEDGER-RECONCILIATION.json",
+			"bytes": 2188,
+			"sha256": "6c29b2cdabb0e3bc6776be3b997ab80289e79d8428a5db50b876267042ef53b0",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/SOURCE-CLOSURE.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/SOURCE-CLOSURE.json",
+			"bytes": 95496,
+			"sha256": "830be3a771815b8ad871526fe3d04b21f602c199429a9d2925179d3bbcb73f4c",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/SOURCE-PREIMAGE-CHECK.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/SOURCE-PREIMAGE-CHECK.json",
+			"bytes": 3512,
+			"sha256": "2aef5098ec130a2da3becff41045cbc96b22b71d2ca7cb2eea7f94c5a8c82c7f",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 6001,
+			"sha256": "126c7c4f49c3b72cdeea71195b35c303b70ca08bc3ad07701122b81c8a33664a",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V1-SOURCE-HOLD.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V1-SOURCE-HOLD.json",
+			"bytes": 7387,
+			"sha256": "de642cabf78cca390a6aa2881e613453e4fdb36a575f91a54259ef77aeb0fbd9",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V2-SOURCE-HOLD.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V2-SOURCE-HOLD.json",
+			"bytes": 5049,
+			"sha256": "d5e62d4d939933816b4a3f901f5023f0839b0d6304f1e2e5188cc53e9b7d3b3c",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-FINAL-BROWSE-DEPENDENCY-INSTALL-ACTUAL-20261011.log",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-FINAL-BROWSE-DEPENDENCY-INSTALL-ACTUAL-20261011.log",
+			"bytes": 1159,
+			"sha256": "2ad42cd6c8c1c7448008c38dea42f1e15c05c54c1fc72bc914189a9d93b6e1b0",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-FINAL-BROWSE-DEPENDENCY-INSTALL-REFUSAL-20261011.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-FINAL-BROWSE-DEPENDENCY-INSTALL-REFUSAL-20261011.json",
+			"bytes": 688,
+			"sha256": "9bf3b720593f9e4e1445670c787ec8782539fb1cb1dd08386baa1ce962d73651",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 4712,
+			"sha256": "a0048caf1776e3307f4b8ff9efd7cb2ccfa86ee4adbe778c20873afd62bf6faa",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-PRESERVATION.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-PRESERVATION.json",
+			"bytes": 1355,
+			"sha256": "1f55217f9bee0aa6e5c255a8261354cf787649b0700f2619a56d9e8b6c5110a7",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-TWO-FIX-SOURCE-DELTA.patch",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V3-TWO-FIX-SOURCE-DELTA.patch",
+			"bytes": 1292,
+			"sha256": "81ef10c99e8c27fb0a117a83974482caea4d3c25d318a5e5cba21cccb2aaca63",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V4-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V4-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 4541,
+			"sha256": "0c243cef7a8b57bd66be4b120c24151f80761d2cecfc93c1de26edaf06cd1f5d",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V4-PRESERVATION.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V4-PRESERVATION.json",
+			"bytes": 2438,
+			"sha256": "6b3b32e612170a8544b3f19d6f742df5a81771981e25555a864c99319edd86bc",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V4-VERIFIER-SOURCE-DELTA.patch",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V4-VERIFIER-SOURCE-DELTA.patch",
+			"bytes": 3875,
+			"sha256": "1c92552d8d357e1ef52709deb2b2c4200c8639386589f1ef13cc4cd26dcd07c7",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V5-ENV-SOURCE-DELTA.txt",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V5-ENV-SOURCE-DELTA.txt",
+			"bytes": 571,
+			"sha256": "96e9c3d931432fa47b2b0459aa7d72a164d06c6f63fb3a6bc3b212f01ccdbb98",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V5-PRESERVATION.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V5-PRESERVATION.json",
+			"bytes": 2994,
+			"sha256": "001f44ebff292976ede621dbaa310f2a857de93492757bcacf69a02166bd089c",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V7-UNCHANGED-PINS.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/V7-UNCHANGED-PINS.json",
+			"bytes": 474,
+			"sha256": "3994fbe0036bd1bceca0487d10110591119562c2880a5106dd7d88a3c142516e",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/VERIFIER-PROVENANCE.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/VERIFIER-PROVENANCE.json",
+			"bytes": 1020,
+			"sha256": "1eca562300ba64c9ea7f241c5a214d76d185b6334309d0681b474674c98ddf8f",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/chooser-input-actor.py",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/chooser-input-actor.py",
+			"bytes": 7157,
+			"sha256": "2a39edf05c31a4d832231c94fee5cc576cf4d6200d4e6d47c086157dc002a26f",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/install-owned-chooser.py",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/install-owned-chooser.py",
+			"bytes": 7235,
+			"sha256": "9ea21ac2deade8a01e8a64a68be31cd0f4452ff9c5fac818d0f436aae632c72f",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/run-browse.py",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/run-browse.py",
+			"bytes": 20011,
+			"sha256": "40cdc1052610845cea193255eea96e203a5b40d904625011aff8906041a6ab34",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/wizard-browse-worker.lua",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/wizard-browse-worker.lua",
+			"bytes": 9627,
+			"sha256": "07c401012c2ec68be07993cd5e1d3d345daf42b7a4fdc192b52938fa65fae9c3",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/zenity-owned-wrapper.sh",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/zenity-owned-wrapper.sh",
+			"bytes": 224,
+			"sha256": "3c6d4b56768bc7fd33eb5768e1de9159a9095a56112d197c23315600dfee3ac0",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/FREEZE.json",
+			"member": "delivery/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/FREEZE.json",
+			"bytes": 537,
+			"sha256": "2cb2a7bab26a70e930cce5557c8cecd6f999a53f0562518f382181854468e826",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/PRESERVATION.json",
+			"member": "delivery/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/PRESERVATION.json",
+			"bytes": 371,
+			"sha256": "e5cde36f5472cb475278892913385069b1c7a87ac3609bc99ba709e6f01d6bd3",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/README.md",
+			"member": "delivery/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/README.md",
+			"bytes": 842,
+			"sha256": "5cb459cd7fcb1be834f9c3551d40184ac8a468954dc85eb8ba2cd02890a174d5",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"member": "delivery/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 607,
+			"sha256": "f8cdede685729c17e50db3c5fb4a56edeb1d51ebeeb27429aa175821133cc963",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/receive-with-root-fence.py",
+			"member": "delivery/linux-wizard-native-root-fence-source-v3-composed-pins-20261011/receive-with-root-fence.py",
+			"bytes": 10991,
+			"sha256": "e4be438a47aabe4d2d9775234c678992d49759bcc1325babd8c1a15d9412ab39",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/C2-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/C2-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 2586,
+			"sha256": "54b6f01707764fadaef31881ec67b8f918f4b4db7e677477fbdd52de1391219e",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/COMPOSED-RUNTIME-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/COMPOSED-RUNTIME-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 2486,
+			"sha256": "142fc19fab98a2cfd04661d56c54d7361681f0cba87710f670a6fbfd74c75449",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/FINAL-COMPOSED-SOURCE-DELTA.txt",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/FINAL-COMPOSED-SOURCE-DELTA.txt",
+			"bytes": 4820,
+			"sha256": "2979ec28ebdfdfac9e659b4790a4ef7715e6f2c939d9d2d61c0689fa8165cfb1",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/FINAL-PRESERVATION.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/FINAL-PRESERVATION.json",
+			"bytes": 814,
+			"sha256": "936139841dbad6c2a88d5aa66de9f704d948d44b14c82baaba6739efd7baceae",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/FREEZE.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/FREEZE.json",
+			"bytes": 2164,
+			"sha256": "126a85fe052e0d61e710d47f6ad6493b89b62c0124e35b6e23d8406197150733",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/PRESERVATION.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/PRESERVATION.json",
+			"bytes": 936,
+			"sha256": "da778a72f73957093d5cb6fa50636fe80c1c4648e5fb23ba61e4ca31d4589804",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/README.md",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/README.md",
+			"bytes": 6152,
+			"sha256": "94e3f12b8bea2f85b2d648e6f06d50ee24ae8e95f4ccc4b800e6ac01666d3a02",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 2921,
+			"sha256": "748f8f236842c212353354dc8dbd6c68a97197fd78b9a4fc7471377c23898983",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V1-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V1-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 3996,
+			"sha256": "f2593529a9f7d2cb8ec7382812035744c90201114ad9c5e1e52a4126ee1943c7",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V2-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V2-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 3002,
+			"sha256": "be67305eff792431a13f9cf5d62ebaabba703cd0ff2dad02d2b27f6c9da40439",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V2-METADATA-BINDING-SOURCE-DELTA.patch",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V2-METADATA-BINDING-SOURCE-DELTA.patch",
+			"bytes": 4245,
+			"sha256": "a3f80e45ee7cd0f6bb1cb48dbfb66d63d53d765148014c3d6f269a23cccc32cc",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V2-PRESERVATION.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V2-PRESERVATION.json",
+			"bytes": 932,
+			"sha256": "177957105d02279009478090d36f203ad26153fea7d8a97c292987f7a3fa6b4b",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V3-COMPILER-METADATA-SOURCE-DELTA.txt",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V3-COMPILER-METADATA-SOURCE-DELTA.txt",
+			"bytes": 4943,
+			"sha256": "a865783dc65f404d2ee1fd2fce635cccd4a7b7fe2e2d75ebc831a6642ee375b3",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V3-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V3-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 2659,
+			"sha256": "f945ea20c59ad3b11dedb8f7912c7ba0e089837e69a179eb4d613668b0f94a64",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V3-PRESERVATION.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V3-PRESERVATION.json",
+			"bytes": 1151,
+			"sha256": "89e36b3bcd8a807162a0251f3e891e157c415bf516b53acc9c15f22c45cc9a38",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V4-ENV-METADATA-SOURCE-DELTA.txt",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V4-ENV-METADATA-SOURCE-DELTA.txt",
+			"bytes": 3009,
+			"sha256": "8282135dc183e5c0b2eaef8172a23684d1a8b8f7dd630cc6d0ae1a3a433dc041",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V4-INDEPENDENT-VERIFIER-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V4-INDEPENDENT-VERIFIER-SOURCE-REVIEW.json",
+			"bytes": 4541,
+			"sha256": "0c243cef7a8b57bd66be4b120c24151f80761d2cecfc93c1de26edaf06cd1f5d",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V4-PRESERVATION.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V4-PRESERVATION.json",
+			"bytes": 1285,
+			"sha256": "b717463299f772f7090dd8a94b03e122b1c6ec316f806e3c9a40e8e445ee10f9",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V5-INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/V5-INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 2506,
+			"sha256": "9701aab9cfbfc492800d0dff6c4cc5a1f66aeac0dfb7dacd9d202974133ef9d4",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/receive-browse-with-root-fence.py",
+			"member": "delivery/linux-wizard-browse-root-fence-source-v5-composed-pins-20261011/receive-browse-with-root-fence.py",
+			"bytes": 28468,
+			"sha256": "75a2d3dc67d3baa9a5bb4e008972cd657d88a756ba4d2a9c378480949401a927",
+			"role": "original frozen final composition Source/provenance; NOT final runtime qualification",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-composed-runtime-forwarding-independent-source-review-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-composed-runtime-forwarding-independent-source-review-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 2486,
+			"sha256": "142fc19fab98a2cfd04661d56c54d7361681f0cba87710f670a6fbfd74c75449",
+			"role": "finite independent composition Source review; native UNRUN by reviewer",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-native-root-fence-v3-composed-independent-source-review-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-native-root-fence-v3-composed-independent-source-review-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 1499,
+			"sha256": "432fb11bcd10bce4f6cb11cdf3fdbc54dceb3a357539b138794d8a2d0aa8b6be",
+			"role": "finite independent composition Source review; native UNRUN by reviewer",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-browse-root-fence-v5-composed-independent-source-review-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"member": "delivery/linux-wizard-browse-root-fence-v5-composed-independent-source-review-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 2012,
+			"sha256": "fdcb8db14d848996396867ec7164e19b2ac61ad7e07cce25251199de5196b376",
+			"role": "finite independent composition Source review; native UNRUN by reviewer",
+			"kind": "original reviewed final composition Source"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-COMPOSED-SOURCE-SELECTED-ACTUAL-20261011.json",
+			"member": "delivery/FINAL-COMPOSED-SOURCE-SELECTED-ACTUAL-20261011.json",
+			"bytes": 1114462,
+			"sha256": "7fcd812774195d8b5d28c5b1268372cfc06468f89af65c6ce429e9c60a40c992",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false,
+			"utf8_status": "VALID",
+			"carriage_return_count": 0,
+			"kind": "exact original full native Source qualification/raw log or incoming input equality"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-COMPOSED-SOURCE-SELECTED-ACTUAL-20261011.log",
+			"member": "delivery/FINAL-COMPOSED-SOURCE-SELECTED-ACTUAL-20261011.log",
+			"bytes": 5826814,
+			"sha256": "dad86f87e73dbc7017e80bfc2e61ad3b769f9b56a8c9123fa7eabab09c5a0611",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true,
+			"utf8_status": "INVALID_BYTES_PRESERVED_AS_RAW_EVIDENCE",
+			"carriage_return_count": 1,
+			"kind": "exact original full native Source qualification/raw log or incoming input equality"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-INCOMING-NATIVE-INPUTS-BYTE-EQUALITY-20261011.json",
+			"member": "delivery/FINAL-INCOMING-NATIVE-INPUTS-BYTE-EQUALITY-20261011.json",
+			"bytes": 1180,
+			"sha256": "4ceb9b80bde077160ef37d0b27f4e6bc60e6292bc8c7b684b95fb48ef033d408",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false,
+			"utf8_status": "VALID",
+			"carriage_return_count": 0,
+			"kind": "exact original full native Source qualification/raw log or incoming input equality"
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-INCOMING-ONLY-SELECTED-ACTUAL-20261011.json",
+			"member": "delivery/FINAL-INCOMING-ONLY-SELECTED-ACTUAL-20261011.json",
+			"bytes": 1117424,
+			"sha256": "e4a1351f3e5bfc588d7da8b7f6f8e5efeabe5638659d2ecb1dc8d1ed62279d5c",
+			"kind": "exact full current-head qualification or graphical native Root fence receipt",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-INCOMING-ONLY-SELECTED-ACTUAL-20261011.log",
+			"member": "delivery/FINAL-INCOMING-ONLY-SELECTED-ACTUAL-20261011.log",
+			"bytes": 39354,
+			"sha256": "c85e7498865068485a80d314576e2bf86d7bd6082e706dd7c49a87e74b35632b",
+			"kind": "exact original matching raw current qualification or native Root log",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-CURRENT-WIZARD-V8-TRACKING-SYNCED-ACTUAL-ROOT-20261011.json",
+			"member": "delivery/FINAL-CURRENT-WIZARD-V8-TRACKING-SYNCED-ACTUAL-ROOT-20261011.json",
+			"bytes": 3411432,
+			"sha256": "5567af3d9c41617b9b680770486d6d36d128255259bd9f6c57f5b824448b6317",
+			"kind": "exact full current-head qualification or graphical native Root fence receipt",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-CURRENT-WIZARD-V8-TRACKING-SYNCED-ACTUAL-ROOT-20261011.log",
+			"member": "delivery/FINAL-CURRENT-WIZARD-V8-TRACKING-SYNCED-ACTUAL-ROOT-20261011.log",
+			"bytes": 644,
+			"sha256": "9360217d460a5b0ae9db690d5d6370062ac25578679f478339e788dd5dd8fcfb",
+			"kind": "exact original matching raw current qualification or native Root log",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-CURRENT-BROWSE-V6-ACTUAL-ROOT-20261011.json",
+			"member": "delivery/FINAL-CURRENT-BROWSE-V6-ACTUAL-ROOT-20261011.json",
+			"bytes": 3449588,
+			"sha256": "9a0df3bf0734fc6810bdda9bd52b229158520cd9f925d468fb26a0cdb4c96eaa",
+			"kind": "exact full current-head qualification or graphical native Root fence receipt",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-CURRENT-BROWSE-V6-ACTUAL-ROOT-20261011.log",
+			"member": "delivery/FINAL-CURRENT-BROWSE-V6-ACTUAL-ROOT-20261011.log",
+			"bytes": 356,
+			"sha256": "1f12dd393d72165eeeb2f635094bebf0006188a09763a1a4ae8b3c87e876dd90",
+			"kind": "exact original matching raw current qualification or native Root log",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/FINAL-CURRENT-WIZARD-V8-LAUNCH-20261011.log",
+			"member": "delivery/FINAL-CURRENT-WIZARD-V8-LAUNCH-20261011.log",
+			"bytes": 420,
+			"sha256": "16e6c6950df29e09213a2932f8ed5d4eccda68d78d7173b510d09187b796d919",
+			"kind": "original first tracking-ref preadmission refusal before native allocation",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/ACTUAL-RESULTS.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/ACTUAL-RESULTS.json",
+			"bytes": 231792,
+			"sha256": "de985380c928432d5d6b6ed16eb449890860875adb51a77b95124fbfbd994c15",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/cancel-command-status.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/cancel-command-status.json",
+			"bytes": 35,
+			"sha256": "0841cfa8bbe147bd9b61d1ea4a5eaa98a27418ef699eff02f3fa4facbf19e054",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/cancel-native.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/cancel-native.json",
+			"bytes": 674,
+			"sha256": "7db6102152762ffa9974f300a4662fe3a3774b46bf36f88767b5d7b53deadf9b",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/cancel-native.log",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/cancel-native.log",
+			"bytes": 949,
+			"sha256": "9cdeab7dee8f0f7bc68db07ed167cc6e0bf5c53bdcd6836f7a0cd34f686a22f3",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/finish-command-status.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/finish-command-status.json",
+			"bytes": 37,
+			"sha256": "da86e496fe66c4a761340ce7e573335ff4d5e7958728b843c5a0a738fb23440b",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/finish-native.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/finish-native.json",
+			"bytes": 2616,
+			"sha256": "76da6746aa16866df3fa7ab1ade89810cc4878cf49aa7987fa5db47c73a3b0de",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/finish-native.log",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/finish-native.log",
+			"bytes": 2223,
+			"sha256": "cc4c544a816d5db06d91a7390cd259e2a798d92074d9d6f61c228f8d2c13ef1b",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/locales-command-status.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/locales-command-status.json",
+			"bytes": 37,
+			"sha256": "2f92cd2f922c46164144dd2b0457b409577e43f346b3e551bae9e8e07d90029a",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/locales-native.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/locales-native.json",
+			"bytes": 91646,
+			"sha256": "ba2619119cf79936583d77ff5840db428bdb83944faa823e9b7fc09f287b3431",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/locales-native.log",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/locales-native.log",
+			"bytes": 63392,
+			"sha256": "471d09205ef1d0788e660325d41d45367ce1ec27f40692901e9e4acc8a218d66",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/recommended-command-status.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/recommended-command-status.json",
+			"bytes": 37,
+			"sha256": "7678b9b90a0acb99aaa3fc96b8606b8dffa2cb9528c65931d16edb4c60648604",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/recommended-native.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/recommended-native.json",
+			"bytes": 2360,
+			"sha256": "17297ad62c12bd8d03984931d5d4ec01981e26a98475f71960064a13268b210c",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/recommended-native.log",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/recommended-native.log",
+			"bytes": 2102,
+			"sha256": "6ea83b7214eb0a63e6de5457c7b366714adc6c353e1dbb28727b6c95f14090c1",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/reopen-command-status.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/reopen-command-status.json",
+			"bytes": 37,
+			"sha256": "3212f2f4fb9ffabb7330eebb442114da095d05bf4cc3243fadb720e665f57ff8",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/reopen-native.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/reopen-native.json",
+			"bytes": 3084,
+			"sha256": "58ac570efff0582b66623eb7435082fcae4eb73bad8047f272f9767a1a86357d",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/reopen-native.log",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/reopen-native.log",
+			"bytes": 2591,
+			"sha256": "af3db5377a280473eed7738ee1d19bb9e67bee3bde2ea381d71478afb4cd6879",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/xvfb-command-status.json",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/xvfb-command-status.json",
+			"bytes": 35,
+			"sha256": "74b56a1ceac1d8a5d372c7435fc95bddc0346d586a266ad2b3c13438df6ff339",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/xvfb.log",
+			"member": "delivery/linux-wizard-real-webkit-private-harness-source-only-v8-composed-pins-20261011/actual-wizard-k3o3hqy9/xvfb.log",
+			"bytes": 64,
+			"sha256": "87e9572cf030493a1f7ba83d385129046b224374ca1414911674b30fc44276d7",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/ACTUAL-RESULTS.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/ACTUAL-RESULTS.json",
+			"bytes": 63113,
+			"sha256": "9b130722cadcf80da3d80509365001318e0894feb58ecee4c3e61419aefe69a4",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-1-status.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-1-status.json",
+			"bytes": 37,
+			"sha256": "cc1df4d4dd86b0ca15c06c1f38597205829984aa866a4e084605b4740ea46b51",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-1.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-1.json",
+			"bytes": 8210,
+			"sha256": "50f8b838a1c97b3502f47f1f5e9809b647194c2d842077cab611becbb0760c87",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-1.log",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-1.log",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-2-status.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-2-status.json",
+			"bytes": 37,
+			"sha256": "b1779a56bc5a2d26e6968f0a497cd3f1a00d11bf57d0a8ff74ca2f0f08db2646",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-2.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-2.json",
+			"bytes": 9185,
+			"sha256": "1954b3c0d67707f07de7936a62c001f4bb2e6316c357ac4231a6ed5ce8afe3aa",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-2.log",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-2.log",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-3-status.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-3-status.json",
+			"bytes": 37,
+			"sha256": "e6c2fc5afa0e718b1c31cc78ce97d871b0d691721c03236e67b68a2c757861bf",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-3.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-3.json",
+			"bytes": 7606,
+			"sha256": "5f041cdac87c27a8fe09b24d1fa505c93d1c3eff47a4888767a8008e1e90e0cf",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-3.log",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-3.log",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-4-status.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-4-status.json",
+			"bytes": 37,
+			"sha256": "7268637d676c414c8addb7b385695fafbccf5af717cf48ed480bbf1475b83889",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-4.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-4.json",
+			"bytes": 8575,
+			"sha256": "eecfc9863eaea0c4460d622f30e04403cd602d0851c1d691c6750d63ff3a18eb",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-4.log",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/actor-4.log",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-1.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-1.json",
+			"bytes": 80,
+			"sha256": "0703b4bb342b5857b56f368c693ee0f13304a2c93529d3f8f1625be1712ba3b0",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-2.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-2.json",
+			"bytes": 80,
+			"sha256": "5c2a8b602ac00529c175ae4a48995a53558bf4a54df25d83a37aee02e4568f6d",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-3.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-3.json",
+			"bytes": 80,
+			"sha256": "def5e227336a6d3b3b4f42c362259b59224f6e392241b762563349b48ae8ddd2",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-4.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/completed-4.json",
+			"bytes": 79,
+			"sha256": "634130c673c836bbd9ea72756fe598e6898a07e60ad5f1946b8b07a5b6716200",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/native-status.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/native-status.json",
+			"bytes": 36,
+			"sha256": "cb732cf4e7144fc1436db803704056bfe26564feb92830b7376bf432a29c0964",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/native.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/native.json",
+			"bytes": 4766,
+			"sha256": "6312c30b4a92902f3dd3ba02b576a7009cc7ad9340b1c16d46b19ff6b1a5ecf6",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/native.log",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/native.log",
+			"bytes": 3102,
+			"sha256": "1ed9a7e01adec8dcf500b10d3ea95967842a3dc7fd6a767fc0574a1545ebc718",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-1.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-1.json",
+			"bytes": 27,
+			"sha256": "650869ff667bc0112eca1ab111b61acd5512c3e45c4bd2cf72359fb05d2be287",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-2.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-2.json",
+			"bytes": 27,
+			"sha256": "e0fc51d5abd7c6b4dcaba4e28629074ccc9fa5b1aee9aab736737a471268c368",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-3.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-3.json",
+			"bytes": 27,
+			"sha256": "6999ee6415cac867cf7226d3f4138d524fea1ed654278719caa64f130797e259",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-4.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/request-4.json",
+			"bytes": 26,
+			"sha256": "0a44f2b4a48ce2cfa40dfb5f7f0a033aef87dbd44c0f092be7d248d362240bdb",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-1.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-1.json",
+			"bytes": 71,
+			"sha256": "2deb4f2ec2c476807da34af66c028d259b6bcf394435a48aede2a2c015113053",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-2.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-2.json",
+			"bytes": 71,
+			"sha256": "3bf4e7d35b03800de988e45410d49fb8b18e37e12963cc50df2d841393d79557",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-3.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-3.json",
+			"bytes": 71,
+			"sha256": "ddbff3151a43eeebf516f58a52698575ff3fc3dd2d935ecc34509d0db3ca16c5",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-4.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/started-4.json",
+			"bytes": 70,
+			"sha256": "141c82c336a210fcea00ba34890ee8378a252f6addad2d096f4a5b7a124030d0",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/xvfb-status.json",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/xvfb-status.json",
+			"bytes": 36,
+			"sha256": "42bfba7eaf5da0eee496802abc4fb582c9b17d999f0e8c2371404f1dd8f805e0",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": false
+		},
+		{
+			"origin": "/workspace/ergopti-delivery/group1-complete-resume-20261007/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/xvfb.log",
+			"member": "delivery/linux-wizard-genuine-browse-adapter-source-v6-composed-pins-20261011/actual-browse-p96pvlbu/xvfb.log",
+			"bytes": 64,
+			"sha256": "87e9572cf030493a1f7ba83d385129046b224374ca1414911674b30fc44276d7",
+			"kind": "exact current ordinary native/actor/controller/request/status/log receipt; profile directories excluded",
+			"original_bytes_preserved": true,
+			"raw_diagnostic": true
+		}
+	],
+	"current_qualified_native_head": "c5cb083d72e041e4a9e6b87a45028fed4950ff60",
+	"no_canonical_changes": true,
+	"no_native_execution_during_preparation": true,
+	"raw_evidence_rule": "All original payload bytes preserved; original full gate log includes invalid UTF-8 and one CR byte, retained without normalization."
+}
