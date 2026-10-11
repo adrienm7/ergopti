@@ -1,6 +1,7 @@
 # .github/workflows/ci-macos.yml
 #
-# macOS lane: unit tests -> E2E tests -> package -> install and launch -> verdict.
+# macOS lane: independent unit/E2E suites, followed by packaging, installed
+# launch and the strict verdict. Native tooltip observations still wait for both suites.
 # Lua unit and stubbed engine E2E tests run on Ubuntu. The Swift launcher tests
 # share the macOS packaging host. The launch matrix installs the exact uploaded
 # archive over the canonical user-state profile on Apple silicon and, for a
@@ -789,7 +790,6 @@ jobs:
 
   e2e-hs:
     name: 'E2E tests (stubbed)'
-    needs: test-hs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -807,8 +807,9 @@ jobs:
       # tests/e2e/PLAN_E2E_REAL_HS.md for what a real macOS/Hammerspoon E2E run
       # would require (a self-hosted GUI runner) and why it is not wired in
       # today. Named/commented explicitly so a green check here never implies
-      # OS-level coverage it does not have (F-HIGH-30). It runs only after the
-      # unit step passed, as the former separate job did.
+      # OS-level coverage it does not have (F-HIGH-30). Its fresh checkout
+      # and interpreter are independent of the unit job; both must pass before
+      # packaging or native tooltip observation.
       - name: Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)
         # Exercises Registry + Expander via the stub layer against
         # hardcoded scenarios and all corpus vectors.
@@ -840,7 +841,7 @@ jobs:
 
   tooltip-canvas:
     name: 'Native tooltip canvas · 12 captures'
-    needs: e2e-hs
+    needs: [test-hs, e2e-hs]
     runs-on: macos-15
     timeout-minutes: 10
     steps:
@@ -912,7 +913,7 @@ jobs:
   # never in a tree restored from an earlier run.
   package-macos:
     name: 'Package'
-    needs: [e2e-hs, managed-ollama-native]
+    needs: [test-hs, e2e-hs, managed-ollama-native]
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
