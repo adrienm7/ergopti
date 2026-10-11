@@ -9698,6 +9698,17 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   or a native modifier-owner qualification. Actual AHK syntax/unit/E2E and
   Windows native/compiled/installed receiving remain unrun in this container.
 
+  The supplemental original Windows pair/category cohort receiver now retains
+  the unchanged28-case census, exact original stdout and four-child retirement.
+  Its source preparer receives actual Git compiler/runtime/test inputs without
+  deriving behavioral expectations. Native PAC outputs are joined to the original
+  successful builder and retained archive/artifact receipts, rather than treated
+  as Git source images. All57 original modeled receiving controls remain, with
+  twelve additive publisher/refusal controls (69pass locally). This source tranche
+  keeps actual Windows cohorts and official enrollment unavailable until genuine
+  committed-source metadata is generated and independently received. No native
+  AHK, physical AltGr, simultaneous engine or installation proof follows.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
