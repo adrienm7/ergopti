@@ -45,6 +45,45 @@ function assertPostExitTranscript(script, name) {
 	);
 }
 
+// Native console output must not retain the hosted runner's undrained pipe.
+function assertOwnedFileOutput(script, name, prefix) {
+	const code = script.replace(/^\s*#.*$/gm, '');
+	const launch = /\$proc = Start-Process[^\n]+/.exec(code);
+	assert.ok(launch, `${name}: the exact asynchronous launch remains owned`);
+	assert.match(
+		launch[0],
+		/-RedirectStandardOutput \$stdoutFile(?:\s|$)/,
+		`${name}: stdout owns its capture`
+	);
+	assert.match(
+		launch[0],
+		/-RedirectStandardError \$stderrFile(?:\s|$)/,
+		`${name}: stderr owns its capture`
+	);
+	for (const [variable, extension] of [
+		['stdoutFile', 'stdout'],
+		['stderrFile', 'stderr']
+	]) {
+		const assignment = `$${variable} = Join-Path $env:RUNNER_TEMP '${prefix}.${extension}.log'`;
+		assert.ok(code.includes(assignment), `${name}: distinct private ${extension} capture path`);
+		assert.ok(
+			code.indexOf(assignment) < launch.index,
+			`${name}: capture is assigned before launch`
+		);
+		assert.equal(
+			[...code.matchAll(new RegExp('\\$' + variable + '\\s*=', 'g'))].length,
+			1,
+			`${name}: the capture owner is not rebound`
+		);
+	}
+	assertPostExitTranscript(script, name);
+	const joined = code.indexOf('$proc.WaitForExit()');
+	assert.ok(
+		code.indexOf('Get-Content -LiteralPath $stderrFile -Encoding utf8') > joined,
+		`${name}: diagnostics are replayed only after native exit`
+	);
+}
+
 const processReceipts = [];
 for (const [job, name] of [
 	['test-ahk', 'Run AHK test suite'],
@@ -61,6 +100,21 @@ for (const [job, name] of [
 	);
 	const finish = /\$proc\.WaitForExit\(\)\s*\n\s*\$exit = \$proc\.ExitCode/.exec(script);
 	assert.ok(finish, `${name}: join the process before reading its exit receipt`);
+	const prefix = job === 'test-ahk' ? 'windows-ahk-suite' : 'windows-ahk-e2e';
+	assertOwnedFileOutput(script, name, prefix);
+	const artifact = pipeline.step(
+		pipeline.job(job),
+		job === 'test-ahk' ? 'Publish AHK execution manifest' : 'Retain E2E native streams'
+	);
+	assert.equal(pipeline.stepField(artifact, 'if'), 'always()', `${name}: retain failed captures`);
+	for (const extension of ['stdout', 'stderr'])
+		assert.ok(
+			artifact
+				.replace(/^\s*#.*$/gm, '')
+				.split('\n')
+				.some((line) => line.trim() === '${{ runner.temp }}/' + prefix + '.' + extension + '.log'),
+			`${name}: retain the complete ${extension} capture`
+		);
 	assertPostExitTranscript(script, name);
 	processReceipts.push({ name, start: start[0], finish: finish[0] });
 }
@@ -114,6 +168,50 @@ for (const [job, name] of [
 	);
 }
 
+for (const [job, name] of [
+	['test-ahk', 'Run AHK test suite'],
+	['e2e-ahk', 'Run E2E suite (Strategy A — pure engine injection)']
+]) {
+	const script = pipeline.runOf(pipeline.step(pipeline.job(job), name)).join('\n');
+	const prefix = job === 'test-ahk' ? 'windows-ahk-suite' : 'windows-ahk-e2e';
+	for (const flag of ['-RedirectStandardOutput $stdoutFile', '-RedirectStandardError $stderrFile'])
+		assert.throws(
+			() => assertOwnedFileOutput(script.replace(flag, ''), name, prefix),
+			/owns its capture/
+		);
+	assert.throws(
+		() =>
+			assertOwnedFileOutput(
+				script.replace(`'${prefix}.stderr.log'`, `'${prefix}.stdout.log'`),
+				name,
+				prefix
+			),
+		/distinct private stderr/
+	);
+	assert.throws(
+		() =>
+			assertOwnedFileOutput(
+				script.replace('-RedirectStandardError $stderrFile', '-RedirectStandardError $stdoutFile'),
+				name,
+				prefix
+			),
+		/stderr owns/
+	);
+	for (const variable of ['stdoutFile', 'stderrFile'])
+		assert.throws(
+			() =>
+				assertOwnedFileOutput(
+					script.replace(
+						'$proc.WaitForExit()',
+						`Get-Content -LiteralPath $${variable}\n$proc.WaitForExit()`
+					),
+					name,
+					prefix
+				),
+			/no transcript reader/
+		);
+}
+
 const ahkIndex = process.argv.indexOf('--ahk');
 if (ahkIndex >= 0) {
 	assert.equal(process.platform, 'win32', 'native exit receipt probes require Windows');
@@ -121,6 +219,8 @@ if (ahkIndex >= 0) {
 	assert.ok(ahk && fs.existsSync(ahk), 'native exit receipt probes require the actual AHK binary');
 	const probeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-exit-'));
 	const quote = (value) => `'${value.replaceAll("'", "''")}'`;
+	const captureSetup = (runner) =>
+		`$stdoutFile = ${quote(runner + '.stdout.log')}; $stderrFile = ${quote(runner + '.stderr.log')}`;
 	try {
 		// The real exclusive FileAppend must refuse the former held reader and
 		// succeed once the workflow waits for native exit before reading.
@@ -157,6 +257,7 @@ if (ahkIndex >= 0) {
 								'$reader = [IO.FileStream]::new($resultsFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)'
 							]
 						: []),
+					captureSetup(runner),
 					receipt.start,
 					'$clock = [Diagnostics.Stopwatch]::StartNew()',
 					'while (-not $proc.HasExited) { if ($clock.ElapsedMilliseconds -ge 5000) { throw "Owned append child did not retire" }; Start-Sleep -Milliseconds 10 }',
@@ -200,6 +301,7 @@ if (ahkIndex >= 0) {
 				const command = [
 					"$ErrorActionPreference = 'Stop'",
 					`$ahk = ${quote(ahk)}; $runner = ${quote(runner)}`,
+					captureSetup(runner),
 					receipt.start,
 					'while (-not $proc.HasExited) { Start-Sleep -Milliseconds 10 }',
 					receipt.finish,
