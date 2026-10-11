@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "role": "independently-reviewed-committed-source-inputs",
+  "approvals": [
+    {
+      "schema": 1,
+      "role": "independently-reviewed-committed-source-input",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift",
+      "original_git_blob": "d04cf1fb08e90864ce282b048e3dc2328ac5bd25",
+      "original_sha256": "50a155a06dfa6afcca03eb3c0e40e06e4aca1c01e1c5743d08410eab33ce1445",
+      "published_source_commit": "69fcb820ee5062ad445b93927cc536c543a3a878",
+      "git_blob": "584f66050ca373601c97fb44ee353464622900ec",
+      "sha256": "2f325b42eb3382ab0b7364c7770338aa2afc290dcfc310714cfe320b94f3639e",
+      "source_review_sha256": "54b03e4c041057351917da949a51ca8222fa397dfc2e3566c059e74ffa71eb88"
+    },
+    {
+      "schema": 1,
+      "role": "independently-reviewed-committed-source-input",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift",
+      "original_git_blob": "8629eb092819aa0180b646a0a146dddddfc35eee",
+      "original_sha256": "d3637e9c4d0e8c846e99af05ba379a6cdd7fe20856e11159ab43dc22eb94058f",
+      "published_source_commit": "69fcb820ee5062ad445b93927cc536c543a3a878",
+      "git_blob": "07cb765ffec67a1ee8c83161358ebec24229c2db",
+      "sha256": "cb7bc059549bb18e2e651e2f92e1576ec0ce1bd033ce4b5a43119d20fcefe4b1",
+      "source_review_sha256": "54b03e4c041057351917da949a51ca8222fa397dfc2e3566c059e74ffa71eb88"
+    }
+  ]
+}

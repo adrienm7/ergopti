@@ -1213,6 +1213,12 @@ const CHECKS = [
 		repro: 'npm run test:ci-pipeline'
 	},
 	{
+		name: 'Paired lease silence receiving retains exact native case and child statuses',
+		cmd: process.execPath,
+		args: ['tools/test/test-lease-silence-xctest-evidence.cjs'],
+		repro: 'npm run test:lease-silence-xctest-evidence'
+	},
+	{
 		name: 'Full default CI source admission preserves mandatory gates and bounded diagnostic policy',
 		cmd: 'node',
 		args: ['tools/test/test-ci-full-default.cjs'],
