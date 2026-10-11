@@ -24,30 +24,40 @@ local function collect_scenarios()
 end
 
 helpers.describe("renderer scenario isolation (tooltip-renderer-scope)", function()
-	for _, failure in ipairs({ false, true }) do
-		helpers.it("restores all renderer scenarios after " .. (failure and "assertion failure" or "success"), function()
-			local scenarios = collect_scenarios()
-			helpers.assert_eq(#scenarios, 11, "the complete native renderer corpus must be replayed")
-			for _, scenario in ipairs(scenarios) do
-				local before, native = {}, _G.hs
-				for name, value in pairs(package.loaded) do before[name] = value end
-				local original_assert = helpers.assert_eq
-				if failure then helpers.assert_eq = function() error("forced renderer assertion", 0) end end
-				local ok, err = xpcall(scenario[2], debug.traceback)
-				helpers.assert_eq = original_assert
-				helpers.assert_eq(ok, not failure, scenario[1] .. ": " .. tostring(err))
-				if failure then
-					helpers.assert_true(tostring(err):find("forced renderer assertion", 1, true) ~= nil,
-						"the original scenario failure must remain visible")
+	for _, initial in ipairs({ "absent", "false", "existing" }) do
+		local sentinel
+		if initial == "false" then sentinel = false end
+		if initial == "existing" then sentinel = {} end
+		for _, failure in ipairs({ false, true }) do
+			helpers.it("restores all renderer scenarios after " .. (failure and "assertion failure" or "success") .. " with " .. initial .. " scanner owner", function()
+				local scenarios = collect_scenarios()
+				helpers.assert_eq(#scenarios, 11, "the complete native renderer corpus must be replayed")
+				for _, scenario in ipairs(scenarios) do
+					helpers.with_fresh_modules({ "toml_codec.record_scanner" }, function()
+						package.loaded["toml_codec.record_scanner"] = sentinel
+						local before, native = {}, _G.hs
+						for name, value in pairs(package.loaded) do before[name] = value end
+						local original_assert = helpers.assert_eq
+						if failure then helpers.assert_eq = function() error("forced renderer assertion", 0) end end
+						local ok, err = xpcall(scenario[2], debug.traceback)
+						helpers.assert_eq = original_assert
+						helpers.assert_eq(ok, not failure, scenario[1] .. ": " .. tostring(err))
+						if failure then
+							helpers.assert_true(tostring(err):find("forced renderer assertion", 1, true) ~= nil,
+								"the original scenario failure must remain visible")
+						end
+						helpers.assert_true(rawequal(_G.hs, native), scenario[1] .. " replaced native state")
+						for name, value in pairs(package.loaded) do
+							helpers.assert_true(rawequal(value, before[name]), scenario[1] .. " leaked " .. name)
+						end
+						for name, value in pairs(before) do
+							helpers.assert_true(rawequal(package.loaded[name], value), scenario[1] .. " removed " .. name)
+						end
+						helpers.assert_true(rawequal(package.loaded["toml_codec.record_scanner"], sentinel),
+							scenario[1] .. " did not restore the exact scanner owner")
+					end)
 				end
-				helpers.assert_true(rawequal(_G.hs, native), scenario[1] .. " replaced native state")
-				for name, value in pairs(package.loaded) do
-					helpers.assert_true(rawequal(value, before[name]), scenario[1] .. " leaked " .. name)
-				end
-				for name, value in pairs(before) do
-					helpers.assert_true(rawequal(package.loaded[name], value), scenario[1] .. " removed " .. name)
-				end
-			end
-		end)
+			end)
+		end
 	end
 end)
