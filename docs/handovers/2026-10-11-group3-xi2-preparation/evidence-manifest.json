@@ -1,0 +1,2104 @@
+{
+	"version": 3,
+	"scope": "INERT_PRIVATE_PREPARATION_AND_SCOPED_NATIVE_RECEIVING_NOT_ADOPTED",
+	"source_head": "2c144060853239c9c416ea1a9c08030382ed2b1f",
+	"capsule": {
+		"entries": [
+			{
+				"proposed_member": "evidence/xi-v2/README.md.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/README.md",
+				"bytes": 5736,
+				"sha256": "9b1deeb317cfc353a761a13dc325af8818926076c7602b905a68d6c9a36cb6c6"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/add_xi_controls.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/add_xi_controls.py",
+				"bytes": 10179,
+				"sha256": "4b10e003e84d5113bdffe373f68701d3ac33b0b444551b60961ac67c16cfba2c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/candidate.patch.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/candidate.patch",
+				"bytes": 38809,
+				"sha256": "c6f56de7a67ac5fc8f3e83357a1994837a54193b62bf6ece74e966cb2401e886"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactual-final-restoration.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactual-final-restoration.json",
+				"bytes": 1567,
+				"sha256": "7f582e244b29d045f14e675551f01c86a8d253895ed1de35cbee7ae034869d4d"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactual-results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactual-results.json",
+				"bytes": 12668,
+				"sha256": "686733f2d488e70f3658a733acd26339cdd339c2a338c7af4bb3d2920a8806f0"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/result.json",
+				"bytes": 772,
+				"sha256": "b5a39234ff5c6d558468b63d82dca95953222afed79dbc3270001bd0ebad74cd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/stderr.txt",
+				"bytes": 1312,
+				"sha256": "4b2bf5d490a0b2f74b2822fbf4400f35156bb2a080b8c0b3eb0259bb50151eab"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/stdout.txt",
+				"bytes": 75,
+				"sha256": "dabb5855f5c2a8c782a4ad928a5c30eda9d98c1e5107fb7f2b4a433a1a3681a7"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-crypto-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/result.json",
+				"bytes": 769,
+				"sha256": "a2bfbfbfdc31f033def3d0e748dd0d19791feb02900d10df288889397a21609f"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/stderr.txt",
+				"bytes": 2676,
+				"sha256": "21a371279b9f84bc427676b5200c951b33e48b9b85302d1e8447ffecbdfdebf7"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-launcher-deps.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/result.json",
+				"bytes": 775,
+				"sha256": "b8af24da3e4427606362585706fa8f89c1b5ae3cc1b6ec5cf04e11f72f20fd99"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/stderr.txt",
+				"bytes": 1349,
+				"sha256": "ba0f0831d9c615010fd9ef4bc31977e694061a3eb95a1e149ca59dfa3abe6691"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/stdout.txt",
+				"bytes": 376,
+				"sha256": "5ebe255753c92bd1da5bb190aeed03139f441e80a7ba0777c4e22cd8ab6d09c8"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/result.json",
+				"bytes": 802,
+				"sha256": "fac25d9cea4bc0bc71f2df4dbc6929172aa23a5f5b1da2838c422ecfc70e7b4d"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "a20aac3e1f489e27b24230f2f6ae91c129da8e9b14788c0f9db98dad767d1c80"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/stderr.txt",
+				"bytes": 1151,
+				"sha256": "b3a58650b24faa055990746f44e49d57b6ddcadebecefbb2f32bcdfa5099b422"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-new-tests-test-linux-portable-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/result.json",
+				"bytes": 777,
+				"sha256": "15c9572f5ae38fd288ed9dd37eb490b7b290b4f867f02e636633baef20981fef"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/stdout.txt",
+				"bytes": 1213,
+				"sha256": "9033a397619e72ff7985acaef01f0e94f65d7ba95a059230b33ff2f17cfd3879"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-crypto-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-crypto-runtime.cjs",
+				"bytes": 7286,
+				"sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-launcher-deps.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-launcher-deps.cjs",
+				"bytes": 25629,
+				"sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-network-runtime.cjs",
+				"bytes": 23053,
+				"sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-crypto-runtime.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs",
+				"bytes": 57190,
+				"sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/result.json",
+				"bytes": 774,
+				"sha256": "3519035b7a732fc8e485c64fc1516691d659cab237da7747fbad58b326f65e99"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/stdout.txt",
+				"bytes": 237,
+				"sha256": "1c14e95d296ab225fc91397ccc6601801bb8ed42505cf65cbf6687f6006eb3c7"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-crypto-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-crypto-runtime.cjs",
+				"bytes": 7286,
+				"sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-launcher-deps.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-launcher-deps.cjs",
+				"bytes": 25629,
+				"sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-network-runtime.cjs",
+				"bytes": 23053,
+				"sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-launcher-deps.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs",
+				"bytes": 57190,
+				"sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/result.json",
+				"bytes": 780,
+				"sha256": "95c76f02cad0c7a7f5a18dd0b3f4c943f0019703b7da6535c7584cfa447cace0"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/stdout.txt",
+				"bytes": 2091,
+				"sha256": "05616219630ae372c30e47ee9767417eeb12e7e78c0da96f2997e48dea43efc3"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-crypto-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-crypto-runtime.cjs",
+				"bytes": 7286,
+				"sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-launcher-deps.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-launcher-deps.cjs",
+				"bytes": 25629,
+				"sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-network-runtime.cjs",
+				"bytes": 23053,
+				"sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-network-runtime.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs",
+				"bytes": 57190,
+				"sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/result.json",
+				"bytes": 807,
+				"sha256": "4e8d1be85812e068f91bb6a77c74873f9c9beb7372eefbf9777e71a8ba1a1ec4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/source-after.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/source-before.json",
+				"bytes": 1567,
+				"sha256": "2e1b7e47b32bd3b308646346b4990f5f707ed772402e339e64047170d64c108a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/stdout.txt",
+				"bytes": 305,
+				"sha256": "deeda1f70d9e57d6012f95adde9db9443182215e170a31728a114ebcc44c73fc"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-crypto-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-crypto-runtime.cjs",
+				"bytes": 7286,
+				"sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-launcher-deps.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-launcher-deps.cjs",
+				"bytes": 25629,
+				"sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-network-runtime.cjs",
+				"bytes": 23053,
+				"sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-source-original-tests-test-linux-portable-network-runtime.cjs/variants/tools/test/test-linux-portable-network-runtime.cjs",
+				"bytes": 57190,
+				"sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-stager-new-portable/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-stager-new-portable/result.json",
+				"bytes": 765,
+				"sha256": "e21b84d2f1b65e6a20f6047454ca189312753115cf6123ea8fdd3b24c0f69760"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-stager-new-portable/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-stager-new-portable/source-after.json",
+				"bytes": 1567,
+				"sha256": "a8494f6bfcf2712017a81b42e286b2bbe230bb548a834a656cb01bd6ba617946"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-stager-new-portable/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-stager-new-portable/source-before.json",
+				"bytes": 1567,
+				"sha256": "a8494f6bfcf2712017a81b42e286b2bbe230bb548a834a656cb01bd6ba617946"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-stager-new-portable/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-stager-new-portable/stderr.txt",
+				"bytes": 948,
+				"sha256": "c2cc2ae90deb217a57ba3d33ff83aa73745d48b7c686fabeb1b236b7eb61648c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-stager-new-portable/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-stager-new-portable/stdout.txt",
+				"bytes": 94,
+				"sha256": "e646fcf9af2386464d5bd5571e991f292eab3d974dfbf87068b5676c969a58cf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/original-stager-new-portable/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/original-stager-new-portable/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/result.json",
+				"bytes": 764,
+				"sha256": "a2d73ef61210d4f978349f8d3003a7b793aee258acd17e518d543bf94bb777dd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/source-after.json",
+				"bytes": 1567,
+				"sha256": "3998a01087e85e12f65354326400f79e50d3db6e5d3e8c6d648988ed2e7e5cc0"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/source-before.json",
+				"bytes": 1567,
+				"sha256": "3998a01087e85e12f65354326400f79e50d3db6e5d3e8c6d648988ed2e7e5cc0"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/stderr.txt",
+				"bytes": 1204,
+				"sha256": "55dc9d7441442288edd45288bb57dcd7b4bbc51affccc536ce1acf55f814da4b"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/stdout.txt",
+				"bytes": 305,
+				"sha256": "154a95091ad7f0c002ad693a0eb06884816f4b364343123657e0e00b7c92cd4f"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-ELF-SONAME-guard-omitted/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 37854,
+				"sha256": "e448bb3f7f2c10fb86684ed39238ee324bf72b2b1fa439676fc4090f4b3850f1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-closure-seed-omitted/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-closure-seed-omitted/result.json",
+				"bytes": 760,
+				"sha256": "ab8418b8b90752e7ad291c3c98d349c2f2243e23b6e0c9a7334d2929948813dd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-closure-seed-omitted/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-closure-seed-omitted/source-after.json",
+				"bytes": 1567,
+				"sha256": "2a0e37eb8f7983693306ded2a419dcbc8046d3ff66a891c2a011b28d862db9f6"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-closure-seed-omitted/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-closure-seed-omitted/source-before.json",
+				"bytes": 1567,
+				"sha256": "2a0e37eb8f7983693306ded2a419dcbc8046d3ff66a891c2a011b28d862db9f6"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-closure-seed-omitted/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-closure-seed-omitted/stderr.txt",
+				"bytes": 948,
+				"sha256": "c2cc2ae90deb217a57ba3d33ff83aa73745d48b7c686fabeb1b236b7eb61648c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-closure-seed-omitted/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-closure-seed-omitted/stdout.txt",
+				"bytes": 94,
+				"sha256": "e646fcf9af2386464d5bd5571e991f292eab3d974dfbf87068b5676c969a58cf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-closure-seed-omitted/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-closure-seed-omitted/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 37948,
+				"sha256": "cd77256eb362d7cef0aa2d5ec115c1d979ef62de818d4400f12746c2c64b0f06"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-explicit-root-copy-omitted/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-explicit-root-copy-omitted/result.json",
+				"bytes": 766,
+				"sha256": "d8ba98a59ade452a7dc58c477a47d447383cc43f83891e7ff902a31af14dfde6"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-explicit-root-copy-omitted/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-explicit-root-copy-omitted/source-after.json",
+				"bytes": 1567,
+				"sha256": "14681eb11f4a0db8a53bc46149dca7258d6c4e8ed69fbb88cffe73d74670d349"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-explicit-root-copy-omitted/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-explicit-root-copy-omitted/source-before.json",
+				"bytes": 1567,
+				"sha256": "14681eb11f4a0db8a53bc46149dca7258d6c4e8ed69fbb88cffe73d74670d349"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-explicit-root-copy-omitted/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-explicit-root-copy-omitted/stderr.txt",
+				"bytes": 948,
+				"sha256": "c2cc2ae90deb217a57ba3d33ff83aa73745d48b7c686fabeb1b236b7eb61648c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-explicit-root-copy-omitted/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-explicit-root-copy-omitted/stdout.txt",
+				"bytes": 94,
+				"sha256": "e646fcf9af2386464d5bd5571e991f292eab3d974dfbf87068b5676c969a58cf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-explicit-root-copy-omitted/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-explicit-root-copy-omitted/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 37795,
+				"sha256": "e24703602be2b7833adce79e989ff2bff22d5301503e83f6f28d78135d3ca385"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-generator-validation-omitted/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-generator-validation-omitted/result.json",
+				"bytes": 750,
+				"sha256": "cc47d3897d09d4e0fa8e69292d8747c28b4f465da63265a8efeb2666cc33e1f8"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-generator-validation-omitted/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-generator-validation-omitted/source-after.json",
+				"bytes": 1567,
+				"sha256": "e4165851ecc4e0fef62b6853d6a388266052fe655d9ff4d2eb4c019dff0c523b"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-generator-validation-omitted/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-generator-validation-omitted/source-before.json",
+				"bytes": 1567,
+				"sha256": "e4165851ecc4e0fef62b6853d6a388266052fe655d9ff4d2eb4c019dff0c523b"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-generator-validation-omitted/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-generator-validation-omitted/stderr.txt",
+				"bytes": 2333,
+				"sha256": "5d540bf1747143a18655a5e273aec0975990cd71867f2258ba5f68fca3101f62"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-generator-validation-omitted/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-generator-validation-omitted/stdout.txt",
+				"bytes": 642,
+				"sha256": "3409add4f099a367119831ef918c6e3900860a4011e37af89ad1a29dbdf0a297"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-generator-validation-omitted/variants/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-generator-validation-omitted/variants/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17968,
+				"sha256": "9ffbd54c364e53bb44e4db03654d03467ad559143ed4fabe9d04f32b0d546798"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-package-job-prerequisite-omitted/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-package-job-prerequisite-omitted/result.json",
+				"bytes": 772,
+				"sha256": "964c7fe986e321998b9bce695a657deb9422f23ad8f376aa33cb89666230e214"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-package-job-prerequisite-omitted/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-package-job-prerequisite-omitted/source-after.json",
+				"bytes": 1567,
+				"sha256": "cb1959939789a4f4bd23712b862cf8f89c9c25b8b1bcff0e42893c8903e8b276"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-package-job-prerequisite-omitted/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-package-job-prerequisite-omitted/source-before.json",
+				"bytes": 1567,
+				"sha256": "cb1959939789a4f4bd23712b862cf8f89c9c25b8b1bcff0e42893c8903e8b276"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-package-job-prerequisite-omitted/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-package-job-prerequisite-omitted/stderr.txt",
+				"bytes": 978,
+				"sha256": "7d3db339d445afb03e4575fa5b6de6143a84ef5bddd140e55a0c53d7f94c500b"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-package-job-prerequisite-omitted/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-package-job-prerequisite-omitted/stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-package-job-prerequisite-omitted/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-package-job-prerequisite-omitted/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242588,
+				"sha256": "ee6d1bb684603f96fed28fdaed3f2187ccedd3bbf12cfeb0349ea5f4edd54038"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/result.json",
+				"bytes": 772,
+				"sha256": "5eb8c2b9b0fa4016d838bba4a7d0edc3e7af23e4fedd1d3042831ee1afabe530"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/source-after.json",
+				"bytes": 1567,
+				"sha256": "3ec67232c788bc8011c8734aabde11b8381002496d9446f1894d22004f1f2d18"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/source-before.json",
+				"bytes": 1567,
+				"sha256": "3ec67232c788bc8011c8734aabde11b8381002496d9446f1894d22004f1f2d18"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/stderr.txt",
+				"bytes": 1493,
+				"sha256": "a3416521da76112066e4d50cc6e4815341c6334b1eb18f3a76733c757dba53e2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/stdout.txt",
+				"bytes": 305,
+				"sha256": "154a95091ad7f0c002ad693a0eb06884816f4b364343123657e0e00b7c92cd4f"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/variants/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-resolver-descriptor-guard-omitted/variants/tools/build/stage-linux-network-runtime.py",
+				"bytes": 37659,
+				"sha256": "2e2c7bf892df7df8634c28102ab048646b77b50987ffffa6b56d6aa95a7a484a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-staging-job-prerequisite-omitted/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-staging-job-prerequisite-omitted/result.json",
+				"bytes": 772,
+				"sha256": "546b053b96ce2df48ef71283b4a89cb07654aaaf4ef62362412b4000d0234be5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-staging-job-prerequisite-omitted/source-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-staging-job-prerequisite-omitted/source-after.json",
+				"bytes": 1567,
+				"sha256": "c6b2a00642ec6f562d2223de3a7ea13d4f9b653456e04893a27e6c13f663dbf7"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-staging-job-prerequisite-omitted/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-staging-job-prerequisite-omitted/source-before.json",
+				"bytes": 1567,
+				"sha256": "c6b2a00642ec6f562d2223de3a7ea13d4f9b653456e04893a27e6c13f663dbf7"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-staging-job-prerequisite-omitted/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-staging-job-prerequisite-omitted/stderr.txt",
+				"bytes": 974,
+				"sha256": "028bce14c40f5b5d2424282322ad799076aeba9469ec0bb98479659f15dc34e9"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-staging-job-prerequisite-omitted/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-staging-job-prerequisite-omitted/stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/counterfactuals/xi-staging-job-prerequisite-omitted/variants/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/counterfactuals/xi-staging-job-prerequisite-omitted/variants/.github/workflows/ci-linux.yml",
+				"bytes": 242588,
+				"sha256": "4fb47f0382540da8e7390f0a8583bf31a3dadb333339eaed69ca11c2986bec2b"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/extend_tests.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/extend_tests.py",
+				"bytes": 8945,
+				"sha256": "d8caa88a9ed833742d595854dfddf6fff55294e077ac33550bff3527be80a341"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-0.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-0.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-0.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-0.stdout",
+				"bytes": 724,
+				"sha256": "1f418df502aeec4390f241260889722a518431c556bccf523d33144f6d9dedda"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-1.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-1.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-1.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-1.stdout",
+				"bytes": 19,
+				"sha256": "413a709001976657cb743636fd34e48fc41d8d302d665460d3f874b3313da127"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-check-0.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-check-0.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-check-0.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-check-0.stdout",
+				"bytes": 66,
+				"sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-check-1.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-check-1.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-check-1.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-check-1.stdout",
+				"bytes": 25,
+				"sha256": "fd2299c9f1c6dc869070883e281051bfe93aacf66c1a3b0069f45b4aa410ca50"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-check-results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-check-results.json",
+				"bytes": 1185,
+				"sha256": "97c86cdfe86b6b94fa855bf71487d67fffa449f6da9839a8cb87077bc065cc1d"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/format-results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/format-results.json",
+				"bytes": 1171,
+				"sha256": "528cf9d50cbadf6c34fd23a0f696a1faf7401b78d32a049409a45ee33a95b89e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/generator-result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/generator-result.json",
+				"bytes": 2168,
+				"sha256": "30fa266f0a3cb085cb01936310cee92f2c68aa138ce71b777a01299b64faa21f"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/generator.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/generator.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/generator.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/generator.stdout",
+				"bytes": 57,
+				"sha256": "82277a0cc36618b1363dd8b515a33fc2bb2415fbe37efa4978cd0727fa55e6eb"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/.github/workflows/ci-linux.yml",
+				"bytes": 242598,
+				"sha256": "abd0a9dc0236013b2a09941a2f42f0cd04cb6c5fa48154809cecb760e91a23d3"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 7206,
+				"sha256": "972e25b015254fb8cbbe8f47d152a4defade5d1581cedc2f85852a5ecb58ab4b"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 590,
+				"sha256": "9afad06eb92d8052cc2a4c120d24b07bb75b8a1354cd0a351cbb506b3edb8ecb"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/static/ergopti_plus/linux/install.sh",
+				"bytes": 45122,
+				"sha256": "e3eff9cdc07478d8f19904eb07e3a811f2372d4ef5e72c098076d6dc90005873"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/build/PKGBUILD",
+				"bytes": 5117,
+				"sha256": "aa82576efe787fc6fc3823a6a43b09e4d50507bb352b8f4d4fa6c39c1a8d0a52"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/build/build-linux-deb.sh",
+				"bytes": 9475,
+				"sha256": "9ed45e868343b06c520ce8992b3f8f7b1fd5bc77ca68a8b4cf2176a57fef4394"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/build/build-linux-rpm.sh",
+				"bytes": 9243,
+				"sha256": "f0b35991fe9fde307950320d93e43f625dac6b8c632c29c908d75851b641dd32"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/build/nix/flake.nix",
+				"bytes": 9219,
+				"sha256": "b49dd7469e1f6afc0b867114adca6de4ec596e7c869bdbaa88032c4538fec08d"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/build/stage-linux-network-runtime.py",
+				"bytes": 37961,
+				"sha256": "261a8202a99ddb80cc54595d846467eac4eaa3b91eefbba7186571e5709bd1e5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 18402,
+				"sha256": "16fcecd2052945b71fc75d4363d629063625d4b3f26669060c6afb70e307b0b0"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/test/test-linux-crypto-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/test/test-linux-crypto-runtime.cjs",
+				"bytes": 7389,
+				"sha256": "e2b7884ebed73d50a205ac9b6131cd60dfcf0c827c501619bc8e2640f944c388"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/test/test-linux-launcher-deps.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/test/test-linux-launcher-deps.cjs",
+				"bytes": 26781,
+				"sha256": "8e919b2cbb4e3a6a47961bd833485a2f338f2fde9813f3c40a67ce9fb60fd713"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/test/test-linux-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/test/test-linux-network-runtime.cjs",
+				"bytes": 25295,
+				"sha256": "29a278278f5fdc448cdbdc0e82ec0ac13486dec6327b919f468b09ccccbf532c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/postimages/tools/test/test-linux-portable-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/postimages/tools/test/test-linux-portable-network-runtime.cjs",
+				"bytes": 69794,
+				"sha256": "eadd092dc896c3aa491aaea4d9048d30ca40d60068ea2f7d716a92ea8eb1fc0e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/.github/workflows/ci-linux.yml.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/.github/workflows/ci-linux.yml",
+				"bytes": 242578,
+				"sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/static/ergopti_plus/_shared/data/linux_native_runtime.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/static/ergopti_plus/_shared/data/linux_native_runtime.json",
+				"bytes": 6920,
+				"sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/static/ergopti_plus/linux/_generated/native_runtime.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/static/ergopti_plus/linux/_generated/native_runtime.lua",
+				"bytes": 570,
+				"sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/static/ergopti_plus/linux/install.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/static/ergopti_plus/linux/install.sh",
+				"bytes": 44872,
+				"sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/build/PKGBUILD.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/build/PKGBUILD",
+				"bytes": 5109,
+				"sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/build/build-linux-deb.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/build/build-linux-deb.sh",
+				"bytes": 9467,
+				"sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/build/build-linux-rpm.sh.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/build/build-linux-rpm.sh",
+				"bytes": 9221,
+				"sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/build/nix/flake.nix.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/build/nix/flake.nix",
+				"bytes": 9213,
+				"sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/build/stage-linux-network-runtime.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/build/stage-linux-network-runtime.py",
+				"bytes": 36440,
+				"sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/codegen/codegen-linux-native-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/codegen/codegen-linux-native-runtime.cjs",
+				"bytes": 17962,
+				"sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/test/test-linux-crypto-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/test/test-linux-crypto-runtime.cjs",
+				"bytes": 7286,
+				"sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/test/test-linux-launcher-deps.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/test/test-linux-launcher-deps.cjs",
+				"bytes": 25629,
+				"sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/test/test-linux-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/test/test-linux-network-runtime.cjs",
+				"bytes": 23053,
+				"sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/preimages/tools/test/test-linux-portable-network-runtime.cjs.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/preimages/tools/test/test-linux-portable-network-runtime.cjs",
+				"bytes": 57190,
+				"sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/receipt.json",
+				"bytes": 10415,
+				"sha256": "339f195f25228d39694e661eabdd1adc206fb9bc4d4ec184b5e9c8beaf5210a4"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/references/.ergopti-cloud--activate.sh.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/references/.ergopti-cloud--activate.sh.txt",
+				"bytes": 665,
+				"sha256": "01a72faa23fb5ae0f0348ac20574c1c50d02aa5ec0833f0c88a2cc2b59eb6dcb"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/references/.ergopti-cloud--reap_validation.py.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/references/.ergopti-cloud--reap_validation.py.txt",
+				"bytes": 968,
+				"sha256": "b1f9d10b9d228af0429dacc65088210051651acc40972918e8d6d00491506f73"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/references/group3-xi2-three-source-six-projection-private-v1--review.json.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/references/group3-xi2-three-source-six-projection-private-v1--review.json.txt",
+				"bytes": 6453,
+				"sha256": "2567f1df69a7128887293b732e7b4b02f5e34826a298c8d668a0bc625101ece9"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/references/xi2-catalogue-stager-private-candidate-v1--receipt.json.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/references/xi2-catalogue-stager-private-candidate-v1--receipt.json.txt",
+				"bytes": 6536,
+				"sha256": "4edd40a561d5ce7cb0607d20a3b75cf0ef680cc9bc3335bf9137b6ebddbbb11e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/run_counterfactuals.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/run_counterfactuals.py",
+				"bytes": 5475,
+				"sha256": "a7c1e2206a24a790745ba7a70f0e12f2718a33df58cd421190f3b16a986e19ab"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/run_targeted-first.py.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/run_targeted-first.py.txt",
+				"bytes": 2544,
+				"sha256": "4ca8ad7ebe1bcd3cac91d880dd95be9841147a42b60ebbc8bc43583013c6eddd"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/run_targeted.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/run_targeted.py",
+				"bytes": 2455,
+				"sha256": "ad2da7bf913b7490baa5c5e5f1f968005c863146a67f11b6a92c2746fc2d0783"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/seal_candidate.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/seal_candidate.py",
+				"bytes": 8471,
+				"sha256": "1efc609a7ee380e2182a45d0e87cf468595c0bd0c26426eba1af044686800d6e"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/source-pair.tar.gz.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/source-pair.tar.gz",
+				"bytes": 176394,
+				"sha256": "23a5eac93e507696bfb52244b38800c9ad0e01d281cdb115d4467bb264d672af"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/source-pairs-before-replays.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/source-pairs-before-replays.json",
+				"bytes": 3191,
+				"sha256": "2a612b88f61389d6414aae1ff9d81b2f7833e96b91fb7771c9d23a0b17c24813"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/stager-format-ast-equality.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/stager-format-ast-equality.json",
+				"bytes": 95,
+				"sha256": "cdc31fbf022e7f3f5eb2964f0f764448ff7b7a8033a28efcbc6ecf5ab8d36695"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-after.json",
+				"bytes": 1061,
+				"sha256": "28b8fc80b7497827df1ceafb93b990d07b221b9a367ff12cc50b6d5815bc8266"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-before.json",
+				"bytes": 1061,
+				"sha256": "28b8fc80b7497827df1ceafb93b990d07b221b9a367ff12cc50b6d5815bc8266"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/run.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/run.py",
+				"bytes": 2455,
+				"sha256": "ad2da7bf913b7490baa5c5e5f1f968005c863146a67f11b6a92c2746fc2d0783"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/targeted-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/targeted-after.json",
+				"bytes": 1061,
+				"sha256": "921cdaf720f506ec153df0e0f2bf245441463b6963bdcad0da0d37e1ced9953a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/targeted-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/targeted-before.json",
+				"bytes": 1061,
+				"sha256": "921cdaf720f506ec153df0e0f2bf245441463b6963bdcad0da0d37e1ced9953a"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/targeted-results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/targeted-results.json",
+				"bytes": 3507,
+				"sha256": "9bd6d96986300695e8fefc1fcf03780b8745628f60399b1de789d8b3efb4f362"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-crypto-runtime.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-crypto-runtime.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-crypto-runtime.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-crypto-runtime.cjs.stdout",
+				"bytes": 1213,
+				"sha256": "9033a397619e72ff7985acaef01f0e94f65d7ba95a059230b33ff2f17cfd3879"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-launcher-deps.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-launcher-deps.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-launcher-deps.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-launcher-deps.cjs.stdout",
+				"bytes": 263,
+				"sha256": "184d5e1567f4c48a0da405fb166dc07609bb1abb058900818ad384abd1e25b79"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-network-runtime.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-network-runtime.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-network-runtime.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-network-runtime.cjs.stdout",
+				"bytes": 2870,
+				"sha256": "0066bbd3492b7cd77a50a5e5dfffbad30e766d6cdb47c90a6384aa08051a4b5f"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-portable-network-registration.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-portable-network-registration.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-portable-network-registration.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-portable-network-registration.cjs.stdout",
+				"bytes": 83,
+				"sha256": "671907233ab93eb3a657d845008dbdad77a5fcbc4d8008b460c6dc84277f3d20"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-portable-network-runtime.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-portable-network-runtime.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-final/test-linux-portable-network-runtime.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-final/test-linux-portable-network-runtime.cjs.stdout",
+				"bytes": 1392,
+				"sha256": "f48569b3a95593de6f32a1e2c3697eebdad283794fd2a3a7a3868d02e13ee7ba"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/targeted-results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/targeted-results.json",
+				"bytes": 3433,
+				"sha256": "f24763a0a32fd36929cbd8bea7f3e6b78d94745b1b364c25fd58991647f27b7b"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-edit-spans.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-edit-spans.json",
+				"bytes": 19221,
+				"sha256": "b255671b3152a45f702d0021bfeeb690e0aef424fc463cb73eb4611c8e7c1abb"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-crypto-runtime.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-crypto-runtime.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-crypto-runtime.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-crypto-runtime.cjs.stdout",
+				"bytes": 1213,
+				"sha256": "9033a397619e72ff7985acaef01f0e94f65d7ba95a059230b33ff2f17cfd3879"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-launcher-deps.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-launcher-deps.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-launcher-deps.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-launcher-deps.cjs.stdout",
+				"bytes": 237,
+				"sha256": "1c14e95d296ab225fc91397ccc6601801bb8ed42505cf65cbf6687f6006eb3c7"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-network-runtime.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-network-runtime.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-network-runtime.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-network-runtime.cjs.stdout",
+				"bytes": 2870,
+				"sha256": "0066bbd3492b7cd77a50a5e5dfffbad30e766d6cdb47c90a6384aa08051a4b5f"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-portable-network-registration.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-portable-network-registration.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-portable-network-registration.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-portable-network-registration.cjs.stdout",
+				"bytes": 83,
+				"sha256": "671907233ab93eb3a657d845008dbdad77a5fcbc4d8008b460c6dc84277f3d20"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-portable-network-runtime.cjs.stderr.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-portable-network-runtime.cjs.stderr",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/test-linux-portable-network-runtime.cjs.stdout.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/test-linux-portable-network-runtime.cjs.stdout",
+				"bytes": 1392,
+				"sha256": "189a17f357c481bf078c115d17edbe7b8a468b88d2d19acf843493b2c6eef6f8"
+			},
+			{
+				"proposed_member": "evidence/xi-v2/files.sha256.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-catalogue-stager-private-candidate-v2/files.sha256",
+				"bytes": 40239,
+				"sha256": "b3faddee8b06cebed616f45c2e0d625fb5e27abda21bde5f0a87801c89503bf3"
+			},
+			{
+				"proposed_member": "evidence/independent-source-review/review.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/group3-xi2-v2-fourteen-path-source-receiving/review.json",
+				"bytes": 5930,
+				"sha256": "66f6c5ed82f298877e1b387b9deb5b1cb2294adc5b59ee6175d2465558a7e342"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/00-stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/00-stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/00-stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/00-stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/01-stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/01-stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/01-stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/01-stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/02-stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/02-stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/02-stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/02-stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/03-stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/03-stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/03-stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/03-stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/04-stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/04-stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/04-stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/04-stdout.txt",
+				"bytes": 1512,
+				"sha256": "2373d570d23d27d2f81ce3a0ef9229b61735255711b337079d079a62f1473d11"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/05-stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/05-stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/05-stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/05-stdout.txt",
+				"bytes": 50,
+				"sha256": "be9cfe8f5c5a9219e76b730c51798349321c06b0bfb3e9a00b15269bdc7ed24f"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/README.md.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/README.md",
+				"bytes": 3614,
+				"sha256": "8cc8dc242088ecd543a37e41e2d55af8e8faf6b8437014c491b303fbd2639779"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/checksum-check.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/checksum-check.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/checksum-check.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/checksum-check.stdout.txt",
+				"bytes": 25801,
+				"sha256": "cb2bcdafae4a3a2a47b3c1adaa5b681b091879acac1931fbf6ec7d238626ddf0"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/installed-0.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/installed-0.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/installed-0.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/installed-0.stdout.txt",
+				"bytes": 131,
+				"sha256": "5fccefb66110c3ed5092f2de415c5450407a2c7cce78f9b1f53e95637b67c54c"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/installed-1.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/installed-1.stderr.txt",
+				"bytes": 475,
+				"sha256": "b282e5a949cce7302027d32de340a3c3a2a493101c17de150c922bc8a55caeab"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/installed-1.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/installed-1.stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/installed-results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/installed-results.json",
+				"bytes": 2633,
+				"sha256": "4ddee1cfff081eab146c057e10da5dc59bc476f5f1f28b2306fd57fb41400fbb"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/load_actual.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/load_actual.lua",
+				"bytes": 2250,
+				"sha256": "d6c22ed615b1924cbdf0600c8abaa24bb80a2df6b012f33506cd68d79f1baf06"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/observe_installed.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/observe_installed.py",
+				"bytes": 1638,
+				"sha256": "654c8fb43dd2c428f787f2d232dadc1d8b297d40947f1794b04000239fa08ede"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/stage-result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/stage-result.json",
+				"bytes": 10927,
+				"sha256": "c40f1d3cb692438ae2ef84717924f8a96ea412e1edf8abf5e8dec960e61654c4"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/stage.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/stage.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/stage.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/stage.stdout.txt",
+				"bytes": 99,
+				"sha256": "c2a1047ee73993dc6e396e0f062e9174a0d9ed48b55fc99409917cb954bf747b"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/stage_actual.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/stage_actual.py",
+				"bytes": 3470,
+				"sha256": "f425446b054c3e55b38054bda4f47c2cc54dfa73e977a9867225d38eb56066ee"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/complete-layout-2/staging-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/complete-layout-2/staging-before.json",
+				"bytes": 3400,
+				"sha256": "1db93ab282685f22086b62c245389e1c9d266400b2d2a4b9172cd8d70bb63348"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/export-observation-3/load_actual.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/export-observation-3/load_actual.lua",
+				"bytes": 2366,
+				"sha256": "3fc59dc82d1ee24baa450940802f6d3a87f4d1a7c63204adb9a9f874094d7297"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/export-observation-3/receive.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/export-observation-3/receive.py",
+				"bytes": 1874,
+				"sha256": "b2293c8dfdd90d383bb8c1b0dcdfc1b09fdbbc95de1e9d91796a5cd7ce0a1246"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/export-observation-3/result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/export-observation-3/result.json",
+				"bytes": 3119,
+				"sha256": "fc3de957537cb011a48c8a1ad562f8a30333a27e3b7c2145f4fc0eed11e94db2"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/export-observation-3/stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/export-observation-3/stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/export-observation-3/stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/export-observation-3/stdout.txt",
+				"bytes": 2379,
+				"sha256": "5f83290bdf5bca0a5c8d29a714dd8920f5a052e2ad63c6049937a66e6ceef448"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-gio_querymodules.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-gio_querymodules.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-gio_querymodules.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-gio_querymodules.stdout.txt",
+				"bytes": 52,
+				"sha256": "7b0b54e0dcf9b9d19e200aab3de2f370c0afb1625b3018b32cf211c42f36b9eb"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-giomoduledir.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-giomoduledir.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-giomoduledir.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-giomoduledir.stdout.txt",
+				"bytes": 38,
+				"sha256": "50e05c6d8fc0d5bbe2e0a4549cff78ae26e2c4d29b231415449ac8e2129e88ad"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-libdir.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-libdir.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-libdir.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-libdir.stdout.txt",
+				"bytes": 26,
+				"sha256": "10d473fdf0015247242e0c5a3b2d63367d857cdf8bf10c561309654ce689cff3"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-schemasdir.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-schemasdir.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/gio-schemasdir.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/gio-schemasdir.stdout.txt",
+				"bytes": 28,
+				"sha256": "64da8a0d805c9dca54a88abda98fcef295b980dc98be3fc1b98be34a55aaf393"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/host-package-status.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/host-package-status.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/host-package-status.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/host-package-status.stdout.txt",
+				"bytes": 151,
+				"sha256": "3a96bbb525f285f946b320b20520778d1ff72f15ba57579faa0c331c5aee0fb5"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/initial-layout-diagnostic.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/initial-layout-diagnostic.json",
+				"bytes": 996,
+				"sha256": "962e0f29804f097d87dada960144d5d018f8ba399170066086a8d2a7eddfa4b6"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/initial-layout-diagnostic.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/initial-layout-diagnostic.stderr.txt",
+				"bytes": 1620,
+				"sha256": "a963d1b6792104774a5f1b5f847818336388e60bee491121339394ae91bf0273"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/initial-layout-diagnostic.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/initial-layout-diagnostic.stdout.txt",
+				"bytes": 49,
+				"sha256": "4b8f095018f5985c8a3590e16d12103a1d21a91e0371ab1d02c445daa5be8407"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/input-pins.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/input-pins.json",
+				"bytes": 1765,
+				"sha256": "351a12bfd7b4c96e7ad8515cefbdcaa406b0887f2cb2d28b410a079f5fff118e"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/installed-0.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/installed-0.stderr.txt",
+				"bytes": 48,
+				"sha256": "32ad7d739751864cf48e9acec6a60e38967eef527dd6cd377ed1d8d838eed7f9"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/installed-0.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/installed-0.stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/installed-1.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/installed-1.stderr.txt",
+				"bytes": 1927,
+				"sha256": "c0eef1d767ee2d3f2e92cce1207b02360fb57a96c3a117ccd7c4ab0588c0b6d8"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/installed-1.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/installed-1.stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/installed-results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/installed-results.json",
+				"bytes": 2392,
+				"sha256": "314df960444af4087ceb89c54b3ae62cfbd2044e8b344defa5b01ccd8945833e"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/load_actual.lua.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/load_actual.lua",
+				"bytes": 2156,
+				"sha256": "9096c08ad82a128e78d60d7561c62bd9f70d3ffa6271df1801fc7c6205f6d544"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/metadata-after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/metadata-after.json",
+				"bytes": 499,
+				"sha256": "bf26816be64ac52f1f18be739fb5eaccbdd42e412a0477a69590b8a3783880e4"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/observe_installed.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/observe_installed.py",
+				"bytes": 1605,
+				"sha256": "0cde97bef416e471bc979cbe32aff12b8b34a43e625740ed9485a8e46817541d"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/prerequisites.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/prerequisites.json",
+				"bytes": 3133,
+				"sha256": "e524fd7c17e0215e59aa9fa72624e0ae5fe800a8d9306e3cdd49e6e65e4f98ec"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/receipt.json",
+				"bytes": 4665,
+				"sha256": "10a098990d1da6aec6ddd84907c4f95b74204d14782a60496091f564c4ddc696"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/receive.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/receive.py",
+				"bytes": 2484,
+				"sha256": "ac3fe12ea2105d346760386015b8a4616a6895da0255d6e876ef71c0bc5bf4e2"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/stage-result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/stage-result.json",
+				"bytes": 10745,
+				"sha256": "fd4332e387564683ccc5fed8f78e9fff2f92a987dcbd42add3911f76356d1658"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/stage.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/stage.stderr.txt",
+				"bytes": 34,
+				"sha256": "3111b968c8da2e14919ab9626f400f9667d2e45520317e23ff6f58da11f2a859"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/stage.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/stage.stdout.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/stage_actual.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/stage_actual.py",
+				"bytes": 3381,
+				"sha256": "481672d43c1a28c50eb08bab96ebc68fa51ed6b20aeac6b9a7e255d781aaa555"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/staging-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/staging-before.json",
+				"bytes": 2993,
+				"sha256": "d3f2a9066eab43ccbe024cfc1e088798f8b9344d7dd7b97222ca379188597be6"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-appdir-receiving-v1/files.sha256.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-appdir-receiving-v1/files.sha256",
+				"bytes": 57295,
+				"sha256": "ee00f7c4cc848bf2b3084066e259b792f207f97bd5bcaf8ffa95b82712e4cc94"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/README.md.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/README.md",
+				"bytes": 2353,
+				"sha256": "763cbef07955dc13e42083ee541b80ec650c2c549022d09d1cbc74d1b367912d"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/after.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/after.json",
+				"bytes": 870679,
+				"sha256": "289aa2c5bfc3ef38376bd04f14047f01682bff29ae98a4bc03b77abe1aa41f03"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/appdir.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/appdir.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/appdir.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/appdir.stdout.txt",
+				"bytes": 964,
+				"sha256": "40ae2459ff273f00e035bffb50b53e4a684ba5656cdd87227d21a596b60634ac"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/before.json",
+				"bytes": 1940,
+				"sha256": "68ba117e8880fa04e939245089ae6813a965861ded4504c85b22b1dcf8d54c13"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/driver.stderr.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/driver.stderr.txt",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/driver.stdout.txt.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/driver.stdout.txt",
+				"bytes": 1666,
+				"sha256": "d569e55067b03d8c3827a4006c466140f028416f5df29c727bd15173b914fa07"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/receipt.json",
+				"bytes": 2611,
+				"sha256": "2a3d7d940f9ecdeef5138bc55a0cb04f033f1642c3cd279a979733a14519095d"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/receive.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/receive.py",
+				"bytes": 3224,
+				"sha256": "7d6d50987b53d5b4182eb8697b1474dd7bc199ca906a52a36b4052ae1dbf7f37"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/results.json",
+				"bytes": 1036,
+				"sha256": "0c06c877c199b5e08d62ecb0578ed67e8a0f8bd4d56ac89910e8447adc655d14"
+			},
+			{
+				"proposed_member": "evidence/xi2-real-builder-appdir-receiving-v1/files.sha256.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-real-builder-appdir-receiving-v1/files.sha256",
+				"bytes": 802,
+				"sha256": "6db7712561999baae4475142c31c76a81fa5434da0c19bf55c21ad8dc9ce2417"
+			},
+			{
+				"proposed_member": "evidence/independent-native-receiving/review.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/group3-xi2-native-appdir-builder-receiving-v1/review.json",
+				"bytes": 23474,
+				"sha256": "5ca6b0a1556a766bfdaa232498e8336472f3ba6301cdfa0e5b8dd28fd7a23f56"
+			}
+		],
+		"files": 348,
+		"bytes": 6766851
+	},
+	"inert_members": true,
+	"shared_custody": "PENDING",
+	"installed_xi_qualification": "staged object exports admitted; complete AppImage/install/input UNRUN",
+	"builder_output_retention": "Original raw/hash census retained; ignored payload outputs later mutated by a separately frozen selected suite; no old-epoch substitution",
+	"excluded_native_payloads": "System/development package binaries and mutable full builder payload are excluded; original scoped raw observations and hash censuses retained."
+}
