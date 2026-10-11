@@ -10593,6 +10593,18 @@ its existing protected cleanup. This
 corrects availability presentation and new-assignment admission; item 106
 remains partial for actual catalogue, consent, invocation and installation.
 
+The signed-role transport now rejoins the exact helper and CLI identities after
+external admission callbacks, before raw start, HELD activation and final
+chosen-ID classification. Replacement during a callback cannot reuse its earlier
+executable observation. All24 original controlled transport cases remain
+byte-exact; eight additive cases cover the five replacement boundaries, an
+unchanged-source receipt and cancellation during start/HELD admission. Both LuaJIT
+and Lua5.4 pass32/0; the predecessor passes27 and fails5. Omitting the helper,
+CLI or cancellation fence independently fails2,3 or1 cases. Original protocol
+ACK, pending retirement debt, private payload rules and deadlines remain exact.
+This is software admission evidence only: native catalogue, TCC, service
+invocation and final package/installation qualification remain open.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current

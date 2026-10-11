@@ -100,7 +100,9 @@ local function query(request, done, admitted)
 		if not current or current.token ~= captured_helper.token then return false end
 		if type(admitted) ~= "function" then return true end
 		local called, ready = pcall(admitted)
-		return called and ready == true and not cancelled
+		if not called or ready ~= true or cancelled then return false end
+		local after = identity(helper)
+		return after and after.token == captured_helper.token and not cancelled
 	end
 	local function line(value)
 		rows = rows + 1
@@ -221,7 +223,9 @@ function M.revalidate_program(executable, arguments, terminal, admitted)
 	local function allowed()
 		local current = identity()
 		local ok, ready = pcall(admitted)
-		return current and current.token == captured.token and ok and ready == true
+		if not current or current.token ~= captured.token or not ok or ready ~= true then return false end
+		local after = identity()
+		return after and after.token == captured.token
 	end
 	return query({ nonce = 1, operation = "revalidate", id = arguments[2] }, function(code, raw)
 		-- Even observed ID presence cannot authorize remote automation execution.
