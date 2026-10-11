@@ -55,9 +55,9 @@
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
  *    phases and one final verdict. Linux keeps one entry; Windows starts its
- *    two suites independently. macOS has four entries: the scoped native
- *    archive, unit tests, managed Ollama and cold bootstrap. Its native
- *    tooltip canvas follows E2E.
+ *    two suites independently. macOS has five entries: the scoped native
+ *    archive, independent unit/E2E tests, managed Ollama and cold bootstrap.
+ *    Its native tooltip canvas still waits for both suites.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
@@ -1173,9 +1173,11 @@ function graphProblems(files) {
 							? []
 							: rel === WINDOWS_BOX && id === 'package-windows'
 								? ['test-ahk', 'e2e-ahk']
-								: rel === MACOS_BOX && id === 'package-macos'
-									? ['e2e-hs', 'managed-ollama-native']
-									: [sequence[index - 1]];
+								: rel === MACOS_BOX && id === 'e2e-hs'
+									? []
+									: rel === MACOS_BOX && id === 'package-macos'
+										? ['test-hs', 'e2e-hs', 'managed-ollama-native']
+										: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
@@ -1217,8 +1219,11 @@ function graphProblems(files) {
 				}
 			}
 			const canvas = jobs.find((candidate) => candidate.id === 'tooltip-canvas');
-			if (!canvas || JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['e2e-hs'])) {
-				problems.push(`${rel} tooltip-canvas must need exactly e2e-hs`);
+			if (
+				!canvas ||
+				JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['test-hs', 'e2e-hs'])
+			) {
+				problems.push(`${rel} tooltip-canvas must need exactly test-hs and e2e-hs`);
 			}
 			if (canvas && pipeline.field(canvas.body, 'if') !== null) {
 				problems.push(`${rel} tooltip-canvas must run on every profile without a job condition`);
@@ -1239,11 +1244,12 @@ function graphProblems(files) {
 				'item36-native',
 				'managed-ollama-native',
 				'test-hs',
+				'e2e-hs',
 				'cold-bootstrap-native'
 			];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
 				problems.push(
-					`${rel} must have exactly the four declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
+					`${rel} must have exactly the five declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
 		} else if (rel === WINDOWS_BOX) {
@@ -1280,7 +1286,7 @@ for (const [what, from, to] of [
 	['canvas bypassed by the macOS verdict', '      - tooltip-canvas\n', ''],
 	[
 		'canvas depends on packaging instead of native E2E',
-		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: e2e-hs\n",
+		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: [test-hs, e2e-hs]\n",
 		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: package-macos\n"
 	],
 	['conditional native canvas job', '  tooltip-canvas:\n', '  tooltip-canvas:\n    if: false\n']
@@ -1291,8 +1297,8 @@ for (const [what, from, to] of [
 mustCatch(
 	'native producer omitted from application packaging',
 	MACOS_BOX,
-	'    needs: [e2e-hs, managed-ollama-native]\n',
-	'    needs: e2e-hs\n',
+	'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
+	'    needs: [test-hs, e2e-hs]\n',
 	graphProblems
 );
 
@@ -1364,7 +1370,37 @@ for (const [what, rel, from, to] of [
 		'    needs: [validate, core, macos, windows, linux]\n',
 		'    needs: [macos, windows, linux]\n'
 	],
-	['a second entry in the macOS lane', MACOS_BOX, '    needs: test-hs\n', ''],
+	['a sixth entry in the macOS lane', MACOS_BOX, '    needs: [test-hs, e2e-hs]\n', ''],
+	[
+		'macOS packaging stops waiting for units',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
+		'    needs: [e2e-hs, managed-ollama-native]\n'
+	],
+	[
+		'macOS packaging stops waiting for E2E',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
+		'    needs: [test-hs, managed-ollama-native]\n'
+	],
+	[
+		'native canvas stops waiting for units',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs]\n',
+		'    needs: e2e-hs\n'
+	],
+	[
+		'native canvas stops waiting for E2E',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs]\n',
+		'    needs: test-hs\n'
+	],
+	[
+		'macOS E2E is coupled to units again',
+		MACOS_BOX,
+		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n",
+		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n    needs: test-hs\n"
+	],
 	[
 		'a second entry in the Linux lane',
 		LINUX_BOX,
