@@ -796,6 +796,35 @@ function uploadPaths(stepBody) {
 	return listed;
 }
 
+/** Expands only the owned launch receipt's two source-bound matrix coordinates. */
+function uploadMatrixPaths(listedPath, entry, job, candidate) {
+	if (!/\$\{\{\s*matrix\b/.test(listedPath)) return [listedPath];
+	assert.equal(entry.rel, '.github/workflows/ci-macos.yml');
+	assert.equal(job.id, 'launch');
+	assert.equal(candidate.name, 'Retain source-bound AppleEvent launch qualification receipt');
+	assert.equal(
+		listedPath,
+		'${{ runner.temp }}/stable-macos-launch-appleevents-${{ matrix.scenario }}-${{ matrix.runner }}.json'
+	);
+	assert.equal(
+		pipeline.stepField(candidate.body, 'if'),
+		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+	);
+	assert(
+		job.body.includes(
+			`        runner: \${{ fromJSON(inputs.release && '["macos-15","macos-15-intel"]' || '["macos-15"]') }}`
+		)
+	);
+	assert(
+		job.body.includes('        scenario: ${{ fromJSON(needs.package-macos.outputs.scenarios) }}')
+	);
+	return ['clean', 'karabiner_config'].flatMap((scenario) =>
+		['macos-15', 'macos-15-intel'].map((runner) =>
+			listedPath.replace('${{ matrix.scenario }}', scenario).replace('${{ matrix.runner }}', runner)
+		)
+	);
+}
+
 /**
  * Where each required asset lands in release-assets, as the real upload steps
  * lay it out: upload-artifact keeps a file's path below the deepest directory
@@ -811,7 +840,8 @@ function uploadedLayout(channel) {
 				if (!/uses:\s*actions\/upload-artifact/.test(candidate.body)) continue;
 				if (!/^ {10}name:\s*assets-/m.test(candidate.body)) continue;
 				const listed = uploadPaths(candidate.body).flatMap((listedPath) => {
-					if (listedPath !== '${{ env.ERGOPTI_OLLAMA_ASSET }}') return [listedPath];
+					if (listedPath !== '${{ env.ERGOPTI_OLLAMA_ASSET }}')
+						return uploadMatrixPaths(listedPath, entry, job, candidate);
 					assert.equal(
 						job.id,
 						'managed-ollama-native',
@@ -1661,6 +1691,53 @@ for (const name of MANAGED_PUBLICATION_ASSETS) {
 		assert.deepEqual(result.ghCalls, [], 'refused bytes cause no publication lookup');
 	});
 }
+check('actual AppleEvent upload expands four closed matrix receipt paths', () => {
+	const entry = pipeline.files().find((file) => file.rel === '.github/workflows/ci-macos.yml');
+	const job = pipeline.jobs(entry.rel).find((row) => row.id === 'launch');
+	const candidate = pipeline
+		.steps(job.body)
+		.find((row) => row.name === 'Retain source-bound AppleEvent launch qualification receipt');
+	const listed = uploadPaths(candidate.body);
+	assert.equal(listed.length, 1);
+	assert.deepEqual(uploadMatrixPaths(listed[0], entry, job, candidate), [
+		'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15.json',
+		'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15-intel.json',
+		'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15.json',
+		'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15-intel.json'
+	]);
+	for (const [changedPath, changedEntry, changedJob, changedCandidate] of [
+		[listed[0].replace('matrix.scenario', 'matrix.foreign'), entry, job, candidate],
+		["${{ matrix['foreign'] }}/receipt.json", entry, job, candidate],
+		[listed[0], { ...entry, rel: '.github/workflows/foreign.yml' }, job, candidate],
+		[listed[0], entry, { ...job, id: 'package-macos' }, candidate],
+		[listed[0], entry, job, { ...candidate, name: 'Foreign uploader' }],
+		[
+			listed[0],
+			entry,
+			job,
+			{ ...candidate, body: candidate.body.replace("matrix.scenario == 'clean'", 'true') }
+		],
+		[
+			listed[0],
+			entry,
+			{ ...job, body: job.body.replace('["macos-15","macos-15-intel"]', '["foreign"]') },
+			candidate
+		],
+		[
+			listed[0],
+			entry,
+			{
+				...job,
+				body: job.body.replace(
+					'fromJSON(needs.package-macos.outputs.scenarios)',
+					'fromJSON(inputs.foreign)'
+				)
+			},
+			candidate
+		]
+	])
+		assert.throws(() => uploadMatrixPaths(changedPath, changedEntry, changedJob, changedCandidate));
+});
 check('both actual native matrix uploads resolve to their exact archive filenames', () => {
 	const layout = uploadedLayout('dev');
 	for (const name of MANAGED_PUBLICATION_ASSETS) {
