@@ -67,8 +67,11 @@ class WireFixture:
         self.trust_attempted = False
         self.trust_removal_deadline = None
         self.trust_query_executable = None
+        self.trust_query_owner = None
+        self.trust_query_output = None
         self.authorization_observation = False
         self.command_file_debt = []
+        self.command_group_debt = []
         self.keychain_created = False
         self.servers = []
         self.started_servers = []
@@ -150,6 +153,7 @@ class WireFixture:
         merge_errors=False,
         security_failure_observation=False,
         trust_operation=None,
+        passive_receiving=None,
     ):
         phase = "setup"
         status = None
@@ -158,14 +162,20 @@ class WireFixture:
         failure = None
         result = None
         closure_refused = False
+        group_settled = False
         security_failure = None
         trust_callee = None
+        trust_install_stream = {"observed": False}
         try:
             if self.command_file_debt:
                 phase = "settle"
                 raise FixtureFailure("Native fixture command file closure debt remains")
             if deadline is not None and time.monotonic() >= deadline:
                 raise subprocess.TimeoutExpired(arguments, timeout)
+            if getattr(self, "command_group_debt", ()):
+                phase = "settle"
+                closure_refused = True
+                raise FixtureFailure("Native fixture child closure debt remains")
             output = tempfile.TemporaryFile()
             errors = tempfile.TemporaryFile()
             if self.groups:
@@ -173,6 +183,7 @@ class WireFixture:
                 def register(value):
                     nonlocal owned
                     owned = value
+                    self.command_group_debt.append(value)
 
                 try:
                     phase = "acquire"
@@ -206,8 +217,15 @@ class WireFixture:
                     failure = primary
                 finally:
                     try:
-                        if owned is not None and not owned.settle():
-                            raise FixtureFailure("Native fixture child closure refused")
+                        if owned is not None:
+                            # Registration may have been interrupted after local
+                            # acquisition. Retain that same owner before its sole
+                            # original settlement attempt.
+                            if not any(value is owned for value in self.command_group_debt):
+                                self.command_group_debt.append(owned)
+                            group_settled = owned.settle()
+                            if group_settled is not True:
+                                raise FixtureFailure("Native fixture child closure refused")
                     except BaseException as refused:
                         phase = "settle"
                         closure_refused = True
@@ -289,6 +307,27 @@ class WireFixture:
                 errors,
                 output,
             )
+            if trust_operation == "add":
+                # A timeout still owns its captures until exact native settlement.
+                # Inspect that existing stderr once before its original close.
+                try:
+                    if (
+                        group_settled is True
+                        and owned is not None
+                        and getattr(owned, "reaped", False) is True
+                    ):
+                        trust_install_stream = self._trust_install_stream(errors)
+                except BaseException as observation_failure:
+                    # Preserve the original primary. A fresh control interruption
+                    # on success still flows through original file closure below.
+                    if failure is None and (
+                        not isinstance(observation_failure, Exception)
+                        or (
+                            type(observation_failure) is FixtureFailure
+                            and observation_failure.args == ("Native fixture cancelled",)
+                        )
+                    ):
+                        failure = observation_failure
             for stream in streams:
                 if stream is None or any(
                     debt["stream"] is stream and debt["uncertain"]
@@ -312,6 +351,12 @@ class WireFixture:
                         self.command_file_debt.append({"stream": stream, "uncertain": False})
             if closure_refused and failure is None:
                 failure = FixtureFailure("Native fixture command file closure refused")
+        if group_settled is True:
+            # Only this original owner's strong settlement ACK retires its record.
+            for index, value in enumerate(self.command_group_debt):
+                if value is owned:
+                    del self.command_group_debt[index]
+                    break
         self.command_fact = {
             "phase": "settle"
             if closure_refused
@@ -322,6 +367,126 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        # Optional receiving observes this same local owner only after its
+        # original literalTrue ACK and original three capture closures. It has
+        # no retirement authority and cannot pay debt or change a primary.
+        if passive_receiving is not None:
+            try:
+                if (
+                    group_settled is True
+                    and owned is not None
+                    and owned.reaped is True
+                    and not closure_refused
+                    and all(stream is not None and stream.closed is True for stream in streams)
+                    and not self.command_file_debt
+                    and not self.command_group_debt
+                ):
+                    receipt = owned.receipt()
+                    if (
+                        type(receipt) is not dict
+                        or set(receipt)
+                        != {
+                            "worker_pid",
+                            "group_id",
+                            "closed",
+                            "reservation_lost",
+                            "signals",
+                            "live_group_members",
+                            "escaped_sessions_managed",
+                        }
+                        or type(receipt["worker_pid"]) is not int
+                        or not 0 < receipt["worker_pid"] <= 2_147_483_647
+                        or receipt["worker_pid"] != owned.process.pid
+                        or type(receipt["group_id"]) is not int
+                        or receipt["group_id"] != receipt["worker_pid"]
+                        or any(
+                            type(receipt[key]) is not bool
+                            for key in (
+                                "closed",
+                                "reservation_lost",
+                                "escaped_sessions_managed",
+                            )
+                        )
+                        or type(receipt["signals"]) is not list
+                        or len(receipt["signals"]) > 2
+                        or any(
+                            type(value) is not int or value not in (15, 9)
+                            for value in receipt["signals"]
+                        )
+                        or type(receipt["live_group_members"]) is not list
+                        or receipt["live_group_members"]
+                    ):
+                        raise FixtureFailure("Native fixture passive receipt bound refused")
+                    receipt = {
+                        **receipt,
+                        "signals": list(receipt["signals"]),
+                        "live_group_members": [],
+                    }
+                    passive_receiving(
+                        {
+                            "version": 1,
+                            "command": dict(self.command_fact),
+                            "exit_status": owned.process.returncode,
+                            "original_failed": failure is not None,
+                            "literal_true_settlement": True,
+                            "stdin_closed": True,
+                            "stderr_closed": True,
+                            "stdout_closed": True,
+                            "command_group_debt": False,
+                            "command_file_debt": False,
+                            "owner": receipt,
+                            "stdout": result[1] if result is not None else None,
+                        }
+                    )
+            except BaseException as observation_failure:
+                if failure is None and (
+                    not isinstance(observation_failure, Exception)
+                    or (
+                        type(observation_failure) is FixtureFailure
+                        and observation_failure.args == ("Native fixture cancelled",)
+                    )
+                ):
+                    failure = observation_failure
+        if trust_operation == "add":
+            try:
+                if self.groups:
+                    child_settled = (
+                        group_settled is True
+                        and owned is not None
+                        and getattr(owned, "reaped", False) is True
+                    )
+                    child_status = getattr(process, "returncode", None) if child_settled else None
+                    fact = {
+                        "version": 1,
+                        "action": "add_trusted_cert",
+                        "domain": "admin",
+                        "keychain": "owned_private",
+                        "phase": self.command_fact["phase"],
+                        "child_settled": child_settled,
+                        "child_exit_status": child_status
+                        if type(child_status) is int and -(2**31) <= child_status < 2**31
+                        else None,
+                        "streams_closed": not closure_refused
+                        and all(stream is None or stream.closed for stream in streams),
+                        "command_file_debt": bool(self.command_file_debt),
+                        "stderr": trust_install_stream,
+                    }
+                    print(
+                        "# native_http_trust_install " + json.dumps(fact, sort_keys=True),
+                        file=sys.stderr,
+                        flush=True,
+                    )
+            except BaseException as observation_failure:
+                # Technical observations cannot replace command results; genuine
+                # control interruptions preserve cancellation on prior success.
+                if failure is None and (
+                    not isinstance(observation_failure, Exception)
+                    or (
+                        type(observation_failure) is FixtureFailure
+                        and observation_failure.args == ("Native fixture cancelled",)
+                    )
+                ):
+                    failure = observation_failure
         if trust_operation in ("add", "remove"):
             # stderr is outside the unchanged one-line JSON reply transport.
             # Cache the exact original outcome before a later restoration command
@@ -345,8 +510,17 @@ class WireFixture:
                     file=sys.stderr,
                     flush=True,
                 )
-            except BaseException:
-                pass  # Optional publication never replaces the exact primary.
+            except BaseException as publication_failure:
+                # A technical sink refusal is optional. Actual cancellation on
+                # original success propagates; an existing primary stays exact.
+                if failure is None and (
+                    not isinstance(publication_failure, Exception)
+                    or (
+                        type(publication_failure) is FixtureFailure
+                        and publication_failure.args == ("Native fixture cancelled",)
+                    )
+                ):
+                    failure = publication_failure
         if security_failure is not None:
             # Closed categories are observations, never a command success or an
             # API OSStatus. Publication follows exact child and file retirement.
@@ -365,6 +539,41 @@ class WireFixture:
         if failure is not None:
             raise failure
         return result
+
+    @staticmethod
+    def _trust_install_stream(stream):
+        """Project the existing settled capture without retaining private bytes."""
+        if stream is None:
+            return {"observed": False}
+        stream.seek(0)
+        raw = stream.read(1025)
+        callee = None
+        category = "empty" if not raw else "unknown"
+        if type(raw) is bytes and len(raw) <= 1024:
+            for name in (
+                b"SecTrustSettingsSetTrustSettings",
+                b"SecKeychainItemImport",
+                b"SecKeychainUnlock",
+            ):
+                for prefix in (name + b": ", b"security: " + name + b": "):
+                    if raw.startswith(prefix):
+                        callee = name.decode("ascii")
+                        category = {
+                            b"User interaction is not allowed.\n": "user_interaction_required",
+                            b"The keychain is locked.\n": "keychain_locked",
+                            b"Access denied.\n": "access_denied",
+                            b"Authorization denied.\n": "access_denied",
+                        }.get(raw[len(prefix) :], "unknown")
+                        break
+                if callee is not None:
+                    break
+        return {
+            "observed": True,
+            "captured_bytes": min(1024, len(raw)),
+            "truncated": len(raw) > 1024,
+            "callee": callee,
+            "category": category,
+        }
 
     @staticmethod
     def _trust_callee_fact(raw, operation):
@@ -489,6 +698,9 @@ class WireFixture:
             raise FixtureFailure("Portable fixture does not alter native trust")
         if enabled:
             self.trust_attempted = True
+            # A diagnostic query shares the original installation budget; it
+            # cannot start a fresh clock after the native add command settles.
+            deadline = time.monotonic() + 15 if self.trust_query_executable is not None else None
             self._command(
                 [
                     "/usr/bin/sudo",
@@ -503,7 +715,17 @@ class WireFixture:
                     str(self.ca),
                 ],
                 trust_operation="add",
+                deadline=deadline,
             )
+            if deadline is not None:
+                original_fact = self.command_fact
+                try:
+                    self._observe_admin_trust(deadline, after_install=True)
+                finally:
+                    # A settled optional refusal cannot overwrite the original
+                    # add outcome. Unsettled query authority remains blocking.
+                    if self.command_fact is None or self.command_fact["phase"] != "settle":
+                        self.command_fact = original_fact
         elif self.trust_attempted:
             arguments = [
                 "/usr/bin/sudo",
@@ -603,9 +825,12 @@ class WireFixture:
             raise FixtureFailure("Native admin trust observation refused")
         return fields
 
-    def _observe_admin_trust(self, deadline, *, after=False):
+    def _observe_admin_trust(self, deadline, *, after=False, after_install=False):
         if self.trust_query_executable is None:
             return
+        owner = getattr(self, "trust_query_owner", None)
+        if owner is not None and owner.verify() != self.trust_query_executable:
+            raise FixtureFailure("Native admin trust query ownership refused")
         fact = {"version": 1, "observed": 0}
         try:
             with self.ca.open("rb") as certificate:
@@ -621,13 +846,35 @@ class WireFixture:
                 deadline=min(deadline, time.monotonic() + 2),
             )
             fact = {"observed": 1, **self._admin_trust_fact(output)}
-        except Exception:
+        except Exception as refused:
+            # This new optional query must preserve the existing worker's exact
+            # cancellation. Other settled query refusals remain observations.
+            if (
+                (after_install or owner is not None)
+                and type(refused) is FixtureFailure
+                and refused.args == ("Native fixture cancelled",)
+            ):
+                raise
             if self.command_fact and self.command_fact["phase"] == "settle":
                 # Unknown output cannot retire an unsettled query's authority.
                 raise
         try:
-            prefix = "# native_http_admin_trust_after " if after else "# native_http_admin_trust "
-            print(prefix + json.dumps(fact, sort_keys=True), flush=True)
+            prefix = (
+                "# native_http_admin_trust_installed "
+                if after_install
+                else "# native_http_admin_trust_after "
+                if after
+                else "# native_http_admin_trust "
+            )
+            if after_install:
+                # PAC owns stdout exclusively for its original JSON replies.
+                print(prefix + json.dumps(fact, sort_keys=True), file=sys.stderr, flush=True)
+            else:
+                print(
+                    prefix + json.dumps(fact, sort_keys=True),
+                    file=getattr(self, "trust_query_output", None),
+                    flush=True,
+                )
         except (OSError, ValueError):
             pass
 
@@ -1178,6 +1425,8 @@ class WireFixture:
             except BaseException:
                 failures.append("keychain")
                 self._report_restoration_failure("keychain")
+        if getattr(self, "command_group_debt", ()):
+            failures.append("child")
         if failures:
             # Keep the private fixture packet when restoration is incomplete.
             raise FixtureFailure("Owned native fixture restoration refused")

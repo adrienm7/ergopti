@@ -1,0 +1,67 @@
+{
+	"qualification": "PARENT_CAPSULE_PREIMAGES_LITERAL_INVERSES_AND_COMPOSITION_RECEIVED",
+	"clock_safe_members": 101,
+	"passive_safe_members": 102,
+	"passive_capsule_sha256": "69a0a31631402c20e22449aa511318a88a26a6ea690eabde3603b99afe15c948",
+	"native_credit": false,
+	"factory45": "HELD",
+	"shared_workflow": "HELD",
+	"sources": {
+		"tools/test/macos_native_http_receiving_facts_test.py": {
+			"base": "b2fc84e8704fb883fc91da8c355d711ef7b862ecf01eef1541ef15f9143f6c6e",
+			"candidate": "8bf9638f78aa3bcc15b19ba282ad9106df764f50c0857f2728ef679094af2281",
+			"bytes": 187460
+		},
+		"tools/test/test-managed-ollama-protocol.cjs": {
+			"base": "ec90ed85bf9b79689b4606ae5e0592c603c289e9603976b8e29c2baa4a3cbc56",
+			"candidate": "bded506a094ac930dacf7ca2eb24c143aa5cd325c4959409ea614c5f8ec8c36b",
+			"bytes": 21194
+		},
+		"static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py": {
+			"base": "0f6c7df65975ff6eb73b9809e20f22011c7437d58728e3e4a78424fb3a137ab4",
+			"candidate": "c0343e0b21fe14f4c9713464415ee92ca50b6550882805735ee8ba35380a0875",
+			"bytes": 40135
+		},
+		"static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift": {
+			"base": "fa6b21693f70f70d391ceedf4b47cbab894e06f623c65d704fe30ad8c83a68dc",
+			"candidate": "1350e5e8868d9e73a3a07acb25eeef9b82dc37e5b6bd5774771f8bb064647822",
+			"bytes": 11633
+		},
+		"tools/test/macos_native_http_clock_contract_controls.py": {
+			"base": null,
+			"candidate": "ae9db2b0eabba3f3be8f7528e8ef7fb5d44ebfc0b50125d399485f064c99a71b",
+			"bytes": 7788
+		},
+		"static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py": {
+			"base": "fa9f8da12f8f2db25a3bcda19e980c55d1f48bfc61e35be6d746297331b0cc6d",
+			"candidate": "f4aa5630a81de356b2cdd6e5b0405527767246afef64b899e8379d1a10d1381d",
+			"bytes": 12243
+		},
+		"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": {
+			"base": "8e5e0eb78c7d00268fa2521066b1bdf0c32773386d63544eb960d7f85a2c056b",
+			"candidate": "9ce69d62fe7d1807b1df6aeedaab0ac6cb45b5fb5842330f9f0254f94033e289",
+			"bytes": 64202
+		},
+		"tools/ci/native_http_clock_evidence.cjs": {
+			"base": null,
+			"candidate": "a1833f9f07b57567b4d5d7ab432f7f3d43418aadb415eaa7fff3c761c6c335fa",
+			"bytes": 25070
+		},
+		"tools/test/fixtures/native_http_clock_workflow.yml": {
+			"base": null,
+			"candidate": "bcb185c4d4779d7832c9cb8c3cb7e9e43de044d13d493226775c74f2758d894f",
+			"bytes": 4145
+		},
+		"tools/test/macos_native_http_clock_passive_receiving_controls.py": {
+			"base": null,
+			"candidate": "7b34135f99fee70e4337db6f69dc0de7912a03a7accb4f7b83d0c602eae86687",
+			"bytes": 15997
+		},
+		"tools/test/test-native-http-clock-evidence.cjs": {
+			"base": null,
+			"candidate": "a3453fd17f18fbff119ea58be2f42e6fb48685c3b4e17aeab16b3d6001ab1189",
+			"bytes": 31949
+		}
+	},
+	"all_203_member_hash_and_byte_inventory_joins": true
+}

@@ -1,0 +1,10 @@
+{
+	"schema": 1,
+	"file": "timeout-capture-r2-proposal.tar.gz",
+	"bytes": 142131,
+	"sha256": "e1052d6f3794796ef29d0692bcccdaa295f0b92703cb1b5813eb20bd97a6ed46",
+	"source_base": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+	"status": "inactive portable preparation; strict75 count enrollment unexecuted, timeout custody/canonical/Darwin qualification pending",
+	"members": 66,
+	"regular_files": 34
+}

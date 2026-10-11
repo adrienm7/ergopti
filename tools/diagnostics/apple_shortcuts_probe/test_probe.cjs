@@ -441,3 +441,216 @@ assert.equal(passed - beforeUnavailableRefinement, 3);
 process.stdout.write(
 	'Unavailable refinement JXA controls: 3 passed, 0 failed; native execution UNRUN\n'
 );
+
+// Additive controlled SDK constant transport cases; no native execution.
+const beforeSDKConstantTransport = passed;
+const sdkConstants = JSON.stringify({
+	event_class: 0x636f7265,
+	event_id: 0x67657464,
+	target_type: 0x62756e64,
+	version: 1
+});
+function sdkConstantCase(encoded = sdkConstants, options = {}) {
+	const calls = [],
+		markers = [];
+	const pointer = { controlledInnerPointer: true };
+	const expected = options.expected || JSON.parse(sdkConstants);
+	const owner = { descriptorType: expected.target_type };
+	let pointerReads = 0,
+		bridgeReads = 0;
+	Object.defineProperty(owner, 'aeDesc', {
+		get() {
+			pointerReads++;
+			return options.noPointer ? null : pointer;
+		}
+	});
+	const api = {
+		NSUTF8StringEncoding: 4,
+		NSFileHandle: {
+			fileHandleWithStandardError: { writeData: (data) => markers.push(data.bytes) }
+		},
+		NSString: {
+			stringWithString: (value) => ({
+				dataUsingEncoding: () => ({ bytes: value, length: Buffer.byteLength(value) })
+			})
+		},
+		NSAppleEventDescriptor: {
+			descriptorWithBundleIdentifier(target) {
+				calls.push(['descriptor', target]);
+				assert.equal(target, 'com.apple.shortcuts.events');
+				if (options.badDescriptor) owner.descriptorType = 0;
+				return owner;
+			}
+		},
+		AEDeterminePermissionToAutomateTarget(ref, eventClass, eventID, ask) {
+			calls.push(['native', ref, eventClass, eventID, ask]);
+			assert.equal(ref, pointer);
+			assert.equal(eventClass, expected.event_class);
+			assert.equal(eventID, expected.event_id);
+			assert.equal(ask, false);
+			if (options.replaceDescriptor) owner.descriptorType = 0;
+			return Object.hasOwn(options, 'code') ? options.code : 0;
+		}
+	};
+	for (const name of ['kAECoreSuite', 'kAEGetData', 'typeApplicationBundleID']) {
+		Object.defineProperty(api, name, {
+			get() {
+				bridgeReads++;
+				if (options.bridgeUnavailable) return undefined;
+				throw new Error('CONTROLLED UNAVAILABLE SDK BRIDGE CONSTANT');
+			}
+		});
+	}
+	if (options.noFunction) delete api.AEDeterminePermissionToAutomateTarget;
+	if (options.noMetadata) delete api.NSAppleEventDescriptor;
+	const context = {
+		ObjC: { import: (name) => assert.ok(['Foundation', 'CoreServices'].includes(name)) },
+		Application(target) {
+			assert.equal(target, 'com.apple.shortcuts.events');
+			calls.push(['Application', target]);
+			return {
+				shortcuts() {
+					calls.push(['catalogue']);
+					if (options.catalogueThrow) throw new Error('PRIVATE CONTROLLED CATALOGUE');
+					return [entry('independent-id', 'independent-name')];
+				}
+			};
+		},
+		$: api
+	};
+	vm.createContext(context);
+	vm.runInContext(source, context);
+	const args = options.args || ['--permission-preflight', '--sdk-constants', encoded];
+	const raw = context.run(args);
+	return { calls, markers, raw, value: JSON.parse(raw), pointerReads, bridgeReads, owner, pointer };
+}
+test('SDK projection replaces unavailable bridge constants in the same no-prompt JXA principal', () => {
+	const result = sdkConstantCase();
+	originalCatalogue(result);
+	assert.equal(result.bridgeReads, 0);
+	assert.equal(result.pointerReads, 1);
+	assert.equal(result.calls.filter((row) => row[0] === 'Application').length, 1);
+	assert.equal(result.calls.filter((row) => row[0] === 'native').length, 1);
+	assert.deepEqual(onlyPreflight(result), [
+		'ASCP:P:BEGIN\n',
+		'ASCP:P:CALL_ATTEMPT\n',
+		'ASCP:P:RETURN:0\n'
+	]);
+	assert.ok(
+		result.calls.findIndex((row) => row[0] === 'native') <
+			result.calls.findIndex((row) => row[0] === 'catalogue')
+	);
+});
+test('removing the SDK projection restores the exact unavailable-constants guard', () => {
+	const legacy = sdkConstantCase(sdkConstants, {
+		bridgeUnavailable: true,
+		args: ['--permission-preflight']
+	});
+	originalCatalogue(legacy);
+	assert.equal(legacy.bridgeReads, 3);
+	assert.equal(legacy.pointerReads, 0);
+	assert.equal(legacy.calls.filter((row) => row[0] === 'native').length, 0);
+	assert.deepEqual(
+		legacy.markers.filter((row) => row.startsWith('ASCP:B:')),
+		['ASCP:B:CONSTANTS\n']
+	);
+	assert.deepEqual(onlyPreflight(legacy), ['ASCP:P:BEGIN\n', 'ASCP:P:UNAVAILABLE\n']);
+	const projected = sdkConstantCase(sdkConstants, { bridgeUnavailable: true });
+	originalCatalogue(projected);
+	assert.equal(projected.bridgeReads, 0);
+	assert.equal(projected.calls.filter((row) => row[0] === 'native').length, 1);
+});
+test('SDK projection preserves API metadata descriptor pointer and lifetime refusals', () => {
+	for (const [options, label] of [
+		[{ noFunction: true }, 'API'],
+		[{ noMetadata: true }, 'METADATA'],
+		[{ badDescriptor: true }, 'DESCRIPTOR'],
+		[{ noPointer: true }, 'POINTER']
+	]) {
+		const result = sdkConstantCase(sdkConstants, options);
+		originalCatalogue(result);
+		assert.equal(result.bridgeReads, 0);
+		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0);
+		assert.deepEqual(
+			result.markers.filter((row) => row.startsWith('ASCP:B:')),
+			['ASCP:B:' + label + '\n']
+		);
+	}
+	const changed = sdkConstantCase(sdkConstants, { replaceDescriptor: true });
+	originalCatalogue(changed);
+	assert.equal(onlyPreflight(changed).at(-1), 'ASCP:P:INVALID\n');
+});
+test('SDK projection admits exact uint32 endpoints without guessing or coercion', () => {
+	for (const value of [0, 4294967295]) {
+		const expected = { event_class: value, event_id: value, target_type: value, version: 1 };
+		const result = sdkConstantCase(JSON.stringify(expected), { expected });
+		originalCatalogue(result);
+		assert.equal(result.bridgeReads, 0);
+		assert.equal(result.pointerReads, 1);
+		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 1);
+		assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:RETURN:0\n');
+	}
+});
+test('SDK projection refuses duplicate noncanonical open and non-uint32 payloads before native pointer access', () => {
+	const values = [
+		'',
+		'null',
+		'[]',
+		sdkConstants + '\n',
+		sdkConstants.replace(':', ': '),
+		'{"version":1,"event_class":1668248165,"event_id":1734702180,"target_type":1651863140}',
+		sdkConstants.replace('"version":1', '"version":1,"version":1'),
+		sdkConstants.replace('"version":1', '"version":1,"extra":0')
+	];
+	for (const name of ['event_class', 'event_id', 'target_type']) {
+		for (const value of [true, false, '1', null, -1, 0.5, 4294967296]) {
+			const parsed = JSON.parse(sdkConstants);
+			parsed[name] = value;
+			values.push(JSON.stringify(parsed));
+		}
+	}
+	for (const version of [true, '1', 0, 2]) {
+		const parsed = JSON.parse(sdkConstants);
+		parsed.version = version;
+		values.push(JSON.stringify(parsed));
+	}
+	for (const encoded of values) {
+		const result = sdkConstantCase(encoded);
+		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0, encoded);
+		assert.equal(result.pointerReads, 0, encoded);
+		assert.equal(result.bridgeReads, 0, encoded);
+		assert.equal(result.raw.includes('CONTROLLED UNAVAILABLE'), false);
+	}
+});
+test('SDK projection requires the explicit three argument channel without widening legacy opt-in', () => {
+	for (const args of [
+		['--sdk-constants', sdkConstants],
+		['--permission-preflight', sdkConstants],
+		['--permission-preflight', '--sdk-constants'],
+		['--permission-preflight', '--sdk-constants', sdkConstants, 'extra']
+	]) {
+		const result = sdkConstantCase(sdkConstants, { args });
+		originalCatalogue(result);
+		assert.deepEqual(onlyPreflight(result), []);
+		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0);
+		assert.equal(result.bridgeReads, 0);
+	}
+});
+test('SDK-projected returned status remains observation and cannot fabricate catalogue or invocation authority', () => {
+	for (const code of [0, -600, -1743, -1744, -2147483648, 2147483647]) {
+		const result = sdkConstantCase(sdkConstants, { code });
+		originalCatalogue(result);
+		assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:RETURN:' + code + '\n');
+		assert.equal(Object.hasOwn(result.value, 'permission'), false);
+		assert.equal(Object.hasOwn(result.value, 'invocation_qualified'), false);
+	}
+	const failed = sdkConstantCase(sdkConstants, { catalogueThrow: true });
+	assert.equal(failed.value.status, 'refused');
+	assert.equal(failed.value.reason, 'native_refused');
+	assert.equal(failed.raw.includes('PRIVATE'), false);
+	assert.equal(onlyPreflight(failed).at(-1), 'ASCP:P:RETURN:0\n');
+});
+assert.equal(passed - beforeSDKConstantTransport, 7);
+process.stdout.write(
+	'SDK constant transport JXA controls: 7 passed, 0 failed; native execution UNRUN\n'
+);

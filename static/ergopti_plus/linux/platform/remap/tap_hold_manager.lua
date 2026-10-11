@@ -104,7 +104,25 @@ local function _run_tap(action, binding)
 		_on_text_injected(action.type_text)
 		return
 	end
+	-- A logging sink may synchronously revoke or republish the selected pair.
+	-- Capture its original source and Manager before the callback, then join
+	-- again immediately before the irreversible action executor.
+	local pair_current
+	if type(binding) == "string" and binding:match("^combination__") then
+		local combinations, engine, generation, execute = _combinations, _engine, _generation, _execute_action
+		if type(combinations) ~= "table" or type(combinations.capture_runtime) ~= "function" then return end
+		local captured, guard = pcall(combinations.capture_runtime)
+		if not captured or type(guard) ~= "function" then return end
+		pair_current = function()
+			local checked, current = pcall(guard)
+			return checked and current == true and _initialized and not _paused
+				and rawequal(_combinations, combinations) and rawequal(_engine, engine)
+				and _generation == generation and _execute_action == execute
+		end
+		if not pair_current() then return end
+	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
+	if pair_current and not pair_current() then return end
 	local ok, err = pcall(_execute_action, action, binding or "tap_hold")
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
 end
@@ -240,9 +258,9 @@ function M.managed_pair_options_current(owner,configured)
   if action~="none" and catalogue_snapshot[action]==nil then return false end
  end
  return getmetatable(M)==nil and rawequal(package.loaded["platform.remap.tap_hold_manager"],M)
-  and record~=nil and record.owner==owner and _combinations==owner and record.loaded==_loaded
-  and record.engine==_engine and _installed_engine==_engine and record.generation==_generation
-  and _initialized and not _paused and _hook==_native_hook and type(_native_hook)=="table"
+  and record~=nil and rawequal(record.owner,owner) and rawequal(_combinations,owner) and rawequal(record.loaded,_loaded)
+  and rawequal(record.engine,_engine) and rawequal(_installed_engine,_engine) and record.generation==_generation
+  and _initialized and not _paused and rawequal(_hook,_native_hook) and type(_native_hook)=="table"
   and rawequal(package.loaded["modules.shortcuts.key_combinations"],Combinations)
   and rawget(Combinations,"new")==original_combination_constructor
   and rawget(Engine,"new")==original_engine_constructor
