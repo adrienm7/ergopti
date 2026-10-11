@@ -479,3 +479,24 @@ helpers.describe("provider checkmark owns its publication (backend-checkmark)", 
 		end)
 	end)
 end)
+
+
+helpers.describe("local backend switches preserve external Ollama", function()
+	for _, target in ipairs({ "mlx", "api" }) do
+		helpers.it("(ollama-owned-retirement) " .. target .. " switch uses only the captured daemon owner", function()
+			with_rows({ backend = "ollama", enabled = true, mlx_installed = true, ollama_installed = true },
+				function(rows, record)
+					local Api = require("modules.llm.api_ollama")
+					local original = Api.stop_owned_server
+					local retirements = 0
+					Api.stop_owned_server = function() retirements = retirements + 1; return false end
+					local ok, accepted = pcall(rows[ROW[target]].action)
+					Api.stop_owned_server = original
+					helpers.assert_true(ok, "the actual backend action must run")
+					helpers.assert_true(accepted, "a committed target retains the predecessor's cleanup debt")
+					helpers.assert_eq(retirements, 1)
+					helpers.assert_eq(record.process_commands, 0, "external daemons remain outside process-name sweeps")
+				end)
+		end)
+	end
+end)

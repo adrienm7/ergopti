@@ -623,7 +623,10 @@ function M.build(ctx)
 					return publish_backend_menu(debt)
 				end)
 				if committed and state.llm_enabled ~= false then
-					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+					local ApiOllama = require("modules.llm.api_ollama")
+					if not invoke_backend_boundary("Owned Ollama retirement", ApiOllama.stop_owned_server) then
+						Logger.warn(LOG, "The prior owned Ollama daemon retains retirement debt.")
+					end
 				end
 				return committed
 			end
@@ -726,7 +729,10 @@ function M.build(ctx)
 				-- The old local server is expendable only after every exact target
 				-- successor has committed.
 				if state.llm_enabled ~= false then
-					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+					local ApiOllama = require("modules.llm.api_ollama")
+					if not invoke_backend_boundary("Owned Ollama retirement", ApiOllama.stop_owned_server) then
+						Logger.warn(LOG, "The prior owned Ollama daemon retains retirement debt.")
+					end
 				end
 				return true
 			end

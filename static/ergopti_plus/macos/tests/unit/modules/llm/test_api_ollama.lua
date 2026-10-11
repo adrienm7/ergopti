@@ -317,6 +317,37 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		end)
 	end
 
+	helpers.it("(ollama-owned-retirement) closes only its published daemon and retains receipt debt", function()
+		with_startup({}, function(api, fixture)
+			helpers.assert_true(api.ensure_running())
+			local original = fixture.tasks[1]
+			original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+			helpers.assert_true(api.is_ready() == false, "daemon readiness is independent of model warmup")
+			helpers.assert_eq(api.stop_owned_server(), false,
+				"stdin EOF cannot acknowledge a daemon's native retirement")
+			helpers.assert_eq(original.input_closes, 1)
+			helpers.assert_eq(api.ensure_running(), false, "the exact daemon debt blocks a successor")
+			helpers.assert_eq(#fixture.tasks, 1)
+			original.emit(original.frame("RETIRED 0"))
+			helpers.assert_eq(api.stop_owned_server(), false, "the receipt cannot substitute for physical exit")
+			original.complete(0)
+			helpers.assert_true(api.stop_owned_server())
+			helpers.assert_eq(original.input_closes, 1, "the original EOF remains a once-only request")
+			helpers.assert_true(api.migration_idle())
+		end)
+	end)
+
+	helpers.it("(ollama-owned-retirement) never acquires authority over an external server", function()
+		with_startup({}, function(api, fixture)
+			package.loaded["modules.llm.ollama_binary"].resolve = function()
+				return "/Applications/Ollama.app/Contents/Resources/ollama", nil, "app"
+			end
+			helpers.assert_eq(api.ensure_running(), false)
+			helpers.assert_true(api.stop_owned_server())
+			helpers.assert_eq(#fixture.tasks, 0, "an external executable does not grant service ownership")
+		end)
+	end)
+
 	for _, case in ipairs({
 		{ name = "false", start = function() return false end },
 		{ name = "nil", start = function() return nil end },
