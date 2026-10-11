@@ -55,7 +55,7 @@ class OllamaInstallFilesPort {
 
 	_RunNonCritical(Action, Request, Authority, OnResult) {
 		if !(Request is Map) || !(Authority is Map)
-				|| Action != "download" && Action != "prepare" && Action != "publish" && Action != "cleanup" && Action != "cleanup_partial"
+				|| Action != "download" && Action != "prepare" && Action != "publish" && Action != "cleanup" && Action != "cleanup_partial" && Action != "inspect" && Action != "retire_runtime"
 				|| !HasMethod(OnResult, "Call")
 				|| !HasMethod(Authority.Get("authorize", 0), "Call")
 				|| !HasMethod(Authority.Get("is_current", 0), "Call")
@@ -114,6 +114,8 @@ class OllamaInstallFilesPort {
 						&& Name != "StageIdentity" && Name != "ManifestSha256"
 						&& Name != "CreationWalIdentity" && Name != "CreationWalSha256"
 						&& Name != "MaxExpandedBytes" && Name != "MaxEntries"
+						&& Name != "RootIdentity" && Name != "RuntimeTicket"
+						&& Name != "ReadyFileIdentity" && Name != "ReadyImageSha256"
 					throw ValueError("Unknown native file argument.", -1, Name)
 				Arguments.Push("-" . Name, String(Value))
 			}
@@ -209,7 +211,8 @@ class OllamaInstallFilesPort {
 		if Record["building"]
 			return false
 		if !IsObject(Record["terminal"])
-			Record["terminal"] := Map("exit", 0, "stdout", "", "stderr", "", "dispatched", false)
+			Record["terminal"] := Map("kind", "undispatched", "exit", 0, "stdout", "", "stderr", "", "dispatched", false,
+				"exit_observed", false, "output_observed", false)
 		return this._PublishPhysical(Record)
 	}
 
@@ -231,7 +234,8 @@ class OllamaInstallFilesPort {
 		if !this._Owns(Record) || IsObject(Record["terminal"])
 			return
 		Record["task"] := 0
-		Record["terminal"] := Map("exit", ExitCode, "stdout", Stdout, "stderr", Stderr, "dispatched", true)
+		Record["terminal"] := Map("exit", ExitCode, "stdout", Stdout, "stderr", Stderr, "dispatched", true,
+			"exit_observed", ExitCode is Integer, "output_observed", Stdout is String && Stderr is String)
 		if !Record["building"]
 			this._PublishPhysical(Record)
 	}
@@ -278,7 +282,7 @@ class OllamaInstallFilesPort {
 	}
 
 	_CleanupAction(Action) {
-		return Action == "cleanup" || Action == "cleanup_partial"
+		return Action == "cleanup" || Action == "cleanup_partial" || Action == "retire_runtime"
 	}
 
 	_Local(Path) {
