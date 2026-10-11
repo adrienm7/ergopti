@@ -74,7 +74,14 @@ check('every scoped full body remains owned; all other product scripts remain ex
 				assert.equal(Full.stepField(step.body, 'run'), Raw.stepField(step.body, 'run'));
 			}
 		}
-	assert.equal(jobs, 26);
+	assert.equal(jobs - 1, 26);
+	assert.equal(jobs, 27);
+	assert.equal(
+		source
+			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
+			.filter((job) => job.file === MAC && job.id === 'lease-silence-native').length,
+		1
+	);
 	assert.ok(steps > 150, 'the full retained script inventory is nonvacuous');
 });
 const testedProtocols = new Set();
@@ -621,6 +628,81 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 	assert.notEqual(unsafe, code);
 	assert.throws(() => Full.fromFiles(changed(MAC, safe, '"${pac_skip_args[@]}"')), /binding/);
 });
+
+// New manual receiver is a closed additive owner, never an optional full-job exception.
+{
+	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
+		(job) => job.id === 'lease-silence-native'
+	);
+	const whole = '  lease-silence-native:\n' + job.body + '\n';
+	for (const [label, before, after] of [
+		['job absent', '  lease-silence-native:\n', '  omitted-lease-silence-native:\n'],
+		[
+			'job duplicate',
+			'  lease-silence-native:\n',
+			"  lease-silence-native:\n    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt\n\n  lease-silence-native:\n"
+		],
+		[
+			'job coupled',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    needs: package-macos\n'
+		],
+		[
+			'job forgiven',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    continue-on-error: true\n'
+		],
+		[
+			'release output',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    outputs:\n      assets: fake\n'
+		],
+		[
+			'secret inherited',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    secrets: inherit\n'
+		],
+		[
+			'automatic/release admission',
+			"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+			'    if: always()\n'
+		],
+		['ARM host wrong', 'runner: macos-15\n', 'runner: ubuntu-latest\n'],
+		['Intel absent', 'runner: macos-15-intel\n', 'runner: macos-15\n'],
+		[
+			'source runner wrong',
+			'tools/diagnostics/run_lease_silence_native.sh',
+			'tools/diagnostics/foreign_native.sh'
+		],
+		[
+			'closed parser control omitted',
+			'node tools/test/test-lease-silence-xctest-evidence.cjs',
+			'echo omitted'
+		],
+		[
+			'artifact missing status',
+			'            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n',
+			''
+		],
+		['artifact missing forbidden', 'if-no-files-found: error', 'if-no-files-found: ignore'],
+		['native budget widened', 'timeout-minutes: 20', 'timeout-minutes: 21']
+	]) {
+		check('lease silence: ' + label, () => {
+			assert.equal(whole.split(before).length, 2, 'one new owner mutation seam');
+			assert.throws(
+				() =>
+					Full.fromFiles(
+						changed(
+							MAC,
+							whole,
+							whole.replace(before, () => after)
+						)
+					),
+				/job inventory|missing job|job condition|failure must remain fatal|lease silence native/
+			);
+		});
+	}
+}
 console.log(
 	`PASS: raw full-default and retired-route source controls=${passed}; native execution UNRUN.`
 );

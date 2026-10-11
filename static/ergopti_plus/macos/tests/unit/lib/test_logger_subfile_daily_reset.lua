@@ -40,6 +40,7 @@ local SECONDS_PER_DAY = 86400
 -- A line matching a built-in sub-file pattern, so the fan-out is guaranteed to
 -- select at least one topical file. "[karabiner" is in SUB_LOG_NAMES_FALLBACK.
 local ROUTED_LINE_TAG = "[karabiner]"
+local LOG_DIR = "/tmp/ergopti_subfile_reset/"
 
 
 
@@ -100,7 +101,7 @@ end
 local function sub_file_modes(opens)
 	local modes = {}
 	for _, o in ipairs(opens) do
-		if o.path:find("ErgoptiPlus_karabiner%.log$") then modes[#modes + 1] = o.mode end
+		if o.path == LOG_DIR .. "ErgoptiPlus_karabiner.log" then modes[#modes + 1] = o.mode end
 	end
 	return modes
 end
@@ -108,7 +109,7 @@ end
 helpers.describe("logger — topical sub-files reset on the first write of a new day", function()
 	helpers.it("truncates a sub-file whose last write was a previous day", function()
 		local opens = capture_opens(STALE_DAYS, function()
-			Logger.init_log_path("/tmp/ergopti_subfile_reset/", 14)
+			Logger.init_log_path(LOG_DIR, 14)
 			Logger.info("karabiner", ROUTED_LINE_TAG .. " first line of the day")
 		end)
 
@@ -126,7 +127,7 @@ helpers.describe("logger — topical sub-files reset on the first write of a new
 
 	helpers.it("appends on every later write of the same day", function()
 		local opens = capture_opens(STALE_DAYS, function()
-			Logger.init_log_path("/tmp/ergopti_subfile_reset/", 14)
+			Logger.init_log_path(LOG_DIR, 14)
 			Logger.info("karabiner", ROUTED_LINE_TAG .. " first line of the day")
 			Logger.info("karabiner", ROUTED_LINE_TAG .. " second line of the day")
 			Logger.info("karabiner", ROUTED_LINE_TAG .. " third line of the day")
@@ -159,7 +160,7 @@ helpers.describe("logger — topical sub-files reset on the first write of a new
 
 	helpers.it("appends when the sub-file already carries today's lines", function()
 		local opens = capture_opens(0, function()
-			Logger.init_log_path("/tmp/ergopti_subfile_reset/", 14)
+			Logger.init_log_path(LOG_DIR, 14)
 			Logger.info("karabiner", ROUTED_LINE_TAG .. " continuing today's file")
 		end)
 
