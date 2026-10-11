@@ -330,6 +330,25 @@ function validateChildTemplates(menu, captionFormat) {
 				'menu.hotstring_personal_file_caption needs one literal format and two scalar slots'
 			);
 	}
+	if (Object.hasOwn(menu, 'hotstring_personal_folder_caption')) {
+		const policy = menu.hotstring_personal_folder_caption;
+		if (
+			!plainPolicyObject(policy) ||
+			Object.keys(policy).length !== 2 ||
+			!['positive_format', 'nonpositive_format'].every(
+				(key) =>
+					Object.hasOwn(policy, key) &&
+					typeof policy[key] === 'string' &&
+					!/[\x00-\x1f\x7f]/.test(policy[key]) &&
+					policy[key].isWellFormed()
+			) ||
+			nativeCountSlots(policy.positive_format) !== 2 ||
+			nativeCountSlots(policy.nonpositive_format) !== 1
+		)
+			throw new Error(
+				'menu.hotstring_personal_folder_caption needs exact positive two-slot and nonpositive one-slot formats'
+			);
+	}
 	validateNativeCompositions(menu);
 	function inertCaptionFits(row) {
 		if (row.caption_getter === undefined && row.caption_getters === undefined) return true;
