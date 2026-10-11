@@ -3676,7 +3676,16 @@ class EarlyReceivedLuaStageTests(unittest.TestCase):
                 version
                 + r"""
 local journal_path=__JOURNAL__
-package.preload['infra.logger']=function() return {FALLBACK_BOOT_LOG_FILE=journal_path} end
+-- The real journal consumes Logger redaction before acquiring its file.
+-- These controlled messages retain their exact identity through this test port.
+package.preload['infra.logger']=function() return {
+    FALLBACK_BOOT_LOG_FILE=journal_path,
+    redact_message=function(message)
+        assert(type(message)=='string')
+        if __MODE__=='redaction_throw' then error('controlled redaction refusal') end
+        return message
+    end,
+} end
 local actual=dofile(__MODULE__)
 local calls={write=0,flush=0,close=0,append=0}
 local mode=__MODE__
@@ -3816,6 +3825,16 @@ print(completed and tostring(result) or 'closed later refusal')
                 )
                 self.assertFalse(stage["qualified"])
                 self.assertEqual(stage["publication_ack"], "unobserved")
+
+    def test_actual_journal_redaction_refusal_precedes_physical_file_acquisition(self):
+        stage, text, seen = self.run_lua(mode="redaction_throw", later="success")
+        self.assertEqual(seen[0], "true")
+        self.assertEqual(seen[2], NONCE)
+        self.assertEqual(seen[1], "1,0,0,0")
+        self.assertEqual(text, "")
+        self.assertEqual(stage["body_stage"], "unobserved")
+        self.assertEqual(stage["publication_ack"], "unobserved")
+        self.assertFalse(stage["qualified"])
 
     def test_missing_malformed_or_foreign_actual_pid_never_publishes_expected_pid(self):
         for pid in ("nil", "true", "'42'", "43", "0", "0/0", "math.huge", "42.5"):
