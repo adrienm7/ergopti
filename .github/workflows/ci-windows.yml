@@ -1,6 +1,7 @@
 # .github/workflows/ci-windows.yml
 #
-# Windows lane: unit tests -> E2E tests -> package -> install and launch -> verdict.
+# Windows lane: independent unit/E2E suites, followed by packaging, installed
+# launch and the strict verdict.
 # The two suites have independent runtimes and fresh checkouts. Packaging never
 # consumes their generated caches. Every run compiles the application; release
 # runs additionally sign it. The launch job downloads assets-windows and runs
@@ -494,7 +495,6 @@ jobs:
 
   e2e-ahk:
     name: 'E2E tests (engine)'
-    needs: [test-ahk]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -600,7 +600,7 @@ jobs:
   # alters; nothing here disables or restores Defender.
   package-windows:
     name: 'Package'
-    needs: [e2e-ahk]
+    needs: [test-ahk, e2e-ahk]
     runs-on: windows-latest
 
     steps:

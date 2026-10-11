@@ -54,9 +54,10 @@
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases and one final verdict. Windows/Linux keep one entry; macOS has
- *    exactly three entries for unit tests and independent mandatory managed
- *    Ollama/cold bootstrap jobs, and observes its native tooltip canvas after E2E.
+ *    phases and one final verdict. Linux keeps one entry; Windows starts its
+ *    two suites independently. macOS has four entries: the scoped native
+ *    archive, unit tests, managed Ollama and cold bootstrap. Its native
+ *    tooltip canvas follows E2E.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
@@ -1168,9 +1169,13 @@ function graphProblems(files) {
 						? rel === MACOS_BOX
 							? MACOS_VERDICT_NEEDS
 							: sequence.slice(0, 4)
-						: rel === MACOS_BOX && id === 'package-macos'
-							? ['e2e-hs', 'managed-ollama-native']
-							: [sequence[index - 1]];
+						: rel === WINDOWS_BOX && id === 'e2e-ahk'
+							? []
+							: rel === WINDOWS_BOX && id === 'package-windows'
+								? ['test-ahk', 'e2e-ahk']
+								: rel === MACOS_BOX && id === 'package-macos'
+									? ['e2e-hs', 'managed-ollama-native']
+									: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
@@ -1241,6 +1246,10 @@ function graphProblems(files) {
 					`${rel} must have exactly the four declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
+		} else if (rel === WINDOWS_BOX) {
+			const expectedEntries = ['test-ahk', 'e2e-ahk'];
+			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries))
+				problems.push(`${rel} must retain exactly the independent unit and E2E entries`);
 		} else if (entries.length !== 1) {
 			problems.push(
 				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
@@ -1362,7 +1371,25 @@ for (const [what, rel, from, to] of [
 		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
 		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"
 	],
-	['a second entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk]\n', ''],
+	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk, e2e-ahk]\n', ''],
+	[
+		'Windows packaging stops waiting for unit tests',
+		WINDOWS_BOX,
+		'    needs: [test-ahk, e2e-ahk]\n',
+		'    needs: [e2e-ahk]\n'
+	],
+	[
+		'Windows packaging stops waiting for E2E tests',
+		WINDOWS_BOX,
+		'    needs: [test-ahk, e2e-ahk]\n',
+		'    needs: [test-ahk]\n'
+	],
+	[
+		'Windows E2E is coupled to unit tests again',
+		WINDOWS_BOX,
+		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n",
+		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n"
+	],
 	[
 		'a second exit in the macOS lane',
 		MACOS_BOX,
