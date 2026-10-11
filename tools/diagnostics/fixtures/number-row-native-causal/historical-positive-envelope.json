@@ -1,0 +1,16 @@
+{
+	"version": 1,
+	"scope": "immutable-historical-native-bytes-inert-transport-only",
+	"capsule": {
+		"entries": [
+			{
+				"proposed_member": "evidence/historical-positive.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-positive.log",
+				"bytes": 49923,
+				"sha256": "8a843de888efae37686ea328668dbba2ab18f2b87bb8bddaab7a2da7dd74ec01"
+			}
+		],
+		"files": 1,
+		"bytes": 49923
+	}
+}
