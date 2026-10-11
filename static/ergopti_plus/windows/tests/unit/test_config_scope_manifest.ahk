@@ -709,7 +709,7 @@ _ScopeObsoleteGlobal(Mode) {
 Test("scope-obsolete-source: actual global clear retains obsolete source and exact inverse", _ScopeObsoleteGlobal.Bind("clear"))
 Test("scope-obsolete-source: actual global recommendation refuses before the cohort backup", _ScopeObsoleteGlobal.Bind("recommended"))
 
-_ScopeObsoleteSessionRefusal() {
+_ScopeObsoleteSessionRefusal(Observe := 0) {
 	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource('"old-shape"')
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Backups := 0, Launches := 0
@@ -730,6 +730,8 @@ _ScopeObsoleteSessionRefusal() {
 		AssertEqual(0, Backups)
 		AssertEqual(0, Launches)
 		AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
+		if HasMethod(Observe, "Call")
+			Observe.Call(Receipt, Fixture)
 	} finally {
 		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Fixture.path))
 		_ScopeOwnerCleanup(Fixture)
@@ -810,3 +812,166 @@ _ScopeObsoleteUnownedNeighbor() {
 	}
 }
 Test("scope-obsolete-source: misspelled layout neighbor stays unowned and retained", _ScopeObsoleteUnownedNeighbor)
+
+
+; A preexisting session refusal must not leave a barrier around a no-op recovery.
+_ScopeObsoleteRefusalThenIndependentNativeWrite() {
+	global _ConfigTransitionRetainedBarrier
+	PriorRetained := _ConfigTransitionRetainedBarrier
+	Seen := Map(), FixtureBundle := false, NextBundle := false, NextRefusal := 0
+	NextDirectory := A_Temp . "\ergopti-scope-ordered-" . A_TickCount . "-" . Random(10000, 99999)
+	AssertTrue(DllCall("CreateDirectoryW", "Str", NextDirectory, "Ptr", 0, "Int"))
+	NextPath := NextDirectory . "\config.toml", NextLocator := NextDirectory . "\paths.toml"
+	NextSource := _CMJFixtureCurrentSource('[layout]`nergopti_base = true`n[private]`ncredential = "keep"`n')
+	Observe(Receipt, Fixture) {
+		Seen["path"] := Fixture.path
+		Seen["locator"] := Fixture.options["locator"]
+		Seen["source"] := FSReadUtf8Exact(Fixture.path)
+		Seen["refusal"] := TOML_WriteRefusal(Fixture.path)
+		Detail := Receipt.Get("detail", 0)
+		if (Detail is Map) && Detail.Has("bundle")
+			FixtureBundle := Detail["bundle"]
+	}
+	Launch(_Success, Borrowed, Refused) {
+		NextBundle := Borrowed, NextRefusal := Refused
+		return true
+	}
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the ordered subject starts without another transaction")
+	try {
+		_ScopeObsoleteSessionRefusal(Observe)
+		AssertEqual("invalid schema stamp", Seen["refusal"], "the genuine refusal is preserved during the original scenario")
+		AssertTrue(FSWriteCreateDurable(NextPath, NextSource))
+		Boot := ConfigMigrateBoot(NextPath)
+		AssertEqual("current", Boot["status"], "the next different source completes genuine native Boot after the strict-refusal scenario")
+		AssertEqual(0, Boot["read_only"])
+		AssertEqual(NextSource, FSReadUtf8Exact(NextPath))
+		Options := Map("path", NextPath, "locator", NextLocator, "stamp", "ordered-refusal",
+			"settle", (*) => 1, "notify", (*) => 0, "reload", Launch)
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Options)
+		AssertEqual("pending", Receipt["status"], "the independent source crosses actual native WAL publication")
+		AssertTrue(_ConfigWriteLeaseSelectOwner(NextBundle, NextPath) is Object)
+		AssertEqual(NextSource, FSReadUtf8Exact(Receipt["backup"]))
+		AssertFalse(TOML_ParseFreshFile(NextPath)["layout"].Has("ergopti_base"))
+		NextRefusal.Call("ordered native replacement refused")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(NextSource, FSReadUtf8Exact(NextPath))
+		AssertFalse(FSStrictExists(ConfigTransitionWalPath(NextLocator)))
+		AssertFalse(_ConfigWriteTerminalIsActive(), "the independent native transaction retires its exact owner")
+		AssertTrue(_ConfigTransitionRetainedBarrier == PriorRetained, "the no-op refusal registered no recovery debt")
+	} finally {
+		if (NextBundle is Object) && _ConfigWriteTerminalTryAcquire([], NextBundle) {
+			Resolution := ConfigTransitionRollbackOwned(NextLocator, NextBundle)
+			AssertTrue(ConfigTransitionResultIs(Resolution, "absent") || ConfigTransitionResultIs(Resolution, "recovered_old"))
+			AssertTrue(_ConfigWriteTerminalRelease(NextBundle))
+			if _ConfigTransitionRetainedBarrier == NextBundle
+				_ConfigTransitionRetainedBarrier := PriorRetained
+		}
+		; The original failing implementation can retain this exact fixture bundle.
+		; Its fence has already been removed by that fixture, so recover honestly
+		; before retiring the real issued object; unrelated retained owners survive.
+		if FixtureBundle is Object {
+			AssertTrue(_ConfigWriteTerminalOwnsExact(FixtureBundle, Seen["path"]))
+			AssertTrue(_ConfigWriteTerminalOwnsExact(FixtureBundle, Seen["locator"]))
+			Resolution := ConfigTransitionRecoverOwned(Seen["locator"], FixtureBundle)
+			AssertTrue(ConfigTransitionResultIs(Resolution, "absent"), "original leak cleanup observes actual absence")
+			AssertTrue(_ConfigWriteTerminalRelease(FixtureBundle))
+			if _ConfigTransitionRetainedBarrier == FixtureBundle
+				_ConfigTransitionRetainedBarrier := PriorRetained
+		}
+		DirDelete(NextDirectory, true)
+	}
+}
+Test("scope-obsolete-source: preexisting refusal leaves an independent native transaction usable", _ScopeObsoleteRefusalThenIndependentNativeWrite)
+
+
+_ScopeAbsentUntouchedNoop(Ready) {
+	Directory := A_Temp . "\ergopti-scope-noop-" . A_TickCount . "-" . Random(10000, 99999)
+	DirCreate(Directory)
+	Path := Directory . "\config.toml", Locator := Directory . "\paths.toml"
+	Source := _CMJFixtureCurrentSource('[script]`nlocale = "fr"`n[private]`nkeep = "unchanged"`n')
+	Bundle := false, Reason := "fixture preexisting schema refusal"
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		if Ready
+			AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		else
+			ConfigSchemaPrepareSource(Path)
+		AssertEqual(Ready, ConfigSchemaCanPrepareWrite(Path), "only the genuine prior Boot grants write admission")
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		AssertTrue(Bundle is Object)
+		TOML_RefuseWrites(Path, Reason)
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "unbounded absent settlement changes no source phase")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "no-op cannot authorize writes through the retained refusal")
+		Bounds := Map("present", 1, "hash", CryptoSha256(Source))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old", Bounds), "a bounded recovered-image claim keeps the strict fence even without promotion")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Path))
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Bundle := false
+		AssertEqual(Ready, ConfigSchemaCanPrepareWrite(Path), "retirement leaves the exact prior readonly/write state unchanged")
+	} finally {
+		Key := _TOML_WriteRefusalKey(Path)
+		if _TOML_WriteRefusals().Has(Key)
+			_TOML_WriteRefusals().Delete(Key)
+		if Bundle is Object {
+			AssertTrue(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"))
+			AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		}
+		DirDelete(Directory, true)
+	}
+}
+Test("scope absent settlement: untouched ready source preserves refusal and write state", _ScopeAbsentUntouchedNoop.Bind(true))
+Test("scope absent settlement: untouched prepared source preserves refusal and readonly state", _ScopeAbsentUntouchedNoop.Bind(false))
+
+
+_ScopeAbsentUnknownAndOwnedRefusals() {
+	Directory := A_Temp . "\ergopti-scope-settlement-" . A_TickCount . "-" . Random(10000, 99999)
+	DirCreate(Directory)
+	Path := Directory . "\config.toml", Locator := Directory . "\paths.toml"
+	Source := _CMJFixtureCurrentSource('[script]`nlocale = "fr"`n')
+	Bundle := false, Reason := "fixture strict settlement refusal"
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		AssertFalse(ConfigMigrateBoot(Path, "known"))
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		AssertTrue(Bundle is Object)
+		TOML_RefuseWrites(Path, Reason)
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "unknown destination does not borrow the untouched-row no-op")
+		AssertFalse(ConfigMigrateBoot(Path, "known"), "refused settlement constructs no destination")
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Path))
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Bundle := false
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		AssertTrue(Bundle is Object)
+		AssertTrue(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		TOML_RefuseWrites(Path, Reason)
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "owned promotion still refuses without a bounded record")
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old", Map("present", 1, "hash", CryptoSha256(Source))), "bounded owned promotion still refuses")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Path))
+		AssertTrue(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "only exact native settlement after the fixture fence is removed restores the acquired phase")
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Bundle := false
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		Key := _TOML_WriteRefusalKey(Path)
+		if _TOML_WriteRefusals().Has(Key)
+			_TOML_WriteRefusals().Delete(Key)
+		if Bundle is Object {
+			Resolution := ConfigTransitionRecoverOwned(Locator, Bundle)
+			AssertTrue(ConfigTransitionResultIs(Resolution, "absent"))
+			AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		}
+		DirDelete(Directory, true)
+	}
+}
+Test("scope absent settlement: unknown and owned sources retain strict refusal", _ScopeAbsentUnknownAndOwnedRefusals)

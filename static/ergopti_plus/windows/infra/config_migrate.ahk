@@ -1196,7 +1196,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		if !Native.terminal_owns.Call(OwnerBundle, FilePath)
 				|| !Native.terminal_owns.Call(OwnerBundle, Locator)
 			return false
-		if Native.settlement_debt.Call(FilePath) || Native.settlement_refusal.Call(FilePath) != ""
+		if Native.settlement_debt.Call(FilePath)
 			return false
 		Port := Native.settlement_port.Call()
 		WalAbsent() {
@@ -1207,10 +1207,27 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			return false
 		; An unmanaged target is a verified no-op, never a new schema destination.
 		if !Destinations.Has(Key)
-			return NativeLive() && Native.terminal_owns.Call(OwnerBundle, FilePath)
+			return NativeLive() && Native.settlement_refusal.Call(FilePath) == ""
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
 				&& Native.terminal_owns.Call(OwnerBundle, Locator)
 		Row := Destinations[Key]
 		if !RegistryLive(Row)
+			return false
+		; An absent unbounded recovery has no acquired source phase to settle.
+		; Keep its existing refusal and readonly/ready row unchanged; this result
+		; grants neither source admission nor a pending recovered-image receipt.
+		if !Bounded && (Row.phase == "prepared" || Row.phase == "ready") {
+			UnchangedPhase := Row.phase
+			return WalAbsent() && RegistryLive(Row) && Destinations[Key] == Row
+				&& Row.phase == UnchangedPhase && NativeLive()
+				&& !Native.settlement_debt.Call(FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, Locator)
+				&& NativeLive() && Destinations[Key] == Row && Row.phase == UnchangedPhase
+		}
+		; Actual owned settlement and bounded retry observations keep the strict
+		; refusal fence before reading or acknowledging any recovered image.
+		if Native.settlement_refusal.Call(FilePath) != ""
 			return false
 		Image := false
 		if Bounded {
