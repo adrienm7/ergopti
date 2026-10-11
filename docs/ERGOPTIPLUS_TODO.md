@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-10. Latest stable: [v1.0.0](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0)
+Updated: 2026-10-11. Latest stable: [v1.0.0](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0)
 at `5ef675e08d9f75b0902026a21f36782e999b3ac2`, published at 01:31:54 UTC.
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
@@ -10479,8 +10479,16 @@ test precondition failure, not a Lua defect or a successful permission grant.
   publisher verification and explicit failures; never commit certificate or
   key material. The maintainer authorized the current v1.0.0 Windows artifact
   without Authenticode before 2026-10-09T22:00:00Z. Publish its exact artifact
-  hash and unsigned status; this is not a Windows test deferral. Future stable
-  releases require actual signing or a separate explicit maintainer decision.
+  hash and unsigned status; this is not a Windows test deferral. That dated
+  one-candidate decision remains historical evidence. On 2026-10-11 the
+  maintainer separately authorized unsigned stable Windows releases until
+  signing is implemented. Retain source- and artifact-bound public unsigned
+  disclosure; all tests, builds, integrity and installation checks stay full.
+  Prefer valid configured signing, and keep partial secrets, signing errors
+  and invalid publisher verification fatal without an unsigned fallback.
+  Revoke the standing permission in
+  `.github/ci/stable_windows_signing_exception.json` when the SignPath
+  integration is completed and qualified. This decision changes no macOS scope.
 
   The stable assembly retains the separately approved qualification limits
   below and the unresolved Karabiner/live-upgrade reports.
@@ -10767,16 +10775,24 @@ test precondition failure, not a Lua defect or a successful permission grant.
 The maintainer explicitly selected v1.0.1 despite two feature-labelled commits
 in the integrated history. An explicit publication-commit patch request must
 leave automatic defaults, breaking-change handling and published-tag guards
-intact. The unsigned Windows artifact is separately authorized for this
-candidate until October 11, 2026 at 07:00 UTC, with a public signature notice.
-The maintainer also explicitly answered "oui" to three exact macOS scopes for
+intact. The earlier candidate-only unsigned Windows permission expired on
+October 11, 2026 at 07:00 UTC. A new explicit maintainer decision on October 11
+authorizes unsigned stable Windows releases until signing is implemented,
+without an arbitrary expiry or per-version renewal. The public notice and
+receipt remain bound to the exact source, release tag and executable digest;
+unsigned status is qualified:false, with every test mandatory. Item 132 tracks
+the signing implementation and revocation of this standing permission.
+The maintainer previously answered "oui" to three exact macOS scopes for
 the same v1.0.1 main-push candidate and expiry: native PAC/WPAD/TLS (including
 the exact bootstrap duplicate), independent native HTTP wire clients, and
 the single native Homebrew ZIP/XZ acceptance method. Their source-bound public
 receipts and release note must state DEFERRED / qualified:false. All other
 tests, builds, applicable signatures, integrity and ordinary verified archive
 installation/launch remain mandatory. The prior thirteen v1.0.0 test deferrals
-are not extended. Item36 workflow dispatch remains full.
+are not extended. Item36 workflow dispatch remains full. The three macOS
+scopes also expired on October 11 at 07:00 UTC and are not renewed by the
+standing Windows decision: their original controls now remain mandatory.
+The proposed fourth native model scope remains unapproved and inactive.
 
 - [ ] Diagnose certificate -1202 and trust-retirement debt, then receive the
       original three PAC/WPAD/bootstrap methods on arm64 and amd64. All twelve
@@ -10790,10 +10806,37 @@ are not extended. Item36 workflow dispatch remains full.
       launch remain required. Restore these three scopes only after their original
       controls pass without a permissions, trust or sender workaround.
 
-The new profile automatically requires full execution for another version,
+The macOS profile automatically requires full execution for another version,
 repository, event, ref, channel or expired context. Its exact authorized
 boundary is recorded in
 `.github/ci/stable_v101_macos_native_qualification_exception.json`.
+
+- [ ] Reconcile the two open Dependabot PRs against the current source: Python
+      [#92](https://github.com/adrienm7/ergopti/pull/92) and npm
+      [#91](https://github.com/adrienm7/ergopti/pull/91). The read-only October 11
+      inventory found both mergeable but 299 commits behind main, with historical
+      failed checks and no approving review. Preserve lockfile integrity, obtain
+      the required approval and receive their actual updated source. Neither PR
+      is recorded as merged here. Recheck default-branch Dependabot alerts after
+      integration rather than treating a PR merge as proof of resolution. The
+      snapshot has 34 open alerts; transformers
+      [#106](https://github.com/adrienm7/ergopti/security/dependabot/106) remains
+      without a patched version listed in its advisory. The official 5.10.1 source
+      proposed by Dependabot still downloads custom-generation code before
+      consent. Independent source inspection confirms that released 5.17.0
+      contains the upstream consent-before-download fix. Receive its explicit
+      project pin, generated lock and downgrade regressions; native MLX
+      installation and inference remain mandatory before release qualification.
+- [ ] Reconcile the maintainer's draft
+      [#87](https://github.com/adrienm7/ergopti/pull/87) against current dev without
+      replaying superseded native owners. Twelve commits are patch-equivalent;
+      the remaining hunks include terminal-menu retirement, brightness module
+      isolation and cross-driver shortcut columns. Retain current fixes and
+      atomic history without force-push or squash. Resolve conflicts, receive
+      the actual tooltip/native controls. The ordinary one-review rule has a
+      configured role-5 exemption; the author cannot self-approve. Use no manual
+      bypass or protection change. No merge or native qualification is claimed,
+      and previous permission/trust stops stay intact.
 
 [CI 38080535633](https://github.com/adrienm7/ergopti/actions/runs/38080535633)
 receives `fbc70b60da7ec545cdfc28c88f90216dc6050829`, including `dev` through
