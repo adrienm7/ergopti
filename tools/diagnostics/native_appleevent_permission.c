@@ -19,8 +19,19 @@ static void *query_permission(void *value) {
     struct permission_request *request = value;
     // Apple's API may wait indefinitely for consent and forbids the main thread.
     // The native child owner bounds the entire process, including this worker.
+    // Fixed diagnostic prefix on the existing owned stderr capture only.
+    // A failed write grants no observed entry; no new API/thread is acquired.
+    if (request->ask) {
+        fputs("OWNED_PERMISSION_WORKER/1 phase=api-call-starting\n", stderr);
+        (void)fflush(stderr);
+    }
     request->status = AEDeterminePermissionToAutomateTarget(
         request->target, request->event_class, request->event_id, request->ask);
+    if (request->ask) {
+        fprintf(stderr, "OWNED_PERMISSION_WORKER/1 phase=api-returned osstatus=%d\n",
+            (int)request->status);
+        (void)fflush(stderr);
+    }
     return NULL;
 }
 
@@ -36,6 +47,11 @@ int owned_appleevent_permission(const AEAddressDesc *target,
         // Do not dispose the target while an unjoined worker might still use it.
         fputs("Owned Automation worker retirement failed\n", stderr);
         _Exit(68);
+    }
+    // Successful original join happens-before this final diagnostic frame.
+    if (ask) {
+        fputs("OWNED_PERMISSION_WORKER/1 phase=worker-joined\n", stderr);
+        (void)fflush(stderr);
     }
     printf("OWNED_APPLEEVENT_PREFLIGHT/1 mode=%s osstatus=%d\n",
         ask ? "request" : "query", (int)request.status);

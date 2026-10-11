@@ -714,6 +714,177 @@ def _run_appleevent_sender(children, receiver, group, role, arguments, *, confin
         raise
 
 
+def _permission_worker_trace(data):
+    """Closed optional prefix; absent bytes never prove the call boundary was not reached."""
+    require(type(data) is bytes and len(data) <= 256, "Permission trace capture bound refused")
+    entry = b"OWNED_PERMISSION_WORKER/1 phase=api-call-starting\n"
+    joined = b"OWNED_PERMISSION_WORKER/1 phase=worker-joined\n"
+    if data == b"":
+        return {"schema": 1, "stage": "no-milestone", "api_osstatus": None}
+    if data == entry:
+        return {"schema": 1, "stage": "api-call-starting", "api_osstatus": None}
+    require(data.startswith(entry), "Permission trace call boundary refused")
+    tail = data[len(entry) :]
+    match = re.fullmatch(
+        rb"OWNED_PERMISSION_WORKER/1 phase=api-returned osstatus=(-?[0-9]{1,11})\n"
+        rb"(OWNED_PERMISSION_WORKER/1 phase=worker-joined\n)?",
+        tail,
+    )
+    require(match is not None, "Permission trace order or frame refused")
+    status = int(match[1])
+    require(
+        -(2**31) <= status < 2**31 and str(status).encode("ascii") == match[1],
+        "Permission trace status refused",
+    )
+    return {
+        "schema": 1,
+        "stage": "worker-joined" if match[2] == joined else "api-returned",
+        "api_osstatus": status,
+    }
+
+
+def _validate_permission_worker_fact(packet):
+    """Information only; API completion never substitutes consent or process closure."""
+    require(
+        type(packet) is dict
+        and set(packet) == {"schema", "stage", "api_osstatus"}
+        and type(packet["schema"]) is int
+        and packet["schema"] == 1,
+        "Permission worker fact shape refused",
+    )
+    require(
+        type(packet["stage"]) is str
+        and packet["stage"]
+        in ("unavailable", "no-milestone", "api-call-starting", "api-returned", "worker-joined"),
+        "Permission worker stage refused",
+    )
+    status = packet["api_osstatus"]
+    require(
+        (
+            packet["stage"] in ("api-returned", "worker-joined")
+            and type(status) is int
+            and -(2**31) <= status < 2**31
+        )
+        or (
+            packet["stage"] in ("unavailable", "no-milestone", "api-call-starting")
+            and status is None
+        ),
+        "Permission worker status unavailable or unbounded",
+    )
+    return dict(packet)
+
+
+def _permission_result_stderr(output, errors):
+    """Extract only a full joined trace agreeing with the unchanged native result."""
+    try:
+        fact = _permission_worker_trace(errors)
+        matched = re.fullmatch(
+            rb"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=(-?[0-9]{1,11})\n", output
+        )
+        if (
+            fact["stage"] == "worker-joined"
+            and matched is not None
+            and str(fact["api_osstatus"]).encode("ascii") == matched[1]
+        ):
+            return b""
+    except AdmissionError:
+        pass
+    return errors  # Partial, dirty, mismatched and native error diagnostics remain refused.
+
+
+def _permission_worker_capture(children, process, stream=1):
+    """Read the same acquired stderr inode once; uncertain close retains exact input debt."""
+    require(
+        process in children.captures and process in children.capture_identities,
+        "Permission worker capture acquisition absent",
+    )
+    require(type(stream) is int and stream in (0, 1), "Permission capture stream refused")
+    path = children.captures[process][stream]
+    identity = children.capture_identities[process][stream]
+    require(
+        path.parent == children.root and owned_path(children.root, path) == path,
+        "Permission worker capture escaped owned root",
+    )
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    data = None
+    info = None
+    primary = None
+    try:
+        info = os.fstat(descriptor)
+        require(
+            stat.S_ISREG(info.st_mode)
+            and info.st_uid == os.getuid()
+            and (info.st_dev, info.st_ino) == identity
+            and 0 <= info.st_size <= 256,
+            "Permission worker capture identity or bound differs",
+        )
+        data = os.read(descriptor, 257)
+        after = os.fstat(descriptor)
+        require(
+            (after.st_dev, after.st_ino, after.st_size) == (info.st_dev, info.st_ino, info.st_size)
+            and len(data) == info.st_size,
+            "Permission worker capture changed or was partial",
+        )
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        try:
+            os.close(descriptor)
+        except BaseException:
+            # A close error cannot authorize retry of a possibly reused integer.
+            # Retain this exact acquisition as uncertainty; never claim full fixture closure.
+            children.record_debt(
+                {
+                    "kind": "permission-capture",
+                    "descriptor": descriptor,
+                    "identity": list(identity),
+                    "close": "unacknowledged",
+                }
+            )
+            if primary is None:
+                raise
+    return data
+
+
+def _observe_permission_worker(children, process, primary):
+    """Sample exact retained captures only after the original settlement; preserve primary."""
+    evidence = getattr(children, "evidence", None)
+    output, errors = None, None
+    fact = {"schema": 1, "stage": "unavailable", "api_osstatus": None}
+    try:
+        group = children.groups.get(process)
+        require(
+            group is not None
+            and group.process is process
+            and group.reaped
+            and not any(entry.get("pid") == process.pid for entry in children.debt),
+            "Permission worker capture lacks exact physical settlement",
+        )
+        errors = _permission_worker_capture(children, process)
+        fact = _permission_worker_trace(errors)
+        if fact["stage"] == "worker-joined":
+            output = _permission_worker_capture(children, process, 0)
+    except (OwnedProcessInterrupted, KeyboardInterrupt, SystemExit):
+        if primary is None:
+            raise
+    except Exception:
+        pass  # Optional unknown/capture refusal never replaces the original command outcome.
+    if evidence is not None and getattr(evidence, "descriptor", None) is not None:
+        try:
+            evidence.record(
+                "automation.permission-worker",
+                status="refused" if primary is not None else "pending",
+                permission_worker=fact,
+            )
+        except (OwnedProcessInterrupted, KeyboardInterrupt, SystemExit):
+            if primary is None:
+                raise
+        except Exception:
+            pass
+    return output, errors
+
+
 def _validate_command_timeout(packet):
     """Closed observations only; these timings cannot authorize or extend a wait."""
     keys = {
@@ -837,6 +1008,7 @@ class PhaseEvidence:
         native_terminal=None,
         native_ui=None,
         sender_failure=None,
+        permission_worker=None,
     ):
         if self.descriptor is None:
             return True
@@ -886,6 +1058,7 @@ class PhaseEvidence:
                 "server-retirement-error",
                 "external-canary",
                 "automation-readiness",
+                "permission-capture",
             }
             kinds = sorted(set(debt_kinds))
             require(
@@ -925,6 +1098,14 @@ class PhaseEvidence:
                     and not packet["groups"][0]["closed"],
                     "Sender observation lost its exact unreaped receiver",
                 )
+            if permission_worker is not None:
+                require(
+                    phase == "automation.permission-worker"
+                    and status in ("pending", "refused")
+                    and not closed,
+                    "Permission worker observation cannot grant consent or closure",
+                )
+                packet["permission_worker"] = _validate_permission_worker_fact(permission_worker)
             first_timeout = getattr(self, "first_timeout", None)
             if first_timeout is not None:
                 packet["first_timeout"] = _validate_command_timeout(first_timeout)
@@ -1387,6 +1568,9 @@ class Children:
                 else "accepted",
                 groups=[self.groups[child] for child in self.active],
             )
+        permission_capture = (None, None)
+        if request is not None and request[-1] == "permission-request":
+            permission_capture = _observe_permission_worker(self, process, failure)
         if failure is not None:
             raise failure
         require(
@@ -1408,6 +1592,9 @@ class Children:
         )
         stdout = output.read_bytes()
         stderr = errors.read_bytes()
+        if request is not None and request[-1] == "permission-request":
+            if permission_capture == (stdout, stderr):
+                stderr = _permission_result_stderr(stdout, stderr)
         require(
             len(stdout) <= 1024 * 1024 and len(stderr) <= 1024 * 1024,
             "Owned native output exceeded evidence bound",

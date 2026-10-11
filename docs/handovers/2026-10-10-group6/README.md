@@ -792,3 +792,49 @@ Receiving ledger SHA256 is
 The complete manual is still separate. Packaging, installation, native managed
 TLS/PAC/WPAD/model acceptance, Automation consent and actual device checks stay
 required. TODO36/62 and transversal16/38 remain open; no release is authorized.
+
+## Exact 12fb native receiving and remaining macOS requirements
+
+Manual38103825010 tests exact12fb210c447aa0c05a924b8b17117287f1d5b56f.
+The typed CFNetwork declaration actually compiles on Darwin. The native archive
+executes25 cases:24 pass, one original Brew Automation case fails, no cases skip.
+The independent no-prompt API case passes but its OSStatus and qualification
+facts do not grant fixture Automation consent. The actual first existing
+window traversal completes seven nodes with no exact sender/receiver names;
+that observation does not establish a device-only cause.
+
+Both architectures genuinely pass SDK49, daily7, logger42 and sourcePAC10.
+Both architectures also pass actual Carbon12. Both fresh cold component
+receivers bind27 source pins to this exact run, import the managed MLX environment
+and verify the real official Ollama archive/client. Their owners and private
+work physically retire. Daemon/model validation is explicitly not executed
+by these component installers. The cold ledger SHA256 is
+4507ea304559b46e58b1b7164e9d051d9a7d8d4ce9bca6a85e73ab1f0b6b0292.
+
+Actual ARM PAC14 executes12 passes and two failures. WPAD reaches system trust
+and refuses the certificate with NSURL/CFNetwork-1202 and SSL-9813 after its
+own trust-add command exits0. That fixture did not enroll the existing
+admin-trust query, so the different HTTP fixture's absence observation cannot
+supply its anchor visibility. Both actual HTTP tests fail during trust setup;
+its exact-CA query observes owned_status-25300/owned_present0 while the
+noninteractive admin authorization succeeds. Original removal/restoration
+failures remain. Model setup does not establish model creation/pull/inference.
+These facts support no speculative trust/keychain/restart/deadline change.
+
+A finite same-call permission diagnostic retains fixed call-boundary, API-return
+and successful original-join milestones through exact owned captures after
+physical settlement. A pre-call boundary does not prove native API entry or
+blocking; missing optional bytes remain unknown. It acquires no new permission,
+thread, query, traversal, grant or clock. Capture interruption/close uncertainty
+retains exact named debt; diagnostic evidence cannot admit consent or fixture
+closure. Original196 portable bodies and strict source inverses remain exact.
+Candidate203 portable controls pass. The seven new controls against the exact
+predecessor produce one assertion failure and37 error records; omitted helpers
+are errors, not assertion failures. Selected final gates and new exact-source
+macOS qualification remain required.
+
+TODO36/62 and transversal16/38 remain open. Native Automation/Brew6, successful
+system certificate setup/restoration, PAC/WPAD/managed model receiving, package
+and installation need macOS continuation. Windows SSPI/Schannel/NTLM, physical
+retirement, packaging and installation remain the maintainer-PC continuation.
+Production native qualification guards stay unchanged. No release is made.
