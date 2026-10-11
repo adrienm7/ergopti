@@ -44,7 +44,7 @@ function parseTomlMagic(toml) {
 		if (objLineMatch) {
 			const key = objLineMatch[1];
 			const body = objLineMatch[2];
-			const outMatch = body.match(/output\s*=\s*("(?:\\.|[^\"])*")/);
+			const outMatch = body.match(/output\s*=\s*("(?:\\.|[^"\\])*")/);
 			if (outMatch) {
 				let val = outMatch[1].slice(1, -1);
 				val = unescapeTomlString(val);
@@ -54,7 +54,7 @@ function parseTomlMagic(toml) {
 		}
 
 		// Try simple key = "value" lines (unquoted key)
-		const kvMatch = line.match(/^([A-Za-z0-9_\-]+)\s*=\s*("(?:\\.|[^\"])*")\s*$/);
+		const kvMatch = line.match(/^([A-Za-z0-9_\-]+)\s*=\s*("(?:\\.|[^"\\])*")\s*$/);
 		if (kvMatch) {
 			const key = kvMatch[1];
 			let val = kvMatch[2].slice(1, -1);
