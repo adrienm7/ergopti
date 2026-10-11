@@ -6708,6 +6708,18 @@ or physical-device acceptance.
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-10 expired startup event retirement correction. A valid queued
+LISTENER_BOUND event previously converted the expired startup clock into lasting
+protocol debt during cancellation, preventing physical retirement. It is now
+consumed once without granting listener readiness after expiry. Nonce, active
+state, duplicate, prior-debt and retirement guards remain; settlement joins and
+all deadlines are unchanged. Original34 suspended controls pass; candidate39
+and all45 serve controls pass. The new real-child cancellation control fails
+on the predecessor at its physical retirement assertion before new-field checks.
+Four causal mutations are refused. These are portable protocol/process controls,
+not Darwin Mach-O or native listener qualification. Selected repository gates
+and exact-source native receiving remain pending. Item62 remains open.
+
 2026-10-10 partial integration and native failure observations. Seven atomic
 commits are integrated without squash in Dev `d92a72d5`. The final selected
 local gates pass formatting, 409 JS controls, Mac 18347/0 across 1569 modules,
