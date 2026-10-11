@@ -698,19 +698,22 @@ function assertCompleteAhkWatchdogBudget() {
 		);
 		assert.equal(steps.length, 1, 'one actual complete-suite CI owner');
 		const minutes = steps[0]['timeout-minutes'];
-		assert.equal(minutes, 60);
+		assert.equal(minutes, 125);
 		assert.ok(steps[0].run.includes('validate-ahk-suite-manifest.cjs'));
 		const startup = values.STARTUP_BUDGET,
 			perTest = values.PER_TEST_BUDGET,
 			cap = values.MAX_TIMEOUT;
 		assert.equal(startup, 120000);
-		assert.equal(cap, 55 * 60 * 1000);
+		assert.equal(cap, 120 * 60 * 1000);
 		assert.equal(minutes * 60 * 1000 - cap, 5 * 60 * 1000);
 		const budget = (count) => Math.min(cap, startup + count * perTest);
 		assert.equal(budget(0), startup);
 		assert.equal(budget(1), startup + perTest);
 		assert.ok(budget(11197) >= 45 * 60 * 1000 && budget(11197) <= cap);
-		assert.equal(budget(11197), 2919250);
+		// The raw 11229 registrations include nine interactive callbacks.
+		assert.equal(budget(11229), cap, 'the measured raw registry receives the declared cap');
+		assert.equal(budget(11220), cap, 'the measured full cohort receives the declared cap');
+		assert.equal(budget(11197), cap);
 		const saturation = Math.ceil((cap - startup) / perTest);
 		assert.ok(saturation > 1);
 		assert.ok(budget(saturation - 1) < cap);
@@ -719,11 +722,16 @@ function assertCompleteAhkWatchdogBudget() {
 		assert.equal(budget(1000000), cap);
 		return budget(11197);
 	}
-	assert.equal(checkBudget(runner, workflow), 2919250);
+	assert.equal(checkBudget(runner, workflow), 7200000);
 	for (const [before, after] of [
-		['global _SUITE_MAX_TIMEOUT_MS := 3300000', 'global _SUITE_MAX_TIMEOUT_MS := 1320000'],
-		['global _SUITE_PER_TEST_BUDGET_MS := 250', 'global _SUITE_PER_TEST_BUDGET_MS := 200'],
-		['global _SUITE_MAX_TIMEOUT_MS := 3300000', '; global _SUITE_MAX_TIMEOUT_MS := 3300000'],
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', 'global _SUITE_MAX_TIMEOUT_MS := 1320000'],
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', 'global _SUITE_MAX_TIMEOUT_MS := 3300000'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 200'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 300'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 250'],
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', 'global _SUITE_MAX_TIMEOUT_MS := 4500000'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 400'],
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', '; global _SUITE_MAX_TIMEOUT_MS := 7200000'],
 		['return Min(_SUITE_MAX_TIMEOUT_MS,', 'return Max(_SUITE_MAX_TIMEOUT_MS,'],
 		['SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)', '; SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)']
 	]) {
@@ -731,16 +739,20 @@ function assertCompleteAhkWatchdogBudget() {
 		assert.throws(() => checkBudget(runner.replace(before, after), workflow));
 	}
 	const step =
-		'      - name: Run AHK test suite\n        shell: pwsh\n        timeout-minutes: 60\n';
+		'      - name: Run AHK test suite\n        shell: pwsh\n        timeout-minutes: 125\n';
 	assert.equal(workflow.split(step).length - 1, 1);
 	for (const after of [
-		step.replace(': 60', ': 25'),
-		step.replace(': 60', ': 0'),
-		step.replace(': 60', ': 55')
+		step.replace(': 125', ': 25'),
+		step.replace(': 125', ': 0'),
+		step.replace(': 125', ': 55'),
+		step.replace(': 125', ': 60'),
+		step.replace(': 125', ': 75'),
+		step.replace(': 125', ': 80'),
+		step.replace(': 125', ': 120')
 	])
 		assert.throws(() => checkBudget(runner, workflow.replace(step, after)));
 	console.log(
-		'PASS: complete AHK budget source/CI parsing, growth, saturation and eight refusal controls; native/full suite NOT_RUN.'
+		'PASS: complete AHK budget source/CI parsing, growth, saturation and seventeen refusal controls; native/full suite NOT_RUN.'
 	);
 }
 
