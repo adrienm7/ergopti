@@ -2580,5 +2580,148 @@ class TrustInstallObservationControls(unittest.TestCase):
             self.assertTrue(probe.trust_attempted)
 
 
+class CleanupCommandMilestoneControls(unittest.TestCase):
+    """Actual command owner over recording children only; no native acquisition."""
+
+    def test_each_cleanup_milestone_preserves_primary_and_private_boundaries(self):
+        modes = [
+            "setup",
+            "acquire",
+            "registered",
+            "input",
+            "wait",
+            "retire",
+            "retire_raise",
+            "retire_only",
+            "success",
+            "observe_success",
+            "observe_wait",
+        ]
+        for mode in modes:
+            with self.subTest(mode=mode):
+                fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+                fixture.command_file_debt = []
+                fixture.native_groups = object()
+                primary = subprocess.TimeoutExpired("private-marker", 15)
+                calls = []
+
+                class Input(io.BytesIO):
+                    def write(self, value):
+                        if mode == "input":
+                            raise primary
+                        return super().write(value)
+
+                child = SimpleNamespace(pid=7781, returncode=None, stdin=Input())
+                owner = SimpleNamespace(process=child, reaped=False)
+
+                def wait(timeout):
+                    calls.append("wait")
+                    if mode in {"wait", "retire", "retire_raise", "observe_wait"}:
+                        raise primary
+                    child.returncode = 0
+
+                def retire():
+                    calls.append("retire")
+                    if mode == "retire_raise":
+                        raise RuntimeError("private-retirement-detail")
+                    owner.reaped = mode not in {"retire", "retire_only"}
+                    return owner.reaped
+
+                owner.wait_for_exit, owner.settle = wait, retire
+
+                def acquire(arguments, native, register, **ports):
+                    self.assertEqual(arguments, ["private-marker"])
+                    self.assertIs(native, fixture.native_groups)
+                    calls.append("acquire")
+                    if mode == "acquire":
+                        raise primary
+                    register(owner)
+                    if mode == "registered":
+                        raise primary
+                    return owner
+
+                fixture.groups = SimpleNamespace(acquire_owned=acquire)
+                stderr, stdout = io.StringIO(), io.StringIO()
+                failure = result = None
+                with (
+                    mock.patch.object(
+                        WIRE.tempfile,
+                        "TemporaryFile",
+                        side_effect=primary if mode == "setup" else io.BytesIO,
+                    ),
+                    contextlib.redirect_stderr(stderr),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    observer = (
+                        mock.patch(
+                            "builtins.print", side_effect=RuntimeError("private-observer-detail")
+                        )
+                        if mode.startswith("observe_")
+                        else contextlib.nullcontext()
+                    )
+                    with observer:
+                        try:
+                            result = fixture._command(
+                                ["private-marker"], security_failure_observation=True
+                            )
+                        except BaseException as caught:
+                            failure = caught
+                success = mode in {"success", "observe_success"}
+                if success:
+                    self.assertIsNone(failure)
+                    self.assertEqual(result, (0, b""))
+                elif mode == "retire_only":
+                    self.assertIs(type(failure), WIRE.FixtureFailure)
+                else:
+                    self.assertIs(
+                        failure, primary, "retirement cannot replace the original failure"
+                    )
+                self.assertEqual(stdout.getvalue(), "")
+                raw = stderr.getvalue()
+                self.assertNotIn("private-marker", raw)
+                self.assertNotIn("private-retirement-detail", raw)
+                self.assertEqual(len(raw.splitlines()), 0 if mode.startswith("observe_") else 1)
+                fact = (
+                    fixture.command_milestone_fact
+                    if mode.startswith("observe_")
+                    else json.loads(raw.removeprefix("# native_http_security_milestones "))
+                )
+                self.assertEqual(fact, fixture.command_milestone_fact)
+                acquired = mode not in {"setup", "acquire"}
+                waited = mode not in {"setup", "acquire", "registered", "input"}
+                self.assertEqual(fact["acquisition_entered"], mode != "setup")
+                self.assertEqual(fact["child_acquired"], acquired)
+                self.assertEqual(fact["wait_entered"], waited)
+                self.assertEqual(fact["wait_returned"], success or mode == "retire_only")
+                self.assertEqual(fact["retirement_attempted"], acquired)
+                self.assertEqual(
+                    fact["retirement_result"],
+                    "not_acquired"
+                    if not acquired
+                    else "refused"
+                    if mode in {"retire", "retire_raise", "retire_only"}
+                    else "acknowledged",
+                )
+                self.assertEqual(
+                    fact["failure_phase"],
+                    None
+                    if success
+                    else "setup"
+                    if mode == "setup"
+                    else "acquire"
+                    if mode in {"acquire", "registered"}
+                    else "input"
+                    if mode == "input"
+                    else "settle"
+                    if mode == "retire_only"
+                    else "wait",
+                )
+                self.assertEqual(calls.count("acquire"), int(mode != "setup"))
+                self.assertEqual(calls.count("wait"), int(waited))
+                self.assertEqual(calls.count("retire"), int(acquired))
+                self.assertEqual(fact["version"], 1)
+                self.assertEqual(fact["action"], "security_cleanup")
+
+
 if __name__ == "__main__":
     unittest.main()

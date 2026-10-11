@@ -610,6 +610,43 @@ class TerminalFailureObservationControls(unittest.TestCase):
         self.assertNotIn("cleanup_failure", value)
         self.assertNotIn("private-input-name", raw)
 
+    def test_prepare_phase_preserves_existing_runtime_and_cleanup_failure_facts(self):
+        policy = RECEIVING.load(
+            "milestone_actual_runtime_policy",
+            ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+        )
+        namespace = SimpleNamespace
+        for phase in [*sorted(RECEIVING.PREPARE_PHASES), None, 4, "private-marker"]:
+            with self.subTest(phase=phase):
+
+                def observed_owner(**values):
+                    return namespace(**values, prepare_phase=phase)
+
+                with patch.dict(self.receive.__globals__, {"SimpleNamespace": observed_owner}):
+                    status, raw = self.receive(
+                        policy.RuntimeRefusal("unavailable"),
+                        RuntimeError("actual_source_close_debt"),
+                    )
+                value = json.loads(raw)
+                self.assertEqual(status, 1)
+                self.assertFalse(value["success"])
+                self.assertEqual(value["reason"], "native_receiving_cleanup_failed")
+                self.assertEqual(
+                    value["primary_failure"],
+                    {"exception_class": "RuntimeRefusal", "code": "unavailable"},
+                )
+                self.assertEqual(
+                    value["cleanup_failure"],
+                    {"exception_class": "RuntimeError", "code": "actual_source_close_debt"},
+                )
+                self.assertEqual(
+                    value["prepare_phase"],
+                    phase
+                    if type(phase) is str and phase in RECEIVING.PREPARE_PHASES
+                    else "unknown",
+                )
+                self.assertNotIn("private-marker", raw)
+
 
 class ReceivingCatalogueControls(unittest.TestCase):
     """Pure catalogue/install admission only; no native request or installer runs."""
