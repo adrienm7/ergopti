@@ -3389,6 +3389,9 @@ native three-OS qualification remains pending.
   installed-layout visibility and French suffix/magic-key placement decisions;
   item 104 separately tracks the common-autocorrection section split.
 
+Current continuation (2026-10-11): The native window supervisor now captures exact HWND/PID, stable DPI/geometry, screenshots and typed GDI/USER resource receipts with finally-owned cleanup. It is implemented but unexecuted on Windows; a VM can exercise native rendering, while real monitor clarity and transitions remain physical acceptance.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 Windows PC acceptance, delegated to the maintainer:
 
 1. Record the tested commit, Windows 10/11 build, monitor scale and layout.
@@ -3990,6 +3993,9 @@ qualification remain required.
   subsequently passes all 32 registered cases on source `cb5ad8f3d2`, including
   the twelve WAL/modal controls. The overall AHK suite has five other failures;
   actual menu/save/restart acceptance remains open, so this item stays partial.
+
+Current continuation (2026-10-11): The Windows handwritten-terminator consumer/editor is already present; older missing-consumer handovers are stale. Primary editor changes now preserve unowned TOML metadata, inline members and comments on all three drivers, or refuse unsafe hidden-data edits. Container Lua/corpus proofs do not close Windows native or physical delimiter acceptance.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
 
 The measured-delay native fixture now isolates the real corpus metadata
 cache from the earlier resolution-cascade double and restores the exact
@@ -4842,6 +4848,9 @@ laws and archive/package/install requirements remain unchanged and unqualified.
         release; verify both required extension TOML files, no retired French source
         fallback, no duplicate Layout row and preserved personal files/preferences.
 
+Current continuation (2026-10-11): Current declarative Hotstrings category/section/source order and shared shipped-pack controls were checked on all three drivers; historical main menu code was not restored over newer dev providers. Installed-layout visibility, suffix/magic-key placement and physical typing remain open.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo37-shipped-ergopti-sections) for this item; prepared sources and portable checks do not establish Windows runtime success.
 
 The Linux E2E job now installs native LuaFileSystem before the unchanged scripted
@@ -5355,6 +5364,9 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   packaging/install are skipped. Its public artifact bytes remain unavailable.
   Items16/38 remain.
 
+Current continuation (2026-10-11): The Windows managed path now installs pinned per-user assets through existing file/runtime owners, resolves the canonical model tag and requests separate model consent. Model pulling binds the original process creation identity, admitted listener and fresh normalized-name receipt. macOS post-pull load failure refuses selection. Real archive/model/inference qualification remains native.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 - [~] **47.** **Partial: authenticated local-server discovery and menus.** The
   shared catalogue owns optional empty authentication only for declared local
   providers; cloud/generic/unknown providers retain typed key requirements.
@@ -5414,6 +5426,9 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   attempts failed and did not qualify POST. Complete native three-OS
   qualification remains; items16/38 stay.
 
+Current continuation (2026-10-11): Provider/model checkmarks and Linux menu callbacks now require durable acknowledgement. macOS discovery, cache, warmup and loadability use the configured origin and reject stale responses. Windows managed version/tags/chat/stream/warmup/delete use the exact admitted IPv4 origin; external server behavior is preserved. Native service receiving remains open.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 - [~] **48.** **Partial: owned local-runtime repair and enable admission.** All
   three drivers require a fresh configured /api/version receipt before the
   existing preference writer can publish AI enable. Redirect, malformed or
@@ -5454,6 +5469,9 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   overwrite foreign configuration. Saved Windows v3/file-port sources remain
   proposals until review and native 25-case qualification. Items 16/38 remain.
 
+Current continuation (2026-10-11): Windows production rescue now dispatches the existing managed per-user installation/start/model owners instead of default winget/browser installation. Source-bound enable acknowledgement, distinct consent, deadlines, cancellation and exact cleanup debt are implemented. macOS Quit retires only its original owned Ollama and preserves external servers. NATIVE_PRODUCTION_QUALIFIED=False remains unchanged; actual Windows/macOS service qualification is still required.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 - [~] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
   reinstalls its own low-level keyboard hook around every SendInput (upstream
   `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
@@ -5465,6 +5483,9 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   `LLM_NavEventOwner_EnsureStarted()` in `ErgoptiPlus.ahk`). Audit every native
   arbiter route, make each one order-independent, and test both hook orders like
   `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
+
+Current continuation (2026-10-11): Production C now separates lower-integrity injections and replay modifier custody, retains immutable event/layout recipes and exact partial FIFO suffixes, and exposes authenticated metadata/held-recipe queries. Captured KLE stepping, canonical output plans and exact plan/attempt-to-FIFO acknowledgements have portable regressions (43 C cases; 40 source exports). Raw release and shutdown preserve outstanding output/physical debt. An opt-in bounded native/HotIf/InputHook trace harness now rejects incomplete or stale receipts and separates entry QPC from completion order; its actual Windows execution is still missing. The tracked native DLL/manifest is intentionally stale pending the official Windows MSVC generator. Complete transformed-output activation still depends on per-event AHK/InputHook/custom-combo delivery contracts and native qualification; unsupported cohorts remain fenced. This is not a claim that all production hook consumers are migrated.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
 
 Delivered prerequisite: terminal replay has one exclusive native release owner
 across the unlocked SendInput boundary. Reentrant and concurrent attempts retain
@@ -5507,6 +5528,9 @@ Windows PC implementation and acceptance, delegated to the maintainer:
       accepted predictions (latency, dropped or interleaved keys) before switching;
       not before the demo.
 
+Current continuation (2026-10-11): A native receiving fixture and supervisor now compare primitive SendEvent/SendInput with independent receipt checks, separate installation sequences and natural cleanup. No Windows measurement was performed and no send policy was selected. Installation sequence is not observed callback order; overlapping physical typing remains a separate experiment.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 Windows PC measurement steps, delegated to the maintainer:
 
 1. Record the commit, Windows build, app, layout/emulation state, arbiter state,
@@ -5538,6 +5562,9 @@ Windows PC measurement steps, delegated to the maintainer:
       and lists it as `provider/model`; the layer editor shows the emulated
       Ergopti legends and each action; « Revenir à cette version » rolls back
       with a backup; « Désinstaller » is greyed on a source run.
+
+Current continuation (2026-10-11): Reproducible native execution commands now cover exact runtime/source prerequisites, captured KLE/route filters, receiving and window evidence. Portable source/mocks are recorded separately; neither installed-driver acceptance nor actual physical input is qualified in Linux.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
 
 Windows PC execution steps, delegated to the maintainer:
 
@@ -9651,6 +9678,9 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   packaging/install and desktop acceptance. Preserve Windows PC steps 11,12 and
   all resource/line-corpus assertions. Transversal 16/38 remain required.
 
+Current continuation (2026-10-11): No native prediction appearance result is claimed. Windows consent/model lifecycle software is implemented independently of tooltip rendering. Native VM screenshots/DPI/GDI receipts and real display typography/clarity remain required before closing appearance acceptance.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 - [~] **91.** Provide all ordered catalogue-key pairs on Windows, with
   hold-first/tap-second and hold-first/hold-second slots, plus symmetric
   simultaneous chords with a configurable positive delay and copy-tap-to-chord.
@@ -10020,6 +10050,9 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
   distinguish measured stalls from causes before changing tooltip/hook code.
 
+Current continuation (2026-10-11): The receiving companion gives exact native metrics/focus/session/idle and privacy scenarios, with retryable log-owner/refusal expectations. Actual Windows UIA, lock/secure-desktop and installed user applications remain unexecuted; held physical input additionally requires a real keyboard.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 Delivered prerequisite: Windows closing records retain an exact accepted
 interval owner through producer teardown. Only content-free `idle_end` and
 `session_end` records can use that authority; ordinary telemetry still uses
@@ -10226,6 +10259,9 @@ exact-boolean regressions also pass the focused runner.
   The original posture/backup/refusal assertions stay intact; an additional
   assertion proves the pending live text cache still contains the old source.
 
+Current continuation (2026-10-11): Current shared two-command category frames and actual menu consumers were checked across all three drivers. Programmable menu publication now joins revision-scoped runtime and preference acknowledgement, live pause and retained inverse debt. Native menu/callback execution remains open.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 The macOS Dynamic scope now admits the shared-index personal-info module placeholder through the existing acknowledged runtime façade and canonical preference owner. It applies the native module choice before publishing config.toml, restores the module/menu/registry snapshots on rejection, refuses unsupported declared owners, and retains unrelated groups, unknown fields, sparse state, pause, and master posture. The checkbox reads the same native owner. Unchanged or never-applied module state is not reset.
 
 Thirty new actual-owner regressions cover enable/disable, false/nil/throw module and save acknowledgements, sparse rollback, conditional-writer refusal, external stale bytes and retry, selected-group isolation, unsupported declarations, exact mapping identities, unchanged native state, the checkbox action and post-commit refresh refusal. Independent initial failures and full receipts remain outside the repository.
@@ -10357,6 +10393,9 @@ Windows-dependent acceptance is explicitly deferred to the maintainer PC. Comple
   E2E, packaging and installation remain required before removing this item.
   Portable Lua and source checks do not qualify physical native input.
 
+Current continuation (2026-10-11): Current common-autocorrection sections/order and independent historical corpora were verified without regeneration. Editor saves now preserve neighboring foreign metadata and unknown typed data. Existing section migration is not reimplemented; actual installed-layout/common-rule typing remains physical acceptance.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
+
 Focused recovery passes 14/0, including five terminal-admission cases. The composed producer now retains staging-only receipts, pins regular-file and staging-directory identities, and preserves ordinary release-only cleanup alongside guarded private inverses through one native removal implementation. Serial portable Mac-target conditional-removal, cooperative configuration, Writer and staging controls pass 178/0, retaining the original refusal assertions. Native release debt remains owned across forward and inverse publication. This is cooperative pathname ownership; portable controls do not establish hosted macOS locking, physical input, packaging or installation.
 
 Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo104-common-autocorrection-families) for this item; prepared sources and portable checks do not establish Windows runtime success.
@@ -10390,6 +10429,9 @@ packaging, installation or physical acceptance.
   Full final-source verification, Windows/macOS execution, E2E, packaging
   and installation remain required. These checks do not replace items 16
   and 38 or establish physical X11/Wayland keyboard behavior.
+
+Current continuation (2026-10-11): Retained programmable timing prompts now reject superseded enabled/interval state. Existing dynamic sources, refusal/restore/cancel/removal and actual publication owners were checked; menu persistence now retains honest inverse debt and macOS rereads live pause. Portable Lua and source controls do not qualify native executable callbacks or physical timing.
+See [execution handover](handovers/2026-10-11-groups-247/README.md).
 
 Final focused Lua validation passes macOS runtime53/scope30/shared40/transport86 and Linux runtime49/shared40/transport31, with no failures or skips in those selections. Deferred output retains the actual native publication receipt after callback completion; source/lifecycle fences and strict cleanup acknowledgement remain required. Foreign clipboard ownership leaves honest unsettled debt. Hosted native/installation and physical input remain unqualified.
 
