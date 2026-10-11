@@ -10637,6 +10637,18 @@ retains complete raw proofs, exact scope and the released owner lock. This
 qualifies the software correction, not native catalogue, consent or invocation;
 item106 and all transverse requirements remain open.
 
+The read-only Shortcuts probe now obtains its three AppleEvent constants from
+the selected Apple SDK through an internally compiled, Git-admitted C helper.
+JXA retains the same descriptor, imported permission signature and no-prompt
+call; no supplied executable or self-declared build receipt is accepted. The
+constant child and discovery share the original post-help20-second deadline,
+with separate acknowledged retirement and source/image identity checks. The
+original35 Python and28 JXA controls are preserved; additive controls exercise
+constant transport and its refusals. Native SDK compilation, same-principal
+permission receiving and catalogue discovery still require Mac CI. This is a
+diagnostic correction, not consent, invocation or installed acceptance; item106
+remains partial.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
