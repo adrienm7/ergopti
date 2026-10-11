@@ -768,3 +768,27 @@ children. This does not emulate Hammerspoon or qualify installation. The actual
 worker exits0 and retires its receipt, but later archive/version checks were
 unrun after refusal. Corrected native cold receiving, model, packaging and
 installation remain required; item62 and transversal16/38 stay open.
+
+## CFNetwork declaration successor and actual cold receiving
+
+Manual38101970834 on663ff4c70 does not validate the prior parenthesization:
+Swift still interprets its as-expression as a pattern and refuses compilation.
+Archive25 and the independent no-prompt SDK call remain unrun. The successor
+uses one explicitly typed String initializer outside the switch, then matches
+the local. It changes no native case, assertion, clock, privacy category or
+routing policy. All63 portable bodies and all55 original bodies remain exact;
+the updated complete diagnostic inverse still reconstructs the same historical
+worker bytes and strict pin. Actual corrected Darwin compilation is pending.
+
+The same manual genuinely passes both independent cold native receivers.
+Fresh MLX11688341858 and official Ollama11687917657 artifacts bind27 source
+pins to663ff4c70. MLX Python3.11.16/uv0.12.21 imports and lock fingerprint pass.
+Official client0.24.0 archive/signature and all20 installed file/link identities
+pass; the actual version child, route worker, receipt and private work retire
+with physical cleanup. The corrected initial daemon_validation is not-executed,
+as required for client installation; daemon/model acceptance is independent.
+Receiving ledger SHA256 is
+3fec4777e99f142dfdd39954b5c6f1804ed1d7c648afaf505bbe3996b93d3189.
+The complete manual is still separate. Packaging, installation, native managed
+TLS/PAC/WPAD/model acceptance, Automation consent and actual device checks stay
+required. TODO36/62 and transversal16/38 remain open; no release is authorized.

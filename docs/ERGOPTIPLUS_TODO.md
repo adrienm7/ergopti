@@ -4741,6 +4741,14 @@ arbitrary filter. Native compilation, the complete model receiver, package and
 all eleven installation legs must still succeed on the same final source.
 These source repairs do not complete item36 or transversal16/38.
 
+The parenthesized diagnostic switch still refuses actual Darwin compilation in
+manual38101970834 at663ff4c70. The archive job executes no XCTest case and its
+independent no-prompt SDK step also stops at compilation; this is not evidence
+of an Automation refusal. The successor converts the public CFNetwork constant
+once into an explicit String initializer before the switch and matches that
+local without a cast-pattern. All25 native cases, original permission/consent
+laws and archive/package/install requirements remain unchanged and unqualified.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -8826,6 +8834,18 @@ namespace authority, and diagnostic refusal preserves the original deadline
 failure. All eighteen test methods in the file and the surrounding SDK41 cohort
 remain unchanged. The stage observed after termination can describe cancellation
 or cleanup; it does not prove the pre-timeout cause. Native receiving is pending.
+
+Exact macOS-only manual38101970834 at663ff4c70 genuinely passes both cold
+receivers. The fresh MLX and official Ollama artifacts bind all27 source pins;
+MLX imports/lock fingerprint and official archive, signature, installed bytes,
+client0.24.0 version and physical cleanup pass. The official caller retains
+not-executed daemon/model state; these client receipts do not qualify serving,
+model inference, managed TLS/PAC/WPAD, packaging or the complete manual verdict.
+The parenthesized CFNetwork diagnostic still refuses actual Swift compilation.
+Its successor moves conversion into an explicit String initializer outside the
+case pattern. All63 portable method bodies, all14 native PAC cases, the exact
+five-span inverse and historical whole-source pin remain unchanged. Corrected
+native compilation/receiving remains required; items62,16 and38 stay open.
 
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
