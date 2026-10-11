@@ -6948,6 +6948,18 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
 
 - [ ] **62.** Downloads on managed company networks: system trust and
 
+2026-10-11 unadopted native successors are durably preserved. The removal-only
+proposal passes nine additive focused controls while retaining250 original
+function texts and156 case identities; full165/native receiving is unrun.
+The genuine publisher extraction passes21 Node and four Linux PowerShell
+controls but still needs shared ownership, a fresh current source census and
+the stronger acquired/final-held reader. Root's historical profile matches
+only19 of21 current updater pins; retain both constructor corrections.
+Actual new producer ZIP downloads are HTTP403/zero bytes. Saved network draft12
+adds only the new exact storage host and is not activated. See the
+[preserved successor checkpoint](handovers/2026-10-11-group6-cloud/README.md).
+No native trust fix, original23/full-suite acceptance or item closure is claimed.
+
 2026-10-11 portable receiver failure diagnostics. Failed, signalled and timed-out
 Python children now emit bounded captured-output tails before the unchanged
 original assertions. The original executable, argv, case roster, success writes
