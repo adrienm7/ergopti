@@ -20,7 +20,8 @@ const STABLE_V101_SCOPE_IDS = Object.freeze([
 	'macos-native-pac',
 	'macos-native-http',
 	'macos-brew-archive',
-	'macos-native-model-receiving'
+	'macos-native-model-receiving',
+	'macos-shortcuts-discovery'
 ]);
 const STABLE_V101_PAC_METHODS = freeze({
 	ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
@@ -187,7 +188,8 @@ function validateStableV101Policy(value) {
 		const row = value.scopes[scope];
 		const brew = scope === 'macos-brew-archive',
 			pac = scope === 'macos-native-pac',
-			model = scope === 'macos-native-model-receiving';
+			model = scope === 'macos-native-model-receiving',
+			shortcuts = scope === 'macos-shortcuts-discovery';
 		keys(
 			row,
 			brew
@@ -196,7 +198,9 @@ function validateStableV101Policy(value) {
 					? ['kind', 'path', 'args', 'methods', 'reason']
 					: model
 						? ['kind', 'path', 'args', 'architectures', 'profiles', 'reason']
-						: ['kind', 'path', 'args', 'command', 'reason']
+						: shortcuts
+							? ['kind', 'path', 'args', 'reason']
+							: ['kind', 'path', 'args', 'command', 'reason']
 		);
 		if (typeof row.reason !== 'string' || !row.reason || /[\r\n]/.test(row.reason))
 			refuse('Invalid v1.0.1 scope reason.');
@@ -208,10 +212,11 @@ function validateStableV101Policy(value) {
 			)
 				refuse('Invalid exact v1.0.1 Brew method.');
 		} else {
+			const expected = shortcuts ? POLICY.scopes[scope] : STABLE_EXTRA_SCOPES[scope];
 			if (
 				row.kind !== 'command' ||
-				row.path !== STABLE_EXTRA_SCOPES[scope].path ||
-				JSON.stringify(row.args) !== JSON.stringify(STABLE_EXTRA_SCOPES[scope].args)
+				row.path !== expected.path ||
+				JSON.stringify(row.args) !== JSON.stringify(expected.args)
 			)
 				refuse('Invalid exact v1.0.1 command scope.');
 			if (pac && JSON.stringify(row.methods) !== JSON.stringify(STABLE_V101_PAC_METHODS))
@@ -226,6 +231,7 @@ function validateStableV101Policy(value) {
 			if (
 				!pac &&
 				!model &&
+				!shortcuts &&
 				row.command !==
 					'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'
 			)
@@ -584,7 +590,7 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			deferredScopes(profile)
 				.map((scope) => scope + ': ' + profile.scopes[scope].reason)
 				.join(' ') +
-			' Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1) retain source-bound missing-proof receipts. Only stable v1.0.1 main push before 2026-10-12T07:00:00Z is authorized; no permission, trust or sender workaround.'
+			' Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1) retain source-bound missing-proof receipts. Only stable v1.0.1 main push before 2026-10-12T07:00:00Z is authorized; no permission, trust or sender workaround.'
 		);
 	return (
 		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
@@ -628,7 +634,8 @@ function admitCommandReceipts(directory, context, sha, now = new Date()) {
 					'macos-native-pac': ['arm64', 'amd64'],
 					'macos-native-http': ['arm64', 'amd64'],
 					'macos-brew-archive': [''],
-					'macos-native-model-receiving': ['arm64', 'amd64']
+					'macos-native-model-receiving': ['arm64', 'amd64'],
+					'macos-shortcuts-discovery': ['']
 				}
 			: {
 					'macos-native-pac': ['arm64', 'amd64'],

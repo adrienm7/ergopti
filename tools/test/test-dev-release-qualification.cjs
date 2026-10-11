@@ -1015,7 +1015,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'macos-native-pac',
 		'macos-native-http',
 		'macos-brew-archive',
-		'macos-native-model-receiving'
+		'macos-native-model-receiving',
+		'macos-shortcuts-discovery'
 	];
 	const selected = q.authorizeQualificationProfile(q.STABLE_V101_PROFILE_ID, context, clock);
 	assert.deepEqual(q.deferredScopes(selected), scopes);
@@ -1107,6 +1108,24 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		Object.assign(altered.scopes['macos-native-model-receiving'], patch);
 		assert.throws(() => q.validateStableV101Policy(altered));
 	}
+	const shortcuts = approved.scopes['macos-shortcuts-discovery'];
+	assert.deepEqual(
+		{ kind: shortcuts.kind, path: shortcuts.path, args: shortcuts.args },
+		{ kind: 'command', path: 'tools/diagnostics/apple_shortcuts_probe/run_probe.py', args: [] }
+	);
+	for (const patch of [
+		{ path: 'tools/diagnostics/apple_shortcuts_probe/test_probe.py' },
+		{ args: ['--foreign'] },
+		{ command: 'foreign' },
+		{ kind: 'swift_test_file' }
+	]) {
+		const altered = structuredClone(approved);
+		Object.assign(altered.scopes['macos-shortcuts-discovery'], patch);
+		assert.throws(() => q.validateStableV101Policy(altered));
+	}
+	const missingShortcuts = structuredClone(approved);
+	delete missingShortcuts.scopes['macos-shortcuts-discovery'];
+	assert.throws(() => q.validateStableV101Policy(missingShortcuts));
 	assert.deepEqual(q.STABLE_V101_PAC_METHODS, approved.scopes['macos-native-pac'].methods);
 	assert.deepEqual(q.STABLE_V101_BREW_METHODS, {
 		HomebrewArchiveAcceptanceTests: [approved.scopes['macos-brew-archive'].name]
@@ -1116,6 +1135,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const notice = q.stablePublicationNotice(approved.id, context, sha, clock);
 	for (const literal of [
 		'DEFERRED / qualified:false',
+		'Native Apple Shortcuts catalogue discovery remains unqualified',
 		'v1.0.1',
 		'Worker12',
 		'arm64/amd64 across pac-inline, pac-url and explicit-proxy',
@@ -1127,7 +1147,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		assert(notice.includes(literal));
 	assert(notice.includes(sha));
 	console.log(
-		'[OK] v1.0.1 exact four scopes, mandatory siblings, context/expiry/source/metadata refusals.'
+		'[OK] v1.0.1 exact five scopes, mandatory siblings, context/expiry/source/metadata refusals.'
 	);
 
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-v101-qualification-'));
@@ -1139,7 +1159,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			['macos-native-http', 'amd64'],
 			['macos-brew-archive', ''],
 			['macos-native-model-receiving', 'arm64'],
-			['macos-native-model-receiving', 'amd64']
+			['macos-native-model-receiving', 'amd64'],
+			['macos-shortcuts-discovery', '']
 		].map(([scope, architecture]) => {
 			const file = path.join(
 				owner,
@@ -1163,7 +1184,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		q.admitCommandReceipts(owner, context, sha, clock);
 		assert.throws(() => q.admitCommandReceipts(owner, context, sha, approved.expires_at));
 		console.log(
-			'[OK] all seven actual publication receipt filenames required; every missing/foreign source refuses.'
+			'[OK] all eight actual publication receipt filenames required; every missing/foreign source refuses.'
 		);
 
 		// Run the real CLI entry with a fixed test clock, retaining all source and file operations.
