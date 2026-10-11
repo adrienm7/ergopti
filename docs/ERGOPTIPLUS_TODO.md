@@ -10168,6 +10168,18 @@ and installation qualification are still required.
   cases without breaking the original 26. These are software-owner controls,
   not native catalogue, TCC, invocation or process-retirement qualification.
 
+  The signed-role Lua transport now closes its reservation after the original
+  ShellRunner acknowledges an already-settled handle with no native start attempt.
+  Construction nil/throw cannot emit a retirement stream; an attempted leader
+  still requires its original protocol ACK, and an unsettled handle stays held.
+  Chosen-ID refusal also requires an actual validated packet table, avoiding
+  false-as-nonnil classification. All18 original transport cases remain;
+  six independent controls exercise the actual ShellRunner with controlled
+  task construction and preserve both attempted and unclosed retirement debt.
+  LuaJIT and Lua5.4 pass24/0; the original source passes20 and fails4.
+  These are software lifecycle results, not native catalogue, consent or
+  invocation qualification. Full selected gates and macOS receiving remain pending.
+
   A separate installed-target metadata diagnostic now has independently
   reviewed source and 34 successful portable filesystem controls
   (19 reader + 15 retained-source/output cases), enrolled in the normal JS
