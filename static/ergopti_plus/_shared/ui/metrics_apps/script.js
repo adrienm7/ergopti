@@ -2433,7 +2433,7 @@ function renderDayTimeline() {
 	}
 
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Jour : ${formatDisplayDate(targetDay)}</div>` +
+		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Jour : ${escapeHtml(formatDisplayDate(targetDay))}</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
 }
 
@@ -2691,7 +2691,7 @@ function renderTopSessionsTable() {
 	tbody.innerHTML = top
 		.map(
 			(r) => `<tr>
-		<td>${formatDisplayDate(r.date)}</td>
+		<td>${escapeHtml(formatDisplayDate(r.date))}</td>
 		<td>${escapeHtml(r.app)}</td>
 		<td style="text-align:right;">${formatDuration(r.ms)}</td>
 		<td style="text-align:right;">${format_int(r.chars)}</td>
@@ -2718,7 +2718,7 @@ function renderTopDaysTable(aggData) {
 	tbody.innerHTML = days
 		.map(
 			(d) => `<tr>
-		<td>${formatDisplayDate(d.date)}</td>
+		<td>${escapeHtml(formatDisplayDate(d.date))}</td>
 		<td style="text-align:right;">${format_int(d.chars || 0)}</td>
 		<td style="text-align:right;">${formatDuration(d.time_ms || 0)}</td>
 		<td style="text-align:right;">${d.switches || 0}</td>
