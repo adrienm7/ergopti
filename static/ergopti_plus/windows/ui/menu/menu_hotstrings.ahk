@@ -1080,6 +1080,9 @@ _HS_TomlFileRow(TF) {
 	TFMenu := Menu(), HandedOff := false
 	PrimaryFailure := 0
 	try {
+	CaptionPolicy := MenuRenderer_PersonalFileCaptionPolicy()
+	if !(CaptionPolicy is Map)
+		return false
 	ControlRows := [], SectionRows := []
 	Owner := PersonalFileControls.ForPath(TF.path)
 	if Owner is PersonalFileAdoptedOwner {
@@ -1105,9 +1108,14 @@ _HS_TomlFileRow(TF) {
 		return false
 	if MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted
 		return false
-	Result := Map(
-		"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",
-		"submenu", TFMenu)
+	; Keep original late reads and native concatenation coercion before projection.
+	Result := (FileStem := TF.stem . "",
+		FileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",
+		CaptionOwner := CaptionPolicy["parent"],
+		CaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
+			? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))
+	if !(Result is Map)
+		return false
 	HandedOff := true
 	return Result
 	} catch as ErrorInfo {

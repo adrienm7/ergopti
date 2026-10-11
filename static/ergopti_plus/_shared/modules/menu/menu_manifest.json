@@ -5541,6 +5541,9 @@
 			"unavailable": "hide"
 		}
 	],
+	"hotstring_personal_file_caption": {
+		"format": "%s (%s)"
+	},
 	"hotstring_personal_file_frame": [
 		{
 			"type": "include",

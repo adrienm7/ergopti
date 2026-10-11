@@ -5566,6 +5566,13 @@ integrated, then publish one grouped release.
   drivers still build (current baseline: Windows 17, macOS 2, Linux 1, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero.
+  The personal-file parent caption now reads its shared DATA format while
+  preserving native stem-before-count coercion, locale FmtCount, child ownership
+  and late refusal/cleanup. The independent original UTF-16 corpus retains all
+  nine expected vectors; its pinned formatter changes only array layout. All
+  original native fixture assertions and four late owner controls remain.
+  Targeted native, full-suite and installed receiving are still pending; the
+  renderer-placement census remains17/2/1 and this item stays partial.
   Bounded Windows receiving38153174855 completes all20 extension subjects:
   eleven pass and nine fail at the new fixture's missing Print function in
   cleanup registration. All12 native children close; fixture-owned menu and
@@ -9167,6 +9174,12 @@ is committed; one request is one commit with its regression test.
   Source pins. The independent raw-artifact review is eab07fb13fec235f.
   The whole suite still reaches its unchanged watchdog after2054 passes and
   remains incomplete; this target proof does not close either item.
+  Shared personal-file caption DATA now preserves the original raw UTF-16
+  domain, coercion order, localized count and native child dispatch. The corpus
+  is independently frozen from the original owner, with format-only layout
+  normalization and unchanged values/order. Original assertions remain;
+  targeted native/full/installed receiving is pending. This does not change
+  the17/2/1 placement census or close items54/81.
   The sites are of four kinds, and three need the
   manifest to say more than it can today:
   (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
