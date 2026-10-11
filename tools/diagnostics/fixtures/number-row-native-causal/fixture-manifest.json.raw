@@ -1,0 +1,81 @@
+{
+  "counterfactual_git_blob": null,
+  "counterfactual_image_role": "private-counterfactual-not-canonical-product",
+  "files": {
+    "NumberRowSourceProbe.counterfactual.swift.raw": {
+      "bytes": 7853,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/NumberRowSourceProbe.counterfactual.swift",
+      "sha256": "60a0cebabf22c47103b1e2dbb3d0dfaf8537e0da28d9793d1d24ed438987e40f"
+    },
+    "NumberRowSourceProbe.original.swift.raw": {
+      "bytes": 7928,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/original/NumberRowSourceProbe.swift",
+      "sha256": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02"
+    },
+    "NumberRowSourceProbeTests.original.swift.raw": {
+      "bytes": 18954,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/original/NumberRowSourceProbeTests.swift",
+      "sha256": "c5fc9a251c9de50196e0ef97ee7741ecdc3e01078cbeb7f77fabd6927a2a20c3"
+    },
+    "historical-positive.raw": {
+      "bytes": 49923,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-positive.log",
+      "sha256": "8a843de888efae37686ea328668dbba2ab18f2b87bb8bddaab7a2da7dd74ec01"
+    },
+    "historical-tis/manifest.json.raw": {
+      "bytes": 1126,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/manifest.json",
+      "sha256": "67097cf99fb45e2f8598110ef108325b37784b7225da882460389cc4bc7e88c0"
+    },
+    "historical-tis/record-000001.dat": {
+      "bytes": 11851,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/record-000001.dat",
+      "sha256": "2be65bdf781b73f24fb08976e3d3fed63f3f822dd8172e4a9c968532badf951b"
+    },
+    "historical-tis/record-000002.dat": {
+      "bytes": 12603,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/record-000002.dat",
+      "sha256": "b43699d5534a67e2b2ba1a5c1248225c0e81c6981682c177ef72bff675a815ae"
+    },
+    "historical-tis/record-000003.dat": {
+      "bytes": 7613,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/record-000003.dat",
+      "sha256": "a51b8d5888d69f50e7959817b66face9d4437dc9fa3ef2d61678a03f3f5444c1"
+    },
+    "historical-tis/record-000004.dat": {
+      "bytes": 7629,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/record-000004.dat",
+      "sha256": "78f81a19028838e681e1396bffe612bf369a50e17903db8e1d9579fce6314c26"
+    },
+    "historical-tis/record-000005.dat": {
+      "bytes": 8350,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/record-000005.dat",
+      "sha256": "8452f03108ba5db2e689d33eb41ede986143da0e3f224ef8bd77d290ba58acec"
+    },
+    "historical-tis/record-000006.dat": {
+      "bytes": 8338,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/record-000006.dat",
+      "sha256": "66a1c83a572f941299c9851bbe7dbec2c9150f2ae8db0ad3521a2c28cc8c1e2e"
+    },
+    "historical-tis/record-000007.dat": {
+      "bytes": 7616,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/record-000007.dat",
+      "sha256": "b817ec32a760ffb4ce82dc8128f786c3c02a22c26dac9a4ca3e956ca02e5a7c5"
+    },
+    "historical-tis/start.json.raw": {
+      "bytes": 191,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/controlled/historical-tis/start.json",
+      "sha256": "9b867e9b76d4974abcc076fc4fc7d54a6ead6d3f977e6231997cb63b6745c833"
+    },
+    "projection-manifest.original-c15.json.raw": {
+      "bytes": 26551,
+      "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/projection-manifest.json",
+      "sha256": "77118a5238f504b1475988957843427f61aaaa798ab9f972e812205a2fb5b7ba"
+    }
+  },
+  "historical_native_head": "3c2a4bbb1cef1c71a24b10a28972123bd81ba193",
+  "historical_native_run": 38086232014,
+  "schema": 1,
+  "scope": "immutable-portable-controls-not-native-receiving",
+  "source_projection_head": "c15a16cc9eee103b4132bcaf811ed890834f894c"
+}
