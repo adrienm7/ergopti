@@ -634,3 +634,25 @@ helpers.describe("Atomic selection on addition (api-entry-add-selection)", funct
 		helpers.assert_nil(io.open(PATH, "rb"))
 	end)
 end)
+
+helpers.describe("API entry identity after restart (api-entry-id-restart)", function()
+	helpers.it("(api-entry-id-restart) preserves two same-provider entries created in the same second across reload", function()
+		local clock, observations = os.time
+		os.time = function() return 1700000000 end
+		local ok, failure = pcall(function()
+			local entries = fresh()
+			local first = assert(entries.add({ provider = "cerebras", label = "first", token = "inert-first" }))
+			entries = fresh(true)
+			local second = assert(entries.add({ provider = "cerebras", label = "second", token = "inert-second" }))
+			local restored = fresh(true)
+			observations = { first = first.id, second = second.id, count = #restored.list(),
+				first_token = restored.get(first.id).token, active = restored.active().id }
+		end)
+		os.time = clock
+		helpers.assert_eq(ok, true, tostring(failure))
+		helpers.assert_true(observations.first ~= observations.second, "durable entry IDs must remain unique")
+		helpers.assert_eq(observations.count, 2)
+		helpers.assert_eq(observations.first_token, "inert-first")
+		helpers.assert_eq(observations.active, observations.second)
+	end)
+end)
