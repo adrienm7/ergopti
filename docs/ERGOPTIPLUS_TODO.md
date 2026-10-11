@@ -3484,6 +3484,8 @@ Hosted Lua owner tests do not qualify physical input.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
+The minimal native lease-silence receiving topic derives from Dev `a2b1fb4be16ff88b9bab755841d744960512b89e`. Its additive DEBUG control uses real outer/inner processes with a fixed no-effect CLI and scripted guardian authority. The source-bound manual ARM/Intel receiver retains the direct Swift child status separately from the PTY and output-capture statuses. Forty-nine portable receiving controls passed on the retained helper packet. Its original 26 transcript assertions plus 14 frozen direct-status cases and one double-LF refusal now run as 41 lasting normal-suite controls; the separate eight source/host controls remain supplemental. All 41 lasting controls and the four strict CI inventories pass. The exact published logger fixture prerequisite `e47c88c23999973b6cd936cfed3db40e2a1cf3a5` is received unchanged so the original covering suite selects its configured sink. Actual native compilation/execution and current package acceptance remain unexecuted. The independent manual-only ARM/Intel CI job is enrolled under explicitly handed-off workflow custody, preserving every existing job, budget, package/install control and release condition. This neither proves the user watchdog exit73 cause nor grants physical input, installed-runtime or shipping authority.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
@@ -5576,9 +5578,18 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 19, macOS 2, Linux 1, each
+  drivers still build (current baseline: Windows 18, macOS 2, Linux 1, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero.
+  The unchanged complete inert-startup replacement operation and callback now
+  belong to the Windows native tray adapter; compiled row DATA remains in the
+  existing shared projection. The physical-route guard retains its independent
+  body contracts and all existing refusal assertions, follows the actual adapter
+  include, and rejects withdrawn or quoted adapter directives. Original native
+  unit/meta assertions remain, with additive owner and critical-state/failure
+  controls. The owning generator lowers Windows19 to18 without changing its
+  scanner or independent corpus. Native Windows receiving, including standalone
+  adapter include hosts, E2E, packaging and installation are still required.
   The shared application-title owner now declares contextual keyboard-slot
   and tap-hold picker page titles, bare native dialog and notification captions,
   and the strict HF native-window title context. Genuine owner generation and
@@ -6910,6 +6921,8 @@ presentation subjects pass. This is not installed Hammerspoon/WebKit, packaging
 or physical-device acceptance.
 
 The macOS personal-hotstring section enable control now consumes its own shared check declaration before native composition. Existing 21-language captions, readiness flags, nil-return transport and genuine section callbacks remain owned by their original providers. Complete portable receiving passes 18/18 cases, retaining all nine original cases; the old and restored-old producers each pass 14/18 with the same four declaration/callback refusals failing. A genuine owner generation preserves startup output and adds only the section declaration; the independent AST/source controls pass 74 checks. Actual Cocoa, durable preferences, installed delivery and final joined-source CI remain required; item 54 stays partial.
+
+The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
 
@@ -9262,7 +9275,7 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 19, macOS 2 and Linux 1 rows are still built by the
+  Windows 18, macOS 2 and Linux 1 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated by its owning generator on 2026-10-11. The sites are of four kinds, and three need the
   manifest to say more than it can today:
@@ -9732,7 +9745,9 @@ tests. One additive saved-locale initialization control retains all original
 31 subjects and passes the complete focused 32-subject replay. Native
 boot/WebKit, packaging and installed-device acceptance remain pending.
 
-The personal-hotstring section caption and check policy now come from the shared declaration, with additive withdrawal, repair and physical-source custody controls. Original fixture predicates and assertion count remain intact; missing helper calls were replaced by the existing strict equality assertion, without changing the expected false values. That earlier tranche retained a genuine census of Windows 19, macOS 3 and Linux 4. The contextual/native-title tranche described above reduces it to Windows 19, macOS 2 and Linux 1 through shared presentation declarations and bounded slot/key title formatting. The remaining three Mac/Linux producers require the explicit Group4 handoff and genuine receiving; Windows retains 19 native sites. Software ownership, native CI and installed/device acceptance remain open, so neither 54 nor 81 is complete.
+The personal-hotstring section caption and check policy now come from the shared declaration, with additive withdrawal, repair and physical-source custody controls. Original fixture predicates and assertion count remain intact; missing helper calls were replaced by the existing strict equality assertion, without changing the expected false values. That earlier tranche retained a genuine census of Windows 19, macOS 3 and Linux 4. The contextual/native-title tranche described above reduces it to Windows 19, macOS 2 and Linux 1 through shared presentation declarations and bounded slot/key title formatting. The remaining three Mac/Linux producers require the explicit Group4 handoff and genuine receiving; The subsequent unchanged bootstrap native-operation relocation lowers Windows to 18 sites, with additive physical-owner and failure/critical-state controls and the original source-route assertions retained. Actual Windows receiving and standalone adapter hosts remain unqualified. Software ownership, native CI and installed/device acceptance remain open, so neither 54 nor 81 is complete.
+
+The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
@@ -9798,6 +9813,17 @@ The personal-hotstring section caption and check policy now come from the shared
   The pinned-Node source guard passes thirty refusals. Deferred execution grants
   no native cohort proof; Windows PowerShell and actual desktop requalification
   of this receiving successor remain unrun.
+
+  The retained-pair repeat/deferred-tap path now joins the existing live
+  category gate before effect admission. Modifier/layer acquisition also checks
+  after the genuine resolver/duration logging callbacks, where category
+  publication can reenter before a refused Reload completes. Previously held
+  press suppression and UP ownership remain; completed hold outcomes are not
+  rewritten. All240 original assertions remain, with12 additive registered
+  callback/repeat/revocation cases and five prepared guard-omission controls.
+  This is a bounded caller repair, not raw AltGr provenance, simultaneous input
+  or a native modifier-owner qualification. Actual AHK syntax/unit/E2E and
+  Windows native/compiled/installed receiving remain unrun in this container.
 
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
@@ -10774,6 +10800,18 @@ retains complete raw proofs, exact scope and the released owner lock. This
 qualifies the software correction, not native catalogue, consent or invocation;
 item106 and all transverse requirements remain open.
 
+The read-only Shortcuts probe now obtains its three AppleEvent constants from
+the selected Apple SDK through an internally compiled, Git-admitted C helper.
+JXA retains the same descriptor, imported permission signature and no-prompt
+call; no supplied executable or self-declared build receipt is accepted. The
+constant child and discovery share the original post-help20-second deadline,
+with separate acknowledged retirement and source/image identity checks. The
+original35 Python and28 JXA controls are preserved; additive controls exercise
+constant transport and its refusals. Native SDK compilation, same-principal
+permission receiving and catalogue discovery still require Mac CI. This is a
+diagnostic correction, not consent, invocation or installed acceptance; item106
+remains partial.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
@@ -10878,6 +10916,28 @@ Swift/workflow bytes establish no source cause for runner variation. This is
 read-only SDK/TIS positive qualification only. The held omission enrollment,
 fresh native eleven-PASS/one-named-expected-FAIL receiving, forced output,
 installed acceptance and physical delivery remain open. Item107 is not removed.
+
+The diagnostic source composition now receives the two independently reviewed
+Group5 guardian build inputs from actual commit `69fcb820`, while retaining the
+other 97 original package inputs and the immutable 99-row historical recipe.
+The historical 53-control cohort uses an explicitly historical projection;
+the current native projection uses the actual composed sources. Both retain
+only the original private final-byte omission and unchanged native expectations.
+Controlled component receiving passes all 53 original controls. The first
+51-control composition run retained 50 passes and one fixture allocation error;
+the successor passes all 51 controls by isolating each negative projection
+without removing either refusal assertion. The committed generator and preparer
+CLI now pass on actual 7836727b4; their current99/historical99 projected inputs
+are byte-exact with the reviewed component receiving. The generator metadata
+digest 0ecbffdb is independently received, not derived from a native result.
+The hosted omission step now enrolls historical53/current51 controls and the
+unchanged twelve-case native eleven-PASS/one-named-expected-FAIL receiver.
+The independent Shortcuts SDK observer/upload pair sits after all existing
+managed-job steps with explicit manual/no-release predicates. All six incoming
+Group5 workflow/catalogue images retain complete insertion inverses.
+Hosted native expected-failure receiving, forced output, installation and
+physical delivery remain required. Neither source enrollment nor diagnostic
+SDK constants qualify the native Swift Shortcuts product or remote invocation.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
@@ -11026,6 +11086,18 @@ installed acceptance and physical delivery remain open. Item107 is not removed.
   interpreter. These source receipts are not a source-to-binary or Windows
   execution qualification. No stale Edit read, restore-after-show sequence
   or capacity-only call replaces the required fresh invisible acquisition.
+
+  The actual Linux Manager refusal notice now uses the owned application
+  notification facade and shared caption composer while retaining its final
+  capability/pause admission. Generic notifications keep literal captions;
+  bodies, options and once-only refusal ownership remain unchanged. The existing
+  registered notifier test retains its original case and adds seven controls.
+  On both Lua ABIs, the focused baseline records39 passes/four failures and the
+  candidate43 passes/zero failures, including all17 generic notifier and18
+  original managed-document cases. Initial fixture-bootstrap failures are
+  retained; the successor preloads the real updater before scoped document
+  doubles, matching the registered runner. Native desktop delivery/clicks and
+  final interpreted/packaged acceptance remain required; item109 stays partial.
 
 - [~] **111.** Offer two distinct shared actions on all drivers: the OS
   normal app switcher and windows only on the display containing the current

@@ -62,13 +62,21 @@ _EBFD_HasCodeLine(Seg, Text) {
 	return _EBFD_CodeLinePosition(Seg, Text) > 0
 }
 
-; The real failure branch appends the declared marker to its native ExtMenu.
+; The real owner supplies observed facts; shared includes select its native marker.
 _EBFD_ErrorFramePublication(Seg) {
 	return _EBFD_ActiveBuilderErrorBranch(Seg)
 		&& _EBFD_HasCodeLine(Seg, 'BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")')
-		&& _EBFD_HasCodeLine(Seg, 'MarkerState := Map("shortcut_extension_name", (*) => ExtId)')
+		&& _EBFD_HasCodeLine(Seg, 'MarkerOutcome := "populated"')
+		&& _EBFD_HasCodeLine(Seg, 'MarkerState := Map("shortcut_extension_name", (*) => ExtId,')
+		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_failed", (*) => MarkerOutcome == "failed",')
+		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_empty", (*) => MarkerOutcome == "empty",')
+		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_missing", (*) => MarkerOutcome == "missing")')
+		&& _EBFD_HasCodeLine(Seg, 'ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())')
+		&& _EBFD_HasCodeLine(Seg, 'MarkerOutcome := BuildFailed ? "failed" : "empty"')
+		&& _EBFD_HasCodeLine(Seg, 'MarkerOutcome := "missing"')
+		&& _EBFD_HasCodeLine(Seg, 'if MarkerOutcome != "populated" {')
 		&& _EBFD_HasCodeLine(Seg, "if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {")
-		&& _EBFD_HasCodeLine(Seg, 'if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_error_frame", Map(), MarkerState, Map()) == 0')
+		&& _EBFD_HasCodeLine(Seg, 'if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_result_frame", Map(), MarkerState, Map()) == 0')
 }
 
 ; Conservative physical receipt of the genuine published native provider.
@@ -121,13 +129,20 @@ _EBFD_ActiveBuilderErrorBranch(Seg) {
 		'ExtName := NM[1]',
 		'}',
 		'}',
-		'MarkerState := Map( , (*) => ExtId)',
+		'MarkerOutcome :=',
+		'MarkerState := Map( , (*) => ExtId,',
+		', (*) => MarkerOutcome == ,',
+		', (*) => MarkerOutcome == ,',
+		', (*) => MarkerOutcome == )',
 		'ErrorRows := MenuRenderer_TemplateRows( , Map(), MarkerState, Map())',
 		'EmptyRows := MenuRenderer_TemplateRows( , Map(), Map(), Map())',
 		'if !(ErrorRows is Array) || ErrorRows.Length == 0',
 		'|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())',
 		'|| !(EmptyRows is Array) || EmptyRows.Length == 0',
 		'|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())',
+		'return []',
+		'ResultRows := MenuRenderer_TemplateRows( , Map(), MarkerState, Map())',
+		'if !(ResultRows is Array) || ResultRows.Length != 0',
 		'return []',
 		'ExtMenu := Menu()',
 		'OwnedMenus.Push(ExtMenu)',
@@ -143,13 +158,17 @@ _EBFD_ActiveBuilderErrorBranch(Seg) {
 		'if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {',
 		'if !BuildFailed',
 		'LoggerError( , , ExtId)',
-		'if MenuRenderer_AppendTemplate(ExtMenu, , Map(), MarkerState, Map()) == 0',
-		'throw Error( )',
+		'MarkerOutcome := BuildFailed ? :',
 		'}',
 		'} else {',
 		'LoggerWarn( , , StrReplace(ExtId, , ))',
-		'if MenuRenderer_AppendTemplate(ExtMenu, , Map(), Map(), Map()) == 0',
-		'throw Error( )',
+		'MarkerOutcome :=',
+		'}',
+		'if MarkerOutcome != {',
+		'if MenuRenderer_AppendTemplate(ExtMenu, , Map(), MarkerState, Map()) == 0',
+		'throw Error(MarkerOutcome ==',
+		'?',
+		': )',
 		'}',
 		'Rows.Push(Map( , ExtName, , ExtMenu))',
 		'}',
@@ -222,7 +241,7 @@ Test("tray_menu: declared extension error marker preserves caption and inertness
 _EBFD_ErrorPublicationSourceControls() {
 	Seg := _DriverFuncBody("_SC_ExtensionRows")
 	AssertTrue(_EBFD_ErrorFramePublication(Seg))
-	Call := 'if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_error_frame", Map(), MarkerState, Map()) == 0'
+	Call := 'if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_result_frame", Map(), MarkerState, Map()) == 0'
 	AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, Call, "; " . Call)),
 		"a commented publication cannot keep the error marker guard green")
 	AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, Call, 'Text := ' . Chr(34) . Call . Chr(34))),

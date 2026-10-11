@@ -2855,6 +2855,26 @@ private func runPOSIXTestHelper(arguments: [String]) -> Int32 {
 		return readResult >= 0
 			? LeaseWorkerExit.success.rawValue
 			: LeaseWorkerExit.innerFailed.rawValue
+	case "lease-inner-silence":
+		// This DEBUG-only role uses a fixed no-effect CLI. Production identity
+		// parsing continues to require the canonical installed Karabiner binary.
+		guard arguments.count == 3,
+			prepareInnerControlDescriptor(kInnerControlDescriptor)
+		else { return LeaseWorkerExit.invalidArguments.rawValue }
+		let token = "00112233445566778899aabbccddeeff"
+		let identity = LeaseIdentity(
+			cliPath: "/usr/bin/true",
+			token: token,
+			modeName: "ergopti_mode_\(token)",
+			revokedName: "ergopti_revoked_\(token)",
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: kDefaultHeartbeatSeconds
+		)
+		return KarabinerLeaseInnerRuntime(
+			identity: identity,
+			channel: SocketLeaseInnerChannel(descriptor: kInnerControlDescriptor),
+			executor: PosixLeaseCLIExecutor()
+		).run()
 	case "reserved-sockets":
 		guard arguments.count == 3 else { return LeaseWorkerExit.invalidArguments.rawValue }
 		for descriptor in STDIN_FILENO...kInnerControlDescriptor {
