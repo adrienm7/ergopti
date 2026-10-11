@@ -181,6 +181,7 @@
 		"test:automation-query-ci-publisher": "node ./tools/test/test-automation-query-ci-publisher.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:windows-managed-bootstrap": "node ./tools/test/test-windows-managed-bootstrap.cjs",
+		"test:windows-terminal-output-custody-adapter": "node ./tools/test/test-windows-terminal-output-custody-adapter.cjs",
 		"test:windows-nav-portable-registration": "node ./tools/test/test-windows-nav-portable-registration.cjs",
 		"test:windows-nav-portable": "node ./tools/test/run-nav-event-owner-portable.cjs",
 		"test:windows-replay-route-core": "node ./tools/test/run-windows-replay-route-core.cjs",

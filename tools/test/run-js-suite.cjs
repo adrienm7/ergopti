@@ -61,6 +61,12 @@ const CHECKS = [
 		repro: 'node tools/test/run-windows-terminal-output-plan.cjs'
 	},
 	{
+		name: 'Windows terminal output custody adapter preserves exact native bindings and closed admission',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-terminal-output-custody-adapter.cjs'],
+		repro: 'npm run test:windows-terminal-output-custody-adapter'
+	},
+	{
 		name: 'Windows Group 7 receipt parser refuses incomplete and malformed native evidence',
 		cmd: process.execPath,
 		args: ['tools/diagnostics/test_windows_group7_receipt.cjs'],
