@@ -50,6 +50,67 @@ function fixturePosixEnvironment(script, environment = {}) {
 	});
 	return exports.join('') + script;
 }
+/** Encode UTF-8 bytes as a Lua quoted string, without JSON-only escapes. */
+function luaString(value) {
+	assert.equal(typeof value, 'string', 'Lua literal input requires a string');
+	for (const character of value) {
+		const code = character.codePointAt(0);
+		assert.ok(code < 0xd800 || code > 0xdfff, 'Lua literal input requires well-formed Unicode');
+	}
+	const encoded = [...Buffer.from(value, 'utf8')].map((byte) => {
+		if (byte === 34) return '\\"';
+		if (byte === 92) return '\\\\';
+		if (byte < 32 || byte > 126) return '\\' + String(byte).padStart(3, '0');
+		return String.fromCharCode(byte);
+	});
+	return '"' + encoded.join('') + '"';
+}
+
+/** Encode only a dense array of strings; syntax never rewrites string data. */
+function luaStringArray(values) {
+	assert.ok(Array.isArray(values), 'Lua table input requires an array');
+	return '{' + Array.from(values, luaString).join(', ') + '}';
+}
+
+/** Actual inert Lua parsing must retain every encoded string byte. */
+function assertLuaLiteralEncoding(lua) {
+	const values = [
+		'',
+		'fixture/[owner]/native[1].py',
+		'quoted "value" and \\backslash',
+		Array.from({ length: 32 }, (_, index) => String.fromCharCode(index)).join('') + '\u007f0129',
+		'Unicode é Ω 中 😀',
+		'-- not a comment; "][=[not syntax]=]"'
+	];
+	const expected =
+		'{' +
+		values.map((value) => '{' + [...Buffer.from(value, 'utf8')].join(',') + '}').join(',') +
+		'}';
+	const source = [
+		`local actual = ${luaStringArray(values)}`,
+		`local expected = ${expected}`,
+		'assert(#actual == #expected, "literal table length")',
+		'for index, bytes in ipairs(expected) do',
+		'  local value = actual[index]',
+		'  assert(type(value) == "string" and #value == #bytes, "literal byte length")',
+		'  for offset, byte in ipairs(bytes) do assert(string.byte(value, offset) == byte, "literal byte mismatch") end',
+		'end',
+		'io.write("PASS Lua literal byte equality")'
+	].join('\n');
+	const result = spawnSync(lua, ['-'], { input: source, encoding: 'utf8', timeout: 10000 });
+	assert.ifError(result.error);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.equal(result.stderr, '');
+	assert.equal(result.stdout, 'PASS Lua literal byte equality');
+	assert.equal(luaStringArray([]), '{}', 'empty admission remains an empty table');
+	assert.throws(() => luaString(1), /requires a string/);
+	assert.throws(() => luaString('\ud800'), /well-formed Unicode/);
+	assert.throws(() => luaString('\udfff'), /well-formed Unicode/);
+	assert.throws(() => luaStringArray('not an array'), /requires an array/);
+	assert.throws(() => luaStringArray([undefined]), /requires a string/);
+	assert.throws(() => luaStringArray(new Array(1)), /requires a string/);
+}
+
 const vectors = [
 	{
 		id: 'pac-only',
@@ -344,19 +405,19 @@ function receivingNetworkSource(fixturePolicy) {
 	return [
 		// This exact existence port also keeps Git Bash paths independent of
 		// the host Lua file-name convention. No NetworkEnv method is replaced.
-		`package.loaded["adapters.file_system"] = { exists = function(p) return p == ${JSON.stringify(shellPath(managedReceiver))} end }`,
-		`local Network = assert(load(${JSON.stringify(networkSource)}, ${JSON.stringify('@' + shellPath(managedRoot) + '/modules/llm/network_env.lua')}))()`,
-		`Network.policy_path = function() return ${JSON.stringify(shellPath(fixturePolicy))} end`,
-		`local receiver = { path = ${JSON.stringify(shellPath(managedReceiver))}, source = ${JSON.stringify(fs.readFileSync(managedReceiver, 'utf8'))} }`
+		`package.loaded["adapters.file_system"] = { exists = function(p) return p == ${luaString(shellPath(managedReceiver))} end }`,
+		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + shellPath(managedRoot) + '/modules/llm/network_env.lua')}))()`,
+		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
+		`local receiver = { path = ${luaString(shellPath(managedReceiver))}, source = ${luaString(fs.readFileSync(managedReceiver, 'utf8'))} }`
 	];
 }
 function emittedOwners(fixturePolicy, python, binary) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
 	const source = [
-		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		...receivingNetworkSource(fixturePolicy),
-		`local packet = require("tests.support.opaque_network_owner_fixture").capture(Network, ${JSON.stringify(shellPath(python))}, ${JSON.stringify(shellPath(binary))}, receiver)`,
+		`local packet = require("tests.support.opaque_network_owner_fixture").capture(Network, ${luaString(shellPath(python))}, ${luaString(shellPath(binary))}, receiver)`,
 		'io.write(require("json").encode(packet))'
 	].join('; ');
 	const generated = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
@@ -373,10 +434,10 @@ function receiveOwners(fixturePolicy, bytes, code, mode, owner) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
 	const source = [
-		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		...receivingNetworkSource(fixturePolicy),
-		`local bytes = require("json").decode(${JSON.stringify(JSON.stringify(bytes))})`,
-		`local result = require("tests.support.opaque_network_owner_fixture").receive(Network, bytes, ${code}, ${mode ? JSON.stringify(mode) : 'nil'}, receiver, ${owner ? JSON.stringify(owner) : 'nil'})`,
+		`local bytes = require("json").decode(${luaString(JSON.stringify(bytes))})`,
+		`local result = require("tests.support.opaque_network_owner_fixture").receive(Network, bytes, ${code}, ${mode ? luaString(mode) : 'nil'}, receiver, ${owner ? luaString(owner) : 'nil'})`,
 		'io.write(require("json").encode(result))'
 	].join('; ');
 	const received = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
@@ -393,9 +454,9 @@ function receivePhase(chunks, code) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
 	const source = [
-		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'local Json = require("json")',
-		`local chunks = Json.decode(${JSON.stringify(JSON.stringify(chunks))})`,
+		`local chunks = Json.decode(${luaString(JSON.stringify(chunks))})`,
 		'local phase = require("modules.llm.opaque_network_admission").new()',
 		'for _, chunk in ipairs(chunks) do phase.push(chunk) end',
 		`local receipt = phase.finish(${code})`,
@@ -434,6 +495,7 @@ const luaAdmission = spawnSync(
 assert.ifError(luaAdmission.error);
 assert.equal(luaAdmission.status, 0, luaAdmission.stderr || luaAdmission.stdout);
 assert.equal(luaAdmission.stdout, 'Lua 5.4', 'standard Lua 5.4 must acknowledge its receiving ABI');
+assertLuaLiteralEncoding(lua);
 const bash = bashExecutable();
 function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
@@ -443,12 +505,12 @@ function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 	const receiver = path.join(ownerRoot, 'platform/network/native_http.py');
 	const admitted = fs.existsSync(receiver) ? [owner + '/platform/network/native_http.py'] : [];
 	const source = [
-		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		`local admitted = ${JSON.stringify(admitted).replace(/\[/g, '{').replace(/\]/g, '}')}`,
+		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		`local admitted = ${luaStringArray(admitted)}`,
 		'package.loaded["adapters.file_system"] = { exists = function(p) for _, v in ipairs(admitted) do if p == v then return true end end return false end }',
-		`local Network = assert(load(${JSON.stringify(networkSource)}, ${JSON.stringify('@' + owner + '/modules/llm/network_env.lua')}))()`,
-		`Network.policy_path = function() return ${JSON.stringify(shellPath(fixturePolicy))} end`,
-		`local prelude, detail = Network.bootstrap_prelude("BOOTSTRAP", ${JSON.stringify(shellPath(interpreter))})`,
+		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + owner + '/modules/llm/network_env.lua')}))()`,
+		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
+		`local prelude, detail = Network.bootstrap_prelude("BOOTSTRAP", ${luaString(shellPath(interpreter))})`,
 		'assert(prelude, detail); io.write(prelude)'
 	].join('; ');
 	const generated = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
@@ -465,9 +527,9 @@ function emittedPrelude(fixturePolicy) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
 	const source = [
-		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
-		`local Network = assert(loadfile(${JSON.stringify(`${macos}/modules/llm/network_env.lua`)}))()`,
-		`Network.policy_path = function() return ${JSON.stringify(shellPath(fixturePolicy))} end`,
+		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		`local Network = assert(loadfile(${luaString(`${macos}/modules/llm/network_env.lua`)}))()`,
+		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		'local prelude, detail = Network.opaque_prelude("TEST")',
 		'assert(prelude, detail); io.write(prelude)'
 	].join('; ');
@@ -485,7 +547,7 @@ function emittedManagedPrelude(fixturePolicy) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
 	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
 	const source = [
-		`package.path = ${JSON.stringify(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
+		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		...receivingNetworkSource(fixturePolicy),
 		'local prelude, detail = Network.managed_http_prelude("MLX")',
 		'assert(prelude, detail); io.write(prelude)'
