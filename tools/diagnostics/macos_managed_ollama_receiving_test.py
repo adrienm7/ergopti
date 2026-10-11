@@ -839,5 +839,105 @@ class ReceivingCatalogueControls(unittest.TestCase):
                 )
 
 
+class NativeCommandExitControls(unittest.TestCase):
+    def test_reserved_exit_status_requires_retirement_before_verdict(self):
+        groups = load("command_wnowait_owner", ROOT / "tools/diagnostics/macos_owned_process.py")
+        for status, timeout, refusal in [(0, 1, False), (7, 1, False), (0, 0, False), (0, 1, True)]:
+            with self.subTest(status=status, timeout=timeout, retirement_refusal=refusal):
+                events = []
+
+                class Process:
+                    pid = 12345
+                    returncode = None
+                    wait_calls = 0
+
+                    def wait(self, *, timeout):
+                        events.append("reap")
+                        self.wait_calls += 1
+                        self.returncode = status
+
+                process = Process()
+
+                class Native:
+                    observed = 0
+
+                    def observe_exit(self, child):
+                        self_test.assertIs(child, process)
+                        self_test.assertIsNone(child.returncode)
+                        events.append("reserved_observation")
+                        self.observed += 1
+                        if timeout == 0 and self.observed == 1:
+                            return None
+                        if refusal:
+                            operation.reservation_lost = True
+                        return SimpleNamespace(si_pid=child.pid)
+
+                    def live_members(self, group, leader):
+                        self_test.assertEqual((group, leader), (process.pid, process.pid))
+                        return []
+
+                self_test = self
+                operation = groups.OwnedProcessGroup(process, Native())
+
+                class Acquisition:
+                    def acquire_owned(self, arguments, native, register, **ports):
+                        self_test.assertEqual(arguments, ["owned-recording-command"])
+                        self_test.assertIs(native, operation.native)
+                        self_test.assertIs(ports["stdin"], RECEIVING.subprocess.DEVNULL)
+                        self_test.assertIs(ports["stdout"], ports["stderr"])
+                        self_test.assertEqual(ports["env"], {"OWNED": "recording"})
+                        ports["stdout"].write(b"owned-command-output")
+                        register(operation)
+
+                subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+                subject.fixture = SimpleNamespace(
+                    groups=Acquisition(), native_groups=operation.native
+                )
+                # A recording PID can never authorize a real signal in this control.
+                with (
+                    patch.object(
+                        groups,
+                        "signal",
+                        SimpleNamespace(SIGTERM="recording_term", SIGKILL="recording_kill"),
+                    ),
+                    patch.object(
+                        groups.os,
+                        "killpg",
+                        side_effect=AssertionError("unexpected native signal"),
+                        create=True,
+                    ),
+                ):
+                    if refusal:
+                        with self.assertRaisesRegex(RuntimeError, "native_command_retirement"):
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            )
+                        self.assertFalse(operation.reaped)
+                        self.assertIsNone(process.returncode)
+                    elif timeout == 0:
+                        with self.assertRaises(RECEIVING.subprocess.TimeoutExpired):
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            )
+                    elif status != 0:
+                        with self.assertRaisesRegex(RuntimeError, "actual_native_command"):
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            )
+                    else:
+                        self.assertEqual(
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            ),
+                            b"owned-command-output",
+                        )
+                if not refusal:
+                    self.assertTrue(operation.reaped)
+                    self.assertEqual(process.returncode, status)
+                    self.assertEqual(process.wait_calls, 1)
+                    self.assertLess(events.index("reserved_observation"), events.index("reap"))
+                self.assertEqual(operation.signals, [])
+
+
 if __name__ == "__main__":
     unittest.main()
