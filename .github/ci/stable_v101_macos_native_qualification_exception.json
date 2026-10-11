@@ -12,7 +12,7 @@
 	"channel": "main",
 	"tag": "v1.0.1",
 	"version": "1.0.1",
-	"authorization_note": "Explicit human authorization on 2026-10-11 permits temporary test deferrals to expedite only stable v1.0.1 main publication. Exactly these five scopes remain DEFERRED/qualified:false. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
+	"authorization_note": "Explicit human authorization on 2026-10-11 permits temporary test deferrals to expedite only stable v1.0.1 main publication. Exactly these six scopes remain DEFERRED/qualified:false. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
 	"scopes": {
 		"macos-native-pac": {
 			"kind": "command",
@@ -58,6 +58,13 @@
 			"path": "tools/diagnostics/apple_shortcuts_probe/run_probe.py",
 			"args": [],
 			"reason": "Native Apple Shortcuts catalogue discovery is DEFERRED and qualified:false after CI38147217648 exceeded its twenty-second native retrieval deadline with unavailable permission-preflight constants; portable Python/JXA controls and ordinary verified install/launch remain mandatory. No permission or catalogue success is inferred."
+		},
+		"macos-launch-appleevents": {
+			"kind": "macos_launch",
+			"path": "tools/diagnostics/macos_launch_gate.py",
+			"scenarios": ["clean", "karabiner_config"],
+			"runners": ["macos-15", "macos-15-intel"],
+			"reason": "Only external AppleEvent transport and its dependent native delayed-timer, Karabiner and ScriptScope feature qualifications are DEFERRED and qualified:false for clean/karabiner_config on macos-15/macos-15-intel after unchanged hosted transport timeouts and unanswered consent. Actual installation, quarantine, logger, startup, alive, Quit, user-state and the complete launch matrix remain mandatory; no permission or runtime workaround is authorized."
 		}
 	}
 }

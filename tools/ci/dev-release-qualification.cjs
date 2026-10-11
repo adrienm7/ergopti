@@ -21,7 +21,8 @@ const STABLE_V101_SCOPE_IDS = Object.freeze([
 	'macos-native-http',
 	'macos-brew-archive',
 	'macos-native-model-receiving',
-	'macos-shortcuts-discovery'
+	'macos-shortcuts-discovery',
+	'macos-launch-appleevents'
 ]);
 const STABLE_V101_PAC_METHODS = freeze({
 	ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
@@ -189,18 +190,21 @@ function validateStableV101Policy(value) {
 		const brew = scope === 'macos-brew-archive',
 			pac = scope === 'macos-native-pac',
 			model = scope === 'macos-native-model-receiving',
-			shortcuts = scope === 'macos-shortcuts-discovery';
+			shortcuts = scope === 'macos-shortcuts-discovery',
+			launch = scope === 'macos-launch-appleevents';
 		keys(
 			row,
 			brew
 				? ['kind', 'path', 'name', 'reason']
-				: pac
-					? ['kind', 'path', 'args', 'methods', 'reason']
-					: model
-						? ['kind', 'path', 'args', 'architectures', 'profiles', 'reason']
-						: shortcuts
-							? ['kind', 'path', 'args', 'reason']
-							: ['kind', 'path', 'args', 'command', 'reason']
+				: launch
+					? ['kind', 'path', 'scenarios', 'runners', 'reason']
+					: pac
+						? ['kind', 'path', 'args', 'methods', 'reason']
+						: model
+							? ['kind', 'path', 'args', 'architectures', 'profiles', 'reason']
+							: shortcuts
+								? ['kind', 'path', 'args', 'reason']
+								: ['kind', 'path', 'args', 'command', 'reason']
 		);
 		if (typeof row.reason !== 'string' || !row.reason || /[\r\n]/.test(row.reason))
 			refuse('Invalid v1.0.1 scope reason.');
@@ -211,6 +215,15 @@ function validateStableV101Policy(value) {
 				row.name !== 'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
 			)
 				refuse('Invalid exact v1.0.1 Brew method.');
+		} else if (launch) {
+			const expected = POLICY.scopes[scope];
+			if (
+				row.kind !== expected.kind ||
+				row.path !== expected.path ||
+				JSON.stringify(row.scenarios) !== JSON.stringify(expected.scenarios) ||
+				JSON.stringify(row.runners) !== JSON.stringify(expected.runners)
+			)
+				refuse('Invalid exact v1.0.1 AppleEvent launch matrix.');
 		} else {
 			const expected = shortcuts ? POLICY.scopes[scope] : STABLE_EXTRA_SCOPES[scope];
 			if (
@@ -590,7 +603,7 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			deferredScopes(profile)
 				.map((scope) => scope + ': ' + profile.scopes[scope].reason)
 				.join(' ') +
-			' Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1) retain source-bound missing-proof receipts. Only stable v1.0.1 main push before 2026-10-12T07:00:00Z is authorized; no permission, trust or sender workaround.'
+			' External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory. Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1) retain source-bound missing-proof receipts. Only stable v1.0.1 main push before 2026-10-12T07:00:00Z is authorized; no permission, trust or sender workaround.'
 		);
 	return (
 		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
@@ -655,6 +668,21 @@ function admitCommandReceipts(directory, context, sha, now = new Date()) {
 			const record = parseClosedJson(fs.readFileSync(file, 'utf8'));
 			if (scopeDisposition(record, scope, sha, context, now) !== 'deferred')
 				refuse('Missing approved deferred command receipt.');
+		}
+	}
+	if (stablePublicationProfile(context, now) === STABLE_V101_POLICY) {
+		const scope = 'macos-launch-appleevents';
+		const matrix = STABLE_V101_POLICY.scopes[scope];
+		for (const scenario of matrix.scenarios) {
+			for (const runner of matrix.runners) {
+				const file = path.join(
+					directory,
+					'stable-' + scope + '-' + scenario + '-' + runner + '.json'
+				);
+				const record = parseClosedJson(fs.readFileSync(file, 'utf8'));
+				if (!validateLaunchQualificationReceipt(record, scenario, runner, sha, context, now))
+					refuse('Missing approved deferred AppleEvent launch receipt.');
+			}
 		}
 	}
 }

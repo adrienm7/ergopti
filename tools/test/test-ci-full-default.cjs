@@ -632,7 +632,8 @@ check(
 			'macos-native-http',
 			'macos-brew-archive',
 			'macos-native-model-receiving',
-			'macos-shortcuts-discovery'
+			'macos-shortcuts-discovery',
+			'macos-launch-appleevents'
 		]);
 		const context = Object.fromEntries(
 			['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(
@@ -890,6 +891,40 @@ check('v101 Shortcuts keeps portable/full work and publishes its validated exact
 	assert(upload.includes('name: assets-qualification-shortcuts-macos'));
 	assert(upload.includes('path: ${{ runner.temp }}/stable-macos-shortcuts-discovery.json'));
 	assert(upload.includes('if-no-files-found: error'));
+});
+
+check('v101 AppleEvents records only exact transport rows and preserves installed launch', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'launch');
+	const code = Raw.runOf(Raw.step(job.body, 'Record the launch qualification scope')).join('\n');
+	assert(
+		code.includes(
+			'policy.validateLaunchQualificationReceipt(receipt, scenario, runner, process.env.GITHUB_SHA, policy.environmentContext())'
+		)
+	);
+	assert(
+		code.indexOf('policy.validateLaunchQualificationReceipt') < code.indexOf('fs.writeFileSync')
+	);
+	assert(code.includes("{ flag: 'wx' }"));
+	const upload = Raw.step(job.body, 'Retain source-bound AppleEvent launch qualification receipt');
+	assert.equal(
+		Raw.stepField(upload, 'if'),
+		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+	);
+	assert(
+		upload.includes(
+			'name: assets-qualification-launch-macos-${{ matrix.runner }}-${{ matrix.scenario }}'
+		)
+	);
+	assert(upload.includes('if-no-files-found: error'));
+	const launch = Raw.runOf(Raw.step(job.body, 'Launch over the user state and judge it')).join(
+		'\n'
+	);
+	assert(
+		launch.includes('python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app')
+	);
+	assert(launch.includes('--qualification-receipt "$RUNNER_TEMP/launch-qualification.json"'));
+	assert(entry.text.includes('node tools/build/macos-release-archives.cjs --ci-install'));
 });
 
 console.log(

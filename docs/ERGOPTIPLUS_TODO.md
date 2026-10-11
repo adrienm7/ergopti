@@ -66,18 +66,23 @@ not been received.
 On October 11 the maintainer explicitly requested immediate publication even
 if tests must be bypassed. The resulting temporary profile applies only to
 `v1.0.1` from a `main` push and expires at `2026-10-12T07:00:00Z`. It records
-five macOS scopes as **DEFERRED, qualified:false** in source-bound receipts and
+six macOS scopes as **DEFERRED, qualified:false** in source-bound receipts and
 public release notes: the three exact native PAC/WPAD/bootstrap methods,
 independent native HTTP wire clients, the single Homebrew archive acceptance
 method, and native managed-model receiving across its three profiles and both
 architectures, plus native Apple Shortcuts catalogue discovery. CI38147217648
 refused that discovery after 20.19 seconds with permission-preflight constants
 unavailable and no returned catalogue; no permission success is inferred. Eight
-source-bound Mac receipts disclose the missing proof. These are not passing tests. The remaining unit and portable
+source-bound Mac receipts disclose that missing proof. The unchanged external
+AppleEvent transport also remains DEFERRED for only `clean` and
+`karabiner_config` on `macos-15` and `macos-15-intel`, together with its dependent
+native feature proofs. Four additional source/scenario/runner-bound records
+make twelve Mac qualification receipts; actual installation, quarantine, logger,
+startup, alive, Quit, user-state and the complete launch matrix remain required. These are not passing tests. The remaining unit and portable
 controls, builds, packaging, asset integrity and ordinary installation/launch
 remain mandatory. Other versions and default contexts execute the full tests;
 no system permission or certificate-trust workaround is adopted. Restoring
-these five native qualifications remains open after publication. v1.0.1 is
+these six native qualifications remains open after publication. v1.0.1 is
 not yet published.
 
 The composed policy, full-default workflow and Swift evidence controls pass
