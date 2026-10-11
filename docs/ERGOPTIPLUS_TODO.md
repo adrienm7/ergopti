@@ -5024,6 +5024,18 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   retaining the original native-owner checks. Retired-Script consumers and
   final-source native/installed qualification remain separate follow-ups.
 
+The two Windows acquired-read timer fixture families now restore both exact
+native descriptors independently, stop their timer, resolve the actual journal
+and acknowledge native-owner retirement before deleting known fixture files.
+Cleanup retains unresolved journals and foreign bytes, reports every secondary
+failure and preserves the original primary Error. All 267 original assertions,
+25 registrations and both eight-attempt loops remain; four additive native
+controls cover body failure, descriptor withdrawal, a real non-sharing file lock
+and a foreign source, including explicit repair. Independent source review
+passes. Actual execution of all nine original and four new native subjects,
+full-suite coverage, E2E, packaging, installation and installed acceptance remain
+pending; portable protocol controls do not replace them. Item 42 remains partial.
+
 The registered Windows external-source control captures the actual native source
 and conditional journal intent without replacing the issued hash port. Atomic
 `fa3e5201` is integrated without squash in Dev `a2b1fb4b`. Personal Windows-only
@@ -5336,7 +5348,9 @@ normal and throwing exits. All original user-file protection assertions remain;
 the independent joined-discovery assertion is unchanged. Native qualification
 of this isolation correction is still pending.
 
-Manual Windows run 38019750684 passed the four ordinary full-save families and the genuine 34-store publication/rollback case, but ended incomplete with 1,894 passes, 11 failures and 9,003 unexecuted subjects at the unchanged 22-minute watchdog. The capacity case measured 142,033.737 ms for publication and 123,130.867 ms for refusal; these phases locate cost without proving an optimization. The newly registered genuine captured-registry diagnostic requires 32 accepted calls, actual native timing, zero Count-getter observer effects, exact repair and unchanged target bytes in the next Windows CI. It remains native UNRUN and requires no physical device. The original 34-store assertions and all nine acquired-read temporal controls still require complete execution; full unit, E2E, fresh startup, packaging/install and separate installed-device acceptance remain open. Count, prototype and key-index proposals remain on HOLD; no production change, cached admission, timeout relaxation or fabricated acknowledgement is included. Item 42 and transversal items 16/38 remain partial.
+Manual Windows run 38019750684 passed the four ordinary full-save families and the genuine 34-store publication/rollback case, but ended incomplete with 1,894 passes, 11 failures and 9,003 unexecuted subjects at the unchanged 22-minute watchdog. The capacity case measured 142,033.737 ms for publication and 123,130.867 ms for refusal; these phases locate cost without proving an optimization.
+
+Manual Windows run 38179815455 independently qualifies the historical source 36a956bc captured-registry diagnostic: 32 genuine accepted calls measured 420.634 ms, with zero Count-getter observer effects, exact descriptor repair and unchanged target bytes. The original 32-personal-file transaction (34 journal targets including configuration and overrides) also passes, measuring 149,988.460 ms for publication and 113,899.121 ms for refusal, with the original exact rollback assertions intact. These measurements locate phase costs without establishing a performance cause or a qualified optimization. The complete unchanged suite remains incomplete: 1,985 terminal passes, zero terminal assertion failures, one started subject without a result and 9,166 subjects never started, at the unchanged 22-minute watchdog. Neither these two bounded native results nor the separate 23-caption native cohort qualifies the final integrated source d316a831 or the nine acquired-read temporal controls and four new cleanup-refusal controls. Full unit, E2E, fresh startup, packaging/install and separate installed-device acceptance remain open. Count, prototype and key-index proposals remain on HOLD; no production change, cached admission, timeout relaxation or fabricated acknowledgement is included. Item 42 and transversal items 16/38 remain partial.
 
 Positive native WAL, gesture-marker and Tap-Hold scenarios now obtain real
 current-source boot admission before writes; they retain the complete admitted
