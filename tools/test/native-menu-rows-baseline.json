@@ -4,9 +4,9 @@
 		"count": 17,
 		"sites": [
 			"windows/ui/menu/menu_hotstrings.ahk:945 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1106 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1283 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1297 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1109 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1294 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1316 append",
 			"windows/ui/menu/menu_llm/menu_main.ahk:416 append",
 			"windows/ui/menu/menu_llm/menu_main.ahk:453 append",
 			"windows/ui/menu/menu_llm/menu_main.ahk:465 append",

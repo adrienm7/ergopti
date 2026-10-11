@@ -1440,6 +1440,178 @@ _MR_ReadNativeCaption(Item, Getters, &Caption) {
 	return true
 }
 
+/**
+ * Captures finite personal-file DATA and the original callable cohort.
+ * @returns {Map|false} Exact source and owner receipt, without native state reads.
+ */
+MenuRenderer_PersonalFileCaptionPolicy() {
+	Guard := _MR_DeclaredParentCallable, Parent := MenuRenderer_PersonalFileParentRow
+	Formatter := _MR_CaptionValues, RootReader := _MR_GetManifestRoot, Loader := _MM_GetManifestRoot
+	Current := _MR_ReasonedGroupCurrent, Snapshot := _MR_ReasonedGroupSnapshot, Plain := _MR_PlainUnicodeCaption
+	if Object.Prototype.HasOwnProp.Call(Guard, "Call") || !(Guard is Func || Guard is BoundFunc)
+		return false
+	for Owner in [Guard, Parent, Formatter, RootReader, Loader, Current, Snapshot, Plain]
+		if !Guard.Call(Owner)
+			return false
+	Root := RootReader.Call()
+	if !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	if !Root.Has("hotstring_personal_file_caption")
+		return false
+	Policy := Root["hotstring_personal_file_caption"], Source := Snapshot.Call(Policy)
+	if !Source || !(Policy is Map) || Policy.Count != 1 || !Policy.Has("format")
+		|| Type(Policy["format"]) != "String" || !Plain.Call(Policy["format"])
+		|| !Formatter.Call(Policy["format"], ["", ""], &Probe)
+		return false
+	return Map("root", Root, "policy", Policy, "source", Source, "parent", Parent,
+		"formatter", Formatter, "root_reader", RootReader, "loader", Loader, "current", Current, "guard", Guard)
+}
+
+/**
+ * Projects original literal receipts only through the retained callable owners.
+ * @param {Map} Receipt Previously admitted source and original callable cohort.
+ * @param {String} Stem Completed original native concatenation receipt.
+ * @param {String} Count Completed original formatted-count concatenation receipt.
+ * @param {Menu} Child Exact finished native child retained by identity.
+ * @returns {Map|false} Declared caption/child DATA or owner/source refusal.
+ */
+MenuRenderer_PersonalFileParentRow(Receipt, Stem, Count, Child) {
+	if !(Receipt is Map) || ObjGetBase(Receipt) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Receipt)
+		return false
+	if Receipt.Count != 9 || Type(Stem) != "String" || Type(Count) != "String" || !(Child is Menu)
+		return false
+	for Key in ["root", "policy", "source", "parent", "formatter", "root_reader", "loader", "current", "guard"]
+		if !Receipt.Has(Key)
+			return false
+	Guard := Receipt["guard"]
+	if Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, "Call")
+		|| !(Guard is Func || Guard is BoundFunc)
+		return false
+	for Pair in [[Receipt["parent"], MenuRenderer_PersonalFileParentRow], [Receipt["formatter"], _MR_CaptionValues],
+		[Receipt["root_reader"], _MR_GetManifestRoot], [Receipt["loader"], _MM_GetManifestRoot],
+		[Receipt["current"], _MR_ReasonedGroupCurrent]]
+		if Pair[1] != Pair[2] || !Guard.Call(Pair[1])
+			return false
+	Root := Receipt["root_reader"].Call()
+	if Root != Receipt["root"] || !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	if !Root.Has("hotstring_personal_file_caption") || Root["hotstring_personal_file_caption"] != Receipt["policy"]
+		|| !Receipt["current"].Call(Receipt["source"])
+		return false
+	if !Receipt["formatter"].Call(Receipt["policy"]["format"], [Stem, Count], &Label)
+		return false
+	if Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, "Call")
+		return false
+	for Pair in [[Receipt["parent"], MenuRenderer_PersonalFileParentRow], [Receipt["formatter"], _MR_CaptionValues],
+		[Receipt["root_reader"], _MR_GetManifestRoot], [Receipt["loader"], _MM_GetManifestRoot],
+		[Receipt["current"], _MR_ReasonedGroupCurrent]]
+		if Pair[1] != Pair[2] || !Guard.Call(Pair[1])
+			return false
+	if Receipt["root_reader"].Call() != Root || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	if !Root.Has("hotstring_personal_file_caption") || Root["hotstring_personal_file_caption"] != Receipt["policy"]
+		|| !Receipt["current"].Call(Receipt["source"])
+		return false
+	return Map("label", Label, "submenu", Child)
+}
+
+/**
+ * Captures finite personal-folder DATA and the original callable cohort.
+ * @returns {Map|false} Exact source and owner receipt, without native state reads.
+ */
+MenuRenderer_PersonalFolderCaptionPolicy() {
+	Guard := _MR_DeclaredParentCallable, Parent := MenuRenderer_PersonalFolderParentRow
+	Formatter := _MR_CaptionValues, RootReader := _MR_GetManifestRoot, Loader := _MM_GetManifestRoot
+	Current := _MR_ReasonedGroupCurrent, Snapshot := _MR_ReasonedGroupSnapshot, Plain := _MR_PlainUnicodeCaption
+	if Object.Prototype.HasOwnProp.Call(Guard, "Call") || !(Guard is Func || Guard is BoundFunc)
+		return false
+	for Owner in [Guard, Parent, Formatter, RootReader, Loader, Current, Snapshot, Plain]
+		if !Guard.Call(Owner)
+			return false
+	Root := RootReader.Call()
+	if !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	if !Root.Has("hotstring_personal_folder_caption")
+		return false
+	Policy := Root["hotstring_personal_folder_caption"], Source := Snapshot.Call(Policy)
+	if !Source || !(Policy is Map) || Policy.Count != 2 || !Policy.Has("positive_format") || !Policy.Has("nonpositive_format")
+		|| Type(Policy["positive_format"]) != "String" || !Plain.Call(Policy["positive_format"])
+		|| Type(Policy["nonpositive_format"]) != "String" || !Plain.Call(Policy["nonpositive_format"])
+		|| !Formatter.Call(Policy["positive_format"], ["", ""], &PositiveProbe)
+		|| !Formatter.Call(Policy["nonpositive_format"], [""], &NonpositiveProbe)
+		return false
+	return Map("root", Root, "policy", Policy, "source", Source, "parent", Parent,
+		"formatter", Formatter, "root_reader", RootReader, "loader", Loader, "current", Current, "guard", Guard)
+}
+
+/**
+ * Projects original literal receipts only through the retained callable owners.
+ * @param {Map} Receipt Previously admitted source and original callable cohort.
+ * @param {Integer} Positive Original native total comparison, without a new numeric domain.
+ * @param {String} FolderName Completed original outer native concatenation receipt.
+ * @param {String} Count Completed positive native count coercion, empty on the skipped branch.
+ * @param {Menu} Child Exact finished native child retained by identity.
+ * @returns {Map|false} Declared caption/child DATA or owner/source refusal.
+ */
+MenuRenderer_PersonalFolderParentRow(Receipt, Positive, FolderName, Count, Child) {
+	if !(Receipt is Map) || ObjGetBase(Receipt) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Receipt)
+		return false
+	if Receipt.Count != 9 || Type(Positive) != "Integer" || (Positive != 0 && Positive != 1)
+		|| Type(FolderName) != "String" || Type(Count) != "String" || !(Child is Menu)
+		return false
+	for Key in ["root", "policy", "source", "parent", "formatter", "root_reader", "loader", "current", "guard"]
+		if !Receipt.Has(Key)
+			return false
+	Guard := Receipt["guard"]
+	if Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, "Call")
+		|| !(Guard is Func || Guard is BoundFunc)
+		return false
+	for Pair in [[Receipt["parent"], MenuRenderer_PersonalFolderParentRow], [Receipt["formatter"], _MR_CaptionValues],
+		[Receipt["root_reader"], _MR_GetManifestRoot], [Receipt["loader"], _MM_GetManifestRoot],
+		[Receipt["current"], _MR_ReasonedGroupCurrent]]
+		if Pair[1] != Pair[2] || !Guard.Call(Pair[1])
+			return false
+	Root := Receipt["root_reader"].Call()
+	if Root != Receipt["root"] || !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	if !Root.Has("hotstring_personal_folder_caption") || Root["hotstring_personal_folder_caption"] != Receipt["policy"]
+		|| !Receipt["current"].Call(Receipt["source"])
+		return false
+	Format := Receipt["policy"][Positive ? "positive_format" : "nonpositive_format"]
+	Values := Positive ? [FolderName, Count] : [FolderName]
+	if !Receipt["formatter"].Call(Format, Values, &Label)
+		return false
+	if Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, "Call")
+		return false
+	for Pair in [[Receipt["parent"], MenuRenderer_PersonalFolderParentRow], [Receipt["formatter"], _MR_CaptionValues],
+		[Receipt["root_reader"], _MR_GetManifestRoot], [Receipt["loader"], _MM_GetManifestRoot],
+		[Receipt["current"], _MR_ReasonedGroupCurrent]]
+		if Pair[1] != Pair[2] || !Guard.Call(Pair[1])
+			return false
+	if Receipt["root_reader"].Call() != Root || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	if !Root.Has("hotstring_personal_folder_caption") || Root["hotstring_personal_folder_caption"] != Receipt["policy"]
+		|| !Receipt["current"].Call(Receipt["source"])
+		return false
+	return Map("label", Label, "submenu", Child)
+}
+
 ; Ordered getter vectors retain original translated formats and reject malformed native data.
 _MR_CaptionVectorMetadata(Item, Getters, ValidateGetters := true) {
 	if !Item.Has("caption_getters")

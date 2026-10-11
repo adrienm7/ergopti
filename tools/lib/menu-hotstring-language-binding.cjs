@@ -2706,3 +2706,65 @@ function personalSectionChoicePublication(source, platform, manifest) {
 }
 
 module.exports.personalSectionChoicePublication = personalSectionChoicePublication;
+
+/** Finite physical contract: frozen pre-change donor plus exactly two reviewed edits. */
+function personalFileCaptionPublication(source) {
+	try {
+		const donor =
+			'\n\tTFMenu := Menu(), HandedOff := false\n\tPrimaryFailure := 0\n\ttry {\n\tControlRows := [], SectionRows := []\n\tOwner := PersonalFileControls.ForPath(TF.path)\n\tif Owner is PersonalFileAdoptedOwner {\n\t\tfor Row in _HS_PersonalFileControlRows(Owner, "")\n\t\t\tControlRows.Push(Row)\n\t\tfor Section in Owner.sectionNames {\n\t\t\tSectionRows.Push(Map("label", Section . " (" . FmtCount(Owner.counts[Section]) . ")",\n\t\t\t\t"items", _HS_PersonalFileControlRows(Owner, Section), "checked", Owner.Selected(Section)))\n\t\t}\n\t} else {\n\t\tUnavailable := _HS_PersonalUnavailableRow("file")\n\t\tif Unavailable is Map\n\t\t\tControlRows.Push(Unavailable)\n\t\tfor _, ES in TF.sections\n\t\t\tSectionRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))\n\t}\n\tCommands := Map("hotstring_file_open", _MakeOpenFileFn(TF.path))\n\tGetters := Map("hotstring_file_ready", (*) => true, "personal_file_open_present", (*) => true,\n\t\t"personal_file_boundary", (*) => Owner is PersonalFileAdoptedOwner)\n\tProviders := Map("personal_file_controls", (*) => ControlRows, "personal_file_sections", (*) => SectionRows)\n\tFileRows := MenuRenderer_TemplateRows("hotstring_personal_file_frame", Commands, Getters, Providers)\n\tif !(FileRows is Array)\n\t\treturn false\n\tif MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted\n\t\treturn false\n\tResult := Map(\n\t\t"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",\n\t\t"submenu", TFMenu)\n\tHandedOff := true\n\treturn Result\n\t} catch as ErrorInfo {\n\t\tPrimaryFailure := ErrorInfo\n\t\tthrow ErrorInfo\n\t} finally {\n\t\tif !HandedOff {\n\t\t\ttry _HS_PersonalReleaseMenus([TFMenu])\n\t\t\tcatch as CleanupFailure {\n\t\t\t\tif !PrimaryFailure\n\t\t\t\t\tthrow CleanupFailure\n\t\t\t\ttry LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)\n\t\t\t}\n\t\t}\n\t}\n';
+		const edits = [
+			[
+				'\tControlRows := [], SectionRows := []',
+				'\tCaptionPolicy := MenuRenderer_PersonalFileCaptionPolicy()\n\tif !(CaptionPolicy is Map)\n\t\treturn false\n\tControlRows := [], SectionRows := []'
+			],
+			[
+				'\tResult := Map(\n\t\t"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",\n\t\t"submenu", TFMenu)',
+				'\t; Keep original late reads and native concatenation coercion before projection.\n\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))\n\tif !(Result is Map)\n\t\treturn false'
+			]
+		];
+		let expected = donor;
+		for (const [before, after] of edits) {
+			if (expected.split(before).length !== 2) return false;
+			expected = expected.replace(before, after);
+		}
+		// Preserve statement boundaries as well as tokens: an unbraced preceding control
+		// cannot skip the genuine native fill while lending its brace depth to the route.
+		return owner(source, '_HS_TomlFileRow(TF) {', '.ahk') === expected;
+	} catch {
+		return false;
+	}
+}
+module.exports.personalFileCaptionPublication = personalFileCaptionPublication;
+
+/** Finite folder contract: complete original owner plus two unique presentation edits. */
+function personalFolderCaptionPublication(source) {
+	try {
+		const donor =
+			'\n\tLocalOwner := !IsSet(OwnedMenus), HandedOff := false\n\tif LocalOwner\n\t\tOwnedMenus := []\n\tPrimaryFailure := 0\n\ttry {\n\tFolderNames := []\n\tfor FolderName in Tree\n\t\tFolderNames.Push(FolderName)\n\tloop FolderNames.Length {\n\t\ti := A_Index\n\t\tloop FolderNames.Length - i {\n\t\t\tj := A_Index\n\t\t\tif (StrCompare(FolderNames[j], FolderNames[j+1]) > 0) {\n\t\t\t\ttmp := FolderNames[j]\n\t\t\t\tFolderNames[j] := FolderNames[j+1]\n\t\t\t\tFolderNames[j+1] := tmp\n\t\t\t}\n\t\t}\n\t}\n\t; The folder rows of THIS level. They go back to the caller when it asked for\n\t; data (the top level, which is a list provider) and are rendered into the\n\t; parent\'s menu otherwise (every level below it).\n\tFolderRows := []\n\tfor _, FolderName in FolderNames {\n\t\tNode := Tree[FolderName]\n\t\tif Node.Get("unavailable", false) {\n\t\t\tUnavailable := _HS_PersonalUnavailableRow("directory", FolderName)\n\t\t\tif Unavailable is Map\n\t\t\t\tFolderRows.Push(Unavailable)\n\t\t\tcontinue\n\t\t}\n\t\tFolderMenu := Menu()\n\t\tOwnedMenus.Push(FolderMenu)\n\t\tFileNodeList := Node["tomls"]\n\t\tloop FileNodeList.Length {\n\t\t\ti := A_Index\n\t\t\tloop FileNodeList.Length - i {\n\t\t\t\tj := A_Index\n\t\t\t\tif (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {\n\t\t\t\t\ttmp := FileNodeList[j]\n\t\t\t\t\tFileNodeList[j] := FileNodeList[j+1]\n\t\t\t\t\tFileNodeList[j+1] := tmp\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tSubfolderRows := []\n\t\tif Node["subfolders"].Count > 0 && _HS_RenderTree(Node["subfolders"], "", SubfolderRows, OwnedMenus) != true\n\t\t\treturn false\n\t\tFileRows := []\n\t\tfor _, TF in FileNodeList {\n\t\t\tFileRow := _HS_TomlFileRow(TF)\n\t\t\tif !(FileRow is Map)\n\t\t\t\treturn false\n\t\t\tOwnedMenus.Push(FileRow["submenu"])\n\t\t\tFileRows.Push(FileRow)\n\t\t}\n\t\tProviders := Map("personal_folders", (*) => SubfolderRows, "personal_files", (*) => FileRows)\n\t\tGetters := Map("personal_folder_file_boundary", (*) => SubfolderRows.Length > 0 && FileRows.Length > 0)\n\t\tFolderChildren := MenuRenderer_TemplateRows("hotstring_personal_directory_frame", Map(), Getters, Providers)\n\t\tif !(FolderChildren is Array)\n\t\t\treturn false\n\t\tif MenuRenderer_AppendTemplate(FolderMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != SubfolderRows.Length + FileRows.Length || !WholeTreeAdmitted\n\t\t\treturn false\n\t\tFolderTotal := _HS_NodeTotal(Node)\n\t\tFolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")\n\t\tFolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))\n\t}\n\tProviders := Map("personal_folders", (*) => FolderRows, "personal_files", (*) => [])\n\tGetters := Map("personal_folder_file_boundary", (*) => false)\n\tRendered := MenuRenderer_TemplateRows("hotstring_personal_directory_frame", Map(), Getters, Providers)\n\tif !(Rendered is Array)\n\t\treturn false\n\tif Rows is Array {\n\t\tfor Row in Rendered\n\t\t\tRows.Push(Row)\n\t} else if MenuRenderer_AppendTemplate(ParentMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != FolderRows.Length || !WholeTreeAdmitted\n\t\treturn false\n\tHandedOff := true\n\treturn true\n\t} catch as ErrorInfo {\n\t\tPrimaryFailure := ErrorInfo\n\t\tthrow ErrorInfo\n\t} finally {\n\t\tif LocalOwner && !HandedOff {\n\t\t\ttry _HS_PersonalReleaseMenus(OwnedMenus)\n\t\t\tcatch as CleanupFailure {\n\t\t\t\tif !PrimaryFailure\n\t\t\t\t\tthrow CleanupFailure\n\t\t\t\ttry LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)\n\t\t\t}\n\t\t}\n\t}\n';
+		const edits = [
+			[
+				'\tFolderNames := []',
+				'\tCaptionPolicy := MenuRenderer_PersonalFolderCaptionPolicy()\n\tif !(CaptionPolicy is Map)\n\t\treturn false\n\tFolderNames := []'
+			],
+			[
+				'\t\tFolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")\n\t\tFolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))',
+				'\t\t; Preserve positive count coercion before the original outer name coercion.\n\t\tFolderRow := (FolderPositive := FolderTotal > 0,\n\t\t\tFolderCount := FolderPositive ? FmtCount(FolderTotal) . "" : "",\n\t\t\tFolderNameReceipt := FolderName . "",\n\t\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\t\tCaptionOwner != MenuRenderer_PersonalFolderParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu))\n\t\tif !(FolderRow is Map)\n\t\t\treturn false\n\t\tFolderRows.Push(FolderRow)'
+			]
+		];
+		let expected = donor;
+		for (const [before, after] of edits) {
+			if (expected.split(before).length !== 2) return false;
+			expected = expected.replace(before, after);
+		}
+		return (
+			owner(
+				source,
+				'_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {',
+				'.ahk'
+			) === expected
+		);
+	} catch {
+		return false;
+	}
+}
+module.exports.personalFolderCaptionPublication = personalFolderCaptionPublication;

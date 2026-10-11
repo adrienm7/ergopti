@@ -1466,8 +1466,8 @@ _SMB_ExtensionObservedNative(Outcome, Mutation := "") {
 			Cleanup.Push(((Owned) => () => _SMB_ObservedCleanupAttempt(CleanupFailures, "owned menu prune", () => MenuDispatcher_PruneMenu(Owned)))(Native))
 		}
 		Cleanup.Push(() => _SMB_ObservedCleanupAttempt(CleanupFailures, "owned directory delete", () => RootOwned && DirExist(Root) ? DirDelete(Root, true) : false))
-		Cleanup.Push(() => _SMB_ObservedCleanupAttempt(CleanupFailures, "independent cleanup report", () => Print(
-			"ERGOPTI_EXTENSION_OBSERVED_CLEANUP primary_present=" . TeardownFailed . " secondary_count=" . CleanupFailures.Length)))
+		Cleanup.Push(() => _SMB_ObservedCleanupAttempt(CleanupFailures, "independent cleanup report", () => _TestPrint(
+			"# ERGOPTI_EXTENSION_OBSERVED_CLEANUP primary_present=" . TeardownFailed . " secondary_count=" . CleanupFailures.Length)))
 		_SMB_FrameRunAllCleanup(TeardownFailed, Cleanup*)
 		if !TeardownFailed && CleanupFailures.Length
 			throw CleanupFailures[1]["failure"]
