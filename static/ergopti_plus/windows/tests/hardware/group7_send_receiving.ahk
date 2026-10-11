@@ -13,6 +13,7 @@
 #Warn All, StdOut
 
 global ProbeDll := ""
+global ProbeModule := 0
 global ProbeStarted := false
 global ProbeToken := 0
 global ProbeClipboard := ClipboardAll()
@@ -43,7 +44,7 @@ ProbeNative(Name, Arguments*) {
 }
 
 ProbeRetire(Reason, Code) {
-	global ProbeDll, ProbeStarted, ProbeToken, ProbeClipboard
+	global ProbeDll, ProbeModule, ProbeStarted, ProbeToken, ProbeClipboard
 	global ProbeClipboardChanged, ProbeClipboardSequence, ProbeGui, ProbeEditor
 	if ProbeStarted {
 		if ProbeToken {
@@ -129,6 +130,11 @@ ProbeEmit(Backend, Payload, Paste) {
 if A_Args.Length != 4 || A_AhkVersion != "2.0.26" || A_PtrSize != 8
 	throw Error("Use the supervisor with pinned AutoHotkey 2.0.26 x64.")
 ProbeDll := A_Args[1]
+; DllCall by path alone unloads an otherwise unowned DLL after each call.
+; The hook thread, callbacks and InitOnce state retain the module until process exit.
+ProbeModule := DllCall("LoadLibraryW", "Str", ProbeDll, "Ptr")
+if !ProbeModule
+	throw OSError()
 InstallSequence := A_Args[2]
 Physical := A_Args[3] == "physical"
 Samples := Integer(A_Args[4])
