@@ -4980,6 +4980,20 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   retaining the original native-owner checks. Retired-Script consumers and
   final-source native/installed qualification remain separate follow-ups.
 
+The registered Windows external-source control now captures the actual native
+source and conditional journal intent without replacing the issued hash port.
+An independently acknowledged filesystem write must yield the exact
+`expected_old_conflict` refusal before WAL/staging or reload, preserve foreign
+bytes, and permit a genuine editor retry with exact refusal compensation.
+Cleanup resolves the actual WAL, proves native-owner retirement and clears only
+its own retained marker before deleting the fixture. Independent source review
+passes; Windows runtime and full-suite qualification remain pending. The latest
+integrated run planned 11,121 cases, passed 2,054 and failed this one control;
+9,066 had no terminal result. Its next global-scope case ran only 44.481 seconds
+before the unchanged suite watchdog, versus 64–66 seconds for the preceding
+successful twelve-store transactions. That evidence does not prove a deadlock
+or authorize a larger watchdog. Item 42 remains partial.
+
 The shared canonical-hash test hook previously survived its foreign-source
 fault and contaminated later transition admission. The bounded fixture successor
 restores the genuine callback first, attempts every existing cleanup, and
