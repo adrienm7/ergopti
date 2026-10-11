@@ -3975,9 +3975,22 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		};
 	}
 	const helper = 'windows/infra/tray_bootstrap.ahk';
+	const adapter = 'windows/adapters/tray_menu.ahk';
 	const entry = 'windows/ErgoptiPlus.ahk';
 	const dispatcher = 'windows/infra/menu_dispatcher.ahk';
 	const controls = [
+		[
+			'withdraw native adapter include',
+			mutateSource(entry, '#Include adapters/tray_menu.ahk', '; #Include adapters/tray_menu.ahk')
+		],
+		[
+			'quoted native adapter include decoy',
+			mutateSource(
+				entry,
+				'#Include adapters/tray_menu.ahk',
+				'QuotedAdapter := "#Include adapters/tray_menu.ahk"'
+			)
+		],
 		[
 			'withdraw native include',
 			mutateSource(
@@ -4022,7 +4035,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		],
 		[
 			'lose disabled inert publication',
-			mutateSource(helper, 'MenuObj.Disable(Label)', '; MenuObj.Disable(Label)')
+			mutateSource(adapter, 'MenuObj.Disable(Label)', '; MenuObj.Disable(Label)')
 		],
 		[
 			'different native menu receiver',
