@@ -504,3 +504,65 @@ _TBPI_NormalWithdrawalIsSeparate() {
 Test("startup immutable authority: genuine21caption/native callback receipts", _TBPI_FrozenCaptions)
 Test("startup immutable authority: actual missing locked empty malformed live sources retain emergency root", _TBPI_UnavailableLiveSource)
 Test("startup immutable authority: normal source withdrawal refuses independently of recovery", _TBPI_NormalWithdrawalIsSeparate)
+
+/** The unique native publication owner follows the adapter boundary. */
+_TBPT_NativeOwnerIsAdapter() {
+	Expected := _DriverProductionFileForSymbol("TrayMenuItemCount")
+	SplitPath(Expected, , &Directory)
+	SplitPath(Directory, &Folder)
+	AssertEqual("adapters", Folder,
+		"the native menu primitive must retain its actual adapter owner")
+	for Name in ["_InstallSafeBootstrapTray", "_TrayBootstrapNoOp"] {
+		AssertEqual(Expected, _DriverProductionFileForSymbol(Name),
+			"the complete operation must belong to the native menu adapter")
+		Assert(_DriverFuncBody(Name) != "",
+			"the adapter export must retain its actual authored function body")
+	}
+}
+
+class _TBPT_FailingNativeMenu extends _TBPT_FakeMenu {
+	__New() {
+		super.__New()
+		this.Failure := Error("owned bootstrap publication failure")
+		this.DeleteCritical := 0
+		this.AddCritical := 0
+	}
+
+	Delete() {
+		this.DeleteCritical := A_IsCritical
+		super.Delete()
+	}
+
+	Add(Label, Callback) {
+		this.AddCritical := A_IsCritical
+		super.Add(Label, Callback)
+		throw this.Failure
+	}
+}
+
+/** Moving the operation retains its original failure and caller critical state. */
+_TBPT_NativeFailureRestoresCritical() {
+	Original := Critical("Off")
+	try {
+		for Setting in [0, 73] {
+			Critical(Setting)
+			MenuPort := _TBPT_FailingNativeMenu(), Received := false
+			try _InstallSafeBootstrapTray("Starting…", MenuPort)
+			catch as Err
+				Received := Err
+			AssertTrue(Received == MenuPort.Failure,
+				"the exact native publication error must reach the caller")
+			AssertEqual(Setting, A_IsCritical,
+				"both disabled and enabled caller critical states must be restored")
+			AssertTrue(MenuPort.DeleteCritical > 0 && MenuPort.AddCritical > 0,
+				"retirement and replacement must stay inside the critical transaction")
+			AssertEqual(1, MenuPort.DeleteCalls)
+			AssertEqual(1, MenuPort.AddCalls)
+			AssertEqual(0, MenuPort.DisableCalls,
+				"a failed native Add must not reach a false disabled-row acknowledgment")
+		}
+	} finally Critical(Original)
+}
+
+Test("startup native adapter: unique complete publication owner", _TBPT_NativeOwnerIsAdapter)
+Test("startup native adapter: original failure and caller critical state survive publication", _TBPT_NativeFailureRestoresCritical)

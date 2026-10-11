@@ -7757,20 +7757,54 @@ console.log(
 			hasBareCall(
 				authenticBody(windows, '.ahk', '_SC_ExtensionRows'),
 				'.ahk',
-				'MenuRenderer_AppendTemplate',
+				'MenuRenderer_TemplateRows',
 				key
 			)
 		);
 		assert.equal(
 			hasBareCall(
-				windows.replaceAll('MenuRenderer_AppendTemplate', 'Foreign.MenuRenderer_AppendTemplate'),
+				windows.replaceAll('MenuRenderer_TemplateRows', 'Foreign.MenuRenderer_TemplateRows'),
 				'.ahk',
-				'MenuRenderer_AppendTemplate',
+				'MenuRenderer_TemplateRows',
 				key
 			),
 			false
 		);
 	}
+	assert.deepEqual(current.shortcut_extension_result_frame, [
+		{
+			type: 'include',
+			section: 'shortcut_extension_error_frame',
+			present_when: 'shortcut_extension_builder_failed'
+		},
+		{
+			type: 'include',
+			section: 'shortcut_extension_error_frame',
+			present_when: 'shortcut_extension_builder_empty'
+		},
+		{
+			type: 'include',
+			section: 'shortcut_extension_empty_frame',
+			present_when: 'shortcut_extension_builder_missing'
+		}
+	]);
+	assert(
+		hasBareCall(
+			authenticBody(windows, '.ahk', '_SC_ExtensionRows'),
+			'.ahk',
+			'MenuRenderer_AppendTemplate',
+			'shortcut_extension_result_frame'
+		)
+	);
+	assert.equal(
+		hasBareCall(
+			windows.replaceAll('MenuRenderer_AppendTemplate', 'Foreign.MenuRenderer_AppendTemplate'),
+			'.ahk',
+			'MenuRenderer_AppendTemplate',
+			'shortcut_extension_result_frame'
+		),
+		false
+	);
 	const earlyError = windows.indexOf(
 		'ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame"'
 	);

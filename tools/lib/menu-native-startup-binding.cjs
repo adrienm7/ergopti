@@ -8,6 +8,7 @@ const projection = require('./codegen-startup-tray.cjs');
 const keys = Object.freeze({
 	entry: 'windows/ErgoptiPlus.ahk',
 	bootstrap: 'windows/infra/tray_bootstrap.ahk',
+	adapter: 'windows/adapters/tray_menu.ahk',
 	dispatcher: 'windows/infra/menu_dispatcher.ahk',
 	safe: 'windows/infra/menu_startup_commands.ahk'
 });
@@ -411,12 +412,14 @@ function nativeStartupRows(inputs, platform) {
 	}
 	if (!generatorHook(generator)) return none();
 	const bootstrap = sources[keys.bootstrap],
+		adapter = sources[keys.adapter],
 		entry = lex(sources[keys.entry]);
 	const dispatcher = sources[keys.dispatcher],
 		safe = sources[keys.safe];
 	if (
 		!entry ||
 		!sourceInclude(bootstrap, '../../_shared/modules/menu/startup_tray_projection.ahk') ||
+		!sourceInclude(sources[keys.entry], 'adapters/tray_menu.ahk') ||
 		!sourceInclude(sources[keys.entry], 'infra/menu_dispatcher.ahk') ||
 		!sourceInclude(dispatcher, 'menu_startup_commands.ahk') ||
 		matches(entry, coldEntry, 0).length !== 1 ||
@@ -429,12 +432,12 @@ function nativeStartupRows(inputs, platform) {
 			commandPublication
 		) ||
 		!exactBody(
-			bootstrap,
+			adapter,
 			'_InstallSafeBootstrapTray(Label := unset, MenuObj := 0) {',
 			inertPublication
 		) ||
 		!exactBody(bootstrap, '_TrayBootstrapProjectedRows(Surface, Commands) {', typedProjection) ||
-		!exactBody(bootstrap, '_TrayBootstrapNoOp(*) {', 'return 0') ||
+		!exactBody(adapter, '_TrayBootstrapNoOp(*) {', 'return 0') ||
 		!exactBody(safe, 'class MenuStartupSafeCommand {', safeClass)
 	)
 		return none();

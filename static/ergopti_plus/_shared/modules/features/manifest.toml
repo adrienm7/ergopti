@@ -7754,6 +7754,22 @@ i18n = "menu.extensions.empty"
 platforms = ["ahk"]
 unavailable = "hide"
 
+# Observed native outcomes select presentation through one shared frame.
+[[menu.shortcut_extension_result_frame]]
+type = "include"
+section = "shortcut_extension_error_frame"
+present_when = "shortcut_extension_builder_failed"
+
+[[menu.shortcut_extension_result_frame]]
+type = "include"
+section = "shortcut_extension_error_frame"
+present_when = "shortcut_extension_builder_empty"
+
+[[menu.shortcut_extension_result_frame]]
+type = "include"
+section = "shortcut_extension_empty_frame"
+present_when = "shortcut_extension_builder_missing"
+
 # Complete native per-model action, identity, specification, capability and hardware frames.
 
 [[menu.llm_model_action_rows]]
