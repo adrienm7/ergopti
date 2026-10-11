@@ -42,6 +42,9 @@ static BOOL factIdentityComplete = NO;
 static int factIdentityNodes = 0, factIdentityError = 0;
 static const char *factIdentityRefusal = "none";
 
+// Information-only serialization of the first existing discovery traversal.
+int owned_discovery_fact(char *buffer, size_t capacity);
+
 static const char *kind(id value) {
     if (value == nil) return "absent";
     if (CFGetTypeID((__bridge CFTypeRef)value) == AXUIElementGetTypeID()) return "ax-element";
@@ -116,6 +119,15 @@ static void publish_facts(void) {
                 memcpy(packet, extended, (size_t)extendedLength + 1);
                 length = extendedLength;
             }
+        }
+        char discoveryPacket[256];
+        int discoveryLength = owned_discovery_fact(discoveryPacket, sizeof(discoveryPacket));
+        if (length > 2 && discoveryLength > 0 &&
+            discoveryLength < (int)sizeof(discoveryPacket) &&
+            length + discoveryLength < (int)sizeof(packet)) {
+            memcpy(packet + length - 2, discoveryPacket, (size_t)discoveryLength);
+            memcpy(packet + length - 2 + discoveryLength, "}\n", 3);
+            length += discoveryLength;
         }
         if (length > 0 && length < (int)sizeof(packet)) {
             size_t offset = 0;
@@ -299,6 +311,34 @@ enum OwnedWindowScope {
     OwnedWindowScopeCandidate
 };
 
+// Store only the first traversal; never merge observations from different windows.
+static bool discoveryObserved = false, discoverySender = false, discoveryReceiver = false;
+static bool discoveryComplete = false;
+static size_t discoveryNodes = 0;
+static enum OwnedWindowScope discoveryScope = OwnedWindowScopeRefused;
+
+static void record_discovery(enum OwnedWindowScope scope, bool sender, bool receiver,
+    bool complete, size_t nodes) {
+    if (discoveryObserved) return;
+    discoveryObserved = true;
+    discoveryScope = scope;
+    discoverySender = sender;
+    discoveryReceiver = receiver;
+    discoveryComplete = complete;
+    discoveryNodes = nodes;
+}
+
+int owned_discovery_fact(char *buffer, size_t capacity) {
+    if (!discoveryObserved) return 0;
+    const char *scope = discoveryScope == OwnedWindowScopeUnrelated ? "unrelated" :
+        discoveryScope == OwnedWindowScopeCandidate ? "candidate" : "refused";
+    return snprintf(buffer, capacity,
+        ",\"discovery\":{\"schema\":1,\"scope\":\"%s\",\"sender\":%s,"
+        "\"receiver\":%s,\"complete\":%s,\"nodes\":%zu}",
+        scope, discoverySender ? "true" : "false", discoveryReceiver ? "true" : "false",
+        discoveryComplete ? "true" : "false", discoveryNodes);
+}
+
 static bool scope_before_deadline(void) {
     NSTimeInterval remaining = identityDeadline - NSProcessInfo.processInfo.systemUptime;
     return remaining > 0 && remaining <= 3;
@@ -321,12 +361,15 @@ static enum OwnedWindowScope discover_window_scope(AXUIElementRef window,
     size_t count = 0, examined = 0;
     AXUIElementRef element = NULL;
     CFTypeRef role = NULL, value = NULL, children = NULL;
-    bool sender_seen = false, receiver_seen = false;
+    bool sender_seen = false, receiver_seen = false, complete = false;
     enum OwnedWindowScope result = OwnedWindowScopeRefused;
     if (agent <= 0 || window == NULL || sender == NULL || receiver == NULL ||
         CFGetTypeID(window) != AXUIElementGetTypeID() ||
         CFGetTypeID(sender) != CFStringGetTypeID() ||
-        CFGetTypeID(receiver) != CFStringGetTypeID() || !scope_before_deadline()) return result;
+        CFGetTypeID(receiver) != CFStringGetTypeID() || !scope_before_deadline()) {
+        record_discovery(result, sender_seen, receiver_seen, complete, examined);
+        return result;
+    }
     pending[count++] = (AXUIElementRef)CFRetain(window);
     while (count > 0) {
         element = pending[--count];
@@ -367,6 +410,7 @@ next_element:
         element = NULL;
     }
     if (scope_before_deadline()) {
+        complete = true;
         if (!sender_seen && !receiver_seen) result = OwnedWindowScopeUnrelated;
         else if (sender_seen && receiver_seen) result = OwnedWindowScopeCandidate;
     }
@@ -376,6 +420,7 @@ done:
     if (role != NULL) CFRelease(role);
     if (element != NULL) CFRelease(element);
     while (count > 0) CFRelease(pending[--count]);
+    record_discovery(result, sender_seen, receiver_seen, complete, examined);
     return result;
 }
 

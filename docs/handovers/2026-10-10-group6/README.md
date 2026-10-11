@@ -652,3 +652,189 @@ production guard stays false. TODO 36/62 and transverse 16/38 remain open; no
 item is removed. Recoverable source and receiving metadata must be preserved
 before container replacement; private paths and historical receipts do not
 restore live authority.
+
+## First existing consent discovery diagnostic continuation
+
+After the delivered `ed45dd050` tranche, TODO36/62 remain open. The exact
+integrated manual `38091956482` is terminal failure: six successful, six failed
+and five skipped jobs, with Release skipped. SDK49/daily7/original42 passed on
+both architectures; package/install and model acceptance remain independent.
+The previous feature and owned integration lock were retired after that result.
+The follow-up feature is recreated from current Dev for bounded diagnostics.
+
+Official Homebrew receiving has 24 passes and one failed case, without skips.
+Seventy-three UI records retain a trusted AX session and qualified signed
+requester; 66 see one window but no candidates. The original discovery can
+classify a window as unrelated before detailed inspection increments `nodes`.
+Those facts do not establish a missing traversal, TCC cause or external blocker.
+
+The four reviewed source paths retain only the first existing traversal's closed
+scope, sender/receiver presence bits, completion and examined count. No new
+native read, action, clock, wait, permission request, capture or retirement is
+added. Facts from different windows are never combined. Complete text presence
+requires an examined descendant; the original 257th-node refusal remains an
+incomplete observation. The same owned FD and 1024-byte packet bound carry the
+optional projection. Missing or oversized metadata cannot grant acceptance or
+prove absence of traversal. Permission-worker milestones are deferred.
+
+Actual original191 portable controls pass. Reviewed revision3 candidate196
+passes with zero failures/skips; five independent literal cases execute the
+actual C scope body under the existing modeled CF/AX port. They do not qualify
+native Accessibility or consent. The five added methods against the original
+producer yield one pass, one failure and three errors. Both original and
+candidate preserve the original 30-second command budget, exact source hashes
+and physical process closure. The initial revision2 candidate195-pass/one-error
+result remains retained separately: its additive AST acquisition could not
+parse an indented method containing unindented C raw-string lines. Revision3
+parses the complete module and uniquely admits the original class/method/literal
+port; every old method and independent expected value stays unchanged.
+
+Canonical selected verification and actual source-specific native receiving
+remain pending. Original deadlines, strict consent/window identity, nonce,
+policy denial, all six Brew profiles, packaging and installation stay required.
+TODO36/62 and transversal16/38 remain open; no production guard is changed.
+
+## Native trust-cause diagnostic continuation
+
+The reviewed R3 packet preserves all55 original portable methods and all14
+native PAC cases. Original55, new8 and candidate63 portable runs pass; three
+new controls against the genuine predecessor produce two failures and one
+error. Real harmless POSIX children provide command/file retirement evidence,
+not Apple Security or native TLS credit. All thin source inputs and the outer
+physical receiver remain exact; session64574 completed with status0.
+
+Existing add/remove operations record bounded phase, status, primary failure,
+closure and known public callee observations before cleanup can replace the
+primary outcome. Debug/fixture-only Swift diagnostics retain at most four
+closed-domain numeric error nodes and the existing trust challenge outcome.
+No raw error, URL, certificate, user-info dictionary or new trust evaluation is
+published; functional error routing and every deadline remain unchanged.
+
+The original PAC XCTest pipeline retains these stderr observations. The native
+HTTP response client sends child stderr to DEVNULL, so its missing Swift chain
+cannot establish absence or cause. Its Python trust observations stay separate.
+The model fixture is another producer and receives no diagnostic cause credit
+from this patch. Initial private receiving notes with a mistaken capture
+assumption are retained alongside the corrected custody map.
+
+Selected repository gates and actual SDK/native receiving are pending.
+SDK49 and PAC14 remain strict. TODO62, packaging, installation, proxy/PAC/WPAD,
+certificate trust and real-device enterprise requirements remain open. No
+release or production qualification is claimed.
+
+Portable receipts are retained in
+`/workspace/scratch/group6-native-trust-cause-portable-20261010-receiving2/`.
+Frozen R3 source, inverse/enrollment proof and independent Source ACK are
+retained in the matching diagnostic and review directories. The collector
+composition changes only HTTP facts55 to63 and preserves the committed
+suspended39/serve45 floors.
+
+## CFNetwork diagnostic compile correction
+
+2026-10-11 diagnostic compilation correction. Exact manual38098879182 on
+716bcb602175e4d2a1751318892dbfe80c890873 refuses the new Swift CFNetwork
+error-domain switch before XCTest: the unparenthesized cast is parsed as an
+as-pattern. Parenthesizing the existing conversion and its exact inverse
+enrollment literal preserves all63 portable methods, the original55 and the
+strict historical worker pin. Actual archive25 and the Swift/PAC cohorts are
+unrun on that refused build; earlier-run passes are not transferred. Candidate
+compilation and native receiving require a corrected exact-source manual run.
+Item62 remains open; no functional routing, trust rule or deadline changes.
+
+## Strict serve45 receiving enrollment
+
+2026-10-11 strict serve receiving enrollment. Authentic ARM receiving on716
+executes private5, numericTLS8, API20 and serve45 with all78 portable tests
+passing, but the workflow expects serve44 and rejects the unchanged strict
+summary. Its two count literals now require45 for the independently added
+listener-cancellation regression; all44 predecessor bodies and every exit,
+summary, no-skip and timeout assertion remain. No native listener or whole-job
+success is inferred. Exact-source native receiving remains required and item62
+stays open.
+
+## Cold caller initial-state receiving correction
+
+2026-10-11 cold caller initial-state correction. Exact716 cold artifact
+11686038953 omits caller.daemon_validation, which its original Python validator
+requires as not-executed. All six environment inputs and eleven bundled source
+pins match; the actual official-client installation route correctly skips the
+daemon stub where the fixture previously initialized this field. The fixture
+now starts with the closed not-executed value. Production selection, source
+pins, physical retirement and original validator predicates remain unchanged.
+The same35 portable controls preserve34 old passes and refuse the genuine
+predecessor at the new strict missing-field check; the corrected35 pass. All
+source inputs stay exact and the original command owner exits0 without retained
+children. This does not emulate Hammerspoon or qualify installation. The actual
+worker exits0 and retires its receipt, but later archive/version checks were
+unrun after refusal. Corrected native cold receiving, model, packaging and
+installation remain required; item62 and transversal16/38 stay open.
+
+## CFNetwork declaration successor and actual cold receiving
+
+Manual38101970834 on663ff4c70 does not validate the prior parenthesization:
+Swift still interprets its as-expression as a pattern and refuses compilation.
+Archive25 and the independent no-prompt SDK call remain unrun. The successor
+uses one explicitly typed String initializer outside the switch, then matches
+the local. It changes no native case, assertion, clock, privacy category or
+routing policy. All63 portable bodies and all55 original bodies remain exact;
+the updated complete diagnostic inverse still reconstructs the same historical
+worker bytes and strict pin. Actual corrected Darwin compilation is pending.
+
+The same manual genuinely passes both independent cold native receivers.
+Fresh MLX11688341858 and official Ollama11687917657 artifacts bind27 source
+pins to663ff4c70. MLX Python3.11.16/uv0.12.21 imports and lock fingerprint pass.
+Official client0.24.0 archive/signature and all20 installed file/link identities
+pass; the actual version child, route worker, receipt and private work retire
+with physical cleanup. The corrected initial daemon_validation is not-executed,
+as required for client installation; daemon/model acceptance is independent.
+Receiving ledger SHA256 is
+3fec4777e99f142dfdd39954b5c6f1804ed1d7c648afaf505bbe3996b93d3189.
+The complete manual is still separate. Packaging, installation, native managed
+TLS/PAC/WPAD/model acceptance, Automation consent and actual device checks stay
+required. TODO36/62 and transversal16/38 remain open; no release is authorized.
+
+## Exact 12fb native receiving and remaining macOS requirements
+
+Manual38103825010 tests exact12fb210c447aa0c05a924b8b17117287f1d5b56f.
+The typed CFNetwork declaration actually compiles on Darwin. The native archive
+executes25 cases:24 pass, one original Brew Automation case fails, no cases skip.
+The independent no-prompt API case passes but its OSStatus and qualification
+facts do not grant fixture Automation consent. The actual first existing
+window traversal completes seven nodes with no exact sender/receiver names;
+that observation does not establish a device-only cause.
+
+Both architectures genuinely pass SDK49, daily7, logger42 and sourcePAC10.
+Both architectures also pass actual Carbon12. Both fresh cold component
+receivers bind27 source pins to this exact run, import the managed MLX environment
+and verify the real official Ollama archive/client. Their owners and private
+work physically retire. Daemon/model validation is explicitly not executed
+by these component installers. The cold ledger SHA256 is
+4507ea304559b46e58b1b7164e9d051d9a7d8d4ce9bca6a85e73ab1f0b6b0292.
+
+Actual ARM PAC14 executes12 passes and two failures. WPAD reaches system trust
+and refuses the certificate with NSURL/CFNetwork-1202 and SSL-9813 after its
+own trust-add command exits0. That fixture did not enroll the existing
+admin-trust query, so the different HTTP fixture's absence observation cannot
+supply its anchor visibility. Both actual HTTP tests fail during trust setup;
+its exact-CA query observes owned_status-25300/owned_present0 while the
+noninteractive admin authorization succeeds. Original removal/restoration
+failures remain. Model setup does not establish model creation/pull/inference.
+These facts support no speculative trust/keychain/restart/deadline change.
+
+A finite same-call permission diagnostic retains fixed call-boundary, API-return
+and successful original-join milestones through exact owned captures after
+physical settlement. A pre-call boundary does not prove native API entry or
+blocking; missing optional bytes remain unknown. It acquires no new permission,
+thread, query, traversal, grant or clock. Capture interruption/close uncertainty
+retains exact named debt; diagnostic evidence cannot admit consent or fixture
+closure. Original196 portable bodies and strict source inverses remain exact.
+Candidate203 portable controls pass. The seven new controls against the exact
+predecessor produce one assertion failure and37 error records; omitted helpers
+are errors, not assertion failures. Selected final gates and new exact-source
+macOS qualification remain required.
+
+TODO36/62 and transversal16/38 remain open. Native Automation/Brew6, successful
+system certificate setup/restoration, PAC/WPAD/managed model receiving, package
+and installation need macOS continuation. Windows SSPI/Schannel/NTLM, physical
+retirement, packaging and installation remain the maintainer-PC continuation.
+Production native qualification guards stay unchanged. No release is made.
