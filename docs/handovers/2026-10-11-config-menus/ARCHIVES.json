@@ -38,6 +38,13 @@
 			"bytes": 3567094,
 			"members": 39,
 			"member_manifest": "WINDOWS-CONFLICT-PROOF-MANIFEST.json"
+		},
+		{
+			"path": "windows-gesture-restart-qualified-proof.tar.gz",
+			"sha256": "9860f6bfcaa7b23710c257fd1301361892dcf5cbb975e703ba923e05eb71c3b5",
+			"bytes": 4407658,
+			"members": 69,
+			"member_manifest": "WINDOWS-RESTART-PROOF-MANIFEST.json"
 		}
 	]
 }
