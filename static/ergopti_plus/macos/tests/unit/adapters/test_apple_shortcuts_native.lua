@@ -304,3 +304,96 @@ H.describe("independent nested query executable", function()
 		end)
 	end)
 end)
+
+H.describe("native query admission callback identity rejoin", function()
+	local function replacement(target, boundary)
+		fixture(function(f)
+			f.helper_inode = 12
+			local armed, starts, terminals, reason = false, 0, 0, nil
+			f.on_start = function() starts = starts + 1 end
+			local handle = assert(f.native.revalidate_program("/usr/bin/shortcuts", { "run", ID }, function(success, value, why)
+				H.assert_eq(success, false); H.assert_nil(value)
+				terminals, reason = terminals + 1, why
+			end, function()
+				if armed then
+					if target == "helper" then f.helper_inode = 13 else f.inode = 13 end
+				end
+				return true
+			end))
+			local task = f.tasks[1]
+			H.assert_eq(task.args, { "--automation-query-worker", "revalidate", "1", ID })
+			if boundary == "start" then
+				armed = true
+				H.assert_eq(handle.start(), false); H.assert_eq(starts, 0)
+				H.assert_eq(#task.inputs, 0); H.assert_true(handle.isSettled())
+			else
+				H.assert_true(handle.start()); H.assert_eq(starts, 1)
+				if boundary == "held" then armed = true end
+				task.emit("Q1 HELD\n")
+				if boundary == "held" then
+					H.assert_eq(#task.inputs, 0); H.assert_true(task.closes > 0)
+					H.assert_eq(handle.isSettled(), false); H.assert_true(handle.hasCleanupDebt())
+					H.assert_eq(f.native.available(), false); H.assert_eq(terminals, 0)
+				else H.assert_eq(task.inputs, { "ACTIVATE\n" }) end
+				f.reply(task, 1, "revalidate")
+				if boundary == "final" then armed = true end
+				task.finish(); H.assert_true(handle.isSettled())
+			end
+			H.assert_eq(terminals, 1); H.assert_eq(reason, "query_refused")
+			H.assert_true(f.native.available()); H.assert_true(handle.terminate())
+			H.assert_eq(terminals, 1); H.assert_eq(#f.tasks, 1)
+		end)
+	end
+	H.it("refuses helper replacement inside raw-start admission", function() replacement("helper", "start") end)
+	H.it("refuses CLI replacement inside raw-start admission", function() replacement("cli", "start") end)
+	H.it("refuses helper replacement inside HELD admission and retains exact ACK debt", function() replacement("helper", "held") end)
+	H.it("refuses CLI replacement inside HELD admission and retains exact ACK debt", function() replacement("cli", "held") end)
+	H.it("refuses CLI replacement inside final chosen-ID admission", function() replacement("cli", "final") end)
+	H.it("preserves unchanged callback source and readonly chosen-ID refusal", function()
+		fixture(function(f)
+			f.helper_inode = 12
+			local callbacks, starts, terminals, result = 0, 0, 0, nil
+			f.on_start = function() starts = starts + 1 end
+			local handle = assert(f.native.revalidate_program("/usr/bin/shortcuts", { "run", ID }, function(...)
+				terminals = terminals + 1; result = { ... }
+			end, function() callbacks = callbacks + 1; return true end))
+			H.assert_true(handle.start()); local task = f.tasks[1]
+			task.emit("Q1 HELD\n"); H.assert_eq(task.inputs, { "ACTIVATE\n" })
+			f.reply(task, 1, "revalidate"); H.assert_eq(terminals, 0)
+			H.assert_eq(handle.isSettled(), false); H.assert_eq(f.native.available(), false)
+			task.finish(); H.assert_eq(callbacks, 3); H.assert_eq(starts, 1)
+			H.assert_eq(terminals, 1); H.assert_eq(result[1], false); H.assert_nil(result[2])
+			H.assert_eq(result[3], "service_retirement_unqualified")
+			H.assert_true(handle.isSettled()); H.assert_true(f.native.available())
+			H.assert_true(handle.terminate()); H.assert_eq(terminals, 1)
+		end)
+	end)
+	local function cancelled(boundary)
+		fixture(function(f)
+			local handle, armed, starts, terminals, reason = nil, false, 0, 0, nil
+			f.on_start = function() starts = starts + 1 end
+			handle = assert(f.native.revalidate_program("/usr/bin/shortcuts", { "run", ID }, function(success, value, why)
+				H.assert_eq(success, false); H.assert_nil(value)
+				terminals, reason = terminals + 1, why
+			end, function()
+				if armed then handle.terminate() end
+				return true
+			end))
+			local task = f.tasks[1]
+			if boundary == "start" then
+				armed = true; H.assert_eq(handle.start(), false); H.assert_eq(starts, 0)
+			else
+				H.assert_true(handle.start()); armed = true; task.emit("Q1 HELD\n")
+				H.assert_true(task.closes > 0); H.assert_eq(handle.isSettled(), false)
+				H.assert_eq(f.native.available(), false); H.assert_eq(terminals, 0)
+				f.reply(task, 1, "revalidate"); task.finish()
+			end
+			H.assert_eq(#task.inputs, 0); H.assert_eq(terminals, 1)
+			H.assert_eq(reason, "query_refused"); H.assert_true(handle.isSettled())
+			H.assert_true(f.native.available()); H.assert_true(handle.terminate())
+			H.assert_eq(terminals, 1)
+		end)
+	end
+	H.it("keeps cancellation authoritative inside raw-start admission", function() cancelled("start") end)
+	H.it("keeps cancellation authoritative inside HELD admission", function() cancelled("held") end)
+end)
