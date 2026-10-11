@@ -216,6 +216,42 @@ static void TestUnregisteredCoreInterop(void)
 	assert(count == 0 && dispatchable == 0 && o.snapshot.event.key_up == 1);
 }
 
+/** Exact ABI custody must retain representation bytes, not only field values. */
+static void TestSnapshotRepresentationCustody(void)
+{
+	/* Independent pinned x64 padding offsets: snapshot, composition, event, route. */
+	static const uint32_t padding[] = {
+		54, 55, 76, 77, 78, 79, 100, 101, 102, 103, 127, 166, 167
+	};
+	ErgoptiOutput_State o; ErgoptiReplay_State r; Start(&o, &r);
+	ErgoptiReplay_Snapshot s = Snapshot();
+	unsigned char expected[168];
+	unsigned char *bytes = (unsigned char *)&s;
+	for (uint32_t i = 0; i < sizeof(padding) / sizeof(padding[0]); ++i)
+		bytes[padding[i]] = (unsigned char)(0x91u + i);
+	memcpy(expected, &s, sizeof(expected));
+	uint16_t text = 0x0061;
+	ErgoptiOutput_Key key; ErgoptiOutput_Unit units[2];
+	uint32_t count; uint64_t attempt;
+	assert(sizeof(s) == sizeof(expected));
+	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 1, &r, &s, &text, 1, 1, &key) == 0);
+	assert(memcmp(&o.snapshot, expected, sizeof(expected)) == 0);
+	/* Caller storage retires while the complete immutable owned receipt survives. */
+	memset(&s, 0xDD, sizeof(s));
+	assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 2, &count, &attempt) == 0);
+	assert(count == 2 && units[0].utf16 == 0x0061 && units[1].key_up == 1);
+	assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 1) == 0);
+	assert(memcmp(&o.snapshot, expected, sizeof(expected)) == 0);
+	assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 2, &count, &attempt) == 0);
+	assert(count == 1 && units[0].utf16 == 0x0061 && units[0].key_up == 1);
+	assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 1) == 0);
+	ErgoptiReplay_Event edge;
+	memset(&edge, 0xEE, sizeof(edge));
+	assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0);
+	assert(memcmp(&edge, expected + 104, 24) == 0);
+	assert(memcmp(&o.snapshot, expected, sizeof(expected)) == 0);
+}
+
 static void TestInvalidAndOwnership(void)
 {
 	ErgoptiOutput_State o = ERGOPTI_OUTPUT_STATE_INIT; ErgoptiReplay_State r;
@@ -250,6 +286,7 @@ int main(void)
 	TestInvalidAndOwnership(); puts("PASS output-plan malformed UTF16, provenance, ownership and sequence");
 	TestDiagnosticCopyAndBounds(); puts("PASS output-plan guarded diagnostic copies and 1024-unit text bound");
 	TestUnregisteredCoreInterop(); puts("PASS output-plan actual unregistered core snapshots and registration coherence");
-	puts("PASS terminal output plan: 6 matrices; native Windows output UNRUN");
+	TestSnapshotRepresentationCustody(); puts("PASS output-plan exact nonzero-padding snapshot and edge custody");
+	puts("PASS terminal output plan: 7 matrices; native Windows output UNRUN");
 	return 0;
 }

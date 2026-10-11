@@ -135,7 +135,8 @@ int32_t ErgoptiOutput_Plan(
 			|| cohort_complete > 1 || (length && text == NULL)) return ERGOPTI_OUTPUT_INVALID;
 	if (sequence <= state->last_sequence || state->next_plan_id == UINT64_MAX)
 		return ERGOPTI_OUTPUT_STALE;
-	frozen = *snapshot;
+	/* Custody compares the complete ABI representation, including padding. */
+	memcpy(&frozen, snapshot, sizeof(frozen));
 	if (frozen.owner != owner) return ERGOPTI_OUTPUT_WRONG_OWNER;
 	if (!InputValid(routes, owner, &frozen)
 			|| (!SnapshotValid(routes, owner, &frozen) && !AbsentRecipe(routes, &frozen))
@@ -175,7 +176,7 @@ int32_t ErgoptiOutput_Plan(
 	}
 	state->key.token = token; state->key.sequence = sequence;
 	state->key.plan_id = ++state->next_plan_id; state->last_sequence = sequence;
-	state->snapshot = frozen; state->count = count; state->accepted = 0;
+	memcpy(&state->snapshot, &frozen, sizeof(state->snapshot)); state->count = count; state->accepted = 0;
 	state->attempting = 0; state->attempt_count = 0; state->attempt_id = 0;
 	state->active = 1; state->dispatchable = (uint8_t)(eligible && cohort_complete);
 	memcpy(state->units, units, count * sizeof(units[0])); *key = state->key;
@@ -235,7 +236,7 @@ int32_t ErgoptiOutput_Consume(
 	if (!state->dispatchable) return ERGOPTI_OUTPUT_DIAGNOSTIC;
 	if (original_edge == NULL) return ERGOPTI_OUTPUT_INVALID;
 	if (state->attempting || state->accepted != state->count) return ERGOPTI_OUTPUT_DEBT;
-	*original_edge = state->snapshot.event; state->active = 0;
+	memcpy(original_edge, &state->snapshot.event, sizeof(*original_edge)); state->active = 0;
 	return ERGOPTI_OUTPUT_OK;
 }
 int32_t ErgoptiOutput_Cancel(
