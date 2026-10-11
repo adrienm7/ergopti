@@ -1,0 +1,1504 @@
+{
+	"product_commit": "7c9cfa47fa07469919ed64eb259027ccdef77675",
+	"qualified_candidate": "06056d09d478cb5a21731a4d154e1845b6ca5c34",
+	"integrated_dev": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+	"integrated_tree": "8b68d57c82ba287cf330d584b2e80fd73ad2efc1",
+	"integration_parents": [
+		"9480d8d89ca9916d1f12764eaac27e2b1988222d",
+		"06056d09d478cb5a21731a4d154e1845b6ca5c34"
+	],
+	"local_final_selected": {
+		"head": "06056d09d478cb5a21731a4d154e1845b6ca5c34",
+		"upstream": "9480d8d89ca9916d1f12764eaac27e2b1988222d",
+		"actual_exit": 0,
+		"format_files": 379,
+		"JavaScript": {
+			"pass": 410,
+			"fail": 0
+		},
+		"Lua_controlled_Hammerspoon": {
+			"pass": 18599,
+			"fail": 0,
+			"modules": 1571
+		},
+		"outer_virtual_E2E": {
+			"pass": 101,
+			"fail": 0,
+			"skip": 1,
+			"original_skip": "driver-specific rolling_buffer_cap"
+		},
+		"source_pins_stable": true,
+		"working_tree_clean": true,
+		"raw_sha256": "efd5ce599da377c7a31d01587c0269fcce7f16c8ee16806f24476231dc867c10",
+		"raw_bytes_preserved": true,
+		"human_count_decoding": "UTF-8 replacement only in memory; original test output bytes unchanged",
+		"native_macos_execution": false
+	},
+	"manual_ci_terminal": {
+		"run_id": 38129586139,
+		"sha": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+		"run_attempt": 1,
+		"status": "completed",
+		"conclusion": "failure",
+		"whole_attempt_terminal": true,
+		"total_count": 17,
+		"pages": 1,
+		"job_outcomes": {
+			"success": 7,
+			"failure": 5,
+			"skipped": 5
+		},
+		"release_actual": "skipped",
+		"jobs": [
+			{
+				"id": 114440951045,
+				"name": "Validate / Checks and plan",
+				"status": "completed",
+				"conclusion": "success"
+			},
+			{
+				"id": 114441094220,
+				"name": "Core / properties",
+				"status": "completed",
+				"conclusion": "success"
+			},
+			{
+				"id": 114441094275,
+				"name": "Core / js",
+				"status": "completed",
+				"conclusion": "success"
+			},
+			{
+				"id": 114441094292,
+				"name": "macOS / Item 36 native archive qualification",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"id": 114441094295,
+				"name": "macOS / Unit tests (stubbed)",
+				"status": "completed",
+				"conclusion": "success"
+			},
+			{
+				"id": 114441094369,
+				"name": "macOS / Managed Ollama native \u00b7 amd64",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"id": 114441094443,
+				"name": "macOS / Managed Ollama native \u00b7 arm64",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"id": 114441094722,
+				"name": "macOS / Native cold MLX bootstrap \u00b7 macos-15 arm64",
+				"status": "completed",
+				"conclusion": "success"
+			},
+			{
+				"id": 114441095019,
+				"name": "Windows",
+				"status": "completed",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 114441095118,
+				"name": "Linux",
+				"status": "completed",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 114443540697,
+				"name": "macOS / E2E tests (stubbed)",
+				"status": "completed",
+				"conclusion": "success"
+			},
+			{
+				"id": 114444088333,
+				"name": "macOS / Native tooltip canvas \u00b7 12 captures",
+				"status": "completed",
+				"conclusion": "success"
+			},
+			{
+				"id": 114444089086,
+				"name": "macOS / Package",
+				"status": "completed",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 114444089215,
+				"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+				"status": "completed",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 114444265719,
+				"name": "macOS / Verdict",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"id": 114444324253,
+				"name": "Validate / Selected OS verdict",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"id": 114444325048,
+				"name": "Release / Publish",
+				"status": "completed",
+				"conclusion": "skipped"
+			}
+		],
+		"native_case_counts": "RAW_LOG_RECEIVING_REQUIRED",
+		"ref_mutations": 0,
+		"raw_source_hashes": {
+			"run-before.json": "043c355a44bd6dbe5e0981c70b5469565ddfbb338015d059667dede5c659dedb",
+			"run-after.json": "043c355a44bd6dbe5e0981c70b5469565ddfbb338015d059667dede5c659dedb",
+			"all-jobs.json": "2bb4782397843206273eec3ee333f399661fef9fc63f43b441d0a4d8f470f6ff"
+		}
+	},
+	"manual_CI_modeled_units": {
+		"pass": 18599,
+		"fail": 0,
+		"raw_sha256": "1612e19cfeef7e5be7187f508e1ac49867a806b027747eee466d68fd1d687243"
+	},
+	"manual_CI_modeled_E2E": {
+		"pass": 101,
+		"fail": 0,
+		"skip": 1,
+		"raw_sha256": "370fc5ffa738e824f704f961600ea335f1097adedc3cec25bb86092748277883"
+	},
+	"Carbon_original_ARM64": {
+		"run_id": 38129586139,
+		"source_sha": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+		"artifact_id": 11698971383,
+		"authenticated_zip_sha256": "a268aa19c85b5489ae545271e556343f0318dfb469d588313786218ecf55c83a",
+		"native_case_counts": {
+			"pass": 12,
+			"fail": 0,
+			"skip": 0
+		},
+		"seven_original_restoration_pairs_status0": true,
+		"independent_original_sources_exact": true,
+		"native_forced_output": false,
+		"physical_keyboard_qualified": false,
+		"whole_workflow_terminal": false,
+		"native_omission_causal11_plus1": "UNRUN"
+	},
+	"Carbon_original_AMD64": {
+		"run_id": 38129586139,
+		"tested_commit": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+		"artifact_id": 11698593009,
+		"authenticated_zip_sha256": "82a1e4d83fa3d5066a65f2a520eed23cb68d3675601781933a9c0bf7f46cc4ba",
+		"native_case_counts": {
+			"pass": 12,
+			"fail": 0,
+			"skip": 0
+		},
+		"seven_original_restoration_pairs_status0": true,
+		"independent_original_sources_exact": true,
+		"failed_methods": [],
+		"failed_method_source_observations": [],
+		"native_forced_output": false,
+		"physical_keyboard_qualified": false,
+		"whole_workflow_terminal": false,
+		"native_omission_causal11_plus1": "UNRUN"
+	},
+	"native_archive": {
+		"run_id": 38129586139,
+		"job_id": 114441094292,
+		"tested_sha": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+		"authenticated_job_log_sha256": "f4dfe877086bc8df0aafc772d6c61069e29f900c5542ce0eb24f5af975587406",
+		"archive_cohort_method_counts": {
+			"pass": 24,
+			"fail": 1,
+			"skip": 0
+		},
+		"separate_no_prompt_readonly_probe": {
+			"pass": 1,
+			"fail": 0
+		},
+		"whole_job_completed_method_counts": {
+			"pass": 25,
+			"fail": 1,
+			"skip": 0
+		},
+		"assertion_events_in_archive_cohort": 2,
+		"failed_methods": [
+			"ErgoptiPlusTests.HomebrewArchiveAcceptanceTests testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState"
+		],
+		"observed_refusal": "Native AppleEvent boundary unavailable: Owned Automation prompt exceeded its deadline",
+		"source_failure_cause": "UNPROVEN",
+		"native_installation_qualified": false
+	},
+	"managed_native_ARM64": {
+		"architecture": "arm64",
+		"source_sha": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+		"run_id": 38129586139,
+		"raw_sha256": "fb25f2cef92e9a01b3136b79810b622f528dd26387fa95044346794125a1c957",
+		"native_Swift_assertions": 14,
+		"HTTPX_HF_cases": 2,
+		"HTTPX_HF_errors_including_teardown": 3,
+		"trust_cleanup_status": 1,
+		"native_model_inference": "UNQUALIFIED",
+		"underlying_cause": "UNPROVEN",
+		"all_completed_Swift_methods": {
+			"total": 134,
+			"counts": {
+				"passed": 132,
+				"failed": 2
+			},
+			"original_results": [
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testActualAcquisitionFailurePreservesPrimaryAndCleanupDebt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testActualRetainedVnodeExecAndAcceptedOwnerSurviveOriginalUnlink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testActualUncertainCloseCannotRecloseAReusedForeignDescriptor",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testUnknownAliasLeaseCannotAuthorizeAnyPrivateHeader",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedListenerPathIdentityTests testActualVarAliasCannotSupplyWrongOriginalInodeBeforeAnyHTTP",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedListenerPathIdentityTests testActualVarAliasRetainsSDKAcceptedOwnerBeforePrivateGET",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testBootstrapContextCannotPartiallyOverrideLegacyRequest",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeBootstrapEmptyBeforeImageProofAndOriginalCloseReceipt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeBootstrapReplacementRefusesActivationAndRetires",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeCertificateDataRefusalsAndDirectory",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeCustomAnchorsPreserveHostnameAndDefaultRefusal",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testProductionStoreAndBootstrapContextLexicalFences",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testActualStalledInputExpiresIdleWithNoAbsoluteDeadline",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testForeignExecutableOnRightPortCannotAdmitSecret",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testLiteralChunkedPOSTKeepsExactAcceptedOwner",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testProgressCannotRefreshOriginalAbsoluteDeadline",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testProgressingPullWithoutAbsoluteDeadlineOutlivesInitialIdleBudget",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testRealAcceptedOwnerBeforeGETAndPhysicalClientEOF",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testRedirectIsRefusedWithoutSecondConnection",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testRetainedReadOnlyMachOReallyLoadsAndOwnsAcceptedTCP",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testStrictRequestKindsAndPinnedExecutablePath",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testTruncatedResponseCannotPublishSuccessfulTerminal",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testWrongCatalogueInodeRefusesDiscoveryBeforeAnyHTTP",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testWrongSDKStartRefusesBeforeAnySecretOrBody",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testActualTTYAndRawChildReceiptSpoofCannotReplacePrivilegedClosure",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testOfficialThirdPinnedInstallerReceivesOnlyItsPrivateEnvironmentContract",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testOriginalDeadlineCancelsActualTerminalOwnerBeforeReceipt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testPauseRetainsLeaderUntilLingeringNativeGroupAndPTYAreClosed",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testPrivateAdmissionRejectsBooleanBudgetCommandsAndEnvironmentOverrides",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testRetainedSourceSnapshotCannotFollowLaterPathReplacement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testSecondPinnedInstallerUsesActualTTYRetainedSourceAndOriginalBudget",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testSourcePinRefusesBeforePayloadAndReportsClosedEmptyScope",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testTerminalEOFBeforeLeaderExitIsNotCancellationOrRetirement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testThirdInstallerCannotBorrowTheSecondPinnedSourceAdmission",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixCancellationBeforeAcquisitionRetiresExactNativeOwner",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixCloseEBADFRemainsRetainedAfterEveryAttempt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixForeignReplacementSurvivesConditionalNamespaceCleanup",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixForkedDescendantCannotImpersonateOriginalMappedPeer",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixMissingWriterEOFNeverGrantsListenerEvent",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixOriginalMappedPeerFrameAndEOFAdmitted",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testCallerEOFPhysicallyRetiresMappedHeldLeader",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testCanonicalIntegerIdentityAndPublicOnlyEnvironmentCannotBeRoundedOrExtended",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testHeldMappedIdentityPrecedesEverySessionByteAndActivation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testNonemptySessionIsRefusedBeforeAnyImageOwnerIsPrepared",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testOptionalListenerEventCancelledBeforeActivationClosesAllOriginalOwners",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testOptionalListenerEventMissingConnectionNeverClaimsBoundOrReady",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testReplacedNamedImageBeforeActivationCannotResumeTheHeldLeader",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testWrongCatalogueInodeNeverPublishesImageReadyOrActivation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testActualGuardianMappedShellBothStreamsAndFinalTailsPersistBeforeRetirement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testInheritedWriterBlocksEOFAndFinalTailSettlement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testInvalidUTF8RefusesLogSuccessButClosesRealPipes",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testNativeSplitRecordsAndFinalTailsUseWriteTimeDay",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testPipeCloseUncertaintyRemainsStickyWithoutNumericRetry",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testReplacedConfiguredDirectoryRefusesBothOldAndForeignSink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testSinkCloseUncertaintyBlocksSuccessfulRetirement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testAcceptedRecordFansOutOnceAndDuplicateOnlyAcknowledges",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBatchBoundsAndContiguityRejectBeforeAnyWrite",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBatchRetrySkipsTheDurablePrefixAndResumesAtExpectedSequence",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBatchValidatesEveryRecordBeforeWritingAndAcknowledgesTheFinalSequence",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBoundLoopbackWorkerAcknowledgesPersistedRecord",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testConfigurePurgesExpiredDailyAndStaleTopicalFiles",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testConfigureRefusalEchoesTheAuthenticatedRequestSession",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testDelayedOldConfigureCannotRollBackTheActiveReloadSession",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testDrainReceiveLoopBoundsZeroLengthDatagrams",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFailedRollbackSynchronizationRetainsDebtBeforeRetry",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFailedShortWriteRollbackRetainsDebtBeforeRetry",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFastDatagramIsNotReported",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFirstRecordAfterMidnightReplacesThePriorDayTopicalView",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFirstRecordOnNewWallClockDayRearmsRetentionWithoutReconfigure",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFreshLauncherAcceptsPersistedPreviousSessionFromPriorProcess",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFreshLauncherPreservesAnExistingSameDayTopicalView",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testGapAndStaleSessionCannotWriteWhileNewSessionRestartsAtOne",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testMalformedDateAndTopicCannotEscapeOrMutateAnySink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testNULInDiagnosticIsEscapedWithoutBlockingTheSequenceQueue",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testObservedCalendarTransitionRotatesTopicalEvenWhenOldRecordHasNewDayMtime",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testReloadSessionAppendsToTodaysTopicalViewInsteadOfTruncatingIt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testReplacedDirectoryAtSamePathDoesNotReuseTopicalInitializationState",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testRetryAfterPartialFanoutDoesNotDuplicateCompletedFiles",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testSameDirectoryReconfigureRetainsObservedTopicalCalendarTransition",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testShortWriteRollbackLeavesOneRecordInEverySink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testSinkReusesADescriptorAcrossAppendsAndReopensAfterUnlink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testSlowDatagramIsReportedWithItsCostBreakdown",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testTopicalRotationUsesMetadataObservedAfterWaitingForTheWriteLock",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testWrongTokenAndNonLoopbackSourceReceiveNoProtocolOracle",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testDanglingAncestorLinkNamesTheAncestor",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testDanglingLogsLinkIsRefusedAndItsTargetIsNeverCreated",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testEveryRefusalHasALocalizedAlertInTheSharedCatalog",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testLocaleChoiceFollowsTheDriverThenTheSystemThenEnglish",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testNoFollowAnyRefusesAnIntermediateLink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testOnlyTheApplicationFolderIsRestrictedToItsOwner",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testPreexistingSourceRunLogsAreReused",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testProcessorNamesTheRefusalInTheNackAndReportsIt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testRegularFileInPlaceOfTheFolderIsNotADirectory",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testRelativePathIsInvalid",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testSymlinkedConfigRootCreatesTheMissingLogsFolderInsideTheTarget",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testSymlinkedDriverFolderIsAccepted",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testSymlinkedLogsFolderIsAcceptedAndWrittenThrough",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualUSCapsMaskChangesAnIndependentLetterExpectation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testHeadlessRoleRequiresTenCanonicalDistinctPositionsAndBoundedIdentity",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testInvalidInvocationRefusesBeforeAnyNativeRead",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testMissingUnicodeDataAndForeignInitialIdentityNeverReadFallback",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testWorkerPreservesUInt32DeadStateAndExactFortyRowOrder",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testWorkerRefusesPartialForeignOrMislabelledFactsWithoutPublication",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testAuthorityScopeIncludesCanonicalSchemeHostEffectivePort",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testBindingEscapesRequestDataAndRefusesInvalidSource",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testOriginalLookupBudgetIncludesSettingsPreparation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceDeadlineRefusesAndRetiresBeforeReplacement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceDecodersRetireEverySession",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceRedirectsHaveFreshCredentialFreeOwners",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceStatusSizeAndEncodingRefusalsRetire",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceTrustAnchorsPreserveHostnameAndDowngradeRefusal",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testStrictUTF16RejectsMalformedSurrogatesAndNUL",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testStrictUTF8AndBOMAdmission",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPSPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACPreservesHTTPPathAndOrderedNativeChoices",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testBinaryFrameLengthAndNULPayloadAreExact",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testInvalidRequestsRefuseBeforeAnyNativeDispatch",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy",
+					"status": "passed"
+				}
+			]
+		},
+		"PAC_WPAD_wire_cohort": {
+			"total": 14,
+			"counts": {
+				"pass": 12,
+				"fail": 2,
+				"skip": 0
+			},
+			"assertion_events": 14,
+			"unexpected_errors": 2,
+			"original_results": [
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPSPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACPreservesHTTPPathAndOrderedNativeChoices",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testBinaryFrameLengthAndNULPayloadAreExact",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testInvalidRequestsRefuseBeforeAnyNativeDispatch",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy",
+					"status": "passed"
+				}
+			]
+		}
+	},
+	"managed_native_AMD64": {
+		"architecture": "amd64",
+		"source_sha": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+		"run_id": 38129586139,
+		"raw_sha256": "55ed1102428e1c7895bf5ef287f341c9159d8188403a447ff19e10bbc50e6a4f",
+		"native_Swift_assertions": 14,
+		"HTTPX_HF_cases": 2,
+		"HTTPX_HF_errors_including_teardown": 3,
+		"trust_cleanup_status": 1,
+		"native_model_inference": "UNQUALIFIED",
+		"underlying_cause": "UNPROVEN",
+		"all_completed_Swift_methods": {
+			"total": 134,
+			"counts": {
+				"passed": 132,
+				"failed": 2
+			},
+			"original_results": [
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testActualAcquisitionFailurePreservesPrimaryAndCleanupDebt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testActualRetainedVnodeExecAndAcceptedOwnerSurviveOriginalUnlink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testActualUncertainCloseCannotRecloseAReusedForeignDescriptor",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedImageAliasTests testUnknownAliasLeaseCannotAuthorizeAnyPrivateHeader",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedListenerPathIdentityTests testActualVarAliasCannotSupplyWrongOriginalInodeBeforeAnyHTTP",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedListenerPathIdentityTests testActualVarAliasRetainsSDKAcceptedOwnerBeforePrivateGET",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testBootstrapContextCannotPartiallyOverrideLegacyRequest",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeBootstrapEmptyBeforeImageProofAndOriginalCloseReceipt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeBootstrapReplacementRefusesActivationAndRetires",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeCertificateDataRefusalsAndDirectory",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testNativeCustomAnchorsPreserveHostnameAndDefaultRefusal",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedNetworkBootstrapTests testProductionStoreAndBootstrapContextLexicalFences",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testActualStalledInputExpiresIdleWithNoAbsoluteDeadline",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testForeignExecutableOnRightPortCannotAdmitSecret",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testLiteralChunkedPOSTKeepsExactAcceptedOwner",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testProgressCannotRefreshOriginalAbsoluteDeadline",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testProgressingPullWithoutAbsoluteDeadlineOutlivesInitialIdleBudget",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testRealAcceptedOwnerBeforeGETAndPhysicalClientEOF",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testRedirectIsRefusedWithoutSecondConnection",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testRetainedReadOnlyMachOReallyLoadsAndOwnsAcceptedTCP",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testStrictRequestKindsAndPinnedExecutablePath",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testTruncatedResponseCannotPublishSuccessfulTerminal",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testWrongCatalogueInodeRefusesDiscoveryBeforeAnyHTTP",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedOllamaAPIWorkerTests testWrongSDKStartRefusesBeforeAnySecretOrBody",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testActualTTYAndRawChildReceiptSpoofCannotReplacePrivilegedClosure",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testOfficialThirdPinnedInstallerReceivesOnlyItsPrivateEnvironmentContract",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testOriginalDeadlineCancelsActualTerminalOwnerBeforeReceipt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testPauseRetainsLeaderUntilLingeringNativeGroupAndPTYAreClosed",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testPrivateAdmissionRejectsBooleanBudgetCommandsAndEnvironmentOverrides",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testRetainedSourceSnapshotCannotFollowLaterPathReplacement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testSecondPinnedInstallerUsesActualTTYRetainedSourceAndOriginalBudget",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testSourcePinRefusesBeforePayloadAndReportsClosedEmptyScope",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testTerminalEOFBeforeLeaderExitIsNotCancellationOrRetirement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPTYWorkerTests testThirdInstallerCannotBorrowTheSecondPinnedSourceAdmission",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixCancellationBeforeAcquisitionRetiresExactNativeOwner",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixCloseEBADFRemainsRetainedAfterEveryAttempt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixForeignReplacementSurvivesConditionalNamespaceCleanup",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixForkedDescendantCannotImpersonateOriginalMappedPeer",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixMissingWriterEOFNeverGrantsListenerEvent",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testActualUnixOriginalMappedPeerFrameAndEOFAdmitted",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testCallerEOFPhysicallyRetiresMappedHeldLeader",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testCanonicalIntegerIdentityAndPublicOnlyEnvironmentCannotBeRoundedOrExtended",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testHeldMappedIdentityPrecedesEverySessionByteAndActivation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testNonemptySessionIsRefusedBeforeAnyImageOwnerIsPrepared",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testOptionalListenerEventCancelledBeforeActivationClosesAllOriginalOwners",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testOptionalListenerEventMissingConnectionNeverClaimsBoundOrReady",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testReplacedNamedImageBeforeActivationCannotResumeTheHeldLeader",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedSuspendedImageTests testWrongCatalogueInodeNeverPublishesImageReadyOrActivation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testActualGuardianMappedShellBothStreamsAndFinalTailsPersistBeforeRetirement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testInheritedWriterBlocksEOFAndFinalTailSettlement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testInvalidUTF8RefusesLogSuccessButClosesRealPipes",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testNativeSplitRecordsAndFinalTailsUseWriteTimeDay",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testPipeCloseUncertaintyRemainsStickyWithoutNumericRetry",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testReplacedConfiguredDirectoryRefusesBothOldAndForeignSink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.SuspendedImageLogCaptureTests testSinkCloseUncertaintyBlocksSuccessfulRetirement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testAcceptedRecordFansOutOnceAndDuplicateOnlyAcknowledges",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBatchBoundsAndContiguityRejectBeforeAnyWrite",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBatchRetrySkipsTheDurablePrefixAndResumesAtExpectedSequence",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBatchValidatesEveryRecordBeforeWritingAndAcknowledgesTheFinalSequence",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testBoundLoopbackWorkerAcknowledgesPersistedRecord",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testConfigurePurgesExpiredDailyAndStaleTopicalFiles",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testConfigureRefusalEchoesTheAuthenticatedRequestSession",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testDelayedOldConfigureCannotRollBackTheActiveReloadSession",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testDrainReceiveLoopBoundsZeroLengthDatagrams",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFailedRollbackSynchronizationRetainsDebtBeforeRetry",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFailedShortWriteRollbackRetainsDebtBeforeRetry",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFastDatagramIsNotReported",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFirstRecordAfterMidnightReplacesThePriorDayTopicalView",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFirstRecordOnNewWallClockDayRearmsRetentionWithoutReconfigure",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFreshLauncherAcceptsPersistedPreviousSessionFromPriorProcess",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testFreshLauncherPreservesAnExistingSameDayTopicalView",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testGapAndStaleSessionCannotWriteWhileNewSessionRestartsAtOne",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testMalformedDateAndTopicCannotEscapeOrMutateAnySink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testNULInDiagnosticIsEscapedWithoutBlockingTheSequenceQueue",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testObservedCalendarTransitionRotatesTopicalEvenWhenOldRecordHasNewDayMtime",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testReloadSessionAppendsToTodaysTopicalViewInsteadOfTruncatingIt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testReplacedDirectoryAtSamePathDoesNotReuseTopicalInitializationState",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testRetryAfterPartialFanoutDoesNotDuplicateCompletedFiles",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testSameDirectoryReconfigureRetainsObservedTopicalCalendarTransition",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testShortWriteRollbackLeavesOneRecordInEverySink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testSinkReusesADescriptorAcrossAppendsAndReopensAfterUnlink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testSlowDatagramIsReportedWithItsCostBreakdown",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testTopicalRotationUsesMetadataObservedAfterWaitingForTheWriteLock",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.LoggerDatagramWorkerTests testWrongTokenAndNonLoopbackSourceReceiveNoProtocolOracle",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testDanglingAncestorLinkNamesTheAncestor",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testDanglingLogsLinkIsRefusedAndItsTargetIsNeverCreated",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testEveryRefusalHasALocalizedAlertInTheSharedCatalog",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testLocaleChoiceFollowsTheDriverThenTheSystemThenEnglish",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testNoFollowAnyRefusesAnIntermediateLink",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testOnlyTheApplicationFolderIsRestrictedToItsOwner",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testPreexistingSourceRunLogsAreReused",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testProcessorNamesTheRefusalInTheNackAndReportsIt",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testRegularFileInPlaceOfTheFolderIsNotADirectory",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testRelativePathIsInvalid",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testSymlinkedConfigRootCreatesTheMissingLogsFolderInsideTheTarget",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testSymlinkedDriverFolderIsAccepted",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.OwnedLogDirectoryTests testSymlinkedLogsFolderIsAcceptedAndWrittenThrough",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testActualUSCapsMaskChangesAnIndependentLetterExpectation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testHeadlessRoleRequiresTenCanonicalDistinctPositionsAndBoundedIdentity",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testInvalidInvocationRefusesBeforeAnyNativeRead",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testMissingUnicodeDataAndForeignInitialIdentityNeverReadFallback",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testWorkerPreservesUInt32DeadStateAndExactFortyRowOrder",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.NumberRowSourceProbeTests testWorkerRefusesPartialForeignOrMislabelledFactsWithoutPublication",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testAuthorityScopeIncludesCanonicalSchemeHostEffectivePort",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testBindingEscapesRequestDataAndRefusesInvalidSource",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testOriginalLookupBudgetIncludesSettingsPreparation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceDeadlineRefusesAndRetiresBeforeReplacement",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceDecodersRetireEverySession",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceRedirectsHaveFreshCredentialFreeOwners",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceStatusSizeAndEncodingRefusalsRetire",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testRealPACSourceTrustAnchorsPreserveHostnameAndDowngradeRefusal",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testStrictUTF16RejectsMalformedSurrogatesAndNUL",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedPACSourceTests testStrictUTF8AndBOMAdmission",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPSPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACPreservesHTTPPathAndOrderedNativeChoices",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testBinaryFrameLengthAndNULPayloadAreExact",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testInvalidRequestsRefuseBeforeAnyNativeDispatch",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy",
+					"status": "passed"
+				}
+			]
+		},
+		"PAC_WPAD_wire_cohort": {
+			"total": 14,
+			"counts": {
+				"pass": 12,
+				"fail": 2,
+				"skip": 0
+			},
+			"assertion_events": 14,
+			"unexpected_errors": 2,
+			"original_results": [
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWPADWireTests testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWireTests testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure",
+					"status": "failed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkHTTPSPACArgumentShapeObservation",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACPreservesHTTPPathAndOrderedNativeChoices",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testBinaryFrameLengthAndNULPayloadAreExact",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testInvalidRequestsRefuseBeforeAnyNativeDispatch",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testNativeErrorsNeverReturnPrivateDiagnosticPayload",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains",
+					"status": "passed"
+				},
+				{
+					"method": "ErgoptiPlusTests.ManagedHTTPWorkerTests testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy",
+					"status": "passed"
+				}
+			]
+		}
+	},
+	"owned_phase_release": {
+		"push_exit": 0,
+		"remote_after": {
+			"refs/heads/codex/ci-validation": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+			"refs/heads/dev": "5f7a8467c9696b26a75de104f6329b39c181b8cb"
+		},
+		"cancellation_census_exit": 0
+	},
+	"remaining_group3_items": [63, 71, 73, 91, 93, 96, 97, 98, 106, 107, 108, 109, 111],
+	"removed_items": [],
+	"physical_only_remaining": false,
+	"shared_custody": "Five Mac CI/enrollment spans and fifteen Linux Xi paths remain pending; existing immutable capsules retain proposals.",
+	"source_only_original_producer": "Group5 publication 18e1637d175761d6e802a58934514b2443c8b985 prepares source; installed editor capture/currentSource is unqualified.",
+	"fresh_native_omission_diagnostic": "UNRUN; expected 11 PASS / 1 named expected FAIL, seven original restoration closures and positive-receiver refusal required.",
+	"whole_native_qualification": false,
+	"additional_native_CI_for_this_docs_only_checkpoint": false
+}
