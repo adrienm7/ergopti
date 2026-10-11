@@ -48,6 +48,21 @@ local function fixture(body)
 				return page
 			end,
 		}
+		-- Availability cases consume the actual native predicate, never a copied rule.
+		package.loaded["ui.menu.shortcut_utils"] = nil
+		package.loaded["adapters.apple_shortcuts_native"] = nil
+		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
+		package.loaded["adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
+		package.loaded["infra.dialog_util"] = {
+			text_prompt = function(_, _, _, save) return save, f.typed end,
+			block_alert = function(_, reason) f.warning = reason end,
+		}
+		package.loaded["modules.gestures.actions_aux_owner"] = { program_available = function() return true end }
+		f.native = require("adapters.apple_shortcuts_native")
+		f.utils = require("ui.menu.shortcut_utils")
+		f.locale = package.loaded["infra.i18n"]
+		f.native_tasks = 0
+		_G.hs.task = { new = function() f.native_tasks = f.native_tasks + 1; error("native task forbidden") end }
 		f.picker = require("ui.action_picker")
 		function f.open(callback)
 			return f.picker.open({ items = {} }, callback or function(id, parameter)
@@ -65,6 +80,7 @@ local function fixture(body)
 	_G.hs = old_hs
 	for key in pairs(package.loaded) do if saved[key] == nil then package.loaded[key] = nil end end
 	for key, value in pairs(saved) do package.loaded[key] = value end
+	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
 	if not ok then error(failure, 0) end
 end
 
@@ -190,6 +206,7 @@ local function automation(f)
 		owners[#owners + 1] = owner
 		return owner
 	end }
+	package.loaded["adapters.apple_shortcuts_native"].is_chosen_program = f.native.is_chosen_program
 	return owners
 end
 
@@ -243,6 +260,197 @@ helpers.describe("Production readonly automation picker sessions", function()
 			owners[1].retirement = true
 			helpers.assert_true(f.open())
 			helpers.assert_eq(#owners, 2)
+		end)
+	end)
+end)
+
+local RESERVED = '{"version":1,"executable":"/usr/bin/shortcuts","arguments":["run","11111111-1111-1111-1111-111111111111"]}'
+local UNAVAILABLE = "platform_reason.program_runner_unavailable"
+
+helpers.describe("Actual macOS reserved program assignment availability", function()
+	helpers.it("manual reserved refusal keeps the editor retryable for an ordinary repair", function()
+		fixture(function(f)
+			_G.hs.json.encode = require("json").encode
+			helpers.assert_true(f.open())
+			local page = f.pages[1]
+			f.message(page, { action = "confirm", id = "run_program", parameter = RESERVED })
+			helpers.assert_eq(#f.calls, 0)
+			helpers.assert_eq(page.deletes, 0)
+			helpers.assert_eq(page.scripts[#page.scripts], 'programProviderRefused("' .. UNAVAILABLE .. '")')
+			helpers.assert_eq(f.owners[1].invalidations, 0)
+			f.message(page, { action = "confirm", id = "run_program", parameter = SCALAR })
+			helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+			helpers.assert_eq(page.deletes, 1)
+			helpers.assert_eq(f.native_tasks, 0)
+		end)
+	end)
+	helpers.it("resolved reserved descriptors obey the same host refusal", function()
+		fixture(function(f)
+			_G.hs.json.encode = require("json").encode
+			helpers.assert_true(f.open())
+			f.owners[1].resolve = function() return RESERVED end
+			f.confirm(f.pages[1])
+			helpers.assert_eq(#f.calls, 0)
+			helpers.assert_eq(f.pages[1].deletes, 0)
+			helpers.assert_eq(f.pages[1].scripts[#f.pages[1].scripts], 'programProviderRefused("' .. UNAVAILABLE .. '")')
+			helpers.assert_eq(f.native_tasks, 0)
+		end)
+	end)
+	for _, case in ipairs({
+		{ "ordinary executable", "/private/tool", { "run" }, false },
+		{ "different shortcut path", "/private/shortcuts", { "run" }, false },
+		{ "other native subcommand", "/usr/bin/shortcuts", { "list" }, false },
+		{ "case-sensitive subcommand", "/usr/bin/shortcuts", { "Run" }, false },
+		{ "empty native arguments", "/usr/bin/shortcuts", {}, false },
+		{ "chosen native UUID", "/usr/bin/shortcuts", { "run", "11111111-1111-1111-1111-111111111111" }, true },
+		{ "native name parameter", "/usr/bin/shortcuts", { "run", "Workflow" }, true },
+		{ "missing native direct parameter", "/usr/bin/shortcuts", { "run" }, true },
+	}) do
+		helpers.it("actual native predicate presentation: " .. case[1], function()
+			fixture(function(f)
+				local Json = require("json")
+				local scalar = Json.encode({ version = 1, executable = case[2], arguments = Json.array(case[3]) })
+				helpers.assert_eq(f.native.is_chosen_program(case[2], case[3]), case[4])
+				helpers.assert_eq(f.utils.program_assignment_reason(scalar), case[4] and UNAVAILABLE or nil)
+				helpers.assert_eq(f.native_tasks, 0)
+			end)
+		end)
+	end
+	helpers.it("malformed syntax stays with the existing parameter owner", function()
+		fixture(function(f)
+			helpers.assert_eq(require("program_parameter").parse("not JSON", "hs"), nil)
+			helpers.assert_eq(f.utils.program_assignment_reason("not JSON"), nil)
+			helpers.assert_eq(f.native_tasks, 0)
+		end)
+	end)
+	for _, mode in ipairs({ "missing", "throw", "nil", "table" }) do
+		helpers.it("unavailable native classifier refuses without disabling ordinary repair: " .. mode, function()
+			fixture(function(f)
+				local original = f.native.is_chosen_program
+				_G.hs.json.encode = require("json").encode
+				helpers.assert_true(f.open())
+				if mode == "missing" then f.native.is_chosen_program = nil
+				else f.native.is_chosen_program = function()
+					if mode == "throw" then error("controlled classifier refusal") end
+					if mode == "table" then return {} end
+					return nil
+				end end
+				f.message(f.pages[1], { action = "confirm", id = "run_program", parameter = SCALAR })
+				helpers.assert_eq(#f.calls, 0)
+				helpers.assert_eq(f.pages[1].deletes, 0)
+				f.native.is_chosen_program = original
+				f.message(f.pages[1], { action = "confirm", id = "run_program", parameter = SCALAR })
+				helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+				helpers.assert_eq(f.native_tasks, 0)
+			end)
+		end)
+	end
+	helpers.it("failed reason observation clears settling before the next confirmation", function()
+		fixture(function(f)
+			helpers.assert_true(f.open())
+			local original = f.locale.get
+			f.locale.get = function(key) if key == UNAVAILABLE then error("controlled translation refusal") end; return key end
+			f.message(f.pages[1], { action = "confirm", id = "run_program", parameter = RESERVED })
+			helpers.assert_eq(#f.calls, 0)
+			f.locale.get = original
+			f.message(f.pages[1], { action = "confirm", id = "run_program", parameter = SCALAR })
+			helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+		end)
+	end)
+	helpers.it("classifier replacement cannot confirm or warn the retired page", function()
+		fixture(function(f)
+			helpers.assert_true(f.open())
+			local old, original = f.pages[1], f.native.is_chosen_program
+			local old_scripts = #old.scripts
+			f.native.is_chosen_program = function(executable, arguments)
+				helpers.assert_true(f.open())
+				return original(executable, arguments)
+			end
+			f.message(old, { action = "confirm", id = "run_program", parameter = RESERVED })
+			helpers.assert_eq(#f.calls, 0)
+			helpers.assert_eq(#old.scripts, old_scripts)
+			f.native.is_chosen_program = original
+			f.message(f.pages[2], { action = "confirm", id = "run_program", parameter = SCALAR })
+			helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+		end)
+	end)
+	helpers.it("reason encoding replacement cannot warn the retired page", function()
+		fixture(function(f)
+			helpers.assert_true(f.open())
+			local old, Json = f.pages[1], require("json")
+			local old_scripts = #old.scripts
+			_G.hs.json.encode = function(value)
+				if value == UNAVAILABLE then helpers.assert_true(f.open()) end
+				return Json.encode(value)
+			end
+			f.message(old, { action = "confirm", id = "run_program", parameter = RESERVED })
+			helpers.assert_eq(#f.calls, 0)
+			helpers.assert_eq(#old.scripts, old_scripts)
+			f.message(f.pages[2], { action = "confirm", id = "run_program", parameter = SCALAR })
+			helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+		end)
+	end)
+	helpers.it("native prompt refuses a reserved value and still accepts an ordinary replacement", function()
+		fixture(function(f)
+			local gestures = { parameter_prompt = function() return "Program" end }
+			f.typed = RESERVED
+			helpers.assert_eq(f.utils.ask_parameter_value(gestures, "run_program", "program", "T", RESERVED), nil)
+			helpers.assert_eq(f.warning, UNAVAILABLE)
+			f.typed = SCALAR
+			helpers.assert_eq(f.utils.ask_parameter_value(gestures, "run_program", "program", "T", RESERVED), SCALAR)
+			helpers.assert_eq(f.native_tasks, 0)
+		end)
+	end)
+	helpers.it("public commit refuses before any writer and permits an ordinary replacement", function()
+		fixture(function(f)
+			local calls = 0
+			local function transaction(_, _, scalar) calls = calls + 1; helpers.assert_eq(scalar, SCALAR); return true end
+			helpers.assert_eq(f.utils.commit_action_parameter({}, "keyboard__cmd_1", "run_program", RESERVED, {}, transaction), false)
+			helpers.assert_eq(calls, 0)
+			helpers.assert_eq(f.warning, UNAVAILABLE)
+			helpers.assert_true(f.utils.commit_action_parameter({}, "keyboard__cmd_1", "run_program", SCALAR, {}, transaction))
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(f.native_tasks, 0)
+		end)
+	end)
+	helpers.it("stored reserved bytes remain editable and ordinary stored values have no refusal hint", function()
+		fixture(function(f)
+			local scalar = RESERVED
+			local gestures = {
+				get_action_parameter_spec = function() return "program" end,
+				get_action_parameter = function() return scalar end,
+				parameter_prompt = function() return "Program" end, parameter_error = function() return "Invalid" end,
+				send_vocabulary = function() return {} end, llm_prompt_choices = function() return {} end,
+				llm_prompt_default_count = function() return 1 end, llm_vision_choices = function() return {} end,
+				llm_language_choices = function() return {} end, program_admission_available = function() return true end,
+				program_binding_supported = function() return true end,
+			}
+			local items = { { type = "action", id = "run_program" } }
+			f.utils.picker_parameter_fields(gestures, items, "keyboard__cmd_1")
+			helpers.assert_eq(items[1].parameterValue, RESERVED)
+			helpers.assert_eq(items[1].hint, UNAVAILABLE)
+			helpers.assert_eq(items[1].disabled, nil)
+			scalar = SCALAR
+			local repaired = { { type = "action", id = "run_program" } }
+			f.utils.picker_parameter_fields(gestures, repaired, "keyboard__cmd_1")
+			helpers.assert_eq(repaired[1].hint, nil)
+			helpers.assert_eq(repaired[1].parameterValue, SCALAR)
+			helpers.assert_eq(f.native_tasks, 0)
+		end)
+	end)
+	helpers.it("physical fallback nil cannot produce a parameterized entry draft", function()
+		fixture(function(f)
+			f.typed = RESERVED
+			local scalar = f.utils.ask_parameter_value({ parameter_prompt = function() return "Program" end }, "run_program", "program", "T", RESERVED)
+			local planner = require("shortcuts.physical_entries").new({ parse = function() return true end, owns = function() return true end }, {
+				is_assignable = function() return true end, get_action_parameter_spec = function() return "program" end,
+				validate_action_parameter = function(_, value) return require("program_parameter").parse(value, "hs") ~= nil end,
+				split_action_parameter_key = function() return nil end,
+			}, { parameter_section = "gestures.action_parameters" })
+			local rows, reason = planner.plan({ operation = "add", slot = "position", action = "run_program", parameter = scalar }, { assignments = {}, parameters = {} })
+			helpers.assert_eq(rows, nil)
+			helpers.assert_eq(reason, "invalid_parameter")
+			helpers.assert_eq(f.native_tasks, 0)
 		end)
 	end)
 end)

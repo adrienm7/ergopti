@@ -901,6 +901,70 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 	);
 }
 
+// Native assignment availability uses existing host hints and refusal delivery.
+{
+	const page = loadPage('hs');
+	page.context.__stored = JSON.stringify({
+		version: 1,
+		executable: '/usr/bin/shortcuts',
+		arguments: ['run', '11111111-1111-1111-1111-111111111111']
+	});
+	page.context.__reason = 'Translated unavailable <script>日本</script>';
+	vm.runInContext(
+		`init({ title:'T', platform:'hs', current:'run_program',
+		editCurrentLabel:'Edit current', parameterStrings:{save:'Save'},
+		items:[{type:'action',id:'run_program',label:'Run program',parameter:'program',
+			parameterValue:__stored,hint:__reason}] });`,
+		page.context
+	);
+	check(page.byId['btn-edit-current'].hidden === false, 'reserved stored value remains editable');
+	page.byId['btn-edit-current'].dispatch('click');
+	check(
+		page.byId['param-hint'].textContent === page.context.__reason,
+		'host availability hint is literal text in the program editor'
+	);
+	check(
+		page.byId['param-program-executable'].value === '/usr/bin/shortcuts',
+		'reserved descriptor executable remains intact'
+	);
+	check(
+		page.byId['param-program-arguments'].querySelectorAll('textarea')[1].value ===
+			'11111111-1111-1111-1111-111111111111',
+		'reserved descriptor ID remains intact'
+	);
+	vm.runInContext('programProviderRefused(__reason)', page.context);
+	check(
+		page.byId['param-error'].hidden === false &&
+			page.byId['param-error'].textContent === page.context.__reason,
+		'host availability refusal is visible as literal text'
+	);
+	check(page.posted.length === 0, 'refusal does not confirm an assignment');
+	vm.runInContext(
+		"programProviderStrings.changed='Original identity reason'; programProviderRefused()",
+		page.context
+	);
+	check(
+		page.byId['param-error'].textContent === 'Original identity reason',
+		'original no-argument identity refusal remains unchanged'
+	);
+	page.byId['param-program-executable'].value = '/private/repaired tool';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 &&
+			JSON.parse(page.posted[0].parameter).executable === '/private/repaired tool',
+		'editor remains usable to submit an ordinary repair to the host'
+	);
+	check(
+		page.context.__stored ===
+			JSON.stringify({
+				version: 1,
+				executable: '/usr/bin/shortcuts',
+				arguments: ['run', '11111111-1111-1111-1111-111111111111']
+			}),
+		'original host scalar is not rewritten by editing or refusal'
+	);
+}
+
 // Parser controls qualify receipt admission only; native Hammerspoon runs in CI.
 {
 	const controls = spawnSync(
