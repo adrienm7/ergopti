@@ -437,6 +437,111 @@ function checkShippedTruststoreLock() {
 	);
 }
 
+/**
+ * Checks the canonical security pin against its actual lock resolution.
+ * @param {object} project Parsed pyproject.toml.
+ * @param {object} lock Parsed uv.lock.
+ * @returns {string[]} Refusal reasons for absent or inconsistent pin ownership.
+ */
+function transformersLockIssues(project, lock) {
+	const issues = [];
+	const direct = (project.project.dependencies || []).filter(
+		(value) => typeof value === 'string' && /^transformers(?:[<>=!~;\s\[]|$)/i.test(value)
+	);
+	const pin = direct.length === 1 && /^transformers==([0-9]+\.[0-9]+\.[0-9]+)$/.exec(direct[0]);
+	if (!pin) issues.push('direct-pin');
+	if (pin) {
+		// Independent advisory oracle: first released consent-before-download fix.
+		const firstFixed = [5, 17, 0];
+		const version = pin[1].split('.').map(Number);
+		const difference = version.map((value, index) => value - firstFixed[index]);
+		if (!version.every(Number.isSafeInteger) || (difference.find((value) => value !== 0) || 0) < 0)
+			issues.push('security-floor');
+	}
+	const resolved = lock.package.filter((entry) => entry.name === 'transformers');
+	if (resolved.length !== 1 || !pin || resolved[0].version !== pin[1])
+		issues.push('resolved-version');
+	const virtual = lock.package.filter((entry) => entry.name === project.project.name);
+	const links =
+		virtual.length === 1 &&
+		virtual[0].dependencies.filter((entry) => entry.name === 'transformers');
+	if (!links || links.length !== 1 || links[0].marker !== undefined)
+		issues.push('virtual-dependency');
+	const declared =
+		virtual.length === 1 &&
+		virtual[0].metadata['requires-dist'].filter((entry) => entry.name === 'transformers');
+	if (!declared || declared.length !== 1 || !pin || declared[0].specifier !== `==${pin[1]}`)
+		issues.push('requires-dist');
+	return issues;
+}
+
+/** Checks real shipped sources and causal pin/lock mutations without dependency imports. */
+function checkShippedTransformersLock() {
+	const project = TOML.parse(fs.readFileSync(SOURCE_PYPROJECT, 'utf8'));
+	const lock = TOML.parse(fs.readFileSync(SOURCE_LOCK, 'utf8'));
+	const issues = transformersLockIssues(project, lock);
+	test(
+		'canonical Transformers security pin owns the exact lock resolution',
+		issues.length === 0,
+		issues.join(', ')
+	);
+	function mutant(name, expected, change) {
+		const changedProject = structuredClone(project);
+		const changedLock = structuredClone(lock);
+		change(changedProject, changedLock);
+		const observed = transformersLockIssues(changedProject, changedLock);
+		test(name, issues.length === 0 && observed.includes(expected), observed.join(', '));
+	}
+	mutant('missing direct Transformers security pin is refused', 'direct-pin', (value) => {
+		value.project.dependencies = value.project.dependencies.filter(
+			(entry) => !entry.startsWith('transformers')
+		);
+	});
+	mutant(
+		'a lock resolution cannot downgrade the canonical Transformers pin',
+		'resolved-version',
+		(_, value) => {
+			value.package.find((entry) => entry.name === 'transformers').version = '0.0.0';
+		}
+	);
+	mutant('missing direct Transformers lock metadata is refused', 'requires-dist', (_, value) => {
+		value.package.find((entry) => entry.name === project.project.name).metadata['requires-dist'] =
+			value.package
+				.find((entry) => entry.name === project.project.name)
+				.metadata['requires-dist'].filter((entry) => entry.name !== 'transformers');
+	});
+	function coordinateVersion(changedProject, changedLock, version) {
+		changedProject.project.dependencies = changedProject.project.dependencies.filter(
+			(entry) => !entry.startsWith('transformers')
+		);
+		changedProject.project.dependencies.push(`transformers==${version}`);
+		changedLock.package.find((entry) => entry.name === 'transformers').version = version;
+		const virtual = changedLock.package.find((entry) => entry.name === project.project.name);
+		if (!virtual.dependencies.some((entry) => entry.name === 'transformers'))
+			virtual.dependencies.push({ name: 'transformers' });
+		virtual.metadata['requires-dist'] = virtual.metadata['requires-dist'].filter(
+			(entry) => entry.name !== 'transformers'
+		);
+		virtual.metadata['requires-dist'].push({ name: 'transformers', specifier: `==${version}` });
+	}
+	mutant(
+		'coordinated vulnerable Transformers metadata cannot bypass the security floor',
+		'security-floor',
+		(changedProject, changedLock) => {
+			coordinateVersion(changedProject, changedLock, '5.10.1');
+		}
+	);
+	const laterProject = structuredClone(project);
+	const laterLock = structuredClone(lock);
+	coordinateVersion(laterProject, laterLock, '5.19.0');
+	test(
+		'consistent later Transformers metadata remains above the security floor',
+		issues.length === 0 && transformersLockIssues(laterProject, laterLock).length === 0
+	);
+}
+
+checkShippedTransformersLock();
+
 checkShippedTruststoreLock();
 
 const bash = bashExecutable();
