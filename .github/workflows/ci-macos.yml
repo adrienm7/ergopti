@@ -486,6 +486,7 @@ jobs:
         timeout-minutes: 10
       - name: Qualify actual native PAC and WPAD XCTest controls
         if: ${{ !cancelled() }}
+        id: managed-ollama-pac-receiving
         shell: bash
         run: |
           set -euo pipefail
@@ -541,6 +542,7 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-source-verdict.json
       - name: Receive actual independent managed HTTP native clients
         if: ${{ !cancelled() }}
+        id: managed-ollama-http-receiving
         shell: bash
         run: |
           set -euo pipefail
@@ -658,8 +660,8 @@ jobs:
               exit 1
           fi
       # Observe the original failure after all receiving cleanup has completed.
-      - name: Retain passive security service logs after native model failure
-        if: ${{ !cancelled() && failure() && steps.managed-ollama-model-receiving.outcome == 'failure' }}
+      - name: Retain passive security service logs after native receiving failure
+        if: ${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.managed-ollama-http-receiving.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}
         shell: bash
         run: |
           set -euo pipefail

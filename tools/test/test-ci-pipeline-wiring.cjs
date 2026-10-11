@@ -282,6 +282,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		'Retain actual native producer, catalogue and receiving evidence',
 		'always()'
 	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain passive security service logs after native receiving failure',
+		"${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.managed-ollama-http-receiving.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}"
+	],
 	[MACOS_BOX, 'package-macos', 'Retain launcher build diagnostics', 'always()'],
 	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
 	[
@@ -1885,6 +1891,55 @@ mustCatch(
 	'      - name: Omitted Configuration assertion diagnostic\n',
 	stepProblems
 );
+// Passive diagnostics never authorize a receiving gate or forgive its failure.
+{
+	const name = 'Retain passive security service logs after native receiving failure';
+	const condition =
+		"${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.managed-ollama-http-receiving.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}";
+	assert.equal(CONDITIONS.get(conditionKey(MACOS_BOX, 'managed-ollama-native', name)), condition);
+	const head = `      - name: ${name}\n`;
+	const changedConditions = [
+		'',
+		'always()',
+		'failure()',
+		'success()',
+		'false',
+		condition.replace('!cancelled() && ', ''),
+		condition.replace('failure() && ', '')
+	];
+	for (const identifier of [
+		'managed-ollama-pac-receiving',
+		'managed-ollama-http-receiving',
+		'managed-ollama-model-receiving'
+	]) {
+		const clause = `steps.${identifier}.outcome == 'failure'`;
+		changedConditions.push(condition.replace(clause, clause.replace("'failure'", "'success'")));
+		changedConditions.push(condition.replace(clause, 'false'));
+	}
+	for (const changed of changedConditions)
+		mustCatch(
+			'passive Security observation condition ' + (changed || '(none)'),
+			MACOS_BOX,
+			head + `        if: ${condition}\n`,
+			head + (changed ? `        if: ${changed}\n` : ''),
+			stepProblems
+		);
+	mustCatch(
+		'passive Security observation missing exact step',
+		MACOS_BOX,
+		head,
+		'      - name: Unknown passive Security observation\n',
+		stepProblems
+	);
+	for (const [rel, job] of [
+		[MACOS_BOX, 'package-macos'],
+		[MACOS_BOX, 'test-hs'],
+		[WINDOWS_BOX, 'test-ahk'],
+		[LINUX_BOX, 'test-linux']
+	])
+		assert.equal(CONDITIONS.has(conditionKey(rel, job, name)), false);
+}
+
 // Each new native evidence condition is exact, scoped to its job and source-owned step.
 for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 	const head = `      - name: ${name}\n`;
