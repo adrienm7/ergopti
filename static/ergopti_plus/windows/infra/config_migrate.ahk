@@ -894,13 +894,13 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		try {
 			VersionSource := FSReadStrict(FilePath)
 			VersionScan := _ConfigMigrateRecordScan(VersionSource)
-			_ConfigMigrateRecordValidateModel(VersionScan, Before)
 			VersionDocument := TOML_ParseDocument(VersionSource)
+			Outcome := _ConfigMigrateClassifyDocument(VersionDocument, Registry, &Version)
+			_ConfigMigrateRecordValidateModel(VersionScan, Before, Outcome == "current", VersionDocument)
 			if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(VersionSource, "the version snapshot"))
 				return Refuse("failed", "the file changed while its physical version ownership was checked")
 		} catch as Err
 			return Refuse("failed", "the physical version owner refused: " . Err.Message)
-		Outcome := _ConfigMigrateClassifyDocument(VersionDocument, Registry, &Version)
 		Result["from"] := Version
 		switch Outcome {
 			case "current":
