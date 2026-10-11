@@ -618,3 +618,38 @@ G5's separately declared build/catalogue spans remain intact. Final canonical
 receiving follows separately on these adopted sources. Native Foundation/Python
 clocks, TLS/PAC/restoration, Swift45 and release/install/enterprise acceptance
 remain unqualified. Items36/62 and transversal16/38 remain open.
+
+## Exact official reusable-workflow job names
+
+The actual attempt-scoped jobs API for manual38166806073/5173 reports
+`macOS / Managed Ollama native · arm64` and
+`macOS / Managed Ollama native · amd64`. The bare-name comparison incorrectly
+refuses authentic parent-prefixed metadata. The
+[immutable source proposal](native-clock-official-job-prefix-proposal.tar.gz)
+retains33 safe regular members, exact API/workflow provenance, both complete
+preimages/postimages and whole inverses. Parent receiving independently joins
+all32 inventory entries, both live preimages and four forward/inverse operations.
+
+Only officialConsistency's exact architecture/name comparison and one original
+owning callback change. Its positive ARM literal comes from actual API/source,
+with one AMD positive and17 additive name/type/architecture/path refusals.
+All31 other complete controls,23 unrelated functions and every original
+assertion remain. No actual job JSON is normalized or relabelled; the duplicate
+array refusal does not claim unseen API-roster uniqueness. Caller consistency
+still grants no authentication, kernel-image binding or factory activation.
+
+The genuine original comparison refuses the independently supplied prefixed
+literal; the candidate selected callback passes and the physical complete32
+controls pass under536 pinned inputs. The first argv and missing-private-loader
+attempts remain explicit preparation errors. These portable runs inherit
+PYTHONDONTWRITEBYTECODE=1; neither diagnoses the separate actual hosted60000ms
+facts156 timeout. Final canonical receiving on adopted source is separate.
+
+Actual5173 Mac receiving records16 bounded Foundation/Python samples, with the
+AMD exported image/payload and409 base,19 additional,8 loader and18 recipe
+maps joined to committed blobs. Both SDK49/sourcePAC10/Worker12 cohorts pass.
+PAC14, independent HTTP/model and original Brew Automation remain failed;
+ARM clock ZIP receiving remains blocked on the newly observed storage host.
+Kernel executable identity stays unknown and the Swift factory stays HELD.
+The whole manual is independently qualified; no completed CI, native network,
+package/install or enterprise result is inferred. Items36/62 and16/38 stay open.

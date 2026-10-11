@@ -666,7 +666,8 @@ function officialConsistency(verdict, run, artifact, job, archive, receiving) {
 		String(job.run_id) === epoch.run_id &&
 			job.head_sha === candidate &&
 			job.status === 'completed' &&
-			job.name === `Managed Ollama native · ${epoch.architecture}` &&
+			((epoch.architecture === 'arm64' && job.name === 'macOS / Managed Ollama native · arm64') ||
+				(epoch.architecture === 'amd64' && job.name === 'macOS / Managed Ollama native · amd64')) &&
 			job.conclusion !== 'skipped' &&
 			job.conclusion !== 'cancelled',
 		'Official job consistency refused'

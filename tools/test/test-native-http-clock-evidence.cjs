@@ -627,7 +627,7 @@ try {
 			run_attempt: 2,
 			head_sha: v.source.candidate,
 			status: 'completed',
-			name: 'Managed Ollama native · arm64',
+			name: 'macOS / Managed Ollama native · arm64',
 			conclusion: 'failure'
 		};
 		const receiving = {
@@ -661,6 +661,71 @@ try {
 				archive,
 				receiving
 			)
+		);
+
+		// Literal parent-prefixed names come from actual ci.yml/API receiving,
+		// independent of the comparison implementation. Caller JSON stays modeled.
+		const amdVerdict = { ...verdict, source: { ...verdict.source, architecture: 'amd64' } };
+		const amdArtifact = { ...artifact, name: 'native-http-clock-amd64-123-2' };
+		const amdJob = { ...job, name: 'macOS / Managed Ollama native · amd64' };
+		const amdResult = evidence.officialConsistency(
+			amdVerdict,
+			run,
+			amdArtifact,
+			amdJob,
+			archive,
+			receiving
+		);
+		assert.equal(amdResult.authentication, 'NOT_ESTABLISHED_BY_CALLER_SUPPLIED_JSON');
+		assert.equal(amdResult.swift_factory_activation, 'HELD');
+		for (const name of [
+			'Managed Ollama native · arm64',
+			'Managed Ollama native · amd64',
+			'Windows / Managed Ollama native · arm64',
+			'macOS / macOS / Managed Ollama native · arm64',
+			'macOS/Managed Ollama native · arm64',
+			'macOS / Managed Ollama native · amd64',
+			'macOS / Managed Ollama native · arm64 extra',
+			null,
+			true,
+			123,
+			['macOS / Managed Ollama native · arm64'],
+			{ name: 'macOS / Managed Ollama native · arm64' }
+		])
+			assert.throws(
+				() =>
+					evidence.officialConsistency(
+						verdict,
+						run,
+						artifact,
+						{ ...job, name },
+						archive,
+						receiving
+					),
+				/Official job consistency refused/
+			);
+		assert.throws(
+			() => evidence.officialConsistency(amdVerdict, run, amdArtifact, job, archive, receiving),
+			/Official job consistency refused/
+		);
+		assert.throws(
+			() => evidence.officialConsistency(verdict, run, artifact, [job, job], archive, receiving),
+			/Official job consistency refused/
+		);
+		assert.throws(
+			() => evidence.officialConsistency(verdict, run, artifact, {}, archive, receiving),
+			/Official job consistency refused/
+		);
+		assert.throws(
+			() => evidence.officialConsistency(verdict, run, artifact, job, archive, {}),
+			/Attempt-scoped job receiving path refused/
+		);
+		assert.throws(
+			() =>
+				evidence.officialConsistency(verdict, run, artifact, job, archive, {
+					job_api_path: '/repos/adrienm7/ergopti/actions/runs/123/jobs'
+				}),
+			/Attempt-scoped job receiving path refused/
 		);
 	});
 	control('actual fresh Git HEAD clean closure receives fixed nineteen inputs', () => {
