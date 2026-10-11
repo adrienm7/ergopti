@@ -421,4 +421,59 @@ test('typing NONE empties actual raw and hotstring SFB computations', () => {
 
 assert.equal(passed, 12, 'all original seven and five selection regressions must execute');
 
+// Date labels are untrusted even when a manifest key cannot be parsed.
+for (const legacy of [false, true]) {
+	test(`metrics date labels remain literal at all HTML sinks (${legacy ? 'legacy' : 'loaded'})`, () => {
+		const elements = Object.fromEntries(
+			['day_timeline_container', 'top_sessions_tbody', 'top_days_tbody'].map((id) => [
+				id,
+				{ innerHTML: '' }
+			])
+		);
+		const context = vm.createContext({
+			window: {},
+			document: { addEventListener() {}, getElementById: (id) => elements[id] || null },
+			console
+		});
+		vm.runInContext(read('host_bridge.js'), context);
+		vm.runInContext(read('dom_utils.js'), context);
+		const scripts = legacy
+			? ['script.js']
+			: ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js'];
+		for (const name of scripts) {
+			if (!legacy) assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
+			vm.runInContext(read(`metrics_apps/${name}`), context);
+		}
+		vm.runInContext('initDashboard = () => {}; renderDashboard = () => {};', context);
+		const hostile = '<img src=x onerror="window.pwned=true">';
+		assert.equal(
+			context.formatDisplayDate(hostile),
+			hostile,
+			'the malformed date reaches the raw fallback'
+		);
+		context.window.bootstrapMetricsAppsData(
+			{ [hostile]: { Editor: { session_longest_ms: 1000, session_longest_chars: 3 } } },
+			{},
+			{}
+		);
+		vm.runInContext('renderDayTimeline(); renderTopSessionsTable();', context);
+		context.renderTopDaysTable({ rich: { by_date: { [hostile]: { chars: 3 } } } });
+		for (const [id, element] of Object.entries(elements)) {
+			assert.ok(element.innerHTML.includes('&lt;img'), `${id} must preserve escaped date text`);
+			assert.ok(!element.innerHTML.includes('<img'), `${id} must not create a date element`);
+		}
+		assert.equal(context.window.pwned, undefined);
+		context.window.bootstrapMetricsAppsData(
+			{ '2026-10-11': { Editor: { session_longest_ms: 1000, session_longest_chars: 3 } } },
+			{},
+			{}
+		);
+		vm.runInContext('renderDayTimeline(); renderTopSessionsTable();', context);
+		context.renderTopDaysTable({ rich: { by_date: { '2026-10-11': { chars: 3 } } } });
+		for (const element of Object.values(elements))
+			assert.ok(element.innerHTML.includes('11/10/2026'));
+	});
+}
+assert.equal(passed, 14, 'the twelve existing controls and both date sink chains must execute');
+
 console.log(`${passed} passed, 0 failed.`);
