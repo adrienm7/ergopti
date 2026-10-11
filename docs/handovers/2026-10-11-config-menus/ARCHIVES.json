@@ -1,0 +1,29 @@
+{
+	"status": "original_byte_archives; qualification belongs to enclosed exact receipts",
+	"archives": [
+		{
+			"path": "native-wizard-v7-browse-v4-reproduction.tar.gz",
+			"sha256": "cc994a1d73237ee11254781746b9e18328361eaf3609ec6741c978c5c11374fc",
+			"bytes": 1301446,
+			"members": 91
+		},
+		{
+			"path": "windows-g4-pending-finite-packets.tar.gz",
+			"sha256": "06d509f8624c490cba20988b34772509b2b0dd9cfe5ee6f4a63f6c73e9e3519d",
+			"bytes": 40882,
+			"members": 22
+		},
+		{
+			"path": "compiler-c2-outer-v3-windows-current-evidence.tar.gz",
+			"sha256": "a904c4f9149a9ab29dcfca5c2ee6e48022f7d131362bda4128d454aa106e1e59",
+			"bytes": 486658,
+			"members": 38
+		},
+		{
+			"path": "final-browse-v5-fresh-wizard-v7-native-evidence.tar.gz",
+			"sha256": "87eb501d18390676f8f811ba3a7237a7b1e51d566c410fbe085fea487d7e1295",
+			"bytes": 2123102,
+			"members": 115
+		}
+	]
+}

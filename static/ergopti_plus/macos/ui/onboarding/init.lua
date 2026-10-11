@@ -696,7 +696,7 @@ local function commit_owned(answers, publication)
 	end
 	-- The layer the imported keys enter is written first, so a live bridge's
 	-- regeneration already deploys it; a refused key import takes it back.
-	local layer, layer_failed = import_nav_layer(tap_hold_keys)
+	local layer, layer_failed
 	-- The answers are saved: a refused import leaves config_karabiner.toml as
 	-- it was, says so, and the reload still applies the rest. A bridge that
 	-- never answers cannot hold the reload back past the timeout either.
@@ -721,8 +721,12 @@ local function commit_owned(answers, publication)
 			"onboarding.error.tap_holds_import_timeout")
 	end, "onboarding.tap_holds_import_timeout")
 	if armed ~= true then
-		Logger.error(LOG, "The tap-hold import timeout could not be armed; the import runs without it.")
+		Logger.error(LOG, "The tap-hold import timeout could not be armed; the import is refused.")
+		settle(false, "the import timeout could not be armed", "onboarding.error.tap_holds_import")
+		return
 	end
+	-- No remap or layer work starts without its bounded continuation owner.
+	layer, layer_failed = import_nav_layer(tap_hold_keys)
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
 		-- Only a refusal takes the layer back: after a timeout the keys may
 		-- still land, and they must not enter an empty layer then.

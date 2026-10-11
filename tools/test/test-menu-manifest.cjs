@@ -12339,8 +12339,8 @@ console.log(
 			'foreign captured render owner'
 		],
 		[
-			'and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
-			'and true',
+			'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
+			'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand true',
 			'missing imported facade custody'
 		],
 		[

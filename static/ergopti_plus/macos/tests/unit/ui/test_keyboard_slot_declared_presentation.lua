@@ -376,3 +376,199 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 		helpers.assert_eq(retained_state.scheduler.activeCount(), 0)
 	end)
 end)
+
+
+-- Native-title contexts receive no borrowed or unused page label.
+local hf_title_corpus = assert(Json.decode(assert(helpers.read_fixture("hf_window_title_original_presentation.json"))))
+
+local function with_title_receiving(scenario)
+	local cleanup_failures = {}
+	local retained_state
+	fixture(function(state, builder, _, locale, titles)
+		retained_state = state
+		local owned, closed = nil, false
+		local function show(receipt, overrides)
+			local opts = {
+				app_id = "token_prompt", presentation_id = "hf_login", presentation_receipt = receipt,
+				frame = { x = 0, y = 0, w = 1560, h = 400 }, focus = false,
+				style_masks = { "titled", "closable", "nonactivating" }, allow_new_windows = false,
+				on_webview_created = function(view) owned = view; return true end,
+				on_close = function() closed = true end,
+			}
+			for key, value in pairs(overrides or {}) do opts[key] = value end
+			return builder.show_webview(opts)
+		end
+		local passed, primary = xpcall(function()
+			scenario(state, builder, locale, titles, show)
+		end, function(value) return value end)
+		if owned ~= nil then
+			local released, result = pcall(function() return owned:delete() end)
+			if not released or result == nil or result == false or not closed then
+				cleanup_failures[#cleanup_failures + 1] = { owner = "title receiving view", failure = result }
+			end
+		end
+		if not passed then error(primary, 0) end
+	end, cleanup_failures)
+	helpers.assert_eq(#cleanup_failures, 0)
+	if retained_state then
+		for _, view in ipairs(retained_state.views) do helpers.assert_eq(view.deletes, 1) end
+		helpers.assert_eq(retained_state.scheduler.activeCount(), 0)
+	end
+end
+
+helpers.describe("explicit native window-title contexts", function()
+	for code, original in pairs(hf_title_corpus.locales) do
+		helpers.it("receives the original HF native caption without a page label in " .. code, function()
+			with_title_receiving(function(state, builder, locale, _, show)
+				locale.set_locale(code)
+				local receipt = builder.prepare_app_window_title("token_prompt", "hf_login")
+				helpers.assert_type(receipt, "table")
+				local title, label = builder.presentation_fields(receipt)
+				helpers.assert_eq(title, original.original_hf_native_label)
+				helpers.assert_nil(label)
+				helpers.assert_eq(builder.presentation_current(receipt), true)
+				helpers.assert_eq(state.creates, 0)
+				helpers.assert_not_nil(show(receipt))
+				helpers.assert_eq(state.creates, 1)
+				helpers.assert_eq(state.views[1].captions, { original.original_native_caption_source_projection })
+				helpers.assert_eq(#state.payloads, 0, "no page title or label is injected by the context")
+			end)
+		end)
+	end
+
+	helpers.it("keeps full-context and title-only preparation policies distinct", function()
+		with_title_receiving(function(state, builder)
+			helpers.assert_nil(builder.prepare_app_presentation("token_prompt", "hf_login"))
+			helpers.assert_nil(builder.prepare_app_window_title("action_picker", "keyboard_slot_selection"))
+			helpers.assert_type(builder.prepare_app_presentation("action_picker", "keyboard_slot_selection"), "table")
+			helpers.assert_nil(builder.prepare_app_window_title("token_prompt", "unknown_context"))
+			helpers.assert_eq(state.creates, 0)
+		end)
+	end)
+
+	helpers.it("withdraws the actual compiled title lookup and repairs before native allocation", function()
+		with_title_receiving(function(state, builder, _, titles, show)
+			local receipt = builder.prepare_app_window_title("token_prompt", "hf_login")
+			helpers.assert_type(receipt, "table")
+			local original, observed = titles.presentation_for_app, 0
+			titles.presentation_for_app = function() observed = observed + 1; return {} end
+			helpers.assert_nil(builder.prepare_app_window_title("token_prompt", "hf_login"))
+			helpers.assert_eq(builder.presentation_current(receipt), false)
+			helpers.assert_nil(show(receipt))
+			helpers.assert_eq(state.creates, 0)
+			helpers.assert_eq(observed, 0)
+			titles.presentation_for_app = original
+			helpers.assert_eq(builder.presentation_current(receipt), true)
+			helpers.assert_not_nil(show(receipt))
+			helpers.assert_eq(state.creates, 1)
+		end)
+	end)
+
+	helpers.it("refuses a borrowed context and caller labels without native allocation", function()
+		with_title_receiving(function(state, builder, _, _, show)
+			local receipt = builder.prepare_app_window_title("token_prompt", "hf_login")
+			helpers.assert_type(receipt, "table")
+			helpers.assert_nil(show(receipt, { app_id = "action_picker" }))
+			helpers.assert_nil(show(receipt, { presentation_id = "keyboard_slot_selection" }))
+			helpers.assert_nil(show(receipt, { title = "Borrowed caption" }))
+			helpers.assert_nil(show(receipt, { label = "Borrowed page label" }))
+			helpers.assert_nil(show({}))
+			helpers.assert_eq(state.creates, 0)
+			helpers.assert_not_nil(show(receipt))
+		end)
+	end)
+
+	helpers.it("retains locale and public preparation ownership before title receiving", function()
+		with_title_receiving(function(state, builder, locale, _, show)
+			locale.set_locale("fr")
+			local receipt = builder.prepare_app_window_title("token_prompt", "hf_login")
+			helpers.assert_type(receipt, "table")
+			locale.set_locale("es")
+			helpers.assert_eq(builder.presentation_current(receipt), false)
+			helpers.assert_nil(show(receipt))
+			locale.set_locale("fr")
+			helpers.assert_eq(builder.presentation_current(receipt), true)
+			local original, observed = builder.prepare_app_window_title, 0
+			builder.prepare_app_window_title = function() observed = observed + 1; return {} end
+			helpers.assert_nil(show(receipt))
+			helpers.assert_eq(observed, 0)
+			helpers.assert_eq(state.creates, 0)
+			builder.prepare_app_window_title = original
+			helpers.assert_not_nil(show(receipt))
+		end)
+	end)
+end)
+
+
+local contextual_original = assert(Json.decode(assert(helpers.read_fixture("contextual_picker_original_prefixes.json"))))
+helpers.describe("declared keyboard action contextual title receiving", function()
+	for code, expected in pairs(contextual_original.locales) do
+		for _, suffix in ipairs(contextual_original.suffix_cases) do
+			helpers.it("keeps the original keyboard action prefix and suffix in " .. code .. ": " .. suffix, function()
+				fixture(function(state, _, _, locale, _, open, ready)
+					locale.set_locale(code)
+					helpers.assert_true(open({ presentation_id = "keyboard_slot_action", presentation_suffix = suffix,
+						items = {}, current = "none" }))
+					helpers.assert_eq(state.creates, 1)
+					helpers.assert_eq(state.views[1].captions[1], "ErgoptiPlus — " .. expected.mac_prefix .. suffix)
+					ready()
+					local payload = state.payloads[#state.payloads]
+					helpers.assert_eq(payload.title, expected.mac_prefix .. suffix)
+					helpers.assert_eq(payload.label, expected.picker_label)
+					helpers.assert_eq(payload.current, "none")
+					helpers.assert_eq(state.confirmations, 0, "Title preparation does not grant an action")
+				end)
+			end)
+		end
+	end
+	for _, suffix in ipairs({ "", "bad\nline", "bad\tline", string.rep("x", 1025), true, {}, 1 }) do
+		helpers.it("refuses invalid contextual suffix data before allocation: " .. type(suffix) .. tostring(suffix), function()
+			fixture(function(state, _, _, _, _, open)
+				helpers.assert_eq(open({ presentation_id = "keyboard_slot_action", presentation_suffix = suffix, items = {} }), false)
+				helpers.assert_eq(state.bridges, 0)
+				helpers.assert_eq(state.creates, 0)
+				helpers.assert_true(open({ presentation_id = "keyboard_slot_action", presentation_suffix = "K1", items = {} }))
+				helpers.assert_eq(state.creates, 1, "Ordinary valid display data repairs the request")
+			end)
+		end)
+	end
+	helpers.it("refuses the Linux context and forged contextual receipts before native allocation", function()
+		fixture(function(state, builder, _, _, _, open)
+			helpers.assert_eq(open({ presentation_id = "tap_hold_action", presentation_suffix = "K1", items = {} }), false)
+			helpers.assert_eq(builder.show_webview({ app_id = "action_picker", presentation_id = "keyboard_slot_action",
+				presentation_receipt = {} }), nil)
+			helpers.assert_eq(state.bridges, 0); helpers.assert_eq(state.creates, 0)
+			helpers.assert_true(open({ presentation_id = "keyboard_slot_action", presentation_suffix = "K1", items = {} }))
+		end)
+	end)
+	helpers.it("refuses a withdrawn factory prepare owner then accepts its exact repair", function()
+		fixture(function(state, builder, _, _, _, open)
+			local original, observed = builder.prepare_app_contextual_title, 0
+			builder.prepare_app_contextual_title = function() observed = observed + 1; return {} end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(open({ presentation_id = "keyboard_slot_action", presentation_suffix = "K1", items = {} }), false)
+				helpers.assert_eq(observed, 0); helpers.assert_eq(state.bridges, 0); helpers.assert_eq(state.creates, 0)
+			end)
+			builder.prepare_app_contextual_title = original
+			if not ok then error(failure, 0) end
+			helpers.assert_true(open({ presentation_id = "keyboard_slot_action", presentation_suffix = "K1", items = {} }))
+		end)
+	end)
+	helpers.it("retains contextual Source custody across translation and repairs the exact lookup", function()
+		fixture(function(state, _, _, _, titles, open)
+			local original, observed = titles.presentation_for_app, 0
+			state.translate_hook = function(key)
+				if key == "dialog.keyboard_shortcut.title_prefix" then
+					titles.presentation_for_app = function() observed = observed + 1; return nil end
+				end
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(open({ presentation_id = "keyboard_slot_action", presentation_suffix = "K1", items = {} }), false)
+				helpers.assert_eq(state.creates, 0); helpers.assert_eq(state.bridges, 0); helpers.assert_eq(observed, 0)
+			end)
+			state.translate_hook = nil; titles.presentation_for_app = original
+			if not ok then error(failure, 0) end
+			helpers.assert_true(open({ presentation_id = "keyboard_slot_action", presentation_suffix = "K1", items = {} }))
+		end)
+	end)
+end)
