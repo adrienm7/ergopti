@@ -9899,6 +9899,20 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
 
   The separate [current Xi preparation handover](handovers/2026-10-11-group3-xi2-current-preparation-v1/README.md) retains the exact c15a16cc9eee103b4132bcaf811ed890834f894c plus 15-source candidate: the mandatory fifteenth PINS.json change joins its command-owner hash to the changed stager. The original selected run remains 14 passing gates and two environment failures (window-family /proc and real Nix CLI/store prerequisites), exit 1, with 13,102/0 Linux units. Separate actual driver/AppDir assembly and both staged CLI-help entries return 0; original libXi ELF bytes are retained by hash and the bounded receiving review. Help reports missing lgi; GUI/installed/AppImage delivery and full native child-family/hard-deadline proof remain unqualified. The old 348-member/14-path handover stays immutable. Initial fix/Linux custody and current-tree receiving remain pending; this adds no input-epoch, modifier/output, public simultaneous or physical authority and does not complete item 93.
 
+  The Linux Manager now rejoins the selected pair's captured runtime source
+  after its genuine Logger callback and immediately before the original action
+  executor. The callback-free settings observer compares captured controller,
+  configuration, engine and Hook identities without invoking table equality
+  callbacks. All224 original registered cases remain byte-exact; four additive
+  controls pass228/0 on each Lua ABI. The original code executes two revoked
+  actions; the first successor also invokes caller equality through the real
+  snapshot/restore route. The corrected identity case passes, and three single
+  predicate reversals fail its unchanged noninvocation assertion. A fourth
+  reversal remains blocked by original engine retirement and is not claimed as
+  independent regression evidence. These controlled driver receipts do not
+  qualify physical buffered input, output or installed delivery; item93 and
+  transverse16/38 remain open.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
