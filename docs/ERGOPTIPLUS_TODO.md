@@ -2630,6 +2630,13 @@ These are software implementations; final hardware verification remains below.
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
 
+Authenticated Windows run38166375806 on source6d84b866 passes all eight
+original global-scope cases: real Restore/Clear, absent consent, backup and
+external-write refusal, immediate refusal, recovery debt and source collisions.
+Its whole suite remains incomplete at the original watchdog (2089 terminal
+passes); this bounded proof does not qualify the current final source, E2E,
+packaging, installation or real-device restart.
+
 The canonical Windows transition-port hash fault fixture now restores the exact
 held native callback before attempting every original teardown. This bounded
 validation prerequisite preserves all 289 original assertions and registrations;
@@ -5571,8 +5578,12 @@ integrated, then publish one grouped release.
   and late refusal/cleanup. The independent original UTF-16 corpus retains all
   nine expected vectors; its pinned formatter changes only array layout. All
   original native fixture assertions and four late owner controls remain.
-  Targeted native, full-suite and installed receiving are still pending; the
-  renderer-placement census remains17/2/1 and this item stays partial.
+  Actual Windows run38169545727 passes the scalar case and four old late
+  controls but fails all seven new physical cases at the parser cache first
+  read (menu_helpers.ahk126). The headless fixture now owns three genuine
+  parser caches and restores their exact previous values or unset states. All
+  398 original assertions remain; corrected native, complete-suite and
+  installed receiving are still pending. The census remains17/2/1.
   Bounded Windows receiving38153174855 completes all20 extension subjects:
   eleven pass and nine fail at the new fixture's missing Print function in
   cleanup registration. All12 native children close; fixture-owned menu and
@@ -9178,8 +9189,12 @@ is committed; one request is one commit with its regression test.
   domain, coercion order, localized count and native child dispatch. The corpus
   is independently frozen from the original owner, with format-only layout
   normalization and unchanged values/order. Original assertions remain;
-  targeted native/full/installed receiving is pending. This does not change
-  the17/2/1 placement census or close items54/81.
+  native receiving38169545727 reports five passes and seven failures: the
+  seven new physical cases reach an uninitialized tray-owned sections cache.
+  The fixture now captures, initializes and independently restores the genuine
+  sections/text/unreadable caches, preserving all assertions and expected
+  values. Corrected native/full/installed receiving remains pending. This
+  does not change the17/2/1 placement census or close items54/81.
   The sites are of four kinds, and three need the
   manifest to say more than it can today:
   (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
