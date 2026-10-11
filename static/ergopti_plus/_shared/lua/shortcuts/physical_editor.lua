@@ -83,7 +83,7 @@ function M.new(options)
 		record.cancelled = true
 		if record.token == nil or record.retiring then return false end
 		record.retiring = true
-		local called, retired = pcall(options.cancel_position, record.token)
+		local called, retired = pcall(record.cancel, record.token)
 		record.retiring = false
 		if not called or retired ~= true then return false end
 		if position == record then position = nil end
@@ -102,7 +102,11 @@ function M.new(options)
 				or type(options.capture_position) ~= "function" or type(options.cancel_position) ~= "function"
 				or type(options.position_field) ~= "string" then return false end
 			if owner.cancel_position() ~= true or type(options.emit_position) ~= "function" then return false end
-			local record = { source = source, epoch = generation, request_id = request.request_id }
+			-- Cancellation belongs to this native request even if the optional port changes.
+			-- The preceding retirement callback may have removed the next request's port.
+			local cancel = options.cancel_position
+			if type(cancel) ~= "function" then return false end
+			local record = { source = source, epoch = generation, request_id = request.request_id, cancel = cancel }
 			position = record
 			local function owned()
 				return rawequal(position, record) and not record.cancelled and rawequal(source, record.source)
