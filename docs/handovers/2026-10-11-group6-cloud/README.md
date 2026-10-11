@@ -653,3 +653,107 @@ ARM clock ZIP receiving remains blocked on the newly observed storage host.
 Kernel executable identity stays unknown and the Swift factory stays HELD.
 The whole manual is independently qualified; no completed CI, native network,
 package/install or enterprise result is inferred. Items36/62 and16/38 stay open.
+
+## Native receiving and held preparations after the clock reader correction
+
+The strict reusable-job reader is published as
+`589991aeb870273913f2767a7a9d2ec15965b8d0`. Its final canonical gate passed
+formatting and all 412 JavaScript controls in 666.730 seconds. The 84 source
+pins, HEAD and index were identical before and after; committed tree
+`5949c7b548fe6949a0c6598708b449c2985170cb` matches the tested index. The raw
+39,382-byte log has SHA-256
+`e3e82a4ec93743bf0ffcd4c40fdacb1f7a39718d9f660fd2eef1cd770138c091`.
+Four exact pushed-SHA, all-event automatic-workflow censuses were empty.
+
+These five immutable packets preserve different evidence and must not be
+combined into a native acceptance claim:
+
+- [Actual macOS receiving](run38166806073-macos-native-receiving-capsule.tar.gz)
+  retains 66 safe regular files from manual 38166806073, attempt 1, on the
+  original published producer `5173d4f`. Both SDK49 controls pass; SourcePAC10
+  and Worker12 pass. PAC14, the independent HTTP client and the Homebrew
+  archive case fail. The AMD clock ZIP was actually downloaded and joined to
+  all 409 original, 19 additional, eight loader and 18 recipe source pins;
+  its 16 samples fit the actual Python interval and all four original command
+  owners close without debt. ARM clock/SDK ZIP downloads returned Forbidden;
+  their raw job logs were received. Kernel identity remains unknown and the
+  Swift factory remains held. Parent receiving independently checked all 65
+  inventory joins and the 424 unique committed producer blobs used by AMD.
+- [Original Windows23 held preparation](windows-original23-held-preparation-preservation.tar.gz)
+  preserves the reviewed 653-file successor, complete forward/inverse receiving,
+  explicit custody acknowledgment 6112013288, and the exact Root67600 source
+  comparison in an 11-file wrapper. No executable proposal is adopted here.
+  The original PAC publisher legitimately replaces two tracked outputs; the
+  proposed strict clean-source check cannot be weakened to admit arbitrary
+  current bytes. Composition with the actual shared receiver interface,
+  original Windows23 execution and complete Windows delivery remain required.
+  Root's separate step number 23 is not this 23-case corpus.
+- [Facts156 timeout diagnosis](group6-facts156-timeout5173-diagnosis.tar.gz)
+  preserves the hosted CoreJS failure, 123 independently joined inventory
+  entries and exact local timing. The original unchanged corpus passes in
+  45.907 seconds without the bytecode variable and 46.407 seconds with it.
+  A private one-hunk fixture polling proposal passes all the same 156 cases
+  in 13.716 seconds, with all 346 original helper/test bodies and the 60-second
+  outer limit preserved. It reduces real server retirement overhead; it does
+  not reproduce the historical hosted timeout. Fixture custody request
+  6112924405 remains pending and that proposal is unadopted. A separate
+  failure-output diagnostic is syntax-checked only; its behavior is unrun.
+
+- [Native trust source diagnosis](group6-5173-native-trust-diagnosis-capsule.tar.gz)
+  retains seven exact producer preimages and an unexecuted removal-capture
+  proposal. The plain WPAD fixture never enrolls the available same-CA query,
+  so its successful add has no immediate certificate-visibility observation.
+  The independent client does enroll that helper but both adds expire before
+  its after-install query. Later certificate absence and authorization success
+  do not establish earlier trust or authorization. No causal TLS repair is
+  supported. The proposed original-owner removal receipt needs explicit shared
+  span custody and meaningful owning controls; runtime behavior is unexecuted.
+
+- [Root67600 terminal metadata](group6-root67600-official-final-received.tar.gz)
+  preserves the separate failed official personal diagnostic run and exact
+  authenticated artifact metadata. Its four ZIPs and raw unit log all returned
+  Forbidden on the newly observed sa12 destination, with zero bytes received.
+  Early publisher/Restore/retirement steps report success, while the unit suite
+  and both late verdicts fail; native counts, closure evidence and causes of the
+  late failures are unreceived. No native credit transfers to our Windows23
+  preparation, which uses different updater fixture preimages.
+
+[Official terminal receiving](native5173-terminal-receiving.tar.gz) records the
+completed failed run on `5173d4f`: 43 jobs, 29 success, eight failure and six
+skipped, including Release. All 17 Linux installation jobs succeed. The exact
+owned CI lease was deleted only after completion and its absence was verified.
+The later published reader `589991aeb8` successfully compares the actually
+received completed AMD run/job/artifact metadata, with independent API/ZIP/Git
+provenance retained separately. The earlier frozen pending receipt is preserved;
+this companion records the later terminal facts. The CI branch was not moved.
+Source-only reader qualification does not repair the actual Windows
+1,320,000 ms watchdog or incomplete 1,993/11,146 execution manifest, native
+macOS trust restoration, ordinary Automation consent, package/installation
+acceptance or corporate-network behavior. Items 36 and 62 stay open.
+
+The saved cloud network draft is revision 11. It adds the two actually observed
+artifact destinations `productionresultssa10.blob.core.windows.net` and
+`productionresultssa12.blob.core.windows.net`, preserving all prior network
+entries, presets, scripts, repositories and secret bindings. Saving is confirmed;
+activation/publication and fresh-task restoration are not established. The
+current process still receives Forbidden for those destinations. No signed
+redirect URL or credentials are included in these packets.
+
+## Test migration handoff to the local AHK audit
+
+Current feature sources remain on `feat/release-network`; no test or runner
+relocation is planned here. Group 6 owns narrow spans of the two updater AHK
+fixtures, managed-native clock client/upload steps in `ci-macos.yml`, the normal
+clock row in `run-js-suite.cjs`, default/pipeline metadata and their original
+owning guards, the clock reader/control pair and the macOS network fixture
+receiving controls. Other groups' rows, controls and workflow steps remain with
+their owners. Original Windows23 runner/workflow preparations remain held.
+
+The fixtures restore selected config paths and scope state before cleanup.
+Build/sign/execute/capture/retirement keep the same owner; trust and consent
+operations stay serialized, and unresolved debt prevents a subsequent actor.
+The clock reader depends on full reusable-job API names and committed source
+paths. Agree on a movement table covering those joins and generated inventories
+before moving anything. The next coordination checkpoint is the current manual
+run's terminal receiving; the source correction is already published. The local
+session's main v1.0.1 publication is separate and has not been modified.

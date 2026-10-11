@@ -4068,6 +4068,15 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-11 held Windows original23 preparation is now durably preserved with
+its actual custody acknowledgment, complete inverses and Root67600 publisher
+comparison. The reviewed runner still requires exact composition for the two
+legitimately generated PAC outputs; no arbitrary binary or clean-source assertion
+is admitted. The actual old5173 Windows unit watchdog leaves only1993/11146
+terminal tests, with E2E/package/install skipped. The independent original23
+proposal remains unadopted and native delivery unqualified; item36 stays open.
+See the [held packet](handovers/2026-10-11-group6-cloud/windows-original23-held-preparation-preservation.tar.gz).
+
 2026-10-11 current-source Windows updater fixture correction. Ten original
 callback registrations now construct an admitted current configuration through
 the original scope fixture and restore the selected path before cleanup. All167
@@ -6938,6 +6947,18 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-11 native producer and portable timeout receiving are now durably
+preserved. The strict reader correction589991aeb8 passes final format/412JS with
+an unchanged84-source/index fence. Actual AMD16 clock samples, closed original
+command owners and all producer source joins are received; PAC14/native HTTP
+and trust restoration still fail, ARM ZIPs remain blocked, kernel identity is
+unknown and the factory remains held. The unchanged portable156 corpus passes
+locally in45.907s; a private one-hunk server-poll proposal passes the same cases
+in13.716s without raising60s or changing any original helper/test body. Its
+shared fixture custody is pending, it is unadopted and historical hosted cause
+remains unproved. The saved network draft11 is not runtime activation. See the
+[receiving checkpoint](handovers/2026-10-11-group6-cloud/README.md); item62 stays open.
 
 2026-10-11 official reusable-job metadata correction. Actual attempt-scoped
 38166806073/5173 API names include the parent macOS prefix. The strict reader
