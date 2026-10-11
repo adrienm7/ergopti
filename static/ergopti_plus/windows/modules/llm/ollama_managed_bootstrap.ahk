@@ -251,7 +251,7 @@ class OllamaManagedBootstrap {
 		for Name in ["origin", "runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256"]
 			if Record["target"].Get(Name, "") != this.Target[Name]
 				return false
-		return true
+		return this.Runtime.IdentityReady()
 	}
 
 	/** Exact borrowed enable writer successor; no arbitrary source recapture. */
