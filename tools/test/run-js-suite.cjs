@@ -73,6 +73,24 @@ const CHECKS = [
 		repro: 'node tools/diagnostics/test_windows_group7_receipt.cjs'
 	},
 	{
+		name: 'Windows bounded hook trace core retains exact ownership and loss receipts',
+		cmd: process.execPath,
+		args: ['tools/test/run-windows-hook-trace-core.cjs'],
+		repro: 'npm run test:windows-hook-trace-core'
+	},
+	{
+		name: 'Windows native callback trace reader refuses missing or malformed observations',
+		cmd: process.execPath,
+		args: ['tools/diagnostics/test_windows_group7_trace.cjs'],
+		repro: 'npm run test:windows-hook-trace-protocol'
+	},
+	{
+		name: 'Windows hook tracing remains opt-in, isolated and bound to native source inputs',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-hook-trace-source.cjs'],
+		repro: 'npm run test:windows-hook-trace-source'
+	},
+	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],

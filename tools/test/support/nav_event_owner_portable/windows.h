@@ -6,7 +6,8 @@
  * This is test infrastructure, not a Windows implementation or qualification.
  * Unsupported native operations terminate the process instead of returning a
  * simulated success. Only locks, threads, error storage and heap allocation
- * required by deterministic tests have implementations.
+ * required by deterministic tests have implementations. Desktop ownership and
+ * QPC boundaries return explicit unavailable results for refusal-path checks.
  */
 
 #ifndef ERGOPTI_PORTABLE_WINDOWS_H
@@ -21,6 +22,7 @@
 #define WINAPI
 #define CALLBACK
 
+typedef struct LARGE_INTEGER { int64_t QuadPart; } LARGE_INTEGER;
 typedef int BOOL;
 typedef uint32_t DWORD;
 typedef uint32_t UINT;
@@ -36,6 +38,13 @@ typedef void *HANDLE;
 typedef void *HWND;
 typedef void *HHOOK;
 typedef void *HINSTANCE;
+typedef struct RECT { int32_t left, top, right, bottom; } RECT;
+typedef struct GUITHREADINFO {
+	DWORD cbSize;
+	DWORD flags;
+	HWND hwndActive, hwndFocus, hwndCapture, hwndMenuOwner, hwndMoveSize, hwndCaret;
+	RECT rcCaret;
+} GUITHREADINFO;
 typedef pthread_mutex_t CRITICAL_SECTION;
 typedef struct INIT_ONCE {
 	pthread_mutex_t mutex;
@@ -133,6 +142,13 @@ HANDLE CreateThread(LPVOID security, size_t stack_size,
 	DWORD (*entry)(LPVOID), LPVOID parameter, DWORD flags, DWORD *thread_id);
 DWORD WaitForSingleObject(HANDLE handle, DWORD milliseconds);
 BOOL CloseHandle(HANDLE handle);
+/** Missing desktop/QPC capability is a fail-closed refusal, never fake success. */
+BOOL QueryPerformanceCounter(LARGE_INTEGER *counter);
+HWND GetForegroundWindow(void);
+DWORD GetWindowThreadProcessId(HWND window, DWORD *process_id);
+DWORD GetCurrentProcessId(void);
+BOOL GetGUIThreadInfo(DWORD thread_id, GUITHREADINFO *information);
+BOOL IsChild(HWND parent, HWND child);
 DWORD GetLastError(void);
 void SetLastError(DWORD error);
 HANDLE GetProcessHeap(void);

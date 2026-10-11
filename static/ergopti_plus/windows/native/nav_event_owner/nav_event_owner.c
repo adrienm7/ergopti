@@ -20,6 +20,7 @@
 
 #include "nav_event_owner.h"
 #include "editor_replace.h"
+#include "hook_trace.h"
 
 
 
@@ -172,6 +173,11 @@ typedef struct NavState {
 
 static INIT_ONCE g_nav_init_once = INIT_ONCE_STATIC_INIT;
 static NavState g_nav_state;
+/* Diagnostic custody survives semantic resets; explicit Stop freezes its pages. */
+static ErgoptiTrace_State g_nav_hook_trace;
+static uint32_t g_nav_hook_trace_inflight;
+static DWORD g_nav_hook_trace_receiver_thread;
+static HWND g_nav_hook_trace_focus;
 #if defined(ERGOPTI_NAV_TESTING)
 /* Deterministic OS modifier snapshot; disabled means "every key reported down". */
 static uint32_t g_nav_test_hook_time;
@@ -181,10 +187,11 @@ static uint8_t g_nav_test_os_modifiers;
 static HINSTANCE g_nav_module;
 static DWORD g_nav_initialization_error;
 
-static LRESULT CALLBACK NavLowLevelKeyboardProc(
+static LRESULT NavLowLevelKeyboardProcCore(
 	int code,
 	WPARAM message,
-	LPARAM data_pointer);
+	LPARAM data_pointer,
+	uint32_t *trace_decision);
 static uint8_t NavRoutingModifiersLocked(const NavState *state);
 static uint8_t NavModifierBit(uint16_t vk, uint16_t sc);
 
@@ -2045,10 +2052,11 @@ static LRESULT NavDeliverHookDecision(
  * @param data_pointer Pointer to KBDLLHOOKSTRUCT.
  * @return One to suppress or the next hook result to pass.
  */
-static LRESULT CALLBACK NavLowLevelKeyboardProc(
+static LRESULT NavLowLevelKeyboardProcCore(
 	int code,
 	WPARAM message,
-	LPARAM data_pointer)
+	LPARAM data_pointer,
+	uint32_t *trace_decision)
 {
 	ErgoptiNav_TestEvent event;
 	ErgoptiNav_DispatchResult result;
@@ -2077,6 +2085,7 @@ static LRESULT CALLBACK NavLowLevelKeyboardProc(
 			wake_window = g_nav_state.wake_window;
 			wake_message = g_nav_state.wake_message;
 		}
+		*trace_decision = ERGOPTI_TRACE_CAPTURE;
 		LeaveCriticalSection(&g_nav_state.lock);
 		if (wake_window != NULL && wake_message != 0)
 			PostMessageW(wake_window, wake_message, 0, 0);
@@ -2165,9 +2174,79 @@ static LRESULT CALLBACK NavLowLevelKeyboardProc(
 		g_nav_state.last_os_error = drain_error;
 		LeaveCriticalSection(&g_nav_state.lock);
 	}
+	if (result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS
+			&& mask_error == ERROR_SUCCESS)
+		*trace_decision = ERGOPTI_TRACE_NAV_SUPPRESS;
 	return delivery_result;
 }
 
+
+
+/** Records actual native hook entries only inside an explicitly owned fixture. */
+static LRESULT CALLBACK NavLowLevelKeyboardProc(
+	int code, WPARAM message, LPARAM data_pointer)
+{
+	KBDLLHOOKSTRUCT raw;
+	GUITHREADINFO focus;
+	LARGE_INTEGER clock;
+	ErgoptiTrace_Event observed;
+	uint64_t owner = 0, token = 0, generation = 0, capture_before = 0;
+	uint32_t decision = ERGOPTI_TRACE_PASS;
+	bool tracing = false;
+	LRESULT result;
+	if (code == HC_ACTION && data_pointer != 0) {
+		EnterCriticalSection(&g_nav_state.lock);
+		if (g_nav_hook_trace.enabled) {
+			owner = g_nav_hook_trace.owner;
+			token = g_nav_hook_trace.token;
+			generation = g_nav_hook_trace.generation;
+			memset(&focus, 0, sizeof(focus));
+			focus.cbSize = (DWORD)sizeof(focus);
+			if (GetForegroundWindow() != (HWND)(uintptr_t)owner
+					|| !GetGUIThreadInfo(g_nav_hook_trace_receiver_thread, &focus)
+					|| focus.hwndFocus != g_nav_hook_trace_focus
+					|| !QueryPerformanceCounter(&clock) || clock.QuadPart <= 0) {
+				(void)ErgoptiTrace_RecordDrop(&g_nav_hook_trace, owner, token, generation);
+			} else {
+				memcpy(&raw, (const void *)data_pointer, sizeof(raw));
+				memset(&observed, 0, sizeof(observed));
+				observed.qpc = (uint64_t)clock.QuadPart;
+				observed.vk = raw.vkCode;
+				observed.scan = raw.scanCode;
+				observed.flags = raw.flags;
+				observed.time = raw.time;
+				observed.extra_info = (uint64_t)raw.dwExtraInfo;
+				observed.message = (uint32_t)message;
+				capture_before = g_nav_state.terminal_next_sequence;
+				++g_nav_hook_trace_inflight;
+				tracing = true;
+			}
+		}
+		LeaveCriticalSection(&g_nav_state.lock);
+		/* This classification copies production provenance; it grants no route. */
+		if (((const KBDLLHOOKSTRUCT *)data_pointer)->flags
+				& (LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED)) {
+			decision = ERGOPTI_TRACE_INJECTED_PASS;
+			if ((((const KBDLLHOOKSTRUCT *)data_pointer)->flags & LLKHF_INJECTED)
+					&& !(((const KBDLLHOOKSTRUCT *)data_pointer)->flags & LLKHF_LOWER_IL_INJECTED)
+					&& (uint64_t)((const KBDLLHOOKSTRUCT *)data_pointer)->dwExtraInfo
+						== ERGOPTI_NAV_TERMINAL_REPLAY_MARKER)
+				decision = ERGOPTI_TRACE_REPLAY_PASS;
+		}
+	}
+	result = NavLowLevelKeyboardProcCore(code, message, data_pointer, &decision);
+	if (tracing) {
+		EnterCriticalSection(&g_nav_state.lock);
+		observed.decision = decision;
+		if (decision == ERGOPTI_TRACE_CAPTURE
+				&& g_nav_state.terminal_next_sequence > capture_before)
+			observed.capture_sequence = g_nav_state.terminal_next_sequence;
+		(void)ErgoptiTrace_Push(&g_nav_hook_trace, owner, token, generation, &observed);
+		--g_nav_hook_trace_inflight;
+		LeaveCriticalSection(&g_nav_state.lock);
+	}
+	return result;
+}
 
 
 /**
@@ -2513,6 +2592,10 @@ static int32_t NavStopCore(void)
 		return ERGOPTI_NAV_STATUS_OS_ERROR;
 
 	EnterCriticalSection(&g_nav_state.lock);
+	if (g_nav_hook_trace.enabled || g_nav_hook_trace_inflight) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_BUSY;
+	}
 	previous_suspended = g_nav_state.suspended;
 	previous_draining = g_nav_state.draining;
 	g_nav_state.suspended = 1;
@@ -2604,6 +2687,100 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_Stop(void)
 	return status;
 }
 
+
+
+/** Maps diagnostic status without changing any existing native status value. */
+static int32_t NavHookTraceStatus(int32_t status)
+{
+	switch (status) {
+	case ERGOPTI_TRACE_OK: return ERGOPTI_NAV_STATUS_OK;
+	case ERGOPTI_TRACE_OVERFLOW: return ERGOPTI_NAV_STATUS_TRACE_INCOMPLETE;
+	case ERGOPTI_TRACE_INVALID:
+	case ERGOPTI_TRACE_CAPACITY_ERROR: return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	case ERGOPTI_TRACE_WRONG_OWNER: return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	case ERGOPTI_TRACE_BUSY: return ERGOPTI_NAV_STATUS_BUSY;
+	default: return ERGOPTI_NAV_STATUS_INVALID_STATE;
+	}
+}
+
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_StartHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation)
+{
+	DWORD process = 0, thread;
+	GUITHREADINFO focus;
+	int32_t status;
+	HWND receiver = (HWND)(uintptr_t)owner;
+	if (owner == 0 || token == 0 || generation == 0)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (!NavEnsureInitialized()) return ERGOPTI_NAV_STATUS_OS_ERROR;
+	thread = GetWindowThreadProcessId(receiver, &process);
+	memset(&focus, 0, sizeof(focus));
+	focus.cbSize = (DWORD)sizeof(focus);
+	if (GetForegroundWindow() != receiver || thread == 0
+			|| process == 0 || process != GetCurrentProcessId()
+			|| !GetGUIThreadInfo(thread, &focus) || focus.hwndFocus == NULL
+			|| (focus.hwndFocus != receiver && !IsChild(receiver, focus.hwndFocus)))
+		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (!g_nav_state.running || g_nav_state.draining || g_nav_hook_trace_inflight) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_BUSY;
+	}
+	if (!g_nav_hook_trace.initialized) {
+		status = ErgoptiTrace_Initialize(&g_nav_hook_trace, owner);
+		if (status != ERGOPTI_TRACE_OK) {
+			LeaveCriticalSection(&g_nav_state.lock);
+			return NavHookTraceStatus(status);
+		}
+	}
+	status = ErgoptiTrace_Start(&g_nav_hook_trace, owner, token, generation);
+	if (status == ERGOPTI_TRACE_OK) {
+		g_nav_hook_trace_receiver_thread = thread;
+		g_nav_hook_trace_focus = focus.hwndFocus;
+	}
+	LeaveCriticalSection(&g_nav_state.lock);
+	return NavHookTraceStatus(status);
+}
+
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ReadHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation, uint32_t offset,
+	ErgoptiTrace_Entry *entries, uint32_t capacity, ErgoptiTrace_Receipt *receipt)
+{
+	uint32_t count;
+	int32_t status;
+	if (owner == 0 || token == 0 || generation == 0 || receipt == NULL
+			|| capacity > ERGOPTI_TRACE_CAPACITY || (capacity && entries == NULL))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (!NavEnsureInitialized()) return ERGOPTI_NAV_STATUS_OS_ERROR;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (offset > g_nav_hook_trace.count) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	}
+	count = g_nav_hook_trace.count - offset;
+	if (count > capacity) count = capacity;
+	status = ErgoptiTrace_Page(&g_nav_hook_trace, owner, token, generation,
+		offset, count, entries, capacity, receipt);
+	LeaveCriticalSection(&g_nav_state.lock);
+	return NavHookTraceStatus(status);
+}
+
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_StopHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation)
+{
+	int32_t status;
+	if (owner == 0 || token == 0 || generation == 0)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (!NavEnsureInitialized()) return ERGOPTI_NAV_STATUS_OS_ERROR;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (g_nav_hook_trace_inflight) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_BUSY;
+	}
+	status = ErgoptiTrace_Stop(&g_nav_hook_trace, owner, token, generation);
+	LeaveCriticalSection(&g_nav_state.lock);
+	return NavHookTraceStatus(status);
+}
 
 
 /** Implements ErgoptiNav_PreparePlan. */

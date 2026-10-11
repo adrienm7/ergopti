@@ -53,14 +53,16 @@ const EXPECTED = [
 	'plan validation is atomic',
 	'nav-stale-physical-modifier',
 	'terminal output custody preserves fault debt (todo49-output-custody)',
+	'hook trace refuses unauthenticated sessions (todo49-hook-trace)',
+	'hook trace excludes deterministic dispatch (todo49-hook-trace)',
 	'native editor receiver matrix'
 ];
 
 /** Requires the complete authored census, including the explicitly native-only case. */
 function checkCensus(names) {
-	assert.equal(EXPECTED.length, 42);
+	assert.equal(EXPECTED.length, 44);
 	assert.deepEqual(names, EXPECTED, 'A native registration was lost, added or reordered.');
-	assert.equal(names.filter((name) => name !== 'native editor receiver matrix').length, 41);
+	assert.equal(names.filter((name) => name !== 'native editor receiver matrix').length, 43);
 }
 
 /** Creates an independent source fixture with the parser's documented table shape. */
@@ -92,6 +94,6 @@ assert.throws(
 	/registration/
 );
 console.log(
-	'Portable navigation registration: 42 authored cases and 6 negative selection controls passed.'
+	'Portable navigation registration: 44 authored cases and 6 negative selection controls passed.'
 );
 console.log('Source selection only; no C execution or Windows native qualification.');

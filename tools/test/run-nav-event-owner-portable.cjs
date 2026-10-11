@@ -120,6 +120,7 @@ function run(argv) {
 			path.join(SOURCE, 'nav_event_owner.c'),
 			path.join(SOURCE, 'replay_route_core.c'),
 			path.join(SOURCE, 'terminal_output_plan.c'),
+			path.join(SOURCE, 'hook_trace.c'),
 			path.join(SOURCE, 'nav_event_owner_test.c'),
 			path.join(SUPPORT, 'runtime.c'),
 			'-o',

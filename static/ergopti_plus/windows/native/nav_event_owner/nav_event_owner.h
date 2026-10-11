@@ -18,6 +18,7 @@
 
 #include "replay_route_core.h"
 #include "terminal_output_plan.h"
+#include "hook_trace.h"
 
 #if !defined(_WIN32)
 #error "The Ergopti navigation event owner requires Win32."
@@ -64,7 +65,8 @@ typedef enum ErgoptiNav_Status {
 	ERGOPTI_NAV_STATUS_TIMEOUT = 7,
 	ERGOPTI_NAV_STATUS_OWNER_MISMATCH = 8,
 	ERGOPTI_NAV_STATUS_STOP_PENDING = 9,
-	ERGOPTI_NAV_STATUS_STOPPED_WITH_ERROR = 10
+	ERGOPTI_NAV_STATUS_STOPPED_WITH_ERROR = 10,
+	ERGOPTI_NAV_STATUS_TRACE_INCOMPLETE = 11
 } ErgoptiNav_Status;
 
 /** Descriptor axis values copied from the AHK-027 native descriptor. */
@@ -651,6 +653,22 @@ ERGOPTI_NAV_API uint32_t ERGOPTI_NAV_CALL ErgoptiNav_GetLastOsError(void);
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestDispatch(
 	const ErgoptiNav_TestEvent *event,
 	ErgoptiNav_DispatchResult *out_result);
+
+/**
+ * Explicit isolated diagnostic session; owner must be this process's foreground
+ * receiver HWND. Default disabled. No input policy or production grant changes.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_StartHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation);
+
+/** Read-only bounded page; incomplete evidence returns TRACE_INCOMPLETE (11). */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ReadHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation, uint32_t offset,
+	ErgoptiTrace_Entry *entries, uint32_t capacity, ErgoptiTrace_Receipt *receipt);
+
+/** Freeze exact session; refusal or in-flight callback never erases evidence. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_StopHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation);
 
 #if defined(ERGOPTI_NAV_TESTING)
 /** Applies one provenance-free startup modifier through the production helper. */
