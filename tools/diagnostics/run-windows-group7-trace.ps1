@@ -21,8 +21,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT
-	-or !$Interactive -or ![Environment]::UserInteractive) {
+if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -or
+	!$Interactive -or ![Environment]::UserInteractive) {
 	throw 'Pass -Interactive from an authorized native Windows desktop with the keyboard idle.'
 }
 if (!(Test-Path -LiteralPath $Runtime -PathType Leaf)) { throw 'Pinned AutoHotkey executable is missing.' }
