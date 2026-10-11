@@ -488,6 +488,17 @@ Test("toml writer admission: semantic no-ops do not hide ignored-root deletes or
 ; Descendant edits preserve unowned inline source tokens; explicit whole-cell
 ; updates retain the generic native Map rendering contract in _TIT_Render.
 ; The generic writer's historical namespace-loss refusals above remain intact.
+
+; Current-source vectors preserve their independently authored bytes at native Boot.
+_TBUI_AdmitCurrentFixture(Path, Source) {
+	Boot := ConfigMigrateBoot(Path)
+	AssertTrue(Boot is Map)
+	AssertEqual("current", Boot["status"])
+	AssertEqual(0, Boot["read_only"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "native admission does not rewrite the fixture image")
+}
+
 _TBUI_ConfigDocumentVectors() {
 	return [
 		{ Id: "root dotted", Source: '# source anchor`nlayout.ergopti_base = true`nfuture.version = "001" # retained`n',
@@ -532,8 +543,11 @@ _TBUI_ConfigDocumentVectors() {
 _TBUI_ConfigDocumentVector(Vector) {
 	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
 	Expected := Chr(0xFEFF) . Vector.Expected
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		_TBUI_AdmitCurrentFixture(Path, Source)
 		Cached := ParseTomlFile(Path)
 		Candidate := TOML_BuildConfigUpdatedContent(Path, Vector.Updates)
 		AssertEqual("ok", Candidate["status"], Vector.Id)
@@ -606,8 +620,10 @@ Test("toml config document writer: duplicate semantic sources refuse", _TBUI_Con
 _TBUI_ConfigNoOpRetainsOwnedComments() {
 	Path := _TBUI_NewPath()
 	Source := Chr(0xFEFF) . '# user heading`n[layout] # layout owner`nergopti_base = true # owned preference`nfuture = "001" # future record`n'
+	Source := _CMJFixtureCurrentSource(Source)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		_TBUI_AdmitCurrentFixture(Path, Source)
 		Updates := [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(true) }]
 		Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
 		AssertEqual("ok", Candidate["status"])
@@ -622,8 +638,11 @@ _TBUI_ConfigExplicitNamespaceReplacement() {
 	Path := _TBUI_NewPath()
 	Source := Chr(0xFEFF) . '# source anchor`nhotstrings.modules.magickey = true`n[future]`nold = "001" # retained`n'
 	Expected := Chr(0xFEFF) . '# source anchor`n[future]`nold = "001" # retained`n[hotstrings.modules.magickey]`nenabled = false`n'
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		_TBUI_AdmitCurrentFixture(Path, Source)
 		Updates := [{ Section: "hotstrings.modules.magickey", Key: "enabled", Value: TOML_Bool(false) }]
 		Prefixes := ["hotstrings.modules.magickey"]
 		AssertEqual("error", TOML_BuildConfigUpdatedContent(Path, Updates)["status"], "an ordinary save retains the obsolete scalar")
@@ -642,8 +661,11 @@ _TBUI_ConfigGatewayUsesSemanticWriter() {
 	HadPath := IsSet(ConfigurationFile), PreviousPath := HadPath ? ConfigurationFile : ""
 	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . 'layout.ergopti_base = true`nfuture.version = "001" # retained`n'
 	Expected := Chr(0xFEFF) . 'layout.ergopti_base = false`nfuture.version = "001" # retained`n'
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		_TBUI_AdmitCurrentFixture(Path, Source)
 		ConfigurationFile := Path
 		Updates := [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }]
 		AssertTrue(ConfigCommitUpdates(Path, Updates, "semantic config gateway fixture", 0, (*) => 0),
@@ -699,7 +721,7 @@ _TBUI_ConfigInlineFullSaveAdmission(Path) {
 	}
 }
 _TBUI_ConfigInlineFullSaveAdmissionProbe() {
-	_FMS_WithSource("config_writer_inline_admission", '_meta.schema_version = 11`n[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
+	_FMS_WithSource("config_writer_inline_admission", _CMJFixtureCurrentSource('[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n'),
 		_TBUI_ConfigInlineFullSaveAdmission)
 }
 Test("toml config document writer: native full-save probe retains strict refusal and observes exact semantic no-op", _TBUI_ConfigInlineFullSaveAdmissionProbe)
@@ -713,8 +735,11 @@ _TBUI_ConfigNewSiblingRetainsNativeReadability() {
 		Source := Chr(0xFEFF) . "[" . Parent . ".first]`nenabled = false # keep first`n"
 			. '[private]`nfuture = "keep" # exact neighbor`n'
 		Expected := Source . "[" . Parent . ".second]`nenabled = true`n"
+		Source := _CMJFixtureCurrentSource(Source)
+		Expected := _CMJFixtureCurrentSource(Expected)
 		try {
 			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			_TBUI_AdmitCurrentFixture(Path, Source)
 			Cached := ParseTomlFile(Path)
 			Updates := [{ Section: Parent . ".second", Key: "enabled", Value: TOML_Bool(true) }]
 			Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
@@ -743,8 +768,11 @@ _TBUI_ConfigNewNamespaceRetainsNativeReadability() {
 		for Prefix in ["", '[private]`nfuture = "keep" # retained`n'] {
 			Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Prefix
 			Expected := Source . "[" . Section . "]`nenabled = false`n"
+			Source := _CMJFixtureCurrentSource(Source)
+			Expected := _CMJFixtureCurrentSource(Expected)
 			try {
 				AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+				_TBUI_AdmitCurrentFixture(Path, Source)
 				Updates := [{ Section: Section, Key: "enabled", Value: TOML_Bool(false) }]
 				Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
 				AssertEqual("ok", Candidate["status"])
@@ -770,8 +798,11 @@ _TBUI_ConfigReplacedNamespaceRetainsNativeReadability() {
 		Path := _TBUI_NewPath()
 		Source := Chr(0xFEFF) . "# source anchor`n" . OwnedSource . '[private]`nfuture = "keep" # retained`n'
 		Expected := Chr(0xFEFF) . '# source anchor`n[private]`nfuture = "keep" # retained`n[script]`nlog_level = "ERROR"`n'
+		Source := _CMJFixtureCurrentSource(Source)
+		Expected := _CMJFixtureCurrentSource(Expected)
 		try {
 			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			_TBUI_AdmitCurrentFixture(Path, Source)
 			Updates := [{ Section: "script", Key: "log_level", Value: "ERROR" }]
 			Prefixes := ["script"]
 			Candidate := TOML_BuildConfigUpdatedContent(Path, Updates, Prefixes)
@@ -865,8 +896,11 @@ _TBUI_ConfigInlineSpanVectors() {
 _TBUI_ConfigInlineSpanVector(Vector) {
 	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
 	Expected := Chr(0xFEFF) . Vector.Expected
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		_TBUI_AdmitCurrentFixture(Path, Source)
 		FileSetTime("20000101000000", Path, "M")
 		BeforeTime := FileGetTime(Path, "M")
 		Cached := ParseTomlFile(Path)

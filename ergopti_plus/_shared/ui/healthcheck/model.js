@@ -749,6 +749,7 @@
 	 */
 	function cell(value) {
 		return String(isAbsent(value) ? '' : value)
+			.replace(/\\/g, '\\\\')
 			.replace(/[\r\n]+/g, ' ')
 			.replace(/\|/g, '\\|');
 	}

@@ -50,6 +50,25 @@ KEYMAPSELECT_MAPINDEX_6 = (
 )
 
 
+def trim_boundary_empty_lines(content: str) -> str:
+    """Remove boundary whitespace through newlines in one linear scan.
+
+    Preserve indentation after the last leading newline and trailing spaces
+    when the source has no final newline, as the correction pipeline expects.
+    """
+    start = 0
+    for index, character in enumerate(content):
+        if not character.isspace():
+            break
+        if character == "\n":
+            start = index + 1
+    end = len(content)
+    if start < end and content.endswith("\n"):
+        while end > start and content[end - 1].isspace():
+            end -= 1
+    return content[start:end]
+
+
 def correct_keylayout(content: str, variant_number: int) -> str:
     """
     Apply all necessary corrections and modifications to a keylayout content.
@@ -61,7 +80,7 @@ def correct_keylayout(content: str, variant_number: int) -> str:
     content = re.sub(r"<!--.*?-->\n", "", content, flags=re.DOTALL)
 
     logger.info("%s🔹 Removing empty lines at start and end…", LOGS_INDENTATION + "\t")
-    content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
+    content = trim_boundary_empty_lines(content)
 
     content = replace_keymapselect(content, 4, KEYMAPSELECT_MAPINDEX_4)
     content = replace_keymapselect(content, 5, KEYMAPSELECT_MAPINDEX_5)

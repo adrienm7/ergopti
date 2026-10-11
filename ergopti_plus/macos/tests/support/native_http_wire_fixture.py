@@ -162,6 +162,44 @@ class WireFixture:
             "retirement_result": "not_acquired",
             "failure_phase": None,
         }
+        # This observer never consumes the deadline clock or acquires authority.
+        timing = {
+            "observed": True,
+            "acquisition_elapsed_ms": None,
+            "input_close_elapsed_ms": None,
+            "wait_budget_ms": None,
+            "wait_elapsed_ms": None,
+            "retirement_elapsed_ms": None,
+        }
+        timing_starts = {}
+
+        def observe_timing(stage, finished=False):
+            if not security_failure_observation or not timing["observed"]:
+                return
+            try:
+                if finished and stage not in timing_starts:
+                    return
+                now = time.perf_counter_ns()
+                if type(now) is not int or now < 0:
+                    raise ValueError("Cleanup observation clock refused")
+                if finished:
+                    started = timing_starts.pop(stage)
+                    if now < started:
+                        raise ValueError("Cleanup observation clock regressed")
+                    timing[stage + "_elapsed_ms"] = round((now - started) / 1_000_000, 3)
+                else:
+                    timing_starts[stage] = now
+                    if stage == "wait":
+                        if type(wait_timeout) not in (int, float) or not (
+                            0 <= wait_timeout < float("inf")
+                        ):
+                            raise ValueError("Cleanup observation budget refused")
+                        timing["wait_budget_ms"] = round(wait_timeout * 1000, 3)
+            except Exception:
+                # Closed unavailability is diagnostic only, including clock refusal.
+                for key in timing:
+                    timing[key] = False if key == "observed" else None
+
         self.command_milestone_fact = None
         status = None
         self.command_fact = None
@@ -191,6 +229,7 @@ class WireFixture:
                 try:
                     phase = "acquire"
                     milestones["acquisition_entered"] = True
+                    observe_timing("acquisition")
                     self.groups.acquire_owned(
                         arguments,
                         self.native_groups,
@@ -199,10 +238,13 @@ class WireFixture:
                         stdout=output,
                         stderr=output if merge_errors else errors,
                     )
+                    observe_timing("acquisition", finished=True)
                     phase = "input"
                     owned.process.stdin.write(input_bytes)
                     try:
+                        observe_timing("input_close")
                         owned.process.stdin.close()
+                        observe_timing("input_close", finished=True)
                     except BaseException:
                         closure_refused = True
                         if owned.process.stdin.closed:
@@ -215,24 +257,38 @@ class WireFixture:
                         raise
                     phase = "wait"
                     milestones["wait_entered"] = True
-                    owned.wait_for_exit(
+                    wait_timeout = (
                         timeout if deadline is None else max(0, deadline - time.monotonic())
                     )
+                    observe_timing("wait")
+                    owned.wait_for_exit(wait_timeout)
+                    observe_timing("wait", finished=True)
                     milestones["wait_returned"] = True
                 except BaseException as primary:
+                    observe_timing(
+                        "acquisition"
+                        if phase == "acquire"
+                        else "input_close"
+                        if phase == "input"
+                        else "wait",
+                        finished=True,
+                    )
                     failure = primary
                     milestones["failure_phase"] = phase
                 finally:
                     try:
                         if owned is not None:
                             milestones["retirement_attempted"] = True
+                            observe_timing("retirement")
                             retirement = owned.settle()
+                            observe_timing("retirement", finished=True)
                             milestones["retirement_result"] = (
                                 "acknowledged" if retirement is True else "not_confirmed"
                             )
                             if not retirement:
                                 raise FixtureFailure("Native fixture child closure refused")
                     except BaseException as refused:
+                        observe_timing("retirement", finished=True)
                         if milestones["retirement_attempted"]:
                             milestones["retirement_result"] = "refused"
                         phase = "settle"
@@ -246,12 +302,14 @@ class WireFixture:
             else:
                 phase = "acquire"
                 milestones["acquisition_entered"] = True
+                observe_timing("acquisition")
                 child = subprocess.Popen(
                     arguments,
                     stdin=subprocess.PIPE,
                     stdout=output,
                     stderr=output if merge_errors else errors,
                 )
+                observe_timing("acquisition", finished=True)
                 milestones["child_acquired"] = True
                 input_owner = child.stdin
                 input_observer = CommandInputOwner(input_owner)
@@ -259,14 +317,22 @@ class WireFixture:
                 try:
                     phase = "wait"
                     milestones["wait_entered"] = True
-                    child.communicate(
-                        input_bytes,
-                        timeout=timeout
-                        if deadline is None
-                        else max(0, deadline - time.monotonic()),
+                    wait_timeout = (
+                        timeout if deadline is None else max(0, deadline - time.monotonic())
                     )
+                    observe_timing("wait")
+                    child.communicate(input_bytes, timeout=wait_timeout)
+                    observe_timing("wait", finished=True)
                     milestones["wait_returned"] = True
                 except BaseException as primary:
+                    observe_timing(
+                        "acquisition"
+                        if phase == "acquire"
+                        else "input_close"
+                        if phase == "input"
+                        else "wait",
+                        finished=True,
+                    )
                     failure = primary
                     milestones["failure_phase"] = phase
                 finally:
@@ -276,11 +342,14 @@ class WireFixture:
                             failure = input_observer.close_failure
                     try:
                         milestones["retirement_attempted"] = True
+                        observe_timing("retirement")
                         if child.poll() is None:
                             child.kill()
                         child.wait()
+                        observe_timing("retirement", finished=True)
                         milestones["retirement_result"] = "acknowledged"
                     except BaseException as refused:
+                        observe_timing("retirement", finished=True)
                         if milestones["retirement_attempted"]:
                             milestones["retirement_result"] = "refused"
                         phase = "settle"
@@ -307,6 +376,7 @@ class WireFixture:
             output.seek(0)
             result = status, output.read(65536)
         except BaseException as refused:
+            observe_timing("acquisition", finished=True)
             if failure is None:
                 failure = refused
                 milestones["failure_phase"] = phase
@@ -377,6 +447,7 @@ class WireFixture:
                 "phase": self.command_fact["phase"],
                 "status": self.command_fact["status"],
                 **milestones,
+                "timing": timing,
             }
             # Passive closed milestones cannot replace a command verdict or primary error.
             try:
