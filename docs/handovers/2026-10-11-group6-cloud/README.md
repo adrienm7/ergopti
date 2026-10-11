@@ -955,3 +955,75 @@ API/Git refusal resolves before the successfulc239 publication; cause is unknown
 All proposals remain held pending their exact ownership/enrollment/native joins.
 Test locations, independent corpora, fixtures, ordering, all TODO items and the
 local main/v1.0.1 release remain preserved.
+
+## Qualified merged checkpoint and final source preparations
+
+Published feature checkpoint `c3a49a115c21d98d05626d847ad3e416ca77987a`
+preserves parents `c23982e1cc` and current Dev `da74809cd1` without squash.
+Its tree `53d02a1d79d10ebf05c72548759fdd42cff8ffd6` is the tested index.
+The [canonical receiving packet](dev-da748-canonical-receiving.tar.gz) retains
+the original log, the110-path before/after fence, publication and exact
+automatic-run censuses. All110 source hashes,
+HEAD and logical index agree before/after; this permits restored temporary
+drift-guard edits and does not claim continuous immutability. Its six serial
+gates pass in1,554.954 seconds: format388, JS413, Lua18609, virtual Hammerspoon
+E2E101 with one declared host/driver skip, Linux E2E193 and Linux unit13268.
+No test failure remains in those selected gates. Physical X11/Wayland/input and
+native Hammerspoon are not qualified by these virtual or stub checks.
+
+The768,835-byte packet hashes
+`3473afc774b722dce3e96e480cd56c87bd504e042027dd8bd1c542a266f5fbc4`,
+with nine safe regular members/eight independent inventory joins. Its exact
+decompressed6,322,353-byte log hashes
+`f41ae1912e2c8814d20f0a1c320df51f469793924c2a5bd0ba4dff8912b4feaa`.
+Four all-event automatic censuses find zero runs on the exact published SHA.
+The subsequent explicit Dev fetch still receives `da74809cd1`.
+
+The [removal custody receipt](native-removal-custody-receiving.tar.gz) corrects
+the historical Root-pending statement and public handoff6114042540. Authentic
+request6113599499 and Root6113764617 name the exact086876e proposal; Root
+releases the settled removal projection, additive nine-case class and unique
+156-to165 literal. G4 removal custody remains absent in the received cut;
+separate poll grants do not authorize removal. Any actual same-span writer must
+serialize independently. Current fixture/corpus preimages remain exact; the
+current72b wrapper requires only its unique census splice, preserving every
+failure diagnostic, original command/assertion/count and60-second boundary.
+The17,862-byte packet hashes
+`7a32d11aa313dd1a70021dd98c3f762b87f1b9e2289a27da329e26645046571a`,
+with ten regular members/nine joins. No tests ran in this custody review.
+The independently received165 portable passes remain separate from live adoption
+and actual Darwin trust restoration.
+
+The [formatted raw-retention metadata proposal](native-pac-raw-metadata-r2-proposal.tar.gz)
+adds only one FULL_STEPS tuple, one STEP_CONDITIONS tuple and a named guard with
+new omission controls. It binds the immutable R2 producer step's eleven paths,
+exact always condition, action, namespace, fatal missing-file contract and
+position after original PAC retention/before SDK acquisition. All40+262 original
+function bodies,128 existing assertions and71+89 tuple elements remain exact;
+whole-file and formatter-only inverses are retained. Pinned repository-config
+Prettier and syntax pass. Bounded actual-parser controls pass one default positive
+with seven causal refusals, and two named-guard positives with twenty refusals;
+the actual metadata preimage admits those seven broken variants. The initial
+external VM-array error and first formatting refusal remain recorded. Full
+pipeline/JS/source-drift, Windows compiler/builder and native receiving are UNRUN.
+Root/Windows/G3 exact custody and truthful current producer fingerprint/source
+enrollment remain mandatory. Compose these three literal additions with G3
+SourceB and G5 clock metadata on authentic future preimages; never overwrite a
+whole private file or relax the original23/native28 late consumers/retirement.
+The286,634-byte packet hashes
+`12e9d323d6c7208338e5fabbb816850e4103ad9fbca7d369b56180772ff035ef`,
+with42 safe regular members/41 independent joins. Request6114372125 follows the
+separate producer request6114209065; neither grants adoption.
+
+These three packets are also POST/GET byte-exact Git blobs: canonical receiving
+`ca3a9b34086d985dd7b69321f3252a981715aacb`, custody
+`56fea0b22dfc61a7e6663299d290ed2c859ead32`, and metadata
+`250aa643efd1451aa69d1af33c528a07189d4007`. The separate G3 manual38176924058
+on actual Dev `da74809cd1` is terminal FAILURE and does not qualify this feature
+SHA. Its Windows unit manifest is incomplete:1,989 terminal passes, zero terminal
+failures and9,157 cases without terminal results under the original watchdog.
+Reported macOS system-trust and Homebrew failures remain unresolved; no native
+cause or complete acceptance follows from matched source maps. Official CI ref,
+lock/manual, main release and test migration remain untouched. Network draft13
+still needs Environment Settings Review/Save then Publish for activation.
+Items36/62 and transversal16/38 remain open;22 stays deliberately withdrawn.
