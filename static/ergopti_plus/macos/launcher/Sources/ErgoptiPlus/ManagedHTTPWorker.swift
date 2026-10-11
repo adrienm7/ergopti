@@ -333,13 +333,14 @@ func managedHTTPNativeErrorFacts(_ error: NSError) -> [String] {
 	var current = error
 	var seen = Set<ObjectIdentifier>()
 	var result: [String] = []
+	let cfNetworkDomain: String = kCFErrorDomainCFNetwork as String
 	while result.count < 4 && seen.insert(ObjectIdentifier(current)).inserted {
 		let domain: String
 		switch current.domain {
 		case NSURLErrorDomain: domain = "url"
 		case NSPOSIXErrorDomain: domain = "posix"
 		case NSOSStatusErrorDomain: domain = "osstatus"
-		case (kCFErrorDomainCFNetwork as String): domain = "cfnetwork"
+		case cfNetworkDomain: domain = "cfnetwork"
 		default: domain = "unknown"
 		}
 		let code = domain == "unknown" ? nil : Int32(exactly: current.code)
