@@ -592,7 +592,7 @@ Test("local server panel: unavailable status reads actual shared caption and ord
 ; ===================================================
 
 _LSPB_Stamp(World) {
-	World.ConfigImage .= "[_meta]`nschema_version = " ConfigMigrateCurrentVersion() "`n"
+	; The native World already owns its current stamp; a second table is invalid TOML.
 	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
 	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
 }
@@ -611,7 +611,12 @@ _LSPB_SourceBatch() {
 	Fixture := _LSJ_Fixture()
 	World := Fixture.World
 	try {
+		Before := World.ConfigImage
+		AssertTrue(FSUtf8ExactMatches(World.ConfigPath, Before))
+		AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "the actual parent source is already admitted")
 		_LSPB_Stamp(World)
+		AssertEqual(Before, World.ConfigImage, "panel admission cannot add a duplicate schema table")
+		AssertTrue(FSUtf8ExactMatches(World.ConfigPath, Before), "the physical parent image remains byte exact")
 		Source := World.Owner.Capture()
 		AssertTrue(Source is LLM_Menu_ApiPrivateSourceReceipt)
 		Ids := []
