@@ -1,9 +1,9 @@
 {
 	"schema": 1,
-	"id": "stable-v1-0-1-20261010-three-macos-native-scopes",
+	"id": "stable-v1-0-1-20261011-four-macos-native-scopes",
 	"authorized": true,
-	"authorization_quote": "oui",
-	"expires_at": "2026-10-11T07:00:00Z",
+	"authorization_quote": "il faut vraiment te dépêcher de créer cette release, quitte à bypass des tests",
+	"expires_at": "2026-10-12T07:00:00Z",
 	"repository": "adrienm7/ergopti",
 	"event_name": "push",
 	"ref": "refs/heads/main",
@@ -12,7 +12,7 @@
 	"channel": "main",
 	"tag": "v1.0.1",
 	"version": "1.0.1",
-	"authorization_note": "Explicit human answer \"oui\" on 2026-10-10 approved only these three exact stable v1.0.1 macOS scopes until October 11 07:00 UTC. Public DEFERRED/qualified:false is required. All other tests, builds, signatures, source/asset integrity and ordinary installation remain mandatory; native Homebrew ZIP/XZ acceptance remains unqualified. No permission/trust/sender workaround or extra scope is authorized.",
+	"authorization_note": "Explicit human authorization on 2026-10-11 permits temporary test deferrals to expedite only stable v1.0.1 main publication. Exactly these four scopes remain DEFERRED/qualified:false. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
 	"scopes": {
 		"macos-native-pac": {
 			"kind": "command",
@@ -41,6 +41,17 @@
 			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
 			"name": "testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
 			"reason": "The single native Homebrew ZIP installation/XZ upgrade/refusal-preservation acceptance method is DEFERRED and qualified:false after owned Automation consent exceeded its deadline; ordinary verified archive install/launch remains mandatory."
+		},
+		"macos-native-model-receiving": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": [
+				"managed-ollama-native",
+				"Receive actual native model create, pull, inference and retirement"
+			],
+			"architectures": ["arm64", "amd64"],
+			"profiles": ["pac-inline", "pac-url", "explicit-proxy"],
+			"reason": "Native model create, pull, inference, cancellation and retirement remain DEFERRED and qualified:false for arm64/amd64 across pac-inline, pac-url and explicit-proxy after the system-trust fixture was refused; producer/catalogue/assets and portable model controls remain mandatory."
 		}
 	}
 }

@@ -851,7 +851,7 @@ function nativeHttpFullBody(script) {
 	// The narrow v1.0.1 wrapper keeps owned-process and client-only outside
 	// the optional wire branch; only this complete closed shell image is admitted.
 	const currentWrapper =
-		'set -euo pipefail\nreceipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nprofile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile "$receipt")"\nif [ "$mode" = deferred ] && [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then\n    echo "[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false."\n    exit 0\nfi\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nif [ "$mode" = deferred ]; then\n    test "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes\n    echo "[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n';
+		'set -euo pipefail\nreceipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nprofile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile "$receipt")"\nif [ "$mode" = deferred ] && [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then\n    echo "[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false."\n    exit 0\nfi\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nif [ "$mode" = deferred ]; then\n    test "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes\n    echo "[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n';
 	if (script.includes('--validate-scope-receipt-profile')) {
 		assert.strictEqual(
 			script,
@@ -1612,11 +1612,8 @@ check('profile-bound native HTTP routing preserves mandatory owners and closed r
 		assert.strictEqual(full.split(command).length - 1, 1);
 	for (const [before, after] of [
 		['--validate-scope-receipt-profile "$receipt"', '--validate-scope-receipt-profile "foreign"'],
-		[
-			'stable-v1-20261009-macos-native-deferred',
-			'stable-v1-0-1-20261010-three-macos-native-scopes'
-		],
-		['test "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes', 'true'],
+		['stable-v1-20261009-macos-native-deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes'],
+		['test "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes', 'true'],
 		[
 			'native_http_receiving_test.py --client-only || status=1',
 			'native_http_receiving_test.py --client-only || true'

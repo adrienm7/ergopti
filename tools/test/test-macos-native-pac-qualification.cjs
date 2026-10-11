@@ -536,7 +536,7 @@ function stableV101PacCollectorControls(repository) {
 	assert.equal(reader.evaluate(valid, 73, 0, admission).exit_status, 73);
 	assert.equal(reader.evaluate(valid, 0, 9, admission).exit_status, 9);
 	assert.throws(() => reader.evaluate(valid, 0, 0, { mode: 'deferred' }));
-	assert.throws(() => full.pacQualification(receipt, env, new Date('2026-10-11T07:00:00Z')));
+	assert.throws(() => full.pacQualification(receipt, env, new Date(profile.expires_at)));
 	console.log(
 		'[OK] v1.0.1 PAC receiving requires every Worker12 method and both exact argument observations.'
 	);

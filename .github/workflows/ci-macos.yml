@@ -498,7 +498,7 @@ jobs:
           native_pac_skip_args=()
           pac_evidence_args=()
           if [ "$mode" = deferred ]; then
-              if [ "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes ]; then
+              if [ "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes ]; then
                   native_pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$receipt")")
                   pac_evidence_args=(--pac-qualification-receipt "$receipt")
                   echo "[DEFERRED] macos-native-pac: only exact native wire methods omitted; Worker controls remain mandatory; qualified=false."
@@ -559,7 +559,7 @@ jobs:
           "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
           "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
           if [ "$mode" = deferred ]; then
-              test "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes
+              test "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes
               echo "[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false."
           elif [ "$mode" = full ]; then
               "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
@@ -1107,7 +1107,7 @@ jobs:
           brew_evidence_args=()
           swift_root_suite="All tests"
           if [ "$mode" = deferred ]; then
-              if [ "$profile" = stable-v1-0-1-20261010-three-macos-native-scopes ]; then
+              if [ "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes ]; then
                   test "$brew_mode" = deferred
                   test "$brew_profile" = "$profile"
                   pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$pac_receipt" --brew-qualification-receipt "$brew_receipt")")

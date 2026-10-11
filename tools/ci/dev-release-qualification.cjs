@@ -15,11 +15,12 @@ const STABLE_V101_POLICY_PATH = path.resolve(
 	__dirname,
 	'../../.github/ci/stable_v101_macos_native_qualification_exception.json'
 );
-const STABLE_V101_PROFILE_ID = 'stable-v1-0-1-20261010-three-macos-native-scopes';
+const STABLE_V101_PROFILE_ID = 'stable-v1-0-1-20261011-four-macos-native-scopes';
 const STABLE_V101_SCOPE_IDS = Object.freeze([
 	'macos-native-pac',
 	'macos-native-http',
-	'macos-brew-archive'
+	'macos-brew-archive',
+	'macos-native-model-receiving'
 ]);
 const STABLE_V101_PAC_METHODS = freeze({
 	ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
@@ -165,8 +166,9 @@ function validateStableV101Policy(value) {
 		value.schema !== 1 ||
 		value.id !== STABLE_V101_PROFILE_ID ||
 		typeof value.authorized !== 'boolean' ||
-		value.authorization_quote !== 'oui' ||
-		value.expires_at !== '2026-10-11T07:00:00Z' ||
+		value.authorization_quote !==
+			'il faut vraiment te dépêcher de créer cette release, quitte à bypass des tests' ||
+		value.expires_at !== '2026-10-12T07:00:00Z' ||
 		value.repository !== 'adrienm7/ergopti' ||
 		value.event_name !== 'push' ||
 		value.ref !== 'refs/heads/main' ||
@@ -184,14 +186,17 @@ function validateStableV101Policy(value) {
 	for (const scope of STABLE_V101_SCOPE_IDS) {
 		const row = value.scopes[scope];
 		const brew = scope === 'macos-brew-archive',
-			pac = scope === 'macos-native-pac';
+			pac = scope === 'macos-native-pac',
+			model = scope === 'macos-native-model-receiving';
 		keys(
 			row,
 			brew
 				? ['kind', 'path', 'name', 'reason']
 				: pac
 					? ['kind', 'path', 'args', 'methods', 'reason']
-					: ['kind', 'path', 'args', 'command', 'reason']
+					: model
+						? ['kind', 'path', 'args', 'architectures', 'profiles', 'reason']
+						: ['kind', 'path', 'args', 'command', 'reason']
 		);
 		if (typeof row.reason !== 'string' || !row.reason || /[\r\n]/.test(row.reason))
 			refuse('Invalid v1.0.1 scope reason.');
@@ -212,7 +217,15 @@ function validateStableV101Policy(value) {
 			if (pac && JSON.stringify(row.methods) !== JSON.stringify(STABLE_V101_PAC_METHODS))
 				refuse('Invalid exact v1.0.1 PAC methods.');
 			if (
+				model &&
+				(JSON.stringify(row.architectures) !== JSON.stringify(['arm64', 'amd64']) ||
+					JSON.stringify(row.profiles) !==
+						JSON.stringify(['pac-inline', 'pac-url', 'explicit-proxy']))
+			)
+				refuse('Invalid exact v1.0.1 native model profiles.');
+			if (
 				!pac &&
+				!model &&
 				row.command !==
 					'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'
 			)
@@ -571,7 +584,7 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			deferredScopes(profile)
 				.map((scope) => scope + ': ' + profile.scopes[scope].reason)
 				.join(' ') +
-			' Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1) retain source-bound missing-proof receipts. Only stable v1.0.1 main push before 2026-10-11T07:00:00Z is authorized; no permission, trust or sender workaround.'
+			' Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1) retain source-bound missing-proof receipts. Only stable v1.0.1 main push before 2026-10-12T07:00:00Z is authorized; no permission, trust or sender workaround.'
 		);
 	return (
 		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
@@ -614,7 +627,8 @@ function admitCommandReceipts(directory, context, sha, now = new Date()) {
 			? {
 					'macos-native-pac': ['arm64', 'amd64'],
 					'macos-native-http': ['arm64', 'amd64'],
-					'macos-brew-archive': ['']
+					'macos-brew-archive': [''],
+					'macos-native-model-receiving': ['arm64', 'amd64']
 				}
 			: {
 					'macos-native-pac': ['arm64', 'amd64'],

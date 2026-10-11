@@ -625,12 +625,13 @@ check(
 	'v101 scope admission is exact main push before expiry and all foreign contexts stay full',
 	() => {
 		const stable = JSON.parse(fs.readFileSync(Policy.STABLE_V101_POLICY_PATH, 'utf8'));
-		assert.equal(stable.id, 'stable-v1-0-1-20261010-three-macos-native-scopes');
-		assert.equal(stable.expires_at, '2026-10-11T07:00:00Z');
+		assert.equal(stable.id, 'stable-v1-0-1-20261011-four-macos-native-scopes');
+		assert.equal(stable.expires_at, '2026-10-12T07:00:00Z');
 		assert.deepEqual(Object.keys(stable.scopes), [
 			'macos-native-pac',
 			'macos-native-http',
-			'macos-brew-archive'
+			'macos-brew-archive',
+			'macos-native-model-receiving'
 		]);
 		const context = Object.fromEntries(
 			['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(
@@ -638,7 +639,7 @@ check(
 			)
 		);
 		context.github_actions = 'true';
-		const clock = new Date('2026-10-11T06:59:59.999Z');
+		const clock = new Date('2026-10-12T06:59:59.999Z');
 		for (const scope of Object.keys(stable.scopes)) {
 			assert.equal(Policy.resolveQualificationProfile(context, clock, scope).id, stable.id);
 			assert.equal(
@@ -663,7 +664,7 @@ check(
 				);
 		}
 		for (const scope of [
-			'macos-native-model-receiving',
+			'macos-native-model-receiving-unadmitted',
 			'core-js-suite',
 			'linux-unit-suite',
 			'windows-native-desktop'
@@ -745,7 +746,7 @@ node() {
 			env: {
 				...process.env,
 				MODE: mode,
-				PROFILE: mode === 'full' ? '' : 'stable-v1-0-1-20261010-three-macos-native-scopes'
+				PROFILE: mode === 'full' ? '' : 'stable-v1-0-1-20261011-four-macos-native-scopes'
 			}
 		});
 		assert.equal(result.status, 0, result.stderr);
@@ -770,9 +771,9 @@ check('v101 HTTP receiver defers only wire and preserves both mandatory statuses
 		const code = Raw.runOf(step).join('\n').replaceAll('${{ matrix.architecture }}', 'arm64');
 		for (const [mode, profile, refused, failedCommand, expected] of [
 			['full', '', false, '', 0],
-			['deferred', 'stable-v1-0-1-20261010-three-macos-native-scopes', false, '', 0],
-			['deferred', 'stable-v1-0-1-20261010-three-macos-native-scopes', false, 'owned', 1],
-			['deferred', 'stable-v1-0-1-20261010-three-macos-native-scopes', false, 'client', 1],
+			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, '', 0],
+			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, 'owned', 1],
+			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, 'client', 1],
 			['full', '', true, '', 17]
 		]) {
 			const shell =
