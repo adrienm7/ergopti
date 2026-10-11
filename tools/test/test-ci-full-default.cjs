@@ -631,7 +631,8 @@ check(
 			'macos-native-pac',
 			'macos-native-http',
 			'macos-brew-archive',
-			'macos-native-model-receiving'
+			'macos-native-model-receiving',
+			'macos-shortcuts-discovery'
 		]);
 		const context = Object.fromEntries(
 			['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(
@@ -863,6 +864,32 @@ check('v101 package joins only validated PAC and Brew identities', () => {
 	);
 	assert.equal(full.includes('brew_evidence_args'), false);
 	assert.equal(full.includes('--brew-qualification-receipt'), false);
+});
+
+check('v101 Shortcuts keeps portable/full work and publishes its validated exact receipt', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'package-macos');
+	const probe = Raw.step(job.body, 'Observe native Apple Shortcuts discovery');
+	const code = Raw.runOf(probe).join('\n');
+	const portable = code.indexOf(
+		'python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe'
+	);
+	const jxa = code.indexOf('node tools/diagnostics/apple_shortcuts_probe/test_probe.cjs');
+	const admission = code.indexOf(
+		"policy.validateQualificationReceipt(receipt, 'macos-shortcuts-discovery'"
+	);
+	const emission = code.indexOf('fs.writeFileSync(');
+	const full = code.indexOf('if [ "$shortcuts_mode" = full ]; then');
+	assert(
+		portable >= 0 && jxa > portable && admission > jxa && emission > admission && full > emission
+	);
+	assert(code.includes("{ flag: 'wx' }"));
+	assert(code.includes('python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py'));
+	const upload = Raw.step(job.body, 'Retain source-bound Shortcuts native qualification receipt');
+	assert.equal(Raw.stepField(upload, 'if'), null);
+	assert(upload.includes('name: assets-qualification-shortcuts-macos'));
+	assert(upload.includes('path: ${{ runner.temp }}/stable-macos-shortcuts-discovery.json'));
+	assert(upload.includes('if-no-files-found: error'));
 });
 
 console.log(

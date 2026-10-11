@@ -792,7 +792,8 @@ const reader = workflow
 	.split('\n')
 	.map((line) => line.slice(10))
 	.join('\n');
-function receive(receipt, env) {
+const receiverTemp = path.join(ROOT, 'recording-shortcuts-reader-output');
+function receive(receipt, env, observation = { attempts: [], published: [], output: '' }) {
 	let output = '';
 	const actualClockPort = {
 		environmentContext: () => policy.environmentContext(env),
@@ -801,14 +802,28 @@ function receive(receipt, env) {
 			policy.validateQualificationReceipt(r, s, h, c, clock)
 	};
 	vm.runInNewContext(reader, {
-		require: (name) =>
-			name === 'node:fs' ? { readFileSync: () => JSON.stringify(receipt) } : actualClockPort,
+		require: (name) => {
+			if (name === 'node:path') return path;
+			if (name === 'node:fs')
+				return {
+					readFileSync: () => JSON.stringify(receipt),
+					writeFileSync: (target, content, options) => {
+						const record = { target, content, options };
+						observation.attempts.push(record);
+						if (observation.writeError) throw observation.writeError;
+						observation.published.push(record);
+					}
+				};
+			assert.equal(name, './tools/ci/dev-release-qualification.cjs');
+			return actualClockPort;
+		},
 		process: {
 			argv: ['node', '-', 'owned-receipt.json'],
-			env,
+			env: { ...env, RUNNER_TEMP: receiverTemp },
 			stdout: {
 				write: (value) => {
 					output += value;
+					observation.output = output;
 				}
 			}
 		}
@@ -1072,6 +1087,58 @@ for (const [name, from, to] of [
 assert.equal(passed, 79);
 console.log(
 	'PASS: Mac qualification deferral source/typed-receipt controls=79; Swift/native execution unqualified.'
+);
+
+// Keep the original source/receipt census separate from public emission controls.
+let publicReceiptChecks = 0;
+function publicReceiptCheck(action) {
+	action();
+	publicReceiptChecks++;
+}
+publicReceiptCheck(() => {
+	for (const [receipt, env] of [
+		[deferred, environment],
+		[full, { ...environment, GITHUB_REF: 'refs/heads/main' }]
+	]) {
+		const observation = { attempts: [], published: [], output: '' };
+		assert.equal(receive(receipt, env, observation), receipt.status);
+		assert.equal(observation.attempts.length, 1);
+		assert.equal(observation.published.length, 1);
+		const record = observation.published[0];
+		assert.equal(record, observation.attempts[0]);
+		assert.equal(record.target, path.join(receiverTemp, 'stable-macos-shortcuts-discovery.json'));
+		assert.equal(record.content, JSON.stringify(receipt) + '\n');
+		assert.deepEqual(Object.keys(record.options), ['flag']);
+		assert.equal(record.options.flag, 'wx');
+		assert.equal(observation.output, receipt.status);
+	}
+});
+publicReceiptCheck(() => {
+	for (const [receipt, env] of [
+		[full, environment],
+		[deferred, { ...environment, GITHUB_EVENT_NAME: 'pull_request' }],
+		[{ ...deferred, source_sha: 'f'.repeat(40) }, environment],
+		[{ ...deferred, qualified: true }, environment]
+	]) {
+		const observation = { attempts: [], published: [], output: '' };
+		assert.throws(() => receive(receipt, env, observation));
+		assert.equal(observation.attempts.length, 0);
+		assert.equal(observation.published.length, 0);
+		assert.equal(observation.output, '');
+	}
+	const writeError = new Error('Recording exclusive publication refused');
+	const observation = { attempts: [], published: [], output: '', writeError };
+	assert.throws(
+		() => receive(deferred, environment, observation),
+		(error) => error === writeError
+	);
+	assert.equal(observation.attempts.length, 1);
+	assert.equal(observation.published.length, 0);
+	assert.equal(observation.output, '');
+});
+assert.equal(publicReceiptChecks, 2);
+console.log(
+	'PASS: Shortcuts public receipt emission controls=2; filesystem/native execution unrun.'
 );
 
 require('./test-item36-native-qualification.cjs')({

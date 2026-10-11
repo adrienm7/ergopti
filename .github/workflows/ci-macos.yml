@@ -1307,6 +1307,11 @@ jobs:
               Object.keys(receipt).sort().join('|') !== 'profile_id|qualified|schema|scope|source_sha|status') {
             throw Error('Invalid full native qualification receipt');
           }
+          fs.writeFileSync(
+            require('node:path').join(process.env.RUNNER_TEMP, 'stable-macos-shortcuts-discovery.json'),
+            JSON.stringify(receipt) + '\n',
+            { flag: 'wx' }
+          );
           process.stdout.write(receipt.status);
           NODE
           )"
@@ -1316,7 +1321,7 @@ jobs:
               --source-sha "$GITHUB_SHA" \
               --output "$RUNNER_TEMP/group3-apple-shortcuts-probe"
           else
-            echo "::warning title=Native Shortcuts qualification DEFERRED::Temporary dev prerelease exception; discovery remains unqualified."
+            echo "::warning title=Native Shortcuts qualification DEFERRED::Source-bound scoped test exception; native catalogue discovery remains DEFERRED/qualified:false."
           fi
         timeout-minutes: 2
 
@@ -1328,6 +1333,13 @@ jobs:
           path: |
             ${{ runner.temp }}/group3-apple-shortcuts-probe
             ${{ runner.temp }}/dev-release-qualification/macos-shortcuts-discovery.json
+          if-no-files-found: error
+
+      - name: Retain source-bound Shortcuts native qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-shortcuts-macos
+          path: ${{ runner.temp }}/stable-macos-shortcuts-discovery.json
           if-no-files-found: error
 
       # LauncherLogTests append to the real launcher log,
