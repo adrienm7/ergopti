@@ -80,6 +80,18 @@ const FULL_STEPS = [
 		'always()'
 	],
 	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Observe independent native Apple Shortcuts SDK preflight and discovery',
+		"${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain independent native Apple Shortcuts SDK observation',
+		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
+	[
 		'.github/workflows/ci-linux.yml',
 		'test-linux',
 		'Qualify actual LuaJIT XI2 ABI and property cookies',
@@ -125,6 +137,18 @@ const FULL_STEPS = [
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
 		'Retain selected number-row Carbon XCTest diagnostics',
+		'always()'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Receive native final-byte number-row causal refusal',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain native final-byte number-row causal diagnostics',
 		'always()'
 	],
 	[

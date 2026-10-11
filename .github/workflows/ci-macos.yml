@@ -535,6 +535,141 @@ jobs:
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json
+      - name: Receive native final-byte number-row causal refusal
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          evidence="$RUNNER_TEMP/number-row-causal-evidence"
+          mkdir "$evidence"
+          projection="$(mktemp -d "$RUNNER_TEMP/number-row-current-projection.XXXXXX")"
+          controls_projection="$(mktemp -d "$RUNNER_TEMP/number-row-historical-controls.XXXXXX")"
+          projection_evidence="$evidence/source-proof"
+          mkdir "$projection_evidence"
+          private_scratch="$(mktemp -d "$evidence/compile.XXXXXX")"
+          recipe="tools/diagnostics/fixtures/number-row-native-causal/projection-manifest.original-c15.json.raw"
+          receiver="tools/diagnostics/number_row_native_causal.py"
+          prepare="tools/diagnostics/prepare_number_row_native_causal.py"
+          generator="tools/diagnostics/generate_number_row_source_composition.py"
+          composition_controls="tools/diagnostics/test_number_row_source_composition.py"
+          approval="tools/diagnostics/fixtures/number-row-native-causal/g5-source-approvals.json.raw"
+          approval_sha="47b2dc03e558db6418234ab6c69a279cc91fd9c29bc587505e13ea0989764549"
+          receiver_sha="d913505e2d3522d5023227b947f3c7896ba3ef4aeadfbd0c1a7042fa9686c148"
+          composition="$evidence/source-composition.json"
+          composition_sha="0ecbffdbbbc22ced77277e9838b1212b2e0341cacce8a3e0732c6a8c018f9a9f"
+          git show "$GITHUB_SHA:$prepare" | cmp - "$prepare"
+          git show "$GITHUB_SHA:$generator" | cmp - "$generator"
+          git show "$GITHUB_SHA:$composition_controls" | cmp - "$composition_controls"
+          git show "$GITHUB_SHA:$approval" | cmp - "$approval"
+          printf '%s  %s\n' '9203a7f77e0ed607557283b8ff27355ad871d99e58229e018c213d7653e79139' "$prepare" | shasum -a 256 -c -
+          printf '%s  %s\n' '8478aca8584e3da947f1e2c3b0f894874cce77aa97022be7832cb40d4182644c' "$generator" | shasum -a 256 -c -
+          printf '%s  %s\n' '0981b0f400596680b19215ffcd2ecef20346dca8bfeae8c46a46f0a7ad68e7f1' "$composition_controls" | shasum -a 256 -c -
+          printf '%s  %s\n' "$receiver_sha" "$receiver" | shasum -a 256 -c -
+          printf '%s  %s\n' "$approval_sha" "$approval" | shasum -a 256 -c -
+          cp "$approval" "$evidence/g5-source-approvals.json"
+          set +e
+          python3 -B "$generator" \
+            --head "$GITHUB_SHA" --recipe "$recipe" --approval "$approval" \
+            --approval-sha256 "$approval_sha" --receiver "$receiver" --output "$composition" \
+            > "$evidence/source-composition-generator.stdout.raw" 2> "$evidence/source-composition-generator.stderr.raw"
+          composition_generator_status=$?
+          set -e
+          printf '%s\n' "$composition_generator_status" > "$evidence/source-composition-generator.status.txt"
+          test "$composition_generator_status" -eq 0
+          printf '%s  %s\n' "$composition_sha" "$composition" | shasum -a 256 -c -
+          python3 -B "$prepare" --composition-controls \
+            "$GITHUB_SHA" "$recipe" "$projection" "$projection_evidence" "$receiver" "$receiver_sha" \
+            "$composition" "$composition_sha" "$approval" "$approval_sha" "$controls_projection"
+          cp "$projection_evidence/NumberRowSourceProbe.original.swift" "$evidence/NumberRowSourceProbe.original.swift"
+          cp "$projection_evidence/actual-git-projection.json" "$evidence/actual-git-projection.json"
+          cp "$projection_evidence/historical-controls-projection.json" "$evidence/historical-controls-projection.json"
+          portable_receiving="$(mktemp -d "$evidence/portable-receiving.XXXXXX")"
+          python3 -B tools/diagnostics/test_number_row_native_causal.py \
+            --fixture-manifest tools/diagnostics/fixtures/number-row-native-causal/fixture-manifest.json.raw \
+            --projection "$controls_projection" --receiving "$portable_receiving" --receiver "$receiver" \
+            --positive-receiver tools/diagnostics/keyboard_geometry_xctest_receipt.py \
+            --transport tools/diagnostics/tis_evidence_transport.cjs --node "$(command -v node)" \
+            2>&1 | tee "$evidence/portable-controls.log"
+          grep -E '^Ran 53 tests in [0-9.]+s$' "$evidence/portable-controls.log"
+          grep -x 'OK' "$evidence/portable-controls.log"
+          composition_receiving="$(mktemp -d "$evidence/composition-receiving.XXXXXX")"
+          python3 -B "$composition_controls" \
+            --repo "$GITHUB_WORKSPACE" --head "$GITHUB_SHA" --recipe "$recipe" \
+            --approval "$approval" --approval-sha256 "$approval_sha" \
+            --composition "$composition" --composition-sha256 "$composition_sha" \
+            --projection "$projection" --controls-projection "$controls_projection" \
+            --original-producer "$evidence/NumberRowSourceProbe.original.swift" \
+            --receiver "$receiver" --positive-receiver tools/diagnostics/keyboard_geometry_xctest_receipt.py \
+            --receiving "$composition_receiving" \
+            2>&1 | tee "$evidence/composition-controls.log"
+          grep -E '^Ran 51 tests in [0-9.]+s$' "$evidence/composition-controls.log"
+          grep -x 'OK' "$evidence/composition-controls.log"
+          source="$projection/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"
+          producer="$projection/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"
+          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"
+          cp "$producer" "$evidence/NumberRowSourceProbe.counterfactual.swift"
+          cp "$recipe" "$evidence/projection-manifest.json"
+          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"
+          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          set +e
+          swift test --package-path "$projection/static/ergopti_plus/macos/launcher" \
+            --scratch-path "$private_scratch" \
+            --filter '(^|[.])NumberRowSourceProbeTests($|[/.])' \
+            2>&1 | tee "$evidence/number-row-causal-xctest.log"
+          number_row_causal_statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${#number_row_causal_statuses[@]}" -eq 2
+          printf '%s\n' "${number_row_causal_statuses[@]}" > "$evidence/actual-pipeline-statuses.txt"
+          python3 -B "$receiver" \
+            --manifest "$recipe" --projection "$projection" \
+            --original-producer "$evidence/NumberRowSourceProbe.original.swift" \
+            --test-source "$source" --log "$evidence/number-row-causal-xctest.log" \
+            --transport tools/diagnostics/tis_evidence_transport.cjs --node "$(command -v node)" \
+            --tis-root "$ERGOPTI_TIS_EVIDENCE_DIR" --session "$ERGOPTI_TIS_EVIDENCE_SESSION" \
+            --swift-exit "${number_row_causal_statuses[0]}" --capture-exit "${number_row_causal_statuses[1]}" \
+            --tis-stdout "$evidence/tis-decoder.stdout.raw" --tis-stderr "$evidence/tis-decoder.stderr.raw" \
+            --receipt "$evidence/number-row-causal-verdict.json" \
+            --composition "$composition" --composition-sha256 "$composition_sha" \
+            --source-approval "$approval" --source-approval-sha256 "$approval_sha" --source-head "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git show "$GITHUB_SHA:$recipe" | cmp - "$recipe"
+          git show "$GITHUB_SHA:$receiver" | cmp - "$receiver"
+          git show "$GITHUB_SHA:$prepare" | cmp - "$prepare"
+          git show "$GITHUB_SHA:$generator" | cmp - "$generator"
+          git show "$GITHUB_SHA:$composition_controls" | cmp - "$composition_controls"
+          git show "$GITHUB_SHA:$approval" | cmp - "$approval"
+        timeout-minutes: 10
+      - name: Retain native final-byte number-row causal diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: number-row-causal-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/number-row-causal-evidence/number-row-causal-xctest.log
+            ${{ runner.temp }}/number-row-causal-evidence/actual-pipeline-statuses.txt
+            ${{ runner.temp }}/number-row-causal-evidence/number-row-causal-verdict.json
+            ${{ runner.temp }}/number-row-causal-evidence/actual-git-projection.json
+            ${{ runner.temp }}/number-row-causal-evidence/projection-manifest.json
+            ${{ runner.temp }}/number-row-causal-evidence/NumberRowSourceProbe.original.swift
+            ${{ runner.temp }}/number-row-causal-evidence/NumberRowSourceProbe.counterfactual.swift
+            ${{ runner.temp }}/number-row-causal-evidence/NumberRowSourceProbeTests.swift
+            ${{ runner.temp }}/number-row-causal-evidence/tis-decoder.stdout.raw
+            ${{ runner.temp }}/number-row-causal-evidence/tis-decoder.stderr.raw
+            ${{ runner.temp }}/number-row-causal-evidence/tis-session.*/start.json
+            ${{ runner.temp }}/number-row-causal-evidence/tis-session.*/manifest.json
+            ${{ runner.temp }}/number-row-causal-evidence/tis-session.*/record-*.dat
+            ${{ runner.temp }}/number-row-causal-evidence/tis-session.*/refusal.json
+            ${{ runner.temp }}/number-row-causal-evidence/portable-controls.log
+            ${{ runner.temp }}/number-row-causal-evidence/source-composition-generator.stdout.raw
+            ${{ runner.temp }}/number-row-causal-evidence/source-composition-generator.stderr.raw
+            ${{ runner.temp }}/number-row-causal-evidence/source-composition-generator.status.txt
+            ${{ runner.temp }}/number-row-causal-evidence/g5-source-approvals.json
+            ${{ runner.temp }}/number-row-causal-evidence/source-composition.json
+            ${{ runner.temp }}/number-row-causal-evidence/historical-controls-projection.json
+            ${{ runner.temp }}/number-row-causal-evidence/composition-controls.log
       - name: Qualify actual native PAC source ownership XCTest controls
         if: ${{ !cancelled() }}
         shell: bash
@@ -833,6 +968,26 @@ jobs:
           path: ${{ runner.temp }}/group3-shortcuts-installed-target-${{ matrix.architecture }}
           if-no-files-found: error
           retention-days: 7
+
+      - name: Observe independent native Apple Shortcuts SDK preflight and discovery
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}"
+        timeout-minutes: 2
+
+      - name: Retain independent native Apple Shortcuts SDK observation
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-apple-shortcuts-independent-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}
 
   # ─────────────────────────────────────────────────
   # 1) Hammerspoon unit and contract tests
