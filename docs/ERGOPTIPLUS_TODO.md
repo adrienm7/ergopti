@@ -9999,6 +9999,17 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   original cases. The original source fails both new refusal cases. These are
   controlled software checks; native GUI and physical delivery remain open.
 
+  The shared optional capture owner now retains each request's exact cancellation
+  callable before native enrollment. Replacing the optional port afterward cannot
+  acknowledge retirement through a foreign success. Refused or throwing retirement
+  keeps the original token and callable for retry; constructor reentry and stale
+  successors remain fenced. Replacing a callable before enrollment stays supported.
+  Both unchanged registered Linux/macOS wrappers pass37 controls on Lua5.4 and
+  LuaJIT; the original producer passes27 and fails all10 appended causal cases.
+  These are controlled request-port observations, not real physical capture/output
+  or packaged acceptance. The remaining native source/collision/output work stays
+  required.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -10027,7 +10038,12 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   editor: absent or callback-removed emission ports refuse native enrollment
   and delivery. Eleven controlled cases pass on both Lua ABIs, with genuine
   original/omission failures; no star migration or new output owner is admitted.
-  Callable replacement/ABA and actual physical delivery remain unqualified.
+  Native capture-port replacement/ABA and actual physical delivery remain unqualified.
+
+  Item97's retained per-request cancellation also protects this editor's optional
+  physical observation. No foreign replacement can settle its original token;
+  refusal retries retain that exact capability. This does not grant a physical J
+  identity, star migration, collision admission or native output authority.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
