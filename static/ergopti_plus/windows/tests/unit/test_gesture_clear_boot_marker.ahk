@@ -5,6 +5,7 @@
 _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 	global _PersonalShortcutsRegistry, KeyboardShortcutAssignments, GestureActionParameters, _SharedDir
 	global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS
+	global ConfigurationFile
 	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
 	OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
@@ -59,26 +60,42 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 		if Outcome != "complete"
 			AssertEqual(Original, FSReadUtf8Exact(Fixture.path), "refusal restores the exact queued intent")
 		RestartPath := Fixture.directory . "\restart-config.toml"
-		Assert(FSWriteDurable(RestartPath, FSReadUtf8Exact(Fixture.path)))
-		Parsed := TOML_ParseFreshFile(RestartPath)
-		AssertEqual("keep", Parsed["gestures"]["unknown_user"])
-		AssertEqual("keep", Parsed["private"]["credential"])
-		if Mode == "recommended" && Outcome == "complete"
-			AssertEqual("alt_tab_monitor", Parsed["gestures"]["tap_4"], "explicit restore imports the monitor-local tap")
-		; The clear once deleted the switch with the assignments, so the next
-		; gesture the user set did nothing until the switch was found again.
-		if Mode == "clear" && Outcome == "complete" {
-			Assert(!Parsed["gestures"].Has("tap_4"), "the clear removes the assignments")
-			AssertEqual(true, Parsed["gestures"]["enabled"],
-				Scope . " clear owns the assignments, not the Gestures switch (gestures-clear-keeps-switch)")
+		RestartSource := FSReadUtf8Exact(Fixture.path)
+		Assert(FSWriteDurable(RestartPath, RestartSource))
+		PreviousConfigurationFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+		try {
+			ConfigurationFile := RestartPath
+			RestartDocument := TOML_ParseDocument(RestartSource)
+			AssertTrue(RestartDocument["_meta"]["schema_version"] is Integer,
+				"the copied restart source retains its actual typed schema metadata")
+			AssertEqual(ConfigMigrateCurrentVersion(), RestartDocument["_meta"]["schema_version"],
+				"the actual copied restart source is current before its own native boot")
+			RestartBoot := ConfigMigrateBoot(RestartPath)
+			AssertEqual("current", RestartBoot["status"], "the independent restart destination completes actual native startup")
+			AssertEqual(0, RestartBoot["read_only"])
+			AssertTrue(FSUtf8ExactMatches(RestartPath, RestartSource), "current-schema restart preserves the copied source exactly")
+			Parsed := TOML_ParseFreshFile(RestartPath)
+			AssertEqual("keep", Parsed["gestures"]["unknown_user"])
+			AssertEqual("keep", Parsed["private"]["credential"])
+			if Mode == "recommended" && Outcome == "complete"
+				AssertEqual("alt_tab_monitor", Parsed["gestures"]["tap_4"], "explicit restore imports the monitor-local tap")
+			; The clear once deleted the switch with the assignments, so the next
+			; gesture the user set did nothing until the switch was found again.
+			if Mode == "clear" && Outcome == "complete" {
+				Assert(!Parsed["gestures"].Has("tap_4"), "the clear removes the assignments")
+				AssertEqual(true, Parsed["gestures"]["enabled"],
+					Scope . " clear owns the assignments, not the Gestures switch (gestures-clear-keeps-switch)")
+			}
+			Raw := IniCacheGet(Parsed, "gestures", "auto_configure_on_next_start")
+			if _GestureAutoConfigureFlagEnabled(Raw)
+				Assert(GestureConsumeAutoConfigureFlag(RestartPath, 0, (*) => 0, Schedule))
+			Expected := Mode == "clear" && Outcome == "complete" ? 0 : 1
+			AssertEqual(Expected, Scheduled, "a completed Clear cannot schedule native setup on the next boot")
+			if Expected == 0
+				Assert(!Parsed["gestures"].Has("auto_configure_on_next_start"), "Clear must remain sparse")
+		} finally {
+			ConfigurationFile := IsSet(PreviousConfigurationFile) ? PreviousConfigurationFile : unset
 		}
-		Raw := IniCacheGet(Parsed, "gestures", "auto_configure_on_next_start")
-		if _GestureAutoConfigureFlagEnabled(Raw)
-			Assert(GestureConsumeAutoConfigureFlag(RestartPath, 0, (*) => 0, Schedule))
-		Expected := Mode == "clear" && Outcome == "complete" ? 0 : 1
-		AssertEqual(Expected, Scheduled, "a completed Clear cannot schedule native setup on the next boot")
-		if Expected == 0
-			Assert(!Parsed["gestures"].Has("auto_configure_on_next_start"), "Clear must remain sparse")
 	} finally {
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
