@@ -4900,11 +4900,22 @@ Its former prepend changed their semantic owner and refused the actual current
 WAL candidate before reload. Four additive regressions cover independent root
 owners, record metadata, BOM and a missing final newline; every original
 assertion and WAL ACK/refusal subject remains unchanged. Bounded source review
-passes, but final-source Windows native unit/E2E, packaging/install and device
-acceptance remain pending. The previous run completed 1,940 of 11,112 planned
-subjects (1,932 passed, eight failed) before its unchanged watchdog: both WAL
-subjects failed and all 14 gesture/Tap-Hold targets were unexecuted. This slice
-does not close item 42 or transversal items 16/38.
+passes. Exact-source Windows run 38090352268 passes all four new root-metadata
+subjects and both original WAL ACK/refusal subjects. Its unchanged 22-minute
+watchdog interrupts the full suite after 1,985 passes and six failures; another
+9,126 planned subjects remain unexecuted. E2E, packaging and installation are
+skipped. Five failures expose stale fixture preconditions: Add, admitted boot
+and modal removal replace a current constructor-owned image with an unstamped
+image, while the read-refusal fixture names a directory that never existed.
+The bounded successor receives the genuine current stamped source, preserves
+all original record and foreign bytes, and uses a real exclusive same-file
+handle for the original native read refusal. All 242 original assertion starts
+and 64 registrations remain in order; four source-image equality operands now
+name the genuine stamped image, with four stronger native/body checks added.
+The source-race subject remains unchanged and requires a genuine native race
+without replacing its issued hash collaborator. Corrected native receiving,
+complete unit/E2E, packaging/install and device acceptance remain pending.
+This slice does not close item 42 or transversal items 16/38.
 
 Four ordinary Windows full-save fixture families now declare the shipped
 schema 12, rather than obsolete schema 11 that prevented their genuine boot.
