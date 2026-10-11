@@ -274,10 +274,20 @@ function readTrace(stdout, expected) {
 		group.native_edges.push(row);
 	}
 	for (const group of cases) {
-		for (const name of CHANNELS)
-			assert(group.ahk_channels[name] > 0, `Missing actual ${name} callback: ${group.case_id}`);
-		for (const name of ['down', 'char', 'up', 'hotkey'])
-			assert.equal(group.ahk_channels[name], 1, `Duplicate ${name} callback.`);
+		const observed = CHANNELS.some((name) => group.ahk_channels[name] > 0);
+		// AHK 2.0.26 removes its own hook around Win32 SendInput (keyboard_mouse.cpp).
+		// A fallback can expose all callbacks; a partial callback cohort remains invalid.
+		if (group.backend === 'SendEvent' || observed) {
+			for (const name of CHANNELS)
+				assert(group.ahk_channels[name] > 0, `Missing actual ${name} callback: ${group.case_id}`);
+			for (const name of ['down', 'char', 'up', 'hotkey'])
+				assert.equal(group.ahk_channels[name], 1, `Duplicate ${name} callback.`);
+			group.ahk_callback_status = 'PASS';
+			group.ahk_callback_reason = 'complete_actual_callback_cohort';
+		} else {
+			group.ahk_callback_status = 'UNRUN';
+			group.ahk_callback_reason = 'sendinput_ahk_callbacks_not_observed';
+		}
 		assert.equal(group.native_edges.length, 2, 'Missing or duplicate actual native edges.');
 		assert.equal(group.native_edges.filter((row) => row.message === 0x100).length, 1);
 		assert.equal(group.native_edges.filter((row) => row.message === 0x101).length, 1);
