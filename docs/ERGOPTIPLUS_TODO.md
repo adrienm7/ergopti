@@ -4980,19 +4980,26 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   retaining the original native-owner checks. Retired-Script consumers and
   final-source native/installed qualification remain separate follow-ups.
 
-The registered Windows external-source control now captures the actual native
-source and conditional journal intent without replacing the issued hash port.
-An independently acknowledged filesystem write must yield the exact
-`expected_old_conflict` refusal before WAL/staging or reload, preserve foreign
-bytes, and permit a genuine editor retry with exact refusal compensation.
-Cleanup resolves the actual WAL, proves native-owner retirement and clears only
-its own retained marker before deleting the fixture. Independent source review
-passes; Windows runtime and full-suite qualification remain pending. The latest
-integrated run planned 11,121 cases, passed 2,054 and failed this one control;
-9,066 had no terminal result. Its next global-scope case ran only 44.481 seconds
-before the unchanged suite watchdog, versus 64–66 seconds for the preceding
-successful twelve-store transactions. That evidence does not prove a deadlock
-or authorize a larger watchdog. Item 42 remains partial.
+The registered Windows external-source control captures the actual native source
+and conditional journal intent without replacing the issued hash port. Atomic
+`fa3e5201` is integrated without squash in Dev `a2b1fb4b`. Personal Windows-only
+manual run [38130526545](https://github.com/adrienm7/ergopti/actions/runs/38130526545)
+actually passes case 1306 in 11,452.116 ms: the acknowledged foreign write yields
+`expected_old_conflict` before WAL/staging or reload, preserves foreign bytes,
+and permits the genuine editor retry with exact refusal compensation. Cleanup
+resolves the actual WAL, proves native-owner retirement and clears only its own
+retained marker before deleting the fixture. Independent source review and native
+receiving pass. The full native suite still reaches the unchanged 1,320,000 ms
+watchdog: 11,121 planned, 1,981 passed, zero failed, 9,140 without terminal results.
+Case 1982 had only 4.780 seconds before interruption; the preceding rollback took
+9.477 seconds. Neither this nor the earlier 44.481-second global-scope interruption
+proves a deadlock or authorizes a larger watchdog. Exact integrated Windows-only
+manual run [38132674726](https://github.com/adrienm7/ergopti/actions/runs/38132674726)
+owns its final verdict; no personal result substitutes for it. Deterministic
+monolithic editor/external-writer E2E, full-suite coverage, packaging, installation
+and physical receiving remain separate. The bounded original receipts and source
+chain are in the [current handover](handovers/2026-10-11-config-menus/README.md).
+Item 42 remains partial.
 
 The shared canonical-hash test hook previously survived its foreign-source
 fault and contaminated later transition admission. The bounded fixture successor
