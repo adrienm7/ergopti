@@ -135,6 +135,41 @@ function check(source) {
 	);
 	for (const name of ['TraceCriterion', 'TraceHotkey', 'TraceDown', 'TraceChar', 'TraceUp'])
 		assert.match(source.harness, new RegExp(`^${name}\\(`, 'm'));
+	const observation = source.harness.slice(
+		source.harness.indexOf('TraceObserve(Channel,'),
+		source.harness.indexOf('TraceCriterion(*)')
+	);
+	for (const field of ['vk', 'sc'])
+		assert.equal(
+			(observation.match(new RegExp(`"${field}":`, 'g')) || []).length,
+			1,
+			'Callback keys must have a single conditional construction site.'
+		);
+	assert(
+		source.harness.includes('TraceObserve(Channel, Vk := 0, Sc := 0,'),
+		'Unobserved callback key identity must not default to fixture VK/SC.'
+	);
+	assert.match(
+		source.harness,
+		/if ObservedKey\s*Json \.= ',"vk":' \. Vk \. ',"sc":' \. Sc/,
+		'Only real key callbacks may publish VK/SC fields.'
+	);
+	for (const channel of ['hotif', 'hotkey', 'char'])
+		assert(
+			source.harness.includes(`TraceObserve("${channel}", 0, 0,`),
+			'Callbacks without key arguments must not fabricate a key receipt.'
+		);
+	for (const channel of ['down', 'up'])
+		assert(
+			source.harness.includes(`TraceObserve("${channel}", Vk, Sc,`),
+			'InputHook key callbacks must retain their actual arguments.'
+		);
+	assert(
+		source.harness.includes(
+			'if Channel == "hotif" || Channel == "hotkey"\n\t\tJson .= \',"registered_fixture":"a"\''
+		),
+		'Registered fixture attribution must remain explicit.'
+	);
 	assert(source.supervisor.includes("'synthetic'"));
 	assert(source.supervisor.includes('No kill was performed.'));
 	assert(source.supervisor.includes('$Node $Reader $Stdout ([string]$Samples) $InstallSequence'));
@@ -170,6 +205,24 @@ const mutations = [
 	[
 		'runner',
 		(text) => text.replace("path.join(SOURCE, 'hook_trace.c')", "path.join(SOURCE, 'unused.c')")
+	],
+	[
+		'harness',
+		(text) =>
+			text.replace(
+				'TraceObserve(Channel, Vk := 0, Sc := 0,',
+				'TraceObserve(Channel, Vk := 65, Sc := 30,'
+			)
+	],
+	['harness', (text) => text.replace('if ObservedKey\n\t\tJson .=', 'if true\n\t\tJson .=')],
+	['harness', (text) => text.replace('TraceObserve("char", 0, 0,', 'TraceObserve("char", 65, 30,')],
+	[
+		'harness',
+		(text) =>
+			text.replace(
+				'if ObservedKey\n\t\tJson .=',
+				'Json .= \',"vk":65\'\n\tif ObservedKey\n\t\tJson .='
+			)
 	]
 ];
 for (const [name, mutate] of mutations)

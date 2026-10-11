@@ -171,8 +171,8 @@ function readTrace(stdout, expected) {
 			'qpc',
 			'channel',
 			'case_id',
-			'vk',
-			'sc',
+			...(['down', 'up'].includes(row.channel) ? ['vk', 'sc'] : []),
+			...(['hotif', 'hotkey'].includes(row.channel) ? ['registered_fixture'] : []),
 			...(row.channel === 'char' ? ['codepoint'] : []),
 			...(row.channel === 'hotif' ? ['decision'] : [])
 		]);
@@ -182,8 +182,11 @@ function readTrace(stdout, expected) {
 			'AHK trace sequence is missing or duplicated.'
 		);
 		assert(CHANNELS.includes(row.channel), 'Unknown AHK callback.');
-		assert.equal(row.vk, 65);
-		assert.equal(row.sc, 30);
+		if (['down', 'up'].includes(row.channel)) {
+			assert.equal(row.vk, 65);
+			assert.equal(row.sc, 30);
+		}
+		if (['hotif', 'hotkey'].includes(row.channel)) assert.equal(row.registered_fixture, 'a');
 		if (row.channel === 'char') assert.equal(row.codepoint, 97);
 		if (row.channel === 'hotif') assert.equal(row.decision, true);
 		const group = cases.find((item) => item.case_id === row.case_id);
@@ -287,6 +290,7 @@ function readTrace(stdout, expected) {
 		hook_order_qualified: false,
 		physical_qualified: false,
 		production_qualified: false,
+		ahk_attribution_semantics: 'owned-case-and-qpc-window',
 		native_sequence_semantics: 'append-completion-order',
 		native_qpc_semantics: 'hook-entry-time',
 		owner: start.owner,
