@@ -490,6 +490,88 @@ check(
 // exact verdict conditions and scoped manual qualification jobs are allowed.
 // The latter retains ordinary admission and adds diagnostic receiving after a
 // manual E2E failure; every mandatory failure still rejects the lane verdict.
+function isManualLeaseSilenceQualification(rel, jobId, condition) {
+	return (
+		rel === MACOS_BOX &&
+		jobId === 'lease-silence-native' &&
+		condition === "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	);
+}
+
+// Fixed scope cases were frozen before the new admission helper.
+const LEASE_SILENCE_MANUAL_SCOPE_CASES = [
+	[
+		'exact_manual_macos_lease',
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		true
+	],
+	[
+		'windows_lane_refuses',
+		'.github/workflows/ci-windows.yml',
+		'lease-silence-native',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		false
+	],
+	[
+		'path_alias_refuses',
+		'./.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		false
+	],
+	[
+		'archive_is_separate_contract',
+		'.github/workflows/ci-macos.yml',
+		'item36-native',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		false
+	],
+	[
+		'job_suffix_refuses',
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native-extra',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		false
+	],
+	[
+		'missing_condition_refuses',
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		null,
+		false
+	],
+	['always_refuses', '.github/workflows/ci-macos.yml', 'lease-silence-native', 'always()', false],
+	[
+		'release_predicate_refuses',
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		"${{ github.event_name == 'workflow_dispatch' && inputs.release }}",
+		false
+	],
+	[
+		'push_predicate_refuses',
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		"${{ github.event_name == 'push' && !inputs.release }}",
+		false
+	],
+	[
+		'changed_literal_refuses',
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}",
+		false
+	]
+];
+for (const [name, rel, jobId, condition, expected] of LEASE_SILENCE_MANUAL_SCOPE_CASES) {
+	check(
+		isManualLeaseSilenceQualification(rel, jobId, condition) === expected,
+		`(lease-silence-manual-scope) ${name} must retain its exact frozen admission`
+	);
+}
+
 const BOX_FILES = {
 	macos: MACOS_BOX,
 	windows: '.github/workflows/ci-windows.yml',
@@ -510,7 +592,10 @@ for (const rel of Object.values(BOX_FILES)) {
 			boxJob.id === 'item36-native' &&
 			condition === "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}";
 		check(
-			condition === null || ALLOWED_JOB_IFS[boxJob.id] === condition || manualArchiveQualification,
+			condition === null ||
+				ALLOWED_JOB_IFS[boxJob.id] === condition ||
+				manualArchiveQualification ||
+				isManualLeaseSilenceQualification(rel, boxJob.id, condition),
 			`${rel}: job \`${boxJob.id}\` has job-level \`if: ${condition}\`; only ` +
 				`${Object.entries(ALLOWED_JOB_IFS)
 					.map(([id, value]) => `${id} (${value})`)

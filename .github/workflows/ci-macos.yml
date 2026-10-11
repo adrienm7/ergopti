@@ -171,6 +171,46 @@ jobs:
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/*.json
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/helper/*.json
 
+  # This no-effect paired-process control runs independently of archive/PAC jobs.
+  # It supplements every full/package/install gate and never publishes assets.
+  lease-silence-native:
+    name: 'Native paired lease silence · ${{ matrix.architecture }}'
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: amd64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+      - name: Receive closed lease silence transcript controls
+        run: node tools/test/test-lease-silence-xctest-evidence.cjs
+      - name: Execute the actual paired native silence control
+        shell: bash
+        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'
+      - name: Retain exact paired-process native receiving
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/lease-silence-native/source.json
+            ${{ runner.temp }}/lease-silence-native/verdict.json
+            ${{ runner.temp }}/lease-silence-native/xctest.log
+            ${{ runner.temp }}/lease-silence-native/swift-status.txt
+            ${{ runner.temp }}/lease-silence-native/script-status.txt
+            ${{ runner.temp }}/lease-silence-native/capture-status.txt
+
   # Native producer and receiving run independently of the Brew/package branch.
   # Both advertised architectures are mandatory even for unpublished manual CI.
   managed-ollama-native:
