@@ -52,10 +52,10 @@ const EXPECTED = [
 	'navigation precedes profile selection',
 	'plan validation is atomic',
 	'nav-stale-physical-modifier',
-	'terminal output custody preserves fault debt (todo49-output-custody)',
 	'hook trace refuses unauthenticated sessions (todo49-hook-trace)',
 	'hook trace excludes deterministic dispatch (todo49-hook-trace)',
-	'native editor receiver matrix'
+	'native editor receiver matrix',
+	'terminal output custody preserves fault debt (todo49-output-custody)'
 ];
 
 /** Requires the complete authored census, including the explicitly native-only case. */
@@ -86,7 +86,10 @@ assert.throws(
 	/Every native registration must be parsed/
 );
 assert.throws(
-	() => testNamesFromSource(fixture(EXPECTED.slice(0, -1))),
+	() =>
+		testNamesFromSource(
+			fixture(EXPECTED.filter((name) => name !== 'native editor receiver matrix'))
+		),
 	/Native-only editor registration/
 );
 assert.throws(
