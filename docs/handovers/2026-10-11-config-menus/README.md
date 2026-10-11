@@ -2,7 +2,48 @@
 
 # Group 1: configuration and menus
 
-The newest bounded correction is integrated without squash in Dev
+The latest runtime correction is integrated without squash in Dev
+`9f26bd3da1c0cc9fb9e5e9632730e32ca960ed17`, with parents
+`fa1049e4d65e9766984163df4bdf0fe468304a96` and feature
+`56f9fbb516ad6bf5315f7b529c4fecec6c372246`. Atomic
+`d6ee90806b8169fbe9732feeb8c2c444f4dc8e19` selects the independently copied restart
+file as the genuine native configuration destination, admits its typed current
+schema and restores the previous path before cleanup. All eight original subjects
+and 22 assertions remain; production writers, source guards and watchdogs are
+unchanged. Selected local format, AHK encoding and 410 JS checks pass.
+
+Source-matched personal Windows manual
+[38138230860](https://github.com/adrienm7/ergopti/actions/runs/38138230860) actually
+passes **all eight original software restart controls**, with SDK 2.0.26, 12 Source
+pins unchanged, exact native exits and acknowledged child retirement. The eight
+native durations total 72,378.169 ms. Independent original-artifact receiving
+passes. All 1,988 Windows Git entries equal Dev `9f26bd3da`; the CI image differs
+only in its reviewed Windows diagnostic workflow and two diagnostic helper/input
+files. The entire CI trees differ. Whole personal CI fails: Core has 408 passes
+and two unchanged workflow-guard failures; native full-suite receiving has 1,990
+passes, zero assertion failures and 9,131 cases without terminal results at the
+unchanged watchdog. No guard is exempted or weakened.
+
+Official Windows manual
+[38138598917](https://github.com/adrienm7/ergopti/actions/runs/38138598917) tests
+**exactly integrated Dev `9f26bd3da`** with the canonical workflow. Its terminal
+12-job result is three successful, three failed, six skipped and zero cancelled;
+Release is skipped. Core JS passes **410/410**. Native units plan 11,121 cases:
+**2,052 pass, zero assertions fail, one started case has no terminal result and
+9,068 never start** at the unchanged 1,320,000 ms watchdog. Case 1306 passes in
+8,844.343 ms; the original eight restart cases remain UNRUN in this monolithic
+suite. The isolated eight-control PASS does not qualify the full suite. Windows
+E2E, packaging and installation are skipped. No individual hang cause or physical
+input acceptance is inferred.
+
+[REMAINING-WORK.md](REMAINING-WORK.md) distinguishes the pending software,
+producer ownership and installed/device checks for all six partial items. This
+final documentation delivery changes no runtime or CI policy. All automatic runs
+are cancelled on each exact published SHA; manual runs are preserved. The older
+manual `38132674726` remains historical and is not substituted for the terminal
+verdict above.
+
+The preceding bounded correction is integrated without squash in Dev
 `a2b1fb4be16ff88b9bab755841d744960512b89e`, with parents
 `5f7a8467c9696b26a75de104f6329b39c181b8cb` and feature
 `d4ce0491e34a16727bd735c264d9075a2bf5f9ec`. It preserves the Action group's
@@ -74,8 +115,18 @@ Keep transversal TODO 16/38 and all unfinished Group 1 items. Item 22 remains wi
 
 ## Evidence and reproduction
 
-[ARCHIVES.json](ARCHIVES.json) pins six bounded original-byte archives. The newest
-[Windows conflict proof](windows-genuine-source-conflict-qualified-proof.tar.gz)
+[ARCHIVES.json](ARCHIVES.json) pins seven bounded original-byte archives. The newest
+[Windows restart proof](windows-gesture-restart-qualified-proof.tar.gz) contains
+69 members, 14,094,696 uncompressed bytes and 4,407,658 compressed bytes,
+SHA-256 `9860f6bfcaa7b23710c257fd1301361892dcf5cbb975e703ba923e05eb71c3b5`.
+[WINDOWS-RESTART-PROOF-MANIFEST.json](WINDOWS-RESTART-PROOF-MANIFEST.json) preserves
+the original source/review chain, selected gates, actual eight-control SDK
+artifact and independent receiving, personal guard failures and full coverage,
+and the official exact-Dev terminal jobs, full manifest and original logs. All
+six earlier archives remain byte-exact. Failed individual-log downloads are not
+counted as proof; official logs are received from the authentic whole-run ZIP.
+
+The preceding [Windows conflict proof](windows-genuine-source-conflict-qualified-proof.tar.gz)
 contains 39 members, 12,452,201 uncompressed bytes and 3,567,094 compressed bytes,
 SHA-256 `c7f57725fc3a26a1aa122c588c4360c48cb7c24501bcb4f094326aa0c9ad3298`.
 [WINDOWS-CONFLICT-PROOF-MANIFEST.json](WINDOWS-CONFLICT-PROOF-MANIFEST.json) pins every
