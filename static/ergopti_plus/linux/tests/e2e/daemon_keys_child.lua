@@ -322,6 +322,13 @@ package.preload["adapters.event_loop"] = function()
 			local Source = require("modules.hotstrings.magic_key_source")
 			assert(require("modules.hotstrings.hotstrings_config").set_all_sections("magickey", true),
 				"the real magic-key category must acknowledge activation")
+			local Config = require("modules.hotstrings.hotstrings_config")
+			if not Config.is_section_checked("magickey", "replace") then
+				assert(Config.toggle_section("magickey", "replace"),
+					"the real virtual replacement setting must acknowledge activation")
+			end
+			assert(Config.is_section_enabled("magickey", "replace"),
+				"the real magic replacement must be enabled before source selection")
 			assert(Source.set("KeyJ"), "the real source owner must acknowledge the key")
 			local choice_ok, choice_reason, before_bytes, native = nil, nil, nil, 36
 			if TAP_COLLISION then

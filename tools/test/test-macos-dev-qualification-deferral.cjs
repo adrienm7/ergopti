@@ -79,6 +79,13 @@ function check(name, callback) {
 const SDK_STEP_NAME = 'Qualify actual SDK accepted-owner and deadline XCTest controls';
 const SDK_FILTER =
 	"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests|ManagedNetworkBootstrapTests'";
+const DAEMON_LOG_FILTER = "--filter '(^|[.])SuspendedImageLogCaptureTests([/.]|$)'";
+const DAEMON_LOG_BLOCK =
+	'          # Independent logging cohort; historical49 above supplies no seven-case credit.\n          log_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-xctest.log"\n          log_source="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-source.json"\n          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])SuspendedImageLogCaptureTests([/.]|$)\' 2>&1 | tee "$log_transcript"\n          log_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#log_statuses[@]}" -eq 2\n          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs judge "$log_transcript" "${log_statuses[0]}" "${log_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-verdict.json"\n';
+const LOGGER_42_FILTER =
+	"--filter '(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)'";
+const LOGGER_42_BLOCK =
+	'          # Unchanged original logger29+directory13; neither SDK49 nor daily-log7 supplies this credit.\n          logger_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-xctest.log"\n          logger_source="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-source.json"\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)\' 2>&1 | tee "$logger_transcript"\n          logger_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#logger_statuses[@]}" -eq 2\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs judge "$logger_transcript" "${logger_statuses[0]}" "${logger_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-verdict.json"\n';
 function admitNativeSdkSelector(mac) {
 	const jobs = [
 		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
@@ -91,6 +98,19 @@ function admitNativeSdkSelector(mac) {
 	];
 	if (steps.length !== 1) return null;
 	const step = steps[0][0];
+	if (
+		step.split(DAEMON_LOG_BLOCK).length !== 2 ||
+		mac.split(DAEMON_LOG_FILTER).length !== 2 ||
+		!step.endsWith(
+			'          grep -Fq \'Executed 49 tests, with 0 failures\' "$transcript"\n' +
+				DAEMON_LOG_BLOCK +
+				LOGGER_42_BLOCK +
+				'        timeout-minutes: 10\n'
+		)
+	)
+		return null;
+	if (step.split(LOGGER_42_BLOCK).length !== 2 || mac.split(LOGGER_42_FILTER).length !== 2)
+		return null;
 	if (!step.startsWith(`      - name: ${SDK_STEP_NAME}\n        shell: bash\n        run: |\n`))
 		return null;
 	if (/^        (?:if|continue-on-error):/m.test(step)) return null;
@@ -127,7 +147,11 @@ function admitNativeSdkSelector(mac) {
 		'            exit 1\n          fi\n';
 	if (step.split(skippedRefusal).length !== 2) return null;
 	const position = jobs[0].index + steps[0].index + step.indexOf(SDK_FILTER);
-	return admitNativePacSelector(mac.slice(0, position) + mac.slice(position + SDK_FILTER.length));
+	return admitNativePacSelector(
+		(mac.slice(0, position) + mac.slice(position + SDK_FILTER.length))
+			.replace(DAEMON_LOG_FILTER, '')
+			.replace(LOGGER_42_FILTER, '')
+	);
 }
 // Only the exact existing PAC/WPAD receiving cohort may use this selector.
 const PAC_STEP_NAME = 'Qualify actual native PAC and WPAD XCTest controls';
@@ -1257,3 +1281,118 @@ console.log(
 		native: 'UNRUN'
 	})
 );
+
+// Independent new logging controls; original79 and number-row controls above remain unchanged.
+const daemonLogEvidence = require('../diagnostics/native_daemon_log_xctest_evidence.cjs');
+const daemonLogMethods = [
+	'testNativeSplitRecordsAndFinalTailsUseWriteTimeDay',
+	'testInheritedWriterBlocksEOFAndFinalTailSettlement',
+	'testPipeCloseUncertaintyRemainsStickyWithoutNumericRetry',
+	'testSinkCloseUncertaintyBlocksSuccessfulRetirement',
+	'testInvalidUTF8RefusesLogSuccessButClosesRealPipes',
+	'testReplacedConfiguredDirectoryRefusesBothOldAndForeignSink',
+	'testActualGuardianMappedShellBothStreamsAndFinalTailsPersistBeforeRetirement'
+];
+const daemonLogRows = [
+	"Test Suite 'Selected tests' started at fixed",
+	"Test Suite 'ErgoptiPlusPackageTests.xctest' started at fixed",
+	"Test Suite 'SuspendedImageLogCaptureTests' started at fixed"
+];
+for (const method of daemonLogMethods) {
+	const name = `-[ErgoptiPlusTests.SuspendedImageLogCaptureTests ${method}]`;
+	daemonLogRows.push(`Test Case '${name}' started.`, `Test Case '${name}' passed (0.001 seconds).`);
+}
+for (const suite of [
+	'SuspendedImageLogCaptureTests',
+	'ErgoptiPlusPackageTests.xctest',
+	'Selected tests'
+])
+	daemonLogRows.push(
+		`Test Suite '${suite}' passed at fixed`,
+		'Executed 7 tests, with 0 failures (0 unexpected) in 0.007 (0.008) seconds'
+	);
+const daemonLogComplete = daemonLogRows.join('\n') + '\n';
+let daemonLogControls = 0;
+function daemonLogCheck(callback) {
+	callback();
+	daemonLogControls++;
+}
+daemonLogCheck(() =>
+	assert.equal(daemonLogEvidence.evaluate(daemonLogComplete, 0, 0).exit_status, 0)
+);
+for (const [from, to] of [
+	["Test Suite 'Selected tests'", "Test Suite 'All tests'"],
+	['SuspendedImageLogCaptureTests', 'OwnedSuspendedImageTests'],
+	['Executed 7 tests', 'Executed 49 tests'],
+	['Executed 7 tests', 'Executed 0 tests'],
+	[
+		'testActualGuardianMappedShellBothStreamsAndFinalTailsPersistBeforeRetirement',
+		'testForeignIntegration'
+	],
+	['passed (0.001 seconds).', 'skipped (0.001 seconds).'],
+	['passed (0.001 seconds).', 'failed (0.001 seconds).'],
+	['0 failures (0 unexpected)', '1 failures (0 unexpected)'],
+	["Test Suite 'Selected tests' passed at fixed", "Test Suite 'Selected tests' failed at fixed"]
+])
+	daemonLogCheck(() => {
+		assert.ok(daemonLogComplete.includes(from));
+		const changed = daemonLogComplete.replaceAll(from, to);
+		assert.notEqual(changed, daemonLogComplete);
+		assert.notEqual(daemonLogEvidence.evaluate(changed, 0, 0).exit_status, 0);
+	});
+const firstStart = daemonLogRows[3],
+	firstFinish = daemonLogRows[4];
+for (const changed of [
+	daemonLogComplete.replace(firstStart + '\n', ''),
+	daemonLogComplete.replace(firstFinish + '\n', ''),
+	daemonLogComplete.replace(firstStart, firstStart + '\n' + firstStart),
+	daemonLogComplete.replace(firstFinish, firstFinish + '\n' + firstFinish),
+	daemonLogComplete + firstStart + '\n',
+	daemonLogComplete.replace(firstStart + '\n' + firstFinish, firstFinish + '\n' + firstStart),
+	daemonLogComplete.slice(0, daemonLogComplete.lastIndexOf("Test Suite 'Selected tests' passed")),
+	''
+])
+	daemonLogCheck(() => assert.notEqual(daemonLogEvidence.evaluate(changed, 0, 0).exit_status, 0));
+daemonLogCheck(() =>
+	assert.equal(daemonLogEvidence.evaluate(daemonLogComplete, 42, 0).exit_status, 42)
+);
+daemonLogCheck(() =>
+	assert.equal(daemonLogEvidence.evaluate(daemonLogComplete, 0, 17).exit_status, 17)
+);
+assert.equal(daemonLogControls, 20);
+let daemonLogSelectorControls = 0;
+for (const [from, to] of [
+	[DAEMON_LOG_BLOCK, ''],
+	[DAEMON_LOG_FILTER, "--filter 'OwnedSuspendedImageTests'"],
+	[DAEMON_LOG_FILTER, "--filter 'SuspendedImageLogCaptureTests|OwnedSuspendedImageTests'"],
+	['tee "$log_transcript"', 'tee "$transcript"'],
+	['"${log_statuses[0]}"', '"0"'],
+	['"${log_statuses[1]}"', '"0"'],
+	['test "${#log_statuses[@]}" -eq 2', 'true'],
+	['daily-log-native-source.json', 'foreign-source.json'],
+	['native_daemon_log_xctest_evidence.cjs begin', 'native_daemon_log_xctest_evidence.cjs omitted'],
+	['native_daemon_log_xctest_evidence.cjs judge', 'true'],
+	['"$GITHUB_RUN_ATTEMPT"', '"1"'],
+	['"$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE"', '"arm64"']
+]) {
+	assert.ok(DAEMON_LOG_BLOCK.includes(from) || from === DAEMON_LOG_BLOCK);
+	const changed = workflow.replace(DAEMON_LOG_BLOCK, DAEMON_LOG_BLOCK.replace(from, to));
+	assert.notEqual(changed, workflow);
+	assert.equal(admitNativeSdkSelector(changed), null);
+	daemonLogSelectorControls++;
+}
+assert.notEqual(admitNativeSdkSelector(workflow), null);
+assert.equal(admitNativeSdkSelector(workflow + '\n# ' + DAEMON_LOG_FILTER + '\n'), null);
+assert.equal(/--filter|--skip|XCTSkip/.test(admitNativeSdkSelector(workflow)), false);
+assert.equal(daemonLogSelectorControls, 12);
+console.log(
+	'PASS: native logging exact-seven receipt controls=20 selector-controls=12; all native execution UNRUN.'
+);
+
+require('./fixtures/native-logger-regression-qualification.cjs')({
+	workflow,
+	admitNativeSdkSelector,
+	LOGGER_42_FILTER,
+	LOGGER_42_BLOCK,
+	nativeSevenTranscript: daemonLogComplete
+});

@@ -21,8 +21,15 @@ private final class SuspendedImageNativeSession {
 	var markers: [String] = []
 	var decoder = OwnedProgramLineDecoder(maximumBytes: 1024)
 	var inputClosed = false
+	var outputEOF = false
+	var errorEOF = false
+	var outputClosed = false
+	var errorClosed = false
+	var receivingCloseFailed = false
+	let loggedFixture: Bool
 
-	init(launcher: URL, inodeDelta: UInt64 = 0, prefillSession: Bool = false, listenerEvent: Bool = false) throws {
+	init(launcher: URL, inodeDelta: UInt64 = 0, prefillSession: Bool = false, listenerEvent: Bool = false, loggedFixture: Bool = false) throws {
+		self.loggedFixture = loggedFixture
 		let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
 		directory = temporary.appendingPathComponent("ergopti-image-\(UUID().uuidString)")
 		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
@@ -31,7 +38,7 @@ private final class SuspendedImageNativeSession {
 		try FileManager.default.createDirectory(at: runtime, withIntermediateDirectories: true,
 			attributes: [.posixPermissions: 0o700])
 		alias = runtime.appendingPathComponent(".ergopti-image-0123456789abcdef0123456789abcdef")
-		try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: alias)
+		try FileManager.default.copyItem(at: URL(fileURLWithPath: loggedFixture ? "/bin/sh" : "/usr/bin/true"), to: alias)
 		try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: alias.path)
 		let sessions = directory.appendingPathComponent("Library/Application Support/Ergopti/ollama-native-sessions")
 		try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: false,
@@ -76,10 +83,21 @@ private final class SuspendedImageNativeSession {
 			"outgoing_inode": String(UInt64(outgoing.st_ino)), "outgoing_sha256": outgoingSHA,
 		]
 		if listenerEvent { request["listener_event"] = true }
+		if loggedFixture {
+			let logs = directory.appendingPathComponent("logs")
+			try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: false,
+				attributes: [.posixPermissions: 0o700])
+			request["log_directory"] = logs.path
+			let script = "printf 'stdout '\nprintf 'stderr ' >&2\nprintf 'split\\nstdout tail'\nprintf 'split\\nstderr tail' >&2\n"
+			try Data(script.utf8).write(to: directory.appendingPathComponent("serve"), options: .withoutOverwriting)
+			process.currentDirectoryURL = directory
+		}
 		process.executableURL = launcher
 		process.arguments = [OwnedSuspendedImageGuardian.flag]
 		process.standardInput = input; process.standardOutput = output; process.standardError = error
 		try process.run()
+		var initialized = false
+		defer { if loggedFixture && !initialized { cleanup() } }
 		guard fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1) == 0 else {
 			throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
 		}
@@ -90,10 +108,12 @@ private final class SuspendedImageNativeSession {
 			}
 		}
 		try input.fileHandleForWriting.write(contentsOf: JSONSerialization.data(withJSONObject: request) + Data([10]))
+		initialized = true
 	}
 
 	func poll() throws {
 		for handle in [output.fileHandleForReading, error.fileHandleForReading] {
+			if handle === output.fileHandleForReading ? outputClosed : errorClosed { continue }
 			var bytes = [UInt8](repeating: 0, count: 1024)
 			let count = Darwin.read(handle.fileDescriptor, &bytes, bytes.count)
 			if count > 0 {
@@ -104,6 +124,8 @@ private final class SuspendedImageNativeSession {
 					guard let text = String(data: line, encoding: .utf8) else { throw NSError(domain: "SuspendedImageReceipt", code: 1) }
 					markers.append(text)
 				}
+			} else if count == 0 {
+				if handle === output.fileHandleForReading { outputEOF = true } else { errorEOF = true }
 			} else if count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR {
 				throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
 			}
@@ -120,10 +142,26 @@ private final class SuspendedImageNativeSession {
 		try input.fileHandleForWriting.close(); inputClosed = true
 	}
 	func finish() throws {
-		try wait { !process.isRunning }; process.waitUntilExit(); try poll()
+		try wait { !process.isRunning && (!loggedFixture || (outputEOF && errorEOF)) }; process.waitUntilExit(); try poll()
 		XCTAssertEqual(process.terminationReason, .exit)
 		XCTAssertEqual(process.terminationStatus, 0)
 		XCTAssertTrue(decoder.buffered.isEmpty)
+	}
+	func closeLoggedReceiving() throws {
+		guard loggedFixture, !process.isRunning, !receivingCloseFailed, outputEOF, errorEOF,
+			markers.last == "V1 RETIRED 0 1 1 0 0 0 0", markers.contains("V1 LOGS_CLOSED 0") else {
+			throw NSError(domain: "SuspendedImageLogClosure", code: 1)
+		}
+		if !outputClosed {
+			outputClosed = true
+			do { try output.fileHandleForReading.close() }
+			catch { receivingCloseFailed = true; throw error }
+		}
+		if !errorClosed {
+			errorClosed = true
+			do { try error.fileHandleForReading.close() }
+			catch { receivingCloseFailed = true; throw error }
+		}
 	}
 	func cleanup() {
 		do {
@@ -132,6 +170,7 @@ private final class SuspendedImageNativeSession {
 			guard markers.contains(where: { $0.hasPrefix("V1 RETIRED ") || $0.hasPrefix("V1 REFUSED ") }) else {
 				XCTFail("native retirement remains unproven; retained \(directory.path)"); return
 			}
+			if loggedFixture { try closeLoggedReceiving() }
 			try sessionWriter.close()
 			guard Darwin.close(outgoingDescriptor) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
 			outgoingDescriptor = -1
@@ -249,5 +288,193 @@ final class OwnedSuspendedImageTests: XCTestCase {
  func testActualUnixCancellationBeforeAcquisitionRetiresExactNativeOwner() throws { try receiveNativeListenerEvent("cancel-acquisition") }
  func testActualUnixForeignReplacementSurvivesConditionalNamespaceCleanup() throws { try receiveNativeListenerEvent("namespace-replacement") }
  func testActualUnixCloseEBADFRemainsRetainedAfterEveryAttempt() throws { try receiveNativeListenerEvent("uncertain-close") }
+
+}
+
+/// Genuine pipe/file controls plus one real guardian/mapped-shell composition.
+/// These controls do not qualify an actual packaged Ollama daemon.
+final class SuspendedImageLogCaptureTests: XCTestCase {
+	private func directory() throws -> URL {
+		let value = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+			.appendingPathComponent("ergopti-native-daily-log-\(UUID().uuidString)")
+		try FileManager.default.createDirectory(at: value, withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700])
+		return value
+	}
+	private func cleanup(_ directory: URL, capture: SuspendedImageLogCapture) {
+		addTeardownBlock {
+			capture.closeWriters()
+			// Unknown close debt retains this fixture's inputs. Never erase them
+			// merely because the SDK test method returned or an assertion failed.
+			if capture.settleAfterRetirement() { try FileManager.default.removeItem(at: directory) }
+		}
+	}
+	private func date(_ day: Int, _ hour: Int, _ minute: Int, _ second: Int) throws -> Date {
+		var calendar = Calendar(identifier: .gregorian); calendar.timeZone = .current
+		return try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: day,
+			hour: hour, minute: minute, second: second)))
+	}
+	private func write(_ data: Data, to descriptor: Int32) {
+		XCTAssertEqual(data.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress, data.count) }, data.count)
+	}
+	func testNativeSplitRecordsAndFinalTailsUseWriteTimeDay() throws {
+		let root = try directory()
+		var now = try date(10, 23, 59, 58)
+		let capture = SuspendedImageLogCapture(directory: root.path, sink: LoggerRecordSink(now: { now }))
+		cleanup(root, capture: capture)
+		XCTAssertEqual(capture.setupError, 0)
+		let descriptors = capture.readDescriptors + [capture.outputDescriptor, capture.errorDescriptor]
+		write(Data("before\nsplit".utf8), to: capture.outputDescriptor); capture.drain()
+		now = try date(11, 0, 0, 1)
+		write(Data(" continuation\n".utf8), to: capture.outputDescriptor)
+		write(Data("stderr tail".utf8), to: capture.errorDescriptor); capture.drain()
+		XCTAssertFalse(capture.settleAfterRetirement(), "parent writers are still live")
+		capture.closeWriters()
+		XCTAssertTrue(capture.settleAfterRetirement())
+		XCTAssertTrue(capture.settleAfterRetirement(), "tail publication is exactly once")
+		XCTAssertEqual(capture.writeError, 0)
+		XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("ErgoptiPlus_2026-10-10.log"), encoding: .utf8),
+			"23:59:58 [OLLAMA-SERVER] before\n")
+		XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("ErgoptiPlus_2026-10-11.log"), encoding: .utf8),
+			"00:00:01 [OLLAMA-SERVER] split continuation\n00:00:01 [OLLAMA-SERVER] stderr tail\n")
+		for descriptor in descriptors { errno = 0; XCTAssertEqual(fcntl(descriptor, F_GETFD), -1); XCTAssertEqual(errno, EBADF) }
+	}
+	func testInheritedWriterBlocksEOFAndFinalTailSettlement() throws {
+		let root = try directory()
+		let capture = SuspendedImageLogCapture(directory: root.path)
+		cleanup(root, capture: capture)
+		XCTAssertEqual(capture.setupError, 0)
+		let inherited = Darwin.dup(capture.outputDescriptor)
+		var inheritedToClose = inherited
+		defer {
+			if inheritedToClose >= 0 {
+				let descriptor = inheritedToClose
+				inheritedToClose = -1
+				XCTAssertEqual(Darwin.close(descriptor), 0)
+			}
+		}
+		XCTAssertGreaterThan(inherited, 2)
+		write(Data("last tail".utf8), to: inherited)
+		capture.closeWriters()
+		XCTAssertFalse(capture.settleAfterRetirement())
+		XCTAssertFalse(capture.settled)
+		XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [])
+		inheritedToClose = -1
+		XCTAssertEqual(Darwin.close(inherited), 0)
+		XCTAssertTrue(capture.settleAfterRetirement())
+		XCTAssertEqual(capture.writeError, 0)
+	}
+	func testPipeCloseUncertaintyRemainsStickyWithoutNumericRetry() throws {
+		let root = try directory(); let sink = LoggerRecordSink()
+		var closes = 0
+		let capture = SuspendedImageLogCapture(directory: root.path, sink: sink, closeOperation: { descriptor in
+			closes += 1; let status = Darwin.close(descriptor)
+			if closes == 1 { errno = EINTR; return -1 }; return status
+		})
+		cleanup(root, capture: capture)
+		XCTAssertEqual(capture.setupError, 0)
+		capture.closeWriters(); XCTAssertEqual(capture.closeError, EINTR)
+		XCTAssertFalse(capture.settleAfterRetirement())
+		let count = closes
+		XCTAssertFalse(capture.settleAfterRetirement()); capture.closeWriters()
+		XCTAssertEqual(closes, count, "the original numeric descriptors are not closed twice")
+		XCTAssertTrue(sink.settleOwnedResources(), "only the fixture closes its known sink after refusal")
+	}
+	func testSinkCloseUncertaintyBlocksSuccessfulRetirement() throws {
+		let root = try directory(); var closes = 0
+		let sink = LoggerRecordSink(closeOperation: { descriptor in
+			closes += 1; let status = Darwin.close(descriptor)
+			if closes == 1 { errno = EINTR; return -1 }; return status
+		})
+		let capture = SuspendedImageLogCapture(directory: root.path, sink: sink)
+		cleanup(root, capture: capture)
+		XCTAssertEqual(capture.setupError, 0)
+		write(Data("record\n".utf8), to: capture.outputDescriptor); capture.closeWriters()
+		XCTAssertFalse(capture.settleAfterRetirement())
+		XCTAssertEqual(sink.ownedCloseError, EINTR)
+		let count = closes
+		XCTAssertFalse(capture.settleAfterRetirement()); XCTAssertEqual(closes, count)
+		XCTAssertFalse(capture.settled)
+	}
+	func testInvalidUTF8RefusesLogSuccessButClosesRealPipes() throws {
+		let root = try directory(); let capture = SuspendedImageLogCapture(directory: root.path)
+		cleanup(root, capture: capture)
+		XCTAssertEqual(capture.setupError, 0)
+		write(Data([0xff, 10]), to: capture.errorDescriptor); capture.closeWriters()
+		XCTAssertTrue(capture.settleAfterRetirement(), "actual closure and successful writes are different facts")
+		XCTAssertEqual(capture.writeError, EILSEQ)
+		XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [])
+	}
+	func testReplacedConfiguredDirectoryRefusesBothOldAndForeignSink() throws {
+		let root = try directory(); let capture = SuspendedImageLogCapture(directory: root.path)
+		cleanup(root, capture: capture)
+		XCTAssertEqual(capture.setupError, 0)
+		let original = root.appendingPathExtension("original")
+		try FileManager.default.moveItem(at: root, to: original)
+		addTeardownBlock { if capture.settled { try FileManager.default.removeItem(at: original) } }
+		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700])
+		write(Data("refused\n".utf8), to: capture.outputDescriptor); capture.closeWriters()
+		XCTAssertTrue(capture.settleAfterRetirement())
+		XCTAssertEqual(capture.writeError, EIO)
+		XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [])
+		XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: original.path), [])
+	}
+	func testActualGuardianMappedShellBothStreamsAndFinalTailsPersistBeforeRetirement() throws {
+		let products = Bundle(for: OwnedSuspendedImageTests.self).bundleURL.deletingLastPathComponent()
+		let launchers = [products.appendingPathComponent("ErgoptiPlus"), products.deletingLastPathComponent().appendingPathComponent("ErgoptiPlus")]
+		let launcher = try XCTUnwrap(launchers.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }))
+		let began = Date()
+		let fixture = try SuspendedImageNativeSession(launcher: launcher, loggedFixture: true)
+		defer { fixture.cleanup() }
+		try fixture.wait { fixture.markers.contains(where: { $0.hasPrefix("V1 IMAGE_READY ") }) }
+		XCTAssertEqual(fixture.markers.count, 1)
+		XCTAssertFalse(fixture.markers.contains("V1 ACTIVE"))
+		XCTAssertEqual(try Data(contentsOf: fixture.session), Data())
+		XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.appendingPathComponent("logs").path), [])
+		let ready = try XCTUnwrap(fixture.markers.first).split(separator: " ")
+		XCTAssertEqual(ready.count, 8)
+		let child = try XCTUnwrap(Int32(ready[2]))
+		let observed = ergopti_owned_program_observe(child)
+		XCTAssertEqual(observed.error_code, 0)
+		XCTAssertEqual(observed.process_group_id, child)
+		XCTAssertEqual(observed.start_seconds, try XCTUnwrap(UInt64(ready[4])))
+		XCTAssertEqual(observed.start_microseconds, try XCTUnwrap(UInt64(ready[5])))
+		XCTAssertFalse(observed.nonlive)
+		try fixture.sessionWriter.write(contentsOf: Data("POST_IMAGE_PROOF_FIXTURE_KEY".utf8))
+		try fixture.sessionWriter.synchronize()
+		try fixture.send("ACTIVATE")
+		try fixture.finish()
+		let ended = Date()
+		XCTAssertEqual(Array(fixture.markers.dropFirst()), ["V1 ACTIVE", "V1 LOGS_CLOSED 0", "V1 OUTGOING_CLOSED 0", "V1 RETIRED 0 1 1 0 0 0 0"])
+		XCTAssertFalse(fixture.process.isRunning)
+		XCTAssertTrue(fixture.outputEOF)
+		XCTAssertTrue(fixture.errorEOF)
+		try fixture.closeLoggedReceiving()
+		try fixture.closeInput()
+		XCTAssertTrue(fixture.outputClosed)
+		XCTAssertTrue(fixture.errorClosed)
+		XCTAssertFalse(fixture.receivingCloseFailed)
+		let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: .gregorian)
+		formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "yyyy-MM-dd"
+		let allowedDays = Set([formatter.string(from: began), formatter.string(from: ended)])
+		let logs = fixture.directory.appendingPathComponent("logs")
+		let names = try FileManager.default.contentsOfDirectory(atPath: logs.path).sorted()
+		XCTAssertFalse(names.isEmpty)
+		var records: [String] = []
+		for name in names {
+			XCTAssertTrue(allowedDays.contains(where: { name == "ErgoptiPlus_\($0).log" }))
+			let bytes = try Data(contentsOf: logs.appendingPathComponent(name))
+			XCTAssertEqual(bytes.last, 10)
+			let text = try XCTUnwrap(String(data: bytes, encoding: .utf8))
+			for line in text.split(separator: "\n", omittingEmptySubsequences: false).dropLast() {
+				XCTAssertNotNil(String(line).range(of: "^[0-9]{2}:[0-9]{2}:[0-9]{2} \\[OLLAMA-SERVER\\] (stdout split|stdout tail|stderr split|stderr tail)$", options: .regularExpression))
+				records.append(String(line.dropFirst("00:00:00 [OLLAMA-SERVER] ".count)))
+			}
+		}
+		XCTAssertEqual(records.sorted(), ["stderr split", "stderr tail", "stdout split", "stdout tail"])
+		XCTAssertEqual(records.filter { $0.hasPrefix("stdout") }, ["stdout split", "stdout tail"])
+		XCTAssertEqual(records.filter { $0.hasPrefix("stderr") }, ["stderr split", "stderr tail"])
+	}
 
 }

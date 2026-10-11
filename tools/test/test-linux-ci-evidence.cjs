@@ -1682,6 +1682,34 @@ const retainedQualifications = new Map([
 	]
 ]);
 function assertRetainedQualification(step) {
+	// Only this exact source-bound seven-file LuaJIT upload may retain failures.
+	if (step.name === 'Retain actual LuaJIT XI2 diagnostic evidence') {
+		assert.equal(pipeline.stepField(step.body, 'if'), 'always()');
+		assert.equal(pipeline.stepField(step.body, 'uses'), 'actions/upload-artifact@v4');
+		assert.equal(pipeline.stepField(step.body, 'run'), null);
+		assert.equal(pipeline.stepField(step.body, 'continue-on-error'), null);
+		assert.deepStrictEqual(
+			step.body.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#')),
+			[
+				'      - name: Retain actual LuaJIT XI2 diagnostic evidence',
+				'        if: always()',
+				'        uses: actions/upload-artifact@v4',
+				'        with:',
+				'          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}',
+				'          retention-days: 7',
+				'          path: |',
+				'            ${{ runner.temp }}/linux-xi2-luajit/receiving.json',
+				'            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json',
+				'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json',
+				'            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json',
+				'            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json',
+				'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout',
+				'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr',
+				'          if-no-files-found: error'
+			]
+		);
+		return true;
+	}
 	// This exact owned native receipt retains failures, independent of qualification.
 	if (step.name === 'Retain actual XI2 property-cookie evidence') {
 		assert.equal(pipeline.stepField(step.body, 'if'), 'always()');
@@ -1812,6 +1840,100 @@ const unknownRetention = {
 assert.strictEqual(assertRetainedQualification(unknownRetention), false);
 assert.throws(() =>
 	assert.doesNotMatch(pipeline.stepField(unknownRetention.body, 'if'), /\balways\(\)/)
+);
+// Independent handwritten LuaJIT receipt fixture; it is not derived from the workflow.
+const xi2LuaJitRetentionFixture = {
+	name: 'Retain actual LuaJIT XI2 diagnostic evidence',
+	body: [
+		'      - name: Retain actual LuaJIT XI2 diagnostic evidence',
+		'        if: always()',
+		'        uses: actions/upload-artifact@v4',
+		'        with:',
+		'          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}',
+		'          retention-days: 7',
+		'          path: |',
+		'            ${{ runner.temp }}/linux-xi2-luajit/receiving.json',
+		'            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json',
+		'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json',
+		'            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json',
+		'            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json',
+		'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout',
+		'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr',
+		'          if-no-files-found: error'
+	].join('\n')
+};
+assert.strictEqual(assertRetainedQualification(xi2LuaJitRetentionFixture), true);
+const xi2LuaJitActualArtifacts = pipeline
+	.steps(pipeline.job('test-linux'))
+	.filter((step) => step.name === 'Retain actual LuaJIT XI2 diagnostic evidence');
+assert.strictEqual(
+	xi2LuaJitActualArtifacts.length,
+	1,
+	'exact LuaJIT receipt owner remains enrolled'
+);
+assert.strictEqual(assertRetainedQualification(xi2LuaJitActualArtifacts[0]), true);
+const xi2LuaJitRetentionMutations = [
+	['success-only', 'if: always()', 'if: success()'],
+	['wrong upload API', 'actions/upload-artifact@v4', 'actions/upload-artifact@v3'],
+	['warn', 'if-no-files-found: error', 'if-no-files-found: warn'],
+	['ignore', 'if-no-files-found: error', 'if-no-files-found: ignore'],
+	['foreign source', '${{ github.sha }}', 'foreign'],
+	['foreign attempt', '${{ github.run_attempt }}', 'foreign'],
+	['retention', 'retention-days: 7', 'retention-days: 8'],
+	['whole namespace', 'linux-xi2-luajit/receiving.json', 'linux-xi2-luajit/'],
+	[
+		'extra data',
+		'          if-no-files-found: error',
+		'            ${{ runner.temp }}/linux-xi2-luajit/config.json\n          if-no-files-found: error'
+	],
+	['harness', '        with:', '        run: true\n        with:'],
+	['masked failure', '        with:', '        continue-on-error: true\n        with:'],
+	['duplicate key', '          path: |', '          path: duplicate\n          path: |'],
+	[
+		'quoted extra option',
+		'          retention-days: 7',
+		"          retention-days: 7\n          'overwrite': true"
+	],
+	['merge mapping', '        with:', '        with:\n          <<: *foreign']
+];
+for (const path of [
+	'linux-xi2-luajit/receiving.json',
+	'linux-xi2-luajit/original-c3/receiving.json',
+	'linux-xi2-luajit/lua-native/display.json',
+	'linux-xi2-luajit/abi-compile.family.json',
+	'linux-xi2-luajit/lua-native.family.json',
+	'linux-xi2-luajit/lua-native/luajit.stdout',
+	'linux-xi2-luajit/lua-native/luajit.stderr'
+]) {
+	xi2LuaJitRetentionMutations.push([
+		'omitted ' + path,
+		'            ${{ runner.temp }}/' + path + '\n',
+		''
+	]);
+}
+for (const [name, before, after] of xi2LuaJitRetentionMutations) {
+	assert(xi2LuaJitRetentionFixture.body.includes(before), 'nonvacuous own mutation: ' + name);
+	assert.throws(
+		() =>
+			assertRetainedQualification({
+				...xi2LuaJitRetentionFixture,
+				body: xi2LuaJitRetentionFixture.body.replace(before, after)
+			}),
+		undefined,
+		name
+	);
+}
+const unknownLuaJitRetention = {
+	...xi2LuaJitRetentionFixture,
+	name: 'Unknown LuaJIT upload',
+	body: xi2LuaJitRetentionFixture.body.replaceAll(
+		'Retain actual LuaJIT XI2 diagnostic evidence',
+		'Unknown LuaJIT upload'
+	)
+};
+assert.strictEqual(assertRetainedQualification(unknownLuaJitRetention), false);
+assert.throws(() =>
+	assert.doesNotMatch(pipeline.stepField(unknownLuaJitRetention.body, 'if'), /\balways\(\)/)
 );
 // Keep the predecessor warn cohorts distinct from the new error-only receipt.
 for (const [name, artifact, file] of [

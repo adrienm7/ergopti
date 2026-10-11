@@ -533,5 +533,114 @@ class ListenerEventControls(unittest.TestCase):
         self.assertFalse(operation.physically_retired)
 
 
+class DaemonLogProtocolControls(unittest.TestCase):
+    """Literal protocol/settlement controls; no native guardian execution credit."""
+
+    def operation(self, *, configured=True):
+        value = object.__new__(OWNER.SuspendedImageOwner)
+        value.request = {"log_directory": "/private/tmp/logs"} if configured else {}
+        value._logs_closed = None
+        value._retired = value._refused = value._failure = value._close_debt = None
+        value._outgoing_closed = 0
+        value._bootstrap_closed = None
+        value.bootstrap = None
+        value._protocol_debt = value._retirement_started = False
+        value.image_ready = value.active = False
+        value.physically_retired = False
+        value._spawn_attempted = True
+        value._guardian_retirement_proven = False
+        value._default_guardian = None
+        value._selector = None
+        value._eof = {"stdout", "stderr"}
+        value._buffers = {"stdout": bytearray(), "stderr": bytearray()}
+        value.process = SimpleNamespace(
+            stdin=None,
+            stdout=None,
+            stderr=None,
+            _child_created=True,
+            returncode=0,
+            wait=lambda **kwargs: 0,
+        )
+        return value
+
+    def test_log_closure_preserves_original_native_status(self):
+        operation = self.operation()
+        operation._parse(b"V1 LOGS_CLOSED 0")
+        operation._parse(b"V1 RETIRED 143 1 1 0 0 0 0")
+        self.assertEqual(operation._retired, (143, (0, 0, 0)))
+        self.assertEqual(operation._logs_closed, 0)
+        self.assertFalse(operation.physically_retired)
+        self.assertTrue(operation.settle())
+        self.assertTrue(operation.physically_retired)
+
+    def test_configured_log_requires_its_own_closed_packet(self):
+        operation = self.operation()
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+            operation._parse(b"V1 RETIRED 0 1 1 0 0 0 0")
+        self.assertIsNone(operation._retired)
+        self.assertTrue(operation._protocol_debt)
+        self.assertFalse(operation.physically_retired)
+
+    def test_unconfigured_log_packet_cannot_add_authority(self):
+        operation = self.operation(configured=False)
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+            operation._parse(b"V1 LOGS_CLOSED 0")
+        self.assertIsNone(operation._logs_closed)
+        self.assertTrue(operation._protocol_debt)
+
+    def test_duplicate_log_close_receipt_refuses(self):
+        operation = self.operation()
+        operation._parse(b"V1 LOGS_CLOSED 0")
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+            operation._parse(b"V1 LOGS_CLOSED 0")
+        self.assertIsNone(operation._retired)
+        self.assertTrue(operation._protocol_debt)
+
+    def test_log_close_receipt_has_exact_fields_and_decimal(self):
+        for wire in (
+            b"V1 LOGS_CLOSED -1",
+            b"V1 LOGS_CLOSED 01",
+            b"V1 LOGS_CLOSED true",
+            b"V1 LOGS_CLOSED 2147483648",
+            b"V1 LOGS_CLOSED 0 0",
+        ):
+            with self.subTest(wire=wire):
+                operation = self.operation()
+                with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+                    operation._parse(wire)
+                self.assertIsNone(operation._logs_closed)
+                self.assertTrue(operation._protocol_debt)
+
+    def test_log_write_failure_never_becomes_successful_settlement(self):
+        operation = self.operation()
+        operation._parse(b"V1 LOGS_CLOSED 5")
+        operation._parse(b"V1 RETIRED 0 1 1 0 0 0 0")
+        self.assertEqual(operation._retired[0], 0, "the real process status stays intact")
+        self.assertTrue(operation.settle(), "known physical closure is not task success")
+        self.assertTrue(operation.physically_retired)
+        self.assertIsNone(operation._failure, "known writes must not invent unknown close debt")
+        self.assertEqual(operation.log_write_errno, 5)
+        self.assertEqual(operation.public_receipt()["log_write_errno"], 5)
+        self.assertTrue(operation.settle())
+        self.assertEqual(
+            operation.log_write_errno, 5, "a later close cannot erase the write failure"
+        )
+        subject = load(
+            "daily_log_serve",
+            PACKET / "static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py",
+        )
+        retired = []
+        caller = SimpleNamespace(
+            operation=operation,
+            cancelled=False,
+            _caller_input=None,
+            _log_directory="/private/tmp/logs",
+            retire=lambda timeout: retired.append(timeout) or True,
+        )
+        with self.assertRaisesRegex(subject.ServeRefusal, "logging"):
+            subject.ServeOwner.wait(caller, 2)
+        self.assertEqual(retired, [2], "the original retirement must precede the write refusal")
+
+
 if __name__ == "__main__":
     unittest.main()

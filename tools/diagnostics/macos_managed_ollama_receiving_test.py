@@ -211,6 +211,24 @@ class StandaloneCompilerControls(unittest.TestCase):
             self.subject.prepare()
         self.fixture._command.assert_not_called()
 
+    def test_original_compiler_exception_leaves_exact_prepare_checkpoint(self):
+        class CompilerBoundary(Exception):
+            pass
+
+        primary = CompilerBoundary("private compiler text must not be projected")
+        self.fixture._command.side_effect = primary
+        with (
+            patch.object(RECEIVING, "load", return_value=self.wire),
+            patch.object(RECEIVING, "Registry"),
+        ):
+            with self.assertRaises(CompilerBoundary) as raised:
+                self.subject.prepare()
+        self.assertIs(raised.exception, primary)
+        self.assertEqual(self.subject.prepare_phase, "outgoing_compile")
+        self.fixture._command.assert_called_once()
+        self.assertEqual(self.fixture._command.call_args.kwargs, {"timeout": 90})
+        self.assertEqual(self.subject.outgoing_context._inputs, [])
+
 
 class RetainedSourceControls(unittest.TestCase):
     def setUp(self):
@@ -516,6 +534,158 @@ class ActualPeerReceiving(unittest.TestCase):
             pac,
         )
         self.assertNotIn("FindProxyForURL(url, host) { return", pac)
+
+
+class FatalFailureObservationControls(unittest.TestCase):
+    def run_main(self, primary=None, cleanup=None, step="outgoing_compile"):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        output = Path(temporary.name)
+        calls = []
+        owner = SimpleNamespace(output=output, stage="prepare", prepare_phase=step, receipt={})
+
+        def run():
+            calls.append("run")
+            if primary is not None:
+                raise primary
+
+        def close():
+            calls.append("close")
+            if cleanup is not None:
+                raise cleanup
+
+        owner.run, owner.close = run, close
+        arguments = [
+            "native-receiving",
+            "--archive",
+            "private-archive",
+            "--catalogue",
+            "private-catalogue",
+            "--launcher",
+            "private-launcher",
+            "--framework",
+            "private-framework",
+            "--output",
+            str(output),
+            "--profile",
+            "pac-inline",
+        ]
+        with (
+            patch.object(RECEIVING.sys, "argv", arguments),
+            patch.object(RECEIVING.sys, "platform", "darwin"),
+        ):
+            with patch.object(RECEIVING, "Receiver", return_value=owner) as constructor:
+                status = RECEIVING.main()
+        constructor.assert_called_once()
+        self.assertEqual(calls, ["run", "close"])
+        result = json.loads((output / "native-receiving.json").read_text())
+        return status, result
+
+    def test_primary_and_cleanup_failures_remain_independent_and_fatal(self):
+        status, result = self.run_main(
+            RuntimeError("actual_native_command"),
+            RECEIVING.QUALIFIED.QualificationRefusal("cleanup"),
+        )
+        self.assertEqual(status, 1)
+        self.assertIs(result["success"], False)
+        self.assertEqual(result["reason"], "native_receiving_cleanup_failed")
+        self.assertEqual(result["failed_stage"], "prepare")
+        self.assertEqual(result["prepare_phase"], "outgoing_compile")
+        self.assertEqual(
+            result["primary_failure"], {"family": "receiver", "code": "actual_native_command"}
+        )
+        self.assertEqual(result["cleanup_failure"], {"family": "qualification", "code": "cleanup"})
+
+    def test_primary_only_keeps_original_failure_reason(self):
+        status, result = self.run_main(RuntimeError("compatibility_source_copy"))
+        self.assertEqual(status, 1)
+        self.assertIs(result["success"], False)
+        self.assertEqual(result["reason"], "native_receiving_failed")
+        self.assertEqual(
+            result["primary_failure"], {"family": "receiver", "code": "compatibility_source_copy"}
+        )
+        self.assertNotIn("cleanup_failure", result)
+
+    def test_cleanup_only_reports_closed_os_code_without_private_filename(self):
+        status, result = self.run_main(
+            cleanup=PermissionError(13, "private-message", "/private/key-path")
+        )
+        self.assertEqual(status, 1)
+        self.assertIs(result["success"], False)
+        self.assertEqual(result["reason"], "native_receiving_cleanup_failed")
+        self.assertNotIn("primary_failure", result)
+        self.assertNotIn("prepare_phase", result)
+        self.assertEqual(result["cleanup_failure"], {"family": "os", "code": "permission"})
+        self.assertNotIn("private", json.dumps(result))
+
+    def test_raw_messages_foreign_types_and_raw_stage_never_reach_receipt(self):
+        class Foreign(RuntimeError):
+            def __str__(self):
+                raise AssertionError("foreign exception text was accessed")
+
+        for primary, expected in [
+            (Foreign("actual_native_command"), {"family": "unknown", "code": "unknown"}),
+            (
+                RECEIVING.subprocess.TimeoutExpired(["private-key", "secret"], 15),
+                {"family": "command", "code": "deadline"},
+            ),
+            (
+                RECEIVING.subprocess.CalledProcessError(
+                    1, ["private-key", "secret"], output=b"private"
+                ),
+                {"family": "command", "code": "refused"},
+            ),
+            (
+                RuntimeError("private-key /path?token=secret"),
+                {"family": "receiver", "code": "unknown"},
+            ),
+            (
+                RuntimeError("actual_native_command", "secret"),
+                {"family": "receiver", "code": "unknown"},
+            ),
+            (
+                RECEIVING.QUALIFIED.QualificationRefusal("private-key"),
+                {"family": "qualification", "code": "unknown"},
+            ),
+        ]:
+            with self.subTest(kind=type(primary).__name__):
+                status, result = self.run_main(primary, step="/private/secret-stage")
+                self.assertEqual(status, 1)
+                self.assertEqual(result["primary_failure"], expected)
+                self.assertEqual(result["prepare_phase"], "unknown")
+                self.assertNotIn("secret", json.dumps(result))
+                self.assertNotIn("private", json.dumps(result))
+
+    def test_wrapped_qualification_and_cancellation_have_closed_facts(self):
+        primary = RECEIVING.QUALIFIED.QualificationRefusal(
+            "operation",
+            primary=RuntimeError("actual_native_command"),
+            cleanup=OSError(5, "private cleanup errno text"),
+        )
+        status, result = self.run_main(primary, KeyboardInterrupt("private-cancel-text"))
+        self.assertEqual(status, 1)
+        self.assertEqual(
+            result["primary_failure"],
+            {
+                "family": "qualification",
+                "code": "operation",
+                "operation_primary": {"family": "receiver", "code": "actual_native_command"},
+                "operation_cleanup": {"family": "os", "code": "unknown"},
+            },
+        )
+        self.assertEqual(
+            result["cleanup_failure"], {"family": "cancellation", "code": "interrupted"}
+        )
+        self.assertNotIn("private", json.dumps(result))
+
+    def test_success_keeps_original_complete_verdict_and_no_failure_fields(self):
+        status, result = self.run_main()
+        self.assertEqual(status, 0)
+        self.assertIs(result["success"], True)
+        self.assertEqual(result["reason"], "complete")
+        self.assertNotIn("primary_failure", result)
+        self.assertNotIn("cleanup_failure", result)
+        self.assertNotIn("prepare_phase", result)
 
 
 if __name__ == "__main__":

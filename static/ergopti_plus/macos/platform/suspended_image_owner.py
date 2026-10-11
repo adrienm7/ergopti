@@ -228,6 +228,7 @@ class SuspendedImageOwner:
         self._refused = None
         self._outgoing_closed = None
         self._bootstrap_closed = None
+        self._logs_closed = None
         self._failure = None
         self._protocol_debt = False
         self._close_debt = None
@@ -410,6 +411,11 @@ class SuspendedImageOwner:
                     raise ImageRefusal("protocol")
                 self._bootstrap_closed = decimal(fields[2], 2**31 - 1)
                 self._retirement_started = True
+            elif role == "LOGS_CLOSED" and len(fields) == 3:
+                if "log_directory" not in self.request or self._logs_closed is not None:
+                    raise ImageRefusal("protocol")
+                self._logs_closed = decimal(fields[2], 2**31 - 1)
+                self._retirement_started = True
             elif role == "RETIRED" and len(fields) == 9:
                 if self._retired is not None or self._refused is not None:
                     raise ImageRefusal("protocol")
@@ -417,6 +423,8 @@ class SuspendedImageOwner:
                 if fields[3:6] != ["1", "1", "0"] or self._outgoing_closed is None:
                     raise ImageRefusal("protocol")
                 if self.bootstrap is not None and self._bootstrap_closed is None:
+                    raise ImageRefusal("protocol")
+                if "log_directory" in self.request and self._logs_closed is None:
                     raise ImageRefusal("protocol")
                 closes = tuple(decimal(value, 2**31 - 1) for value in fields[6:])
                 self._retired = (status, closes)
@@ -493,6 +501,11 @@ class SuspendedImageOwner:
                 if self._close_debt is None:
                     self._close_debt = error
 
+    @property
+    def log_write_errno(self):
+        """Bounded write result; actual physical closure remains a separate proof."""
+        return self._logs_closed
+
     def public_receipt(self):
         """Project bounded lifecycle scalars without keys, names or native logs."""
         receipt = {
@@ -506,6 +519,8 @@ class SuspendedImageOwner:
             "guardian_status": getattr(self.process, "returncode", None),
             "protocol_debt": self._protocol_debt,
         }
+        if "log_directory" in self.request:
+            receipt["log_write_errno"] = self._logs_closed
         if self.bootstrap is not None:
             receipt["bootstrap_close_errno"] = self._bootstrap_closed
         return receipt
