@@ -8050,3 +8050,143 @@ function languageParentSource(source, driver) {
 		);
 	}
 }
+
+// Native file IO composition stays retained; only its outer scalar policy moved.
+{
+	const assert = require('node:assert/strict');
+	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8');
+	const {
+		personalFileCaptionPublication: bound
+	} = require('../lib/menu-hotstring-language-binding.cjs');
+	assert.equal(
+		bound(source),
+		true,
+		'actual complete donor owner with only the two approved scalar policy edits'
+	);
+	const late =
+		'\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))';
+	assert.equal(
+		source.split(late).length - 1,
+		1,
+		'single original-order late scalar/owner expression exists once'
+	);
+	for (const replacement of [
+		'; ' + late.replaceAll('\n', '\n; '),
+		late.replace('CaptionOwner.Call', 'Foreign.CaptionOwner.Call'),
+		late.replace('FileStem, FileCount', 'FileCount, FileStem'),
+		'if false {\n' + late + '\n}',
+		'if false\n' + late
+	])
+		assert.equal(
+			bound(source.replace(late, replacement)),
+			false,
+			'comment/foreign/reordered/dead observer routes refuse'
+		);
+	const marker = '_HS_TomlFileRow(TF) {';
+	const bodyStart = source.indexOf(marker),
+		bodyEnd = source.indexOf('\n; Shared declarations own fixed labels', bodyStart);
+	assert(bodyStart >= 0 && bodyEnd > bodyStart, 'original native donor interval exists');
+	const original = source.slice(bodyStart, bodyEnd);
+	const foreign =
+		source.slice(0, bodyStart) + 'class Foreign {\n' + original + '\n}' + source.slice(bodyEnd);
+	assert.equal(
+		bound(foreign),
+		false,
+		'foreign class cannot lend its method as the genuine root function'
+	);
+	assert.equal(
+		foreign.replace('class Foreign {\n' + original + '\n}', original),
+		source,
+		'foreign wrapper exact inverse'
+	);
+	const refused = original.replace('\n\ttry {', '\n\tif false\n\ttry {');
+	assert.notEqual(refused, original, 'actual outer try control is altered');
+	const deadTry = source.slice(0, bodyStart) + refused + source.slice(bodyEnd);
+	assert.equal(
+		bound(deadTry),
+		false,
+		'false guarded outer try cannot lend unconditional ownership'
+	);
+	assert.equal(deadTry.replace(refused, original), source, 'false try wrapper exact inverse');
+	const io =
+		'\n\tif MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted)';
+	assert.equal(original.split(io).length - 1, 1, 'complete genuine native fill coordinate unique');
+	const deadIoOwner = original.replace(io, '\n\tif false' + io);
+	assert.notEqual(
+		deadIoOwner,
+		original,
+		'whole native fill statement receives actual unbraced false guard'
+	);
+	const deadIo = source.slice(0, bodyStart) + deadIoOwner + source.slice(bodyEnd);
+	assert.equal(
+		bound(deadIo),
+		false,
+		'unbraced false control before whole native fill cannot lend route ownership'
+	);
+	assert.equal(
+		deadIo.replace(deadIoOwner, original),
+		source,
+		'whole native fill control exact inverse'
+	);
+	assert.equal(bound(source + '\n_HS_TomlFileRow(TF) {}\n'), false, 'duplicate root owner refuses');
+	console.log(
+		'[OK] personal-file caption: complete genuine donor route, original single late expression and retained shared projection.'
+	);
+}
+
+// The retained native folder frame only changes admitted scalar projection.
+{
+	const assert = require('node:assert/strict');
+	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8');
+	const {
+		personalFolderCaptionPublication: bound
+	} = require('../lib/menu-hotstring-language-binding.cjs');
+	assert.equal(
+		bound(source),
+		true,
+		'complete genuine original folder owner plus only two caption edits'
+	);
+	const marker = '_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {';
+	const begin = source.indexOf(marker),
+		end = source.indexOf('\n; Release only returned native menus', begin);
+	assert(begin >= 0 && end > begin, 'nonempty actual complete folder native owner exists');
+	const original = source.slice(begin, end);
+	const alteredOwners = [
+		'class Foreign {\n' + original + '\n}',
+		original.replace('\n\ttry {', '\n\tif false\n\ttry {'),
+		original.replace(
+			'\n\t\tif MenuRenderer_AppendTemplate(FolderMenu,',
+			'\n\t\tif false\n\t\tif MenuRenderer_AppendTemplate(FolderMenu,'
+		),
+		original.replace(
+			'\n\t\tFolderTotal := _HS_NodeTotal(Node)',
+			'\n\t\tif false\n\t\tFolderTotal := _HS_NodeTotal(Node)'
+		),
+		original.replace(
+			'FolderCount := FolderPositive ? FmtCount(FolderTotal) . "" : ""',
+			'FolderCount := FmtCount(FolderTotal) . ""'
+		),
+		original.replace(
+			'CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu)',
+			'Foreign.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu)'
+		)
+	];
+	for (const altered of alteredOwners) {
+		assert.notEqual(altered, original, 'causal original physical route actually altered');
+		const refused = source.slice(0, begin) + altered + source.slice(end);
+		assert.equal(
+			bound(refused),
+			false,
+			'foreign/dead fill/dead total/unconditional count/foreign receiving refuses'
+		);
+		assert.equal(
+			refused.replace(altered, original),
+			source,
+			'exact causal inverse restores original route'
+		);
+	}
+	assert.equal(bound(source + '\n' + marker + '}\n'), false, 'duplicate root folder owner refuses');
+	console.log(
+		'[OK] personal-folder caption: entire original traversal and real fill/late total path retained; optional count observation cannot move.'
+	);
+}
