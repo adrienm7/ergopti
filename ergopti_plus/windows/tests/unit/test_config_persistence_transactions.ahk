@@ -69,6 +69,8 @@ _CPT_Notify(Message, Options) {
 }
 
 _CPT_ThrowingNotify(Message, Options) {
+	global _CPT_NotifyCalls
+	_CPT_NotifyCalls += 1
 	throw Error("injected notifier failure")
 }
 
@@ -87,10 +89,24 @@ _CPT_Timer(Callback, Period) {
 ; ============================================
 ; ============================================
 
+; A controlled writer still enters through the genuine native source owner.
+; Admit an actual fresh destination without creating a file, so the historical
+; failure assertions continue to prove that no durable effect occurred.
+_CPT_PrepareAbsentConfig(Path) {
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the isolated subject never clears an inherited terminal barrier")
+	AssertFalse(FSStrictExists(Path), "the fresh subject must be physically absent before Boot")
+	Boot := ConfigMigrateBoot(Path)
+	AssertEqual("absent", Boot["status"], "the actual fresh Boot supplies the source admission")
+	AssertEqual(0, Boot["read_only"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	AssertEqual("", TOML_WriteRefusal(Path))
+	AssertFalse(FSStrictExists(Path), "native source initialization does not publish a fake writer result")
+}
+
 _CPT_GestureFailureLeavesBothMapsUntouched(FailAt) {
 	global ConfigurationFile, _CPT_ConfigWriteCalls, _CPT_ConfigUpdates, _CPT_NotifyCalls
 	OriginalPath := ConfigurationFile
-	Path := A_Temp . "\ergopti_ahk15_persistence.toml"
+	Path := A_Temp . "\ergopti_ahk15_persistence_" . FailAt . ".toml"
 	try FileDelete(Path)
 	ConfigurationFile := Path
 	Assignments := Map("tap_3", "copy")
@@ -101,6 +117,7 @@ _CPT_GestureFailureLeavesBothMapsUntouched(FailAt) {
 		"value", "https://new.example")
 	_CPT_ResetConfigFakes(FailAt)
 	try {
+		_CPT_PrepareAbsentConfig(Path)
 		Committed := _GestureCommitAssignment(&Assignments, &Parameters,
 			"gestures", "tap_3", "open_url", ParameterCandidate,
 			_CPT_ConfigWriter, _CPT_Notify)
@@ -142,6 +159,7 @@ _CPT_GestureSuccessPublishesBothMaps() {
 		"value", "https://new.example")
 	_CPT_ResetConfigFakes()
 	try {
+		_CPT_PrepareAbsentConfig(ConfigurationFile)
 		Committed := _GestureCommitAssignment(&Assignments, &Parameters,
 			"gestures", "tap_3", "open_url", ParameterCandidate,
 			_CPT_ConfigWriter, _CPT_Notify)
@@ -185,6 +203,7 @@ _CPT_PersonalPreferenceFailureIsReturnedAndVisible() {
 	ConfigurationFile := Path
 	_CPT_ResetConfigFakes(1)
 	try {
+		_CPT_PrepareAbsentConfig(Path)
 		AssertFalse(_EditorPrefSet("close_on_add", "1", _CPT_ConfigWriter, _CPT_Notify),
 			"the personal-editor preference setter must propagate a false write")
 		AssertFalse(FileExist(Path), "a failed preference write must leave disk unchanged")
@@ -200,12 +219,26 @@ Test("AHK-15-persistence: personal-editor preference failure is returned and vis
 	_CPT_PersonalPreferenceFailureIsReturnedAndVisible)
 
 _CPT_FailureNotifierCannotEscapePersistenceBoundary() {
-	_CPT_ResetConfigFakes(1)
-	Returned := ConfigCommitUpdates("ignored.toml",
-		[{ Section: "script", Key: "locale", Value: "fr" }],
-		"the injected notifier failure", _CPT_ConfigWriter, _CPT_ThrowingNotify)
-	AssertFalse(Returned,
-		"a secondary notifier exception must not replace the writer's false status")
+	global ConfigurationFile, _CPT_ConfigWriteCalls, _CPT_ConfigUpdates, _CPT_NotifyCalls
+	SavedPath := ConfigurationFile
+	Path := A_Temp . "\ergopti_ahk15_notifier.toml"
+	try {
+		_CPT_PrepareAbsentConfig(Path)
+		ConfigurationFile := Path
+		_CPT_ResetConfigFakes(1)
+		Returned := ConfigCommitUpdates(Path,
+			[{ Section: "script", Key: "locale", Value: "fr" }],
+			"the injected notifier failure", _CPT_ConfigWriter, _CPT_ThrowingNotify)
+		AssertFalse(Returned,
+			"a secondary notifier exception must not replace the writer's false status")
+		AssertEqual(1, _CPT_ConfigWriteCalls, "the original writer refusal must precede the notifier exception")
+		AssertEqual(1, _CPT_NotifyCalls, "the real writer refusal invokes the throwing notifier exactly once")
+		AssertEqual(1, _CPT_ConfigUpdates.Length)
+		AssertFalse(FileExist(Path), "the controlled failed writer creates no source")
+	} finally {
+		ConfigurationFile := SavedPath
+		try FileDelete(Path)
+	}
 }
 Test("AHK-15-persistence: failure notifier cannot escape the persistence boundary",
 	_CPT_FailureNotifierCannotEscapePersistenceBoundary)

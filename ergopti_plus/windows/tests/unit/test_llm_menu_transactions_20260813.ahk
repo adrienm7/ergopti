@@ -120,7 +120,7 @@ _LMT_Notify(Message, Options) {
 	return true
 }
 
-_LMT_InstallFixture() {
+_LMT_InstallFixture(SelectedPath := unset) {
 	static Sequence := 0
 	global Features, _LLM_Menu, ConfigurationFile, LLM_PROFILE_HOTKEY_LIMIT
 	global _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
@@ -134,7 +134,13 @@ _LMT_InstallFixture() {
 		Previous["profile_limit"] := LLM_PROFILE_HOTKEY_LIMIT
 	; The actual profile provider needs the number-row protocol even in a cold fixture.
 	LLM_PROFILE_HOTKEY_LIMIT := 9
-	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction_" . A_ScriptHwnd . "_" . ++Sequence . ".toml"
+	if IsSet(SelectedPath) {
+		if !(SelectedPath is String) || InStr(SelectedPath, A_Temp . "\") != 1
+				|| FSStrictExists(SelectedPath) != 0
+			throw ValueError("The selected transaction fixture requires a fresh private configuration path.")
+		_LMT_ConfigPath := SelectedPath
+	} else
+		_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction_" . A_ScriptHwnd . "_" . ++Sequence . ".toml"
 	ConfigurationFile := _LMT_ConfigPath
 	AssertEqual("absent", ConfigMigrateBoot(ConfigurationFile)["status"], "the genuine native transaction fixture constructs strict fresh absence")
 	Features := _LMT_Features()
@@ -535,14 +541,27 @@ class _LMT_ApiPhysicalPublicationFault {
 	ObserveNativeRefusal() {
 		static Sequence := 0
 		AssertTrue(this.Handle != 0)
+		; CreateFile specifies the exact sharing error; rename promises only failure.
+		DeleteHandle := DllCall("kernel32\CreateFileW", "Str", this.ApiPath,
+			"UInt", 0x00010000, "UInt", 7, "Ptr", 0, "UInt", 3,
+			"UInt", 0x80, "Ptr", 0, "Ptr")
+		DeleteError := A_LastError
+		if DeleteHandle != -1 {
+			if !DllCall("kernel32\CloseHandle", "Ptr", DeleteHandle, "Int")
+				throw OSError(A_LastError, A_ThisFunc, "Cannot close the unexpected delete-access probe.")
+		}
+		AssertEqual(-1, DeleteHandle, "The same held target must deny actual delete access")
+		AssertEqual(32, DeleteError,
+			"The incompatible native delete-access request must report a sharing violation")
 		ProbePath := this.ApiPath . ".physical-fault-" . A_ScriptHwnd . "-" . ++Sequence
 		if FSWriteCreateDurable(ProbePath, '[{"Id":"api_probe"}]') != 1
 			throw Error("Cannot acquire the owned native replacement probe stage.")
 		try {
 			Moved := FSAtomicMoveReplace(ProbePath, this.ApiPath, &MoveError)
 			AssertFalse(Moved)
-			AssertEqual(32, MoveError,
-				"the real second target must refuse native replacement with a sharing violation")
+			AssertTrue(MoveError is Integer && MoveError > 0,
+				"The actual native replacement refusal must retain its nonzero error receipt")
+			_TestPrint("# api-native-fault delete_access_error=" . DeleteError . " move_error=" . MoveError)
 			AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath))
 			this.NativeRefusals += 1
 		} finally {
@@ -1050,11 +1069,11 @@ _LMT_InfoBarCallback(Built, Position := 0) {
 _LMT_SharedInfoBarNativeOwner() {
 	global _LLM_Menu, _LLM_Engine, ConfigurationFile, LLM_MENU_INDENT_OPTIONS, _LMT_WriterResult
 	global _LMT_WriterCalls, _LMT_ApplyCalls
-	Previous := _LMT_InstallFixture()
+	Path := _LMT_InfoBarPrivatePath()
+	Previous := _LMT_InstallFixture(Path)
 	PreviousEngine := _LLM_Engine
 	PreviousSuspend := A_IsSuspended
 	Suspend(false)
-	Path := _LMT_InfoBarPrivatePath()
 	ConfigurationFile := Path
 	HadIndent := IsSet(LLM_MENU_INDENT_OPTIONS)
 	PreviousIndent := HadIndent ? LLM_MENU_INDENT_OPTIONS : 0
@@ -1935,18 +1954,18 @@ _LMT_IndentWriteObserved(Path, Updates, Mode, Seen) {
 		return 2
 	if Mode == "truthy string"
 		return "ack"
-	return TOML_BatchWrite(Path, Updates)
+	return TOML_ConfigBatchWrite(Path, Updates)
 }
 
 ; Uses the actual Win32 menu, native dispatcher, configuration lease and strict
 ; TOML writer. Private file ownership is retired in finally, even on assertions.
 _LMT_IndentNativeOwners() {
 	global ConfigurationFile, _LLM_Menu, _LLM_Engine, _LMT_ApplyCalls, _MenuDispatchCallbacks
-	Previous := _LMT_InstallFixture()
-	PreviousEngine := _LLM_Engine
-	SavedSuspend := A_IsSuspended
 	Path := A_Temp . "\ergopti-indent-choice-" . DllCall("GetCurrentProcessId", "uint") . "-" . A_TickCount . ".toml"
 	AssertFalse(FileExist(Path), "this fixture must acquire a new private path")
+	Previous := _LMT_InstallFixture(Path)
+	PreviousEngine := _LLM_Engine
+	SavedSuspend := A_IsSuspended
 	ConfigurationFile := Path
 	try {
 		Corpus := _LMT_IndentCorpus()
@@ -1964,6 +1983,7 @@ _LMT_IndentNativeOwners() {
 					. "[llm.generation]`ntemperature = 0.9`n[private]`nfuture = 42`n"
 				if FileExist(Path)
 					FileDelete(Path)
+				Initial := _CMJFixtureCurrentSource(Initial)
 				FileAppend(Initial, Path, "UTF-8-RAW")
 				Seen := Map("calls", 0)
 				Writer := _LMT_IndentWriteMode.Bind(Mode, Seen)
@@ -2236,6 +2256,7 @@ _LMT_InfoBarAdmitFixture(Path, Selected) {
 		. (Selected ? "true" : "false") . '`n[llm.generation]`ntemperature = 0.9`n[private]`nfuture = 42`n'
 	if FileExist(Path)
 		FileDelete(Path)
+	Initial := _CMJFixtureCurrentSource(Initial)
 	FileAppend(Initial, Path, "UTF-8-RAW")
 	return Initial
 }
@@ -2267,15 +2288,15 @@ _LMT_InfoBarWriter(Mode, Seen, Path, Updates, Content, Presence) {
 		FileDelete(Path)
 		FileAppend(Foreign, Path, "UTF-8-RAW")
 	}
-	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+	return TOML_ConfigBatchWrite(Path, Updates, [], 0, Content, Presence)
 }
 
 _LMT_InfoBarRetainedReceipts() {
 	global ConfigurationFile, _LLM_Menu, _LLM_Engine, _LMT_ApplyCalls
-	Previous := _LMT_InstallFixture()
+	Path := _LMT_InfoBarPrivatePath()
+	Previous := _LMT_InstallFixture(Path)
 	PreviousEngine := _LLM_Engine
 	PreviousSuspend := A_IsSuspended
-	Path := _LMT_InfoBarPrivatePath()
 	ConfigurationFile := Path
 	try {
 		for Condition in ["ack", "false", "nil", "throw", "source race", "paused", "master", "source", "runtime", "sparse", "retired"] {
@@ -2413,7 +2434,7 @@ _LMT_PrivacyPhysicalWrite(Expected, Path, Updates, Content, Presence) {
 	} else if !((_LMT_WriterResult is Integer) && _LMT_WriterResult == 1) {
 		return _LMT_WriterResult
 	}
-	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+	return TOML_ConfigBatchWrite(Path, Updates, [], 0, Content, Presence)
 }
 
 _LMT_PrivacyLeaseWrite(Expected, Key, Path, Updates) {
@@ -3259,3 +3280,58 @@ ExitApp(0)
 }
 Test("LLM menu: actual toggle refuses observer reentry until return and releases its guard (llm-observation-reentry)",
 	_LMT_ObservationReentry)
+
+
+
+
+
+; Genuine narrow defaults must preserve legal namespaces under their held lease.
+_LMT_NarrowSemanticDefault(Kind) {
+	global ConfigurationFile, _LLM_Menu, _LLM_Engine, LLM_MENU_INDENT_OPTIONS
+	Path := _LMT_InfoBarPrivatePath()
+	Previous := _LMT_InstallFixture(Path), PreviousEngine := _LLM_Engine
+	Bundle := 0
+	try {
+		_LLM_Menu["enabled"] := true
+		_LLM_Menu["n_predictions"] := 3
+		_LLM_Menu["pred_indent"] := 1
+		_LLM_Menu["show_all_at_once"] := false
+		_LLM_Menu["show_info_bar"] := true
+		_LLM_Menu["disable_url_bars"] := false
+		_LLM_Menu["disable_password_fields"] := false
+		_LLM_Engine := LLM_Menu_DeepClone(_LLM_Menu)
+		Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n[llm.models]`nselected = "ollama"`n'
+			. '[llm.profiles]`nnum_predictions = 3`n[llm.display]`npred_indent = 1`nstreaming_multi = true`nshow_info_bar = true`n'
+			. '[llm.trigger]`nurl_bar_filter_enabled = false`nsecure_filter_enabled = false`n[private]`nfuture = 42`n')
+		Assert(FSWriteDurable(Path, Initial))
+		Expected := Kind == "info" ? _LLM_Menu_InfoBarSnapshot()
+			: Kind == "indent" ? _LLM_Menu_IndentSnapshot() : _LLM_Menu_PrivacySnapshot("disable_url_bars")
+		AssertFalse(Expected["blocked"], "the actual canonical source admits this narrow default")
+		Section := Kind == "privacy" ? "llm.trigger" : "llm.display"
+		Key := Kind == "info" ? "show_info_bar" : Kind == "indent" ? "pred_indent" : "url_bar_filter_enabled"
+		Value := Kind == "indent" ? 0 : TOML_Bool(Kind == "privacy")
+		Updates := [{ Section: Section, Key: Key, Value: Value }]
+		Bundle := _ConfigWriteTerminalTryAcquire([Path])
+		Assert(Bundle is Object)
+		Written := Kind == "info" ? _LLM_Menu_InfoBarWrite(Expected, Path, Updates)
+			: Kind == "indent" ? _LLM_Menu_IndentWrite(Expected, Path, Updates)
+			: _LLM_Menu_PrivacyWrite(Expected, "disable_url_bars", Path, Updates)
+		AssertTrue(Written, "the actual narrow default must acknowledge semantic publication")
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
+		AssertEqual(42, Document["private"]["future"])
+		AssertTrue(TOML_SameValue(Value, Document["llm"][Kind == "privacy" ? "trigger" : "display"][Key]))
+		Assert(InStr(FSReadUtf8Exact(Path), "[private]`nfuture = 42`n"), "the foreign physical record remains byte-exact")
+	} finally {
+		try {
+			if Bundle is Object
+				Assert(_ConfigWriteTerminalRelease(Bundle))
+		} finally {
+			_LLM_Engine := PreviousEngine
+			_LMT_RestoreFixture(Previous)
+		}
+	}
+}
+Test("LLM narrow semantic default: Info Bar preserves dotted schema and foreign bytes", _LMT_NarrowSemanticDefault.Bind("info"))
+Test("LLM narrow semantic default: indentation preserves dotted schema and foreign bytes", _LMT_NarrowSemanticDefault.Bind("indent"))
+Test("LLM narrow semantic default: privacy preserves dotted schema and foreign bytes", _LMT_NarrowSemanticDefault.Bind("privacy"))

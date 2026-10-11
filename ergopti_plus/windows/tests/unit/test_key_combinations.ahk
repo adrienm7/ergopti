@@ -451,7 +451,11 @@ Test("key combinations: the first key's own tap is cancelled, once (key-combinat
 ; ====================================
 
 _KCT_SlotsAreWrittenToTheConfiguration() {
+	global ConfigurationFile
+	SavedConfigurationFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
 	Fixture := _ScopeOwnerFixture()
+	; The real picker writes the selected configuration, not a generic data file.
+	ConfigurationFile := Fixture.path
 	Reloads := []
 	Reload := () => (Reloads.Push("reload"), true)
 	Section() {
@@ -468,8 +472,8 @@ _KCT_SlotsAreWrittenToTheConfiguration() {
 			"a hold the picker does not offer is refused")
 		AssertThrows(() => SetKeyCombinationHold("left_alt_then_left_alt", "ctrl", Fixture.path, Reload),
 			"a pair of one key twice is refused")
-		Assert(FSWriteDurable(Fixture.path, '[shortcuts.key_combination_taps]`nspace_then_enter = "caps_word"`n'
-			. 'left_alt_then_caps_lock = "caps_lock"`n[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`n'))
+		Assert(FSWriteDurable(Fixture.path, _CMJFixtureCurrentSource('[shortcuts.key_combination_taps]`nspace_then_enter = "caps_word"`n'
+			. 'left_alt_then_caps_lock = "caps_lock"`n[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`n')))
 		AssertTrue(ClearKeyCombination("space_then_enter", Fixture.path, Reload))
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		Taps := Parsed.Has("shortcuts.key_combination_taps") ? Parsed["shortcuts.key_combination_taps"] : Map()
@@ -480,7 +484,10 @@ _KCT_SlotsAreWrittenToTheConfiguration() {
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		Taps := Parsed.Has("shortcuts.key_combination_taps") ? Parsed["shortcuts.key_combination_taps"] : Map()
 		AssertFalse(Taps.Has("left_alt_then_caps_lock"), "a declared pair goes back to its empty default")
-	} finally _ScopeOwnerCleanup(Fixture)
+	} finally {
+		ConfigurationFile := IsSet(SavedConfigurationFile) ? SavedConfigurationFile : unset
+		_ScopeOwnerCleanup(Fixture)
+	}
 }
 Test("key combinations: the slots are written to config.toml and reload the driver (key-combinations-2026-10-01)",
 	_KCT_SlotsAreWrittenToTheConfiguration)
@@ -709,12 +716,13 @@ _KCT_RegisterPairClearAvailability()
 ; Fresh disk slots deliberately differ from the runtime maps in the fixture.
 _KCT_GroupScope(Mode) {
 	global _MenuDispatchCallbacks
-	Fixture := _ScopeOwnerFixture()
 	Source := '[shortcuts.key_combination_taps]`nleft_alt_then_caps_lock = "open_url"`nspace_then_enter = "caps_word"`nfuture_pair = "keep"`n'
 		. '[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`nfuture_pair = "keep"`n'
 		. '[shortcuts.keyboard]`nwin_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
 		. '[action_parameters]`ncombination__left_alt_then_caps_lock__open_url = "https://pair.test"`n'
 		. 'combination__future_pair__open_url = "keep"`nkeyboard__win_b__open_url = "keep"`n'
+	Fixture := _ScopeOwnerFixture(Source)
+	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {

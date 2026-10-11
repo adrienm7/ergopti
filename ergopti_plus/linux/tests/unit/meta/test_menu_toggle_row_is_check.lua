@@ -68,8 +68,9 @@ end
 --- @param key string Menu key.
 --- @param toggle table The toggle row.
 --- @param state boolean What every checked_when getter answers.
+--- @param ready boolean|nil Explicit AI action availability, true by default.
 --- @return table rendered, function command
-local function render(key, toggle, state)
+local function render(key, toggle, state, ready)
 	package.loaded["menu.renderer"] = nil
 	local R = require("menu.renderer").new({
 		platform      = PLATFORM,
@@ -79,7 +80,12 @@ local function render(key, toggle, state)
 		logger        = helpers.make_logger_stub(),
 	})
 	local command = function() end
-	local answer = setmetatable({}, { __index = function() return function() return state end end })
+	local answer = setmetatable({}, { __index = function(_, name)
+		return function()
+			if name == "llm_toggle_ready" then return ready ~= false end
+			return state
+		end
+	end })
 	local rows = R.build(key, key,
 		setmetatable({}, { __index = function() return function() end end }),
 		setmetatable({}, { __index = function() return function() return { items = {} } end end }),
@@ -125,6 +131,18 @@ helpers.describe("menu: a category toggle is a checkbox with one label (linux)",
 			count = count + 1
 		end
 		helpers.assert_true(count >= #EXPECTED_MENUS, "the check must render every Linux toggle, rendered " .. count)
+	end)
+
+	helpers.it("an unavailable AI toggle keeps its checked state and explicit reason without a callback", function()
+		local toggle = linux_toggles(manifest_root()).llm_menu
+		helpers.assert_eq(toggle.disabled_reason_key, "menu.llm.save_unavailable")
+		for _, state in ipairs({ true, false }) do
+			local rows = render("llm_menu", toggle, state, false)
+			helpers.assert_eq(rows[1].title, toggle.i18n .. " — " .. toggle.disabled_reason_key)
+			helpers.assert_eq(rows[1].checked, state)
+			helpers.assert_eq(rows[1].disabled, true)
+			helpers.assert_nil(rows[1].fn, "a refused row cannot retain a native callback")
+		end
 	end)
 
 end)

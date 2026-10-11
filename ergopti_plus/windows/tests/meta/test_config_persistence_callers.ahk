@@ -106,7 +106,7 @@ _CPC_IndentWriterReturnsItsNativeStatus() {
 	Lines := StrSplit(Body, "`n", "`r")
 	Calls := 0
 	for Index, Line in Lines {
-		if !InStr(Line, "TOML_BatchWrite(")
+		if !InStr(Line, "TOML_ConfigBatchWrite(")
 			continue
 		Calls += 1
 		Assert(_CPC_LineConsumesResult(Lines, Index), "the indentation writer must return its native ACK")
@@ -152,14 +152,18 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 		Assert(_CPC_LineConsumesResult(Lines, Index),
 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
 	}
-	; The complete parent inventory is 37: 28 public and 9 internal calls.
-	; SaveFullConfig now consumes its retained-source private writer result;
-	; that same production site moves to 27 public + 10 internal calls, still 37.
+	; The audited complete inventory is 40: 32 public and 8 internal lines.
+	; Two narrow captured-source writers now share the semantic public
+	; gateway; the complete scan still consumes every native result.
 	; Build-mode results are qualified maps; write-mode results are native ACKs.
 	; The independent private-call guard and full-snapshot source audit below
 	; retain the exact source/presence and strict Integer-1 receipt boundaries.
+	; The admitted recovery owner expands one former ternary line into two
+	; guarded/default pairs. All four lines retain the same strict Written
+	; acknowledgement, independently audited by the native-ternary controls.
+	; This is three additional counted lines, not three new writer owners.
 	; No production caller disappears when this source-bound gateway moves.
-	AssertEqual(37, Calls,
+	AssertEqual(40, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -174,11 +178,11 @@ _CPC_PrivacyPublisherRetainsSourceAndStrictResult() {
 	Lines := StrSplit(Writer, "`n", "`r")
 	Calls := 0
 	for Index, Line in Lines {
-		if !InStr(Line, "_TOML_BatchWriteImpl(")
+		if !InStr(Line, "TOML_ConfigBatchWrite(")
 			continue
 		Calls += 1
 		Assert(_CPC_LineConsumesResult(Lines, Index), "privacy publication must return its native ACK")
-		Assert(InStr(Line, 'Path, Owned, [], "write", Content, 1') > 0,
+		Assert(InStr(Line, 'Path, Owned, [], 0, Content, 1') > 0,
 			"the native publisher must receive only the owned leaf and retained source")
 		Discarded := Lines.Clone()
 		Discarded[Index] := StrReplace(Line, "return ", "")
@@ -187,10 +191,10 @@ _CPC_PrivacyPublisherRetainsSourceAndStrictResult() {
 		Assigned[Index] := StrReplace(Line, "return ", "Ignored := ")
 		AssertFalse(_CPC_LineConsumesResult(Assigned, Index), "an untested privacy ACK must fail")
 	}
-	AssertEqual(1, Calls, "one independently audited privacy publisher joins the private census")
+	AssertEqual(1, Calls, "one independently audited privacy publisher reaches the canonical semantic gateway")
 	ReadPos := InStr(Writer, "Content := FSReadUtf8Exact(Path)")
 	SourcePos := InStr(Writer, "_LLM_Menu_EnableReadSource()",, ReadPos)
-	PublishPos := InStr(Writer, 'return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)')
+	PublishPos := InStr(Writer, 'return TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)')
 	Assert(ReadPos > 0 && SourcePos > ReadPos && PublishPos > SourcePos,
 		"the privacy publisher revalidates the retained image after the final native read")
 	Assert(InStr(Writer, "return WriterFn.Call(Path, Owned, Content, 1)") > 0,
@@ -225,14 +229,16 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; cleanup add three consumers, independently audited in the semantic cohort.
 	; Scoped build admission adds one qualified-map consumer, audited separately
 	; against its captured source, finalizer and status-before-target chain.
-	AssertEqual(10, Calls, "audit every internal publisher before changing its complete inventory")
+	; Info Bar and privacy now delegate their retained source to the public
+	; semantic gateway; their two former private calls are audited above/below.
+	AssertEqual(8, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
 	Assert(Writer != "" && Action != "" && Command != "", "all source, transaction and result owners must exist")
 	ReadPos := InStr(Writer, "Content := FSReadUtf8Exact(Path)")
 	SourcePos := InStr(Writer, "_LLM_Menu_EnableReadSource()",, ReadPos)
-	PublishPos := InStr(Writer, 'return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)')
+	PublishPos := InStr(Writer, 'return TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)')
 	Assert(ReadPos > 0 && SourcePos > ReadPos && PublishPos > SourcePos,
 		"the actual native writer binds the canonical publisher to its revalidated source image")
 	Assert(InStr(Action, "return LLM_Menu_CommitMutation(") > 0
@@ -490,7 +496,10 @@ _CPC_SemanticConfigPublishersRetainSource() {
 		&& InStr(Build, "return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)") > 0,
 		"semantic preparation retains its exact source through final admission")
 	Assert(InStr(Publish,
-		'return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)') > 0,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write",') > 0
+		&& InStr(Publish, "ProvidedContent?, ProvidedPresence?, true, NativeAdmission)") > 0
+		&& InStr(Publish, "_ConfigWriteLeaseOwns(Owner, Path)") > 0
+		&& InStr(Publish, "_FSNativeAdmissionAccepted(AdmissionFn)") > 0,
 		"semantic publication retains the canonical writer result and its fresh source owner")
 	ReadPos := InStr(Cleanup, "Source := FSReadUtf8Exact(FilePath)")
 	OwnPos := InStr(Cleanup, "SourceImage := Source",, ReadPos)
@@ -682,10 +691,10 @@ _CPC_FullSnapshotSourceChain(Body) {
 		'm)^[ \t]*Updates := _ConfigPrepareTypedUpdates\(Updates\)',
 		'm)^[ \t]*if HasMethod\(WriterFn, "Call"\)[ \t]*\n[ \t]*Written := WriterFn\.Call\(BoundPath, Updates\)',
 		'm)^[ \t]*Written := _TOML_BatchWriteImpl\(BoundPath, Updates, \[\], "write",[ \t]*\n[ \t]*SourceImage\["source_content"\], SourceImage\["source_present"\], true\)',
-		'm)^[ \t]*if \(\(Written is Integer\) && Written == 1\)',
-		'm)^[ \t]*_ConfigFullSaveAcknowledge\(TargetGeneration\)'
+		'm)^[ \t]*if \(\(Written is Integer\) && Written == 1\)[ \t]*\n[ \t]*Result := CONFIG_SAVE_OK[ \t]*\n[ \t]*else[ \t]*\n[ \t]*Result := CONFIG_SAVE_FAILED',
+		'm)^[ \t]*if \(Result = CONFIG_SAVE_OK\) && !_ConfigFullSaveAcknowledge\(TargetGeneration\)[ \t]*\n[ \t]*Result := CONFIG_SAVE_FAILED'
 	]
-	Tokens := ["SourceImage", "if", "SourceImage", "if", "ObsoleteSource", "Updates", "Updates", "if", "Updates", "if", "Written", "if", "_ConfigFullSaveAcknowledge"]
+	Tokens := ["SourceImage", "if", "SourceImage", "if", "ObsoleteSource", "Updates", "Updates", "if", "Updates", "if", "Written", "if", "if"]
 	Code := _DriverMaskNonCode(&Body)
 	Cursor := 1
 	for Index, Pattern in Patterns {
@@ -744,6 +753,15 @@ _CPC_FullSnapshotRetainsSourcePolicyAndStrictAck() {
 		"a suffix-sharing output name cannot authorize the actual Written acknowledgment")
 	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full, "SourceImage := TOML_BuildConfigUpdatedContent(", "UnrelatedSourceImage := TOML_BuildConfigUpdatedContent(")),
 		"a suffix-sharing source variable cannot lend its unrelated capture")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full,
+		"!_ConfigFullSaveAcknowledge(TargetGeneration)", "true")),
+		"a successful write cannot silently omit its generation acknowledgement")
+	Ack := "if (Result = CONFIG_SAVE_OK) && !_ConfigFullSaveAcknowledge(TargetGeneration)"
+	Assert(InStr(Full, Ack, true) > 0, "the failed-ack mutation must own the actual final acknowledgement")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full,
+		Ack . "`n`t`t`t`t`t`tResult := CONFIG_SAVE_FAILED",
+		Ack . "`n`t`t`t`t`t`tResult := CONFIG_SAVE_OK", true)),
+		"generation acknowledgement refusal cannot be promoted back into a successful save")
 
 }
 Test("AHK-15-persistence: actual full snapshot retains shared source policy and exact native ACK", _CPC_FullSnapshotRetainsSourcePolicyAndStrictAck)

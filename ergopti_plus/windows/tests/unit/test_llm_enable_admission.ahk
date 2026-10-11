@@ -62,7 +62,7 @@ _LEA_Write(State, Path, Updates) {
 	State["writes"] += 1
 	State["enabled_at_write"] := _LLM_Menu["enabled"]
 	State["lease_at_write"] := _ConfigWriteTerminalIsActive()
-	return State["writer_ack"] ? TOML_BatchWrite(Path, Updates) : false
+	return State["writer_ack"] ? TOML_ConfigBatchWrite(Path, Updates) : false
 }
 
 _LEA_Apply(State, *) {
@@ -98,7 +98,12 @@ _LEA_WithFixture(Body) {
 		. "_" . A_TickCount . "_" . Random(1, 1000000) . ".toml"
 	try {
 		ConfigurationFile := Path
-		AssertTrue(FSWrite(Path, '[llm]`nenabled = false`n`n[foreign]`nvalue = "keep"`n'))
+		EnableSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n`n[foreign]`nvalue = "keep"`n')
+		AssertTrue(FSWrite(Path, EnableSource))
+		EnableBoot := ConfigMigrateBoot(Path)
+		AssertEqual("current", EnableBoot["status"], "the selected source owns its native boot admission")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, EnableSource), "admission preserves the authored source")
 		LLM_OLLAMA_BASE_URL := "http://127.0.0.1:18148"
 		_LLM_Menu_EnableAdmission := 0
 		_LLM_AuxOwners := Map()
@@ -177,6 +182,55 @@ _LEA_ConfirmedEnableCase() {
 	_LEA_WithFixture(_LEA_ConfirmedEnable)
 }
 Test("AI enable admission: actual tray toggle publishes only after owned version and persistence", _LEA_ConfirmedEnableCase)
+
+_LEA_DefaultWriterApply(State, *) {
+	global ConfigurationFile
+	_LEA_Apply(State)
+	State["lease_at_default_apply"] := _ConfigWriteTerminalIsActive()
+		&& _ConfigWriteLeaseOwns(_ConfigWriteLeaseCurrent(ConfigurationFile), ConfigurationFile)
+	State["schema_at_default_apply"] := ConfigSchemaCanPrepareWrite(ConfigurationFile)
+	State["document_at_default_apply"] := TOML_ParseDocument(State["disk_at_apply"])
+	return true
+}
+
+_LEA_ConfirmedDefaultWriter(State) {
+	global _LLM_Menu, ConfigurationFile, _LLM_Menu_EnableAdmission
+	; Omitting the writer port exercises production persistence without interception.
+	State["port"].Delete("writer")
+	State["port"]["apply"] := _LEA_DefaultWriterApply.Bind(State)
+	AssertFalse(State["port"].Has("writer"))
+	AssertTrue(LLM_Menu_OnToggle(State["port"]), "the actual toggle retains the inert owned probe")
+	AssertEqual(1, State["probes"])
+	AssertEqual(0, State["writes"], "no recording writer can acknowledge the default path")
+	AssertEqual(0, State["applies"])
+	AssertFalse(_LLM_Menu["enabled"], "native version readiness must precede durable consent")
+	AssertContains(FSReadStrict(ConfigurationFile), "enabled = false")
+	_LEA_Answer(State, Map("ok", true, "status", 200, "body", '{"version":"0.12.3"}'))
+	AssertEqual(1, State["applies"], "the genuine default writer must acknowledge before application")
+	AssertEqual(0, State["writes"], "the recording persistence port remains absent")
+	AssertTrue(State["enabled_at_apply"])
+	AssertTrue(State["lease_at_default_apply"], "the actual config lease still owns application")
+	AssertTrue(State["schema_at_default_apply"], "the published source retains genuine current schema admission")
+	Document := State["document_at_default_apply"]
+	AssertTrue(Document["llm"]["enabled"] is TOML_Bool)
+	AssertTrue(Document["llm"]["enabled"].Value, "the actual default writer durably enabled AI")
+	AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
+	AssertEqual("keep", Document["foreign"]["value"])
+	AssertContains(State["disk_at_apply"], 'value = "keep"', "unowned physical settings survive enable")
+	AssertFalse(LLM_AuxIsCurrent(State["owner"]))
+	AssertEqual(0, _LLM_Menu_EnableAdmission)
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the acknowledged transaction releases its owned barrier")
+	Committed := FSReadUtf8Exact(ConfigurationFile)
+	_LEA_Answer(State, Map("ok", true, "status", 200, "body", '{"version":"late"}'))
+	AssertEqual(1, State["applies"], "a duplicate answer cannot apply the default transaction again")
+	AssertEqual(0, State["writes"])
+	AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Committed), "a duplicate answer changes no durable bytes")
+}
+
+_LEA_ConfirmedDefaultWriterCase() {
+	_LEA_WithFixture(_LEA_ConfirmedDefaultWriter)
+}
+Test("AI enable admission: genuine default writer preserves semantic source before one application", _LEA_ConfirmedDefaultWriterCase)
 
 _LEA_RefusedReceipt(State, Receipt) {
 	global _LLM_Menu, ConfigurationFile

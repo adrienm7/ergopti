@@ -14,8 +14,9 @@
 ;   KS_IsUp(keyName)   → KS_IsUp(KeyName)
 ;
 ; PHYSICAL MODE:
-; Both functions use the "P" (physical) mode of GetKeyState exclusively.
-; Logical/toggle state (CapsLock LED, NumLock) is out of scope for this adapter.
+; Both port functions use the "P" (physical) mode exclusively. The separate
+; Windows-local startup observation reads the native CapsLock toggle; it
+; does not extend the cross-platform physical KeyState contract.
 ;
 ; FAIL-SAFE:
 ; GetKeyState is wrapped in try/catch. An unknown key name or any AHK error
@@ -53,6 +54,14 @@ KS_IsUp(KeyName) {
 	} catch {
 		return 1
 	}
+}
+
+; Captures native CapsLock intent once before callbacks can write the LED.
+; This Windows-local observation has no include-position globals and keeps
+; native read failures visible; physical key state is a different contract.
+; @return {Boolean} The native toggle state; throws when observation fails.
+KS_CapsLockToggleState() {
+	return GetKeyState("CapsLock", "T") ? true : false
 }
 
 ; Returns the wrap-safe tick epoch of the most recent physical keyboard or
