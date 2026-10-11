@@ -362,6 +362,12 @@ const OPENS_SUBMENU = {
 	},
 	extensions_shortcuts: [
 		{
+			menu: 'shortcut_extension_result_frame',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_shortcuts.ahk' }
+		},
+		{
 			menu: 'shortcut_extension_boundary',
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
