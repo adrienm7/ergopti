@@ -1801,11 +1801,15 @@ Test("shared-personal-file-caption: original literal domain, real shared mutatio
 ; The actual unavailable-file producer retains its physical source and late read order.
 _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 	global _SharedDir, _FmtCountCache
+	global _ParseExtTomlSectionsCache, _TomlFileCache, _TomlUnreadableFiles
 	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
 	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\windows_personal_file_parent_caption_original.json", "UTF-8"))
 	Root := _MR_GetManifestRoot(), Key := "hotstring_personal_file_caption", Original := Root[Key]
 	SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
+	SavedSectionsCache := IsSet(_ParseExtTomlSectionsCache) ? _ParseExtTomlSectionsCache : unset
+	SavedFileCache := IsSet(_TomlFileCache) ? _TomlFileCache : unset
+	SavedUnreadableCache := IsSet(_TomlUnreadableFiles) ? _TomlUnreadableFiles : unset
 	Directory := A_Temp . "\ergopti-caption-" . A_TickCount . "-" . Random(10000, 99999)
 	DirectoryOwned := false, Menus := [], HadPrimary := false, CleanupFailures := []
 	StemReads := 0, CountReads := 0, ChildObserved := false, ForeignReads := 0
@@ -1851,6 +1855,18 @@ _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 		global _FmtCountCache
 		_FmtCountCache := IsSet(SavedCounts) ? SavedCounts : unset
 	}
+	RestoreSectionsCache(*) {
+		global _ParseExtTomlSectionsCache
+		_ParseExtTomlSectionsCache := IsSet(SavedSectionsCache) ? SavedSectionsCache : unset
+	}
+	RestoreFileCache(*) {
+		global _TomlFileCache
+		_TomlFileCache := IsSet(SavedFileCache) ? SavedFileCache : unset
+	}
+	RestoreUnreadableCache(*) {
+		global _TomlUnreadableFiles
+		_TomlUnreadableFiles := IsSet(SavedUnreadableCache) ? SavedUnreadableCache : unset
+	}
 	DeleteDirectory(*) {
 		if DirectoryOwned && DirExist(Directory)
 			DirDelete(Directory, true)
@@ -1861,6 +1877,8 @@ _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 			CleanupFailures.Push(Map("owner", Owner, "failure", Failure))
 	}
 	try {
+		; The headless host omits tray startup; own every cache used by the real parser.
+		_ParseExtTomlSectionsCache := Map(), _TomlFileCache := Map(), _TomlUnreadableFiles := Map()
 		AssertFalse(DirExist(Directory), "fresh physical fixture directory has no foreign owner")
 		DirectoryOwned := true
 		DirCreate(Directory)
@@ -1949,6 +1967,9 @@ _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 		Attempt("exact_original_observer_descriptors", RepairPoison)
 		Attempt("policy", (*) => Root[Key] := Original)
 		Attempt("count_cache", RestoreCounts)
+		Attempt("sections_cache", RestoreSectionsCache)
+		Attempt("file_cache", RestoreFileCache)
+		Attempt("unreadable_cache", RestoreUnreadableCache)
 		for Native in Menus {
 			Attempt("exact_owned_menu", _HS_PersonalReleaseMenus.Bind([Native]))
 			Attempt("exact_owned_prune", MenuDispatcher_PruneMenu.Bind(Native))
