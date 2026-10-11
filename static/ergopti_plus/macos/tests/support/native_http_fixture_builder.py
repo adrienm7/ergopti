@@ -181,6 +181,22 @@ class OwnedFixtureBuild:
             if now >= deadline:
                 raise BuildRefused("Native fixture build startup deadline exhausted")
             deadline = min(deadline, now + timeout)
+        observer = getattr(self, "passive_command_receiver", None)
+        if observer is not None:
+            if arguments[:2] == ["/usr/bin/xcrun", "swiftc"]:
+                role = "compile"
+            elif arguments[:-1] == ["/usr/bin/codesign", "--force", "--sign", "-"]:
+                role = "sign"
+            elif arguments[:-1] == ["/usr/bin/codesign", "--verify", "--strict"]:
+                role = "strict_verify"
+            else:
+                raise BuildRefused("Native fixture passive command role refused")
+            return self.fixture._command(
+                arguments,
+                timeout=timeout,
+                deadline=deadline,
+                passive_receiving=lambda fact: observer(role, fact),
+            )
         return self.fixture._command(arguments, timeout=timeout, deadline=deadline)
 
     def _verify_sources(self):

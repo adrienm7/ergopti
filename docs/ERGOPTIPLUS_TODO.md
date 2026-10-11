@@ -6988,6 +6988,45 @@ Root releases only the four stale PAC recipe predicates; all other PAC checks,
 SourcePAC10/402 and the independent native14 corpus remain exact. The final
 selected gate and genuine native clients/signing/trust are still required.
 
+2026-10-11 published builder qualification and clock-evidence continuation.
+Commit4dd97e10 physically passes format382, JS410 and Hammerspoon18599/zero
+failures across1571 modules; all19 owned source/HEAD/index fences and published
+blob joins match. The original failed gate remains separately retained.
+The clock successor preserves original143 bodies and adds13 independently
+authored frame/context cases; physical156 passes. A fixed diagnostic-only Swift
+role emits16 system-uptime samples through the same signed recipe and original
+command owner. Its actual Darwin compile and Python/Foundation calibration
+remain unexecuted. Factory45 is held; numerical observations cannot activate it.
+
+Optional passive observation occurs only after the same original owner's strong
+ACK and capture closure. Compilation/signing/verification retain60/15/15 budgets;
+the observer adds no query, child, clock or retirement authority. New passive21
+and independent receiver32 controls pass; six deliberate omissions fail their
+intended assertions. The collector joins original raw frame/image/receipt bytes,
+19 source inputs, staged recipe, separate clean Git snapshots and a private
+isolated Python cache context. Metadata consistency never authenticates caller
+JSON or proves kernel executable identity. Its reviewed two-step workflow input
+fixture is prospective; the actual shared workflow remains unchanged and held
+pending peer custody/rebase and genuine native receiving. All73 original helper
+bodies and five literal inverses are received. The first composed canonical gate
+is retained red: format384 passes, JS407 passes/three fail and Hammerspoon18599
+passes/zero fail across1571 modules; all19 source/index/HEAD fences match.
+Independent correction receiving preserves every32 assertion while replacing
+only two bare Bash expressions with the existing resolver and making Windows
+POSIX deferral explicit. A genuine direct runner entry is adopted after the
+other owner's terminal gate and explicit handoff; every previous row is retained. Both original143 and passive21 default/`-B` controls produce none
+of the five retained platform caches. Actual five unchanged legacy diagnostic
+scripts pass226 combined cases and reproduce exactly those files with default
+imports, versus none with `-B`. Cloud activation now exports the no-bytecode
+setting through Node children; installation/startup draft revision6 is saved,
+not published or restored in a fresh task. The second selected gate retains
+format384, JS410 passes/one missing-alias failure and Hammerspoon18599 passes
+with zero failures; all26 source/index/HEAD fences match. Owner custody6111341548
+releases only the missing canonical npm alias and matching reproduction command.
+Its proportional correction gate, both native architectures, actual trust/restore, PAC14/SDK49, E2E/package/install,
+ordinary consent/Brew6 and managed-network/device acceptance remain required.
+Items36/62 and16/38 remain open;22 stays excluded.
+
 2026-10-11 integrated component receiving. Exact2e4d manual38106361453
 actually passes SDK49, daily7, logger42 and sourcePAC10 on both architectures.
 Both PAC14 runs have12 passes and two failures. Fresh cold MLX/official Ollama

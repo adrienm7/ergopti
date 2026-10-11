@@ -1,0 +1,42 @@
+{
+	"qualification": "PARENT_SOURCE_RECEIVING_ONLY_NODE24_PRIOR_PORTABLE_NOT_NODE22_OR_NATIVE",
+	"capsule_sha256": "31f2b43b910be077f4301da6c6a79eb9d7a3fe55918325b41dc301aa88db5efb",
+	"members": 21,
+	"inventory_join": true,
+	"whole_literal_inverse": true,
+	"actual_live_preimage": "a3453fd17f18fbff119ea58be2f42e6fb48685c3b4e17aeab16b3d6001ab1189",
+	"candidate": "da75ea6e72178fe06862c7b6bb503e44bb6353a486325dfa83ce25351a23ab33",
+	"native_credit": false,
+	"packet": "native-clock-canonical-correction-portable-proposal.tar.gz",
+	"previous_node_runtime": "24.19.0",
+	"current_node22_replay": "32_PASS_0_FAILURE_0_ERROR_0_SKIP",
+	"actual_windows": "UNRUN",
+	"canonical_gate": "PENDING",
+	"shared_runner": "ADOPTED_SINGLE_CHECKS_OBJECT_AFTER_G3_TERMINAL_HANDOFF_6111144663",
+	"cache_cause": "ACTUAL_COMMITTED_FIVE_LEGACY_LOADER_CONTROLS_226_PASS_DEFAULT_WRITES_FIVE_B_WRITES_NONE",
+	"setup_draft": "REVISION6_INSTALL_AND_START_ONLY_SAVED_NOT_PUBLISHED",
+	"node22_source_sha256": "da75ea6e72178fe06862c7b6bb503e44bb6353a486325dfa83ce25351a23ab33",
+	"focused_records": [
+		{
+			"name": "clock32-node22",
+			"exit": 0,
+			"seconds": 17.739,
+			"log_sha256": "ac7351366a462cb27587111214468281817e33740d40d750c88485214973f6a4",
+			"native": false
+		},
+		{
+			"name": "bash-resolution-corrected",
+			"exit": 0,
+			"seconds": 0.087,
+			"log_sha256": "a0ab02d87cba55a865fd95df1e6d1000743a65e23e3224d96bc5bbee74b9cd29",
+			"native": false
+		},
+		{
+			"name": "false-green-scan",
+			"exit": 0,
+			"seconds": 1.73,
+			"log_sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"native": false
+		}
+	]
+}

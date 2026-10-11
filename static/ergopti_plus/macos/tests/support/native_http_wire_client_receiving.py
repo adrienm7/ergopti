@@ -8,6 +8,9 @@ ad-hoc signing and exact launcher device/inode bind the real receiving child.
 import hashlib
 import importlib.util
 import json
+import math
+import re
+import time
 import os
 from pathlib import Path
 import shutil
@@ -198,6 +201,334 @@ class WorkerStageReceipt:
             self.name_pending = False
 
 
+class NativeClockRefused(RuntimeError):
+    pass
+
+
+def native_clock_frame(raw, before, after):
+    # Compare every actual sample; never infer a shared epoch from the endpoints.
+    def finite_number(value):
+        if type(value) not in (int, float):
+            return False
+        try:
+            return math.isfinite(value)
+        except OverflowError:
+            return False
+
+    if (
+        type(raw) is not bytes
+        or not 1 <= len(raw) <= 4096
+        or not raw.endswith(b"\n")
+        or raw.count(b"\n") != 1
+        or not finite_number(before)
+        or not finite_number(after)
+        or not 0 < before <= after
+        or after - before > 15
+    ):
+        raise NativeClockRefused("Native clock frame refused")
+
+    def unique(pairs):
+        if len({key for key, _ in pairs}) != len(pairs):
+            raise NativeClockRefused("Native clock duplicate field refused")
+        return dict(pairs)
+
+    def nonfinite(value):
+        raise NativeClockRefused("Native clock nonfinite field refused")
+
+    try:
+        fields = json.loads(raw.decode("ascii"), object_pairs_hook=unique, parse_constant=nonfinite)
+    except (ValueError, UnicodeError) as refused:
+        raise NativeClockRefused("Native clock JSON refused") from refused
+    if (
+        type(fields) is not dict
+        or set(fields) != {"version", "system_uptime"}
+        or type(fields["version"]) is not int
+        or fields["version"] != 1
+        or type(fields["system_uptime"]) is not list
+        or len(fields["system_uptime"]) != 16
+    ):
+        raise NativeClockRefused("Native clock grammar refused")
+    samples = fields["system_uptime"]
+    for index, sample in enumerate(samples):
+        if (
+            not finite_number(sample)
+            or not before <= sample <= after
+            or (index > 0 and sample < samples[index - 1])
+        ):
+            raise NativeClockRefused("Native clock epoch/order refused")
+    return samples
+
+
+def native_clock_epoch(environment, architecture):
+    if architecture not in ("arm64", "amd64"):
+        raise NativeClockRefused("Native clock architecture context refused")
+    names = ("GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT")
+    values = [environment.get(name) for name in names]
+    # A local native run can receive numeric samples without claiming CI context.
+    if all(value is None for value in values):
+        return None
+    if (
+        any(type(value) is not str for value in values)
+        or re.fullmatch(r"[0-9a-f]{40}", values[0]) is None
+        or re.fullmatch(r"[1-9][0-9]{0,19}", values[1]) is None
+        or re.fullmatch(r"[1-9][0-9]{0,5}", values[2]) is None
+    ):
+        raise NativeClockRefused("Native clock run context refused")
+    return {
+        "candidate": values[0],
+        "run_id": values[1],
+        "run_attempt": values[2],
+        "architecture": architecture,
+        "provenance": "github_environment",
+    }
+
+
+def native_clock_python_loader(cache):
+    # Bounded pathname admission, not an atomic freshness or interpreter attestation.
+    cache = Path(cache)
+    if (
+        not cache.is_absolute()
+        or cache.resolve() != cache
+        or sys.pycache_prefix != str(cache)
+        or sys.flags.isolated != 1
+        or sys.flags.ignore_environment != 1
+        or sys.flags.no_user_site != 1
+        or sys.dont_write_bytecode is not True
+        or sys.flags.safe_path is not True
+    ):
+        raise NativeClockRefused("Native clock Python loader context refused")
+    before = cache.lstat()
+    if not stat.S_ISDIR(before.st_mode) or stat.S_IMODE(before.st_mode) != 0o700:
+        raise NativeClockRefused("Native clock private cache mode refused")
+    if any(cache.iterdir()):
+        raise NativeClockRefused("Native clock private cache contains bytecode")
+    after = cache.lstat()
+    if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+        raise NativeClockRefused("Native clock private cache replaced")
+    return {
+        "version": 1,
+        "isolated": 1,
+        "ignore_environment": 1,
+        "no_user_site": 1,
+        "dont_write_bytecode": True,
+        "safe_path": True,
+        "cache_empty": True,
+        "cache_device": before.st_dev,
+        "cache_inode": before.st_ino,
+    }
+
+
+class NativeClockEvidence:
+    """Passive exclusive file export; never another child or retirement owner."""
+
+    def __init__(self, destination):
+        self.root = Path(destination)
+        if not self.root.is_absolute() or self.root.parent.resolve() != self.root.parent:
+            raise NativeClockRefused("Native clock evidence parent refused")
+        self.root.mkdir(mode=0o700)
+        self.identity = self.root.lstat()
+        self.records = {}
+        self.refused = False
+        if stat.S_IMODE(self.identity.st_mode) != 0o700:
+            raise NativeClockRefused("Native clock evidence mode refused")
+
+    def _write(self, name, raw):
+        if (
+            name
+            not in {
+                "compile.json",
+                "sign.json",
+                "strict_verify.json",
+                "clock.json",
+                "clock-frame.bin",
+                "image.bin",
+                "source-receipt.json",
+                "clock-receipt.json",
+                "python-loader.json",
+            }
+            or type(raw) is not bytes
+            or len(raw) > 8_388_608
+        ):
+            raise NativeClockRefused("Native clock passive export refused")
+        directory = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            current = os.fstat(directory)
+            named = self.root.lstat()
+            if (
+                not stat.S_ISDIR(current.st_mode)
+                or (current.st_dev, current.st_ino) != (self.identity.st_dev, self.identity.st_ino)
+                or (named.st_dev, named.st_ino) != (current.st_dev, current.st_ino)
+                or stat.S_IMODE(current.st_mode) != 0o700
+            ):
+                raise NativeClockRefused("Native clock evidence root changed")
+            descriptor = os.open(
+                name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=directory,
+            )
+            try:
+                offset = 0
+                while offset < len(raw):
+                    written = os.write(descriptor, raw[offset:])
+                    if written <= 0:
+                        raise NativeClockRefused("Native clock evidence write refused")
+                    offset += written
+                acquired = os.fstat(descriptor)
+                if not stat.S_ISREG(acquired.st_mode) or acquired.st_nlink != 1:
+                    raise NativeClockRefused("Native clock evidence alias refused")
+            finally:
+                os.close(descriptor)
+            final = self.root.lstat()
+            if (final.st_dev, final.st_ino) != (current.st_dev, current.st_ino):
+                raise NativeClockRefused("Native clock evidence root replaced")
+        finally:
+            os.close(directory)
+
+    def command(self, role, fact):
+        # The command boundary performs bounded memory observation only. File
+        # export waits until the original clock's after reading and validation.
+        try:
+            if role not in ("compile", "sign", "strict_verify", "clock") or role in self.records:
+                raise NativeClockRefused("Native clock passive role refused")
+            received = dict(fact)
+            raw = received.pop("stdout")
+            if role == "clock" and (type(raw) is not bytes or len(raw) > 4096):
+                raise NativeClockRefused("Native clock raw frame exceeds bound")
+            self.records[role] = (received, raw if role == "clock" else None)
+        except BaseException:
+            self.refused = True
+            raise
+
+    def export(self, build, builder, raw, fact):
+        if self.refused or set(self.records) != {"compile", "sign", "strict_verify", "clock"}:
+            raise NativeClockRefused("Native clock passive records incomplete")
+        if self.records["clock"][1] != raw:
+            raise NativeClockRefused("Native clock raw frame changed")
+        if native_clock_python_loader(self.root.parent / "private-cache") != self.loader:
+            raise NativeClockRefused("Native clock private loader changed")
+        for role, (record, _) in self.records.items():
+            self._write(role + ".json", json.dumps(record, sort_keys=True).encode("ascii"))
+        self._write("clock-frame.bin", raw)
+        image = builder.regular_bytes(build.verify())[0]
+        receipt = builder.regular_bytes(build.receipt_path)[0]
+        if (
+            hashlib.sha256(image).hexdigest() != build.image_digest
+            or hashlib.sha256(receipt).hexdigest() != build.receipt_digest
+        ):
+            raise NativeClockRefused("Native clock original export changed")
+        # These are original bytes, not reconstructed receipts or executable copies.
+        self._write("image.bin", image)
+        self._write("source-receipt.json", receipt)
+        self._write("clock-receipt.json", json.dumps(fact, sort_keys=True).encode("ascii"))
+        build.verify()
+        self._write("python-loader.json", json.dumps(self.loader, sort_keys=True).encode("ascii"))
+
+
+def prepare_native_clock_evidence(build):
+    destination = os.environ.get("ERGOPTI_NATIVE_CLOCK_EVIDENCE")
+    if destination is None:
+        return
+    try:
+        sink = NativeClockEvidence(destination)
+        sink.loader = native_clock_python_loader(sink.root.parent / "private-cache")
+        build.passive_clock_evidence = sink
+        build.passive_command_receiver = sink.command
+    except BaseException as refused:
+        if not isinstance(refused, Exception) or (
+            type(refused) is wire.FixtureFailure and refused.args == ("Native fixture cancelled",)
+        ):
+            raise
+        # Original receiving proceeds. Missing evidence never means qualification.
+
+
+def export_native_clock_evidence(build, builder, raw, fact):
+    try:
+        sink = getattr(build, "passive_clock_evidence", None)
+        if sink is not None:
+            sink.export(build, builder, raw, fact)
+    except BaseException as refused:
+        if not isinstance(refused, Exception) or (
+            type(refused) is wire.FixtureFailure and refused.args == ("Native fixture cancelled",)
+        ):
+            raise
+
+
+def receive_native_clock(build, builder):
+    if sys.platform != "darwin" or not build.fixture.native or build.fixture.groups is None:
+        raise NativeClockRefused("Native clock requires the actual Darwin child owner")
+    executable = build.verify()
+    image, identity = builder.regular_bytes(executable)
+    architecture = {"arm64": "arm64", "x86_64": "amd64"}.get(os.uname().machine)
+    cpu = {"arm64": 0x0100000C, "amd64": 0x01000007}.get(architecture)
+    if (
+        len(image) < 32
+        or image[:4] != b"\xcf\xfa\xed\xfe"
+        or int.from_bytes(image[4:8], "little") != cpu
+    ):
+        raise NativeClockRefused("Native clock signed image architecture refused")
+    epoch = native_clock_epoch(os.environ, architecture)
+    receiver, _ = builder.regular_bytes(Path(__file__))
+    receiver_digest = hashlib.sha256(receiver).hexdigest()
+    before = time.monotonic()
+    observer = getattr(build, "passive_command_receiver", None)
+    if observer is None:
+        status, raw = build.fixture._command(
+            [str(executable), "--fixture-clock-proof"], timeout=15, deadline=before + 15
+        )
+    else:
+        status, raw = build.fixture._command(
+            [str(executable), "--fixture-clock-proof"],
+            timeout=15,
+            deadline=before + 15,
+            passive_receiving=lambda fact: observer("clock", fact),
+        )
+    after = time.monotonic()
+    if type(status) is not int or status != 0:
+        raise NativeClockRefused("Native clock child refused")
+    samples = native_clock_frame(raw, before, after)
+    build.verify()
+    if hashlib.sha256(builder.regular_bytes(Path(__file__))[0]).hexdigest() != receiver_digest:
+        raise NativeClockRefused("Native clock receiver source changed")
+    if native_clock_epoch(os.environ, architecture) != epoch:
+        raise NativeClockRefused("Native clock run context changed")
+    fact = {
+        "version": 1,
+        "state": "observed",
+        "native_acceptance": "UNQUALIFIED_GIT_HEAD_CLEANLINESS_NOT_RECEIVED",
+        "git_head": None,
+        "tracked_clean_sources": None,
+        "epoch": epoch,
+        "context_bound": epoch is not None,
+        "python_before": before,
+        "python_after": after,
+        "system_uptime": samples,
+        "source_receipt_sha256": build.receipt_digest,
+        "source_hashes": dict(build.source_hashes),
+        "staged_hashes": dict(build.staged_hashes),
+        "receiver_sha256": receiver_digest,
+        "binary_sha256": build.image_digest,
+        "device": identity.st_dev,
+        "inode": identity.st_ino,
+        "architecture": architecture,
+        "signature": "existing_build_codesign_strict_verified_same_image",
+    }
+    encoded = json.dumps(fact, sort_keys=True)
+    if len(encoded.encode("ascii")) > 16_384:
+        raise NativeClockRefused("Native clock receipt bound refused")
+    export_native_clock_evidence(build, builder, raw, fact)
+    # This observation uses stderr; the worker stdout response ABI is unchanged.
+    # Technical publication refusal is optional, genuine cancellation propagates.
+    try:
+        print("# native_http_clock_proof " + encoded, file=sys.stderr, flush=True)
+    except BaseException as refused:
+        if not isinstance(refused, Exception) or (
+            type(refused) is wire.FixtureFailure and refused.args == ("Native fixture cancelled",)
+        ):
+            raise
+    return fact
+
+
 class RealNativeClientReceiving(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -222,7 +553,9 @@ class RealNativeClientReceiving(unittest.TestCase):
             build_spec.loader.exec_module(builder)
             cls.build = builder.OwnedFixtureBuild(cls.fixture)
             cls.root = cls.build.root
+            prepare_native_clock_evidence(cls.build)
             cls.build.build()
+            cls.clock_proof = receive_native_clock(cls.build, builder)
             cls.fixture.authorization_observation = True
             cls.app = cls.build.app
             cls.resources = cls.build.resources

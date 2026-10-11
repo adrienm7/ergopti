@@ -153,6 +153,7 @@ class WireFixture:
         merge_errors=False,
         security_failure_observation=False,
         trust_operation=None,
+        passive_receiving=None,
     ):
         phase = "setup"
         status = None
@@ -366,6 +367,86 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        # Optional receiving observes this same local owner only after its
+        # original literalTrue ACK and original three capture closures. It has
+        # no retirement authority and cannot pay debt or change a primary.
+        if passive_receiving is not None:
+            try:
+                if (
+                    group_settled is True
+                    and owned is not None
+                    and owned.reaped is True
+                    and not closure_refused
+                    and all(stream is not None and stream.closed is True for stream in streams)
+                    and not self.command_file_debt
+                    and not self.command_group_debt
+                ):
+                    receipt = owned.receipt()
+                    if (
+                        type(receipt) is not dict
+                        or set(receipt)
+                        != {
+                            "worker_pid",
+                            "group_id",
+                            "closed",
+                            "reservation_lost",
+                            "signals",
+                            "live_group_members",
+                            "escaped_sessions_managed",
+                        }
+                        or type(receipt["worker_pid"]) is not int
+                        or not 0 < receipt["worker_pid"] <= 2_147_483_647
+                        or receipt["worker_pid"] != owned.process.pid
+                        or type(receipt["group_id"]) is not int
+                        or receipt["group_id"] != receipt["worker_pid"]
+                        or any(
+                            type(receipt[key]) is not bool
+                            for key in (
+                                "closed",
+                                "reservation_lost",
+                                "escaped_sessions_managed",
+                            )
+                        )
+                        or type(receipt["signals"]) is not list
+                        or len(receipt["signals"]) > 2
+                        or any(
+                            type(value) is not int or value not in (15, 9)
+                            for value in receipt["signals"]
+                        )
+                        or type(receipt["live_group_members"]) is not list
+                        or receipt["live_group_members"]
+                    ):
+                        raise FixtureFailure("Native fixture passive receipt bound refused")
+                    receipt = {
+                        **receipt,
+                        "signals": list(receipt["signals"]),
+                        "live_group_members": [],
+                    }
+                    passive_receiving(
+                        {
+                            "version": 1,
+                            "command": dict(self.command_fact),
+                            "exit_status": owned.process.returncode,
+                            "original_failed": failure is not None,
+                            "literal_true_settlement": True,
+                            "stdin_closed": True,
+                            "stderr_closed": True,
+                            "stdout_closed": True,
+                            "command_group_debt": False,
+                            "command_file_debt": False,
+                            "owner": receipt,
+                            "stdout": result[1] if result is not None else None,
+                        }
+                    )
+            except BaseException as observation_failure:
+                if failure is None and (
+                    not isinstance(observation_failure, Exception)
+                    or (
+                        type(observation_failure) is FixtureFailure
+                        and observation_failure.args == ("Native fixture cancelled",)
+                    )
+                ):
+                    failure = observation_failure
         if trust_operation == "add":
             try:
                 if self.groups:
