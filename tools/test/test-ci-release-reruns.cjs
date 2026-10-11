@@ -1821,7 +1821,7 @@ check(
 			'set -euo pipefail\nnode tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null\nprintf published > unsigned-marker';
 		const env = {
 			GITHUB_ACTIONS: 'true',
-			GITHUB_REPOSITORY: REPOSITORY,
+			GITHUB_REPOSITORY: 'adrienm7/ergopti',
 			GITHUB_EVENT_NAME: 'push',
 			GITHUB_REF: 'refs/heads/main',
 			GITHUB_SHA: sha,
@@ -1847,6 +1847,51 @@ check(
 			'published',
 			'complete signed configuration retains full defaults'
 		);
+
+		const signing = require(path.join(work, 'tools/ci/windows-stable-signing.cjs'));
+		const context = require(
+			path.join(work, 'tools/ci/dev-release-qualification.cjs')
+		).environmentContext(env);
+		const assets = path.join(work, 'release-assets');
+		fs.mkdirSync(assets, { recursive: true });
+		const bytes = Buffer.from('owned unsigned publication fixture');
+		fs.writeFileSync(path.join(assets, 'ErgoptiPlus.exe'), bytes);
+		const hash = require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+		const evidence = signing.receipt(context, sha, sha, hash);
+		fs.writeFileSync(
+			path.join(assets, 'windows-signing-qualification.json'),
+			JSON.stringify(evidence)
+		);
+		const unsignedEnv = { ...env, ERGOPTI_WINDOWS_CREATE_RELEASE: 'true' };
+		fs.unlinkSync(marker);
+		const admitted = runScript(script, work, unsignedEnv);
+		assert.equal(admitted.status, 0, admitted.stdout + admitted.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'unsigned admission reaches publication'
+		);
+		fs.unlinkSync(marker);
+		const foreign = runScript(script, work, { ...unsignedEnv, GITHUB_REPOSITORY: REPOSITORY });
+		assert.notEqual(foreign.status, 0, 'another repository cannot borrow signature authorization');
+		assert.match(foreign.stderr, /not admitted/);
+		assert.equal(fs.existsSync(marker), false, 'repository refusal cannot reach publication');
+		const configured = runScript(script, work, {
+			...unsignedEnv,
+			ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'true'
+		});
+		assert.notEqual(configured.status, 0, 'configured signing cannot publish an unsigned receipt');
+		assert.match(configured.stderr, /not admitted/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'signed preference refusal cannot reach publication'
+		);
+		fs.writeFileSync(path.join(assets, 'ErgoptiPlus.exe'), 'tampered bytes');
+		const tampered = runScript(script, work, unsignedEnv);
+		assert.notEqual(tampered.status, 0);
+		assert.match(tampered.stderr, /not admitted/);
+		assert.equal(fs.existsSync(marker), false, 'digest refusal cannot reach publication');
 	}
 );
 
