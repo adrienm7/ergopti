@@ -4066,6 +4066,19 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-11 replacement-container receiving checkpoint. The official `5f7` archive
+ZIP/log and all 400 archive/403 SDK source pins are independently authenticated.
+Archive25 has 24 passes, one original Homebrew refusal and zero skips. The
+separate no-prompt SDK pass has OSStatus -600 and all qualification flags false.
+Final `first_permission_worker` retains `api-call-starting` after 256 history
+files and 92 omitted records. This qualifies ARM diagnostic retention, without
+proving API entry, blocking or consent. The 73 UI observations contain 67
+complete unrelated seven-node traversals and six missing discovery facts, with
+zero candidates/matches. The original prompt deadline remains primary; Brew6
+is unexecuted and package/install skipped. All 205 portable controls pass;
+source review establishes no causal consent repair. See the
+[cloud continuation](handovers/2026-10-11-group6-cloud/README.md). Item 36 stays open.
+
 2026-10-11 integrated permission-history correction. Exact manual38106361453
 on2e4d798e executes25 archive cases:24 pass, one Homebrew case fails, none
 skip. Sparkle wrong-key preservation, valid retry and relaunch pass; the separate
@@ -6854,6 +6867,23 @@ or physical-device acceptance.
 The macOS personal-hotstring section enable control now consumes its own shared check declaration before native composition. Existing 21-language captions, readiness flags, nil-return transport and genuine section callbacks remain owned by their original providers. Complete portable receiving passes 18/18 cases, retaining all nine original cases; the old and restored-old producers each pass 14/18 with the same four declaration/callback refusals failing. A genuine owner generation preserves startup output and adds only the section declaration; the independent AST/source controls pass 74 checks. Actual Cocoa, durable preferences, installed delivery and final joined-source CI remain required; item 54 stays partial.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-11 replacement-container receiving checkpoint. Original `5f7` PAC
+artifacts match official API hashes and each SourcePAC10 receipt's 402 Git pins.
+Both PAC14 cohorts have 12 passing/two failing methods, zero skips. WPAD's
+successful add precedes positive system-trust -1202/-9813; its own CA visibility
+is unobserved. Wire's certificate observation is its deliberate untrusted
+negative, then positive trust-add reaches the deadline. Independent HTTP's
+different CA is absent after timed-out add; admin authorization succeeds but
+restoration removal exits one with debt. These observations establish no
+causal trust-policy fix. Real Linux 262 streaming/48 API and portable 63 HTTP
+controls pass without Mac native credit. Inactive post-install70/timeout75
+preparations preserve every original63 method; matching canonical enrollment,
+composition review and Darwin qualification remain outstanding. Group1 handed
+off the bounded post-install fixture/test spans; registry/timeout coordination
+continues. Model, package/install, Windows-PC and enterprise acceptance remain
+required. See the
+[cloud continuation](handovers/2026-10-11-group6-cloud/README.md). Item 62 stays open.
 
 2026-10-11 integrated component receiving. Exact2e4d manual38106361453
 actually passes SDK49, daily7, logger42 and sourcePAC10 on both architectures.
