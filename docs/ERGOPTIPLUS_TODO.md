@@ -33,6 +33,25 @@ either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
 
 ### v1.0.1 integration receiving
 
+Latest receiving, October 11: `main` is `657bae0467` and
+[CI 38136018539](https://github.com/adrienm7/ergopti/actions/runs/38136018539)
+is still incomplete. The native Apple Silicon MLX bootstrap, Linux units,
+macOS stubbed units/E2E and native tooltip captures pass. Core has one failing
+pipeline-condition guard. Both managed Ollama architectures fail earlier
+PAC/WPAD and independent HTTP receiving; a private CA is untrusted and later
+security commands time out. The model itself has not been received. Passive
+security logs were incorrectly conditional on the later model step alone.
+These failures remain mandatory, with no new test exception or release claim.
+
+Dependabot PRs #91 and #92 were approved and rebase-merged, preserving their
+atomic history. After the corrective main push and rescan, GitHub reports zero
+open Dependabot alerts; all 34 original alerts have an explicit fixed timestamp.
+This does not close the separate 43 CodeQL findings tracked in item 144.
+The latest CodeQL analysis itself succeeded in all three language jobs.
+
+The following paragraphs retain earlier receiving checkpoints. They do not
+supersede this current state or establish completion of groups 2, 4 or 7.
+
 The isolated integration branch has received `dev` through `1e0556e802`.
 The merge retains both histories and the complete test union: 179 Homebrew
 controls and 55 native HTTP controls. `main` remains the published v1.0.0.
@@ -10811,22 +10830,6 @@ repository, event, ref, channel or expired context. Its exact authorized
 boundary is recorded in
 `.github/ci/stable_v101_macos_native_qualification_exception.json`.
 
-- [ ] Reconcile the two open Dependabot PRs against the current source: Python
-      [#92](https://github.com/adrienm7/ergopti/pull/92) and npm
-      [#91](https://github.com/adrienm7/ergopti/pull/91). The read-only October 11
-      inventory found both mergeable but 299 commits behind main, with historical
-      failed checks and no approving review. Preserve lockfile integrity, obtain
-      the required approval and receive their actual updated source. Neither PR
-      is recorded as merged here. Recheck default-branch Dependabot alerts after
-      integration rather than treating a PR merge as proof of resolution. The
-      snapshot has 34 open alerts; transformers
-      [#106](https://github.com/adrienm7/ergopti/security/dependabot/106) remains
-      without a patched version listed in its advisory. The official 5.10.1 source
-      proposed by Dependabot still downloads custom-generation code before
-      consent. Independent source inspection confirms that released 5.17.0
-      contains the upstream consent-before-download fix. Receive its explicit
-      project pin, generated lock and downgrade regressions; native MLX
-      installation and inference remain mandatory before release qualification.
 - [ ] Reconcile the maintainer's draft
       [#87](https://github.com/adrienm7/ergopti/pull/87) against current dev without
       replaying superseded native owners. Twelve commits are patch-equivalent;
@@ -10945,6 +10948,29 @@ The generated stable and dev Homebrew casks were published in tap commit
 `ba0fadd9af349eca1b5d1887e034f8bebd6d0092` with only the supported
 `depends_on macos: :big_sur` declaration changed. Published artifact versions,
 URLs and hashes were retained. Native Homebrew acceptance remains separate.
+
+- [ ] **144.** Resolve the current CodeQL findings with causal evidence.
+
+  The October 11 main-branch snapshot contains 43 open findings, distinct from
+  the now-resolved Dependabot alerts. Prioritize production rendering and text
+  parsing before test infrastructure. Preserve all original regression checks;
+  do not silence a query by changing only equivalent source spelling.
+  - Receive and publish the metrics date HTML escaping (#23), diagnostic
+    Markdown escaping (#36), keyboard parsing (#19, #20, #34), icon preview
+    text sink (#22), keylayout whitespace parser (#9), benchmark token
+    permissions (#8) and source-guard regex (#21) corrections.
+  - Qualify Lua fixture quoting (#44, #45, #51, #52), test regex construction
+    (#39, #41), shell argument boundaries (#46) and the Python TLS contexts
+    (#11–#18). Native trust and account experiments previously stopped remain
+    stopped; portable evidence does not qualify their execution.
+  - Review exact source-to-consumer evidence for the URL source ratchets
+    (#47–#50), local script extraction (#24–#30), structural comment removal
+    (#31–#33), Atom Markdown conversion (#35), canonical download URL (#37),
+    diagnostic string (#38), deliberate newline corruption (#40) and GitHub
+    masking command (#10). A proven false positive needs an explicit rationale;
+    a test-file label alone does not make a finding harmless.
+  - Confirm the resulting states with a fresh hosted CodeQL analysis of the
+    published source. No finding is recorded as closed by local tests alone.
 
 ## Time estimate
 
