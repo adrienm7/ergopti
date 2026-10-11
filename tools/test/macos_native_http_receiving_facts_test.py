@@ -128,8 +128,41 @@ def debug_certificate_failure_projection(source):
     return source.replace(diagnostic, original, 1)
 
 
+# One complete diagnostic-only observation composes before the existing
+# certificate/PAC inverses. Every helper, call and challenge span is literal and
+# unique; the original historical whole-source pin still protects all other bytes.
+TRUST_CAUSE_DIAGNOSTIC_INVERSE = (
+    '#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n/// Observations of an already-delivered error only. No message, URL, certificate\n/// or arbitrary userInfo key is read; the original failure policy is unchanged.\nfunc managedHTTPNativeErrorFacts(_ error: NSError) -> [String] {\n\tfunc integer(_ value: Any?) -> Int32? {\n\t\tguard let number = value as? NSNumber,\n\t\t\tCFGetTypeID(number) != CFBooleanGetTypeID(),\n\t\t\t["c", "C", "s", "S", "i", "I", "l", "L", "q", "Q"].contains(String(cString: number.objCType)),\n\t\t\tnumber.doubleValue >= Double(Int32.min), number.doubleValue <= Double(Int32.max)\n\t\telse { return nil }\n\t\treturn Int32(exactly: number.int64Value)\n\t}\n\tvar current = error\n\tvar seen = Set<ObjectIdentifier>()\n\tvar result: [String] = []\n\tlet cfNetworkDomain: String = kCFErrorDomainCFNetwork as String\n\twhile result.count < 4 && seen.insert(ObjectIdentifier(current)).inserted {\n\t\tlet domain: String\n\t\tswitch current.domain {\n\t\tcase NSURLErrorDomain: domain = "url"\n\t\tcase NSPOSIXErrorDomain: domain = "posix"\n\t\tcase NSOSStatusErrorDomain: domain = "osstatus"\n\t\tcase cfNetworkDomain: domain = "cfnetwork"\n\t\tdefault: domain = "unknown"\n\t\t}\n\t\tlet code = domain == "unknown" ? nil : Int32(exactly: current.code)\n\t\tvar streamDomain: Int32?\n\t\tvar streamCode: Int32?\n\t\tif domain == "cfnetwork" || domain == "url" {\n\t\t\tif let admittedDomain = integer(current.userInfo["_kCFStreamErrorDomainKey"]),\n\t\t\t\tlet admittedCode = integer(current.userInfo["_kCFStreamErrorCodeKey"]) {\n\t\t\t\tstreamDomain = admittedDomain; streamCode = admittedCode\n\t\t\t}\n\t\t}\n\t\tresult.append("# native_http_error_chain node=\\(result.count) domain=\\(domain) code=\\(code.map(String.init) ?? "none") stream_domain=\\(streamDomain.map(String.init) ?? "none") stream_code=\\(streamCode.map(String.init) ?? "none")")\n\t\tguard let underlying = current.userInfo[NSUnderlyingErrorKey] as? NSError else { break }\n\t\tcurrent = underlying\n\t}\n\treturn result\n}\n#endif\n\n',
+    '\t#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n\tfor fact in managedHTTPNativeErrorFacts(error) { _ = fputs(fact + "\\n", stderr) }\n\t#endif\n',
+    '\t\t#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n\t\tif challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {\n\t\t\t_ = fputs("# native_http_trust_challenge mode=\\(certificates.isEmpty ? "system" : "extra")\\n", stderr)\n\t\t}\n\t\t#endif\n',
+    '\t\t\t\t#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n\t\t\t\t_ = fputs("# native_http_extra_trust result=refused\\n", stderr)\n\t\t\t\t#endif\n',
+    '\t\t\t#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n\t\t\t_ = fputs("# native_http_extra_trust result=accepted\\n", stderr)\n\t\t\t#endif\n',
+)
+TRUST_CAUSE_DIAGNOSTIC_MARKERS = (
+    "managedHTTPNativeErrorFacts",
+    "native_http_error_chain",
+    "native_http_trust_challenge",
+    "native_http_extra_trust",
+)
+
+
+def trust_cause_diagnostic_projection(source):
+    """Invert all five exact observation spans together, or retain legacy bytes."""
+    if not any(marker in source for marker in TRUST_CAUSE_DIAGNOSTIC_MARKERS):
+        return source
+    if any(source.count(span) != 1 for span in TRUST_CAUSE_DIAGNOSTIC_INVERSE):
+        raise ValueError("Trust cause diagnostic enrollment refused")
+    projected = source
+    for span in TRUST_CAUSE_DIAGNOSTIC_INVERSE:
+        projected = projected.replace(span, "", 1)
+    if any(marker in projected for marker in TRUST_CAUSE_DIAGNOSTIC_MARKERS):
+        raise ValueError("Trust cause diagnostic projection refused")
+    return projected
+
+
 def historical_pac_ownership_projection(source):
     """Accept the exact legacy source or the complete approved ownership repair."""
+    source = trust_cause_diagnostic_projection(source)
     source = debug_certificate_failure_projection(source)
     source = pac_source_acquisition_projection(source)
     if hashlib.sha256(source.encode("utf-8")).hexdigest() == HISTORICAL_HTTP_RELEASE_SHA256:
@@ -2318,6 +2351,263 @@ class NativeTrustRemovalOriginalDeadlineTests(unittest.TestCase):
             # native grant is executed or inferred by this portable control.
             self.fixture.trust_attempted = True
         self.assertEqual(deadlines, [115.0, 215.0])
+
+
+class TrustOutcomeDiagnosticTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = WIRE.WireFixture(native=False)
+        self.addCleanup(self.cleanup_fixture)
+
+    def cleanup_fixture(self):
+        # Recording native command ports never alter any actual trust store.
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+        self.fixture.close()
+
+    def outcome(self, stderr):
+        lines = stderr.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("# native_http_trust_outcome "))
+        return json.loads(lines[0].removeprefix("# native_http_trust_outcome "))
+
+    def assert_native_arguments(self, arguments, operation):
+        if operation == "add":
+            self.assertEqual(
+                arguments,
+                [
+                    "/usr/bin/sudo",
+                    "-n",
+                    "/usr/bin/security",
+                    "add-trusted-cert",
+                    "-d",
+                    "-r",
+                    "trustRoot",
+                    "-k",
+                    str(self.fixture.keychain),
+                    str(self.fixture.ca),
+                ],
+            )
+        else:
+            self.assertEqual(
+                arguments,
+                [
+                    "/usr/bin/sudo",
+                    "-n",
+                    "/usr/bin/security",
+                    "remove-trusted-cert",
+                    "-d",
+                    str(self.fixture.ca),
+                ],
+            )
+
+    def test55RealOwnedCommandSuccessUsesOnlyStderrAndAddsNoReplyBytes(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        original_command = self.fixture._command
+        results = []
+
+        def command(arguments, **options):
+            self.assert_native_arguments(arguments, "add")
+            result = original_command(
+                [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'original')"],
+                **options,
+            )
+            results.append(result)
+            return result
+
+        self.fixture.native = True
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                self.fixture.trust(True)
+        self.assertEqual(results, [(0, b"original")])
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(
+            self.outcome(stderr),
+            {
+                "version": 1,
+                "operation": "add",
+                "phase": "complete",
+                "status": 0,
+                "primary": "none",
+                "closure_refused": False,
+                "command_file_debt": False,
+                "callee": None,
+            },
+        )
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(self.fixture.command_file_debt, [])
+
+    def test56RealFailedCommandsKeepDistinctAddAndRemovalOutcomeAndPrivateBytes(self):
+        results = []
+        original_command = self.fixture._command
+        self.fixture.native = True
+        for operation, callee, code in [
+            ("add", "SecTrustSettingsSetTrustSettings", 7),
+            ("remove", "SecTrustSettingsRemoveTrustSettings", 9),
+        ]:
+            stderr, stdout = io.StringIO(), io.StringIO()
+            script = (
+                "import sys; sys.stderr.write("
+                + repr(callee + ": private https://private.invalid/token\n")
+                + "); sys.exit("
+                + str(code)
+                + ")"
+            )
+
+            def command(arguments, **options):
+                self.assert_native_arguments(arguments, operation)
+                return original_command([sys.executable, "-c", script], **options)
+
+            with mock.patch.object(self.fixture, "_command", side_effect=command):
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    with self.assertRaises(WIRE.FixtureFailure):
+                        self.fixture.trust(operation == "add")
+            fact = self.outcome(stderr)
+            self.assertEqual(
+                fact,
+                {
+                    "version": 1,
+                    "operation": operation,
+                    "phase": "exit",
+                    "status": code,
+                    "primary": "exception",
+                    "closure_refused": False,
+                    "command_file_debt": False,
+                    "callee": "trust_settings_set"
+                    if operation == "add"
+                    else "trust_settings_remove",
+                },
+            )
+            self.assertNotIn("private", stderr.getvalue())
+            self.assertNotIn("https", stderr.getvalue())
+            self.assertTrue(self.fixture.trust_attempted)
+            results.append(fact)
+        self.assertEqual([x["status"] for x in results], [7, 9])
+        self.assertEqual(results[0]["operation"], "add")
+
+    def test57UnknownMalformedCalleeAndThrowingSinkNeverReplaceOriginalFailure(self):
+        original = RuntimeError("exact private primary")
+        real_popen = WIRE.subprocess.Popen
+        original_command = self.fixture._command
+        children = []
+
+        def fail_after_child(*args, **kwargs):
+            child = real_popen(*args, **kwargs)
+            children.append(child)
+            # The unchanged _command finally retains this actual child.
+            child.communicate = mock.Mock(side_effect=original)
+            return child
+
+        def command(arguments, **options):
+            self.assert_native_arguments(arguments, "add")
+            return original_command([sys.executable, "-c", "pass"], **options)
+
+        self.fixture.native = True
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch.object(WIRE.subprocess, "Popen", side_effect=fail_after_child):
+                with mock.patch.object(
+                    WIRE, "print", side_effect=OSError("private sink"), create=True
+                ):
+                    with self.assertRaises(RuntimeError) as caught:
+                        self.fixture.trust(True)
+        self.assertIs(caught.exception, original)
+        self.assertEqual(len(children), 1)
+        self.assertIsNotNone(children[0].returncode)
+        self.assertTrue(children[0].stdin.closed)
+        self.assertEqual(self.fixture.command_file_debt, [])
+        for raw in [
+            b"",
+            b"SecTrustSettingsSetTrustSettings: secret\r\n",
+            b"SecTrustSettingsSetTrustSettings: secret\nextra\n",
+            b"SecTrustSettingsSetTrustSettings: \x00\n",
+            b"x" * 1025,
+        ]:
+            self.assertIsNone(WIRE.WireFixture._trust_callee_fact(raw, "add"))
+        self.assertIsNone(
+            WIRE.WireFixture._trust_callee_fact(
+                b"SecTrustSettingsSetTrustSettings: secret\n", "remove"
+            )
+        )
+
+
+class TrustCauseDiagnosticEnrollmentTests(unittest.TestCase):
+    @staticmethod
+    def source():
+        return (
+            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+        ).read_text(encoding="utf-8")
+
+    def test58CompleteDiagnosticInverseKeepsExactPreimageAndHistoricalWholePin(self):
+        source = self.source()
+        self.assertEqual(len(TRUST_CAUSE_DIAGNOSTIC_INVERSE), 5)
+        original = trust_cause_diagnostic_projection(source)
+        self.assertEqual(
+            hashlib.sha256(original.encode()).hexdigest(),
+            "761b1a636bfc69d987545a30502db5a7c549e76c9b674630fc27bb4b157febc7",
+        )
+        self.assertEqual(trust_cause_diagnostic_projection(original), original)
+        released = HistoricalPACOwnershipProjectionTests.release_source()
+        legacy = historical_pac_ownership_projection(released)
+        self.assertEqual(
+            hashlib.sha256(legacy.encode()).hexdigest(),
+            "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98",
+        )
+        self.assertEqual(historical_pac_ownership_projection(legacy), legacy)
+
+    def test59EveryMissingAndPartialObservationSpanRefuses(self):
+        source = HistoricalPACOwnershipProjectionTests.release_source()
+        for span in TRUST_CAUSE_DIAGNOSTIC_INVERSE:
+            with self.subTest(span=span):
+                self.assertEqual(source.count(span), 1)
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(span, "", 1))
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(span, span[:-1], 1))
+
+    def test60DuplicateObservationAndUnenrolledSiblingCannotDisappear(self):
+        source = HistoricalPACOwnershipProjectionTests.release_source()
+        for span in TRUST_CAUSE_DIAGNOSTIC_INVERSE:
+            with self.subTest(span=span):
+                self.assertEqual(source.count(span), 1)
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(span, span + span, 1))
+        with self.assertRaises(ValueError):
+            historical_pac_ownership_projection(
+                source + "\n// native_http_error_chain unenrolled sibling\n"
+            )
+
+    def test61RawMessageDomainAndUnboundedErrorHelpersRemainUnenrolled(self):
+        source = HistoricalPACOwnershipProjectionTests.release_source()
+        for before, after in (
+            (
+                'result.append("# native_http_error_chain node=',
+                'result.append(current.localizedDescription + "# native_http_error_chain node=',
+            ),
+            ('default: domain = "unknown"', "default: domain = current.domain"),
+            ("while result.count < 4 &&", "while result.count < 400 &&"),
+            ("current.userInfo[NSUnderlyingErrorKey]", 'current.userInfo["raw-private-value"]'),
+        ):
+            with self.subTest(change=before):
+                self.assertEqual(source.count(before), 1)
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(before, after, 1))
+
+    def test62ChangedFunctionalReturnAndOtherUnapprovedBytesKeepHistoricalRefusal(self):
+        source = HistoricalPACOwnershipProjectionTests.release_source()
+        for before, after in (
+            (
+                'case NSURLErrorTimedOut: return "deadline"',
+                'case NSURLErrorTimedOut: return "certificate"',
+            ),
+            ('\t\treturn "certificate"\n', '\t\treturn "unavailable"\n'),
+            ("return Int32(exactly: number.int64Value)", "return Int32(0)"),
+        ):
+            with self.subTest(change=before):
+                self.assertEqual(source.count(before), 1)
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(before, after, 1))
+        original = trust_cause_diagnostic_projection(source)
+        with self.assertRaises(ValueError):
+            historical_pac_ownership_projection(original + "\n// unapproved\n")
 
 
 if __name__ == "__main__":
