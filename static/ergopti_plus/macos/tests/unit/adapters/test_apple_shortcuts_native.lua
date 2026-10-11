@@ -44,6 +44,12 @@ local function fixture(body)
 			f.decoded = f.decoded + 1; return f.wires[value]
 		end }, fs = { symlinkAttributes = metadata, attributes = metadata, pathToAbsolute = function(path) return path end } }
 		f.native = require("adapters.apple_shortcuts_native")
+		function f.use_actual_shell()
+			package.loaded["adapters.shell_runner"] = nil
+			f.shell = require("adapters.shell_runner")
+			package.loaded["adapters.apple_shortcuts_native"] = nil
+			f.native = require("adapters.apple_shortcuts_native")
+		end
 		function f.reply(task, nonce, operation, id, changes)
 			local packet = { version = 1, nonce = nonce, operation = operation, status = "observed",
 				rows = Json.array({ { id = id or ID, name = "日本 e\204\129\n", accepts_input = false } }), truncated = false }
@@ -157,6 +163,81 @@ H.describe("shipped native Apple Shortcut transport", function()
 				H.assert_nil(f.native.revalidate_program("/usr/bin/shortcuts", arguments, function() end, function() return true end))
 			end
 			H.assert_eq(#f.tasks, 0)
+		end)
+	end)
+end)
+
+H.describe("native query acknowledged construction refusal", function()
+	for _, fault in ipairs({ "nil", "throw" }) do
+		H.it("releases an unstarted picker after actual ShellRunner construction " .. fault, function()
+			fixture(function(f)
+				local constructors, callbacks = 0, 0
+				_G.hs.task.new = function()
+					constructors = constructors + 1
+					if fault == "throw" then error("owned construction refusal") end
+					return nil
+				end
+				f.use_actual_shell()
+				local owner = assert(f.native.create())
+				for attempt = 1, 2 do
+					local accepted, reason = owner.discover(function(value, why)
+						H.assert_nil(value); H.assert_eq(why, "query_refused")
+						callbacks = callbacks + 1
+					end)
+					H.assert_eq(accepted, false); H.assert_eq(reason, "start_refused")
+					H.assert_eq(constructors, attempt); H.assert_eq(callbacks, attempt)
+					H.assert_eq(owner.pending(), false); H.assert_true(f.native.available())
+					H.assert_nil(next(f.shell._active_tasks))
+				end
+			end)
+		end)
+		H.it("settles an unstarted chosen-ID query after actual ShellRunner construction " .. fault, function()
+			fixture(function(f)
+				local constructors, terminals, reason = 0, 0, nil
+				_G.hs.task.new = function()
+					constructors = constructors + 1
+					if fault == "throw" then error("owned construction refusal") end
+					return nil
+				end
+				f.use_actual_shell()
+				local handle = assert(f.native.revalidate_program("/usr/bin/shortcuts", { "run", ID }, function(success, value, why)
+					H.assert_eq(success, false); H.assert_nil(value)
+					terminals, reason = terminals + 1, why
+				end, function() return true end))
+				H.assert_eq(handle.start(), false); H.assert_true(handle.isSettled())
+				H.assert_eq(constructors, 1); H.assert_eq(terminals, 1); H.assert_eq(reason, "query_refused")
+				H.assert_true(handle.terminate()); H.assert_eq(terminals, 1)
+				H.assert_true(f.native.available()); H.assert_nil(next(f.shell._active_tasks))
+			end)
+		end)
+	end
+	H.it("keeps attempted query retirement debt after an observed leader exit", function()
+		fixture(function(f)
+			local called = 0
+			f.on_construct = function(task)
+				task.physical = true
+				task.wasStartAttempted = function() return true end
+				function task.onSettled(callback) callback(); return true end
+			end
+			local handle = assert(f.native.revalidate_program("/usr/bin/shortcuts", { "run", ID }, function() called = called + 1 end, function() return true end))
+			H.assert_true(handle.start()); H.assert_eq(handle.isSettled(), false)
+			H.assert_eq(f.native.available(), false); H.assert_eq(called, 0)
+			H.assert_eq(handle.terminate(), false); H.assert_eq(handle.isSettled(), false)
+			H.assert_eq(called, 0)
+		end)
+	end)
+	H.it("retains a never-attempted query whose settlement callback lacks actual closure", function()
+		fixture(function(f)
+			local called = 0
+			f.on_construct = function(task)
+				task.wasStartAttempted = function() return false end
+				function task.onSettled(callback) callback(); return true end
+			end
+			local handle = assert(f.native.revalidate_program("/usr/bin/shortcuts", { "run", ID }, function() called = called + 1 end, function() return true end))
+			H.assert_true(handle.start()); H.assert_eq(handle.isSettled(), false)
+			H.assert_eq(f.native.available(), false); H.assert_eq(called, 0)
+			H.assert_eq(handle.terminate(), false); H.assert_eq(handle.isSettled(), false)
+			H.assert_eq(called, 0)
 		end)
 	end)
 end)
