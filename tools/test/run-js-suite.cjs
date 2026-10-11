@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'web text decoding and icon demo preserve literal input with bounded parsing',
+		cmd: process.execPath,
+		args: ['tools/test/test-web-text-admission.cjs'],
+		repro: 'npm run test:web-text-admission'
+	},
+	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],
