@@ -4042,6 +4042,12 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-11 diagnostic build refusal. Exact manual38098879182 on716bcb602
+fails Swift compilation before the archive XCTest starts; no25-case or first
+consent traversal result is received. The shared macOS worker cast correction
+preserves all original archive/consent assertions and clocks. Corrected native
+receiving, Brew6, package and installation remain pending; item36 stays open.
+
 2026-10-10 first existing consent discovery diagnostic. The owned observer now
 retains the first window's existing traversal result: closed scope, two label
 presence bits, completion and examined count. It adds no AX read, action, clock,
@@ -6722,6 +6728,16 @@ or physical-device acceptance.
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-11 diagnostic compilation correction. Exact manual38098879182 on
+716bcb602175e4d2a1751318892dbfe80c890873 refuses the new Swift CFNetwork
+error-domain switch before XCTest: the unparenthesized cast is parsed as an
+as-pattern. Parenthesizing the existing conversion and its exact inverse
+enrollment literal preserves all63 portable methods, the original55 and the
+strict historical worker pin. Actual archive25 and the Swift/PAC cohorts are
+unrun on that refused build; earlier-run passes are not transferred. Candidate
+compilation and native receiving require a corrected exact-source manual run.
+Item62 remains open; no functional routing, trust rule or deadline changes.
 
 2026-10-10 native trust-cause diagnostic continuation. Existing add/remove
 commands now retain bounded phase, exit, primary failure and physical closure

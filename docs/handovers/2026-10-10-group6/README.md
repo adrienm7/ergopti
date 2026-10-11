@@ -728,3 +728,15 @@ Frozen R3 source, inverse/enrollment proof and independent Source ACK are
 retained in the matching diagnostic and review directories. The collector
 composition changes only HTTP facts55 to63 and preserves the committed
 suspended39/serve45 floors.
+
+## CFNetwork diagnostic compile correction
+
+2026-10-11 diagnostic compilation correction. Exact manual38098879182 on
+716bcb602175e4d2a1751318892dbfe80c890873 refuses the new Swift CFNetwork
+error-domain switch before XCTest: the unparenthesized cast is parsed as an
+as-pattern. Parenthesizing the existing conversion and its exact inverse
+enrollment literal preserves all63 portable methods, the original55 and the
+strict historical worker pin. Actual archive25 and the Swift/PAC cohorts are
+unrun on that refused build; earlier-run passes are not transferred. Candidate
+compilation and native receiving require a corrected exact-source manual run.
+Item62 remains open; no functional routing, trust rule or deadline changes.

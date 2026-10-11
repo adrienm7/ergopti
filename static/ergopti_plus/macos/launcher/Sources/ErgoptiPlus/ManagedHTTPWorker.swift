@@ -339,7 +339,7 @@ func managedHTTPNativeErrorFacts(_ error: NSError) -> [String] {
 		case NSURLErrorDomain: domain = "url"
 		case NSPOSIXErrorDomain: domain = "posix"
 		case NSOSStatusErrorDomain: domain = "osstatus"
-		case kCFErrorDomainCFNetwork as String: domain = "cfnetwork"
+		case (kCFErrorDomainCFNetwork as String): domain = "cfnetwork"
 		default: domain = "unknown"
 		}
 		let code = domain == "unknown" ? nil : Int32(exactly: current.code)
