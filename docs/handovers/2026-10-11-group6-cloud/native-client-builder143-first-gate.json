@@ -1,0 +1,41 @@
+{
+	"exit": 1,
+	"seconds": 1123.136,
+	"before_and_after_fence_equal": true,
+	"head": "ed6ba402ddef9b3f38f7a5ca23c37bc57fb082c7",
+	"logical_index_tree": "80ab6304559c07ba0782fb2523c1a2d5dc7b43ae",
+	"source_sha256": {
+		"docs/ERGOPTIPLUS_TODO.md": "a458d01607f25894f6e9ab55aebe59ceeaede38cebf570c024294f40f30a6ed0",
+		"docs/handovers/2026-10-11-group6-cloud/README.md": "773cdcb60baea93a3145a7694ec1086251de33f134d17b110a00c3ad92cd9dfe",
+		"static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py": "0f6c7df65975ff6eb73b9809e20f22011c7437d58728e3e4a78424fb3a137ab4",
+		"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "8e5e0eb78c7d00268fa2521066b1bdf0c32773386d63544eb960d7f85a2c056b",
+		"tools/test/macos_native_http_receiving_facts_test.py": "b2fc84e8704fb883fc91da8c355d711ef7b862ecf01eef1541ef15f9143f6c6e",
+		"tools/test/test-managed-ollama-protocol.cjs": "ec90ed85bf9b79689b4606ae5e0592c603c289e9603976b8e29c2baa4a3cbc56",
+		"docs/handovers/2026-10-11-group6-cloud/native-client-builder143-portable-proposal.json": "95331f8ca23351f4a7558a5af9db0ea656a89409d5dcc2f93e01cecdc0b749b6",
+		"docs/handovers/2026-10-11-group6-cloud/native-client-builder143-portable-proposal.tar.gz": "8e9a42f0ea401ae8f51bd96c1b9da0bdb99dffd7beb84d848b672d761e1b4979",
+		"docs/handovers/2026-10-11-group6-cloud/timeout-capture103-canonical-gate.json": "69df2f442817c7da32df5a3439d0264ecf28037d865e5e9cfe23a2d42f232abf",
+		"docs/handovers/2026-10-11-group6-cloud/timeout-capture103-canonical-gate.log.gz": "c7397aa0469b082b5307ad12a2b1f054655ac72852207caac0ecc3975bd814fd",
+		"static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py": "fa9f8da12f8f2db25a3bcda19e980c55d1f48bfc61e35be6d746297331b0cc6d",
+		"tools/test/macos_native_http_client_root_controls.py": "303ef0e5e4e55d5667e66f46f970cff7cba64785c98cc3a16cda09683bb48ac8",
+		"tools/test/macos_native_http_fixture_builder_controls.py": "fbf105d904401b17f8c785bfceabc6c0c15a5c136ce94ec9f3e614816e188532"
+	},
+	"log_sha256": "2afa7af999750b1230d7727cab79f3c06c68030e6ecaa367201600cf1dd46236",
+	"log_bytes": 3629605,
+	"log": "native-client-builder143-first-gate.log.gz",
+	"qualification": "FAILED_SELECTED_GATE; physical143 does not cover standalone diagnostic10",
+	"format": "FAILED: README Prettier; 382 Python files formatted",
+	"javascript": {
+		"passed": 408,
+		"failed": 2,
+		"total": 410
+	},
+	"hammerspoon": {
+		"passed": 18599,
+		"failed": 0,
+		"modules": 1571
+	},
+	"compressed_sha256": "ad14c36d7bddfdcfaa8732ead66ad02c769f5df8f9ad1c3d37e9b7cdb02d93f0",
+	"compressed_bytes": 518261,
+	"raw_bytes_preserved": true,
+	"raw_encoding": "Raw bytes include the independent negative UTF-8 corpus; strict whole-file UTF-8 decoding is not claimed."
+}

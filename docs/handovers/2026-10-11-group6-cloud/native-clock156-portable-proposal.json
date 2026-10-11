@@ -1,0 +1,12 @@
+{
+	"qualification": "PARENT_INDEPENDENT_TESTED_CLOCK156_CAPSULE_PREIMAGES_INVERSES_RECEIVED_NO_NATIVE_CREDIT",
+	"capsule_bytes": 335113,
+	"capsule_sha256": "ca45b77b999f5d7ab50ead5be6c87c7b03dcde36d49e164ffb4ebe49cf46e4f7",
+	"safe_regular_members": 101,
+	"whole_existing_path_inverse": true,
+	"current_builder143_preimages_exact": true,
+	"physical_default156_tests": 156,
+	"portable_parser_context_tests": 13,
+	"omission_assertion_records": [85, 4, 1, 2, 3],
+	"native_credit": false
+}

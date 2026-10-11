@@ -220,6 +220,12 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
+		'Retain independent native HTTP clock receiving',
+		"${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
 		'Qualify actual explicit curl stream ownership',
 		'${{ !cancelled() }}'
 	],
