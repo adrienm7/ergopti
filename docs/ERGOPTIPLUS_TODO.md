@@ -10865,12 +10865,28 @@ separately. Preserve their unfinished native qualification requirements.
       installation checks and explicit existing qualification limits. The
       run `38165477221` on `47e7308da0` exposed one obsolete serial Linux
       prerequisite assertion among 410 Core checks. Its correction preserves
-      both mandatory suites before packaging and still needs hosted receiving.
+      both mandatory suites before packaging. Run `38167194052` on `bd198a6eae`
+      passed all 410 Core checks, all 11,225 canonical AHK cases and the Linux
+      and macOS verdicts. The separate native AltGr cohort then failed four
+      cases: three isolated-runner dependency omissions and one child completion
+      timeout. The dependency fix passes the unchanged five noninteractive
+      callbacks with warning-free stdout matching the TAP receipt; 33 related
+      controls and 70 E2E cases also pass. Failed child evidence now remains in
+      the uploaded directory. The native US-layout observation still requires
+      hosted receiving. Local French-layout refusal is not native qualification.
+      Publication remains pending; the six disclosed macOS deferrals remain open.
 - [ ] Record elapsed time by default for every CI step, suite and test,
       including failure and timeout outcomes. Preserve source, OS and
       architecture with machine-readable results and a readable slowest-test
       summary. Distinguish setup, execution and cleanup; do not add nested
       durations twice or expose personal data in diagnostic output.
+- [ ] Preserve live test progress while retaining file-backed native output.
+      The Windows unit log in run `38167194052` still showed only runner setup
+      after 26 minutes; captured callback output is emitted after the native
+      process returns. Add a safely shared progress channel or bounded tailing,
+      with exact final-drain and failure handling, so an active long test is
+      distinguishable from a stalled process. Preserve the transcript writer's
+      file-sharing contract and avoid restoring the pipe-overflow failure.
 - [ ] Group the GitHub Actions graph into four parallel lanes: Common, Windows,
       macOS and Linux. Each lane must show Unit tests, E2E tests, Build, then
       Test the build; all four terminal results converge into Release. Split
@@ -10887,6 +10903,20 @@ separately. Preserve their unfinished native qualification requirements.
       durations within those boundaries rather than slicing arbitrary numeric
       ranges. Preserve shared-state and ordering dependencies within a lot;
       the earlier contiguous three-shard proposal is not acceptable unchanged.
+- [ ] Organize test directories by the same feature lots and phases exposed in
+      CI. Give each directory one discoverable runner shared by local and hosted
+      execution. Derive CI enrollment from that structure through one canonical
+      inventory; reject orphaned files, duplicate execution and stale job names.
+      Preserve native platform boundaries while giving corresponding shared
+      scenarios consistent names across drivers. Inventory and move tests with
+      coverage proof before removing the old entry points.
+- [ ] Coordinate the migration with groups 1, 2/4/7, 3, 5 and 6 after their
+      current validation checkpoints. Keep feature work at existing paths until
+      each owner supplies its final commit and test/runner inventory, then agree
+      an explicit old-to-new path map. Preserve shared-file span ownership and
+      test ordering; do not interrupt active workflows or refactor their test
+      directories concurrently. Initial coordination requests were acknowledged
+      on 2026-10-11; no file moves have been agreed yet.
 - [ ] Optimize the measured slow paths and distribute independent work across
       isolated jobs. Prove complete test coverage with every selected case
       executed exactly once, strict failure propagation and owned cleanup.
