@@ -197,6 +197,35 @@ jobs:
           path: ${{ runner.temp }}/stable-linux-unit-suite.json
           if-no-files-found: warn
 
+      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.
+      # The child-local libXi projection grants no installed runtime or input epoch.
+      - name: Qualify actual LuaJIT XI2 ABI and property cookies
+        id: native_xi2_luajit
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb
+          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"
+        timeout-minutes: 7
+
+      - name: Retain actual LuaJIT XI2 diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/linux-xi2-luajit/receiving.json
+            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json
+            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json
+            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json
+            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json
+            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout
+            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr
+          if-no-files-found: error
+
   e2e-linux:
     name: 'E2E tests'
     needs: [test-linux]

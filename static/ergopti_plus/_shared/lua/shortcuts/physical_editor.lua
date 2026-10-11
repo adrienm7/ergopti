@@ -195,7 +195,10 @@ function M.new(options)
 		generation = generation + 1
 		local refreshed, packet = pcall(function()
 			if not alive or generation ~= epoch + 1 or not capture() then return nil end
-			return records()
+			local entries = records()
+			-- Labels may retire the displayed source after its capture acknowledged.
+			if not current() or generation ~= epoch + 1 then return nil end
+			return entries
 		end)
 		if not refreshed or packet == nil then
 			return { committed = true, refreshed = false }

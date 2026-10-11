@@ -1,0 +1,42 @@
+{
+	"groups": {
+		"reader": [
+			"test_installed_target_reader.InstalledTargetReaderTests.test_binary_plist_explicit_ns_declaration",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_both_explicit_identical_declarations",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_bundle_ancestor_symlink_refused",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_conflicting_declared_dictionaries",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_dictionary_named_entry_replacement_refused",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_dictionary_symlink_refused",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_exact_xml_source_bytes_and_metadata_only",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_fifo_and_empty_dictionary_refused",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_malformed_and_duplicate_plist_refused",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_missing_exact_declared_dictionary",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_no_declared_dictionary_even_when_file_exists",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_no_extension_guess",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_original_deadline_not_refreshed",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_oversized_source_files_refused",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_resolution_exact_target_and_single_native_route",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_resolution_foreign_duplicate_ambiguous_and_traversal_refused",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_retained_descriptors_all_closed_on_refusal",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_traversal_absolute_and_nonstring_declarations",
+			"test_installed_target_reader.InstalledTargetReaderTests.test_wrong_identifier"
+		],
+		"loader_output": [
+			"test_collector_source_binding.OutputCustodyTests.test_completed_receipt_exact_bytes_and_closed_resources",
+			"test_collector_source_binding.OutputCustodyTests.test_exclusive_directory_and_file_bytes",
+			"test_collector_source_binding.OutputCustodyTests.test_moved_output_refuses_without_writing_foreign_replacement",
+			"test_collector_source_binding.OutputCustodyTests.test_original_cancellation_has_priority_over_receipt_io",
+			"test_collector_source_binding.OutputCustodyTests.test_original_retirement_error_has_priority_over_lost_output_name",
+			"test_collector_source_binding.OutputCustodyTests.test_receipt_refusal_without_pending_primary_is_not_success",
+			"test_collector_source_binding.OutputCustodyTests.test_symlink_receiving_parent_and_existing_destination_refused",
+			"test_collector_source_binding.SourceBindingTests.test_all_source_descriptors_closed_after_read_refusal",
+			"test_collector_source_binding.SourceBindingTests.test_change_after_validated_read_cannot_reopen_foreign_source",
+			"test_collector_source_binding.SourceBindingTests.test_changed_timestamp_valid_pyc_is_never_executed",
+			"test_collector_source_binding.SourceBindingTests.test_exact_retained_actual_owner_image",
+			"test_collector_source_binding.SourceBindingTests.test_final_source_symlink_refused",
+			"test_collector_source_binding.SourceBindingTests.test_named_source_replacement_during_read_refuses_before_execution",
+			"test_collector_source_binding.SourceBindingTests.test_source_ancestor_symlink_refused",
+			"test_collector_source_binding.SourceBindingTests.test_wrong_source_digest_refuses_before_any_execution"
+		]
+	}
+}

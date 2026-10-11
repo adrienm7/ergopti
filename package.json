@@ -159,6 +159,7 @@
 		"test:action-picker-disabled-rows": "node ./tools/test/test-action-picker-disabled-rows.cjs",
 		"test:action-picker-parameter-editor": "node ./tools/test/test-action-picker-parameter-editor.cjs",
 		"test:apple-shortcuts-cold-cli": "node ./tools/test/test-apple-shortcuts-cold-cli-probe.cjs",
+		"test:apple-shortcuts-installed-target": "node ./tools/test/test-apple-shortcuts-installed-target.cjs",
 		"test:text-case-vectors-shared": "node ./tools/test/test-text-case-vectors-shared.cjs",
 		"test:desktop-navigation-vectors-shared": "node ./tools/test/test-desktop-navigation-vectors-shared.cjs",
 		"test:wrap-pair-vectors-shared": "node ./tools/test/test-wrap-pair-vectors-shared.cjs",
