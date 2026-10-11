@@ -770,8 +770,9 @@ _HTRA_Source(Kind) {
 
 _HTRA_MenuAddCollisionBody(Kind) {
 	global _HotstringsTerminatorRecords
-	AddFixture := _ScopeOwnerFixture()
-	AddSource := _HTRA_Source(Kind)
+	OriginalAddBody := _HTRA_Source(Kind)
+	AddFixture := _ScopeOwnerFixture(OriginalAddBody)
+	AddSource := AddFixture.source
 	AddBundle := 0, AddAcknowledge := 0, AddRefused := 0, AddLaunches := 0
 	AddLaunch(Acknowledge, Borrowed, Refused) {
 		AddBundle := Borrowed, AddAcknowledge := Acknowledge, AddRefused := Refused
@@ -780,6 +781,8 @@ _HTRA_MenuAddCollisionBody(Kind) {
 	}
 	AddFixture.options["reload"] := AddLaunch
 	try {
+		AssertEqual(OriginalAddBody, SubStr(AddSource, InStr(AddSource, "`n") + 1),
+			"the genuine current Add source retains every original record and foreign byte")
 		AssertTrue(FSWriteDurable(AddFixture.path, AddSource))
 		HotstringsTerminatorRecordsInit(AddSource)
 		PriorAddOwner := _HotstringsTerminatorRecords
@@ -936,13 +939,16 @@ _HTRB_WithBoot(Body) {
 }
 
 _HTRB_AdmittedGeneration() {
-	Fixture := _ScopeOwnerFixture()
+	OriginalBootBody := _HTR_Source()
+	Fixture := _ScopeOwnerFixture(OriginalBootBody)
 	try {
-		Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
+		AssertEqual(OriginalBootBody, SubStr(Fixture.source, InStr(Fixture.source, "`n") + 1),
+			"the genuine current boot source retains every original record and foreign byte")
+		Assert(FSWriteDurable(Fixture.path, Fixture.source))
 		BootSnapshot := 0
 		ApplyBootConfigToml(Map(), Fixture.path, &BootSnapshot)
 		Assert(BootSnapshot is Object, "the actual loader must publish its admitted image")
-		AssertEqual(_HTR_Source(), BootSnapshot.Source)
+		AssertEqual(Fixture.source, BootSnapshot.Source)
 		Assert(FSWriteDurable(Fixture.path, 'hotstrings = [unterminated`n'))
 		AssertTrue(HotstringsTerminatorRecordsInitBoot(BootSnapshot),
 			"the consumer must not borrow a later refused source generation")
@@ -955,20 +961,58 @@ Test("terminator-boot: real loader receipt retains the admitted generation after
 
 _HTRB_RefusedGeneration(ReadRefusal) {
 	global _HotstringsTerminatorRecords, _ConfigBootRejectedOverrides, _ConfigBootReadFailed
-	Fixture := _ScopeOwnerFixture()
+	Fixture := _ScopeOwnerFixture(), ReadLock := false, PrimaryFailure := false
+	CloseReadLock() {
+		if IsObject(ReadLock) {
+			ReadLock.Close()
+			ReadLock := false
+		}
+	}
 	try {
 		InvalidSource := 'hotstrings = [unterminated`n'
 		Assert(FSWriteDurable(Fixture.path, InvalidSource))
 		BootSnapshot := { Source: "foreign preexisting output" }
-		RejectedPath := ReadRefusal ? Fixture.directory : Fixture.path
-		AssertEqual(-1, ApplyBootConfigToml(Map(), RejectedPath, &BootSnapshot))
+		RejectedPath := Fixture.path
+		if ReadRefusal {
+			; The genuine journal already owns this file; native opening must now fail.
+			ReadLock := FileOpen(RejectedPath, "r-rwd")
+			Assert(IsObject(ReadLock), "the actual reader refusal requires its real exclusive file lock")
+		}
+		ReadFailure := false
+		try {
+			AssertEqual(-1, ApplyBootConfigToml(Map(), RejectedPath, &BootSnapshot))
+		} catch as Failure {
+			ReadFailure := Failure
+			throw Failure
+		} finally {
+			try CloseReadLock()
+			catch as Failure {
+				if !ReadFailure
+					throw Failure
+			}
+		}
 		AssertEqual(0, BootSnapshot, "the real refusal must clear an earlier output receipt")
 		AssertFalse(HotstringsTerminatorRecordsInitBoot(BootSnapshot))
 		AssertEqual(0, _HotstringsTerminatorRecords, "no empty record initialization may hide a refused load")
 		AssertEqual("!", HotstringsGetWordDelimiters())
 		AssertTrue(ReadRefusal ? _ConfigBootReadFailed : _ConfigBootRejectedOverrides > 0)
 		AssertEqual(InvalidSource, FSReadUtf8Exact(Fixture.path), "refusal cannot migrate or erase source bytes")
-	} finally _ScopeOwnerCleanup(Fixture)
+	} catch as Failure {
+		PrimaryFailure := Failure
+		throw Failure
+	} finally {
+		; Attempt both owned releases even if native close fails, preserving the first error.
+		CleanupFailure := false
+		for Operation in [CloseReadLock, () => _ScopeOwnerCleanup(Fixture)] {
+			try Operation.Call()
+			catch as Failure {
+				if !CleanupFailure
+					CleanupFailure := Failure
+			}
+		}
+		if !PrimaryFailure && CleanupFailure
+			throw CleanupFailure
+	}
 }
 Test("terminator-boot: semantic refusal preserves source protection without publishing an empty owner",
 	_HTRB_WithBoot.Bind(_HTRB_RefusedGeneration.Bind(false)))
@@ -981,7 +1025,8 @@ _HTRB_RemoveAfterModal(PauseAfterConfirmation) {
 
 _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 	global _HotstringsTerminatorRecords
-	Fixture := _ScopeOwnerFixture(), PriorSuspend := A_IsSuspended
+	OriginalRemovalBody := _HTR_Source()
+	Fixture := _ScopeOwnerFixture(OriginalRemovalBody), PriorSuspend := A_IsSuspended
 	Calls := 0, Acquisitions := 0, Success := 0, Bundle := 0
 	Confirm(*) {
 		Calls += 1
@@ -1003,15 +1048,17 @@ _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 		Fixture.options["acquire"] := RefuseAcquisition
 	try {
 		Suspend(false)
-		Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
-		HotstringsTerminatorRecordsInit(_HTR_Source())
+		AssertEqual(OriginalRemovalBody, SubStr(Fixture.source, InStr(Fixture.source, "`n") + 1),
+			"the genuine current removal source retains every original record and foreign byte")
+		Assert(FSWriteDurable(Fixture.path, Fixture.source))
+		HotstringsTerminatorRecordsInit(Fixture.source)
 		Admission := HotstringsTerminatorRecordCapture(_HotstringsTerminatorRecords.Records[1])
 		Outcome := _HS_DelimRemoveRecord(Admission, Fixture.options)
 		AssertEqual(1, Calls, "the real removal helper must receive the confirmation")
 		if PauseAfterConfirmation {
 			AssertEqual(false, Outcome, "a pause during confirmation revokes admission")
 			AssertEqual(0, Acquisitions, "paused confirmation must not acquire transaction ownership")
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
 		} else {
 			Assert(Outcome is Map)
 			AssertEqual("pending", Outcome["status"], "publication still requires the runtime ACK")
@@ -1089,3 +1136,38 @@ _HTRD_RetiredOwner() {
 }
 Test("terminator-admission: equal bytes cannot replace the captured runtime owner identity",
 	_HTRD_WithDisplayed.Bind(_HTRD_RetiredOwner))
+
+
+; A synthesized parent must not capture the independent root schema stamp or
+; bare user keys. The original AOT/foreign subject still has no parent header.
+_HTR_CurrentRootOwners(Bom, FinalNewline) {
+	RootBytes := 'root_owner = "keep root" # retain root comment`nroot_flag = true`nroot_count = 7`nroot_unknown.child = "keep dotted"`n'
+	Source := _CMJFixtureCurrentSource(RootBytes . _HTR_Source())
+	if !FinalNewline
+		Source := SubStr(Source, 1, StrLen(Source) - 1)
+	if Bom
+		Source := Chr(0xFEFF) . Source
+	Before := TOML_ParseDocument(Source)
+	AssertFalse(InStr(Source, '[hotstrings]`n'), "the real source must require a new parent declaration")
+	Plan := HotstringsTerminatorRecordPlan(Source, _HTR_Operation())
+	Parsed := TOML_ParseDocument(Plan.Content)
+	AssertEqual(ConfigMigrateCurrentVersion(), Parsed["_meta"]["schema_version"],
+		"the actual edited candidate retains its current root schema authority")
+	AssertFalse(Parsed["hotstrings"].Has("_meta"), "schema metadata never moves under the created parent")
+	for Key in ["_meta", "root_owner", "root_flag", "root_count", "root_unknown", "private", "foreign"]
+		AssertTrue(TOML_SameValue(Before[Key], Parsed[Key]), "the independent root/foreign owner survives: " . Key)
+	AssertContains(Plan.Content, RootBytes, "all original bare root bytes and comments remain exact")
+	AssertContains(Plan.Content, '[private]`ncredential = "keep"`n')
+	AssertContains(Plan.Content, '[[foreign.rows]]`nvalue = "never alter" # foreign comment')
+	AssertEqual(Bom ? Chr(0xFEFF) : "_", SubStr(Plan.Content, 1, 1), "BOM and first root metadata byte stay before any table")
+	AssertEqual(3, Parsed["hotstrings"]["terminators"].Length)
+	loop 2
+		AssertTrue(TOML_SameValue(Before["hotstrings"]["terminators"][A_Index],
+			Parsed["hotstrings"]["terminators"][A_Index]), "each original record and unknown metadata survive")
+	AssertEqual("section", Parsed["hotstrings"]["terminators"][3]["key"])
+	AssertEqual("§", Parsed["hotstrings"]["terminators"][3]["char"])
+}
+Test("terminator-records: new parent retains current root metadata and bare owners", _HTR_CurrentRootOwners.Bind(false, true))
+Test("terminator-records: new parent retains current root metadata without a final newline", _HTR_CurrentRootOwners.Bind(false, false))
+Test("terminator-records: new parent retains BOM before current root metadata", _HTR_CurrentRootOwners.Bind(true, true))
+Test("terminator-records: new parent retains BOM and unterminated foreign comment", _HTR_CurrentRootOwners.Bind(true, false))

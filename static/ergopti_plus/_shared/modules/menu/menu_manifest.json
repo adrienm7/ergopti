@@ -985,12 +985,40 @@
 		{
 			"type": "dynamic",
 			"id": "agent_system1",
-			"i18n": "menu.agent.system1"
+			"i18n": "menu.agent.system1",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "list",
+			"id": "agent_system1",
+			"i18n": "menu.agent.system1",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "dynamic",
 			"id": "agent_system2",
-			"i18n": "menu.agent.system2"
+			"i18n": "menu.agent.system2",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "list",
+			"id": "agent_system2",
+			"i18n": "menu.agent.system2",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "---"
@@ -6948,6 +6976,53 @@
 			],
 			"platforms": [
 				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"hotstring_personal_default_choice": [
+		{
+			"type": "check",
+			"id": "personal_default_section",
+			"caption_source": "native",
+			"caption_getter": "personal_default_section_label",
+			"checked_when": [
+				"personal_default_section_selected"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "check",
+			"id": "personal_default_section",
+			"caption_source": "native",
+			"caption_getter": "personal_default_section_label",
+			"checked_when": [
+				"personal_default_section_selected"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"hotstring_personal_section_choice": [
+		{
+			"type": "check",
+			"id": "personal_section_toggle",
+			"caption_source": "native",
+			"caption_getter": "personal_section_label",
+			"checked_when": [
+				"personal_section_selected"
+			],
+			"disabled_when": [
+				"personal_section_ready"
+			],
+			"platforms": [
+				"hs"
 			],
 			"unavailable": "hide"
 		}

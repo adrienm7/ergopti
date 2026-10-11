@@ -2504,3 +2504,85 @@ _LAG_AgentAppsActualBuildEntryRefusal() {
 
 Test("LLM agent: actual Build guards renderer entry and repairs native apps dispatch (agent-apps-command)",
 	_LAG_AgentAppsActualBuildEntryRefusal)
+
+
+; System providers return DATA without acquiring a native destination or dispatch owner.
+_LAG_SystemListData() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _MenuDispatchCallbacks, _MenuDispatchTokens
+		Callbacks := _MenuDispatchCallbacks, Tokens := _MenuDispatchTokens
+		SavedCallbacks := Callbacks.Clone(), SavedTokens := Tokens.Clone()
+		for Key in ["agent_system1", "agent_system2"] {
+			Rows := _LLM_Agent_MenuSystemRows(Key)
+			AssertTrue(Rows is Array, "the genuine provider returns detached row DATA")
+			AssertEqual(1, Rows.Length)
+			AssertTrue(Rows[1] is Map)
+			AssertEqual(_LLM_Agent_SystemRow(Key)["label"], Rows[1]["label"])
+			AssertTrue(Rows[1]["items"] is Array, "the completed children remain DATA, not a native Menu")
+		}
+		AssertTrue(Callbacks == _MenuDispatchCallbacks && Tokens == _MenuDispatchTokens,
+			"the actual producer preserves both held dispatcher owners")
+		AssertEqual(SavedCallbacks.Count, Callbacks.Count, "DATA construction registers no native command")
+		AssertEqual(SavedTokens.Count, Tokens.Count, "DATA construction registers no native token")
+		for Id, Callback in SavedCallbacks
+			AssertTrue(Callbacks.Has(Id) && Callbacks[Id] == Callback, "existing callbacks stay exact")
+		for Id, Token in SavedTokens
+			AssertTrue(Tokens.Has(Id) && Tokens[Id] == Token, "existing tokens stay exact")
+		AssertEqual(0, Fx.Commits.Length)
+		AssertEqual(0, Fx.Rebuilds)
+	}
+}
+Test("LLM agent: genuine System list provider creates DATA without native dispatch effects (agent-system-list)",
+	_LAG_SystemListData)
+
+_LAG_SystemListReceiving() {
+	Corpus := _LAG_WindowsProviderCaptionCorpus()
+	_LAG_Run(_LAG_Menu("action", Corpus["backend"], Corpus["backend"]), _LTN_Screen(""), _Body.Bind(Corpus))
+	_Body(Corpus, Fx, Lines, Sent) {
+		_LAG_WithModelCaptionLocale("fr", _Read.Bind(Corpus, Fx))
+		_Read(Corpus, Fx) {
+			Owned := [], TeardownPrimary := false
+			Item := _MR_FindItemById("agent_menu", "agent_system1")
+			AssertTrue(Item is Map, "the genuine Windows declaration is uniquely visible")
+			AssertEqual("list", Item["type"], "central list receiving is the actual production route")
+			Platforms := Item["platforms"]
+			Restore() {
+				Item["platforms"] := Platforms
+			}
+			try {
+				Built := LLM_Agent_MenuBuild()
+				Owned.Push(Built)
+				AssertEqual(6, TrayMenuItemCount(Built), "the complete original mode/System/apps order stays native")
+				AssertEqual(Corpus["locales"]["fr"]["systems"]["system1"]["cerebras"], _CTC_LabelAt(Built, 2))
+				AssertEqual(Corpus["locales"]["fr"]["systems"]["system2"]["cerebras"], _CTC_LabelAt(Built, 3))
+				AssertTrue(TrayMenuSubmenuHandle(Built.Handle, 2) != 0 && TrayMenuSubmenuHandle(Built.Handle, 3) != 0,
+					"the central renderer publishes both real completed native children")
+				Item["platforms"] := ["hs"]
+				Refused := LLM_Agent_MenuBuild()
+				Owned.Push(Refused)
+				AssertEqual(5, TrayMenuItemCount(Refused), "a withdrawn Windows list cannot execute through a dynamic handler")
+				AssertEqual(Corpus["locales"]["fr"]["systems"]["system2"]["cerebras"], _CTC_LabelAt(Refused, 2),
+					"the independent current System remains in its declared native position")
+				Restore()
+				Repaired := LLM_Agent_MenuBuild()
+				Owned.Push(Repaired)
+				AssertEqual(6, TrayMenuItemCount(Repaired), "repair reopens the same genuine declaration route")
+				AssertEqual(Corpus["locales"]["fr"]["systems"]["system1"]["cerebras"], _CTC_LabelAt(Repaired, 2))
+				AssertTrue(Item["platforms"] == Platforms, "the exact original declaration owner is restored")
+				AssertEqual(0, Fx.Commits.Length)
+				AssertEqual(0, Fx.Rebuilds)
+			} catch as Failure {
+				TeardownPrimary := Failure
+				throw Failure
+			} finally {
+				Cleanup := [Restore]
+				for Built in Owned
+					Cleanup.Push(_CTC_ReleaseMenu.Bind(Built))
+				_LAG_AgentAppsRunCleanup(TeardownPrimary, Cleanup*)
+			}
+		}
+	}
+}
+Test("LLM agent: complete Build receives declared System lists and respects withdrawal/repair (agent-system-list)",
+	_LAG_SystemListReceiving)

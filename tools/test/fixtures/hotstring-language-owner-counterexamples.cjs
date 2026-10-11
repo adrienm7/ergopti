@@ -302,6 +302,63 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 				controls++;
 			}
 		}
+		if (platform === 'linux') {
+			for (const [before, after, reason] of [
+				[
+					'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)',
+					'local rows = {}',
+					'actual enclosing build withdrawn'
+				],
+				[
+					'if not personal_choices_admitted then return nil end',
+					'rows = {}\n\tif not personal_choices_admitted then return nil end',
+					'actual completed enclosing child replaced'
+				],
+				[
+					'if not personal_choices_admitted then return nil end',
+					'local rows = {}\n\tif not personal_choices_admitted then return nil end',
+					'actual completed enclosing child shadowed'
+				],
+				[
+					'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)',
+					'return {}\n\tlocal rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)',
+					'unconditional exit before actual enclosing build'
+				],
+				[
+					'if not personal_choices_admitted then return nil end\n\treturn rows',
+					'if not personal_choices_admitted then return nil end\n\treturn {}',
+					'actual final enclosing result discarded'
+				],
+				[
+					'if not personal_choices_admitted then return nil end',
+					'if false then return nil end',
+					'actual final enclosing refusal withdrawn'
+				],
+				[
+					'if not personal_choices_admitted then return nil end',
+					'if personal_choices_admitted then return nil end',
+					'actual final enclosing refusal inverted'
+				]
+			]) {
+				assert.equal(
+					language.split(before).length - 1,
+					1,
+					reason + ': actual unique result coordinate'
+				);
+				const changed = language.replace(before, after);
+				assert.notEqual(changed, language, reason + ': genuine source mutation');
+				assert.equal(admits({ ...sources, [languageFile]: changed }), false, reason);
+				assert.equal(
+					changed.slice(0, language.indexOf(before)) +
+						before +
+						changed.slice(language.indexOf(before) + after.length),
+					language,
+					reason + ': exact source inverse'
+				);
+				assert.equal(admits(), true, reason + ': genuine repair restores ownership');
+				controls++;
+			}
+		}
 		assert.equal(admits(), true, 'exact source survives every independent negative control');
 	}
 	controls += verifyIndependentHotstringMutants(base, manifest);

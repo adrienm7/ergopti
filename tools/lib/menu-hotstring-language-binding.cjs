@@ -231,9 +231,8 @@ function reachable(source, extension, effect, flow) {
 }
 
 /** Requires ordered, unique and reachable native effects in the actual owner. */
-function route(source, extension, statements) {
+function route(source, extension, statements, flow = paths(source, extension)) {
 	let previous = -1;
-	const flow = paths(source, extension);
 	for (const [fragment, depth = 0] of statements) {
 		const matches = ranges(source, fragment, extension, depth);
 		if (
@@ -1067,6 +1066,29 @@ function luaDeclaredLinuxRoot(source, topGraph) {
 	);
 }
 
+/** The actual Linux enclosing build retains its result through its final refusal and return. */
+function luaLinuxHotstringsResult(outer, built, source) {
+	const rows = luaLocal(outer, 'rows');
+	const terminal =
+		'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)\nif not personal_choices_admitted then return nil end\nreturn rows';
+	const shape = (text) => scriptTokens(text, '.lua').map((token) => [token.kind, token.value]);
+	return (
+		rows.statement.live &&
+		rows.value?.live &&
+		rows.value === built &&
+		luaRetained(outer, rows) &&
+		luaReturnBinding(outer, rows) &&
+		route(source, '.lua', [
+			[
+				'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
+			],
+			['if not personal_choices_admitted then return nil end'],
+			['return rows']
+		]) &&
+		isDeepStrictEqual(shape(source).slice(-shape(terminal).length), shape(terminal))
+	);
+}
+
 function luaHotstringGraph(sources, platform) {
 	const source = sources[files[platform][0]],
 		moduleGraph = luaGraph(source);
@@ -1103,7 +1125,11 @@ function luaHotstringGraph(sources, platform) {
 		if (
 			built.length !== 1 ||
 			!luaSame(built[0].args[5], providers) ||
-			!outer.nodes.some((n) => n.type === 'return' && n.live && n.values.includes(built[0]))
+			!luaLinuxHotstringsResult(
+				outer,
+				built[0],
+				owner(source, 'local function _manifest_hotstring_rows(ctx, config)', '.lua')
+			)
 		)
 			return false;
 		const nativeProducer = luaLocal(moduleGraph, '_build_hotstrings'),
@@ -1695,8 +1721,10 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 			route(outer, '.lua', [
 				['["hotstring_languages"] = language_rows,'],
 				[
-					'return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
-				]
+					'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
+				],
+				['if not personal_choices_admitted then return nil end'],
+				['return rows']
 			]) &&
 			route(owner(source, 'local function _build_hotstrings(ctx)', '.lua'), '.lua', [
 				['local items = _manifest_hotstring_rows(ctx, config)']
@@ -1707,4 +1735,974 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 	}
 }
 
-module.exports = { hotstringScopePublication, hotstringLanguagePublication, files };
+const PERSONAL_DEFAULT_CHOICES = {
+	ahk: {
+		signature: '_HS_PersonalRows(Options := unset) {',
+		extension: '.ahk',
+		row: 'DefaultChoice',
+		collection: 'DefaultRows',
+		depth: 3,
+		frameDepth: 2,
+		init: 'DefaultRows := []',
+		append: 'DefaultRows.Push(DefaultChoice)',
+		refusal: 'if !(DefaultChoice is Map)\n\t\t\t\treturn []',
+		call: 'DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",\n\t\t\t\tMap("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)),\n\t\t\t\tMap("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),\n\t\t\t\t\t"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))',
+		frame:
+			'DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))\n\t\tDefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)\n\t\tDefaultProviders := Map("personal_default_choices", (*) => DefaultRows)\n\t\tDefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)',
+		prefix:
+			'DefaultRows := []\n\t\tfor _, SecName in TomlData["sections_order"] {\n\t\t\tif (SecName == "-")\n\t\t\t\tcontinue\n\t\t\tif !TomlData["sections"].Has(SecName)\n\t\t\t\tcontinue\n\t\t\tSecLabel := DisambiguatedLabels[SecName]',
+		enclosure: 'if (PersonalTomlData != false) {',
+		enclosureDepth: 1,
+		sink: 'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted\n\t\t\treturn []'
+	},
+	hs: {
+		signature: 'function M.build_custom(ctx, counts)',
+		extension: '.lua',
+		row: 'choice',
+		collection: 'cat_choices',
+		depth: 4,
+		frameDepth: 0,
+		init: 'local cat_choices = {}',
+		append: 'table.insert(cat_choices, choice)',
+		refusal: 'if type(choice) ~= "table" then return nil end',
+		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\tstate.custom_default_section = sname\n\t\t\t\t\t\t\tif ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then\n\t\t\t\t\t\t\t\tpcall(ctx.hotstring_editor.set_default_section, sname)\n\t\t\t\t\t\t\tend\n\t\t\t\t\t\t\tif ctx.save_prefs() ~= true then return false end\n\t\t\t\t\t\t\tctx.updateMenu()\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return lbl end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
+		frame:
+			'local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame", {\n\t\t["personal_default_none"] = none_action,\n\t}, {\n\t\t["personal_default_unset"] = function() return not state.custom_default_section end,\n\t\t["personal_default_boundary"] = function() return #cat_choices > 0 end,\n\t}, { ["personal_default_choices"] = function() return cat_choices end })',
+		prefix:
+			'local cat_choices = {}\n\tif type(personal_secs) == "table" then\n\t\tlocal has_real = false\n\t\tfor _, sec in ipairs(personal_secs) do\n\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\thas_real = true; break\n\t\t\tend\n\t\tend\n\t\tif has_real then\n\t\t\tfor _, sec in ipairs(personal_secs) do\n\t\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\t\tlocal lbl   = (type(sec.description) == "string" and sec.description ~= "")\n\t\t\t\t\t\tand sec.description or tostring(sec.name):gsub("_", " ")\n\t\t\t\t\tlbl = ctx.applyTriggerChar(lbl)\n\t\t\t\t\tlocal sname = sec.name\n\t\t\t\t\tlocal selected = (state.custom_default_section == sname) or nil',
+		frameVariable: 'cat_menu'
+	},
+	linux: {
+		signature: '["hotstring_personal"] = function()',
+		extension: '.lua',
+		row: 'choice',
+		collection: 'choices',
+		depth: 2,
+		frameDepth: 1,
+		init: 'local choices = {}',
+		append: 'choices[#choices + 1] = choice',
+		refusal:
+			'if type(choice) ~= "table" then\n\t\t\t\t\t\tpersonal_choices_admitted = false\n\t\t\t\t\t\treturn {}\n\t\t\t\t\tend',
+		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\tEditor.set_pref("default_section", name)\n\t\t\t\t\t\t\tif type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return name end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
+		frame:
+			'local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {\n\t\t\t\t\t["personal_default_none"] = none_action,\n\t\t\t\t}, {\n\t\t\t\t\t["personal_default_unset"] = function() return current == nil or current == "" end,\n\t\t\t\t\t["personal_default_boundary"] = function() return false end,\n\t\t\t\t}, { ["personal_default_choices"] = function() return choices end })',
+		prefix:
+			'local choices = {}\n\n\t\t\t\tfor _, name in ipairs(personal and personal.sections_order or {}) do\n\t\t\t\t\tlocal selected = (current == name)',
+		enclosure: 'if ok_editor and type(Editor.get_pref) == "function" then',
+		enclosureDepth: 0,
+		frameVariable: 'sub'
+	}
+};
+
+/** The two actual unbraced refusal bodies are conditional children of their native guards. */
+function personalDefaultChoiceFlow(body, proof) {
+	const flow = paths(body, '.ahk');
+	for (const [fragment, depth] of [
+		[proof.refusal, proof.depth],
+		['if !(DefaultFrame is Array)\n\t\t\treturn []', proof.frameDepth]
+	]) {
+		const found = ranges(body, fragment, '.ahk', depth);
+		if (found.length !== 1) throw Error('One actual conditional default-choice refusal');
+		const guard = found[0],
+			returns = flow.tokens
+				.map((token, index) => ({ token, index }))
+				.filter(
+					({ token }) =>
+						token.value === 'return' && token.start > guard.start && token.end < guard.end
+				);
+		if (returns.length !== 1) throw Error('One actual guarded refusal body');
+		const index = returns[0].index;
+		flow.contexts[index] = [...flow.contexts[index], guard.index];
+	}
+	return flow;
+}
+
+/** Actual Linux check refusal invalidates this invocation's real enclosing build. */
+function personalDefaultLinuxRefusal(moduleGraph, native, graph, proof, source) {
+	const admitted = luaLocal(native, 'personal_choices_admitted'),
+		rows = luaLocal(native, 'rows'),
+		failure = ranges(
+			owner(
+				owner(source, 'local function _manifest_hotstring_rows(ctx, config)', '.lua'),
+				proof.signature,
+				'.lua'
+			),
+			proof.refusal,
+			'.lua',
+			proof.depth
+		);
+	if (
+		failure.length !== 1 ||
+		admitted.value?.type !== 'literal' ||
+		admitted.value.value !== true ||
+		!admitted.statement.live ||
+		admitted.writes.length !== 1 ||
+		!luaRetained(native, rows)
+	)
+		return false;
+	const write = admitted.writes[0];
+	if (
+		!write.live ||
+		write.type !== 'assign' ||
+		write.targets.length !== 1 ||
+		write.targets[0].binding !== admitted ||
+		write.values.length !== 1 ||
+		write.values[0].type !== 'literal' ||
+		write.values[0].value !== false ||
+		!graph.nodes.includes(write)
+	)
+		return false;
+	const refusal = graph.nodes.filter(
+		(node) =>
+			node.type === 'if' && node.branches.length === 1 && node.branches[0].body.includes(write)
+	);
+	if (
+		refusal.length !== 1 ||
+		refusal[0].branches[0].body.length !== 2 ||
+		refusal[0].branches[0].body[1].type !== 'return'
+	)
+		return false;
+	const actual = owner(source, 'local function _manifest_hotstring_rows(ctx, config)', '.lua');
+	if (
+		!route(actual, '.lua', [
+			['local personal_choices_admitted = true'],
+			[
+				'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)'
+			],
+			['if not personal_choices_admitted then return nil end'],
+			['return rows']
+		])
+	)
+		return false;
+	const terminal = native.nodes.filter(
+		(node) =>
+			node.type === 'if' &&
+			node.branches.length === 1 &&
+			node.branches[0].test?.type === 'unary' &&
+			node.branches[0].test.op === 'not' &&
+			node.branches[0].test.value.binding === admitted &&
+			node.branches[0].body.length === 1 &&
+			node.branches[0].body[0].type === 'return' &&
+			node.branches[0].body[0].values.length === 1 &&
+			node.branches[0].body[0].values[0].type === 'literal' &&
+			node.branches[0].body[0].values[0].value === null
+	);
+	if (terminal.length !== 1 || !terminal[0].live || terminal[0].start <= rows.statement.end)
+		return false;
+	const parent = luaOwnerGraph(moduleGraph, luaPhysicalFunction(moduleGraph, '_build_hotstrings')),
+		items = luaLocal(parent, 'items'),
+		receive = luaLocal(parent, 'receive');
+	return (
+		luaCall(items.value, '_manifest_hotstring_rows') &&
+		luaSame(items.value.callee, luaLocal(moduleGraph, '_manifest_hotstring_rows')) &&
+		luaRendererGraph(native) &&
+		luaRendererGraph(parent) &&
+		luaRetained(parent, items) &&
+		// Calling the retained native receiver is its real sink, not a data mutation.
+		luaRetained(
+			{
+				...parent,
+				nodes: parent.nodes.filter((node) => node.type !== 'call' || !luaSame(node.callee, receive))
+			},
+			receive
+		) &&
+		route(owner(source, 'local function _build_hotstrings(ctx)', '.lua'), '.lua', [
+			['local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "hotstrings")'],
+			['if not receive then return nil end'],
+			['local items = _manifest_hotstring_rows(ctx, config)'],
+			[
+				'return receive(items, { hotstrings_enabled = function() return _hotstrings_on(ctx) end,\n\t\thotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return true end })'
+			]
+		])
+	);
+}
+
+/** The actual default list consumes one typed shared checkbox per native section. */
+function personalDefaultChoicePublication(source, platform, manifest) {
+	try {
+		if (!Object.hasOwn(PERSONAL_DEFAULT_CHOICES, platform)) return false;
+		const expected = [['ahk', 'hs'], ['linux']].map((platforms) => ({
+			type: 'check',
+			id: 'personal_default_section',
+			caption_source: 'native',
+			caption_getter: 'personal_default_section_label',
+			checked_when: ['personal_default_section_selected'],
+			platforms,
+			unavailable: 'hide'
+		}));
+		if (!isDeepStrictEqual(manifest?.hotstring_personal_default_choice, expected)) return false;
+		const frame = manifest?.hotstring_personal_default_frame;
+		if (
+			!Array.isArray(frame) ||
+			frame.filter((row) => row?.id === 'personal_default_choices').length !== 1 ||
+			!isDeepStrictEqual(
+				frame.find((row) => row?.id === 'personal_default_choices'),
+				{ type: 'list', id: 'personal_default_choices' }
+			)
+		)
+			return false;
+		const proof = PERSONAL_DEFAULT_CHOICES[platform],
+			extension = proof.extension;
+		let body;
+		if (platform === 'ahk') {
+			body = owner(source, proof.signature, extension);
+			if (
+				bindings(body, extension, 'MenuRenderer_CheckRow').length ||
+				bindings(body, extension, 'MenuRenderer_TemplateRows').length
+			)
+				return false;
+		} else {
+			const moduleGraph = luaGraph(source);
+			const native = luaOwnerGraph(
+				moduleGraph,
+				luaPhysicalFunction(
+					moduleGraph,
+					platform === 'hs' ? 'M.build_custom' : '_manifest_hotstring_rows'
+				)
+			);
+			let graph = native;
+			if (platform === 'linux') {
+				const providers = luaLocal(native, 'providers');
+				const fields = luaField(providers.value, 'hotstring_personal');
+				if (
+					fields.length !== 1 ||
+					fields[0].value.type !== 'function' ||
+					!luaRetained(native, providers)
+				)
+					return false;
+				graph = luaOwnerGraph(moduleGraph, fields[0].value);
+			}
+			const row = luaLocal(graph, proof.row),
+				collection = luaLocal(graph, proof.collection),
+				frame = luaLocal(graph, proof.frameVariable);
+			if (
+				!luaRendererGraph(graph) ||
+				bindings(source, extension, '_ENV').length ||
+				![row, collection, frame].every((record) => record.statement.live && record.value?.live) ||
+				!luaRetained(graph, row) ||
+				!luaRetained(graph, collection, true) ||
+				!luaRetained(graph, frame)
+			)
+				return false;
+			const facade = luaLocal(moduleGraph, 'ManifestMenu');
+			const rootedFacade = (expression, seen = new Set()) => {
+				if (expression?.type !== 'id') return false;
+				if (expression.binding === facade) return true;
+				const binding = expression.binding;
+				if (!binding || seen.has(binding) || binding.writes.length) return false;
+				seen.add(binding);
+				return rootedFacade(binding.value, seen);
+			};
+			if (
+				moduleGraph.nodes.some(
+					(node) =>
+						['assign', 'assign-function'].includes(node.type) &&
+						(node.type === 'assign' ? node.targets : [node.target]).some(
+							(target) => ['field', 'index'].includes(target.type) && rootedFacade(target.object)
+						)
+				)
+			)
+				return false;
+			if (
+				platform === 'linux' &&
+				!personalDefaultLinuxRefusal(moduleGraph, native, graph, proof, source)
+			)
+				return false;
+			body =
+				platform === 'hs'
+					? owner(source, proof.signature, extension)
+					: owner(
+							owner(source, 'local function _manifest_hotstring_rows(ctx, config)', extension),
+							proof.signature,
+							extension
+						);
+		}
+		const statements = [
+			...(proof.enclosure ? [[proof.enclosure, proof.enclosureDepth]] : []),
+			[proof.prefix, proof.frameDepth],
+			[proof.call, proof.depth],
+			[proof.refusal, proof.depth],
+			[proof.append, proof.depth],
+			[proof.frame, proof.frameDepth],
+			...(proof.sink ? [[proof.sink, proof.frameDepth]] : [])
+		];
+		if (
+			!route(
+				body,
+				extension,
+				statements,
+				platform === 'ahk' ? personalDefaultChoiceFlow(body, proof) : paths(body, extension)
+			)
+		)
+			return false;
+		const sink = proof.sink ?? proof.frame;
+		if (
+			!retainedChild(body, extension, proof.row, proof.call, proof.append, proof.depth) ||
+			!retainedChild(body, extension, proof.collection, proof.init, sink, proof.frameDepth)
+		)
+			return false;
+		return (
+			platform !== 'ahk' ||
+			['DefaultCommands', 'DefaultGetters', 'DefaultProviders'].every((name) =>
+				retainedChild(body, extension, name, proof.frame, proof.sink, proof.frameDepth)
+			)
+		);
+	} catch {
+		return false;
+	}
+}
+
+module.exports = {
+	hotstringScopePublication,
+	hotstringLanguagePublication,
+	personalDefaultChoicePublication,
+	files
+};
+
+// This finite extension uses the already received Lua graph and physical-route machinery.
+const PERSONAL_SECTION_FACTORY_BODY = `return function()
+		if admission ~= nil then
+			local ok, admitted = pcall(admission)
+			if not ok or admitted ~= true then
+				return KeymapLifecycle.commit_mutation(ctx, "admit personal file section", function() return false end)
+			end
+		end
+		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
+		if PersonalFiles.components(group_name) and require("infra.preferences").personal_choices_available({
+			{ group = group_name, section = sec_name, enabled = will_enable },
+		}) ~= true then
+			return KeymapLifecycle.commit_mutation(ctx, "admit canonical personal section choice", function() return false end)
+		end
+		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable custom hotstring section") then return end
+		local mutator
+		if ctx.keymap then
+			if will_enable then mutator = ctx.keymap.enable_section else mutator = ctx.keymap.disable_section end
+		end
+		KeymapLifecycle.commit_mutation(ctx, "toggle custom hotstring section", function()
+			if type(mutator) ~= "function" then return false end
+			return mutator(group_name, sec_name)
+		end, function()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
+			ctx.updateMenu()
+		end)
+	end`;
+
+function personalSectionLocal(graph, name) {
+	const found = graph.records.filter(
+		(record) =>
+			record.name === name &&
+			record.kind === 'local' &&
+			record.functionDepth === graph.ownerDepth &&
+			record.statement.live &&
+			record.value?.live
+	);
+	if (found.length !== 1) throw Error('One actual section local ' + name);
+	return found[0];
+}
+
+function personalSectionParameters(value, names) {
+	if (
+		!isDeepStrictEqual(
+			value.params.map((parameter) => parameter.name),
+			names
+		)
+	)
+		throw Error('Actual personal section parameters');
+	if (value.params.some((parameter) => parameter.binding.writes.length))
+		throw Error('Actual personal section parameter retained');
+	return Object.fromEntries(value.params.map((parameter) => [parameter.name, parameter.binding]));
+}
+
+/** This family permits only its actual collection writes and authenticated handoffs.
+ * New aliases, container captures and foreign argument escapes refuse conservatively.
+ * No generic parser or renderer retention contract is changed.
+ */
+function personalSectionCustody(graph, records, writes = [], transfers = [], reads = []) {
+	const roots = new Set(records),
+		allowedWrites = new Set(writes),
+		allowedTransfers = new Set(transfers),
+		allowedReads = new Set(reads);
+	const touches = (expression) =>
+		expression &&
+		graph.nodes.some(
+			(node) =>
+				node.type === 'id' &&
+				roots.has(node.binding) &&
+				node.start >= expression.start &&
+				node.end <= expression.end
+		);
+	for (const record of graph.records) {
+		if (record.value && touches(record.value) && !allowedTransfers.has(record.value)) return false;
+	}
+	for (const node of graph.nodes) {
+		if (
+			node.type === 'assign' &&
+			!allowedWrites.has(node) &&
+			[...node.targets, ...node.values].some(touches)
+		)
+			return false;
+		if (node.type === 'assign-function' && [node.target, node.value].some(touches)) return false;
+		if (node.type !== 'call' || ![node.callee, ...node.args].some(touches)) continue;
+		if (allowedTransfers.has(node)) continue;
+		const read =
+			allowedReads.has(node) &&
+			node.callee.type === 'id' &&
+			['type', 'ipairs'].includes(node.callee.name) &&
+			node.callee.binding.global &&
+			!node.callee.binding.writes.length &&
+			node.args.length === 1 &&
+			node.args[0].type === 'id' &&
+			roots.has(node.args[0].binding);
+		if (!read) return false;
+	}
+	return true;
+}
+
+/** The genuine personal content list receives the shared Mac section check leaves. */
+function personalSectionChoicePublication(source, platform, manifest) {
+	try {
+		if (
+			platform !== 'hs' ||
+			!isDeepStrictEqual(manifest?.hotstring_personal_section_choice, [
+				{
+					type: 'check',
+					id: 'personal_section_toggle',
+					caption_source: 'native',
+					caption_getter: 'personal_section_label',
+					checked_when: ['personal_section_selected'],
+					disabled_when: ['personal_section_ready'],
+					platforms: ['hs'],
+					unavailable: 'hide'
+				}
+			])
+		)
+			return false;
+		const rows = manifest?.hotstring_personal_content_frame;
+		if (
+			!Array.isArray(rows) ||
+			rows.filter((row) => row?.id === 'personal_main_sections').length !== 1 ||
+			!isDeepStrictEqual(
+				rows.find((row) => row?.id === 'personal_main_sections'),
+				{ type: 'list', id: 'personal_main_sections' }
+			)
+		)
+			return false;
+		const moduleGraph = luaGraph(source),
+			nativeValue = luaPhysicalFunction(moduleGraph, 'M.build_custom'),
+			native = luaOwnerGraph(moduleGraph, nativeValue),
+			context = personalSectionParameters(nativeValue, ['ctx', 'counts']).ctx,
+			facade = luaLocal(moduleGraph, 'ManifestMenu'),
+			sectionOwner = luaFunctionBinding(native, 'append_section_rows'),
+			factory = luaFunctionBinding(moduleGraph, 'toggleSectionFn'),
+			scopeOwner = luaFunctionBinding(native, 'scope_menu');
+		if (
+			!sectionOwner ||
+			!factory ||
+			!scopeOwner ||
+			!luaRendererGraph(native) ||
+			bindings(source, '.lua', '_ENV').length
+		)
+			return false;
+		const rooted = (expression, record, seen = new Set()) => {
+			if (expression?.type !== 'id') return false;
+			if (expression.binding === record) return true;
+			const alias = expression.binding;
+			if (!alias || alias.writes.length || seen.has(alias)) return false;
+			seen.add(alias);
+			return rooted(alias.value, record, seen);
+		};
+		const imports = {
+			ManifestMenu: 'infra.manifest_menu',
+			PersonalFileScope: 'infra.personal_file_scope',
+			KeymapLifecycle: 'ui.menu.keymap_lifecycle',
+			PersonalFiles: 'hotstrings.personal_files',
+			Labels: 'menu.labels'
+		};
+		for (const [name, path] of Object.entries(imports)) {
+			const record = luaLocal(moduleGraph, name);
+			if (
+				record.writes.length ||
+				!record.statement.live ||
+				!luaCall(record.value, 'require') ||
+				!record.value.callee.binding.global ||
+				record.value.callee.binding.writes.length ||
+				record.value.args.length !== 1 ||
+				record.value.args[0]?.value !== path
+			)
+				return false;
+			if (
+				moduleGraph.nodes.some(
+					(node) =>
+						['assign', 'assign-function'].includes(node.type) &&
+						(node.type === 'assign' ? node.targets : [node.target]).some(
+							(target) => ['field', 'index'].includes(target.type) && rooted(target.object, record)
+						)
+				)
+			)
+				return false;
+			if (
+				moduleGraph.nodes.some(
+					(node) =>
+						['field', 'index'].includes(node.type) &&
+						node.object?.type === 'id' &&
+						node.object.name === name &&
+						node.object.binding !== record
+				)
+			)
+				return false;
+		}
+		for (const name of ['require', 'pcall', 'type', 'ipairs', 'tostring']) {
+			if (
+				moduleGraph.globals.get(name)?.writes.length ||
+				moduleGraph.records.some((record) => record.name === name)
+			)
+				return false;
+		}
+		const published = luaLocal(moduleGraph, 'M');
+		if (
+			moduleGraph.nodes.some(
+				(node) =>
+					['assign', 'assign-function'].includes(node.type) &&
+					(node.type === 'assign' ? node.targets : [node.target]).some(
+						(target) =>
+							['field', 'index'].includes(target.type) &&
+							rooted(target.object, published) &&
+							(target.type === 'field'
+								? target.key === 'build_custom'
+								: target.key?.type !== 'string' || target.key.value === 'build_custom') &&
+							node.value !== nativeValue
+					)
+			)
+		)
+			return false;
+		const shape = (text) => scriptTokens(text, '.lua').map((token) => [token.kind, token.value]);
+		const count = luaLocal(moduleGraph, 'fmt_count');
+		if (
+			count.writes.length ||
+			count.value.type !== 'field' ||
+			count.value.key !== 'fmt_count' ||
+			!luaSame(count.value.object, luaLocal(moduleGraph, 'Labels'))
+		)
+			return false;
+		if (
+			!isDeepStrictEqual(
+				shape(
+					owner(
+						source,
+						'local function toggleSectionFn(ctx, group_name, sec_name, sec_label, admission)',
+						'.lua'
+					)
+				),
+				shape(PERSONAL_SECTION_FACTORY_BODY)
+			)
+		)
+			return false;
+		personalSectionParameters(factory.value, [
+			'ctx',
+			'group_name',
+			'sec_name',
+			'sec_label',
+			'admission'
+		]);
+		const section = luaOwnerGraph(moduleGraph, sectionOwner.value),
+			parameters = personalSectionParameters(sectionOwner.value, [
+				'target',
+				'group_name',
+				'secs',
+				'group_enabled',
+				'admission'
+			]),
+			row = personalSectionLocal(section, 'row'),
+			action = personalSectionLocal(section, 'action'),
+			caption = personalSectionLocal(section, 'caption'),
+			selected = personalSectionLocal(section, 'sec_on'),
+			ready = personalSectionLocal(section, 'ready'),
+			label = personalSectionLocal(section, 'lbl'),
+			paused = personalSectionLocal(native, 'paused');
+		const sectionLoops = section.nodes.filter(
+			(node) =>
+				node.type === 'for' &&
+				node.start < row.statement.start &&
+				node.end > row.statement.end &&
+				node.values.length === 1 &&
+				luaCall(node.values[0], 'ipairs') &&
+				luaSame(node.values[0].args[0], parameters.secs)
+		);
+		if (
+			sectionLoops.length !== 1 ||
+			sectionLoops[0].names.length !== 2 ||
+			sectionLoops[0].names[1].name !== 'sec' ||
+			section.records.some((record) => record.name === 'sec' && record.kind !== 'iteration') ||
+			section.nodes.some(
+				(node) => node.type === 'id' && node.name === 'ctx' && node.binding !== context
+			) ||
+			label.writes.length !== 1
+		)
+			return false;
+		const actualSection = sectionLoops[0].names[1].binding;
+		if (
+			!luaSame(paused.value.object, context) ||
+			paused.value.key !== 'paused' ||
+			![action, caption, selected, ready].every((record) => luaRetained(section, record)) ||
+			!luaRetained(section, parameters.target, true) ||
+			!luaCall(action.value, 'toggleSectionFn') ||
+			action.value.callee.binding !== factory ||
+			action.value.args.length !== 5 ||
+			!luaSame(action.value.args[0], context) ||
+			!luaSame(action.value.args[1], parameters.group_name) ||
+			action.value.args[2]?.type !== 'field' ||
+			action.value.args[2].key !== 'name' ||
+			!luaSame(action.value.args[2].object, actualSection) ||
+			action.value.args[3]?.binding !== label ||
+			!luaSame(action.value.args[4], parameters.admission) ||
+			ready.value.type !== 'binary' ||
+			ready.value.op !== 'and' ||
+			!luaSame(ready.value.left, parameters.group_enabled) ||
+			ready.value.right.type !== 'unary' ||
+			ready.value.right.op !== 'not' ||
+			!luaSame(ready.value.right.value, paused) ||
+			!luaCall(row.value, 'ManifestMenu', 'check_row') ||
+			row.value.callee.object.binding !== facade
+		)
+			return false;
+		const command = luaField(row.value.args[2], 'personal_section_toggle');
+		if (
+			row.value.args[2]?.fields.length !== 1 ||
+			command.length !== 1 ||
+			!luaSame(command[0].value, action)
+		)
+			return false;
+		for (const [name, record] of [
+			['personal_section_label', caption],
+			['personal_section_selected', selected],
+			['personal_section_ready', ready]
+		]) {
+			const field = luaField(row.value.args[3], name);
+			if (
+				field.length !== 1 ||
+				field[0].value.type !== 'function' ||
+				field[0].value.params.length ||
+				field[0].value.body.length !== 1 ||
+				field[0].value.body[0].type !== 'return' ||
+				field[0].value.body[0].values.length !== 1 ||
+				!luaSame(field[0].value.body[0].values[0], record)
+			)
+				return false;
+		}
+		if (row.value.args[3]?.fields.length !== 3) return false;
+		const nilWrites = section.nodes.filter(
+			(node) =>
+				node.type === 'assign' &&
+				node.targets.some(
+					(target) => ['field', 'index'].includes(target.type) && rooted(target.object, row)
+				)
+		);
+		if (
+			nilWrites.length !== 2 ||
+			!nilWrites.every(
+				(node) =>
+					node.live &&
+					node.targets.length === 1 &&
+					node.targets[0].type === 'field' &&
+					luaSame(node.targets[0].object, row) &&
+					['action', 'checked'].includes(node.targets[0].key) &&
+					node.values.length === 1 &&
+					node.values[0].type === 'literal' &&
+					node.values[0].value === null
+			) ||
+			!luaRetained(
+				{ ...section, nodes: section.nodes.filter((node) => !nilWrites.includes(node)) },
+				row
+			)
+		)
+			return false;
+		const body = owner(
+			owner(source, 'function M.build_custom(ctx, counts)', '.lua'),
+			'local function append_section_rows(target, group_name, secs, group_enabled, admission)',
+			'.lua'
+		);
+		if (
+			!route(body, '.lua', [
+				['if type(secs) ~= "table" then return true end'],
+				['local has_real = false'],
+				[
+					'for _, sec in ipairs(secs) do if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then has_real = true; break end end'
+				],
+				['if not has_real then return true end'],
+				[
+					'for _, sec in ipairs(secs) do if type(sec) ~= "table" then goto continue_sec end if sec.name == "-" then',
+					0
+				],
+				[
+					'local boundary = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})',
+					2
+				],
+				['if type(boundary) ~= "table" then return false end', 2],
+				['for _, row in ipairs(boundary) do target[#target + 1] = row end', 2],
+				['elseif not sec.is_module_placeholder then', 2],
+				[
+					'local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec.name) or false',
+					2
+				],
+				[
+					'local lbl = (type(sec.description) == "string" and sec.description ~= "") and sec.description or tostring(sec.name):gsub("_", " ") lbl = ctx.applyTriggerChar(lbl)',
+					2
+				],
+				['local ready = group_enabled and not paused', 2],
+				[
+					'local caption = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl',
+					2
+				],
+				['local action = toggleSectionFn(ctx, group_name, sec.name, lbl, admission)', 2],
+				[
+					'local row = ManifestMenu.check_row("hotstring_personal_section_choice", "personal_section_toggle", { personal_section_toggle = action, }, { personal_section_label = function() return caption end, personal_section_selected = function() return sec_on end, personal_section_ready = function() return ready end, })',
+					2
+				],
+				['if type(row) ~= "table" then return false end', 2],
+				['if not ready then row.action = nil end', 2],
+				['if row.checked == false then row.checked = nil end', 2],
+				['target[#target + 1] = row', 2],
+				['return true']
+			])
+		)
+			return false;
+		const grow = personalSectionLocal(native, 'g_rows'),
+			main = personalSectionLocal(native, 'main_sections'),
+			items = personalSectionLocal(native, 'menu_items'),
+			admission = personalSectionLocal(native, 'admission'),
+			scopeNames = personalSectionLocal(native, 'scope_names'),
+			groups = personalSectionLocal(native, 'personal_group_names'),
+			sections = personalSectionLocal(native, 'g_secs'),
+			enabled = personalSectionLocal(native, 'g_enabled'),
+			inventory = personalSectionLocal(native, 'all_personal_secs_by_group');
+		if (
+			![grow, main, items, admission, paused].every((record) =>
+				luaRetained(native, record, record === main)
+			) ||
+			!luaRetained(native, scopeNames, true) ||
+			!luaCall(items.value, 'ManifestMenu', 'template_rows') ||
+			items.value.callee.object.binding !== facade
+		)
+			return false;
+		const checks = native.nodes.filter(
+			(node) => luaCall(node, 'append_section_rows') && luaSame(node.args[0], grow)
+		);
+		if (
+			checks.length !== 1 ||
+			checks[0].callee.binding !== sectionOwner ||
+			checks[0].args.length !== 5 ||
+			!luaSame(checks[0].args[2], sections) ||
+			!luaSame(checks[0].args[3], enabled) ||
+			!luaSame(checks[0].args[4], admission)
+		)
+			return false;
+		const callers = native.nodes.filter(
+			(node) =>
+				node.type === 'for' &&
+				node.start < checks[0].start &&
+				node.end > checks[0].end &&
+				node.values.length === 1 &&
+				luaCall(node.values[0], 'ipairs') &&
+				luaSame(node.values[0].args[0], groups)
+		);
+		if (
+			callers.length !== 1 ||
+			callers[0].names.length !== 2 ||
+			!luaSame(checks[0].args[1], callers[0].names[1].binding) ||
+			sections.value.type !== 'index' ||
+			!luaSame(sections.value.object, inventory) ||
+			!luaSame(sections.value.key, callers[0].names[1].binding) ||
+			!luaCall(enabled.value, 'groupEnabled') ||
+			enabled.value.callee.binding !== luaFunctionBinding(moduleGraph, 'groupEnabled') ||
+			!luaSame(enabled.value.args[0], context) ||
+			!luaSame(enabled.value.args[1], callers[0].names[1].binding)
+		)
+			return false;
+		const provider = luaField(items.value.args[3], 'personal_main_sections');
+		if (
+			provider.length !== 1 ||
+			provider[0].value.type !== 'function' ||
+			provider[0].value.body.length !== 1 ||
+			provider[0].value.body[0].type !== 'return' ||
+			!luaSame(provider[0].value.body[0].values[0], main)
+		)
+			return false;
+		const scope = luaOwnerGraph(moduleGraph, scopeOwner.value),
+			scopeParameters = personalSectionParameters(scopeOwner.value, [
+				'names',
+				'file_rows',
+				'section_rows'
+			]);
+		if (!luaRendererGraph(scope) || !luaRetained(scope, scopeParameters.section_rows)) return false;
+		const nativeBody = owner(source, 'function M.build_custom(ctx, counts)', '.lua');
+		if (
+			!route(nativeBody, '.lua', [
+				['local paused = ctx.paused'],
+				['local personal_group_names = {}'],
+				[
+					'for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do if ctx.get_group_name(f) == "personal" then has_personal = true; break end end'
+				],
+				['if has_personal then table.insert(personal_group_names, "personal") end'],
+				[
+					'for _, ext_name in ipairs(get_personal_ext_groups(ctx)) do table.insert(personal_group_names, ext_name) end'
+				],
+				['local all_personal_secs_by_group = {}'],
+				[
+					'for _, gname in ipairs(personal_group_names) do local secs = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(gname) or nil all_personal_secs_by_group[gname] = secs end'
+				],
+				['local main_sections, unavailable_rows, tree_rows = {}, {}, {}'],
+				['local used_sources = {}'],
+				['for _, gname in ipairs(personal_group_names) do local record'],
+				[
+					'for index, source in ipairs(ctx.personal_files or {}) do if source.name == gname and not used_sources[index] then record, used_sources[index] = source, true break end end',
+					1
+				],
+				[
+					'local g_enabled = groupEnabled(ctx, gname) local g_secs = all_personal_secs_by_group[gname] local g_rows = {} local admission = gname ~= "personal" and PersonalFileScope.bind(ctx, record) or nil',
+					1
+				],
+				[
+					'if append_section_rows(g_rows, gname, g_secs, g_enabled, admission) ~= true then return nil end',
+					1
+				],
+				[
+					'if #g_rows > 0 or PersonalFiles.components(gname) then if gname == "personal" then for _, row in ipairs(g_rows) do main_sections[#main_sections + 1] = row end',
+					1
+				],
+				[
+					'local menu_items = ManifestMenu.template_rows("hotstring_personal_content_frame", {}, { ["personal_main_boundary"] = function() return #main_sections > 0 end, ["personal_tree_boundary"] = function() return #tree_rows > 0 end, ["personal_custom_boundary"] = function() return #custom_rows > 0 end, ["personal_empty"] = function() return false end, }, { ["personal_controls"] = function() return controls end, ["personal_main_sections"] = function() return main_sections end, ["personal_unavailable_directories"] = function() return unavailable_rows end, ["personal_tree"] = function() return tree_rows end, ["personal_custom_sections"] = function() return custom_rows end, })'
+				],
+				['if type(menu_items) ~= "table" then return nil end'],
+				[
+					'local scope_names = {} for _, name in ipairs(personal_group_names) do scope_names[#scope_names + 1] = name end if type(custom_secs) == "table" then scope_names[#scope_names + 1] = "custom" end'
+				],
+				[
+					'return { label = title_str, checked = both_enabled or nil, submenu = scope_menu(scope_names, {}, menu_items), }'
+				]
+			])
+		)
+			return false;
+		if (
+			!route(
+				owner(nativeBody, 'local function scope_menu(names, file_rows, section_rows)', '.lua'),
+				'.lua',
+				[
+					[
+						'return ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil, { commands = { ["hotstring_category_enable_all"] = M.category_scope_fn(ctx, names, true), ["hotstring_category_disable_all"] = M.category_scope_fn(ctx, names, false), } }, { ["hotstring_category_file"] = function() return file_rows end, ["hotstring_category_sections"] = function() return section_rows end, })'
+					]
+				]
+			)
+		)
+			return false;
+		const terminal = native.body.at(-1);
+		if (terminal.type !== 'return' || !terminal.live || terminal.values.length !== 1) return false;
+		const handoff = luaField(terminal.values[0], 'submenu');
+		if (
+			handoff.length !== 1 ||
+			!luaCall(handoff[0].value, 'scope_menu') ||
+			handoff[0].value.callee.binding !== scopeOwner ||
+			!luaSame(handoff[0].value.args[0], scopeNames) ||
+			!luaSame(handoff[0].value.args[2], items)
+		)
+			return false;
+		// The actual extension receiver is already a genuine receiving port for g_rows.
+		// Its input must also stay closed; an arbitrary same-spelling callee gets no credit.
+		const fileOwner = luaFunctionBinding(native, 'file_menu_for_group');
+		if (!fileOwner) return false;
+		const fileReceives = native.nodes.filter(
+			(node) => luaCall(node, 'file_menu_for_group') && luaSame(node.args[1], grow)
+		);
+		if (fileReceives.length !== 1 || fileReceives[0].callee.binding !== fileOwner) return false;
+		const fileGraph = luaOwnerGraph(moduleGraph, fileOwner.value),
+			fileParameters = personalSectionParameters(fileOwner.value, [
+				'gname',
+				'rows',
+				'check',
+				'readonly'
+			]),
+			rendered = personalSectionLocal(fileGraph, 'rendered');
+		if (
+			!luaCall(rendered.value, 'ManifestMenu', 'build') ||
+			rendered.value.callee.object.binding !== facade ||
+			rendered.value.args[0]?.value !== 'hotstring_category_menu'
+		)
+			return false;
+		const fileSections = luaField(rendered.value.args[5], 'hotstring_category_sections');
+		if (
+			fileSections.length !== 1 ||
+			fileSections[0].value.type !== 'function' ||
+			fileSections[0].value.params.length ||
+			fileSections[0].value.body.length !== 1 ||
+			fileSections[0].value.body[0].type !== 'return' ||
+			fileSections[0].value.body[0].values.length !== 1 ||
+			!luaSame(fileSections[0].value.body[0].values[0], fileParameters.rows)
+		)
+			return false;
+		const boundary = personalSectionLocal(section, 'boundary'),
+			targetWrites = section.nodes.filter(
+				(node) =>
+					node.type === 'assign' &&
+					node.targets.some(
+						(target) =>
+							['field', 'index'].includes(target.type) && rooted(target.object, parameters.target)
+					)
+			),
+			mainWrites = native.nodes.filter(
+				(node) =>
+					node.type === 'assign' &&
+					node.targets.some(
+						(target) => ['field', 'index'].includes(target.type) && rooted(target.object, main)
+					)
+			);
+		// The preceding physical-route checks require both actual target sinks and the actual main sink.
+		// Cardinality closes extra append-shaped writes that generic append retention permits.
+		if (targetWrites.length !== 2 || mainWrites.length !== 1) return false;
+		const scopeReturn = scope.body.at(-1);
+		if (
+			scopeReturn.type !== 'return' ||
+			!scopeReturn.live ||
+			scopeReturn.values.length !== 1 ||
+			!luaCall(scopeReturn.values[0], 'ManifestMenu', 'build') ||
+			scopeReturn.values[0].callee.object.binding !== facade
+		)
+			return false;
+		const exactReads = (graph, roles) =>
+			roles.map(([name, record]) => {
+				const calls = graph.nodes.filter(
+					(node) => luaCall(node, name) && node.args.length === 1 && luaSame(node.args[0], record)
+				);
+				if (calls.length !== 1) throw Error('One actual personal section read port ' + name);
+				return calls[0];
+			});
+		return (
+			personalSectionCustody(
+				section,
+				[parameters.target, row, boundary],
+				[...targetWrites, ...nilWrites],
+				[],
+				exactReads(section, [
+					['type', row],
+					['type', boundary],
+					['ipairs', boundary]
+				])
+			) &&
+			personalSectionCustody(
+				native,
+				[grow, main, items],
+				mainWrites,
+				[checks[0], items.value, fileReceives[0], handoff[0].value],
+				exactReads(native, [
+					['type', items],
+					['ipairs', grow]
+				])
+			) &&
+			personalSectionCustody(scope, [scopeParameters.section_rows], [], [scopeReturn.values[0]]) &&
+			personalSectionCustody(fileGraph, [fileParameters.rows], [], [rendered.value])
+		);
+	} catch {
+		return false;
+	}
+}
+
+module.exports.personalSectionChoicePublication = personalSectionChoicePublication;
