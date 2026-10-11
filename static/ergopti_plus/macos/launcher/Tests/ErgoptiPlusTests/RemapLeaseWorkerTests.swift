@@ -3867,6 +3867,98 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 	}
 
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	/// Couples real outer and inner roles without accessing Karabiner or user profiles.
+	func testRealInnerSilenceExitZeroBecomesOuterFailureAfterReady() throws {
+		let executable = try guardianTestExecutable()
+		let fixture = try makeExecutableFixture(body: "exit 125\n")
+		let directory = fixture.deletingLastPathComponent()
+		defer { try? FileManager.default.removeItem(at: directory) }
+		let innerExitMarker = directory.appendingPathComponent("inner-exit-status")
+		func quote(_ value: String) -> String {
+			return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+		}
+		let wrapper = "#!/bin/sh\n"
+			+ quote(executable.path) + " --posix-test-helper lease-inner-silence\n"
+			+ "result=$?\nprintf '%s\\n' \"$result\" >> " + quote(innerExitMarker.path) + "\n"
+			+ "exit \"$result\"\n"
+		try wrapper.write(to: fixture, atomically: true, encoding: .utf8)
+		try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: fixture.path)
+
+		var parentPipe = [Int32](repeating: -1, count: 2)
+		XCTAssertEqual(parentPipe.withUnsafeMutableBufferPointer { Darwin.pipe($0.baseAddress!) }, 0)
+		guard parentPipe[0] >= 0, parentPipe[1] >= 0 else { return }
+		defer { for descriptor in parentPipe { _ = Darwin.close(descriptor) } }
+		for descriptor in parentPipe {
+			let flags = fcntl(descriptor, F_GETFD)
+			XCTAssertGreaterThanOrEqual(flags, 0)
+			guard flags >= 0 else { return }
+			XCTAssertEqual(fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC), 0)
+		}
+		let output = directory.appendingPathComponent("public-protocol")
+		let outputDescriptor = Darwin.open(output.path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0o600)
+		XCTAssertGreaterThanOrEqual(outputDescriptor, 0)
+		guard outputDescriptor >= 0 else { return }
+		defer { _ = Darwin.close(outputDescriptor) }
+		let spawner = SilenceRecordingInnerSpawner(executablePath: fixture.path)
+		let guardian = ScriptedLeaseGuardianRegistration(armResult: true)
+
+		/// Refuses every unexpected canonical fallback without creating a child.
+		final class RefusalOnlyRecoveryExecutor: LeaseCLIExecuting {
+			private(set) var calls = 0
+
+			func execute(
+				cliPath: String,
+				payload: String,
+				timeout: TimeInterval,
+				interruption: () -> LeaseCLIInterruption
+			) -> LeaseCLIResult {
+				calls += 1
+				return .spawnFailed(EPERM)
+			}
+		}
+		let recovery = RefusalOnlyRecoveryExecutor()
+		let identity = LeaseIdentity(
+			cliPath: "/usr/bin/true",
+			token: token,
+			modeName: "ergopti_mode_\(token)",
+			revokedName: "ergopti_revoked_\(token)",
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: 5
+		)
+		let runtime = KarabinerLeaseOuterRuntime(
+			identity: identity,
+			detached: false,
+			spawner: spawner,
+			guardianRegistration: guardian,
+			recoveryExecutor: recovery,
+			parentInputDescriptor: parentPipe[0],
+			parentOutputDescriptor: outputDescriptor
+		)
+		let started = ProcessInfo.processInfo.systemUptime
+		let exitCode = runtime.run()
+		let elapsed = ProcessInfo.processInfo.systemUptime - started
+		XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
+		XCTAssertEqual(recovery.calls, 0, "the no-effect test must never reach canonical CLI fallback")
+		XCTAssertGreaterThanOrEqual(elapsed, 6.75,
+			"the actual inner must exhaust its unchanged five-second pulse plus 1.75-second slack")
+		XCTAssertLessThan(elapsed, 12,
+			"the exact native silence and replacement fence must finish within the test bound")
+		XCTAssertEqual(try String(contentsOf: output, encoding: .utf8), "READY\n",
+			"no STOP or PING was sent; outer failure must not invent a terminal public acknowledgement")
+		let statuses = try String(contentsOf: innerExitMarker, encoding: .utf8)
+		XCTAssertTrue(statuses.hasPrefix("0\n"),
+			"clean native inner silence fencing exits zero before the outer classifies private EOF")
+		XCTAssertEqual(spawner.children.count, 2,
+			"initial private loss must receive exactly one clean replacement fence")
+		for child in spawner.children {
+			XCTAssertTrue(child.reaped, "every exact spawned leader must be reaped")
+			XCTAssertEqual(child.descriptor, -1, "every retained private endpoint must be closed")
+		}
+		XCTAssertEqual(guardian.retireCalls, 1)
+	}
+	#endif
+
 	/// Proves private socket HUP discards buffered live commands before execution.
 	func testPrivatePeerClosureOutranksBufferedSet() throws {
 		var sockets = [Int32](repeating: -1, count: 2)
@@ -5889,6 +5981,37 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 // ======= 7/ Behavioral Test Doubles =======
 // ==========================================
 // ==========================================
+
+#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+/// Retains real POSIX children only to assert exact cleanup after native silence.
+private final class SilenceRecordingInnerSpawner: LeaseInnerSpawning {
+	private let delegate: PosixLeaseInnerSpawner
+	private(set) var children: [SpawnedLeaseInner] = []
+
+	/// Pins the exact test-owned wrapper before the real POSIX spawn.
+	init(executablePath: String) {
+		delegate = PosixLeaseInnerSpawner(executablePath: executablePath)
+	}
+
+	/// Records each real child while preserving the production spawner contract.
+	func spawn(identity: LeaseIdentity) -> SpawnedLeaseInner? {
+		guard let child = delegate.spawn(identity: identity) else { return nil }
+		children.append(child)
+		// Direct XCTest runtime calls bypass the production SIGPIPE disposition.
+		// Refusal on this exact socket must remain an assertion, not kill XCTest.
+		var enabled: Int32 = 1
+		guard setsockopt(
+			child.descriptor, SOL_SOCKET, SO_NOSIGPIPE,
+			&enabled, socklen_t(MemoryLayout<Int32>.size)
+		) == 0 else {
+			child.terminateOwnedProcessGroupAndReap()
+			child.closeSocket()
+			return nil
+		}
+		return child
+	}
+}
+#endif
 
 /// Supplies deterministic commands and liveness events to the inner runtime.
 private final class ScriptedLeaseInnerChannel: LeaseInnerChannel {

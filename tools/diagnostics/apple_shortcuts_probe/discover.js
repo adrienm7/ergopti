@@ -10,13 +10,44 @@ function checkpoint(number) {
 }
 // The native import owns the C signature: no fabricated AEDesc layout or ABI cast.
 // This asks about the same osascript principal, never starts the target or prompts.
-function permissionPreflight() {
+function sdkProjection(raw) {
+	if (typeof raw !== 'string' || raw.length === 0 || raw.length > 1024) return null;
+	try {
+		var value = JSON.parse(raw);
+		if (!value || Array.isArray(value) || value.version !== 1) return null;
+		var canonical = {
+			event_class: value.event_class,
+			event_id: value.event_id,
+			target_type: value.target_type,
+			version: 1
+		};
+		if (JSON.stringify(canonical) !== raw) return null;
+		if (
+			[canonical.event_class, canonical.event_id, canonical.target_type].some(function (item) {
+				return (
+					typeof item !== 'number' ||
+					!isFinite(item) ||
+					Math.floor(item) !== item ||
+					item < 0 ||
+					item > 4294967295
+				);
+			})
+		)
+			return null;
+		return canonical;
+	} catch (error) {
+		return null;
+	}
+}
+
+function permissionPreflight(projected) {
 	checkpoint('P:BEGIN');
 	try {
 		ObjC.import('CoreServices');
-		var eventClass = $.kAECoreSuite,
-			eventID = $.kAEGetData,
-			targetType = $.typeApplicationBundleID;
+		var eventClass = projected === undefined ? $.kAECoreSuite : projected && projected.event_class,
+			eventID = projected === undefined ? $.kAEGetData : projected && projected.event_id,
+			targetType =
+				projected === undefined ? $.typeApplicationBundleID : projected && projected.target_type;
 		// Fixed failure-only annotations identify the original unavailable guard;
 		// they never change bridge admission or disclose exception/native values.
 		if (typeof $.AEDeterminePermissionToAutomateTarget !== 'function') {
@@ -89,6 +120,13 @@ function run(args) {
 		checkpoint(1);
 		if (Array.isArray(args) && args.length === 1 && args[0] === '--permission-preflight')
 			permissionPreflight();
+		else if (
+			Array.isArray(args) &&
+			args.length === 3 &&
+			args[0] === '--permission-preflight' &&
+			args[1] === '--sdk-constants'
+		)
+			permissionPreflight(sdkProjection(args[2]));
 		var catalogue = app.shortcuts();
 		checkpoint(2);
 		if (!Array.isArray(catalogue))

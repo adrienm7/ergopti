@@ -24,6 +24,106 @@ function changed(rel, before, after) {
 		return { ...entry, text: entry.text.replace(before, () => after) };
 	});
 }
+function assertNativeHTTPClockWorkflow(workflow, expected) {
+	const job = workflow.jobs['managed-ollama-native'];
+	assert.ok(job && Array.isArray(job.steps), 'Actual managed native clock owner must exist.');
+	const owners = job.steps.filter(
+		(step) => step.name === 'Receive actual independent managed HTTP native clients'
+	);
+	assert.equal(owners.length, 1, 'Actual independent client must have one source-owned step.');
+	assert.equal(
+		job.steps.filter((step) => step.name === 'Retain independent native HTTP clock receiving')
+			.length,
+		1,
+		'Clock artifact transport must have one source-owned step.'
+	);
+	const index = job.steps.indexOf(owners[0]);
+	assert.deepEqual(
+		job.steps.slice(index, index + 2),
+		expected.jobs['managed-ollama-native'].steps,
+		'Actual two clock steps must equal the fixed reviewed producer input.'
+	);
+	assert.equal(
+		job.steps.filter((step) => step.id === 'native_http_clock').length,
+		1,
+		'Clock output authority must have one unique step ID.'
+	);
+	const packages = workflow.jobs['package-macos'].steps.filter(
+		(step) => step.name === 'Receive actual managed HTTP native clients'
+	);
+	assert.deepEqual(
+		packages,
+		[
+			{
+				name: 'Receive actual managed HTTP native clients',
+				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
+				'timeout-minutes': 5
+			}
+		],
+		'Package original first-two mandatory controls and duplicate deferral must stay exact.'
+	);
+}
+function receiveClockWorkflow(files) {
+	const YAML = require('yaml');
+	const actual = files.find((entry) => entry.rel === MAC);
+	assert.ok(actual, 'Actual macOS workflow source must be present.');
+	const expected = YAML.parse(
+		fs.readFileSync(`${Raw.ROOT}/tools/test/fixtures/native_http_clock_workflow.yml`, 'utf8')
+	);
+	assertNativeHTTPClockWorkflow(YAML.parse(actual.text), expected);
+}
+check(
+	'actual independent clock wiring equals the fixed producer and preserves Package disposition',
+	() => {
+		receiveClockWorkflow(source);
+	}
+);
+for (const [name, before, after] of [
+	[
+		'clock upload absence',
+		'      - name: Retain independent native HTTP clock receiving\n',
+		'      - name: Omitted independent native HTTP clock receiving\n'
+	],
+	[
+		'clock output authority identity',
+		'        id: native_http_clock\n',
+		'        id: foreign_native_http_clock\n'
+	],
+	[
+		'clock deferred artifact must remain skipped',
+		"        if: ${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}\n",
+		'        if: always()\n'
+	],
+	[
+		'clock exact five-minute command cap',
+		'        timeout-minutes: 5\n      - name: Retain independent native HTTP clock receiving\n',
+		'        timeout-minutes: 6\n      - name: Retain independent native HTTP clock receiving\n'
+	],
+	[
+		'clock artifact attempt binding',
+		'          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n',
+		'          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}\n'
+	],
+	[
+		'clock capture status remains independently fatal',
+		'              for code in "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}"; do\n',
+		'              for code in "${owned_status[0]}" "${public_status[0]}" "${client_status[0]}"; do\n'
+	],
+	[
+		'clock source-after judge cannot be omitted',
+		'              node tools/ci/native_http_clock_evidence.cjs judge ',
+		'              true omitted_clock_judge '
+	],
+	[
+		'Package first-two commands remain outside duplicate wire deferral',
+		'          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n',
+		'          true omitted_package_owned_process\n'
+	]
+]) {
+	check(name + ' is refused by actual live equality', () => {
+		assert.throws(() => receiveClockWorkflow(changed(MAC, before, after)), /clock|Clock|Package/);
+	});
+}
 check('raw loader and full view retain every exact source byte', () => {
 	const view = Full.fromFiles(source);
 	assert.deepEqual(view.rawFiles(), source);
@@ -74,7 +174,14 @@ check('every scoped full body remains owned; all other product scripts remain ex
 				assert.equal(Full.stepField(step.body, 'run'), Raw.stepField(step.body, 'run'));
 			}
 		}
-	assert.equal(jobs, 26);
+	assert.equal(jobs - 1, 26);
+	assert.equal(jobs, 27);
+	assert.equal(
+		source
+			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
+			.filter((job) => job.file === MAC && job.id === 'lease-silence-native').length,
+		1
+	);
 	assert.ok(steps > 150, 'the full retained script inventory is nonvacuous');
 });
 const testedProtocols = new Set();
@@ -258,6 +365,8 @@ for (const lane of ['macos', 'windows', 'linux']) {
 for (const [rel, id, name] of [
 	[MAC, 'managed-ollama-native', 'Qualify actual selected number-row Carbon XCTest controls'],
 	[MAC, 'managed-ollama-native', 'Retain selected number-row Carbon XCTest diagnostics'],
+	[MAC, 'managed-ollama-native', 'Receive native final-byte number-row causal refusal'],
+	[MAC, 'managed-ollama-native', 'Retain native final-byte number-row causal diagnostics'],
 	[MAC, 'item36-native', 'Observe the actual no-prompt SDK permission API independently'],
 	[MAC, 'managed-ollama-native', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
 	[MAC, 'managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls'],
@@ -621,6 +730,81 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 	assert.notEqual(unsafe, code);
 	assert.throws(() => Full.fromFiles(changed(MAC, safe, '"${pac_skip_args[@]}"')), /binding/);
 });
+
+// New manual receiver is a closed additive owner, never an optional full-job exception.
+{
+	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
+		(job) => job.id === 'lease-silence-native'
+	);
+	const whole = '  lease-silence-native:\n' + job.body + '\n';
+	for (const [label, before, after] of [
+		['job absent', '  lease-silence-native:\n', '  omitted-lease-silence-native:\n'],
+		[
+			'job duplicate',
+			'  lease-silence-native:\n',
+			"  lease-silence-native:\n    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt\n\n  lease-silence-native:\n"
+		],
+		[
+			'job coupled',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    needs: package-macos\n'
+		],
+		[
+			'job forgiven',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    continue-on-error: true\n'
+		],
+		[
+			'release output',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    outputs:\n      assets: fake\n'
+		],
+		[
+			'secret inherited',
+			'  lease-silence-native:\n',
+			'  lease-silence-native:\n    secrets: inherit\n'
+		],
+		[
+			'automatic/release admission',
+			"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+			'    if: always()\n'
+		],
+		['ARM host wrong', 'runner: macos-15\n', 'runner: ubuntu-latest\n'],
+		['Intel absent', 'runner: macos-15-intel\n', 'runner: macos-15\n'],
+		[
+			'source runner wrong',
+			'tools/diagnostics/run_lease_silence_native.sh',
+			'tools/diagnostics/foreign_native.sh'
+		],
+		[
+			'closed parser control omitted',
+			'node tools/test/test-lease-silence-xctest-evidence.cjs',
+			'echo omitted'
+		],
+		[
+			'artifact missing status',
+			'            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n',
+			''
+		],
+		['artifact missing forbidden', 'if-no-files-found: error', 'if-no-files-found: ignore'],
+		['native budget widened', 'timeout-minutes: 20', 'timeout-minutes: 21']
+	]) {
+		check('lease silence: ' + label, () => {
+			assert.equal(whole.split(before).length, 2, 'one new owner mutation seam');
+			assert.throws(
+				() =>
+					Full.fromFiles(
+						changed(
+							MAC,
+							whole,
+							whole.replace(before, () => after)
+						)
+					),
+				/job inventory|missing job|job condition|failure must remain fatal|lease silence native/
+			);
+		});
+	}
+}
 console.log(
 	`PASS: raw full-default and retired-route source controls=${passed}; native execution UNRUN.`
 );

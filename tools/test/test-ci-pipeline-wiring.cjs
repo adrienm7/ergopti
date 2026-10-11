@@ -194,6 +194,18 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Observe independent native Apple Shortcuts SDK preflight and discovery',
+		"${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native Apple Shortcuts SDK observation',
+		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Observe installed Shortcuts Events metadata without launch',
 		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
 	],
@@ -232,6 +244,18 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain selected number-row Carbon XCTest diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Receive native final-byte number-row causal refusal',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain native final-byte number-row causal diagnostics',
 		'always()'
 	],
 	[
@@ -276,6 +300,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		'managed-ollama-native',
 		'Receive actual independent managed HTTP native clients',
 		'${{ !cancelled() }}'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native HTTP clock receiving',
+		"${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}"
 	],
 	[
 		MACOS_BOX,
@@ -346,6 +376,7 @@ const WINDOWS_FILE_RETENTION = [
 ];
 
 const STEP_CONDITIONS = [
+	[MACOS_BOX, 'lease-silence-native', 'Retain exact paired-process native receiving', 'always()'],
 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
 	...scoped.contract.retained_steps.map((owner) => [
@@ -1097,6 +1128,10 @@ for (const candidate of topJobs) {
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
  */
+// Exact intended independent receiver from the previously reviewed manual enrollment design.
+const LEASE_SILENCE_NATIVE_BODY =
+	"    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt";
+
 function graphProblems(files) {
 	const problems = [];
 	const topLevel = pipeline.jobsOfText(files.find((entry) => entry.rel === ENTRY).text, ENTRY);
@@ -1161,6 +1196,7 @@ function graphProblems(files) {
 			rel === MACOS_BOX
 				? [
 						'item36-native',
+						'lease-silence-native',
 						'managed-ollama-native',
 						...sequence.slice(0, 2),
 						'tooltip-canvas',
@@ -1202,6 +1238,11 @@ function graphProblems(files) {
 			}
 		}
 		if (rel === MACOS_BOX) {
+			const silence = jobs.filter((candidate) => candidate.id === 'lease-silence-native');
+			if (silence.length !== 1 || silence[0].body !== LEASE_SILENCE_NATIVE_BODY)
+				problems.push(
+					'lease-silence-native exact manual nonrelease source/host/artifact owner refused'
+				);
 			const scoped = jobs.find((candidate) => candidate.id === 'item36-native');
 			if (
 				!scoped ||
@@ -1247,13 +1288,14 @@ function graphProblems(files) {
 		if (rel === MACOS_BOX) {
 			const expectedEntries = [
 				'item36-native',
+				'lease-silence-native',
 				'managed-ollama-native',
 				'test-hs',
 				'cold-bootstrap-native'
 			];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
 				problems.push(
-					`${rel} must have exactly the four declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
+					`${rel} must have exactly the five declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
 		} else if (entries.length !== 1) {
@@ -1261,7 +1303,8 @@ function graphProblems(files) {
 				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
 			);
 		}
-		const expectedExits = rel === MACOS_BOX ? ['item36-native', 'macos-ok'] : [sequence[4]];
+		const expectedExits =
+			rel === MACOS_BOX ? ['item36-native', 'lease-silence-native', 'macos-ok'] : [sequence[4]];
 		if (
 			rel === MACOS_BOX
 				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
@@ -1328,8 +1371,8 @@ for (const [what, from, to] of [
 	],
 	[
 		'broad scoped item36 admission',
-		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
-		'    if: always()\n'
+		"  item36-native:\n    name: 'Item 36 native archive qualification'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+		"  item36-native:\n    name: 'Item 36 native archive qualification'\n    if: always()\n"
 	],
 	[
 		'unqualified scoped item36 release output',
@@ -1338,6 +1381,65 @@ for (const [what, from, to] of [
 	]
 ])
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
+
+// Independently frozen additive lease-silence job mutations; old graph and NumberRow controls stay whole.
+for (const [label, before, after] of [
+	['job absent', '  lease-silence-native:\n', '  omitted-lease-silence-native:\n'],
+	[
+		'job duplicate',
+		'  lease-silence-native:\n',
+		"  lease-silence-native:\n    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt\n\n  lease-silence-native:\n"
+	],
+	[
+		'job coupled',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    needs: package-macos\n'
+	],
+	[
+		'job forgiven',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    continue-on-error: true\n'
+	],
+	[
+		'release output',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    outputs:\n      assets: fake\n'
+	],
+	[
+		'secret inherited',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    secrets: inherit\n'
+	],
+	[
+		'automatic/release admission',
+		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+		'    if: always()\n'
+	],
+	['ARM host wrong', 'runner: macos-15\n', 'runner: ubuntu-latest\n'],
+	['Intel absent', 'runner: macos-15-intel\n', 'runner: macos-15\n'],
+	[
+		'source runner wrong',
+		'tools/diagnostics/run_lease_silence_native.sh',
+		'tools/diagnostics/foreign_native.sh'
+	],
+	[
+		'closed parser control omitted',
+		'node tools/test/test-lease-silence-xctest-evidence.cjs',
+		'echo omitted'
+	],
+	[
+		'artifact missing status',
+		'            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n',
+		''
+	],
+	['artifact missing forbidden', 'if-no-files-found: error', 'if-no-files-found: ignore'],
+	['native budget widened', 'timeout-minutes: 20', 'timeout-minutes: 21']
+]) {
+	const whole = '  lease-silence-native:\n' + LEASE_SILENCE_NATIVE_BODY + '\n';
+	assert.equal(whole.split(before).length, 2, label + ': exact new owner seam');
+	const changed = whole.replace(before, () => after);
+	mustCatch('lease silence: ' + label, MACOS_BOX, whole, changed, graphProblems);
+}
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
@@ -4901,6 +5003,481 @@ for (const name of [
 		/failure must remain fatal/
 	);
 }
+
+const causalEnrollment = require('./fixtures/number-row-native-causal-enrollment.cjs')(pipeline);
+const numberRowCausalEnrollmentProblems = causalEnrollment.problems;
+errors.push(...numberRowCausalEnrollmentProblems(pipeline.files()));
+mustCatch(
+	'mandatory causal cohort',
+	MACOS_BOX,
+	'      - name: Receive native final-byte number-row causal refusal\n',
+	'      - name: Omitted causal cohort\n',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'unique owned causal step',
+	MACOS_BOX,
+	'      - name: Receive native final-byte number-row causal refusal\n',
+	'      - name: Receive native final-byte number-row causal refusal\n      - name: Receive native final-byte number-row causal refusal\n',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'independent full selector',
+	MACOS_BOX,
+	'--scratch-path "$private_scratch" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests($|[/.])\'',
+	'--scratch-path "$private_scratch" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests.testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject$\'',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'immediate actual status capture',
+	MACOS_BOX,
+	'number_row_causal_statuses=("${PIPESTATUS[@]}")',
+	'number_row_causal_statuses=(0 0)',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'original native exit forwarded',
+	MACOS_BOX,
+	'--swift-exit "${number_row_causal_statuses[0]}"',
+	'--swift-exit 1',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'original capture exit forwarded',
+	MACOS_BOX,
+	'--capture-exit "${number_row_causal_statuses[1]}"',
+	'--capture-exit 0',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'original producer retained',
+	MACOS_BOX,
+	'          python3 -B "$receiver" \\\n            --manifest "$recipe" --projection "$projection" \\\n            --original-producer "$evidence/NumberRowSourceProbe.original.swift"',
+	'          python3 -B "$receiver" \\\n            --manifest "$recipe" --projection "$projection" \\\n            --original-producer "$producer"',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'native restoration transport mandatory',
+	MACOS_BOX,
+	'--tis-root "$ERGOPTI_TIS_EVIDENCE_DIR" --session "$ERGOPTI_TIS_EVIDENCE_SESSION"',
+	'--tis-root /missing --session fixed',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'separate native compile scratch',
+	MACOS_BOX,
+	'--scratch-path "$private_scratch"',
+	'--scratch-path "$projection"',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'actual source HEAD admission',
+	MACOS_BOX,
+	'          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          evidence=',
+	'          true\n          evidence=',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'artifact missing evidence fatal',
+	MACOS_BOX,
+	'      - name: Retain native final-byte number-row causal diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-causal-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n',
+	'      - name: Retain native final-byte number-row causal diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-causal-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: warn\n',
+	numberRowCausalEnrollmentProblems
+);
+mustCatch(
+	'fresh native TIS nonce',
+	MACOS_BOX,
+	'          cp "$recipe" "$evidence/projection-manifest.json"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex")',
+	'          cp "$recipe" "$evidence/projection-manifest.json"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write("fixed-session"',
+	numberRowCausalEnrollmentProblems
+);
+
+// Additive V5 composition enrollment refusals; original twelve controls remain whole.
+const numberRowCompositionSourceMutations = [
+	['missing genuine generator', 'python3 -B "$generator"', 'echo "$generator"'],
+	[
+		'wrong generator current commit',
+		'--head "$GITHUB_SHA" --recipe "$recipe" --approval "$approval"',
+		'--head "historical" --recipe "$recipe" --approval "$approval"'
+	],
+	[
+		'unreceived source approval digest',
+		'approval_sha="47b2dc03e558db6418234ab6c69a279cc91fd9c29bc587505e13ea0989764549"',
+		'approval_sha="0000000000000000000000000000000000000000000000000000000000000000"'
+	],
+	[
+		'unreviewed receiver image',
+		'receiver_sha="d913505e2d3522d5023227b947f3c7896ba3ef4aeadfbd0c1a7042fa9686c148"',
+		'receiver_sha="0000000000000000000000000000000000000000000000000000000000000000"'
+	],
+	[
+		'invented composition expected digest',
+		'composition_sha="0ecbffdbbbc22ced77277e9838b1212b2e0341cacce8a3e0732c6a8c018f9a9f"',
+		'composition_sha="0000000000000000000000000000000000000000000000000000000000000000"'
+	],
+	['forgiven generator status', 'test "$composition_generator_status" -eq 0', 'true'],
+	[
+		'invented generator status',
+		'composition_generator_status=$?',
+		'composition_generator_status=0'
+	],
+	[
+		'skipped generated digest admission',
+		'printf \'%s  %s\\n\' "$composition_sha" "$composition" | shasum -a 256 -c -',
+		'true'
+	],
+	[
+		'native projection passed to original53',
+		'--projection "$controls_projection" --receiving "$portable_receiving"',
+		'--projection "$projection" --receiving "$portable_receiving"'
+	],
+	[
+		'missing historical-only preparer mode',
+		'"$prepare" --composition-controls',
+		'"$prepare" --composition'
+	],
+	[
+		'collapsed historical and native path',
+		'controls_projection="$(mktemp -d "$RUNNER_TEMP/number-row-historical-controls.XXXXXX")"',
+		'controls_projection="$projection"'
+	],
+	[
+		'occupied outer evidence passed to materializer',
+		'"$projection" "$projection_evidence" "$receiver" "$receiver_sha"',
+		'"$projection" "$evidence" "$receiver" "$receiver_sha"'
+	],
+	[
+		'missing composition51 controls',
+		'python3 -B "$composition_controls"',
+		'echo "$composition_controls"'
+	],
+	[
+		'wrong composition51 count',
+		"grep -E '^Ran 51 tests in [0-9.]+s$'",
+		"grep -E '^Ran 0 tests in [0-9.]+s$'"
+	],
+	[
+		'historical projection compiled by Swift',
+		'--package-path "$projection/static/ergopti_plus/macos/launcher"',
+		'--package-path "$controls_projection/static/ergopti_plus/macos/launcher"'
+	],
+	[
+		'final receiver missing composition fields',
+		'--source-approval "$approval" --source-approval-sha256 "$approval_sha" --source-head "$GITHUB_SHA"',
+		'--source-approval "$approval"'
+	],
+	[
+		'extra successful exit before real native',
+		'          set +e\n          swift test --package-path "$projection/static/ergopti_plus/macos/launcher"',
+		'          exit 0\n          set +e\n          swift test --package-path "$projection/static/ergopti_plus/macos/launcher"'
+	],
+	[
+		'missing historical role evidence',
+		'            ${{ runner.temp }}/number-row-causal-evidence/historical-controls-projection.json\n',
+		''
+	]
+];
+assert.equal(
+	numberRowCompositionSourceMutations.length,
+	18,
+	'independent composition source inverse census'
+);
+for (const [label, before, after] of numberRowCompositionSourceMutations)
+	mustCatch(
+		'NumberRow composition: ' + label,
+		MACOS_BOX,
+		before,
+		after,
+		numberRowCausalEnrollmentProblems
+	);
+
+// The final manual SDK diagnostic cannot suppress any earlier native script.
+const SHORTCUTS_INDEPENDENT_OBSERVER = [
+	'      - name: Observe independent native Apple Shortcuts SDK preflight and discovery',
+	"        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
+	'        shell: bash',
+	'        run: |',
+	'          set -euo pipefail',
+	'          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \\',
+	'            --source-root "$GITHUB_WORKSPACE" \\',
+	'            --source-sha "$GITHUB_SHA" \\',
+	'            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}"',
+	'        timeout-minutes: 2'
+].join('\n');
+const SHORTCUTS_INDEPENDENT_RETENTION = [
+	'      - name: Retain independent native Apple Shortcuts SDK observation',
+	"        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
+	'        uses: actions/upload-artifact@v4',
+	'        with:',
+	'          name: native-apple-shortcuts-independent-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+	'          retention-days: 7',
+	'          if-no-files-found: error',
+	'          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}'
+].join('\n');
+function shortcutsIndependentReceivingProblems(files) {
+	const jobs = files.flatMap((file) => pipeline.jobsOfText(file.text, file.rel));
+	const owners = jobs.filter((job) => job.file === MACOS_BOX && job.id === 'managed-ollama-native');
+	if (owners.length !== 1) return ['independent Shortcuts owner job missing or duplicated'];
+	const owned = owners[0];
+	const members = pipeline.steps(owned.body);
+	const problems = [];
+	for (const [name, expected] of [
+		[
+			'Observe independent native Apple Shortcuts SDK preflight and discovery',
+			SHORTCUTS_INDEPENDENT_OBSERVER
+		],
+		['Retain independent native Apple Shortcuts SDK observation', SHORTCUTS_INDEPENDENT_RETENTION]
+	]) {
+		const matches = jobs.flatMap((job) =>
+			pipeline
+				.steps(job.body)
+				.filter((step) => step.name === name)
+				.map((step) => ({ job, step }))
+		);
+		if (matches.length !== 1 || matches[0].job !== owned || matches[0].step.body !== expected)
+			problems.push('independent Shortcuts exact unique owner/body: ' + name);
+	}
+	const python = members.findIndex((step) =>
+		/^actions\/setup-python@v[1-9][0-9]*$/.test(pipeline.stepField(step.body, 'uses') ?? '')
+	);
+	const observer = members.findIndex(
+		(step) => step.name === 'Observe independent native Apple Shortcuts SDK preflight and discovery'
+	);
+	const retention = members.findIndex(
+		(step) => step.name === 'Retain independent native Apple Shortcuts SDK observation'
+	);
+	const installed = members.findIndex(
+		(step) => step.name === 'Retain installed Shortcuts Events metadata diagnostic'
+	);
+	if (
+		python < 0 ||
+		observer <= python ||
+		installed < 0 ||
+		installed >= observer ||
+		retention !== observer + 1 ||
+		retention !== members.length - 1
+	)
+		problems.push(
+			'independent Shortcuts must be the final adjacent pair after installed metadata retention'
+		);
+	return problems;
+}
+const shortcutsIndependentFiles = pipeline.files();
+assert.deepEqual(
+	shortcutsIndependentReceivingProblems(shortcutsIndependentFiles),
+	[],
+	'actual independent SDK observation remains enrolled'
+);
+const shortcutsIndependentMutations = [
+	['missing observer', SHORTCUTS_INDEPENDENT_OBSERVER, ''],
+	[
+		'duplicate observer',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER + '\n' + SHORTCUTS_INDEPENDENT_OBSERVER
+	],
+	[
+		'implicit success observer',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace('!cancelled() && ', '')
+	],
+	[
+		'push-only observer',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace("'workflow_dispatch'", "'push'")
+	],
+	[
+		'release observer',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace('!inputs.release', 'inputs.release')
+	],
+	[
+		'extended observer budget',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace('timeout-minutes: 2', 'timeout-minutes: 3')
+	],
+	[
+		'foreign observer SHA',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace('$GITHUB_SHA', '$GITHUB_RUN_ID')
+	],
+	[
+		'foreign observer source root',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace('$GITHUB_WORKSPACE', '$RUNNER_TEMP')
+	],
+	[
+		'forgiven observer status',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace(
+			'"\n        timeout-minutes: 2',
+			'" || true\n        timeout-minutes: 2'
+		)
+	],
+	[
+		'continue-on-error observer',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace(
+			'        run: |',
+			'        continue-on-error: true\n        run: |'
+		)
+	],
+	[
+		'foreign observer output',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.replace(
+			'group3-apple-shortcuts-probe-independent-',
+			'group3-foreign-probe-'
+		)
+	],
+	[
+		'comment-only observer decoy',
+		SHORTCUTS_INDEPENDENT_OBSERVER,
+		SHORTCUTS_INDEPENDENT_OBSERVER.split('\n')
+			.map((line) => '      # ' + line.trimStart())
+			.join('\n')
+	],
+	['missing retention', SHORTCUTS_INDEPENDENT_RETENTION, ''],
+	[
+		'duplicate retention',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION + '\n' + SHORTCUTS_INDEPENDENT_RETENTION
+	],
+	[
+		'success-only retention',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace('always()', 'success()')
+	],
+	[
+		'release-wide retention',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace(' && !inputs.release', '')
+	],
+	[
+		'foreign retention uploader',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace('upload-artifact@v4', 'upload-artifact@v3')
+	],
+	[
+		'warn-only missing evidence',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace('if-no-files-found: error', 'if-no-files-found: warn')
+	],
+	[
+		'shortened evidence retention',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace('retention-days: 7', 'retention-days: 1')
+	],
+	[
+		'unbound artifact architecture',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace(
+			'native-apple-shortcuts-independent-${{ matrix.architecture }}-',
+			'native-apple-shortcuts-independent-'
+		)
+	],
+	[
+		'unbound artifact source',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace('-${{ github.sha }}-', '-')
+	],
+	[
+		'unbound artifact run',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace('-${{ github.run_id }}-', '-')
+	],
+	[
+		'unbound artifact attempt',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION.replace('-${{ github.run_attempt }}', '')
+	],
+	[
+		'extra quoted artifact input',
+		SHORTCUTS_INDEPENDENT_RETENTION,
+		SHORTCUTS_INDEPENDENT_RETENTION + "\n          'overwrite': true"
+	]
+];
+assert.equal(shortcutsIndependentMutations.length, 24, 'independently declared SDK inverse census');
+for (const [label, before, after] of shortcutsIndependentMutations) {
+	assert.notEqual(before, after, label + ' changes actual source');
+	mustCatch(
+		'independent SDK: ' + label,
+		MACOS_BOX,
+		before,
+		after,
+		shortcutsIndependentReceivingProblems
+	);
+}
+const shortcutsIndependentPair =
+	SHORTCUTS_INDEPENDENT_OBSERVER + '\n\n' + SHORTCUTS_INDEPENDENT_RETENTION;
+const shortcutsIndependentGuardJob = pipeline.job('managed-ollama-native');
+const shortcutsIndependentGuardian = pipeline.step(
+	shortcutsIndependentGuardJob,
+	'Receive selected-release shell corpus and native guardian cancellation'
+);
+const shortcutsIndependentPackage = '      - name: Observe native Apple Shortcuts discovery\n';
+for (const [label, transform] of [
+	[
+		'observer moved after native guardian',
+		(text) =>
+			text
+				.replace(shortcutsIndependentPair, '')
+				.replace(
+					shortcutsIndependentGuardian,
+					shortcutsIndependentGuardian + '\n' + shortcutsIndependentPair
+				)
+	],
+	[
+		'observer moved into dependent package',
+		(text) =>
+			text
+				.replace(shortcutsIndependentPair, '')
+				.replace(
+					shortcutsIndependentPackage,
+					shortcutsIndependentPair + '\n' + shortcutsIndependentPackage
+				)
+	],
+	[
+		'later original-style gate after observer',
+		(text) =>
+			text.replace(
+				shortcutsIndependentPair,
+				shortcutsIndependentPair + '\n\n      - name: Later gate fixture\n        run: echo later'
+			)
+	]
+]) {
+	const mutated = shortcutsIndependentFiles.map((file) =>
+		file.rel === MACOS_BOX ? { ...file, text: transform(file.text) } : file
+	);
+	assert.notDeepEqual(mutated, shortcutsIndependentFiles, label + ' changes actual source');
+	assert.ok(shortcutsIndependentReceivingProblems(mutated).length > 0, label + ' refuses');
+}
+const shortcutsIndependentHarmless =
+	'      - name: Independent SDK guard harmless fixture\n        run: echo harmless';
+for (const name of [
+	'Independent SDK guard harmless fixture',
+	'Independent SDK guard renamed harmless fixture'
+]) {
+	const positive = shortcutsIndependentFiles.map((file) =>
+		file.rel === MACOS_BOX
+			? {
+					...file,
+					text: file.text.replace(
+						shortcutsIndependentPair,
+						shortcutsIndependentHarmless.replace('Independent SDK guard harmless fixture', name) +
+							'\n\n' +
+							shortcutsIndependentPair
+					)
+				}
+			: file
+	);
+	assert.notDeepEqual(positive, shortcutsIndependentFiles, 'positive changes actual source');
+	assert.deepEqual(
+		shortcutsIndependentReceivingProblems(positive),
+		[],
+		'unrelated own fixture remains editable: ' + name
+	);
+}
+console.log('PASS: independent Shortcuts SDK source controls=3 positive/27 refusal; native UNRUN.');
 
 if (errors.length > 0) {
 	console.error(

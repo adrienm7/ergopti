@@ -86,7 +86,10 @@ const LOGGER_42_FILTER =
 	"--filter '(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)'";
 const LOGGER_42_BLOCK =
 	'          # Unchanged original logger29+directory13; neither SDK49 nor daily-log7 supplies this credit.\n          logger_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-xctest.log"\n          logger_source="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-source.json"\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)\' 2>&1 | tee "$logger_transcript"\n          logger_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#logger_statuses[@]}" -eq 2\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs judge "$logger_transcript" "${logger_statuses[0]}" "${logger_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-verdict.json"\n';
+const causalEnrollment = require('./fixtures/number-row-native-causal-enrollment.cjs')(fullDefault);
 function admitNativeSdkSelector(mac) {
+	mac = causalEnrollment.admit(mac);
+	if (mac === null) return null;
 	const jobs = [
 		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
 	];

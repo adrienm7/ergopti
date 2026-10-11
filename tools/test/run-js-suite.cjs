@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Windows ordered-pair cohort receiving retains original publisher and retirement',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-key-combination-cohorts.cjs'],
+		repro: 'node tools/test/test-windows-key-combination-cohorts.cjs'
+	},
+	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],
@@ -1213,6 +1219,12 @@ const CHECKS = [
 		repro: 'npm run test:ci-pipeline'
 	},
 	{
+		name: 'Paired lease silence receiving retains exact native case and child statuses',
+		cmd: process.execPath,
+		args: ['tools/test/test-lease-silence-xctest-evidence.cjs'],
+		repro: 'npm run test:lease-silence-xctest-evidence'
+	},
+	{
 		name: 'Full default CI source admission preserves mandatory gates and bounded diagnostic policy',
 		cmd: 'node',
 		args: ['tools/test/test-ci-full-default.cjs'],
@@ -1930,6 +1942,12 @@ const CHECKS = [
 		cmd: process.execPath,
 		args: ['tools/test/test-managed-ollama-protocol.cjs'],
 		repro: 'node tools/test/test-managed-ollama-protocol.cjs'
+	},
+	{
+		name: 'Native HTTP clock evidence retains source and command receiving boundaries',
+		cmd: process.execPath,
+		args: ['tools/test/test-native-http-clock-evidence.cjs'],
+		repro: 'npm run test:native-http-clock-evidence'
 	},
 	{
 		name: 'managed Ollama catalogue preserves native source and publication admission',

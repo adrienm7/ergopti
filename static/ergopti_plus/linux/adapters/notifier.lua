@@ -200,4 +200,16 @@ function M._send_application(caption, message, opts)
 	return send(message, opts, caption)
 end
 
+--- Dispatches an owned application notice through the shared caption policy.
+--- @param caption function Shared application-caption callback.
+--- @param message string Original notification body.
+--- @param opts table|nil Native title, level and click options.
+--- @param native_admit function Current native owner admission at the effect boundary.
+--- @return boolean admitted Exact native command admission result.
+function M._send_application_owned(caption, message, opts, native_admit)
+	assert(type(caption) == "function", "application caption callback is required")
+	if type(native_admit) ~= "function" then return false end
+	return send(message, opts, caption, native_admit)
+end
+
 return M

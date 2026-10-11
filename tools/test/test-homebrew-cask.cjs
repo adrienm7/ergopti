@@ -862,6 +862,75 @@ function nativeHttpFullBody(script) {
 		.join('\n');
 }
 
+function nativeHttpClockPipeline(workflow, expected) {
+	const job = workflow.jobs['managed-ollama-native'];
+	assert.ok(job && Array.isArray(job.steps), 'Actual managed native clock owner must exist.');
+	const owners = job.steps.filter(
+		(step) => step.name === 'Receive actual independent managed HTTP native clients'
+	);
+	assert.strictEqual(
+		owners.length,
+		1,
+		'Actual independent client must have one source-owned step.'
+	);
+	assert.strictEqual(
+		job.steps.filter((step) => step.name === 'Retain independent native HTTP clock receiving')
+			.length,
+		1,
+		'Clock artifact transport must have one source-owned step.'
+	);
+	const index = job.steps.indexOf(owners[0]);
+	assert.deepStrictEqual(
+		job.steps.slice(index, index + 2),
+		expected.jobs['managed-ollama-native'].steps,
+		'Actual two clock steps must equal the fixed reviewed producer input.'
+	);
+	assert.strictEqual(
+		job.steps.filter((step) => step.id === 'native_http_clock').length,
+		1,
+		'Clock output authority must have one unique step ID.'
+	);
+	const packages = workflow.jobs['package-macos'].steps.filter(
+		(step) => step.name === 'Receive actual managed HTTP native clients'
+	);
+	assert.deepStrictEqual(
+		packages,
+		[
+			{
+				name: 'Receive actual managed HTTP native clients',
+				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
+				'timeout-minutes': 5
+			}
+		],
+		'Package original first-two mandatory controls and duplicate deferral must stay exact.'
+	);
+	assert.strictEqual(owners[0].if, '${{ !cancelled() }}');
+	assert.strictEqual(owners[0].shell, 'bash');
+	assert.strictEqual(owners[0]['timeout-minutes'], 5);
+	assert.notStrictEqual(owners[0]['continue-on-error'], true);
+	const script = nativeHttpFullBody(owners[0].run);
+	const command =
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py';
+	assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
+	assert.strictEqual(script.split(command).length - 1, 1);
+	for (const mandatory of [
+		`${command} 2>&1 | tee "$clock_root/owned-process.log"\nowned_status=("\${PIPESTATUS[@]}")\n`,
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"\npublic_status=("${PIPESTATUS[@]}")\n',
+		'ERGOPTI_NATIVE_CLOCK_EVIDENCE="$clock_root/payload" "$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"\nclient_status=("${PIPESTATUS[@]}")\n',
+		'for code in "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}"; do\n    if [ "$code" -ne 0 ]; then status=1; fi\ndone\n',
+		' - "$clock_root/native-statuses.json" "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}" || clock_status=1\n',
+		'node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ matrix.architecture }}" "$clock_root/clock-verdict.json" || clock_status=1\n',
+		'if [ "$clock_status" -ne 0 ]; then status=1; fi\n'
+	]) {
+		assert.strictEqual(
+			script.split(mandatory).length,
+			2,
+			'Actual command and capture failures remain fatal.'
+		);
+	}
+	assert.ok(script.endsWith('exit "$status"\n'));
+}
+
 check('shared native process ownership controls remain registered and mandatory', () => {
 	const result = spawnSync(
 		process.platform === 'win32' ? 'python' : 'python3',
@@ -882,6 +951,10 @@ check('shared native process ownership controls remain registered and mandatory'
 	const workflow = require('yaml').parse(
 		fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
 	);
+	const expectedClockSteps = require('yaml').parse(
+		fs.readFileSync(path.join(ROOT, 'tools/test/fixtures/native_http_clock_workflow.yml'), 'utf8')
+	);
+	nativeHttpClockPipeline(workflow, expectedClockSteps);
 	const command =
 		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py';
 	for (const [job, name] of [
@@ -904,10 +977,103 @@ check('shared native process ownership controls remain registered and mandatory'
 		}
 		assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
 		assert.strictEqual(script.split(command).length - 1, 1);
-		assert.ok(script.includes(`${command} || status=1\n`));
+		if (job === 'managed-ollama-native') {
+			assert.ok(
+				script.includes(
+					`${command} 2>&1 | tee "$clock_root/owned-process.log"\nowned_status=("\${PIPESTATUS[@]}")\n`
+				)
+			);
+		} else {
+			assert.ok(script.includes(`${command} || status=1\n`));
+		}
 		assert.ok(script.endsWith('exit "$status"\n'));
 		assert.notStrictEqual(steps[0]['continue-on-error'], true);
 	}
+	// Mutate the actual pair and its input together: the intrinsic mandatory
+	// command/status predicates must still refuse a self-consistent omission.
+	const clone = (value) => JSON.parse(JSON.stringify(value));
+	for (const [before, after] of [
+		[
+			`${command} 2>&1 | tee "$clock_root/owned-process.log"`,
+			'true 2>&1 | tee "$clock_root/owned-process.log"'
+		],
+		['owned_status=("${PIPESTATUS[@]}")', 'owned_status=(0 0)'],
+		['public_status=("${PIPESTATUS[@]}")', 'public_status=(0 0)'],
+		['client_status=("${PIPESTATUS[@]}")', 'client_status=(0 0)'],
+		[
+			'for code in "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}"; do',
+			'for code in "${public_status[@]}" "${client_status[@]}"; do'
+		],
+		['if [ "$code" -ne 0 ]; then status=1; fi', 'if [ "$code" -ne 0 ]; then status=0; fi'],
+		['"${client_status[@]}" || clock_status=1', '"${client_status[@]}" || clock_status=0'],
+		[
+			'"$clock_root/clock-verdict.json" || clock_status=1',
+			'"$clock_root/clock-verdict.json" || clock_status=0'
+		],
+		[
+			'if [ "$clock_status" -ne 0 ]; then status=1; fi',
+			'if [ "$clock_status" -ne 0 ]; then status=0; fi'
+		],
+		['exit "$status"', 'exit 0']
+	]) {
+		const actual = clone(workflow);
+		const expected = clone(expectedClockSteps);
+		const owner = actual.jobs['managed-ollama-native'].steps.find(
+			(step) => step.id === 'native_http_clock'
+		);
+		assert.ok(owner.run.includes(before));
+		owner.run = owner.run.replace(before, after);
+		expected.jobs['managed-ollama-native'].steps[0].run = owner.run;
+		assert.throws(() => nativeHttpClockPipeline(actual, expected), assert.AssertionError);
+	}
+	const harmless = clone(workflow);
+	harmless.jobs['managed-ollama-native'].steps.unshift({
+		name: 'Unrelated source owner',
+		run: 'true'
+	});
+	nativeHttpClockPipeline(harmless, expectedClockSteps);
+	const foreign = clone(workflow);
+	foreign.jobs['independent-foreign-owner'] = {
+		steps: [{ name: 'Foreign control', run: 'false' }]
+	};
+	nativeHttpClockPipeline(foreign, expectedClockSteps);
+	const duplicate = clone(workflow);
+	duplicate.jobs['managed-ollama-native'].steps.push(
+		clone(expectedClockSteps.jobs['managed-ollama-native'].steps[0])
+	);
+	assert.throws(
+		() => nativeHttpClockPipeline(duplicate, expectedClockSteps),
+		assert.AssertionError
+	);
+	const missingUpload = clone(workflow);
+	missingUpload.jobs['managed-ollama-native'].steps = missingUpload.jobs[
+		'managed-ollama-native'
+	].steps.filter((step) => step.name !== 'Retain independent native HTTP clock receiving');
+	assert.throws(
+		() => nativeHttpClockPipeline(missingUpload, expectedClockSteps),
+		assert.AssertionError
+	);
+	const cancellation = clone(workflow);
+	const cancelledExpected = clone(expectedClockSteps);
+	const cancellationOwner = cancellation.jobs['managed-ollama-native'].steps.find(
+		(step) => step.id === 'native_http_clock'
+	);
+	cancellationOwner.if = '${{ always() }}';
+	cancelledExpected.jobs['managed-ollama-native'].steps[0].if = cancellationOwner.if;
+	assert.throws(
+		() => nativeHttpClockPipeline(cancellation, cancelledExpected),
+		assert.AssertionError
+	);
+	const packageCorruption = clone(workflow);
+	const packageOwner = packageCorruption.jobs['package-macos'].steps.find(
+		(step) => step.name === 'Receive actual managed HTTP native clients'
+	);
+	assert.ok(packageOwner.run.includes(`${command} || status=1\n`));
+	packageOwner.run = packageOwner.run.replace(`${command} || status=1\n`, 'true\n');
+	assert.throws(
+		() => nativeHttpClockPipeline(packageCorruption, expectedClockSteps),
+		assert.AssertionError
+	);
 });
 
 check(
