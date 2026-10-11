@@ -137,7 +137,6 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	if model == "" then return end
 
 	local chat = remote.serves(provider.id, "chat")
-	local previous = entries.active()
 	-- The label is required by the builds before 2026-10 that read this file;
 	-- it holds the automatic name and no tray reads it.
 	local entry, err = entries.add({
@@ -146,7 +145,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		label = provider.id .. "/" .. model,
 		model = model ~= provider.default_model and model or "",
 		base_url = base_url,
-	})
+	}, chat)
 	if not entry then
 		dialogs.error(tostring(err), heading)
 		return
@@ -157,9 +156,6 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		-- Only the agent's System 1 reads this key: predictions keep their entry.
 		Logger.info(LOG, "API entry '%s' serves the agent's System 1 only; predictions keep their entry.",
 			entry.id)
-		if previous and entries.set_active(previous.id) ~= true then
-			Logger.error(LOG, "The predictions' API entry '%s' could not be selected again.", previous.id)
-		end
 	end
 	if type(on_changed) == "function" then on_changed() end
 	run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id])
