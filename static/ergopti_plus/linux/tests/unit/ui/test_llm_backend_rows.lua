@@ -43,11 +43,11 @@ local function setup(backend)
 			for _, e in ipairs(state.entries) do if e.id == id then state.active = e end end
 			return true
 		end,
-		add = function(fields)
+		add = function(fields, select)
 			local entry = { id = "e" .. (#state.entries + 1), provider = fields.provider, label = fields.label,
 				token = fields.token, model = fields.model, base_url = fields.base_url }
 			state.entries[#state.entries + 1] = entry
-			state.active = entry
+			if select ~= false then state.active = entry end
 			return entry
 		end,
 		remove = function(id)
@@ -894,4 +894,72 @@ helpers.describe("Shared inert empty API status (llm-empty-status)", function()
 		helpers.assert_eq(ok, false)
 		helpers.assert_eq(rawequal(err, raised), true)
 	end)
+end)
+
+helpers.describe("Atomic non-chat addition (ai-menu-nonchat-add)", function()
+	for _, chosen in ipairs({ false, true }) do
+		helpers.it("(ai-menu-nonchat-add) never restores selection with a second write chosen=" .. tostring(chosen), function()
+			local build, state, restore = setup("api")
+			local previous = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
+			if chosen then state.entries, state.active = { previous }, previous end
+			state.answers, state.refuse_selection = { "inert-key", "jev-latest" }, true
+			find(build(), "➕ TypeSafe (Jev)").action()
+			restore()
+			helpers.assert_eq(state.selection_sets or 0, 0, "non-chat creation must publish without selecting")
+			helpers.assert_eq(state.active, chosen and previous or nil)
+			helpers.assert_eq(#state.tests, 1)
+			helpers.assert_eq(state.changed, 1)
+		end)
+	end
+	for _, refused in ipairs({ false, true }) do
+		helpers.it("(ai-menu-nonchat-add) uses one actual private publication refusal=" .. tostring(refused), function()
+			local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local path, rename = assert(os.tmpname()), os.rename
+			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert","model":"qwen","base_url":"","future":{"retained":true}}],"active_id":"chosen","future":{"kept":true}}]]
+			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
+			local stages, changes, probes, active, count, after = 0, 0, 0
+			local ok, failure = pcall(function()
+				local provider = { id = "typesafe", label = "TypeSafe (Jev)", base_url = "https://example.invalid/v1", default_model = "jev-latest" }
+				package.loaded["modules.llm.api_remote"] = {
+					provider_config_receipt = function() return { published = false, ids = { cerebras = true, typesafe = true } } end,
+					provider = function() return provider end,
+					providers = function() return { provider } end,
+					serves = function(id) return id ~= "typesafe" end,
+					test = function() probes = probes + 1; return true end,
+				}
+				local owner = helpers.load_module("modules.llm.api_entries"); owner._set_path_for_test(path)
+				os.rename = function(from, to)
+					if to == path then
+						stages = stages + 1
+						if refused or stages > 1 then return nil, "private publication refused" end
+					end
+					return rename(from, to)
+				end
+				local answers = { "inert-key", "jev-latest" }
+				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
+					{ get_backend = function() return "api" end, set_backend = function() error("non-chat addition must preserve the backend") end },
+					{ prompt = function() return table.remove(answers, 1) end, error = function() end },
+					function() changes = changes + 1 end, function() return {} end)
+				find(rows, "➕ TypeSafe (Jev)").action()
+				active, count = owner.active(), #owner.list()
+				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
+			end)
+			os.rename = rename
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			assert(os.remove(path))
+			helpers.assert_eq(ok, true, tostring(failure))
+			helpers.assert_eq(stages, 1)
+			helpers.assert_eq(active.id, "chosen", "RAM selection survives both outcomes")
+			helpers.assert_eq(count, refused and 1 or 2)
+			helpers.assert_eq(changes, refused and 0 or 1)
+			helpers.assert_eq(probes, refused and 0 or 1)
+			if refused then helpers.assert_eq(after, original) end
+			local image = require("json").decode(after)
+			helpers.assert_eq(image.active_id, "chosen", "durable selection never changes")
+			helpers.assert_eq(image.future.kept, true)
+			helpers.assert_eq(image.entries[1].future.retained, true)
+		end)
+	end
 end)
