@@ -5023,10 +5023,20 @@ checks its typed current schema and genuine native startup, and preserves the
 copied bytes before invoking the original marker consumer. Its inner protected
 scope restores the previous configuration path, including unset, before outer
 cleanup. All eight subjects and original assertions remain; production writers,
-source protection and watchdogs are unchanged. Independent source review passes;
-selected local and actual Windows successor validation remain pending. This does
-not qualify full-suite coverage, packaging, installation or physical gestures.
-Item 42 remains partial.
+source protection and watchdogs are unchanged. Independent source review and
+selected local format, encoding and 410 JS checks pass. Atomic `d6ee9080` is
+integrated without squash in Dev `9f26bd3da`. Source-matched personal Windows
+manual [38138230860](https://github.com/adrienm7/ergopti/actions/runs/38138230860)
+actually passes all eight original native controls with all original assertions
+retained, 12 Source pins unchanged and acknowledged child retirement. Its full
+suite and two unchanged CI guards fail; this diagnostic is not a whole-CI PASS.
+Exact integrated manual [38138598917](https://github.com/adrienm7/ergopti/actions/runs/38138598917)
+passes 410 JS checks and 2,052 native units with zero assertion failures, then
+reaches the unchanged watchdog: one started case lacks a terminal result and
+9,068 never start. The eight original cases are UNRUN in this monolithic suite.
+E2E, packaging and installation are skipped; physical gestures remain untested.
+The [remaining-work checklist](handovers/2026-10-11-config-menus/REMAINING-WORK.md)
+preserves the full-suite and device requirements. Item 42 remains partial.
 
 The shared canonical-hash test hook previously survived its foreign-source
 fault and contaminated later transition admission. The bounded fixture successor

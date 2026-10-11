@@ -1,0 +1,424 @@
+{
+	"status": "original bytes; qualification belongs to each original receiving record",
+	"archive": "windows-gesture-restart-qualified-proof.tar.gz",
+	"archive_bytes": 4407658,
+	"archive_sha256": "9860f6bfcaa7b23710c257fd1301361892dcf5cbb975e703ba923e05eb71c3b5",
+	"member_count": 69,
+	"uncompressed_bytes": 14094696,
+	"members": [
+		{
+			"name": "integrated-terminal/OFFICIAL-ARTIFACTS-ACTUAL-BINDING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/OFFICIAL-ARTIFACTS-ACTUAL-BINDING.json",
+			"bytes": 3690,
+			"sha256": "03963f7402166645f58022fa9c94b49baafb47a9ea00c6b70bc1fb585989ffcc"
+		},
+		{
+			"name": "integrated-terminal/OFFICIAL-CORE-JS-ORIGINAL.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/OFFICIAL-CORE-JS-ORIGINAL.log",
+			"bytes": 52836,
+			"sha256": "8a059605695ae95baabaf1b8aae545c11879230a080a53279676a696f055a7e0"
+		},
+		{
+			"name": "integrated-terminal/OFFICIAL-CURRENT-SOURCE-NATIVE-ACCOUNTING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/OFFICIAL-CURRENT-SOURCE-NATIVE-ACCOUNTING.json",
+			"bytes": 3749,
+			"sha256": "2c530ced0235187b4a846b860f6d075e2ccf41b132d9381d24f49eed2cf5c30b"
+		},
+		{
+			"name": "integrated-terminal/OFFICIAL-FULL-MANIFEST-ARTIFACT-ACTUAL-BINDING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/OFFICIAL-FULL-MANIFEST-ARTIFACT-ACTUAL-BINDING.json",
+			"bytes": 786,
+			"sha256": "66d01cdb8fe692f44a12a120a40057e09e043b10b9ba9dbc9ac139ad13f4aaae"
+		},
+		{
+			"name": "integrated-terminal/OFFICIAL-FULL-MANIFEST-ORIGINAL-ARTIFACT.zip",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/OFFICIAL-FULL-MANIFEST-ORIGINAL-ARTIFACT.zip",
+			"bytes": 129674,
+			"sha256": "6ad66b3044b2de8b1b1e785a492c9c282b901076157440edf30b39e506b3a706"
+		},
+		{
+			"name": "integrated-terminal/OFFICIAL-MANIFEST-DOWNLOAD-RECEIPT.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/OFFICIAL-MANIFEST-DOWNLOAD-RECEIPT.json",
+			"bytes": 402,
+			"sha256": "3653fbea46ac5ef32689751864e9a6f36a798210a708a0df2918770ef0582a38"
+		},
+		{
+			"name": "integrated-terminal/OFFICIAL-WINDOWS-AHK-ORIGINAL.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/OFFICIAL-WINDOWS-AHK-ORIGINAL.log",
+			"bytes": 2754584,
+			"sha256": "1f51679366a13c8db6cae67f636b858a93fd367ecc461b19a2b42f2c0eb1848b"
+		},
+		{
+			"name": "integrated-terminal/TERMINAL-ACCOUNTING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/TERMINAL-ACCOUNTING.json",
+			"bytes": 398,
+			"sha256": "5fffbbb0b5622b9dfa0147cda5d15dfd7d8ac5057adba52fb52fde32aa2abbda"
+		},
+		{
+			"name": "integrated-terminal/TERMINAL-JOBS.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/TERMINAL-JOBS.json",
+			"bytes": 38812,
+			"sha256": "d5c2fe46df6425e8344ba3da486e1487d13f3851a515ddc4fe2685cba798229b"
+		},
+		{
+			"name": "integrated-terminal/TERMINAL-RUN.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/TERMINAL-RUN.json",
+			"bytes": 13956,
+			"sha256": "e185834ea922196d1c942161f26554342b2ce37c7d76d4a6d7284a2fe1e4441e"
+		},
+		{
+			"name": "integrated-terminal/WHOLE-RUN-LOGS.zip",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-WINDOWS-CI-OCT11/WHOLE-RUN-LOGS.zip",
+			"bytes": 1028508,
+			"sha256": "20a3f5ec9001357860b6708349815e8a02800989c6cb12a8212c93f79dcd8657"
+		},
+		{
+			"name": "native-eight-and-personal-full/ARTIFACTS-ACTUAL-BINDING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/ARTIFACTS-ACTUAL-BINDING.json",
+			"bytes": 4460,
+			"sha256": "78e9987601105066c366cc43a6ba047d1dddcfa7ed769cce2a3d5b97eeebea93"
+		},
+		{
+			"name": "native-eight-and-personal-full/CORE-114466613895-ORIGINAL-API.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/CORE-114466613895-ORIGINAL-API.log",
+			"bytes": 97915,
+			"sha256": "e2c23360f22cb9d83acf6b52c09062f6064d98a2ae1f476a49f8655f96b56cdc"
+		},
+		{
+			"name": "native-eight-and-personal-full/CORE-ACTUAL-FAILURE-ACCOUNTING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/CORE-ACTUAL-FAILURE-ACCOUNTING.json",
+			"bytes": 1954,
+			"sha256": "4ea947f78c6def6b03bfbdb7dd3197c96154381364fec4a38deebdfd747806fd"
+		},
+		{
+			"name": "native-eight-and-personal-full/CORE-ACTUAL-FAILURE-BLOCK.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/CORE-ACTUAL-FAILURE-BLOCK.log",
+			"bytes": 7738,
+			"sha256": "40d960bbbf9b09e049b9ba6ce53c03fdde0806ecb35e619b9066088bbb7d7996"
+		},
+		{
+			"name": "native-eight-and-personal-full/CORE-DOWNLOAD-RECEIPT.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/CORE-DOWNLOAD-RECEIPT.json",
+			"bytes": 374,
+			"sha256": "32399388d21db753b11e73311a0d4bde33fe3274634f2e574f401ac6bb173d0d"
+		},
+		{
+			"name": "native-eight-and-personal-full/FULL-MANIFEST-ARTIFACT-ACTUAL-BINDING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/FULL-MANIFEST-ARTIFACT-ACTUAL-BINDING.json",
+			"bytes": 788,
+			"sha256": "d7eaf557782c7f48020588d5d48a987d35e6478bad38f4e52fbf9db252755278"
+		},
+		{
+			"name": "native-eight-and-personal-full/FULL-MANIFEST-DOWNLOAD-RECEIPT.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/FULL-MANIFEST-DOWNLOAD-RECEIPT.json",
+			"bytes": 402,
+			"sha256": "32fa2c72c4cdab428840a767d3e489327c600ff8605a8e1c91f32789bde58ec3"
+		},
+		{
+			"name": "native-eight-and-personal-full/FULL-MANIFEST-ORIGINAL-ARTIFACT.zip",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/FULL-MANIFEST-ORIGINAL-ARTIFACT.zip",
+			"bytes": 128534,
+			"sha256": "69bf2c99bcfc5df9919027ff8ef9bec26856c10c69c85ecac136fe6d8ad48cbb"
+		},
+		{
+			"name": "native-eight-and-personal-full/FULL-SUITE-ACTUAL-ACCOUNTING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/FULL-SUITE-ACTUAL-ACCOUNTING.json",
+			"bytes": 2581,
+			"sha256": "1e0cad57b659296bfe9a217e91480979cb30b8fcb0deb1e851a37b7c3bbc51d4"
+		},
+		{
+			"name": "native-eight-and-personal-full/FULL-UNIT-DOWNLOAD-RECEIPT.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/FULL-UNIT-DOWNLOAD-RECEIPT.json",
+			"bytes": 380,
+			"sha256": "0f2bba13c8520ea94257ce25afcddb516a8ce35730942ca3c7cddc15af165632"
+		},
+		{
+			"name": "native-eight-and-personal-full/INDEPENDENT-ACTUAL-EIGHT-NATIVE-REVIEW.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/INDEPENDENT-ACTUAL-EIGHT-NATIVE-REVIEW.json",
+			"bytes": 5230,
+			"sha256": "07edf13c1f525292d8454ae21ca62e8c818af6d6c002123336d8af3456d97b12"
+		},
+		{
+			"name": "native-eight-and-personal-full/JOBS-FIRST-CHECKPOINT.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/JOBS-FIRST-CHECKPOINT.json",
+			"bytes": 18007,
+			"sha256": "8b382c4ba075865654c0bed6c28a63a8f78e78fc620bac96618507f062cebb0b"
+		},
+		{
+			"name": "native-eight-and-personal-full/RUN-ACTUAL-BINDING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/RUN-ACTUAL-BINDING.json",
+			"bytes": 12538,
+			"sha256": "3fbb80e69639c985ccd8c6b9b4cd5194e824c10099ccb62e9b04e3c375c9c5ea"
+		},
+		{
+			"name": "native-eight-and-personal-full/SUPPLEMENTAL-ACTUAL-EIGHT-NATIVE-RECEIVING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/SUPPLEMENTAL-ACTUAL-EIGHT-NATIVE-RECEIVING.json",
+			"bytes": 3832,
+			"sha256": "f36d7452a0d75d38185c19b059259d7229c737725ad452604eb2bd1e176ff953"
+		},
+		{
+			"name": "native-eight-and-personal-full/SUPPLEMENTAL-ARTIFACT-ACTUAL-BINDING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/SUPPLEMENTAL-ARTIFACT-ACTUAL-BINDING.json",
+			"bytes": 842,
+			"sha256": "dbd5e2a8dde90d66e2695845f50c91a5f8285f64d5b753ecce9b495d8469082e"
+		},
+		{
+			"name": "native-eight-and-personal-full/SUPPLEMENTAL-DOWNLOAD-RECEIPT.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/SUPPLEMENTAL-DOWNLOAD-RECEIPT.json",
+			"bytes": 411,
+			"sha256": "02190138c8b970340d57983ff649073a9d7d60941756157b05072e121b62b34a"
+		},
+		{
+			"name": "native-eight-and-personal-full/SUPPLEMENTAL-ORIGINAL-ARTIFACT.zip",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/SUPPLEMENTAL-ORIGINAL-ARTIFACT.zip",
+			"bytes": 198660,
+			"sha256": "9e63e06e940e026b712cb2b29d3268cfd12bd31c0d1da78df2a0651d673ac074"
+		},
+		{
+			"name": "native-eight-and-personal-full/WINDOWS-UNIT-114466613956-ORIGINAL-API.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/WINDOWS-UNIT-114466613956-ORIGINAL-API.log",
+			"bytes": 2949698,
+			"sha256": "8bc4b0faa82be941f3dd6288c09882ff745a73eb4550ce867f00fcc42ece8f30"
+		},
+		{
+			"name": "native-eight-and-personal-full/WINDOWS-UNIT-CHECKPOINT-2.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-38138230860-cold-receiving-20261011/WINDOWS-UNIT-CHECKPOINT-2.json",
+			"bytes": 7750,
+			"sha256": "6300a03454a6d6062dae9834f072c0a4a4453f19ce4be934ecb3dd8e0b0ba429"
+		},
+		{
+			"name": "personal-ci-source/CONTEXT.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/CONTEXT.json",
+			"bytes": 2036,
+			"sha256": "d1390c3a95e31a864bafca5f979f02d335283120931393b225f1214c91f5b46c"
+		},
+		{
+			"name": "personal-ci-source/FREEZE.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/FREEZE.json",
+			"bytes": 1545,
+			"sha256": "56363e77dc05e0f8a060cf3c2c80bd4ed6b07802679f4d99c3c81564b93db407"
+		},
+		{
+			"name": "personal-ci-source/INDEPENDENT-FINAL-SOURCE-REVIEW.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/INDEPENDENT-FINAL-SOURCE-REVIEW.json",
+			"bytes": 4259,
+			"sha256": "c25b81b4bd42497f0199502b149092f6b0ed329750f06a7dd17fe15df061c736"
+		},
+		{
+			"name": "personal-ci-source/OVERLAY-MAP.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/OVERLAY-MAP.json",
+			"bytes": 938,
+			"sha256": "c0de42de864a006a01a14ecd525fa9d2b05779daeac804871704b29e00e15bcb"
+		},
+		{
+			"name": "personal-ci-source/PRIVATE-FORMAT-CHECK.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/PRIVATE-FORMAT-CHECK.log",
+			"bytes": 66,
+			"sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+		},
+		{
+			"name": "personal-ci-source/PRIVATE-SOURCE-CHECKS.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/PRIVATE-SOURCE-CHECKS.json",
+			"bytes": 976,
+			"sha256": "8acd5fbd4ceb93fa66dace0b27bc87547380898322c3108af4e68d6e9cfbee15"
+		},
+		{
+			"name": "personal-ci-source/PRIVATE-SYNTAX-CHECK.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/PRIVATE-SYNTAX-CHECK.log",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "personal-ci-source/SOURCE-PROPOSAL.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 4933,
+			"sha256": "a226150149625787fafb272fa7d345cce68018d7a4377e747701ab6fb6d4eb92"
+		},
+		{
+			"name": "personal-ci-source/WORKFLOW.patch",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/WORKFLOW.patch",
+			"bytes": 3110,
+			"sha256": "927d3675cfe7e846aa2f3cc13ba89751c11a54ef6aae86a8d499bcfeddabd8a9"
+		},
+		{
+			"name": "personal-ci-source/cohort-inputs.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/cohort-inputs.json",
+			"bytes": 2358,
+			"sha256": "ebd4269349738c73743f06e6ce8dcebf99b0d5eee224e7e22e6de41cd45ffa03"
+		},
+		{
+			"name": "personal-ci-source/run-windows-gesture-restart-cohort.cjs",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/run-windows-gesture-restart-cohort.cjs",
+			"bytes": 8253,
+			"sha256": "53950ed3854fea71074284c8d0d28947ea875b3c60eca0c6b40ce518e2829e01"
+		},
+		{
+			"name": "personal-ci-source/workflow.POST.yml",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/workflow.POST.yml",
+			"bytes": 74842,
+			"sha256": "d998de0306a138fd903b6bcfa0f30e5f083af6ffddc88b9d9a47b569a21cc8d9"
+		},
+		{
+			"name": "personal-ci-source/workflow.PRE.yml",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-gesture-restart-eight-cohort-ci-source-only-v3-formatted-20261011/workflow.PRE.yml",
+			"bytes": 72291,
+			"sha256": "9fda9bad22d0eec1c4d5394f13f657e66c473aaf705ec1e963ad1f5f4c6cb3cc"
+		},
+		{
+			"name": "personal-terminal/TERMINAL-ACCOUNTING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-EIGHT-SUPPLEMENTAL-WINDOWS-CI-OCT11/TERMINAL-ACCOUNTING.json",
+			"bytes": 397,
+			"sha256": "e27aa15d459dcf93c23e26f598b1d8d1a68bf0eca8174d5a4824582d526d4bc8"
+		},
+		{
+			"name": "personal-terminal/TERMINAL-JOBS.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-EIGHT-SUPPLEMENTAL-WINDOWS-CI-OCT11/TERMINAL-JOBS.json",
+			"bytes": 39935,
+			"sha256": "4e3a77c374f4131766afb068ae3c487bb6dc2bf8e0403c77f270ff2257017ca5"
+		},
+		{
+			"name": "personal-terminal/TERMINAL-RUN.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-EIGHT-SUPPLEMENTAL-WINDOWS-CI-OCT11/TERMINAL-RUN.json",
+			"bytes": 14011,
+			"sha256": "87e2c9057b226310ecd3b0420eea83b880d427dba65363193769564fb8f00e6d"
+		},
+		{
+			"name": "personal-terminal/WHOLE-RUN-LOGS.zip",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-EIGHT-SUPPLEMENTAL-WINDOWS-CI-OCT11/WHOLE-RUN-LOGS.zip",
+			"bytes": 985315,
+			"sha256": "8fcc86e9e99e84bbc859931b19590276f1ac7de8a2dba745f538dafbec6f1fd3"
+		},
+		{
+			"name": "predecessor-eight-unrun/ACTUAL-WINDOWS-NATIVE-CASE-AND-COVERAGE.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-WINDOWS-CI-OCT11/ACTUAL-WINDOWS-NATIVE-CASE-AND-COVERAGE.json",
+			"bytes": 2187,
+			"sha256": "3eb0138705c1cc11ec8f149d5fb727711686a09c75336df2901e178edbfb94e7"
+		},
+		{
+			"name": "predecessor-eight-unrun/TERMINAL-ACCOUNTING.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-WINDOWS-CI-OCT11/TERMINAL-ACCOUNTING.json",
+			"bytes": 398,
+			"sha256": "0cb68ef8f2ed0ce786d27c4709a2b9e6ff95155e76e99d733a15b8d60eb84de9"
+		},
+		{
+			"name": "predecessor-eight-unrun/TERMINAL-JOBS.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-WINDOWS-CI-OCT11/TERMINAL-JOBS.json",
+			"bytes": 38836,
+			"sha256": "812f60a347e5d0a1bf5a21d152aa6a6ec325aef6b2d06c5e9d261fe4a27f9629"
+		},
+		{
+			"name": "predecessor-eight-unrun/TERMINAL-RUN.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-WINDOWS-CI-OCT11/TERMINAL-RUN.json",
+			"bytes": 14000,
+			"sha256": "c7edcddc7cbe100568ddf52b619d39e9fa5942314f349449f3f88059c5b34083"
+		},
+		{
+			"name": "predecessor-six-failures/ACTUAL-WINDOWS-NATIVE-CASE-AND-COVERAGE.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GENUINE-SOURCE-CONFLICT-INTEGRATED-WINDOWS-CI-OCT11/ACTUAL-WINDOWS-NATIVE-CASE-AND-COVERAGE.json",
+			"bytes": 2738,
+			"sha256": "e96e09375203ac2d75d2b2c329b142bdbb40ea4467c17b99db63e2463098eeb0"
+		},
+		{
+			"name": "predecessor-six-failures/TERMINAL-WINDOWS-JOB-ORIGINAL-API.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GENUINE-SOURCE-CONFLICT-INTEGRATED-WINDOWS-CI-OCT11/TERMINAL-WINDOWS-JOB-ORIGINAL-API.log",
+			"bytes": 2992140,
+			"sha256": "9831f9834b6a06da7157344aa862fffc65c696d757e844219daccee88f0bea05"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-EIGHT-SUPPLEMENTAL-DISPATCH-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-EIGHT-SUPPLEMENTAL-DISPATCH-OCT11.json",
+			"bytes": 1529,
+			"sha256": "f42110fe6fbc2b1e1a93387e33f5c8cf40b24770a246733c4f29c343af1ee70c"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-DEV-AUTO-TERMINAL-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-DEV-AUTO-TERMINAL-OCT11.json",
+			"bytes": 13940,
+			"sha256": "6da10569bb4fd98ccbf6e68d86ef242b7232656506e4ba6897efe112210eba3f"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-DEV-INTEGRATION-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-DEV-INTEGRATION-OCT11.json",
+			"bytes": 389,
+			"sha256": "9f4a1371339e7bc9a9eef10e292241f86d85366bb8e0c73bf1d2abe18d73c8a2"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-INCOMING-DOCS-EXTRA-PINS-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INCOMING-DOCS-EXTRA-PINS-OCT11.json",
+			"bytes": 1048,
+			"sha256": "e9c2b9655abcd2559af140657a83ee9a37ff93b7e67e248e94a151a3f20ec926"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-INCOMING-DOCS-SELECTED-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INCOMING-DOCS-SELECTED-OCT11.json",
+			"bytes": 1117424,
+			"sha256": "561ed638acf3417760bd513bf1dc8c0bd3b9090f3b699a345928dc89354e81f1"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-INCOMING-DOCS-SELECTED-OCT11.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INCOMING-DOCS-SELECTED-OCT11.log",
+			"bytes": 39329,
+			"sha256": "ea521e1fd8392be163c0dddcf8707b78ca292bcbf6c8552d90c93c3164fb9a83"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-INTEGRATED-DISPATCH-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-INTEGRATED-DISPATCH-OCT11.json",
+			"bytes": 457,
+			"sha256": "d26ab694a343d83a77f95158fb33870581b5be917273e8ff06ae5cd7c1552d85"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-NATIVE-ROLE-SELECTED-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-NATIVE-ROLE-SELECTED-OCT11.json",
+			"bytes": 1117326,
+			"sha256": "4397ce013f5a5cdbc072faaecce91bac2291ad8cfffa2c422c07d2b1ea7cdfb1"
+		},
+		{
+			"name": "receiving/RESUMED-GESTURE-RESTART-NATIVE-ROLE-SELECTED-OCT11.log",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-GESTURE-RESTART-NATIVE-ROLE-SELECTED-OCT11.log",
+			"bytes": 39775,
+			"sha256": "e998097f3fa74e51c9ad9c243e9ccde645cdad55399ecd7b36a14a4ac38025b6"
+		},
+		{
+			"name": "receiving/RESUMED-RESTART-FINAL-SOURCE-CORRESPONDENCE-OCT11.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/RESUMED-RESTART-FINAL-SOURCE-CORRESPONDENCE-OCT11.json",
+			"bytes": 770,
+			"sha256": "b3897e6103e10f11f7fa848b77132ae7a53c33214b15a4ea8dbc2cf0d1897f08"
+		},
+		{
+			"name": "source/FREEZE.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/new-gesture-restart-boot-fixture-review-20261011/FREEZE.json",
+			"bytes": 596,
+			"sha256": "a4305900163aa3be007394048d26b8261a4691fc66ba5cf46ff99409e4a5aaef"
+		},
+		{
+			"name": "source/INDEPENDENT-SOURCE-REVIEW.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/new-gesture-restart-boot-fixture-review-20261011/INDEPENDENT-SOURCE-REVIEW.json",
+			"bytes": 3748,
+			"sha256": "88c35515083c22e071081a0ea9962a5765d02f652d07e24702b99447b3d00479"
+		},
+		{
+			"name": "source/POST.ahk",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/new-gesture-restart-boot-fixture-review-20261011/POST.ahk",
+			"bytes": 6665,
+			"sha256": "e6b6deda8957cb83eb2a8a6dec1eba805a1550a9922684f1b95ae8bc6c2948cd"
+		},
+		{
+			"name": "source/PRE.ahk",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/new-gesture-restart-boot-fixture-review-20261011/PRE.ahk",
+			"bytes": 5644,
+			"sha256": "23a8d9f34c5e78053cf23f024e0ca5415ced54c27ed1b58520646cce924ddb1c"
+		},
+		{
+			"name": "source/SOURCE-PROPOSAL.json",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/new-gesture-restart-boot-fixture-review-20261011/SOURCE-PROPOSAL.json",
+			"bytes": 6410,
+			"sha256": "215b2eef6b3aa1026e77ee8d3c0b3ecc9fce867f60d4cb85b6fa57e4c8f4e592"
+		},
+		{
+			"name": "source/SOURCE.patch",
+			"original_file": "/workspace/ergopti-delivery/group1-complete-resume-20261007/new-gesture-restart-boot-fixture-review-20261011/SOURCE.patch",
+			"bytes": 4593,
+			"sha256": "cd620d027528ed3f3b4cfd0b6c1725a9f7f7c37010b0f4c6dedb60ad9eadeea4"
+		}
+	]
+}
