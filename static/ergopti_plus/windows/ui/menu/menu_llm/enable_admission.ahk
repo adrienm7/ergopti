@@ -129,7 +129,7 @@ _LLM_Menu_EnableWrite(Request, Path, Updates) {
 		return false
 	if !_LLM_Menu_EnableStillCurrent(Request)
 		return false
-	Writer := _LLM_Menu_EnablePort(Request["port"], "writer", TOML_BatchWrite)
+	Writer := _LLM_Menu_EnablePort(Request["port"], "writer", TOML_ConfigBatchWrite)
 	return Writer.Call(Path, Updates)
 }
 
