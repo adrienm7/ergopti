@@ -10560,6 +10560,23 @@ seals the product and staged inputs: old67/34 becomes new101/0, with the same
 one host-specific skip. This is modeled virtual E2E, not actual Hammerspoon,
 Carbon classification, physical keys or installed release qualification.
 
+Manual macOS program assignment now reuses the actual read-only native
+classifier to refuse the reserved Apple Shortcuts route before any parameter
+writer. The picker keeps the editor open with the existing translated
+unavailable reason, and stored descriptors remain editable with that hint.
+The host rechecks session ownership after the availability observation;
+provider reentry cannot confirm a retired page. No syntax, persistence,
+catalogue admission, native task or invocation contract is widened. All 21
+existing translations are retained. The original 14 host cases remain;
+additive controlled receiving passes 36/0 on both Lua ABIs, while the
+predecessor passes 14 and fails 22. Four omitted-boundary variants fail
+causally. Nine actual parameter-editor VM controls pass under pinned Node22;
+the predecessor passes 7 and fails 2, and either omitted UI change fails its
+affected case. The new test fixture explicitly restores its shell-runner cache slot after
+its existing protected cleanup. This
+corrects availability presentation and new-assignment admission; item 106
+remains partial for actual catalogue, consent, invocation and installation.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
