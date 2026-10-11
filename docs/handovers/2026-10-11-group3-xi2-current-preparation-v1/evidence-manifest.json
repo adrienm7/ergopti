@@ -1,0 +1,253 @@
+{
+	"version": 1,
+	"scope": "INERT_C15_FIFTEEN_PATH_PREPARATION_AND_BOUNDED_BUILDER_HELP_RECEIVING_NOT_ADOPTED",
+	"source_head": "c15a16cc9eee103b4132bcaf811ed890834f894c",
+	"candidate_source_paths": 15,
+	"candidate_patch_sha256": "8f5193cbda5ef1248988433b9b565f504b2c5fd3fa1cce774ca093e364a34308",
+	"canonical_adoption": false,
+	"custody": "initial fix/Linux custody pending",
+	"mandatory_fifteenth_path": {
+		"path": "tools/test/fixtures/validation-curl/PINS.json",
+		"field": "command_owner_sha256",
+		"joins_stager_path": "tools/build/stage-linux-network-runtime.py",
+		"joins_stager_sha256": "261a8202a99ddb80cc54595d846467eac4eaa3b91eefbba7186571e5709bd1e5"
+	},
+	"capsule": {
+		"entries": [
+			{
+				"proposed_member": "evidence/current-c15/current-c15-fifteen-path.patch.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-recovery-v4/current-c15-fifteen-path.patch",
+				"bytes": 39445,
+				"sha256": "8f5193cbda5ef1248988433b9b565f504b2c5fd3fa1cce774ca093e364a34308"
+			},
+			{
+				"proposed_member": "evidence/current-c15/source-recovery.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-recovery-v4/source-recovery.json",
+				"bytes": 4768,
+				"sha256": "c5a80abd4d7ccc319467e8b9ca3d7024f9caede8c7250b4c45b471452389bf76"
+			},
+			{
+				"proposed_member": "evidence/current-c15/selected-terminal-receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-native-prerequisites-qualification-v2/selected-terminal-receipt.json",
+				"bytes": 2234,
+				"sha256": "0e14982c42be24b96a50d596697a609a7a168e967533a4309f0009c758063ec2"
+			},
+			{
+				"proposed_member": "evidence/current-c15/gate-results-received.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-native-prerequisites-qualification-v2/gate-results-received.json",
+				"bytes": 1598,
+				"sha256": "6c91568f4328fdf96219b81291e8a94b9458f8d7c08cea68accad808d5d63fc4"
+			},
+			{
+				"proposed_member": "evidence/current-c15/selected-verify.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-native-prerequisites-qualification-v2/selected-verify.raw.log",
+				"bytes": 2068760,
+				"sha256": "472c6e8415ea75437cbbc43087f7fa66571f2c581ae1e4cb1db92eaa3dd8c40d"
+			},
+			{
+				"proposed_member": "evidence/recovery/manifest.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-recovery-v4/manifest.json",
+				"bytes": 1989,
+				"sha256": "3ee606a09ceccc2d5aa2afd492f7a843b3dc8e652b211576f8b14e08328e4e36"
+			},
+			{
+				"proposed_member": "evidence/selected/command.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-native-prerequisites-qualification-v2/command.json",
+				"bytes": 437,
+				"sha256": "af088b4a859cb2214cfcdea891d20a4633fb052fbae928269361d58d55ffa089"
+			},
+			{
+				"proposed_member": "evidence/selected/selected-plan.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-native-prerequisites-qualification-v2/selected-plan.raw.log",
+				"bytes": 4055,
+				"sha256": "14cb7238e122493ef205bd6d224d890769cccb84ef0f9f47bc2b0b25bc8c7ccb"
+			},
+			{
+				"proposed_member": "evidence/selected/selected-verify.exit.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-native-prerequisites-qualification-v2/selected-verify.exit",
+				"bytes": 2,
+				"sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+			},
+			{
+				"proposed_member": "evidence/builder/receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/receipt.json",
+				"bytes": 916,
+				"sha256": "baa710527b03f87b4d051f00328a0dc950755acceb787a7b2a56b44f5b5d30d4"
+			},
+			{
+				"proposed_member": "evidence/builder/results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/results.json",
+				"bytes": 360,
+				"sha256": "30d507cb09e6c2ff5f4532f5c55bf25c1e3fb7c9ba9d07ae6f0142f8cffb7021"
+			},
+			{
+				"proposed_member": "evidence/builder/source-before.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/source-before.json",
+				"bytes": 2049,
+				"sha256": "07b012f53defe5ba7b240e8d1a60eff6cd97ed50afcb01f619a442a9fa38c9cb"
+			},
+			{
+				"proposed_member": "evidence/builder/actual-output-census.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/actual-output-census.json",
+				"bytes": 927882,
+				"sha256": "39036e7f7c6932dbda9f411bdedba017775bdbeb2f81c4189988842a8408f529"
+			},
+			{
+				"proposed_member": "evidence/builder/previous-owned-output-census.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/previous-owned-output-census.json",
+				"bytes": 434901,
+				"sha256": "ae89563af013b66b6e306db9c275f1000999cf49f2853b7231c3dba0e988ebc4"
+			},
+			{
+				"proposed_member": "evidence/builder/driver.stdout.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/driver.stdout.raw",
+				"bytes": 1666,
+				"sha256": "a712f6ea02242dc17f199f5f377ce02c5111f087a63c3a3f359597a46e9e8aee"
+			},
+			{
+				"proposed_member": "evidence/builder/driver.stderr.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/driver.stderr.raw",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/builder/appdir.stdout.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/appdir.stdout.raw",
+				"bytes": 964,
+				"sha256": "9001f54a2fbfbf332fcf1bb4401e360c45d8a689e79cd441f2af5ad3dc8b2aa3"
+			},
+			{
+				"proposed_member": "evidence/builder/appdir.stderr.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/appdir.stderr.raw",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/builder/files.sha256.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-real-builder-receiving-v2/files.sha256",
+				"bytes": 971,
+				"sha256": "dada2ffd3006f8e89ef3e2fda6517ea8689b821493baad4e76db4b9f40b62faa"
+			},
+			{
+				"proposed_member": "evidence/help/receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-appdir-help-receiving-v1/receipt.json",
+				"bytes": 1124,
+				"sha256": "be48a99b67a0e35236f964e3da256fbc455a4f7ebd5ca480ecd0887aadee0ce5"
+			},
+			{
+				"proposed_member": "evidence/help/results.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-appdir-help-receiving-v1/results.json",
+				"bytes": 590,
+				"sha256": "6d7267c2d96cafc39736e382d78a2971d867a89098d6446d3338a856ee85ec68"
+			},
+			{
+				"proposed_member": "evidence/help/AppRun.stdout.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-appdir-help-receiving-v1/AppRun.stdout.raw",
+				"bytes": 2014,
+				"sha256": "cba10a89bce3e09dd430c398c03e1113f02312f87b76637dbef2f2c338426ee8"
+			},
+			{
+				"proposed_member": "evidence/help/AppRun.stderr.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-appdir-help-receiving-v1/AppRun.stderr.raw",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/help/package-bin.stdout.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-appdir-help-receiving-v1/package-bin.stdout.raw",
+				"bytes": 2014,
+				"sha256": "cba10a89bce3e09dd430c398c03e1113f02312f87b76637dbef2f2c338426ee8"
+			},
+			{
+				"proposed_member": "evidence/help/package-bin.stderr.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-appdir-help-receiving-v1/package-bin.stderr.raw",
+				"bytes": 0,
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"proposed_member": "evidence/help/files.sha256.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/xi2-current-dev-appdir-help-receiving-v1/files.sha256",
+				"bytes": 504,
+				"sha256": "2d5eb217f02d4a05b1efb877674d364f923486d72472ee0108532f5940a5cb0b"
+			},
+			{
+				"proposed_member": "evidence/independent-review/REPORT.md.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/group3-xi2-current-builder-help-receiving-v1/REPORT.md",
+				"bytes": 2547,
+				"sha256": "7310ad8eb7f2b746315073a24eb1a19ef69d58fc438f58f26522249077a2b16a"
+			},
+			{
+				"proposed_member": "evidence/independent-review/review.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/group3-xi2-current-builder-help-receiving-v1/review.json",
+				"bytes": 1942,
+				"sha256": "ced61b066e302bb5a9d064d1582cadc28653e48db75a60f30e1ecc9616699ce8"
+			},
+			{
+				"proposed_member": "evidence/independent-review/external-pins.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/group3-xi2-current-builder-help-receiving-v1/external-pins.json",
+				"bytes": 9435,
+				"sha256": "6ec0a1c33dc5644d0d4d0258d2f9cc25f8f41e96aeb74b38bad4ee2c133f91f9"
+			},
+			{
+				"proposed_member": "evidence/independent-review/files.sha256.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/group3-xi2-current-builder-help-receiving-v1/files.sha256",
+				"bytes": 316,
+				"sha256": "eecf3bb22948ea143d241154b1cc2fb80cfe8ae5d490fa00c49bd88bac5747fa"
+			}
+		],
+		"files": 30,
+		"bytes": 3513483,
+		"archive": {
+			"repository_filename": "current-preparation.tar.gz",
+			"bytes": 665787,
+			"sha256": "b34b15aabd46a0e031469ca36fcb7abbabe9f2855007a95ed60857cbc9c3d465"
+		}
+	},
+	"generator": {
+		"source_path": "/workspace/ergopti/docs/handovers/2026-10-10-group3-continuation/generate_capsule.py",
+		"bytes": 2488,
+		"sha256": "07900ef9b6c37d9e26d4f8e8e48b93f7f1416f358a78678415a78c04bf278761"
+	},
+	"preserved_previous_public_handover": {
+		"source_head": "2c144060853239c9c416ea1a9c08030382ed2b1f",
+		"capsule_files": 348,
+		"candidate_paths": 14,
+		"files": {
+			"/workspace/ergopti/docs/handovers/2026-10-11-group3-xi2-preparation/README.md": {
+				"bytes": 3896,
+				"sha256": "1319f4411f425031c9bf72548ecabe51337ffbaddff8eb1f136c051dcb2d7101"
+			},
+			"/workspace/ergopti/docs/handovers/2026-10-11-group3-xi2-preparation/evidence-manifest.json": {
+				"bytes": 143711,
+				"sha256": "0b8890a8bde88dce701d662db8137f47570dfc9be6c97a9038a4bfdaf62bd8f6"
+			},
+			"/workspace/ergopti/docs/handovers/2026-10-11-group3-xi2-preparation/private-preparation.tar.gz": {
+				"bytes": 1591227,
+				"sha256": "c4fd2d7b2a94af0b7ca50b87251592f99ab92c50537b38b5bf6422921d6eaed4"
+			}
+		}
+	},
+	"excluded_payloads": [
+		"actual-current-build-linux.tar.gz",
+		"previous-owned-build-linux.tar.gz",
+		"development-package binaries"
+	],
+	"qualification": {
+		"selected_pass": 14,
+		"selected_environment_fail": 2,
+		"selected_exit": 1,
+		"linux_units_pass": 13102,
+		"linux_units_fail": 0,
+		"driver_exit": 0,
+		"appdir_assembly_exit": 0,
+		"AppRun_help_exit": 0,
+		"package_bin_help_exit": 0
+	},
+	"limits": [
+		"No installed, GUI, AppImage creation/mount or other-distribution qualification.",
+		"No input epoch, modifier/output custody, simultaneous capability or physical qualification.",
+		"Missing lgi in actual help output.",
+		"Ordinary subreaper receiving has no full native child-family or explicit hard-timeout qualification.",
+		"Later Dev acec284ec is parent-supplied coordination context, not this native epoch."
+	]
+}

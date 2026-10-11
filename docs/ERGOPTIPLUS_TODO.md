@@ -9808,6 +9808,8 @@ The personal-hotstring section caption and check policy now come from the shared
   qualification. Shared source custody and final composed/native gates remain
   pending; the preparation is saved in the Group3 Xi handover, not adopted.
 
+  The separate [current Xi preparation handover](handovers/2026-10-11-group3-xi2-current-preparation-v1/README.md) retains the exact c15a16cc9eee103b4132bcaf811ed890834f894c plus 15-source candidate: the mandatory fifteenth PINS.json change joins its command-owner hash to the changed stager. The original selected run remains 14 passing gates and two environment failures (window-family /proc and real Nix CLI/store prerequisites), exit 1, with 13,102/0 Linux units. Separate actual driver/AppDir assembly and both staged CLI-help entries return 0; original libXi ELF bytes are retained by hash and the bounded receiving review. Help reports missing lgi; GUI/installed/AppImage delivery and full native child-family/hard-deadline proof remain unqualified. The old 348-member/14-path handover stays immutable. Initial fix/Linux custody and current-tree receiving remain pending; this adds no input-epoch, modifier/output, public simultaneous or physical authority and does not complete item 93.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
@@ -10645,16 +10647,13 @@ remains partial for actual catalogue, consent, invocation and installation.
   sources, followed by affected delivery gates. Device work: actual number-row
   and dead-state output on real layouts after owner qualification.
 
-  A callable diagnostics-only component is prepared for the single final-byte
-  number-row source counterfactual: exact original Swift tests, immutable
-  portable fixtures, a strict refusal receiver and a current-Git 99-image
-  materializer. The unchanged 53-case portable cohort must be run explicitly;
-  ordinary JS checks do not enroll it. Routine CI wiring remains separately
-  pending shared custody. After the files are committed, receive the preparer's
-  actual-Git projection independently, without Swift or fabricated CI variables.
-  Fresh native compilation, the exact expected assertion transcript and seven
-  TIS restorations remain unrun. This does not enable forced number-row delivery
-  or complete item 107.
+  The callable LF-safe number-row causal diagnostic component is committed at `5fa75b1f29f8d3c8c2c9088724a0ff9b4c1db9c3`: selected format 379 / JavaScript 410 and 53 explicit portable controls pass, and actual Git materialization receives 99 original inputs with only the private final-byte omission followed by a fresh ordered 53/0/0 cohort. [The diagnostic handover](handovers/2026-10-11-group3-number-row-diagnostic-component/README.md) preserves the exact component and separate inactive 25-path CI proposal. The five shared enrollment spans and narrow validator still require custody; fresh native 11 PASS / 1 named expected FAIL and seven TIS restoration closures remain unrun, with the first native assertion wording unobserved and mismatches refused. Preserve the already frozen Windows four-step continuation and existing KLE/HKL qualification; forced output, installed acceptance and device delivery remain open. Item 107 stays partial; no item is removed.
+
+  Windows continuation:
+  1. Implement the original native-HKL symbols/output owner, retaining scan-code down/up/repeat edges, focus/window/thread/HKL, policy generation, modifiers/AltGr/Caps and exact output/restoration debt. Preserve already qualified KLE output and read-only HKL probes.
+  2. Join all-ten capability and row registration/dispatch only after that owner is composed and qualified; a preview, dead-key descriptor or text fallback must not grant output or clear unknown composition state.
+  3. Receive registered native before/after cases with independent French/US ten-key symbols, Shift digits, Caps/dead states, AltGr/Ctrl/Win pass-through, repeats, focus/source changes, pause/reload and failed retirement, checking actual receiver/key-state/caret and closure.
+  4. Validate physical number-row delivery on the user's Windows PC.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
