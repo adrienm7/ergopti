@@ -42,7 +42,12 @@ const CHECKS = [
 		args: ['tools/test/test-windows-nav-portable-registration.cjs'],
 		repro: 'node tools/test/test-windows-nav-portable-registration.cjs'
 	},
-
+	{
+		name: 'Windows Group 7 receipt parser refuses incomplete and malformed native evidence',
+		cmd: process.execPath,
+		args: ['tools/diagnostics/test_windows_group7_receipt.cjs'],
+		repro: 'node tools/diagnostics/test_windows_group7_receipt.cjs'
+	},
 	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',
 		cmd: process.execPath,
