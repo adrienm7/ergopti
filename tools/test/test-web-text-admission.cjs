@@ -60,10 +60,63 @@ function checkQuotedParsing(line) {
 	);
 }
 
+function checkLiteralDemo() {
+	const listeners = new Map();
+	const drive = { style: {}, textContent: '\u00a0' };
+	let markupWrites = 0;
+	Object.defineProperty(drive, 'innerHTML', {
+		set() {
+			markupWrites += 1;
+		}
+	});
+	const text = {
+		value: '',
+		addEventListener(event, callback) {
+			listeners.set(event, callback);
+		}
+	};
+	const font = {
+		value: '48',
+		addEventListener(event, callback) {
+			listeners.set(`font:${event}`, callback);
+		}
+	};
+	const ligatures = [];
+	const demo = fs.readFileSync(path.join(root, 'src/lib/icons/icomoon/demo-files/demo.js'), 'utf8');
+	vm.runInNewContext(demo, {
+		document: {
+			body: { style: { boxShadow: '' }, addEventListener() {} },
+			getElementById(id) {
+				return { fontSize: font, testDrive: drive, testText: text }[id];
+			}
+		},
+		window: {
+			icomoonLiga(element) {
+				ligatures.push(element.textContent);
+			}
+		}
+	});
+	assert.equal(drive.style.fontSize, '48px');
+	for (const event of ['input', 'change']) {
+		text.value = '<img src=x onerror="throw new Error(1)"> & ligature';
+		listeners.get(event)();
+		assert.equal(markupWrites, 0, 'demo input never enters HTML parsing');
+		assert.equal(drive.textContent, text.value, 'markup and ampersands remain literal demo text');
+		assert.equal(ligatures.at(-1), text.value, 'the existing ligature hook observes literal text');
+	}
+	text.value = '';
+	listeners.get('input')();
+	assert.equal(drive.textContent, '\u00a0', 'the empty sample retains its nonbreaking-space glyph');
+	font.value = '64';
+	listeners.get('font:change')();
+	assert.equal(drive.style.fontSize, '64px');
+}
+
 const controls = {
 	decode: checkDecoding,
 	simple: () => checkQuotedParsing(`plain = "${'\\!'.repeat(65536)}`),
-	object: () => checkQuotedParsing(`"object" = { output = "${'\\!'.repeat(65536)} }`)
+	object: () => checkQuotedParsing(`"object" = { output = "${'\\!'.repeat(65536)} }`),
+	dom: checkLiteralDemo
 };
 const requested = process.argv.slice(2);
 const selected = requested.length ? requested : Object.keys(controls);
