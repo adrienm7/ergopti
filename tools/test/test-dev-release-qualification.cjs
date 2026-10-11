@@ -475,6 +475,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 		'ci-macos.yml': [
 			'item36-native',
+			'lease-silence-native',
 			'managed-ollama-native',
 			'test-hs',
 			'e2e-hs',
@@ -494,6 +495,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		release: "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
 		'windows-ok': 'always()',
 		'item36-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		'lease-silence-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
 		'macos-ok': 'always()',
 		'package-linux':
 			"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
@@ -538,7 +540,17 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			}
 		}
 	}
-	assert.equal(jobs, 26);
+	assert.equal(
+		pipeline
+			.jobsOfText(
+				fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8'),
+				'.github/workflows/ci-macos.yml'
+			)
+			.filter((job) => job.id === 'lease-silence-native').length,
+		1
+	);
+	assert.equal(jobs - 1, 26);
+	assert.equal(jobs, 27);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');
