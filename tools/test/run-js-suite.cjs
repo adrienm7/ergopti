@@ -43,6 +43,24 @@ const CHECKS = [
 		repro: 'node tools/test/test-windows-nav-portable-registration.cjs'
 	},
 	{
+		name: 'Windows navigation executes every portable production C case',
+		cmd: process.execPath,
+		args: ['tools/test/run-nav-event-owner-portable.cjs'],
+		repro: 'node tools/test/run-nav-event-owner-portable.cjs'
+	},
+	{
+		name: 'Windows captured-event route core executes independent event vectors',
+		cmd: process.execPath,
+		args: ['tools/test/run-windows-replay-route-core.cjs'],
+		repro: 'node tools/test/run-windows-replay-route-core.cjs'
+	},
+	{
+		name: 'Windows canonical output planner executes independent custody matrices',
+		cmd: process.execPath,
+		args: ['tools/test/run-windows-terminal-output-plan.cjs'],
+		repro: 'node tools/test/run-windows-terminal-output-plan.cjs'
+	},
+	{
 		name: 'Windows Group 7 receipt parser refuses incomplete and malformed native evidence',
 		cmd: process.execPath,
 		args: ['tools/diagnostics/test_windows_group7_receipt.cjs'],
