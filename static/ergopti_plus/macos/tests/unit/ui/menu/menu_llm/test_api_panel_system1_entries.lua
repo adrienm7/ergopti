@@ -269,3 +269,27 @@ helpers.describe("complete API presentation frames", function()
 		end)
 	end
 end)
+
+helpers.describe("Durable API identity allocation (api-entry-id-restart)", function()
+	helpers.it("(api-entry-id-restart) never reuses an earlier process's same-second entry", function()
+		local clock, observed = os.time
+		os.time = function() return 1700000000 end
+		local ok, failure = pcall(function()
+			helpers.with_fresh_modules(FRESH, function()
+				local earlier = { id = "typesafe-1700000000-1", provider = "typesafe", token = "inert-previous", model = "jev-latest" }
+				local world = install({ entries = { earlier }, prompts = { CATALOGUE.providers.typesafe.base_url, "inert-new", "jev-latest" } })
+				local _, rows = world.panel.build(world.ctx)
+				local result = row_starting(add_rows(rows), "➕ TypeSafe (Jev)").action()
+				observed = { result = result, entries = world.entries, persisted = #world.persisted }
+			end)
+		end)
+		os.time = clock
+		helpers.assert_true(ok, tostring(failure))
+		helpers.assert_true(observed.result)
+		helpers.assert_eq(#observed.entries, 2)
+		helpers.assert_eq(observed.entries[1].id, "typesafe-1700000000-1")
+		helpers.assert_eq(observed.entries[1].token, "inert-previous")
+		helpers.assert_eq(observed.entries[2].id, "typesafe-1700000000-2")
+		helpers.assert_eq(observed.persisted, 1)
+	end)
+end)
