@@ -635,6 +635,7 @@ jobs:
               --output "$ERGOPTI_OLLAMA_CATALOGUE"
           } 2>&1 | tee "$RUNNER_TEMP/managed-ollama-producer-build.log"
       - name: Receive actual native model create, pull, inference and retirement
+        id: managed-ollama-model-receiving
         shell: bash
         run: |
           set -euo pipefail
@@ -656,6 +657,19 @@ jobs:
           else
               exit 1
           fi
+      # Observe the original failure after all receiving cleanup has completed.
+      - name: Retain passive security service logs after native model failure
+        if: ${{ !cancelled() && failure() && steps.managed-ollama-model-receiving.outcome == 'failure' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools/diagnostics python3 - "$ERGOPTI_OLLAMA_BUILD_ROOT/security-observation" <<'PY'
+          import sys
+          from macos_launch_gate import collect_security_logs
+          collect_security_logs(sys.argv[1])
+          PY
+        timeout-minutes: 3
+
       - name: Upload qualified native inputs for the application catalogue
         uses: actions/upload-artifact@v4
         with:
@@ -690,6 +704,7 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/assets
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/staged
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/receiving/*/native-receiving.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/security-observation
             ${{ runner.temp }}/managed-ollama-launcher-build.log
             ${{ runner.temp }}/managed-ollama-producer-build.log
 

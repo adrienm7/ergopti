@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -417,6 +418,130 @@ class VerdictTests(unittest.TestCase):
 
     def test_healthy_launch_passes(self):
         self.assertEqual(gate.evaluate("clean", observe()), [])
+
+    def test_security_log_workflow_is_failure_owned_and_retained(self):
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci-macos.yml"
+        text = workflow.read_text(encoding="utf-8")
+        jobs = re.findall(r"^  managed-ollama-native:\n(.*?)(?=^  [\w-]+:\n|\Z)", text, re.M | re.S)
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+
+        def step(name):
+            blocks = re.findall(
+                r"^      - name: " + re.escape(name) + r"\n(.*?)(?=^      - |\Z)", job, re.M | re.S
+            )
+            self.assertEqual(len(blocks), 1, name)
+            return blocks[0]
+
+        receiver = step("Receive actual native model create, pull, inference and retirement")
+        self.assertIn("        id: managed-ollama-model-receiving\n", receiver)
+        capture = step("Retain passive security service logs after native model failure")
+        conditions = re.findall(r"^        if: (.*)$", capture, re.M)
+        self.assertEqual(
+            conditions,
+            [
+                "${{ !cancelled() && failure() && steps.managed-ollama-model-receiving.outcome == 'failure' }}"
+            ],
+        )
+        self.assertIn("from macos_launch_gate import collect_security_logs", capture)
+        self.assertIn("collect_security_logs(sys.argv[1])", capture)
+        self.assertIn('"$ERGOPTI_OLLAMA_BUILD_ROOT/security-observation"', capture)
+        self.assertIn("        timeout-minutes: 3\n", capture)
+        retained = step("Retain actual native producer, catalogue and receiving evidence")
+        self.assertIn("        if: always()\n", retained)
+        self.assertIn(
+            "            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/security-observation\n", retained
+        )
+        self.assertLess(
+            job.index("Receive actual native model create"),
+            job.index("Retain passive security service logs"),
+        )
+        self.assertLess(
+            job.index("Retain passive security service logs"),
+            job.index("Upload qualified native inputs"),
+        )
+
+    def test_security_failure_logs_reuse_only_bounded_default_redacted_capture(self):
+        for outcome in ("success", "refused", "timeout"):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder) / "security"
+                calls = []
+
+                def recording_run(arguments, **options):
+                    calls.append((arguments, options))
+                    self.assertEqual(arguments[0:2], ["log", "show"])
+                    if outcome == "timeout":
+                        raise subprocess.TimeoutExpired(arguments, options["timeout"])
+                    return subprocess.CompletedProcess(
+                        arguments,
+                        0 if outcome == "success" else 64,
+                        "initial authorization evidence\n" + "x" * 400000,
+                        "observation refused" if outcome == "refused" else "",
+                    )
+
+                with (
+                    mock.patch.object(gate.sys, "platform", "darwin"),
+                    mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
+                    mock.patch.object(gate.subprocess, "run", side_effect=recording_run),
+                ):
+                    receipts = gate.collect_security_logs(output)
+                self.assertEqual(len(calls), 1)
+                arguments, options = calls[0]
+                self.assertEqual(arguments[arguments.index("--last") + 1], "4m")
+                self.assertEqual(options["timeout"], 120)
+                self.assertNotIn("--privacy", arguments)
+                predicate = arguments[arguments.index("--predicate") + 1]
+                for process in (
+                    "security",
+                    "securityd",
+                    "trustd",
+                    "authd",
+                    "SecurityAgent",
+                    "authorizationhost",
+                ):
+                    self.assertIn(f'process == "{process}"', predicate)
+                self.assertEqual(len(receipts), 1)
+                receipt = receipts[0]
+                self.assertEqual(
+                    receipt["status"], "captured" if outcome == "success" else "unavailable"
+                )
+                self.assertEqual(
+                    json.loads((output / "unified-log-collection.json").read_text()), receipts
+                )
+                if outcome != "timeout":
+                    with gzip.open(
+                        output / receipt["archive_file"], "rt", encoding="utf-8"
+                    ) as handle:
+                        self.assertTrue(handle.read().startswith("initial authorization evidence"))
+                    self.assertEqual(len((output / "security-system.log").read_text()), 400000)
+                else:
+                    self.assertIn("TimeoutExpired", receipt["cause"])
+
+    def test_security_log_capture_refuses_non_ci_hosts_and_existing_output(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "security"
+            for platform, ci in (("win32", "true"), ("darwin", "false")):
+                with (
+                    mock.patch.object(gate.sys, "platform", platform),
+                    mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": ci}),
+                    mock.patch.object(gate.subprocess, "run") as run,
+                ):
+                    with self.assertRaises(RuntimeError):
+                        gate.collect_security_logs(output)
+                    run.assert_not_called()
+                    self.assertFalse(output.exists())
+            output.mkdir()
+            sentinel = output / "original"
+            sentinel.write_text("preserved", encoding="utf-8")
+            with (
+                mock.patch.object(gate.sys, "platform", "darwin"),
+                mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
+                mock.patch.object(gate.subprocess, "run") as run,
+            ):
+                with self.assertRaises(FileExistsError):
+                    gate.collect_security_logs(output)
+                run.assert_not_called()
+                self.assertEqual(sentinel.read_text(), "preserved")
 
     def test_appleevent_diagnostics_retain_system_logs_and_collection_failures(self):
         for outcome in ("success", "refused", "timeout"):
