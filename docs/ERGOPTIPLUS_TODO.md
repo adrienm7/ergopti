@@ -9651,6 +9651,27 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   peer-FD, cleanup and deadline assertion. The original failed receipt stays
   retained; corrective native receiving remains UNRUN. Item93 stays partial.
 
+  Current integrated receiving: manual Linux run 38098766836 on
+  a634372ed1ebed8c04719d58eb999d6a37303b2f is wholly SUCCESS
+  (25 passed, three intentionally skipped; Release/Publish skipped). All17
+  installation variants pass. Its original XI2 artifact11686924755 is now
+  received: seven original members, ZIP SHA256
+  8bbb88c3b4e5cab125789bd1e26c8d9b68436219a9301c13faeb1092f5cddd7f.
+  Actual C3, all29 ABI comparisons, three genuine LuaJIT cookies, source pins
+  and exact native family retirement pass. This qualifies the bounded
+  CONTROLLED diagnostic, not product input/output provenance or physical
+  delivery. Current official Fedora, Arch and openSUSE source metadata now
+  completes the six libXi package-name mappings; current nixos-unstable
+  supplies libxi/xi.pc. Registry/generator admission and portable ELF staging
+  still require coordinated implementation and native installed receiving.
+  A recoverable14-path private preparation now retains the genuine generator,
+  five successful targeted guards and twelve expected refusal controls.
+  Separate original staging, real Xi/X11 exported-symbol loading and actual
+  driver/full AppDir assembly pass on the source-pinned private candidate.
+  These are scoped Linux results, not a completed AppImage/install/input
+  qualification. Shared source custody and final composed/native gates remain
+  pending; the preparation is saved in the Group3 Xi handover, not adopted.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
@@ -10221,7 +10242,24 @@ and installation qualification are still required.
   task construction and preserve both attempted and unclosed retirement debt.
   LuaJIT and Lua5.4 pass24/0; the original source passes20 and fails4.
   These are software lifecycle results, not native catalogue, consent or
-  invocation qualification. Full selected gates and macOS receiving remain pending.
+  invocation qualification. Selected format376, JS410/0, controlled E2E and Lua18419/0
+  gates pass. Atomic498ca73ceb2c8b5f8f7c56e7b6bb75964639d09e is
+  integrated without squash as2c144060853239c9c416ea1a9c08030382ed2b1f.
+  Official macOS manual38103158093 tests that exact integrated SHA;
+  the whole run fails with5 PASS,7 FAIL and5 SKIP. Stubbed Unit18419/0,
+  stubbed E2E and the native tooltip job pass; CoreJS409/410 and managed
+  native/cold/archive diagnostics fail. Package and installation skip,
+  Release/Publish skips. The selected documentation gate also reproduces
+  the original managed Ollama retirement assertion. Published Group6
+  dependency e9a742b4 passes39 suspended-owner and45 serve controls on
+  its actual isolated Git image; the literal parent owner fails the new
+  deterministic real-peer retirement case. All78 old test bodies remain.
+  Group6 has now integrated that producer and its exact45-test native
+  receiver closure without squash as2e4d798e1dd76398e9c075560127544953a3e079.
+  This branch receives that currentDev through a normal fast-forward;
+  the three Group3 TODO blocks and all incoming Group6 blocks are preserved.
+  Final composed receiving remains separate; no native Shortcuts
+  catalogue/invocation or installed-package success is claimed.
 
   A separate installed-target metadata diagnostic now has independently
   reviewed source and 34 successful portable filesystem controls
@@ -10592,6 +10630,15 @@ Carbon classification, physical keys or installed release qualification.
   becomes16/0 on both Lua ABIs; restoring the obsolete false-port input fails
   the actual-effect assertion. This fixture repair does not qualify native
   clipboard/GUI delivery or Windows invisible capture. Item109 stays partial.
+
+  The 2026-10-11 read-only review now retains actual tagged upstream
+  AutoHotkey2.0.26 script2.cpp and Debugger.cpp bytes plus official API
+  documentation. They confirm the preceding unsupported hidden-snapshot
+  boundary: public refresh calls show/foreground the main window; DBGp has
+  no key-history snapshot command and debugger attachment interrupts the
+  interpreter. These source receipts are not a source-to-binary or Windows
+  execution qualification. No stale Edit read, restore-after-show sequence
+  or capacity-only call replaces the required fresh invisible acquisition.
 
 - [~] **111.** Offer two distinct shared actions on all drivers: the OS
   normal app switcher and windows only on the display containing the current
