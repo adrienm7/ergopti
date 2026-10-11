@@ -37,6 +37,91 @@ local UNFOCUSED_APPS = { error_dialog = true }
 -- The generated shared policy owns branding for every native host.
 local WindowTitles = require("window_titles")
 
+-- These receipts prepare page content only; GTK keeps the app's generic caption.
+local ContextLookupOwner = rawget(WindowTitles, "presentation_for_app")
+local ContextComposeOwner = rawget(WindowTitles, "compose")
+local ContextKeyOwner = rawget(WindowTitles, "key_for_app")
+local ContextPresentation = require("webview.presentation")
+local ContextPrepareOwner = rawget(ContextPresentation, "prepare_contextual_title")
+local _contextual_title_receipts = setmetatable({}, { __mode = "k" })
+local ContextPrepareApi, ContextFieldsApi, ContextCurrentApi, ContextShowOwner, ContextCreateOwner, ContextWindowTitleOwner
+
+--- Prepares declared page-title content through this manager's genuine receipt.
+--- @param presentation_id string Declared action_picker context.
+--- @param suffix string Ordinary one-line display data, never binding authority.
+--- @param source_opts table Actual plain picker request retained for title-only custody.
+--- @return table|nil Opaque empty receiving receipt.
+function M.prepare_app_contextual_title(presentation_id, suffix, source_opts)
+	if type(source_opts) ~= "table" or getmetatable(source_opts) ~= nil
+		or rawget(source_opts, "presentation_id") ~= presentation_id
+		or rawget(source_opts, "presentation_suffix") ~= suffix
+		or rawget(source_opts, "title") ~= nil or rawget(source_opts, "label") ~= nil then return nil end
+	local Presentation = ContextPresentation
+	local I18n, Locale = require("infra.i18n"), require("infra.locale")
+	local Core = require("locale.core")
+	if type(I18n) ~= "table" or type(Locale) ~= "table" or type(Core) ~= "table" then return nil end
+	local prepare, translate = ContextPrepareOwner, rawget(I18n, "get")
+	local locale_get, locale_current = rawget(Locale, "get"), rawget(Locale, "current_locale")
+	local core_get, core_current = rawget(Core, "get"), rawget(Core, "current_locale")
+	local function owners_live()
+		return getmetatable(source_opts) == nil
+			and rawget(source_opts, "presentation_id") == presentation_id
+			and rawget(source_opts, "presentation_suffix") == suffix
+			and rawget(source_opts, "title") == nil and rawget(source_opts, "label") == nil
+			and getmetatable(M) == nil and rawget(package.loaded, "ui.webview_manager") == M
+			and getmetatable(WindowTitles) == nil and rawget(package.loaded, "window_titles") == WindowTitles
+			and getmetatable(Presentation) == nil and rawget(package.loaded, "webview.presentation") == Presentation
+			and getmetatable(I18n) == nil and rawget(package.loaded, "infra.i18n") == I18n
+			and getmetatable(Locale) == nil and rawget(package.loaded, "infra.locale") == Locale
+			and getmetatable(Core) == nil and rawget(package.loaded, "locale.core") == Core
+			and rawget(WindowTitles, "presentation_for_app") == ContextLookupOwner
+			and rawget(WindowTitles, "compose") == ContextComposeOwner
+			and rawget(WindowTitles, "key_for_app") == ContextKeyOwner
+			and rawget(M, "window_title") == ContextWindowTitleOwner
+			and rawget(Presentation, "prepare_contextual_title") == prepare and type(prepare) == "function"
+			and rawget(I18n, "get") == translate and rawget(Locale, "get") == locale_get
+			and rawget(Locale, "current_locale") == locale_current
+			and rawget(Core, "get") == core_get and rawget(Core, "current_locale") == core_current
+			and rawget(M, "prepare_app_contextual_title") == ContextPrepareApi
+			and rawget(M, "contextual_title_fields") == ContextFieldsApi
+			and rawget(M, "contextual_title_current") == ContextCurrentApi
+			and rawget(M, "show") == ContextShowOwner and rawget(M, "_create_gtk_window") == ContextCreateOwner
+	end
+	if not owners_live() then return nil end
+	local ok, prepared = pcall(prepare, WindowTitles, I18n, Locale, "action_picker",
+		presentation_id, "linux", suffix, owners_live)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not owners_live()
+		or prepared.current() ~= true then return nil end
+	local receipt = {}
+	_contextual_title_receipts[receipt] = { title = prepared.title, current = prepared.current }
+	return receipt
+end
+
+--- Authenticates only receipts minted here against the retained Source cohort.
+--- @param receipt table Opaque empty receiving receipt.
+--- @return boolean current
+function M.contextual_title_current(receipt)
+	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or next(receipt) ~= nil
+		or rawget(M, "contextual_title_current") ~= ContextCurrentApi then return false end
+	local retained = _contextual_title_receipts[receipt]
+	if retained == nil then return false end
+	local ok, current = pcall(retained.current)
+	return ok and current == true
+end
+
+--- Returns the prepared page title; it does not change any native window caption.
+--- @param receipt table Opaque empty receiving receipt.
+--- @return string|nil title
+function M.contextual_title_fields(receipt)
+	if not ContextCurrentApi(receipt) then return nil end
+	return _contextual_title_receipts[receipt].title
+end
+
+local function contextual_title_live(app_name, receipt)
+	return receipt == nil or (app_name == "action_picker" and ContextCurrentApi(receipt))
+end
+
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
 
@@ -369,7 +454,8 @@ end
 --- @param app_name string The shared UI app directory name (e.g. "action_picker").
 --- @param active_locale string|nil Locale code (default: the interface's).
 --- @return boolean true if the window was opened or brought to front.
-function M.show(app_name, active_locale)
+function M.show(app_name, active_locale, contextual_receipt)
+	if not contextual_title_live(app_name, contextual_receipt) then return false end
 	if _shutting_down then return false end
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "show(): app_name is required.")
@@ -384,6 +470,8 @@ function M.show(app_name, active_locale)
 			active_locale = require("infra.manifest_reader").default_for("script.locale")
 		end
 	end
+
+	if not contextual_title_live(app_name, contextual_receipt) then return false end
 
 	-- If window already exists, bring to front.
 	if _windows[app_name] then
@@ -419,6 +507,8 @@ function M.show(app_name, active_locale)
 		return false
 	end
 
+	if not contextual_title_live(app_name, contextual_receipt) then return false end
+
 	-- Store window state.
 	_next_window_epoch = _next_window_epoch + 1
 	_windows[app_name] = {
@@ -446,7 +536,8 @@ function M.show(app_name, active_locale)
 	-- inject a native boundary without weakening the production contract.
 	local creation_owner = _windows[app_name]
 	local create_ok, created, create_err = xpcall(function()
-		return M._create_gtk_window(app_name, html, handler)
+		if not contextual_title_live(app_name, contextual_receipt) then return false end
+		return M._create_gtk_window(app_name, html, handler, contextual_receipt)
 	end, debug.traceback)
 	owned.acquiring = false
 	if not create_ok or created ~= true or owned.cancelled or _windows[app_name] ~= owned then
@@ -860,7 +951,8 @@ end
 --- @param handler table|nil The bridge handler module.
 --- @return boolean true only after the native window is tracked.
 --- @return string|nil error_message Exact refusal reason.
-function M._create_gtk_window(app_name, html, handler)
+function M._create_gtk_window(app_name, html, handler, contextual_receipt)
+	if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
 	if not _gtk_available or not _lgi then return false, "GTK/WebKit unavailable" end
 	if _gtk_windows[app_name] then return false, "native acquisition already owned" end
 	local window_epoch = M.current_epoch(app_name) or 0
@@ -875,9 +967,15 @@ function M._create_gtk_window(app_name, html, handler)
 		-- Read geometry from the single-source manifest.
 		local geometry = _read_app_geometry(app_name)
 
+		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
+
+		-- Contextual content never changes this generic native app caption.
+		local caption = M.window_title(_app_title(app_name))
+		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
+
 		-- ── Create the GTK window ──
 		local window = Gtk.Window({
-			title            = M.window_title(_app_title(app_name)),
+			title            = caption,
 			default_width    = geometry.width,
 			default_height   = geometry.height,
 			window_position  = Gtk.WindowPosition.CENTER,
@@ -887,7 +985,8 @@ function M._create_gtk_window(app_name, html, handler)
 		})
 
 		attempt.window = window
-		if window == nil or window == false or attempt.cancelled then return false, "native acquisition revoked" end
+		if window == nil or window == false or attempt.cancelled
+			or not contextual_title_live(app_name, contextual_receipt) then return false, "native acquisition revoked" end
 
 		-- Set minimum size if supported.
 		local ok_size, size_err = pcall(function()
@@ -1294,6 +1393,13 @@ function M.shutdown()
 	if retired then Logger.info(LOG, "WebView manager shut down.") end
 	return retired
 end
+
+ContextPrepareApi = M.prepare_app_contextual_title
+ContextFieldsApi = M.contextual_title_fields
+ContextCurrentApi = M.contextual_title_current
+ContextShowOwner = M.show
+ContextCreateOwner = M._create_gtk_window
+ContextWindowTitleOwner = M.window_title
 
 -- Auto-init on module load so the GTK probe runs once.
 M.init()

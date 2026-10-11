@@ -1,0 +1,132 @@
+{
+	"provenance": "Original pre-change HEAD 1e5c1faf; literal prefixes copied before authoring production. Suffix cases chosen by hand; no expectations from the new implementation.",
+	"suffix_cases": ["K1", "é", "左 Ctrl"],
+	"locales": {
+		"da": {
+			"mac_prefix": "Vælg en tast — ",
+			"linux_prefix": "Tap-handling — ",
+			"picker_label": "Handling:",
+			"linux_native_caption": "ErgoptiPlus — Handling:"
+		},
+		"de": {
+			"mac_prefix": "Taste wählen — ",
+			"linux_prefix": "Tap-Aktion — ",
+			"picker_label": "Aktion:",
+			"linux_native_caption": "ErgoptiPlus — Aktion:"
+		},
+		"en": {
+			"mac_prefix": "Choose a key — ",
+			"linux_prefix": "Tap action — ",
+			"picker_label": "Action:",
+			"linux_native_caption": "ErgoptiPlus — Action:"
+		},
+		"es": {
+			"mac_prefix": "Elegir una tecla — ",
+			"linux_prefix": "Acción al pulsar — ",
+			"picker_label": "Acción:",
+			"linux_native_caption": "ErgoptiPlus — Acción:"
+		},
+		"fr": {
+			"mac_prefix": "Choisir une touche — ",
+			"linux_prefix": "Action au tap — ",
+			"picker_label": "Action :",
+			"linux_native_caption": "ErgoptiPlus — Action :"
+		},
+		"it": {
+			"mac_prefix": "Scegli un tasto — ",
+			"linux_prefix": "Azione al tap — ",
+			"picker_label": "Azione:",
+			"linux_native_caption": "ErgoptiPlus — Azione:"
+		},
+		"nl": {
+			"mac_prefix": "Kies een toets — ",
+			"linux_prefix": "Tik-actie — ",
+			"picker_label": "Actie:",
+			"linux_native_caption": "ErgoptiPlus — Actie:"
+		},
+		"no": {
+			"mac_prefix": "Velg en tast — ",
+			"linux_prefix": "Tap-handling — ",
+			"picker_label": "Handling:",
+			"linux_native_caption": "ErgoptiPlus — Handling:"
+		},
+		"pl": {
+			"mac_prefix": "Wybierz klawisz — ",
+			"linux_prefix": "Akcja przy kliknięciu — ",
+			"picker_label": "Akcja:",
+			"linux_native_caption": "ErgoptiPlus — Akcja:"
+		},
+		"pt": {
+			"mac_prefix": "Escolha uma tecla — ",
+			"linux_prefix": "Ação ao toque — ",
+			"picker_label": "Ação:",
+			"linux_native_caption": "ErgoptiPlus — Ação:"
+		},
+		"sv": {
+			"mac_prefix": "Välj en tangent — ",
+			"linux_prefix": "Tap-åtgärd — ",
+			"picker_label": "Åtgärd:",
+			"linux_native_caption": "ErgoptiPlus — Åtgärd:"
+		},
+		"tr": {
+			"mac_prefix": "Tuş seç — ",
+			"linux_prefix": "Dokunma eylemi — ",
+			"picker_label": "Eylem:",
+			"linux_native_caption": "ErgoptiPlus — Eylem:"
+		},
+		"cs": {
+			"mac_prefix": "Vybrat klávesu — ",
+			"linux_prefix": "Akce při klepnutí — ",
+			"picker_label": "Akce:",
+			"linux_native_caption": "ErgoptiPlus — Akce:"
+		},
+		"ru": {
+			"mac_prefix": "Выберите клавишу — ",
+			"linux_prefix": "Действие при нажатии — ",
+			"picker_label": "Действие:",
+			"linux_native_caption": "ErgoptiPlus — Действие:"
+		},
+		"uk": {
+			"mac_prefix": "Оберіть клавішу — ",
+			"linux_prefix": "Дія при натисканні — ",
+			"picker_label": "Дія:",
+			"linux_native_caption": "ErgoptiPlus — Дія:"
+		},
+		"he": {
+			"mac_prefix": "בחר מקש — ",
+			"linux_prefix": "פעולת הקשה — ",
+			"picker_label": "פעולה:",
+			"linux_native_caption": "ErgoptiPlus — פעולה:"
+		},
+		"ar": {
+			"mac_prefix": "اختر مفتاحًا — ",
+			"linux_prefix": "إجراء النقر — ",
+			"picker_label": "الإجراء:",
+			"linux_native_caption": "ErgoptiPlus — الإجراء:"
+		},
+		"hi": {
+			"mac_prefix": "कुंजी चुनें — ",
+			"linux_prefix": "टैप क्रिया — ",
+			"picker_label": "क्रिया:",
+			"linux_native_caption": "ErgoptiPlus — क्रिया:"
+		},
+		"zh": {
+			"mac_prefix": "选择按键 — ",
+			"linux_prefix": "点按操作 — ",
+			"picker_label": "动作：",
+			"linux_native_caption": "ErgoptiPlus — 动作："
+		},
+		"ja": {
+			"mac_prefix": "キーを選択 — ",
+			"linux_prefix": "タップ操作 — ",
+			"picker_label": "アクション:",
+			"linux_native_caption": "ErgoptiPlus — アクション:"
+		},
+		"ko": {
+			"mac_prefix": "키 선택 — ",
+			"linux_prefix": "탭 동작 — ",
+			"picker_label": "동작:",
+			"linux_native_caption": "ErgoptiPlus — 동작:"
+		}
+	}
+}

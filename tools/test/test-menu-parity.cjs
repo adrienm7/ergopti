@@ -4184,6 +4184,7 @@ const linuxAiSources = Object.fromEntries(
 	].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
 );
 const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
+require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(linuxAiSources, manifest);
 {
 	const assert = require('node:assert/strict');
 	for (const kind of ['llm', 'agent']) {
@@ -4316,8 +4317,8 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 				'declared source identity refusal withdrawn'
 			],
 			[
-				'rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
-				'true',
+				'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
+				'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand true',
 				'actual module custody withdrawn'
 			],
 			[
@@ -4330,7 +4331,11 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 				'receive_separator("foreign_boundary")',
 				'Quit-last declared boundary disconnected'
 			],
-			['getmetatable(ManifestMenu) == nil', 'true', 'facade metatable refusal withdrawn']
+			[
+				'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil',
+				'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and true',
+				'facade metatable refusal withdrawn'
+			]
 		]) {
 			assert.equal(builder.split(before).length - 1, 1, reason + ': actual source preimage');
 			assert.equal(withBuilder(builder.replace(before, after)), false, reason);
@@ -7786,7 +7791,11 @@ function languageParentSource(source, driver) {
 			'local separator_factory = Foreign.receiver',
 			'foreign captured source receiver'
 		],
-		['getmetatable(ManifestMenu) == nil', 'true', 'withdrawn genuine facade metatable refusal'],
+		[
+			'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil',
+			'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and true',
+			'withdrawn genuine facade metatable refusal'
+		],
 		[
 			'local declared = ManifestMenu.get_array("top_level")',
 			'local declared = {}',
