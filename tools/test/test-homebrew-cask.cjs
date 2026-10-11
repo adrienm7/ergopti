@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 191 tests in /);
+	assert.match(result.stderr, /Ran 196 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -1564,6 +1564,78 @@ check(
 			assert.equal(ui.split(before).length - 1, 1);
 			assert.throws(() => assertPassive(ui.replace(before, after)));
 		}
+	}
+);
+
+check(
+	'first discovery metadata reuses the existing traversal without action or identity credit',
+	() => {
+		const ui = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_consent.m'),
+			'utf8'
+		);
+		const helper = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+			'utf8'
+		);
+		const controls = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance_test.py'),
+			'utf8'
+		);
+		function guard(source) {
+			const begin = source.indexOf('static void record_discovery(');
+			const end = source.indexOf('static bool scope_before_deadline(void)', begin);
+			assert.ok(begin >= 0 && end > begin);
+			const metadata = source.slice(begin, end);
+			assert.match(metadata, /if \(discoveryObserved\) return;/);
+			assert.match(metadata, /discoveryScope = scope;/);
+			assert.match(metadata, /discoveryComplete = complete;/);
+			assert.match(metadata, /discoveryNodes = nodes;/);
+			assert.doesNotMatch(
+				metadata,
+				/AXUIElement|CFString|NSWorkspace|PerformAction|open\(|write\(|fsync\(|systemUptime|clock|factCandidates|factMatches/
+			);
+			const start = source.indexOf('static enum OwnedWindowScope discover_window_scope(');
+			const finish = source.indexOf(
+				'// Passive traversal of only the retained refused window.',
+				start
+			);
+			const core = source.slice(start, finish);
+			assert.equal(
+				(
+					core.match(
+						/record_discovery\(result, sender_seen, receiver_seen, complete, examined\);/g
+					) || []
+				).length,
+				2
+			);
+			assert.match(core, /if \(scope_before_deadline\(\)\) \{\s*complete = true;/);
+			assert.match(
+				core,
+				/while \(count > 0\) CFRelease\(pending\[--count\]\);\s*record_discovery\(result, sender_seen, receiver_seen, complete, examined\);\s*return result;/
+			);
+			assert.match(source, /char discoveryPacket\[256\];/);
+			assert.match(source, /length \+ discoveryLength < \(int\)sizeof\(packet\)/);
+			assert.match(source, /if \(scope == OwnedWindowScopeUnrelated\) continue;/);
+		}
+		guard(ui);
+		for (const [before, after] of [
+			['if (discoveryObserved) return;', ''],
+			['discoveryNodes = nodes;', 'discoveryNodes = 0;'],
+			['complete = true;', 'complete = false;'],
+			['length + discoveryLength < (int)sizeof(packet)', 'length + discoveryLength < 8192']
+		]) {
+			assert.equal(ui.split(before).length - 1, 1);
+			assert.throws(() => guard(ui.replace(before, after)));
+		}
+		assert.match(helper, /set\(packet\) - \{"discovery"\}/);
+		assert.match(helper, /0 <= discovery\["nodes"\] <= 257/);
+		assert.match(
+			helper,
+			/require\(discovery\["scope"\] == "refused", "Incomplete discovery gained a scope"\)/
+		);
+		assert.match(controls, /class FirstDiscoveryFactControls\(unittest\.TestCase\)/);
+		assert.match(controls, /discovery_same_traversal_controls=5/);
 	}
 );
 

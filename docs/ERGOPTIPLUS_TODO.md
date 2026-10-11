@@ -4042,6 +4042,21 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-10 first existing consent discovery diagnostic. The owned observer now
+retains the first window's existing traversal result: closed scope, two label
+presence bits, completion and examined count. It adds no AX read, action, clock,
+wait or permission request. These observations cannot admit a candidate,
+matching identity or consent. The original 1024-byte packet limit remains;
+omitted optional facts cannot prove that no traversal occurred. All191 original
+portable methods remain unchanged. Candidate196 passes; the five added methods
+against the predecessor produce one pass, one failure and three errors. Five
+literal C-core cases execute under the existing modeled CF/AX interface, without
+native UI credit. The initial candidate's new AST extraction error is retained;
+its correction changes only that additive test. Canonical selected gates and
+exact-source native Homebrew receiving are pending. Original Automation deadline,
+nonce, denial, Brew6, packaging and installation requirements stay unchanged.
+Item36 remains open; no external prerequisite or functional cause is inferred.
+
 2026-10-10 exact integrated9e370 native archive receiving. Whole manual
 38075470794 finishes failed. The archive invocation executes25 cases:24 pass,
 one Homebrew case fails with two failure records, one unexpected; no cases skip.
@@ -6707,6 +6722,21 @@ or physical-device acceptance.
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-10 native trust-cause diagnostic continuation. Existing add/remove
+commands now retain bounded phase, exit, primary failure and physical closure
+observations before cleanup can replace them. Debug/fixture-only Swift error
+facts expose at most four closed-domain numeric nodes and the original trust
+challenge outcome, without raw messages, URLs, certificates or another trust
+query. All55 original portable controls remain; candidate63 passes. Three new
+controls on the predecessor produce two failures and one error. Five exact
+source enrollment spans reconstruct the unchanged historical worker for its
+original guard; partial, duplicate and foreign edits remain refused. Existing
+PAC XCTest captures the new Swift stderr; the native HTTP client discards its
+child stderr, and model trust preparation is a separate producer. No cause is
+inferred from those unavailable transports. Original14 PAC cases and SDK49
+stay unchanged. Actual macOS compilation, TLS/PAC, model, packaging and
+installation qualification remain pending. Item62 stays open.
 
 2026-10-10 expired startup event retirement correction. A valid queued
 LISTENER_BOUND event previously converted the expired startup clock into lasting

@@ -1871,7 +1871,8 @@ def _validate_owned_automation_ui_fact(packet):
     }
     require(
         type(packet) is dict
-        and set(packet) in (keys, keys | {"first_button"}, keys | {"first_button", "identity"}),
+        and set(packet) - {"discovery"}
+        in (keys, keys | {"first_button"}, keys | {"first_button", "identity"}),
         "Unadmitted Automation UI fact fields",
     )
     require(
@@ -1947,6 +1948,40 @@ def _validate_owned_automation_ui_fact(packet):
             packet["first_agent"] >= 0 and packet["first_type"] != "none",
             "Automation UI refusal lacks an agent/type",
         )
+    if "discovery" in packet:
+        discovery = packet["discovery"]
+        require(
+            type(discovery) is dict
+            and set(discovery) == {"schema", "scope", "sender", "receiver", "complete", "nodes"}
+            and type(discovery["schema"]) is int
+            and discovery["schema"] == 1
+            and type(discovery["scope"]) is str
+            and discovery["scope"] in {"unrelated", "candidate", "refused"}
+            and all(type(discovery[key]) is bool for key in ("sender", "receiver", "complete"))
+            and type(discovery["nodes"]) is int
+            and 0 <= discovery["nodes"] <= 257,
+            "Unadmitted first discovery scalar facts",
+        )
+        require(
+            not (discovery["sender"] or discovery["receiver"]) or discovery["nodes"] >= 2,
+            "Discovery text identity precedes its descendant observation",
+        )
+        if discovery["complete"]:
+            require(
+                0 < discovery["nodes"] <= 256
+                and discovery["scope"]
+                == (
+                    "candidate"
+                    if discovery["sender"] and discovery["receiver"]
+                    else "refused"
+                    if discovery["sender"] or discovery["receiver"]
+                    else "unrelated"
+                ),
+                "Complete discovery scope and identity observations disagree",
+            )
+        else:
+            require(discovery["scope"] == "refused", "Incomplete discovery gained a scope")
+        require(packet["windows"] > 0, "Discovery lacks its observed window")
     if "first_button" in packet:
         button = packet["first_button"]
         require(

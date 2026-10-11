@@ -652,3 +652,79 @@ production guard stays false. TODO 36/62 and transverse 16/38 remain open; no
 item is removed. Recoverable source and receiving metadata must be preserved
 before container replacement; private paths and historical receipts do not
 restore live authority.
+
+## First existing consent discovery diagnostic continuation
+
+After the delivered `ed45dd050` tranche, TODO36/62 remain open. The exact
+integrated manual `38091956482` is terminal failure: six successful, six failed
+and five skipped jobs, with Release skipped. SDK49/daily7/original42 passed on
+both architectures; package/install and model acceptance remain independent.
+The previous feature and owned integration lock were retired after that result.
+The follow-up feature is recreated from current Dev for bounded diagnostics.
+
+Official Homebrew receiving has 24 passes and one failed case, without skips.
+Seventy-three UI records retain a trusted AX session and qualified signed
+requester; 66 see one window but no candidates. The original discovery can
+classify a window as unrelated before detailed inspection increments `nodes`.
+Those facts do not establish a missing traversal, TCC cause or external blocker.
+
+The four reviewed source paths retain only the first existing traversal's closed
+scope, sender/receiver presence bits, completion and examined count. No new
+native read, action, clock, wait, permission request, capture or retirement is
+added. Facts from different windows are never combined. Complete text presence
+requires an examined descendant; the original 257th-node refusal remains an
+incomplete observation. The same owned FD and 1024-byte packet bound carry the
+optional projection. Missing or oversized metadata cannot grant acceptance or
+prove absence of traversal. Permission-worker milestones are deferred.
+
+Actual original191 portable controls pass. Reviewed revision3 candidate196
+passes with zero failures/skips; five independent literal cases execute the
+actual C scope body under the existing modeled CF/AX port. They do not qualify
+native Accessibility or consent. The five added methods against the original
+producer yield one pass, one failure and three errors. Both original and
+candidate preserve the original 30-second command budget, exact source hashes
+and physical process closure. The initial revision2 candidate195-pass/one-error
+result remains retained separately: its additive AST acquisition could not
+parse an indented method containing unindented C raw-string lines. Revision3
+parses the complete module and uniquely admits the original class/method/literal
+port; every old method and independent expected value stays unchanged.
+
+Canonical selected verification and actual source-specific native receiving
+remain pending. Original deadlines, strict consent/window identity, nonce,
+policy denial, all six Brew profiles, packaging and installation stay required.
+TODO36/62 and transversal16/38 remain open; no production guard is changed.
+
+## Native trust-cause diagnostic continuation
+
+The reviewed R3 packet preserves all55 original portable methods and all14
+native PAC cases. Original55, new8 and candidate63 portable runs pass; three
+new controls against the genuine predecessor produce two failures and one
+error. Real harmless POSIX children provide command/file retirement evidence,
+not Apple Security or native TLS credit. All thin source inputs and the outer
+physical receiver remain exact; session64574 completed with status0.
+
+Existing add/remove operations record bounded phase, status, primary failure,
+closure and known public callee observations before cleanup can replace the
+primary outcome. Debug/fixture-only Swift diagnostics retain at most four
+closed-domain numeric error nodes and the existing trust challenge outcome.
+No raw error, URL, certificate, user-info dictionary or new trust evaluation is
+published; functional error routing and every deadline remain unchanged.
+
+The original PAC XCTest pipeline retains these stderr observations. The native
+HTTP response client sends child stderr to DEVNULL, so its missing Swift chain
+cannot establish absence or cause. Its Python trust observations stay separate.
+The model fixture is another producer and receives no diagnostic cause credit
+from this patch. Initial private receiving notes with a mistaken capture
+assumption are retained alongside the corrected custody map.
+
+Selected repository gates and actual SDK/native receiving are pending.
+SDK49 and PAC14 remain strict. TODO62, packaging, installation, proxy/PAC/WPAD,
+certificate trust and real-device enterprise requirements remain open. No
+release or production qualification is claimed.
+
+Portable receipts are retained in
+`/workspace/scratch/group6-native-trust-cause-portable-20261010-receiving2/`.
+Frozen R3 source, inverse/enrollment proof and independent Source ACK are
+retained in the matching diagnostic and review directories. The collector
+composition changes only HTTP facts55 to63 and preserves the committed
+suspended39/serve45 floors.
