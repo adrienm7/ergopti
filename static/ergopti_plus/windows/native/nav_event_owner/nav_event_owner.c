@@ -147,6 +147,7 @@ typedef struct NavState {
 		NAV_INJECTED_MODIFIER_CAPACITY];
 	uint64_t terminal_token;
 	uint8_t terminal_release_active;
+	uint8_t terminal_replay_modifiers_lr;
 	uint32_t terminal_phase;
 	uint32_t terminal_queued;
 	uint32_t terminal_replayed;
@@ -281,6 +282,7 @@ static void NavResetSemanticStateLocked(NavState *state)
 	state->suspended = 0;
 	state->transition = 0;
 	state->physical_modifiers_lr = 0;
+	state->terminal_replay_modifiers_lr = 0;
 	state->downstream_modifiers_lr = 0;
 	state->active_plan_valid = 0;
 	state->prepared_plan_valid = 0;
@@ -1548,6 +1550,7 @@ static bool NavBuildHookEventLocked(
 {
 	uint8_t modifier_bit;
 	bool key_up;
+	bool terminal_replay;
 	if (message != WM_KEYDOWN
 			&& message != WM_SYSKEYDOWN
 			&& message != WM_KEYUP
@@ -1561,13 +1564,17 @@ static bool NavBuildHookEventLocked(
 	if ((native_event->flags & LLKHF_EXTENDED) != 0)
 		out_event->sc = (uint16_t)(out_event->sc | 0x100u);
 	out_event->kind = key_up ? ERGOPTI_NAV_EVENT_UP : ERGOPTI_NAV_EVENT_DOWN;
-	if ((uint64_t)native_event->dwExtraInfo
-			== ERGOPTI_NAV_TERMINAL_REPLAY_MARKER) {
+	terminal_replay = (native_event->flags & LLKHF_INJECTED) != 0
+		&& (native_event->flags & LLKHF_LOWER_IL_INJECTED) == 0
+		&& (uint64_t)native_event->dwExtraInfo
+			== ERGOPTI_NAV_TERMINAL_REPLAY_MARKER;
+	if ((native_event->flags & LLKHF_LOWER_IL_INJECTED) != 0) {
+		/* A marker cannot grant lower-integrity input physical authority. */
+		out_event->injected = ERGOPTI_NAV_INJECTION_LOWER_INTEGRITY;
+	} else if (terminal_replay) {
 		/* Replayed physical input keeps physical routing semantics while the
 		 * private marker prevents the terminal capture from recapturing it. */
 		out_event->injected = ERGOPTI_NAV_INJECTION_PHYSICAL;
-	} else if ((native_event->flags & LLKHF_LOWER_IL_INJECTED) != 0) {
-		out_event->injected = ERGOPTI_NAV_INJECTION_LOWER_INTEGRITY;
 	} else if ((native_event->flags & LLKHF_INJECTED) != 0) {
 		out_event->injected = ERGOPTI_NAV_INJECTION_STANDARD;
 	}
@@ -1576,7 +1583,16 @@ static bool NavBuildHookEventLocked(
 	NavReconcileStalePhysicalModifiersLocked(state);
 	modifier_bit = NavModifierBit(out_event->vk, out_event->sc);
 	if (modifier_bit != 0) {
-		if (out_event->injected == ERGOPTI_NAV_INJECTION_PHYSICAL) {
+		if (terminal_replay) {
+			/* Replay is effective input, not an asynchronous physical snapshot.
+			 * Keep its owner separate so physical reconciliation and crossed
+			 * releases cannot retire the replayed down before its exact up. */
+			if (key_up) {
+				state->terminal_replay_modifiers_lr &= (uint8_t)~modifier_bit;
+			} else {
+				state->terminal_replay_modifiers_lr |= modifier_bit;
+			}
+		} else if (out_event->injected == ERGOPTI_NAV_INJECTION_PHYSICAL) {
 			if (key_up) {
 				state->physical_modifiers_lr = (uint8_t)(
 					state->physical_modifiers_lr & ~modifier_bit);
@@ -1626,6 +1642,7 @@ typedef struct NavPassContext {
 static uint8_t NavRoutingModifiersLocked(const NavState *state)
 {
 	return (uint8_t)(state->physical_modifiers_lr
+		| state->terminal_replay_modifiers_lr
 		| NavInjectedModifierMaskLocked(state));
 }
 
@@ -2612,6 +2629,16 @@ static void NavConsumeTerminalReplayLocked(NavState *state, uint32_t count)
 /** Retires exclusive release ownership at its final locked acknowledgement. */
 static int32_t NavFinishTerminalReleaseLocked(int32_t status)
 {
+	if (status == ERGOPTI_NAV_STATUS_OK
+			&& g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_IDLE) {
+		/* A capture may finish while its physical modifier is still held.
+		 * Only a successful final acknowledgement transfers that down to the
+		 * ordinary physical-up owner; partial sends and overflow keep replay
+		 * ownership intact for the exact queued suffix. */
+		g_nav_state.physical_modifiers_lr |=
+			g_nav_state.terminal_replay_modifiers_lr;
+		g_nav_state.terminal_replay_modifiers_lr = 0;
+	}
 	g_nav_state.terminal_release_active = 0;
 	LeaveCriticalSection(&g_nav_state.lock);
 	return status;
