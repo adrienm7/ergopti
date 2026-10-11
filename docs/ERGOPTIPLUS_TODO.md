@@ -4068,6 +4068,15 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-11 current-source portable qualification is preserved at feature
+`c3a49a115c`, merged without squash from current Dev `da74809cd1`. All six
+selected format/JS/Lua/Linux gates pass; virtual E2E is not native desktop or
+installed-package acceptance. The raw PAC retention metadata successor now
+passes formatting, syntax and bounded omission controls without changing any
+original assertion, but shared adoption, producer enrollment and Windows
+receiving remain pending. See the [terminal checkpoint](handovers/2026-10-11-group6-cloud/README.md).
+Item36 stays open; no original23, Brew6 or full-suite qualification is claimed.
+
 2026-10-11 authentic original producer bytes are received through supported Git
 API blobs: historical f1db PRE/POST, actual PAC pair/LICENSE and twelve targeted
 results join official ZIP digests. This is not our original23 or full-suite
@@ -6957,6 +6966,15 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-11 removal custody correction: Root explicitly released the exact
+fixture projection, additive nine-case class and single156-to165 literal in
+comment6113764617. The later Root-pending statement was stale. G4 removal
+custody, any actual overlapping writer, current-wrapper composition and live
+selected/native receiving still remain necessary. The companion metadata and
+custody packets are [durably preserved](handovers/2026-10-11-group6-cloud/README.md).
+No observation grants restoration, resolves hosted trust failures or completes
+managed-company/installed acceptance. Item62 and transversal16/38 stay open.
 
 2026-10-11 full private removal receiving now passes165 actual cases, zero
 failed/errors/skipped, in45.164s under the original60s boundary, with29 candidate
