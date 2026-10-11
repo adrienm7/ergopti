@@ -147,6 +147,7 @@ class _G4B_Runtime {
 		this.Owned := false
 		this.Starts := 0
 		this.Stops := 0
+		this.LiveIdentity := true
 		this.Record := Map("ready_image_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	}
 	Start(Target, Authority, Ready, Exit) {
@@ -177,6 +178,9 @@ class _G4B_Runtime {
 	}
 	HasOwner() {
 		return this.Owned
+	}
+	IdentityReady() {
+		return this.Owned && this.LiveIdentity
 	}
 }
 
@@ -653,6 +657,26 @@ _G4B_RejectArrayTags() {
 }
 Test("managed bootstrap: model receipt uses actual normalized-name set contract (groups247-managed)", _G4B_RejectArrayTags)
 
+/** Cleanup ownership must not grant HTTP admission to a replaced listener. */
+_G4B_DeadListenerRefuses() {
+	global _LLM_ManagedBootstrap
+	Saved := _LLM_ManagedBootstrap
+	F := _G4B_Fixture()
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		_LLM_ManagedBootstrap := F.Flow
+		AssertEqual(LLM_OllamaRequestOrigin(), F.Flow.Target["origin"])
+		F.Runtime.LiveIdentity := false
+		AssertTrue(F.Runtime.HasOwner(), "Physical cleanup ownership remains retained.")
+		AssertThrows(LLM_OllamaRequestOrigin, "A dead captured server cannot borrow a replacement listener.")
+	} finally {
+		F.Close()
+		_LLM_ManagedBootstrap := Saved
+	}
+}
+Test("managed bootstrap: retained READY refuses dead listener (groups247-live-identity)", _G4B_DeadListenerRefuses)
+
 /** A superseded deferred retry must tolerate callbacks cleared by prior success. */
 _G4B_OptionalRetryCallbacks() {
 	global _LLM_Deps_Epoch
@@ -689,3 +713,55 @@ _G4B_OptionalDeferredRetry() {
 }
 Test("managed bootstrap: deferred retry preserves absent callbacks (groups247-optional-callbacks)", _G4B_OptionalDeferredRetry)
 
+/** Uses an actual owned Windows listener; this is not Ollama installation qualification. */
+_G4B_NativeListenerIdentity() {
+	Root := A_Temp . "\ergopti-native-listener-" . DllCall("GetCurrentProcessId", "UInt") . "-" . A_TickCount
+	DirCreate(Root)
+	Observed := Map("terminal", false, "exit", -1, "stderr", "")
+	PowerShell := A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+	Fixture := A_ScriptDir . "\fixtures\ollama_live_identity_listener.ps1"
+	Task := ShellRunner_SpawnTreeOwned(PowerShell, ["-NoLogo", "-NoProfile", "-NonInteractive",
+		"-ExecutionPolicy", "Bypass", "-File", Fixture, "-Directory", Root],
+		Observe, , , 4096, true, true)
+	Observe(Code, Out, Err) {
+		Observed["exit"] := Code
+		Observed["stderr"] := Err
+		Observed["terminal"] := true
+	}
+	try {
+		AssertTrue(Task.start(), "The owned native listener must launch.")
+		Deadline := A_TickCount + 5000
+		while !FileExist(Root . "\ready.json") && A_TickCount < Deadline && !Observed["terminal"]
+			Sleep(10)
+		AssertTrue(FileExist(Root . "\ready.json"), "The real process must publish its listener identity.")
+		Native := JsonParse(FileRead(Root . "\ready.json", "UTF-8"))
+		Receipt := Map("child_pid", Native["pid"], "child_created_filetime", Native["created_filetime"])
+		Target := Map("port", Native["port"], "origin", "http://127.0.0.1:" . Native["port"], "executable", PowerShell)
+		AssertTrue(OllamaNativeIdentityReady(Receipt, Target), "PID, birth time, executable and actual listener must agree.")
+		Stale := Receipt.Clone()
+		Stale["child_created_filetime"] += 1
+		AssertFalse(OllamaNativeIdentityReady(Stale, Target), "A live PID cannot substitute for its captured birth identity.")
+		ForeignImage := Target.Clone()
+		ForeignImage["executable"] := A_AhkPath
+		AssertFalse(OllamaNativeIdentityReady(Receipt, ForeignImage), "The listener PID alone cannot admit another executable.")
+		ForeignOrigin := Target.Clone()
+		ForeignOrigin["origin"] .= "/api"
+		AssertFalse(OllamaNativeIdentityReady(Receipt, ForeignOrigin), "Configured origin must be the exact captured authority.")
+		FileAppend("stop`n", Root . "\stop", "UTF-8-RAW")
+		Deadline := A_TickCount + 5000
+		while !Observed["terminal"] && A_TickCount < Deadline
+			Sleep(10)
+		AssertTrue(Observed["terminal"], "Natural tree retirement must be acknowledged.")
+		AssertEqual(0, Observed["exit"], "The actual helper must exit successfully after releasing its listener.")
+		AssertEqual("", Observed["stderr"], "Native listener errors cannot become a successful retirement receipt.")
+		AssertFalse(OllamaNativeIdentityReady(Receipt, Target), "Retained READY cannot admit a terminated listener.")
+	} finally {
+		if !Observed["terminal"] {
+			FileAppend("stop`n", Root . "\stop", "UTF-8-RAW")
+			if !Task.requestTerminate()
+				throw Error("Owned native listener cleanup remains pending.")
+		}
+		DirDelete(Root, true)
+	}
+}
+Test("managed bootstrap: exact native listener identity rejects stale authority (groups247-native-identity)", _G4B_NativeListenerIdentity)
