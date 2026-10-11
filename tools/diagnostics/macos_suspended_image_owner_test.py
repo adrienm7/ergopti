@@ -642,5 +642,103 @@ class DaemonLogProtocolControls(unittest.TestCase):
         self.assertEqual(retired, [2], "the original retirement must precede the write refusal")
 
 
+class ListenerExpiryProtocolControls(unittest.TestCase):
+    """Literal parser lifecycle laws; no native guardian or closure credit."""
+
+    def operation(self):
+        value = object.__new__(OWNER.SuspendedImageOwner)
+        value.request = {
+            "listener_event": True,
+            "session_path": "/private/daemon-" + "a" * 32 + ".json",
+        }
+        value.image_ready = value.active = True
+        value.listener_bound = value._listener_event_seen = False
+        value._retired = value._refused = value._failure = None
+        value._protocol_debt = value._retirement_started = False
+        value._startup_deadline = 100
+        value.physically_retired = False
+        return value
+
+    @staticmethod
+    def event(nonce="a" * 32):
+        return ("V1 LISTENER_BOUND " + nonce).encode()
+
+    def test_expired_matching_event_is_consumed_without_readiness_or_clock_renewal(self):
+        for now in (100, 101):
+            with self.subTest(now=now), patch.object(OWNER.time, "monotonic", return_value=now):
+                operation = self.operation()
+                operation._parse(self.event())
+                self.assertTrue(operation._listener_event_seen)
+                self.assertFalse(operation.listener_bound)
+                self.assertFalse(operation._protocol_debt)
+                self.assertIsNone(operation._failure)
+                self.assertEqual(operation._startup_deadline, 100)
+                self.assertFalse(operation.physically_retired)
+                with self.assertRaisesRegex(OWNER.ImageRefusal, "deadline"):
+                    operation.wait_listener_bound()
+
+    def test_duplicate_matching_event_after_expiry_still_creates_protocol_debt(self):
+        with patch.object(OWNER.time, "monotonic", return_value=100):
+            operation = self.operation()
+            operation._parse(self.event())
+            with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+                operation._parse(self.event())
+            self.assertTrue(operation._protocol_debt)
+            self.assertFalse(operation.listener_bound)
+            self.assertFalse(operation.physically_retired)
+            self.assertEqual(operation._startup_deadline, 100)
+
+    def test_wrong_nonce_retirement_started_and_inactive_state_remain_refused(self):
+        for condition in ("wrong-nonce", "retirement-started", "inactive", "not-requested"):
+            operation = self.operation()
+            event = self.event()
+            if condition == "wrong-nonce":
+                event = self.event("b" * 32)
+            elif condition == "retirement-started":
+                operation._retirement_started = True
+            elif condition == "inactive":
+                operation.active = False
+            else:
+                operation.request["listener_event"] = False
+            with (
+                self.subTest(condition=condition),
+                patch.object(OWNER.time, "monotonic", return_value=100),
+            ):
+                with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+                    operation._parse(event)
+                self.assertTrue(operation._protocol_debt)
+                self.assertFalse(operation.listener_bound)
+                self.assertFalse(operation._listener_event_seen)
+                self.assertFalse(operation.physically_retired)
+
+    def test_ontime_receipt_keeps_original_fresh_wait_fence_and_duplicate_refusal(self):
+        operation = self.operation()
+        with patch.object(OWNER.time, "monotonic", return_value=99):
+            operation._parse(self.event())
+        self.assertTrue(operation.listener_bound)
+        self.assertTrue(operation._listener_event_seen)
+        self.assertEqual(operation._startup_deadline, 100)
+        with patch.object(OWNER.time, "monotonic", return_value=100):
+            with self.assertRaisesRegex(OWNER.ImageRefusal, "deadline"):
+                operation.wait_listener_bound()
+            with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+                operation._parse(self.event())
+        self.assertTrue(operation._protocol_debt)
+        self.assertFalse(operation.physically_retired)
+
+    def test_consuming_late_valid_event_cannot_clear_existing_protocol_corruption(self):
+        operation = self.operation()
+        primary = OWNER.ImageRefusal("protocol")
+        operation._failure = primary
+        operation._protocol_debt = True
+        with patch.object(OWNER.time, "monotonic", return_value=100):
+            operation._parse(self.event())
+        self.assertTrue(operation._protocol_debt)
+        self.assertIs(operation._failure, primary)
+        self.assertFalse(operation.listener_bound)
+        self.assertFalse(operation.physically_retired)
+        self.assertEqual(operation._startup_deadline, 100)
+
+
 if __name__ == "__main__":
     unittest.main()

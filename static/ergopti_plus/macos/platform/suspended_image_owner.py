@@ -221,6 +221,7 @@ class SuspendedImageOwner:
         self.image_ready = False
         self.active = False
         self.listener_bound = False
+        self._listener_event_seen = False
         self.physically_retired = False
         self.listener = None
         self._retired = None
@@ -386,12 +387,16 @@ class SuspendedImageOwner:
                     self.request.get("listener_event") is not True
                     or not self.active
                     or self.listener_bound
+                    or self._listener_event_seen
                     or self._retirement_started
                     or fields[2] != name.removeprefix("daemon-").removesuffix(".json")
                 ):
                     raise ImageRefusal("protocol")
-                self.progress()
-                self.listener_bound = True
+                self._listener_event_seen = True
+                # A valid queued event can be drained after startup expiry while
+                # retiring this exact owner. It cannot grant listener readiness.
+                if time.monotonic() < self._startup_deadline:
+                    self.listener_bound = True
             elif role == "PENDING" and len(fields) == 3:
                 decimal(fields[2], 2**31 - 1)
                 self._retirement_started = True

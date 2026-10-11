@@ -952,6 +952,62 @@ class ListenerBeforeAPIControls(unittest.TestCase):
         self.assertFalse(self.owner.operation.physically_retired)
         self.assertTrue(self.owner.retire(5))
 
+    def test_cancel_drains_matching_late_listener_event_without_granting_api_readiness(self):
+        # The actual private peer deliberately emits no event during ACTIVATE;
+        # it emits exactly one matching event only after receiving CANCEL.
+        before = """            if request.get('listener_event') is True:
+                print('V1 LISTENER_BOUND', session.name[7:-5], flush=True)
+"""
+        self.assertEqual(PEER.count(before), 1)
+        peer = PEER.replace(before, "")
+        before_cancel = "        elif line == 'CANCEL\\n' or line == '':\n"
+        self.assertEqual(peer.count(before_cancel), 1)
+        peer = peer.replace(
+            before_cancel,
+            before_cancel
+            + "            if request.get('listener_event') is True:\n"
+            + "                print('V1 LISTENER_BOUND', session.name[7:-5], flush=True)\n",
+        )
+        with patch.dict(globals(), {"PEER": peer}):
+            self.readiness_peer(prepare=False)
+        self.owner = self.subject.ServeOwner(
+            11434,
+            5,
+            60,
+            5,
+            listener_event=True,
+            register=lambda owner: setattr(self, "owner", owner),
+        )
+        self.owner.prepare().start()
+        self.readiness_payload(self.owner)
+        operation = self.owner.operation
+        self.assertFalse(operation.listener_bound)
+        operation._startup_deadline = 0
+        with self.assertRaisesRegex(self.subject.OWNER.ImageRefusal, "deadline"):
+            self.owner.acquire_readiness()
+        self.assertEqual(self.owner._api_responses, [])
+        self.assertFalse(self.owner._api_ready)
+        self.assertFalse(operation.physically_retired)
+        self.assertTrue(self.owner.retire(5))
+        self.assertTrue(operation._listener_event_seen)
+        self.assertFalse(operation.listener_bound)
+        self.assertFalse(operation._protocol_debt)
+        self.assertEqual(operation._startup_deadline, 0)
+        self.assertTrue(operation.physically_retired)
+        self.assertTrue(operation._guardian_retirement_proven)
+        self.assertIsNotNone(operation._retired)
+        self.assertEqual(operation._outgoing_closed, 0)
+        self.assertEqual(operation._bootstrap_closed, 0)
+        self.assertEqual(operation._eof, {"stdout", "stderr"})
+        self.assertEqual(operation.process.returncode, 0)
+        for stream in ("stdin", "stdout", "stderr"):
+            self.assertIsNone(getattr(operation.process, stream))
+        self.assertIsNone(operation._selector)
+        self.assertIsNone(self.owner.source_fd)
+        self.assertEqual(self.binary.stat().st_nlink, 1)
+        self.assertFalse(self.owner._api_ready)
+        self.assertEqual(self.owner._api_responses, [])
+
 
 @unittest.skipUnless(os.name == "posix", "Actual private POSIX process/file owners required")
 class CallerInputControls(unittest.TestCase):

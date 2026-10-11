@@ -6,7 +6,7 @@ package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 	.. shared .. "/?.lua;" .. shared .. "/?/init.lua;"
 	.. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
 
-local result = { version = 1, runtime = "native Hammerspoon", tasks = 0 }
+local result = { version = 1, runtime = "native Hammerspoon", tasks = 0, daemon_validation = "not-executed" }
 local owner = {}
 _G.ergopti_cold_bootstrap_owner = owner
 local function publish()
