@@ -288,6 +288,84 @@ _TRFE_ShortTapRefusal(Reset) {
 Test("runner receipt sharing: incomplete append is refused and closed (receipt-sharing)", _TRFE_ShortTapRefusal.Bind(false))
 Test("runner receipt sharing: incomplete reset is refused and closed (receipt-sharing)", _TRFE_ShortTapRefusal.Bind(true))
 
+; The native desktop cohort is a third real entry, not an assertion-library owner.
+_TRFE_ReceiptBootstrapPatterns() {
+	return Map(
+		"shared", "(?im)^#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)",
+		"e2e", "(?im)^#Include[ \t]+\.\./test_framework\.ahk\s*\r?\n\s*global[ \t]+TEST_RESULTS_FILE[ \t]*:=[ \t]*_TestResultsPath\([ \t]*A_ScriptDir[^\r\n]*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./\.\./modules/keylogger/keylogger_hook\.ahk(?=[ \t]*\r?$)",
+		"native", "(?im)^OnError\(_NativeDesktopStartupError\)\s*\r?\n\s*#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)")
+}
+
+_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapCode) {
+	if ReceiptBootstrapCode == ""
+		return false
+	ReceiptBootstrapPatterns := _TRFE_ReceiptBootstrapPatterns()
+	for ReceiptBootstrapOwner, ReceiptBootstrapExpected in Map("shared", 2, "e2e", 1, "native", 1) {
+		RegExReplace(ReceiptBootstrapCode, ReceiptBootstrapPatterns[ReceiptBootstrapOwner], "", &ReceiptBootstrapObserved)
+		if ReceiptBootstrapObserved != ReceiptBootstrapExpected
+			return false
+	}
+	RegExReplace(ReceiptBootstrapCode, "(?im)^_TestResultsBeginRun\s*\(\s*\)[ \t]*\r?$", "", &ReceiptBootstrapObserved)
+	return ReceiptBootstrapObserved == 3
+}
+
+_TRFE_ReceiptBootstrapRefusals(ReceiptBootstrapCode) {
+	ReceiptBootstrapPatterns := _TRFE_ReceiptBootstrapPatterns()
+	AssertTrue(RegExMatch(ReceiptBootstrapCode, ReceiptBootstrapPatterns["native"], &ReceiptBootstrapNative), "the actual native entry bootstrap is readable")
+	AssertTrue(RegExMatch(ReceiptBootstrapCode, ReceiptBootstrapPatterns["e2e"], &ReceiptBootstrapE2e), "the actual E2E entry bootstrap is readable")
+	ReceiptBootstrapUnits := []
+	ReceiptBootstrapPosition := 1
+	while RegExMatch(ReceiptBootstrapCode, ReceiptBootstrapPatterns["shared"], &ReceiptBootstrapShared, ReceiptBootstrapPosition) {
+		if ReceiptBootstrapShared.Pos < ReceiptBootstrapNative.Pos || ReceiptBootstrapShared.Pos >= ReceiptBootstrapNative.Pos + ReceiptBootstrapNative.Len
+			ReceiptBootstrapUnits.Push(ReceiptBootstrapShared[0])
+		ReceiptBootstrapPosition := ReceiptBootstrapShared.Pos + ReceiptBootstrapShared.Len
+	}
+	AssertEqual(1, ReceiptBootstrapUnits.Length, "the remaining shared entry is the unit owner")
+	ReceiptBootstrapOwners := [ReceiptBootstrapUnits[1], ReceiptBootstrapE2e[0], ReceiptBootstrapNative[0]]
+	ReceiptBootstrapFixture := ReceiptBootstrapOwners[1] . "`n" . ReceiptBootstrapOwners[2] . "`n" . ReceiptBootstrapOwners[3] . "`n"
+	AssertTrue(_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapFixture), "all actual entry fragments remain admitted")
+	; Explicit physical line boundaries work under the runner's actual PCRE engine.
+	for ReceiptBootstrapLineEnding in ["`n", "`r`n"] {
+		ReceiptBootstrapEnded := RegExReplace(ReceiptBootstrapFixture, "\r?\n", ReceiptBootstrapLineEnding)
+		AssertTrue(_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapEnded), "actual owner fragments admit LF and CRLF boundaries")
+		AssertTrue(RegExMatch(ReceiptBootstrapEnded, ReceiptBootstrapPatterns["native"], &ReceiptBootstrapEndedNative),
+			"the actual native fragment is nonempty under each physical line ending")
+		ReceiptBootstrapEndedMissing := StrReplace(ReceiptBootstrapEnded, ReceiptBootstrapEndedNative[0],
+			StrReplace(ReceiptBootstrapEndedNative[0], "_TestResultsBeginRun()", ""))
+		AssertFalse(_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapEndedMissing), "line endings cannot supply a missing entry call")
+		ReceiptBootstrapEndedForeign := RegExReplace(ReceiptBootstrapEndedNative[0],
+			"(?im)app_state\.ahk(?=[ \t]*\r?$)", "app_state.ahk.foreign", &ReceiptBootstrapEndedChanges)
+		AssertEqual(1, ReceiptBootstrapEndedChanges, "the physical-line foreign dependency mutation is nonvacuous")
+		AssertFalse(_TRFE_ReceiptBootstrapOwned(StrReplace(ReceiptBootstrapEnded, ReceiptBootstrapEndedNative[0],
+			ReceiptBootstrapEndedForeign)), "line endings cannot admit a foreign bootstrap dependency")
+	}
+	for ReceiptBootstrapOwner in ReceiptBootstrapOwners {
+		ReceiptBootstrapMissing := StrReplace(ReceiptBootstrapOwner, "_TestResultsBeginRun()", "")
+		AssertFalse(_TRFE_ReceiptBootstrapOwned(StrReplace(ReceiptBootstrapFixture, ReceiptBootstrapOwner, ReceiptBootstrapMissing, true, , 1)),
+			"every actual owner must initialize its receipt")
+		ReceiptBootstrapMoved := ReceiptBootstrapMissing . "`n_TestResultsBeginRun()"
+		AssertFalse(_TRFE_ReceiptBootstrapOwned(StrReplace(ReceiptBootstrapFixture, ReceiptBootstrapOwner, ReceiptBootstrapMoved, true, , 1)),
+			"an unchanged call count cannot move initialization after bootstrap dependencies")
+		ReceiptBootstrapForeign := RegExReplace(ReceiptBootstrapOwner,
+			"(?im)(app_state|keylogger_hook)\.ahk(?=[ \t]*\r?$)", "$1.ahk.foreign", &ReceiptBootstrapChanged)
+		AssertEqual(1, ReceiptBootstrapChanged, "the actual dependency mutation is nonvacuous")
+		AssertFalse(_TRFE_ReceiptBootstrapOwned(StrReplace(ReceiptBootstrapFixture, ReceiptBootstrapOwner,
+			ReceiptBootstrapForeign, true, , 1)), "a same-count foreign bootstrap dependency is refused")
+	}
+	ReceiptBootstrapDuplicate := StrReplace(ReceiptBootstrapFixture, ReceiptBootstrapNative[0],
+		StrReplace(ReceiptBootstrapNative[0], "_TestResultsBeginRun()", "_TestResultsBeginRun()`n_TestResultsBeginRun()"))
+	AssertFalse(_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapDuplicate), "a duplicate declared entry call is refused")
+	AssertFalse(_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapFixture . "_TestResultsBeginRun()`n"),
+		"an unowned fourth top-level call is refused")
+	ReceiptBootstrapDecoys := "`n; _TestResultsBeginRun()`n" . Chr(34) . "_TestResultsBeginRun()" . Chr(34) . "`n"
+	ReceiptBootstrapRawDecoys := ReceiptBootstrapFixture . ReceiptBootstrapDecoys
+	ReceiptBootstrapMasked := _DriverMaskNonCode(&ReceiptBootstrapRawDecoys)
+	AssertTrue(_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapMasked), "comments and strings add no entry authority")
+	ReceiptBootstrapRawMissing := StrReplace(ReceiptBootstrapFixture, ReceiptBootstrapNative[0], StrReplace(ReceiptBootstrapNative[0], "_TestResultsBeginRun()", "")) . ReceiptBootstrapDecoys
+	ReceiptBootstrapMasked := _DriverMaskNonCode(&ReceiptBootstrapRawMissing)
+	AssertFalse(_TRFE_ReceiptBootstrapOwned(ReceiptBootstrapMasked), "decoys cannot replace actual native initialization")
+}
+
 ; Read by semantic owner through canonical masking; prose cannot supply wiring.
 _TRFE_SharedReceiptWiring() {
 	Source := _DriverDirConcat("tests")
@@ -311,8 +389,9 @@ _TRFE_SharedReceiptWiring() {
 	AssertEqual(1, Count, "entry selection must enter the headless refusal boundary exactly once")
 	RegExReplace(Code, "(?m)^_TestResultsInitializeOrExit\s*\(\s*TEST_RESULTS_FILE\s*\)", "", &Count)
 	AssertEqual(0, Count, "a library include cannot initialize the parent's requested receipt")
-	RegExReplace(Code, "(?m)^_TestResultsBeginRun\(\)\s*$", "", &Count)
-	AssertEqual(2, Count, "the unit and E2E entry points initialize before their bootstrap graph")
+	AssertTrue(_TRFE_ReceiptBootstrapOwned(Code),
+		"unit, E2E and native desktop entries initialize once before their bootstrap graph")
+	_TRFE_ReceiptBootstrapRefusals(Code)
 	RegExReplace(Code, "(?im)^global\s+TEST_RESULTS_FILE\s*:=\s*_TestResultsPath\s*\(\s*A_ScriptDir[^\r\n]*\r?\n\s*_TestResultsBeginRun\s*\(\s*\)", "", &Count)
 	AssertEqual(1, Count, "the E2E default selection must enter the shared refusal boundary")
 	Body := _DriverExtractFunctionBody(&Code, "_TestResultsInitializeOrExit", 1, true)
