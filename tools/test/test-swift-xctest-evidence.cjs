@@ -1336,7 +1336,7 @@ function stableV101PackageCollectorControls(repository) {
 	assert.deepEqual(result.qualification.classes, []);
 	assert.deepEqual(result.qualification.methods, expectedPac);
 	assert.deepEqual(result.brew_qualification.methods, expectedBrew);
-	assert.equal(result.qualification.expires_at, '2026-10-11T07:00:00Z');
+	assert.equal(result.qualification.expires_at, profile.expires_at);
 	const pattern = new RegExp(evidence.pacSkipPattern(pac, brew));
 	for (const [suite, methods] of Object.entries(definitions)) {
 		for (const method of methods) {
@@ -1409,13 +1409,11 @@ function stableV101PackageCollectorControls(repository) {
 	assert.throws(() =>
 		evidence.pacQualification(pacReceipt, { ...env, ERGOPTI_DEV_RELEASE_TAG: 'v1.0.2' }, now)
 	);
-	assert.throws(() => evidence.pacQualification(pacReceipt, env, new Date('2026-10-11T07:00:00Z')));
+	assert.throws(() => evidence.pacQualification(pacReceipt, env, new Date(profile.expires_at)));
 	assert.throws(() =>
 		evidence.pacQualification({ ...pacReceipt, source_sha: 'f'.repeat(40) }, env, now)
 	);
-	assert.throws(() =>
-		evidence.brewQualification(brewReceipt, env, new Date('2026-10-11T07:00:00Z'))
-	);
+	assert.throws(() => evidence.brewQualification(brewReceipt, env, new Date(profile.expires_at)));
 	const otherSource = 'f'.repeat(40);
 	const otherBrew = evidence.brewQualification(
 		q.qualificationReceipt(profile, 'macos-brew-archive', { source_sha: otherSource }),

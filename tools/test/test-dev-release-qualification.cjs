@@ -1010,8 +1010,13 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		tag: 'v1.0.1',
 		version: '1.0.1'
 	};
-	const clock = '2026-10-10T18:00:00Z';
-	const scopes = ['macos-native-pac', 'macos-native-http', 'macos-brew-archive'];
+	const clock = '2026-10-11T14:00:00Z';
+	const scopes = [
+		'macos-native-pac',
+		'macos-native-http',
+		'macos-brew-archive',
+		'macos-native-model-receiving'
+	];
 	const selected = q.authorizeQualificationProfile(q.STABLE_V101_PROFILE_ID, context, clock);
 	assert.deepEqual(q.deferredScopes(selected), scopes);
 	assert.equal(q.stablePublicationProfile(context, clock), selected);
@@ -1025,7 +1030,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			{ qualified: true },
 			{ source_sha: 'b'.repeat(40) },
 			{ version: '1.0.2' },
-			{ expires_at: '2026-10-12T07:00:00Z' },
+			{ expires_at: '2026-10-13T07:00:00Z' },
 			{ extra: true }
 		])
 			assert.throws(() => q.scopeDisposition({ ...receipt, ...patch }, scope, sha, context, clock));
@@ -1054,7 +1059,6 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'core-js-suite',
 		'linux-unit-suite',
 		'linux-e2e-suite',
-		'macos-native-model-receiving',
 		'macos-stubbed-unit',
 		'macos-stubbed-e2e',
 		'macos-launch-appleevents'
@@ -1080,6 +1084,29 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const extraScope = structuredClone(approved);
 	extraScope.scopes['core-js-suite'] = approved.scopes['macos-native-http'];
 	assert.throws(() => q.validateStableV101Policy(extraScope));
+	// Earlier consent and a pending proposal cannot authorize the newly added model scope.
+	for (const patch of [
+		{ authorization_quote: 'oui' },
+		{ authorization_quote: 'PENDING_EXPLICIT_HUMAN_APPROVAL' },
+		{ id: 'stable-v1-0-1-20261010-three-macos-native-scopes' },
+		{ expires_at: '2099-10-12T07:00:00Z' }
+	])
+		assert.throws(() => q.validateStableV101Policy({ ...approved, ...patch }));
+	const model = approved.scopes['macos-native-model-receiving'];
+	assert.deepEqual(model.architectures, ['arm64', 'amd64']);
+	assert.deepEqual(model.profiles, ['pac-inline', 'pac-url', 'explicit-proxy']);
+	for (const patch of [
+		{ architectures: ['arm64'] },
+		{ architectures: ['arm64', 'amd64', 'foreign'] },
+		{ profiles: ['pac-inline', 'pac-url'] },
+		{ profiles: ['pac-inline', 'pac-url', 'explicit-proxy', 'foreign'] },
+		{ args: ['managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls'] },
+		{ command: 'foreign' }
+	]) {
+		const altered = structuredClone(approved);
+		Object.assign(altered.scopes['macos-native-model-receiving'], patch);
+		assert.throws(() => q.validateStableV101Policy(altered));
+	}
 	assert.deepEqual(q.STABLE_V101_PAC_METHODS, approved.scopes['macos-native-pac'].methods);
 	assert.deepEqual(q.STABLE_V101_BREW_METHODS, {
 		HomebrewArchiveAcceptanceTests: [approved.scopes['macos-brew-archive'].name]
@@ -1091,6 +1118,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'DEFERRED / qualified:false',
 		'v1.0.1',
 		'Worker12',
+		'arm64/amd64 across pac-inline, pac-url and explicit-proxy',
+		'portable model controls',
 		'owned-process/client-only',
 		'ordinary verified archive installation/launch',
 		'Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified'
@@ -1098,7 +1127,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		assert(notice.includes(literal));
 	assert(notice.includes(sha));
 	console.log(
-		'[OK] v1.0.1 exact three scopes, mandatory siblings, context/expiry/source/metadata refusals.'
+		'[OK] v1.0.1 exact four scopes, mandatory siblings, context/expiry/source/metadata refusals.'
 	);
 
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-v101-qualification-'));
@@ -1108,7 +1137,9 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			['macos-native-pac', 'amd64'],
 			['macos-native-http', 'arm64'],
 			['macos-native-http', 'amd64'],
-			['macos-brew-archive', '']
+			['macos-brew-archive', ''],
+			['macos-native-model-receiving', 'arm64'],
+			['macos-native-model-receiving', 'amd64']
 		].map(([scope, architecture]) => {
 			const file = path.join(
 				owner,
@@ -1132,7 +1163,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		q.admitCommandReceipts(owner, context, sha, clock);
 		assert.throws(() => q.admitCommandReceipts(owner, context, sha, approved.expires_at));
 		console.log(
-			'[OK] all five actual publication receipt filenames required; every missing/foreign source refuses.'
+			'[OK] all seven actual publication receipt filenames required; every missing/foreign source refuses.'
 		);
 
 		// Run the real CLI entry with a fixed test clock, retaining all source and file operations.
