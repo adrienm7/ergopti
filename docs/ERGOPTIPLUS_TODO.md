@@ -10645,6 +10645,17 @@ remains partial for actual catalogue, consent, invocation and installation.
   sources, followed by affected delivery gates. Device work: actual number-row
   and dead-state output on real layouts after owner qualification.
 
+  A callable diagnostics-only component is prepared for the single final-byte
+  number-row source counterfactual: exact original Swift tests, immutable
+  portable fixtures, a strict refusal receiver and a current-Git 99-image
+  materializer. The unchanged 53-case portable cohort must be run explicitly;
+  ordinary JS checks do not enroll it. Routine CI wiring remains separately
+  pending shared custody. After the files are committed, receive the preparer's
+  actual-Git projection independently, without Swift or fabricated CI variables.
+  Fresh native compilation, the exact expected assertion transcript and seven
+  TIS restorations remain unrun. This does not enable forced number-row delivery
+  or complete item 107.
+
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
   Win/Super on Windows/Linux. Implemented: one ordinary editable conditional
