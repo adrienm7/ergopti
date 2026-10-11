@@ -346,6 +346,7 @@ const WINDOWS_FILE_RETENTION = [
 ];
 
 const STEP_CONDITIONS = [
+	[MACOS_BOX, 'lease-silence-native', 'Retain exact paired-process native receiving', 'always()'],
 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
 	...scoped.contract.retained_steps.map((owner) => [
@@ -1097,6 +1098,10 @@ for (const candidate of topJobs) {
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
  */
+// Exact intended independent receiver from the previously reviewed manual enrollment design.
+const LEASE_SILENCE_NATIVE_BODY =
+	"    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt";
+
 function graphProblems(files) {
 	const problems = [];
 	const topLevel = pipeline.jobsOfText(files.find((entry) => entry.rel === ENTRY).text, ENTRY);
@@ -1161,6 +1166,7 @@ function graphProblems(files) {
 			rel === MACOS_BOX
 				? [
 						'item36-native',
+						'lease-silence-native',
 						'managed-ollama-native',
 						...sequence.slice(0, 2),
 						'tooltip-canvas',
@@ -1202,6 +1208,11 @@ function graphProblems(files) {
 			}
 		}
 		if (rel === MACOS_BOX) {
+			const silence = jobs.filter((candidate) => candidate.id === 'lease-silence-native');
+			if (silence.length !== 1 || silence[0].body !== LEASE_SILENCE_NATIVE_BODY)
+				problems.push(
+					'lease-silence-native exact manual nonrelease source/host/artifact owner refused'
+				);
 			const scoped = jobs.find((candidate) => candidate.id === 'item36-native');
 			if (
 				!scoped ||
@@ -1247,13 +1258,14 @@ function graphProblems(files) {
 		if (rel === MACOS_BOX) {
 			const expectedEntries = [
 				'item36-native',
+				'lease-silence-native',
 				'managed-ollama-native',
 				'test-hs',
 				'cold-bootstrap-native'
 			];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
 				problems.push(
-					`${rel} must have exactly the four declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
+					`${rel} must have exactly the five declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
 		} else if (entries.length !== 1) {
@@ -1261,7 +1273,8 @@ function graphProblems(files) {
 				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
 			);
 		}
-		const expectedExits = rel === MACOS_BOX ? ['item36-native', 'macos-ok'] : [sequence[4]];
+		const expectedExits =
+			rel === MACOS_BOX ? ['item36-native', 'lease-silence-native', 'macos-ok'] : [sequence[4]];
 		if (
 			rel === MACOS_BOX
 				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
@@ -1328,8 +1341,8 @@ for (const [what, from, to] of [
 	],
 	[
 		'broad scoped item36 admission',
-		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
-		'    if: always()\n'
+		"  item36-native:\n    name: 'Item 36 native archive qualification'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+		"  item36-native:\n    name: 'Item 36 native archive qualification'\n    if: always()\n"
 	],
 	[
 		'unqualified scoped item36 release output',
@@ -1338,6 +1351,65 @@ for (const [what, from, to] of [
 	]
 ])
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
+
+// Independently frozen additive lease-silence job mutations; old graph and NumberRow controls stay whole.
+for (const [label, before, after] of [
+	['job absent', '  lease-silence-native:\n', '  omitted-lease-silence-native:\n'],
+	[
+		'job duplicate',
+		'  lease-silence-native:\n',
+		"  lease-silence-native:\n    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt\n\n  lease-silence-native:\n"
+	],
+	[
+		'job coupled',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    needs: package-macos\n'
+	],
+	[
+		'job forgiven',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    continue-on-error: true\n'
+	],
+	[
+		'release output',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    outputs:\n      assets: fake\n'
+	],
+	[
+		'secret inherited',
+		'  lease-silence-native:\n',
+		'  lease-silence-native:\n    secrets: inherit\n'
+	],
+	[
+		'automatic/release admission',
+		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+		'    if: always()\n'
+	],
+	['ARM host wrong', 'runner: macos-15\n', 'runner: ubuntu-latest\n'],
+	['Intel absent', 'runner: macos-15-intel\n', 'runner: macos-15\n'],
+	[
+		'source runner wrong',
+		'tools/diagnostics/run_lease_silence_native.sh',
+		'tools/diagnostics/foreign_native.sh'
+	],
+	[
+		'closed parser control omitted',
+		'node tools/test/test-lease-silence-xctest-evidence.cjs',
+		'echo omitted'
+	],
+	[
+		'artifact missing status',
+		'            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n',
+		''
+	],
+	['artifact missing forbidden', 'if-no-files-found: error', 'if-no-files-found: ignore'],
+	['native budget widened', 'timeout-minutes: 20', 'timeout-minutes: 21']
+]) {
+	const whole = '  lease-silence-native:\n' + LEASE_SILENCE_NATIVE_BODY + '\n';
+	assert.equal(whole.split(before).length, 2, label + ': exact new owner seam');
+	const changed = whole.replace(before, () => after);
+	mustCatch('lease silence: ' + label, MACOS_BOX, whole, changed, graphProblems);
+}
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
