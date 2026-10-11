@@ -269,6 +269,27 @@ function M.open(opts, on_confirm)
 				end
 				return
 			end
+			local reason_ok, reason = pcall(function()
+				return id == "run_program" and type(parameter) == "string"
+					and require("ui.menu.shortcut_utils").program_assignment_reason(parameter) or nil
+			end)
+			if _active_session ~= session then
+				session.settling = false
+				return
+			end
+			if not reason_ok then
+				session.settling = false
+				Logger.error(LOG, "Program availability observation failed; keeping the picker open.")
+				return
+			end
+			if reason then
+				session.settling = false
+				local encoded, argument = pcall(hs.json.encode, reason)
+				if encoded and type(argument) == "string" and _active_session == session and session.webview then
+					pcall(function() session.webview:evaluateJavaScript("programProviderRefused(" .. argument .. ")") end)
+				end
+				return
+			end
 			local callback = session.on_confirm
 			local callback_ok, callback_result = Logger.callback(
 				LOG, "Action picker confirmation", callback, id, parameter)
