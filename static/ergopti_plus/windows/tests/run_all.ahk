@@ -2035,6 +2035,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_tree_owned.ahk
 #Include unit/test_ollama_install_files_port.ahk
 #Include unit/test_ollama_runtime_owner.ahk
+#Include unit/test_ollama_managed_bootstrap.ahk
 #Include unit/test_run_program_actions.ahk
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk
