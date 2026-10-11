@@ -38,7 +38,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					if initial == "existing" then sentinel = {} end
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
-						"_generated.action_catalogue", "config_binding_identity", "config_binding_publication", "config_keyboard_publication", "hs", "hs.timer",
+						"_generated.action_catalogue", "config_binding_identity", "tap_hold.key_combinations", "config_binding_publication", "config_keyboard_publication", "hs", "hs.timer",
 						"llm.translate", "ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
@@ -60,6 +60,12 @@ helpers.describe("Gesture actions fixture ownership", function()
 						helpers.assert_type(publication.owner_is_current, "function")
 						helpers.assert_type(identity, "table", "construction loads the real shared admission owner")
 						helpers.assert_type(identity.gesture_binding_fits, "function")
+						local pair_policy = package.loaded["tap_hold.key_combinations"]
+						helpers.assert_type(pair_policy, "table", "construction loads the real ordered-pair dependency")
+						helpers.assert_nil(getmetatable(pair_policy), "the actual shared pair policy is a plain module")
+						helpers.assert_eq(pair_policy.PAIR_SEPARATOR, "_then_")
+						helpers.assert_type(pair_policy.pair, "function")
+						helpers.assert_eq(pair_policy.pair("space", "tab"), "space_then_tab")
 						local keyboard = package.loaded["config_keyboard_publication"]
 						helpers.assert_type(keyboard, "table", "construction loads the real keyboard publication owner")
 						helpers.assert_type(keyboard.publish, "function")

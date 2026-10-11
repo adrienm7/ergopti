@@ -1361,7 +1361,7 @@ function M.split_action_parameter_key(key)
 end
 
 function M.get_action_parameter(binding, action_name)
-	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__" or binding:sub(1, 8) == "script__") then
+	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__" or binding:sub(1, 8) == "script__" or binding:sub(1, 13) == "combination__") then
 		local fits, reason = M.action_parameter_binding_fits(binding)
 		if fits == false then
 			if _action_params[parameter_key(binding, action_name)] ~= nil then
@@ -1598,6 +1598,11 @@ end
 --- @return boolean|nil fits
 --- @return string detail
 function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 13) == "combination__" then
+		local owner = rawget(package.loaded, "platform.remap.tap_hold_manager")
+		local catalogue = BindingPublication.current("combination", "platform.remap.tap_hold_manager", owner)
+		return BindingIdentity.combination_binding_fits(binding, catalogue), BindingIdentity.RETIRED_COMBINATION
+	end
 	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then
 		local catalogue = KeyboardPublication.current(rawget(package.loaded, "modules.shortcuts.keyboard_shortcuts"))
 		return BindingIdentity.keyboard_binding_fits(binding, catalogue), BindingIdentity.RETIRED_KEYBOARD

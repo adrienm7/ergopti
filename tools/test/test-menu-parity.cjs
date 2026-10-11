@@ -1638,6 +1638,15 @@ OPENS_SUBMENU.personal_default_choices = {
 	}
 };
 
+// The genuine personal content list receives Mac section check leaves.
+OPENS_SUBMENU.personal_main_sections = {
+	menu: 'hotstring_personal_section_choice',
+	platforms: ['hs'],
+	kind: 'compose',
+	personal_section_choice: true,
+	native_sources: { hs: 'macos/ui/menu/menu_hotstrings_custom.lua' }
+};
+
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
 
 /**
@@ -2710,6 +2719,20 @@ const {
 		}
 		assert.equal(admits(), true, 'exact source/declaration repair restores check-list ownership');
 	}
+}
+
+// A section check compose edge owes its actual native receiver and independent withdrawal controls.
+{
+	const assert = require('node:assert/strict');
+	const edge = OPENS_SUBMENU.personal_main_sections;
+	assert.deepEqual(edge, {
+		menu: 'hotstring_personal_section_choice',
+		platforms: ['hs'],
+		kind: 'compose',
+		personal_section_choice: true,
+		native_sources: { hs: 'macos/ui/menu/menu_hotstrings_custom.lua' }
+	});
+	require('./fixtures/personal-section-owner-counterexamples.cjs')(SP, manifest);
 }
 
 // A captured parent receiver earns credit only for the real returned native parent.
@@ -5579,32 +5602,38 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 													target,
 													manifest[target]
 												)
-											: opened.personal_default_choice === true
-												? require('../lib/menu-hotstring-language-binding.cjs').personalDefaultChoicePublication(
+											: opened.personal_section_choice === true
+												? require('../lib/menu-hotstring-language-binding.cjs').personalSectionChoicePublication(
 														fs.readFileSync(path.join(SP, file), 'utf8'),
 														platform,
 														manifest
 													)
-												: opened.selected_group?.[platform]
-													? publishesSelectedMenuGroup(
+												: opened.personal_default_choice === true
+													? require('../lib/menu-hotstring-language-binding.cjs').personalDefaultChoicePublication(
 															fs.readFileSync(path.join(SP, file), 'utf8'),
-															path.extname(file),
-															target,
-															manifest[target],
-															opened.selected_group[platform]
+															platform,
+															manifest
 														)
-													: publishesTemplate(
-															fs.readFileSync(path.join(SP, file), 'utf8'),
-															path.extname(file),
-															target
-														) ||
-														publishesIncludedCommands(
-															fs.readFileSync(path.join(SP, file), 'utf8'),
-															path.extname(file),
-															target,
-															manifest,
-															platform
-														))
+													: opened.selected_group?.[platform]
+														? publishesSelectedMenuGroup(
+																fs.readFileSync(path.join(SP, file), 'utf8'),
+																path.extname(file),
+																target,
+																manifest[target],
+																opened.selected_group[platform]
+															)
+														: publishesTemplate(
+																fs.readFileSync(path.join(SP, file), 'utf8'),
+																path.extname(file),
+																target
+															) ||
+															publishesIncludedCommands(
+																fs.readFileSync(path.join(SP, file), 'utf8'),
+																path.extname(file),
+																target,
+																manifest,
+																platform
+															))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
