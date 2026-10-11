@@ -2721,7 +2721,7 @@ function renderTopDaysTable(aggData) {
 		<td>${escapeHtml(formatDisplayDate(d.date))}</td>
 		<td style="text-align:right;">${format_int(d.chars || 0)}</td>
 		<td style="text-align:right;">${formatDuration(d.time_ms || 0)}</td>
-		<td style="text-align:right;">${d.switches || 0}</td>
+		<td style="text-align:right;">${escapeHtml(d.switches || 0)}</td>
 		<td style="text-align:right;">${d.sessions || 0}</td>
 	</tr>`
 		)

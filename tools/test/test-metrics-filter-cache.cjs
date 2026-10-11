@@ -476,4 +476,59 @@ for (const legacy of [false, true]) {
 }
 assert.equal(passed, 14, 'the twelve existing controls and both date sink chains must execute');
 
+// Replay host data through real aggregation before inspecting its HTML display.
+for (const legacy of [false, true]) {
+	test(`metrics top days escape actual aggregate switch labels (${legacy ? 'legacy' : 'loaded'})`, () => {
+		const context = legacy
+			? vm.createContext({ window: {}, document: { addEventListener() {} }, console })
+			: appsFixture().context;
+		if (legacy) {
+			vm.runInContext(read('host_bridge.js'), context);
+			vm.runInContext(read('metrics_apps/script.js'), context);
+			vm.runInContext('initDashboard = () => {}; renderDashboard = () => {};', context);
+		} else {
+			vm.runInContext(read('metrics_apps/charts.js'), context);
+			vm.runInContext(read('metrics_apps/modal.js'), context);
+		}
+		vm.runInContext(read('dom_utils.js'), context);
+		const tbody = { innerHTML: '' };
+		context.document.getElementById = (id) => (id === 'top_days_tbody' ? tbody : null);
+		const hostile = '<img src=x onerror="window.pwned=true">';
+		const publish = (switches) => {
+			context.window.bootstrapMetricsAppsData(
+				{
+					'2026-10-11': {
+						Editor: {
+							chars: 3,
+							app_time_ms: 60000,
+							session_count_total: 2,
+							switches_to: { Browser: switches }
+						}
+					}
+				},
+				{},
+				{}
+			);
+			vm.runInContext("currentPeriod = 'all';", context);
+			return context.getAggregatedData();
+		};
+		const aggregate = publish(hostile);
+		assert.equal(aggregate.rich.by_date['2026-10-11'].switches, '0' + hostile);
+		assert.equal(aggregate.rich.by_date['2026-10-11'].sessions, 2);
+		context.renderTopDaysTable(aggregate);
+		assert.ok(
+			tbody.innerHTML.includes('0&lt;img'),
+			'the actual accumulated value stays literal text'
+		);
+		assert.ok(!tbody.innerHTML.includes('<img'), 'the aggregate must not create an HTML element');
+		assert.equal(context.window.pwned, undefined);
+		const ordinary = publish(5);
+		assert.equal(ordinary.rich.by_date['2026-10-11'].switches, 5);
+		context.renderTopDaysTable(ordinary);
+		assert.ok(tbody.innerHTML.includes('>5</td>'));
+		assert.ok(tbody.innerHTML.includes('>2</td>'));
+	});
+}
+assert.equal(passed, 16, 'the fourteen prior controls and both aggregate sink chains must execute');
+
 console.log(`${passed} passed, 0 failed.`);
