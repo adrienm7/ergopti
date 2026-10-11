@@ -116,9 +116,9 @@ end
 
 local function task_api(state)
 	return {
-		new = function(_, callback, _stream, args)
-			local task = { args = args, done = callback }
-			function task.setStreamingCallback() return true end
+		new = function(_, callback, stream, args)
+			local task = { args = args, done = callback, stream = stream }
+			function task:setStreamingCallback(callback) self.stream = callback; return true end
 			function task:start() return self end
 			function task:terminate() return self end
 			state.tasks[#state.tasks + 1] = task
@@ -517,6 +517,39 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 			require("infra.i18n").get("ollama.error_checksum"))
 		helpers.assert_nil(require("modules.llm.ollama_binary").resolve(),
 			"a refused archive must leave nothing for the resolver to find")
+	end))
+
+	helpers.it("(ollama-install-stream-error) retains a split streamed failure when completion has no bytes", scoped(function()
+		local state = new_state()
+		local checker = load_ollama_checker(state)
+		helpers.assert_true(checker.install_for_selection())
+		local task = state.tasks[1]
+		helpers.assert_type(task.stream, "function", "the production bootstrap must expose its streaming callback")
+		task.stream(task, "", "archive extraction failed: no space ")
+		task.stream(task, "", "left on device\n")
+		task.done(1, "", "")
+		helpers.assert_eq(checker.get_state(), "failed")
+		helpers.assert_eq(checker.get_failure_message(), "archive extraction failed: no space left on device")
+	end))
+
+	helpers.it("(ollama-install-stream-error) uses a localized fallback only when no diagnostic exists", scoped(function()
+		local state = new_state()
+		local checker = load_ollama_checker(state)
+		helpers.assert_true(checker.install_for_selection())
+		state.tasks[1].done(1, "", "")
+		helpers.assert_eq(checker.get_failure_message(), require("infra.i18n").get("download_window.error_unknown"))
+	end))
+
+	helpers.it("(ollama-install-stream-error) retains the first full cause before trailing progress markers", scoped(function()
+		local state = new_state()
+		local checker = load_ollama_checker(state)
+		helpers.assert_true(checker.install_for_selection())
+		local task = state.tasks[1]
+		helpers.assert_type(task.stream, "function")
+		task.stream(task, "", "archive extraction failed: no space left on device\n")
+		task.stream(task, "OLLAMA_DOWNLOAD_PROGRESS 98\n", "")
+		task.done(1, "", "")
+		helpers.assert_eq(checker.get_failure_message(), "archive extraction failed: no space left on device")
 	end))
 end)
 
