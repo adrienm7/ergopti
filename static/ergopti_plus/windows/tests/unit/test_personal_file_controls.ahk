@@ -503,3 +503,52 @@ Test("personal-file-route: native long-root source retains exact loader and acti
 	_PFC_SuppliedRootRoute.Bind("long"))
 Test("personal-file-route: physically identical dot-root source retains its supplied logical route",
 	_PFC_SuppliedRootRoute.Bind("dot"))
+
+/** Quoted owned keys and foreign source bytes share the real typed document writer. */
+_PFC_QuotedMetadataUsesSemanticOwner() {
+	Fixture := _PFC_Fixture()
+	try {
+		Source := '# Preserve this source comment.`n[_meta]`n"delay" = 0.25`n'
+			. 'future = { nested = "unowned", enabled = false }`n'
+			. '[_meta.sections."é.foo"]`n"show_tooltip" = true`nneighbor = "untouched"`n'
+			. '[[live]]`n"abcd" = "first"`n[[quiet]]`n"qwer" = "second"`n'
+		Candidate := Fixture.owner.PatchMetadata("", "delay", 0.125, Source)
+		Parsed := TOML_ParseDocument(Candidate)
+		AssertEqual(0.125, Parsed["_meta"]["delay"], "the quoted leaf is replaced without adding a duplicate key")
+		AssertEqual("unowned", Parsed["_meta"]["future"]["nested"])
+		AssertContains(Candidate, 'future = { nested = "unowned", enabled = false }')
+		AssertContains(Candidate, '# Preserve this source comment.')
+		AssertContains(Candidate, '[[live]]`n"abcd" = "first"`n[[quiet]]`n"qwer" = "second"')
+		AssertEqual(false, SubStr(Candidate, 1, 1) == Chr(0xFEFF), "an unmarked source does not acquire a BOM")
+		Candidate := Fixture.owner.PatchMetadata("é.foo", "show_tooltip", false, Candidate)
+		Parsed := TOML_ParseDocument(Candidate)
+		Assert(Parsed["_meta"]["sections"]["é.foo"]["show_tooltip"] is TOML_Bool)
+		AssertEqual(false, Parsed["_meta"]["sections"]["é.foo"]["show_tooltip"].Value)
+		AssertContains(Candidate, 'neighbor = "untouched"')
+		AssertEqual(0.125, Fixture.owner.ReadMetadata(Candidate).Delay)
+		AssertEqual(false, Fixture.owner.ReadMetadata(Candidate).Sections["é.foo"].ShowTooltip)
+	} finally _PFC_Cleanup(Fixture)
+}
+Test("personal-file-metadata: quoted leaves preserve semantic identity and all foreign source data",
+	_PFC_QuotedMetadataUsesSemanticOwner)
+
+/** A native case fold cannot authorize rewriting a foreign semantic key. */
+_PFC_MetadataCaseAliasesRefuse() {
+	Fixture := _PFC_Fixture()
+	try {
+		for Source in [
+			'[_meta]`nDelay = 0.25`n[[live]]`n"abcd" = "first"`n',
+			'[_META]`ndelay = 0.25`n[[live]]`n"abcd" = "first"`n'] {
+			AssertFalse(Fixture.owner.MetadataAvailable("", "delay", Source))
+			Refused := false
+			try Fixture.owner.PatchMetadata("", "delay", 0.125, Source)
+			catch ValueError
+				Refused := true
+			AssertTrue(Refused, "case-alias metadata refuses without granting source ownership")
+		}
+		AssertTrue(Fixture.owner.MetadataAvailable("", "priority", '[_meta]`nDelay = 0.25`npriority = 61`n'))
+		AssertEqual(Fixture.content, FSReadUtf8Exact(Fixture.file), "read-only admission never writes the source")
+	} finally _PFC_Cleanup(Fixture)
+}
+Test("personal-file-metadata: case-alias fields refuse while safe neighboring controls remain available",
+	_PFC_MetadataCaseAliasesRefuse)
