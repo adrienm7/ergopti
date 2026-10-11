@@ -3,6 +3,7 @@
 	"version": "3.0.0",
 	"private": true,
 	"scripts": {
+		"test:web-text-admission": "node ./tools/test/test-web-text-admission.cjs",
 		"test:linux:nix-native": "node ./tools/test/run-linux-nix-native.cjs",
 		"test:linux:nix-source": "node ./tools/test/test-linux-nix-native.cjs",
 		"predev": "node ./tools/dev/write-branch.js",

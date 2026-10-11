@@ -5,13 +5,10 @@ let magic = {};
 
 function unescapeTomlString(s) {
 	if (!s && s !== '') return s;
+	// Decode each source escape once; a decoded backslash is literal data.
+	const escapes = { '\\': '\\', n: '\n', r: '\r', t: '\t', '"': '"', "'": "'" };
 	return s
-		.replace(/\\\\/g, '\\')
-		.replace(/\\n/g, '\n')
-		.replace(/\\r/g, '\r')
-		.replace(/\\t/g, '\t')
-		.replace(/\\"/g, '"')
-		.replace(/\\'/g, "'")
+		.replace(/\\(\\|n|r|t|"|')/g, (_match, escape) => escapes[escape])
 		.replace(/\r\n/g, '\n')
 		.replace(/\r/g, '\n');
 }
