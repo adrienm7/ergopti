@@ -10926,6 +10926,18 @@ receiving, forced output, installation and physical delivery remain required.
   execution qualification. No stale Edit read, restore-after-show sequence
   or capacity-only call replaces the required fresh invisible acquisition.
 
+  The actual Linux Manager refusal notice now uses the owned application
+  notification facade and shared caption composer while retaining its final
+  capability/pause admission. Generic notifications keep literal captions;
+  bodies, options and once-only refusal ownership remain unchanged. The existing
+  registered notifier test retains its original case and adds seven controls.
+  On both Lua ABIs, the focused baseline records39 passes/four failures and the
+  candidate43 passes/zero failures, including all17 generic notifier and18
+  original managed-document cases. Initial fixture-bootstrap failures are
+  retained; the successor preloads the real updater before scoped document
+  doubles, matching the registered runner. Native desktop delivery/clicks and
+  final interpreted/packaged acceptance remain required; item109 stays partial.
+
 - [~] **111.** Offer two distinct shared actions on all drivers: the OS
   normal app switcher and windows only on the display containing the current
   mouse cursor, resolved at invocation. Preserve saved action IDs; never use
