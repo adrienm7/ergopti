@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 196 tests in /);
+	assert.match(result.stderr, /Ran 203 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -1638,6 +1638,33 @@ check(
 		assert.match(controls, /discovery_same_traversal_controls=5/);
 	}
 );
+
+// PERMISSION_WORKER_MILESTONES_BEGIN
+check('permission worker diagnostics keep the same API, thread and settlement authority', () => {
+	const helper = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+		'utf8'
+	);
+	const worker = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_permission.c'),
+		'utf8'
+	);
+	assert.equal((worker.match(/AEDeterminePermissionToAutomateTarget\(/g) || []).length, 1);
+	assert.equal((worker.match(/pthread_create\(/g) || []).length, 1);
+	assert.equal((worker.match(/pthread_join\(/g) || []).length, 1);
+	assert.match(worker, /phase=api-call-starting/);
+	assert.match(worker, /phase=api-returned osstatus=%d/);
+	assert.match(worker, /phase=worker-joined/);
+	assert.match(worker, /_Exit\(68\)/);
+	assert.match(helper, /group\.process is process\s+and group\.reaped/);
+	assert.match(
+		helper,
+		/_observe_permission_worker\(self, process, failure\)\s*if failure is not None:\s*raise failure/
+	);
+	assert.match(helper, /stderr = _permission_result_stderr\(stdout, stderr\)/);
+	assert.match(helper, /if permission_capture == \(stdout, stderr\):/);
+});
+// PERMISSION_WORKER_MILESTONES_END
 
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);

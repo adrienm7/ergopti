@@ -6341,5 +6341,300 @@ int main(void) {
             self.assertEqual(result.stderr, "")
 
 
+class PermissionWorkerMilestoneControls(unittest.TestCase):
+    entry = b"OWNED_PERMISSION_WORKER/1 phase=api-call-starting\n"
+    returned = b"OWNED_PERMISSION_WORKER/1 phase=api-returned osstatus=-1744\n"
+    joined = b"OWNED_PERMISSION_WORKER/1 phase=worker-joined\n"
+
+    def test_literal_prefix_records_never_grant_api_or_process_success(self):
+        for data, stage, status in (
+            (b"", "no-milestone", None),
+            (self.entry, "api-call-starting", None),
+            (self.entry + self.returned, "api-returned", -1744),
+            (self.entry + self.returned + self.joined, "worker-joined", -1744),
+        ):
+            with self.subTest(stage=stage):
+                self.assertEqual(
+                    probe._permission_worker_trace(data),
+                    {"schema": 1, "stage": stage, "api_osstatus": status},
+                )
+        for value in (-2147483648, 2147483647, 0):
+            data = (
+                self.entry
+                + (
+                    "OWNED_PERMISSION_WORKER/1 phase=api-returned osstatus=" + str(value) + "\n"
+                ).encode()
+            )
+            self.assertEqual(probe._permission_worker_trace(data)["api_osstatus"], value)
+
+    def test_noise_duplicate_truncation_order_bounds_and_noncanonical_status_refuse(self):
+        for data in (
+            self.joined,
+            self.returned,
+            self.entry * 2,
+            self.entry[:-1],
+            self.entry + self.joined,
+            self.entry + self.returned + self.joined * 2,
+            self.entry + self.returned + b"noise\n",
+            b"\0",
+            b"x" * 257,
+            self.entry + self.returned.replace(b"-1744", b"-0"),
+            self.entry + self.returned.replace(b"-1744", b"01"),
+            self.entry + self.returned.replace(b"-1744", b"2147483648"),
+            self.entry + self.returned.replace(b"-1744", b"-2147483649"),
+        ):
+            with self.subTest(data=data):
+                with self.assertRaises(probe.AdmissionError):
+                    probe._permission_worker_trace(data)
+        with self.assertRaises(probe.AdmissionError):
+            probe._permission_worker_trace("not-bytes")
+
+    def test_normal_result_only_extracts_complete_status_agreeing_joined_frames(self):
+        output = b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=-1744\n"
+        complete = self.entry + self.returned + self.joined
+        self.assertEqual(probe._permission_result_stderr(output, complete), b"")
+        for errors in (
+            self.entry,
+            self.entry + self.returned,
+            complete + b"noise\n",
+            b"Owned Automation worker retirement failed\n",
+        ):
+            self.assertEqual(probe._permission_result_stderr(output, errors), errors)
+        for foreign in (
+            output.replace(b"request", b"query"),
+            output.replace(b"-1744", b"0"),
+            output.replace(b"-1744", b"-01744"),
+        ):
+            self.assertEqual(probe._permission_result_stderr(foreign, complete), complete)
+
+    def test_deadline_primary_retains_call_boundary_only_after_exact_existing_settlement(self):
+        process = SimpleNamespace(pid=19)
+        group = SimpleNamespace(process=process, reaped=True)
+        evidence = Mock(descriptor=7)
+        owner = SimpleNamespace(groups={19: group}, debt=[], evidence=evidence)
+
+        # Model only the existing exact process dictionary; no fake kernel closure credit.
+        class Key:
+            pid = 19
+
+        process = Key()
+        group.process = process
+        owner.groups = {process: group}
+        primary = probe.AdmissionError("original owned deadline")
+        with patch.object(probe, "_permission_worker_capture", return_value=self.entry) as capture:
+            probe._observe_permission_worker(owner, process, primary)
+        capture.assert_called_once_with(owner, process)
+        self.assertEqual(
+            evidence.record.call_args.kwargs["permission_worker"],
+            {"schema": 1, "stage": "api-call-starting", "api_osstatus": None},
+        )
+        self.assertEqual(evidence.record.call_args.kwargs["status"], "refused")
+        self.assertEqual(str(primary), "original owned deadline")
+
+    def test_debt_foreign_owner_capture_refusal_and_cancel_do_not_fabricate_call_boundary(self):
+        class Key:
+            pid = 19
+
+        process = Key()
+        primary = probe.AdmissionError("same primary")
+        for fault in (
+            "unreaped",
+            "foreign",
+            "debt",
+            "noisy",
+            "capture",
+            "interrupted",
+            "keyboard",
+            "exit",
+        ):
+            group = SimpleNamespace(process=process, reaped=fault != "unreaped")
+            if fault == "foreign":
+                group.process = Key()
+            evidence = Mock(descriptor=7)
+            owner = SimpleNamespace(
+                groups={process: group},
+                debt=[{"pid": 19}] if fault == "debt" else [],
+                evidence=evidence,
+            )
+            with (
+                self.subTest(fault=fault),
+                patch.object(probe, "_permission_worker_capture") as capture,
+            ):
+                capture.return_value = b"noise\n"
+                if fault in ("capture", "interrupted", "keyboard", "exit"):
+                    capture.side_effect = {
+                        "capture": OSError("refused"),
+                        "interrupted": probe.OwnedProcessInterrupted("cancel"),
+                        "keyboard": KeyboardInterrupt("cancel"),
+                        "exit": SystemExit(9),
+                    }[fault]
+                probe._observe_permission_worker(owner, process, primary)
+                self.assertEqual(
+                    evidence.record.call_args.kwargs["permission_worker"],
+                    {"schema": 1, "stage": "unavailable", "api_osstatus": None},
+                )
+                if fault in ("unreaped", "foreign", "debt"):
+                    capture.assert_not_called()
+                self.assertEqual(str(primary), "same primary")
+                self.assertEqual(owner.debt, [{"pid": 19}] if fault == "debt" else [])
+
+    def test_capture_close_refusal_retains_exact_acquisition_without_retry_or_call_credit(self):
+        class Key:
+            pid = 19
+
+        process = Key()
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = root / "child.stderr"
+            path.write_bytes(self.entry)
+            info = path.stat()
+            close = os.close
+            open_original = os.open
+            nofollow = getattr(os, "O_NOFOLLOW", 1 << 24)
+            nonblock = getattr(os, "O_NONBLOCK", 1 << 25)
+            modeled_bits = (0 if hasattr(os, "O_NOFOLLOW") else nofollow) | (
+                0 if hasattr(os, "O_NONBLOCK") else nonblock
+            )
+            for failure_type in (
+                OSError,
+                probe.OwnedProcessInterrupted,
+                KeyboardInterrupt,
+                SystemExit,
+            ):
+                for point in ("before-syscall", "after-syscall"):
+                    with self.subTest(error=failure_type.__name__, point=point):
+                        acquired, debts = [], []
+                        physical_close = []
+                        owner = SimpleNamespace(
+                            root=root,
+                            captures={process: (root / "unused", path)},
+                            capture_identities={process: ((0, 0), (info.st_dev, info.st_ino))},
+                            record_debt=debts.append,
+                        )
+                        failure = failure_type("unknown close")
+
+                        def capture_open(value, flags, **kwargs):
+                            self.assertEqual(flags, os.O_RDONLY | nofollow | nonblock)
+                            fd = open_original(value, flags & ~modeled_bits, **kwargs)
+                            acquired.append(fd)
+                            return fd
+
+                        def refuse_close(fd):
+                            self.assertEqual(fd, acquired[0])
+                            if point == "after-syscall":
+                                close(fd)
+                                physical_close.append(fd)
+                            raise failure
+
+                        try:
+                            with (
+                                patch.object(probe.os, "O_NOFOLLOW", nofollow, create=True),
+                                patch.object(probe.os, "O_NONBLOCK", nonblock, create=True),
+                                patch.object(
+                                    probe.os, "getuid", return_value=info.st_uid, create=True
+                                ),
+                                patch.object(probe.os, "open", side_effect=capture_open),
+                                patch.object(
+                                    probe.os, "close", side_effect=refuse_close
+                                ) as refused_close,
+                            ):
+                                with self.assertRaises(failure_type) as caught:
+                                    probe._permission_worker_capture(owner, process)
+                            self.assertIs(caught.exception, failure)
+                            self.assertEqual(refused_close.call_count, 1)
+                            self.assertEqual(len(acquired), 1)
+                            self.assertEqual(
+                                debts,
+                                [
+                                    {
+                                        "kind": "permission-capture",
+                                        "descriptor": acquired[0],
+                                        "identity": [info.st_dev, info.st_ino],
+                                        "close": "unacknowledged",
+                                    }
+                                ],
+                            )
+                            if point == "before-syscall":
+                                self.assertEqual(os.fstat(acquired[0]).st_ino, info.st_ino)
+                            self.assertEqual(
+                                physical_close, acquired if point == "after-syscall" else []
+                            )
+                        finally:
+                            if acquired and not physical_close:
+                                close(acquired[0])
+                                physical_close.append(acquired[0])
+                        self.assertEqual(physical_close, acquired)
+
+    def test_actual_worker_body_preserves_query_and_request_on_the_explicit_thread_api_port(self):
+        source = (
+            Path(__file__).resolve().parents[2] / "tools/diagnostics/native_appleevent_permission.c"
+        ).read_text()
+        start = source.index("struct permission_request {")
+        body = source[start:]
+        port = r"""
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+typedef int32_t OSStatus;
+typedef unsigned AEEventClass;
+typedef unsigned AEEventID;
+typedef struct { int value; } AEAddressDesc;
+static int calls;
+typedef int pthread_t;
+static int pthread_create(pthread_t *worker, const void *attributes,
+    void *(*entry)(void *), void *argument) {
+    if (worker == NULL || attributes != NULL || entry == NULL) abort();
+    *worker = 7;
+    if (entry(argument) != NULL) abort();
+    return 0;
+}
+static int pthread_join(pthread_t worker, void **value) {
+    if (worker != 7 || value != NULL) abort();
+    return 0;
+}
+static OSStatus AEDeterminePermissionToAutomateTarget(const AEAddressDesc *target,
+    AEEventClass cls, AEEventID event, bool ask) {
+    if (target == NULL || target->value != 8 || cls != 9 || event != 10) abort();
+    calls++;
+    return ask ? -1744 : -1743;
+}
+static const OSStatus noErr = 0;
+"""
+        main = r"""
+int main(int argc, char **argv) {
+    if (argc != 2) return 91;
+    AEAddressDesc target = {8};
+    int result = owned_appleevent_permission(&target, 9, 10, strcmp(argv[1], "request") == 0);
+    return result == 67 && calls == 1 ? 0 : 92;
+}
+"""
+        compiler = probe.shutil.which("cc")
+        self.assertIsNotNone(compiler, "Actual compiler needed for the explicit API port")
+        with TemporaryDirectory() as directory:
+            unit, binary = Path(directory) / "worker.c", Path(directory) / "worker"
+            unit.write_text(port + body + main)
+            built = subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Werror", str(unit), "-o", str(binary)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(built.returncode, 0, built.stderr)
+            query = subprocess.run([str(binary), "query"], capture_output=True, timeout=5)
+            self.assertEqual(query.returncode, 0)
+            self.assertEqual(
+                query.stdout, b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-1743\n"
+            )
+            self.assertEqual(query.stderr, b"")
+            request = subprocess.run([str(binary), "request"], capture_output=True, timeout=5)
+            self.assertEqual(request.returncode, 0)
+            self.assertEqual(
+                request.stdout, b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=-1744\n"
+            )
+            self.assertEqual(request.stderr, self.entry + self.returned + self.joined)
+
+
 if __name__ == "__main__":
     unittest.main()

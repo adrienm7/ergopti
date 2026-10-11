@@ -4042,6 +4042,26 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-11 typed worker and first-traversal receiving. Exact manual38103825010
+on12fb210c actually compiles and executes25 native archive cases:24 pass,
+one original Homebrew case fails, none skip. Sparkle wrong-key preservation,
+valid retry and relaunch pass. The separate no-prompt SDK case passes; its
+qualification facts do not grant fixture Automation consent. The existing
+first traversal completes seven nodes without exact sender/receiver name
+matches; no selector defect or device-only cause is established.
+
+The next diagnostic retains fixed call-boundary, API-return and original-join
+milestones from the same permission worker after exact physical settlement.
+A pre-call marker does not prove actual API entry or blocking. It adds no
+permission request, thread, traversal, grant or clock. Unknown capture remains
+unknown; interrupted or uncertain reader closure retains named debt. All196
+original portable bodies remain exact; candidate203 passes. The seven new
+controls against the exact predecessor produce one assertion failure and37
+error records, including missing helper functions; these are distinct outcomes.
+Actual corrected diagnostic receiving still requires macOS CI. Original consent,
+nonce, denial, Brew6, packaging and installation requirements remain; item36
+stays open.
+
 2026-10-11 diagnostic build refusal. Exact manual38098879182 on716bcb602
 fails Swift compilation before the archive XCTest starts; no25-case or first
 consent traversal result is received. The shared macOS worker cast correction
@@ -6736,6 +6756,29 @@ or physical-device acceptance.
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-11 exact12fb native component receiving. Manual38103825010 finishes
+failed: seven successful jobs, five failed and five skipped, none cancelled;
+Release, packaging and installation are skipped. Both architectures actually
+pass SDK49, daily7, logger42, Carbon12, sourcePAC10, Python78 and catalogue27.
+Fresh MLX/Ollama cold receipts bind27 source pins and close their real owners,
+receipts and private work; daemon/model validation remains not-executed.
+The exact composed local gate passes formatting,410 JS checks and18,419 Lua
+controls across1,570 modules, including the mandatory independent E2E corpus.
+These completed component results do not qualify the complete native lane.
+
+PAC14 executes12 passes and two failures on each architecture. WPAD reaches
+system trust but refuses its certificate with NSURL/CFNetwork-1202 and SSL-9813
+after its own trust-add command exits0. Its admin-query observer is not enrolled;
+other fixtures cannot supply its anchor visibility. Both native HTTP cases
+fail trust setup; their own exact-CA query reports owned_status-25300 and
+owned_present0, while noninteractive admin authorization succeeds. Trust
+removal/restoration failures and model setup refusals remain. No deterministic
+safe trust/keychain/restart correction is established by these observations.
+Native macOS certificate setup/restoration, PAC/WPAD/model receiving and full
+package/install need continuation. Windows SSPI/Schannel/NTLM, physical
+retirement and package/install remain explicit maintainer-PC steps. No native
+production guard is changed; items36/62 and transversal16/38 stay open.
 
 2026-10-11 cold caller initial-state correction. Exact716 cold artifact
 11686038953 omits caller.daemon_validation, which its original Python validator
