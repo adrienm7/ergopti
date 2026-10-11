@@ -524,6 +524,43 @@ local function row_starting(rows, prefix)
 end
 
 helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backends)", function()
+	helpers.it("(local-server-selection-ack) refuses a backend setter that mutates then returns false", function()
+		with_panel(function(Panel, api, _, world, ctx)
+			ctx.activate_api = function() ctx.state.llm_backend = "api"; return false end
+			local selected
+			helpers.assert_true(Panel.select_model(ctx, "omlx", "model-a", function(value) selected = value end))
+			helpers.assert_eq(world.persists, 1, "entry persistence is independent of backend activation")
+			helpers.assert_eq(api.get_active_entry().model, "model-a")
+			helpers.assert_eq(selected, false, "an unacknowledged setter cannot publish a selected backend")
+		end)
+	end)
+
+	helpers.it("(local-server-selection-ack) rejects a selected model superseded during backend activation", function()
+		with_panel(function(Panel, api, _, _, ctx)
+			ctx.activate_api = function()
+				ctx.state.llm_backend = "api"
+				api.set_entries({ { id = "newer", provider = "openai", token = "fixture", model = "model-b" } })
+				api.set_active_entry_id("newer")
+				return true
+			end
+			local selected
+			helpers.assert_true(Panel.select_model(ctx, "omlx", "model-a", function(value) selected = value end))
+			helpers.assert_eq(api.get_active_entry().id, "newer", "the newer entry remains authoritative")
+			helpers.assert_eq(selected, false, "API mode alone cannot acknowledge the originally selected model")
+		end)
+	end)
+
+	helpers.it("(local-server-selection-ack) acknowledges the exact persisted model after a true backend setter", function()
+		with_panel(function(Panel, api, _, _, ctx)
+			ctx.activate_api = function() ctx.state.llm_backend = "api"; return true end
+			local selected
+			helpers.assert_true(Panel.select_model(ctx, "omlx", "model-a", function(value) selected = value end))
+			helpers.assert_eq(selected, true)
+			helpers.assert_eq(api.get_active_entry().provider, "omlx")
+			helpers.assert_eq(api.get_active_entry().model, "model-a")
+		end)
+	end)
+
 	helpers.it("lists the answering servers and makes a chosen model the backend (local-openai-backends)", function()
 		with_panel(function(Panel, api, LocalServers, world, ctx)
 			local rows = Panel.rows(ctx)
