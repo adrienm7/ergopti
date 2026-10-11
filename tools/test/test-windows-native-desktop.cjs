@@ -117,6 +117,11 @@ function checkNativeEntry(source) {
 	assert.deepEqual(code.match(/^#Warn .*$/gm), ['#Warn All, StdOut', '#Warn VarUnset, Off']);
 	assert.match(code, /^#Include test_framework\.ahk$/m);
 	assert.match(code, /^#Include test_stubs\.ahk$/m);
+	// These real owners are used by the isolated AltGr callbacks. Registration
+	// alone succeeds when AHK instead resolves either missing function as unset.
+	for (const owner of ['adapters/text_sender.ahk', 'platform/remap/altgr_criteria.ahk']) {
+		assert.equal(code.split('#Include ../' + owner + '\n').length, 2);
+	}
 	assert.deepEqual(code.match(/^#Include unit\/.*$/gm), [
 		'#Include unit/test_console_window.ahk',
 		'#Include unit/test_key_combinations.ahk'
@@ -139,6 +144,8 @@ for (const [before, after] of [
 	['#Warn All, StdOut', '#Warn All, Off'],
 	['#Warn VarUnset, Off', '#Warn VarUnset, Off\n#Warn LocalSameAsGlobal, Off'],
 	['#Include test_framework.ahk', '#Include unrelated_framework.ahk'],
+	['#Include ../adapters/text_sender.ahk', '; omitted sender owner'],
+	['#Include ../platform/remap/altgr_criteria.ahk', '; omitted AltGr criteria owner'],
 	[
 		'#Include unit/test_console_window.ahk',
 		'#Include unit/test_console_window.ahk\n#Include unit/test_toml_numeric_strings.ahk'
