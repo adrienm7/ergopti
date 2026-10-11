@@ -1,0 +1,408 @@
+{
+	"schema_version": 1,
+	"status": "COMMITTED_DIAGNOSTIC_COMPONENT_WITH_SEPARATE_INACTIVE_CI_PREPARATION",
+	"item": 107,
+	"source_epoch": {
+		"commit": "5fa75b1f29f8d3c8c2c9088724a0ff9b4c1db9c3",
+		"parent": "acec284ec4872c20d04368da26efc4a10db3650d",
+		"tree": "be44a6c5712eb1aa3db4ff2965ec08948fb8acb2",
+		"historical_recipe_commit": "c15a16cc9eee103b4132bcaf811ed890834f894c",
+		"future_commit_authority": false
+	},
+	"component": {
+		"paths": 19,
+		"committed": true,
+		"selected_container_format_files": 379,
+		"selected_javascript_pass": 410,
+		"selected_exit": 0,
+		"portable_before_materializer": {
+			"pass": 53,
+			"fail": 0,
+			"skip": 0
+		},
+		"actual_git_materializer_exit": 0,
+		"actual_git_inputs": 99,
+		"private_omissions": 1,
+		"projected_blob_null_count": 1,
+		"portable_after_materializer": {
+			"pass": 53,
+			"fail": 0,
+			"skip": 0
+		},
+		"first_root_harness_refusal_preserved": true,
+		"second_receiving_independent": true
+	},
+	"native": {
+		"new_sdk_causal": "UNRUN",
+		"expected_pass": 11,
+		"expected_named_fail": 1,
+		"expected_skip": 0,
+		"fresh_tis_restoration_closures": "UNRUN",
+		"required_closures": 7,
+		"first_assertion_spelling": "UNOBSERVED_REFUSE_MISMATCH",
+		"previous_positive12": "SEPARATE",
+		"installed_invocation_permission_forced_output_physical": "NOT_QUALIFIED"
+	},
+	"inactive_forward_cut": {
+		"paths": 25,
+		"source_epoch": "acec284ec4872c20d04368da26efc4a10db3650d",
+		"five_shared_spans_and_validator": "PENDING_CUSTODY_NOT_ADOPTED",
+		"original_receipt_labels": "RETAINED_AT_PREPARATION_EPOCH",
+		"patch_sha256": "014abd0fb24a769c8f8bbab290d9f0308a399614aeec00dca0888c6bb2ce9edd",
+		"full_original_seal_embedded": true,
+		"all_original_seal_subjects_embedded": false,
+		"apply_to_current_source": "NOT_AUTHORIZED_BY_CAPSULE"
+	},
+	"historical_native_transcript": {
+		"bytes": 49923,
+		"sha256": "8a843de888efae37686ea328668dbba2ab18f2b87bb8bddaab7a2da7dd74ec01",
+		"compressed_image_bytes": 3835,
+		"compressed_sha256": "9e25600adb72942a4512b5c091d72d64cb7cd9d7470425142ef0d7854b8be8f4",
+		"no_oracle_regeneration": true
+	},
+	"historical_integrated_ui": {
+		"run": 38117107673,
+		"tested_commit": "acec284ec4872c20d04368da26efc4a10db3650d",
+		"whole": "FAILURE",
+		"job_success": 7,
+		"job_failure": 9,
+		"job_skip": 9,
+		"release": "SKIPPED",
+		"owned_lock_released": true,
+		"delegated_mac_archive_methods": {
+			"pass": 24,
+			"fail": 1,
+			"total": 25,
+			"assertion_events": 2
+		},
+		"delegated_linux_unit": {
+			"pass": 13102,
+			"fail": 0,
+			"later_runtime_preflight": "FAILED",
+			"child_exit": 1,
+			"zero_descendants": false,
+			"closure": null
+		},
+		"delegated_raw_locally_downloaded": false,
+		"cause_or_current_native_acceptance": "NOT_INFERRED",
+		"remaining_counts": "PENDING_AT_DELEGATED_CHECKPOINT"
+	},
+	"external_evidence_pins": {
+		"independent_review_seal": {
+			"source_path": "/workspace/.ergopti-cloud/reviews/number-row-diagnostics-actual-git-materializer-receiving-v1/files.sha256",
+			"bytes": 652,
+			"sha256": "22d9db96b3bc62d62568e7515fa45ca380afd8ded055b6e0de7679b1cff31a6b",
+			"embedded": false
+		},
+		"independent_review_execution": {
+			"source_path": "/workspace/.ergopti-cloud/reviews/number-row-diagnostics-actual-git-materializer-receiving-v1/execution-receipt.json",
+			"bytes": 622,
+			"sha256": "ba3c10ea37ee584f87edf3d4eab58f648965d3039d6c5c5d402209930d972b16",
+			"embedded": false
+		},
+		"feature_push_four_censuses": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/feature-push-post-receiving-v1/receipt.json",
+			"bytes": 504,
+			"sha256": "1aa557b7e150dfccd9bbd77fbabf7066b4974f1a213a00635951637acba12aa4",
+			"embedded": false
+		},
+		"historical_ui_terminal_lock_release": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/shortcuts-availability-integration/terminal-lock-release/receipt.json",
+			"bytes": 879,
+			"sha256": "94628c016852f90cab502529d77259d5e3ee6f3fd8552fc5e97b976c4f89a7a5",
+			"embedded": false
+		},
+		"delegated_receiving_coordination": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/shortcuts-availability-integration/coordination-page15-post-release.json",
+			"bytes": 132545,
+			"sha256": "9d81ba811926627fde014fe6c994b87e48d768ea77cf6cf5d4e21e1b5713666e",
+			"embedded": false
+		},
+		"windows_frozen_todo_addendum": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows107-pc-continuation-proposal-v1/todo107-addendum.md",
+			"bytes": 1099,
+			"sha256": "209495d962082294e1c54f1e51ef4b62e389d0a69ccd0e18be9b7e749ca54fcd",
+			"embedded": false
+		},
+		"old24_receipt": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-native-enrollment-complete-v3/receipt.json",
+			"bytes": 6290,
+			"sha256": "dde7fd962d7367d07c01c82c2af70ba7c9b28ab40384c6236d5e5c295392c69b",
+			"embedded": false
+		},
+		"old24_seal": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-native-enrollment-complete-v3/files.sha256",
+			"bytes": 40667,
+			"sha256": "2f9f6c741ae8fc695ae78db38769e998abac24a2f06cc51d5a5f4242bf8693d6",
+			"embedded": false
+		},
+		"old30_docs_receipt": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-preparation-documentation-v1/receipt.json",
+			"bytes": 3671,
+			"sha256": "b6be9e38a7ffbbff9af8f517ae3a59b5796f3794706fb51fd4ebc8ee47db35c5",
+			"embedded": false
+		},
+		"old30_docs_seal": {
+			"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-preparation-documentation-v1/files.sha256",
+			"bytes": 2325,
+			"sha256": "dcfdf36d2e56e9b1975374fece69475d77c9fec6a6b1c9ac7908142b4c9a564e",
+			"embedded": false
+		}
+	},
+	"generator": {
+		"source_path": "/workspace/ergopti/docs/handovers/2026-10-10-group3-continuation/generate_capsule.py",
+		"bytes": 2488,
+		"sha256": "07900ef9b6c37d9e26d4f8e8e48b93f7f1416f358a78678415a78c04bf278761",
+		"existing_owner_generator_unchanged": true
+	},
+	"capsule": {
+		"files": 35,
+		"bytes": 476991,
+		"entries": [
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/NumberRowSourceProbe.counterfactual.swift.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/NumberRowSourceProbe.counterfactual.swift.raw",
+				"bytes": 7853,
+				"sha256": "60a0cebabf22c47103b1e2dbb3d0dfaf8537e0da28d9793d1d24ed438987e40f",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/NumberRowSourceProbe.original.swift.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/NumberRowSourceProbe.original.swift.raw",
+				"bytes": 7928,
+				"sha256": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/NumberRowSourceProbeTests.original.swift.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/NumberRowSourceProbeTests.original.swift.raw",
+				"bytes": 18954,
+				"sha256": "c5fc9a251c9de50196e0ef97ee7741ecdc3e01078cbeb7f77fabd6927a2a20c3",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/fixture-manifest.json.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/fixture-manifest.json.raw",
+				"bytes": 4798,
+				"sha256": "50fbec17bdd2f624bf65c6e16613deb2c0ddd2b9d6eff10a640520780770b8d1",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-positive-envelope.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-positive-envelope.json",
+				"bytes": 469,
+				"sha256": "969eb0c5b767c1636364849f844ce20197e0da30451f9952f1617f0f40308230",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-positive.tar.gz.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-positive.tar.gz",
+				"bytes": 3835,
+				"sha256": "9e25600adb72942a4512b5c091d72d64cb7cd9d7470425142ef0d7854b8be8f4",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/manifest.json.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/manifest.json.raw",
+				"bytes": 1126,
+				"sha256": "67097cf99fb45e2f8598110ef108325b37784b7225da882460389cc4bc7e88c0",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000001.dat.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000001.dat",
+				"bytes": 11851,
+				"sha256": "2be65bdf781b73f24fb08976e3d3fed63f3f822dd8172e4a9c968532badf951b",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000002.dat.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000002.dat",
+				"bytes": 12603,
+				"sha256": "b43699d5534a67e2b2ba1a5c1248225c0e81c6981682c177ef72bff675a815ae",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000003.dat.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000003.dat",
+				"bytes": 7613,
+				"sha256": "a51b8d5888d69f50e7959817b66face9d4437dc9fa3ef2d61678a03f3f5444c1",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000004.dat.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000004.dat",
+				"bytes": 7629,
+				"sha256": "78f81a19028838e681e1396bffe612bf369a50e17903db8e1d9579fce6314c26",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000005.dat.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000005.dat",
+				"bytes": 8350,
+				"sha256": "8452f03108ba5db2e689d33eb41ede986143da0e3f224ef8bd77d290ba58acec",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000006.dat.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000006.dat",
+				"bytes": 8338,
+				"sha256": "66a1c83a572f941299c9851bbe7dbec2c9150f2ae8db0ad3521a2c28cc8c1e2e",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000007.dat.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/record-000007.dat",
+				"bytes": 7616,
+				"sha256": "b817ec32a760ffb4ce82dc8128f786c3c02a22c26dac9a4ca3e956ca02e5a7c5",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/start.json.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/historical-tis/start.json.raw",
+				"bytes": 191,
+				"sha256": "9b867e9b76d4974abcc076fc4fc7d54a6ead6d3f977e6231997cb63b6745c833",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/fixtures/number-row-native-causal/projection-manifest.original-c15.json.raw.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/fixtures/number-row-native-causal/projection-manifest.original-c15.json.raw",
+				"bytes": 26551,
+				"sha256": "77118a5238f504b1475988957843427f61aaaa798ab9f972e812205a2fb5b7ba",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/number_row_native_causal.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/number_row_native_causal.py",
+				"bytes": 16349,
+				"sha256": "5aaadaed103f6458ef01cec87474b8de8f9eb1584008338332baa199157632fd",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/prepare_number_row_native_causal.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/prepare_number_row_native_causal.py",
+				"bytes": 4215,
+				"sha256": "fd278fd71e3912c95f793ffd6a56e0cfe55e508817f7a2d67d11d764c437b09b",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/component/tools/diagnostics/test_number_row_native_causal.py.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/candidate/tools/diagnostics/test_number_row_native_causal.py",
+				"bytes": 23308,
+				"sha256": "f058b0937e278229f2b348d07c65c8e73c575dbb12cbbde53713ab91d3df9ca2",
+				"role": "Exact committed diagnostic image; inert archived bytes"
+			},
+			{
+				"proposed_member": "evidence/inactive25/enrollment.patch.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-enrollment-lf19-dev-acec-v1/enrollment.patch",
+				"bytes": 211959,
+				"sha256": "014abd0fb24a769c8f8bbab290d9f0308a399614aeec00dca0888c6bb2ce9edd"
+			},
+			{
+				"proposed_member": "evidence/inactive25/receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-enrollment-lf19-dev-acec-v1/receipt.json",
+				"bytes": 2923,
+				"sha256": "7239ba84e0cfb907496c8bd092cd6ab8d610a8754cb076c9f3654c39f6abbf98"
+			},
+			{
+				"proposed_member": "evidence/inactive25/files.sha256.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-enrollment-lf19-dev-acec-v1/files.sha256",
+				"bytes": 5279,
+				"sha256": "4b8731a0ff3c657f35d7a85522a8af1b52b794f2fbe5307786179fe80f92e83e"
+			},
+			{
+				"proposed_member": "evidence/receiving/commit-receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/commit-receipt.json",
+				"bytes": 5979,
+				"sha256": "9c48e49847e8f8eebaf05c40121c870c06d003120e7afccd5e34d9b5c7799029"
+			},
+			{
+				"proposed_member": "evidence/receiving/terminal.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/terminal.json",
+				"bytes": 185,
+				"sha256": "6b201d8369f3e1ab4da19c5ce9f92a5e1156190a61d904740c982f413e16c61e"
+			},
+			{
+				"proposed_member": "evidence/receiving/portable53.receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/portable53.receipt.json",
+				"bytes": 917,
+				"sha256": "821b63f2e18fe56dc6794674caa7125942b1da5ba429a74f61af3e361b121b53"
+			},
+			{
+				"proposed_member": "evidence/receiving/harness-first-refusal.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/harness-first-refusal.json",
+				"bytes": 228,
+				"sha256": "d39f29ea26fc6312c961afd303b23e9f5f306c876cb357de1b80c8e0eb8949e0"
+			},
+			{
+				"proposed_member": "evidence/receiving/selected-verify.receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/selected-verify.receipt.json",
+				"bytes": 245,
+				"sha256": "29aac02850fe19d15a3671a6be5ed5b28417039fcc7ef6222966f1fcbdc0e51a"
+			},
+			{
+				"proposed_member": "evidence/receiving/materializer-receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/actual-git-materializer/receipt.json",
+				"bytes": 577,
+				"sha256": "d5c5126399b92494502a061210a882abb151b9ae3908aa453d9000d598609c07"
+			},
+			{
+				"proposed_member": "evidence/receiving/actual-git-projection.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-diagnostics-canonical-selected-v1/actual-git-materializer/evidence/actual-git-projection.json",
+				"bytes": 44524,
+				"sha256": "3fba6e9712c93d376f6856bf49b897c30d432642f764cc53438ee75a92af50fc"
+			},
+			{
+				"proposed_member": "evidence/windows/source-report.md.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows107-pc-continuation-proposal-v1/source-report.md.txt",
+				"bytes": 6219,
+				"sha256": "16cdee433770cfe28df2ef3ea32cb07a7cac379e88ab8eeb7e4c3d9cd1f84c9c"
+			},
+			{
+				"proposed_member": "evidence/windows/source-pins.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows107-pc-continuation-proposal-v1/source-pins.json.txt",
+				"bytes": 2256,
+				"sha256": "10be003d547c58a79578478b38945fc6fa0472711c60c1efe8d8fe7c0f778348"
+			},
+			{
+				"proposed_member": "evidence/windows/historical-handover.md.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows107-pc-continuation-proposal-v1/handover.md",
+				"bytes": 2137,
+				"sha256": "4beb1d75496706d59bf03655918ae60e3f1e7761d709550372b73fbf0f23f0fe"
+			},
+			{
+				"proposed_member": "evidence/review/REPORT.md.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/number-row-diagnostics-actual-git-materializer-receiving-v1/REPORT.md",
+				"bytes": 1841,
+				"sha256": "bb9c4c4144ca5eb4f14c154d7db0c0aee789d0c0eac5914a972ffa0d2c8b730d"
+			},
+			{
+				"proposed_member": "evidence/review/review.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/number-row-diagnostics-actual-git-materializer-receiving-v1/review.json",
+				"bytes": 6658,
+				"sha256": "8b5364e272989c48b1e92602dff1263e1899230519affb25d5506b11924694ee"
+			},
+			{
+				"proposed_member": "evidence/preparation/lf19-receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-diagnostics-lf-private-v1/receipt.json",
+				"bytes": 5487,
+				"sha256": "2734792783ef77b5471ff6c1edf3eddd24cc9a91a9e37f40965b8b524f29928f"
+			}
+		]
+	},
+	"scope_limits": [
+		"No new code or workflow adoption by this documentation packet",
+		"No native execution by documentation generation",
+		"Five shared spans and validator custody remains pending",
+		"No original expectations or raw receipts rewritten",
+		"No runtime/dependency checkout or compiled payload",
+		"All Group3 items remain partial"
+	],
+	"archive": {
+		"filename": "private-preparation.tar.gz",
+		"bytes": 102176,
+		"sha256": "d68c039bb138ca5fb1ff41e15823636a8402d452ccd82b65ad27ca72f0485e63",
+		"regular_inert_members": 35,
+		"original_and_extracted_reproduction_exact": true
+	}
+}
