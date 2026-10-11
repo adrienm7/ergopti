@@ -675,43 +675,135 @@ Test("terminator-records: genuine WAL commit retains pending ownership until rel
 Test("terminator-records: genuine refused reload rolls back exact bytes and permits an admitted retry", _HTR_WalLifecycle.Bind(true))
 
 _HTR_ForeignSource() {
-	Fixture := _ScopeOwnerFixture()
-	Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
+	global _ConfigTransitionRetainedBarrier
+	PriorRetained := _ConfigTransitionRetainedBarrier
+	OriginalBody := _HTR_Source()
+	Fixture := _ScopeOwnerFixture(OriginalBody)
+	Source := Fixture.source
 	Port := ConfigTransitionProductionPort(), NativeHash := Port["hash"]
-	Changed := false, Foreign := _HTR_Source() . '# independently changed source`n'
-	Hash(Content) {
-		Digest := NativeHash.Call(Content)
-		if !Changed && Content == _HTR_Source() {
-			Changed := true
-			Assert(FSWriteDurable(Fixture.path, Foreign))
-		}
-		return Digest
-	}
+	Changed := false, Foreign := Source . '# independently changed source`n'
 	Bundle := 0, OnRefused := 0, Launches := 0
 	Launch(Success, Borrowed, Refused) {
 		Launches += 1, Bundle := Borrowed, OnRefused := Refused
 		return true
 	}
+	Fixture.options["port"] := Port
+	Fixture.options["reload"] := Launch
 	TeardownPrimary := false
 	try {
-		Port["hash"] := Hash
-		Fixture.options["port"] := Port
-		Fixture.options["reload"] := Launch
-		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
+		AssertEqual(OriginalBody, SubStr(Source, InStr(Source, "`n") + 1),
+			"the genuine current boot retains every original record and foreign byte")
+		AssertTrue(ConfigTransitionProductionPort(Port), "the original native port owns the entire conflict scenario")
+		Acquired := ConfigTransitionAcquireLifecycleBundle(Fixture.options["locator"], [Fixture.path], Port,
+			Fixture.options.Get("acquire", 0), Fixture.options.Get("settle", 0))
+		AssertTrue(ConfigTransitionResultIs(Acquired, "bundle_acquired"), "capture starts inside the actual lifecycle owner")
+		Bundle := Acquired["bundle"]
+		Captured := FSReadUtf8Exact(Fixture.path)
+		AssertEqual(Source, Captured, "the real old file precedes the independent write")
+		Candidate := HotstringsTerminatorRecordPlan(Captured, _HTR_Operation())
+		Expected := ConfigTransitionExpectedOld(1, Captured, Port)
+		AssertTrue(Expected is Map, "the unchanged native hash captures an actual source precondition")
+		AssertEqual(NativeHash.Call(Source), Expected["hash"], "the captured digest belongs to the actual old bytes")
+		AssertTrue(ConfigTransitionProductionPort(Port), "hash capture preserves the original native callback image")
+		; This independent writer acts after actual capture and before real prepare.
+		; No published WAL, native callback replacement or timing assumption is used.
+		AssertTrue(FSWriteDurable(Fixture.path, Foreign))
+		Changed := FSUtf8ExactMatches(Fixture.path, Foreign)
+		Transition := ConfigTransitionCommitOwned(Fixture.options["locator"],
+			[ConfigTransitionPresentTarget(Fixture.path, Candidate.Content, Expected)], Bundle, Port)
 		AssertEqual(0, Launches, "a stale exact-source intent must refuse before reload admission")
-		Assert(Changed, "the actual native hash boundary must exercise the source race")
-		AssertEqual("refused", Receipt["status"])
+		Assert(Changed, "the actual captured native hash precedes the independent source race")
+		AssertEqual("retry", Transition["status"], "the real conditional journal refuses the detached stale candidate")
+		AssertEqual("expected_old_conflict", Transition["kind"], "refusal is caused by the genuine captured source conflict")
 		AssertEqual(Foreign, FSReadUtf8Exact(Fixture.path), "a foreign source wins before any replacement")
+		AssertTrue(ConfigTransitionProductionPort(Port), "the refused candidate never revokes native authority")
+		AssertTrue(ConfigTransitionResultIs(ConfigTransitionInspect(Fixture.options["locator"], Port), "absent"),
+			"conflict occurs before any actual WAL publication")
+		AssertFalse(FileExist(ConfigTransitionWalPath(Fixture.options["locator"])), "no synthetic or prepared WAL is retained")
+		Files := 0
+		Loop Files Fixture.directory . "\*", "F" {
+			Files += 1
+			AssertEqual(Fixture.path, Fixture.directory . "\" . A_LoopFileName, "conflict creates no stage, backup or replacement file")
+		}
+		AssertEqual(1, Files, "only the independently changed original file remains")
+		_ConfigWriteTerminalRelease(Bundle)
+		AssertFalse(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object,
+			"an absent WAL permits actual terminal-owner retirement")
+		Bundle := 0
+		; A fresh attempt goes through the untouched editor and its real reload port.
+		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
+		AssertEqual(1, Launches, "the genuine editor retry reaches reload after exact fresh capture")
+		AssertEqual("pending", Receipt["status"])
+		Published := TOML_ParseDocument(FSReadUtf8Exact(Fixture.path))
+		AssertEqual(3, Published["hotstrings"]["terminators"].Length)
+		AssertContains(FSReadUtf8Exact(Fixture.path), '# independently changed source`n',
+			"the fresh actual editor candidate preserves the independently added source")
+		AssertTrue(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object,
+			"the real retry retains ownership until the actual reload callback")
+		OnRefused.Call("controlled refusal after genuine retry")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Foreign, FSReadUtf8Exact(Fixture.path), "real retry refusal restores exact independent bytes")
+		AssertTrue(ConfigTransitionResultIs(ConfigTransitionInspect(Fixture.options["locator"], Port), "absent"))
+		AssertFalse(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object)
+		AssertTrue(ConfigTransitionProductionPort(Port), "retry and compensation retain native authority")
 	} catch as Failure {
 		TeardownPrimary := Failure
 		throw Failure
 	} finally {
-		; The canonical callback is restored before any later cleanup can throw.
-		CleanupFailure := false
-		for Operation in [() => (Port["hash"] := NativeHash),
-			() => HasMethod(OnRefused, "Call") ? OnRefused.Call("controlled cleanup") : 0,
-			() => Bundle is Object ? _ConfigWriteTerminalRelease(Bundle) : 0,
-			() => _ScopeOwnerCleanup(Fixture)] {
+		CleanupFailure := false, RetirementReady := false, OwnerRetired := false
+		ResolveCleanup() {
+			if !(Bundle is Object) {
+				RetirementReady := true
+				return
+			}
+			Inspected := ConfigTransitionInspect(Fixture.options["locator"], Port)
+			if ConfigTransitionResultIs(Inspected, "absent") {
+				RetirementReady := true
+				return
+			}
+			if !ConfigTransitionResultIs(Inspected, "ready")
+				throw Error("The genuine terminator fixture journal could not be inspected for retirement.")
+			Resolution := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
+			if !ConfigTransitionResultIs(Resolution, "absent") && !ConfigTransitionResultIs(Resolution, "recovered_old")
+				throw Error("The genuine terminator fixture journal could not restore its owned source before retirement.")
+			After := ConfigTransitionInspect(Fixture.options["locator"], Port)
+			if !ConfigTransitionResultIs(After, "absent")
+				throw Error("The genuine terminator fixture journal remains after native rollback.")
+			RetirementReady := true
+		}
+		RetireOwner() {
+			if !RetirementReady {
+				if Bundle is Object && !ConfigTransitionRetainBarrier(Bundle)
+					throw Error("The unresolved genuine terminator fixture barrier could not be retained.")
+				return
+			}
+			if Bundle is Object && _ConfigWriteTerminalTryAcquire([], Bundle) {
+				Released := _ConfigWriteTerminalRelease(Bundle)
+				if !(Released is Integer) || Released != 1
+					throw Error("The genuine terminator fixture terminal release was not acknowledged.")
+			}
+			if _ConfigWriteTerminalIsActive()
+				throw Error("A genuine terminal barrier is still active before terminator fixture retirement.")
+			if Bundle is Object && (_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object
+					|| _ConfigWriteLeaseSelectOwner(Bundle, Fixture.options["locator"]) is Object)
+				throw Error("The genuine terminator fixture still owns a target or locator after terminal release.")
+			OwnerRetired := true
+			PreviousCritical := A_IsCritical
+			Critical("On")
+			try {
+				; A foreign marker never belongs to this fixture's retirement.
+				if Bundle is Object && _ConfigTransitionRetainedBarrier == Bundle
+					_ConfigTransitionRetainedBarrier := PriorRetained
+			} finally Critical(PreviousCritical)
+		}
+		RetireFiles() {
+			if !RetirementReady || !OwnerRetired
+				throw Error("The unresolved genuine terminator fixture and native journal are retained for recovery.")
+			_ScopeOwnerCleanup(Fixture)
+		}
+		; Every cleanup phase is attempted; actual WAL resolution precedes release.
+		for Operation in [() => HasMethod(OnRefused, "Call") ? OnRefused.Call("controlled cleanup") : 0,
+			ResolveCleanup, RetireOwner, RetireFiles] {
 			try Operation.Call()
 			catch as Failure {
 				if !CleanupFailure
