@@ -855,3 +855,103 @@ producer owner may provide the exact safe ZIP bytes through immutable Git API
 blobs for official size/digest comparison; no signed URL or credential is shared.
 No unchanged403 retry, CI ref, workflow or release is created by these proposals.
 Items36/62, transversal16/38 and the deliberate exclusion of22 remain unchanged.
+
+## Current Dev composition and additional receiving
+
+The current remote Dev delivery is
+`da74809cd1bfae395ebb0e402bcf3c130a286cab`. Receive it explicitly with
+`git fetch origin refs/heads/dev:refs/remotes/origin/dev`: this container's
+configured fetch map follows only `main`, so `git fetch origin dev` updates
+FETCH_HEAD without updating `origin/dev`. The group6 feature preserves its
+published `72b29be399` diagnostic and `c23982e1cc` preservation commits. Group3's
+official manual38176924058 and lock98c39b47 are separately owned; this feature
+does not modify either. Its local merged-source qualification is separate from
+that official run and from completing items36/62.
+
+The [full portable removal receiving](native-removal-full165-receiving.tar.gz)
+supersedes the earlier full165 UNRUN checkpoint: all165 actual cases pass, zero
+failed/errors/skipped, in45.164 seconds under the unchanged60-second business
+boundary. All29 private/live source hashes agree before/after; no candidate
+bytecode is written, the directly owned child is reaped and its process group is
+absent. The original fixture/capture/debt assertions remain. The packet is137,501
+bytes, SHA256
+`70646defa298f662c8ad67ec6c9ee12154d49f7e00e00ebba828541f0a384402`,
+with40 safe regular members and39 independent inventory joins. The first parent
+single-line parser refusal is preserved: original test47 emits a bounded removal
+diagnostic before its separate `ok`; receiving that actual terminal does not
+change an assertion or oracle. Live fixture/156 registry adoption and normal
+selected gates are still pending. Native trust and historical hosted cause remain
+unqualified.
+
+The [strict library seam](root-receiver-strict-read-proposal.tar.gz) adds only an
+optional source-bound reader to the unadopted extracted CJS module. Default
+behavior and semantic/output predicates remain exact. The strict branch parses
+PRE/POST JSON from the same acquired Buffer that supplies its hash and checks
+Buffer/hash linkage; it never makes the ordinary second JSON read. All21 default
+modeled controls and five new controls pass. The original module produces four
+causal assertion failures, no helper errors. Initial and acquired hardlinks are
+actual POSIX files; the changed-second-read control is explicitly modeled. Its
+271,926 bytes hash
+`d11ff9c3cc1ed56a30a526f72ba6e16f8fd8a756aba92777ce285d93bb80dbe6`,
+with49 safe regular members/48 inventory joins. This is a trusted code seam,
+not caller-JSON authority or whole directory/Git closure. Caller/module/loader
+enrollment, the current full source profile and authentic runtime receiving still
+block activation.
+
+The [authentic f1db producer receiving](f1db-actual-producer-receiving.tar.gz)
+receives both original official ZIPs through the producer's already-published Git
+blobs. Each complete decoded ZIP joins official API size/digest and Git ID; all
+seven members have safe paths/type and valid CRCs. This supported API transfer
+resolves the earlier missing-byte checkpoint without modifying signed URLs or
+claiming network-draft activation. Twenty-two semantic joins verify historical
+PRE's3,262-row commitment, same-run POST/PRE linkage, exactly two generated runtime
+outputs, unchanged LICENSE/all3,260 other rows, actual vendor EXE/manifest and
+static x64 PE32+/mitigations. The authentic RESULT reports12 targeted passes,
+four direct-child close receipts and nine clean cleanup reports. Raw TAP/captures
+and local kernel closure are not independently observed. The2,152,201-byte packet
+hashes `bd8da7a16497ec0858d2a948be9e07f0317371ce92dc9d3f5e43e112ceaa1756`,
+with23 safe regular members/22 inventory joins. It grants neither current21 pin
+admission, our original23 nor complete unit/E2E/package/install acceptance.
+
+The actual raw prepared source receipt, MSVC function, Duktape sources/header,
+generated `pac_generated.h`, command captures and used-compiler trace are absent
+from those seven members. Never invoke the receiver over reconstructed or dummy
+substitutes. The [raw retention proposal](native-pac-raw-retention-r2-proposal.tar.gz)
+adds a separate always upload for already-produced files and observations from
+the original identity/dumpbin commands, without replay or changed compiler/native
+commands. It records decoded stdout lines, not raw byte/stderr or compiler traces.
+Both optional capture refusals now follow all six original native output guards
+and precede artifact/publication IO; those later IOs are unobserved on refusal.
+Actual Linux PowerShell7.4.11 passes three parse/order/helper/real-IO controls;
+the first proposal fails the causal ordering assertion. Whole Windows builder,
+format/full pipeline and native receiving remain UNRUN. Its67,231 bytes hash
+`9472603b16072b08ae3c21ee044e890ae713a2b322b8b466dbbc45b00913c2c4`,
+with20 safe regular members/19 inventory joins. Root/Windows/G3 ownership and
+canonical always-fatal workflow guard/producer-fingerprint enrollment remain
+necessary. Original preimage bytes and full inverses are retained.
+
+The [G5 diagnostic graft](g5-portable-output-graft-proposal.tar.gz) applies only
+the two published72b29 additions to authenticated26e wrapper bytes. Six actual
+same-file portable controls pass, old output-loss assertion is red, syntax/format
+pass and removing both additions restores every G5 byte. All existing60,000 ms
+boundaries, argv/executables/assertions/counts/success writes remain. The actual
+38174614308 Source uses60 seconds, not the reported90; its failed script/cause
+remain unknown while raw job/qualification ZIP access is Forbidden. Whole G5,
+JS/Python/native receiving is unrun on this unadopted graft. Its31,408 bytes hash
+`83210ead3609265de26d7de0cbb370d6d6ba5bd22cf0b649ed72e5b69ca10194`,
+with21 safe regular members/20 inventory joins.
+
+These additional packets are also POST/GET byte-exact immutable Git blobs:
+full165 `00e20a11a7c4de7ecc0d37db6d22e84775a53b13`, strict seam
+`46776f6c0f1706117053573cb2950912c875b653`, actual f1db
+`0732ed3c05af674f0cc3752da9570c2915636364`, raw retention
+`575d13c4ee725a61af26c21f3ee6286cff829546`, and G5 graft
+`8f4d5c0df93d5735015329861a4620f87b5340f1`. They create no ref, workflow or
+release. [Network draft13](network-draft13-receiving.json) adds only the newly
+observed `productionresultssa3.blob.core.windows.net`, preserving all six previous
+custom hosts and all other fields. Saved/read-back confirmation is not activation;
+Review/Save then Publish in Environment Settings is still required. A brief401
+API/Git refusal resolves before the successfulc239 publication; cause is unknown.
+All proposals remain held pending their exact ownership/enrollment/native joins.
+Test locations, independent corpora, fixtures, ordering, all TODO items and the
+local main/v1.0.1 release remain preserved.

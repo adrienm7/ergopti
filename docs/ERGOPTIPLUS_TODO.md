@@ -4068,6 +4068,16 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-11 authentic original producer bytes are received through supported Git
+API blobs: historical f1db PRE/POST, actual PAC pair/LICENSE and twelve targeted
+results join official ZIP digests. This is not our original23 or full-suite
+acceptance; Root's map still matches only19 of21 current updater pins. Missing
+raw prepared/MSVC/header/command evidence is explicit. A finite retention proposal
+preserves original commands/guards and passes three Linux PowerShell controls,
+but remains unadopted and Windows/pipeline receiving is unrun. The current Dev
+composition and held packets are documented in the
+[cloud checkpoint](handovers/2026-10-11-group6-cloud/README.md). Item36 stays open.
+
 2026-10-11 held Windows original23 preparation is now durably preserved with
 its actual custody acknowledgment, complete inverses and Root67600 publisher
 comparison. The reviewed runner still requires exact composition for the two
@@ -6947,6 +6957,18 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-11 full private removal receiving now passes165 actual cases, zero
+failed/errors/skipped, in45.164s under the original60s boundary, with29 candidate
+and live hashes unchanged before/after. Live fixture/registry adoption and native
+trust remain unqualified. The strict library seam passes21 default plus five
+causal controls; G5's exact diagnostic graft passes six portable controls and
+retains every original60s assertion/command. These are held proposals, not timeout
+cause fixes. Actual producer ZIP bytes are now independently received; missing
+raw source/header/compiler evidence and current-profile ownership remain.
+Saved network draft13 adds only the new exact sa3 host and is not activated.
+See the [additional receiving](handovers/2026-10-11-group6-cloud/README.md).
+No item is removed and native/company/installed acceptance remains pending.
 
 2026-10-11 unadopted native successors are durably preserved. The removal-only
 proposal passes nine additive focused controls while retaining250 original
@@ -9920,6 +9942,17 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   or a native modifier-owner qualification. Actual AHK syntax/unit/E2E and
   Windows native/compiled/installed receiving remain unrun in this container.
 
+  The supplemental original Windows pair/category cohort receiver now retains
+  the unchanged28-case census, exact original stdout and four-child retirement.
+  Its source preparer receives actual Git compiler/runtime/test inputs without
+  deriving behavioral expectations. Native PAC outputs are joined to the original
+  successful builder and retained archive/artifact receipts, rather than treated
+  as Git source images. All57 original modeled receiving controls remain, with
+  twelve additive publisher/refusal controls (69pass locally). This source tranche
+  keeps actual Windows cohorts and official enrollment unavailable until genuine
+  committed-source metadata is generated and independently received. No native
+  AHK, physical AltGr, simultaneous engine or installation proof follows.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -10121,6 +10154,20 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
 
   The separate [current Xi preparation handover](handovers/2026-10-11-group3-xi2-current-preparation-v1/README.md) retains the exact c15a16cc9eee103b4132bcaf811ed890834f894c plus 15-source candidate: the mandatory fifteenth PINS.json change joins its command-owner hash to the changed stager. The original selected run remains 14 passing gates and two environment failures (window-family /proc and real Nix CLI/store prerequisites), exit 1, with 13,102/0 Linux units. Separate actual driver/AppDir assembly and both staged CLI-help entries return 0; original libXi ELF bytes are retained by hash and the bounded receiving review. Help reports missing lgi; GUI/installed/AppImage delivery and full native child-family/hard-deadline proof remain unqualified. The old 348-member/14-path handover stays immutable. Initial fix/Linux custody and current-tree receiving remain pending; this adds no input-epoch, modifier/output, public simultaneous or physical authority and does not complete item 93.
 
+  The Linux Manager now rejoins the selected pair's captured runtime source
+  after its genuine Logger callback and immediately before the original action
+  executor. The callback-free settings observer compares captured controller,
+  configuration, engine and Hook identities without invoking table equality
+  callbacks. All224 original registered cases remain byte-exact; four additive
+  controls pass228/0 on each Lua ABI. The original code executes two revoked
+  actions; the first successor also invokes caller equality through the real
+  snapshot/restore route. The corrected identity case passes, and three single
+  predicate reversals fail its unchanged noninvocation assertion. A fourth
+  reversal remains blocked by original engine retirement and is not claimed as
+  independent regression evidence. These controlled driver receipts do not
+  qualify physical buffered input, output or installed delivery; item93 and
+  transverse16/38 remain open.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
@@ -10221,6 +10268,17 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   original cases. The original source fails both new refusal cases. These are
   controlled software checks; native GUI and physical delivery remain open.
 
+  The shared optional capture owner now retains each request's exact cancellation
+  callable before native enrollment. Replacing the optional port afterward cannot
+  acknowledge retirement through a foreign success. Refused or throwing retirement
+  keeps the original token and callable for retry; constructor reentry and stale
+  successors remain fenced. Replacing a callable before enrollment stays supported.
+  Both unchanged registered Linux/macOS wrappers pass37 controls on Lua5.4 and
+  LuaJIT; the original producer passes27 and fails all10 appended causal cases.
+  These are controlled request-port observations, not real physical capture/output
+  or packaged acceptance. The remaining native source/collision/output work stays
+  required.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -10249,7 +10307,12 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   editor: absent or callback-removed emission ports refuse native enrollment
   and delivery. Eleven controlled cases pass on both Lua ABIs, with genuine
   original/omission failures; no star migration or new output owner is admitted.
-  Callable replacement/ABA and actual physical delivery remain unqualified.
+  Native capture-port replacement/ABA and actual physical delivery remain unqualified.
+
+  Item97's retained per-request cancellation also protects this editor's optional
+  physical observation. No foreign replacement can settle its original token;
+  refusal retries retain that exact capability. This does not grant a physical J
+  identity, star migration, collision admission or native output authority.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;

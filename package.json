@@ -3,6 +3,7 @@
 	"version": "3.0.0",
 	"private": true,
 	"scripts": {
+		"test:windows-key-combination-cohorts": "node ./tools/test/test-windows-key-combination-cohorts.cjs",
 		"test:lease-silence-xctest-evidence": "node ./tools/test/test-lease-silence-xctest-evidence.cjs",
 		"test:linux:nix-native": "node ./tools/test/run-linux-nix-native.cjs",
 		"test:linux:nix-source": "node ./tools/test/test-linux-nix-native.cjs",

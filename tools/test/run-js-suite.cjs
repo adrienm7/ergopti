@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Windows ordered-pair cohort receiving retains original publisher and retirement',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-key-combination-cohorts.cjs'],
+		repro: 'node tools/test/test-windows-key-combination-cohorts.cjs'
+	},
+	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],
