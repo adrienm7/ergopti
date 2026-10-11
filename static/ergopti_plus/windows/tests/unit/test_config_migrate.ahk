@@ -1361,6 +1361,7 @@ _CMJ_SnapshotObserver(Kind) {
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Source))
 		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		ParseConfigTomlFile(Path)
 		Snapshot := ConfigTomlReadSnapshot(Path)
 		switch Kind {
 			case "snapshot-cache-getter":
@@ -1383,6 +1384,8 @@ _CMJ_SnapshotObserver(Kind) {
 				Original := Descriptor.Value
 				Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
 		}
+		; Only the genuine parser publishes the replacement generation.
+		ParseConfigTomlFile(Path)
 		Fresh := ConfigTomlReadSnapshot(Path)
 		AssertEqual(0, Hits.count, "read generation comparison rejects genuine exported observers before any invocation")
 		AssertFalse(Fresh == Snapshot, "only a genuine fresh native reread replaces the altered published generation")
