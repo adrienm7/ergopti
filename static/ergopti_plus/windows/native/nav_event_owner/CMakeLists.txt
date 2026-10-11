@@ -16,6 +16,7 @@ endif()
 
 add_library(ergopti_nav_owner SHARED
 	nav_event_owner.c
+	replay_route_core.c
 	editor_replace.c
 	nav_event_owner.def
 )
@@ -27,6 +28,7 @@ add_executable(ergopti_nav_event_owner_test
 	nav_event_owner_test.c
 	editor_replace_test.c
 	nav_event_owner.c
+	replay_route_core.c
 	editor_replace.c
 )
 
@@ -35,6 +37,12 @@ target_compile_definitions(ergopti_nav_event_owner_test PRIVATE
 	ERGOPTI_NAV_TESTING=1)
 target_link_libraries(ergopti_nav_event_owner_test PRIVATE user32)
 
+add_executable(ergopti_replay_route_core_test
+	replay_route_core.c
+	replay_route_core_test.c
+)
+target_compile_features(ergopti_replay_route_core_test PRIVATE c_std_11)
+
 if(MSVC)
 	set_property(TARGET ergopti_nav_owner PROPERTY
 		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -42,12 +50,17 @@ if(MSVC)
 		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 	# VS 2019 16.11 diagnoses SDK 10.0.19041's own macro expansion as C5105.
 	# Keep warnings fatal while suppressing only that external-header warning.
+	set_property(TARGET ergopti_replay_route_core_test PROPERTY
+		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+	target_compile_options(ergopti_replay_route_core_test PRIVATE /W4 /WX /wd5105)
 	target_compile_options(ergopti_nav_owner PRIVATE /W4 /WX /wd5105)
 	target_compile_options(ergopti_nav_event_owner_test PRIVATE /W4 /WX /wd5105)
 endif()
 
 include(CTest)
 if(BUILD_TESTING)
+	add_test(NAME ergopti_replay_route_core_test
+		COMMAND ergopti_replay_route_core_test)
 	add_test(NAME ergopti_nav_event_owner_test
 		COMMAND ergopti_nav_event_owner_test)
 endif()

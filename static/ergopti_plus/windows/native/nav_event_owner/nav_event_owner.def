@@ -14,6 +14,9 @@ EXPORTS
 	ErgoptiNav_PreparePlan
 	ErgoptiNav_CommitPlan
 	ErgoptiNav_SetSuspended
+	ErgoptiNav_RegisterTerminalRoutes
+	ErgoptiNav_ListTerminalHeldRecipes
+	ErgoptiNav_PeekTerminalRoute
 	ErgoptiNav_BeginTerminalCapture
 	ErgoptiNav_CommitTerminalCapture
 	ErgoptiNav_AbortTerminalCapture

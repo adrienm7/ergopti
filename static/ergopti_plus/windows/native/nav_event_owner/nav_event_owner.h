@@ -16,6 +16,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "replay_route_core.h"
+
 #if !defined(_WIN32)
 #error "The Ergopti navigation event owner requires Win32."
 #endif
@@ -46,6 +48,7 @@ extern "C" {
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_MAX 100u
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_BASE 0xFFC3D44Du
 #define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY 8192u
+#define ERGOPTI_NAV_TERMINAL_ROUTE_BUSY (-11)
 #define ERGOPTI_NAV_TERMINAL_REPLAY_MARKER 0x4552475054524D31ull
 
 /** Return codes shared by every fallible API entry point. */
@@ -248,6 +251,13 @@ typedef struct ErgoptiNav_TerminalCaptureSnapshot {
 	uint32_t release_kind;
 } ErgoptiNav_TerminalCaptureSnapshot;
 
+/** Immutable queued event metadata; reading never acknowledges keyboard output. */
+typedef struct ErgoptiNav_TerminalRouteSnapshot {
+	uint64_t token;
+	uint64_t sequence;
+	ErgoptiReplay_Snapshot route;
+} ErgoptiNav_TerminalRouteSnapshot;
+
 #pragma pack(pop)
 
 #if defined(__cplusplus)
@@ -293,6 +303,8 @@ ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TestEvent) == 16, "Test event ABI si
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TestEvent, extra_info) == 8, "Test event marker offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_DispatchResult) == 12, "Dispatch result ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_DispatchResult, receipt_sequence) == 4, "Dispatch sequence offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalRouteSnapshot) == 184, "Terminal route snapshot ABI size changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalRouteSnapshot, route) == 16, "Terminal route offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalCaptureSnapshot) == 28, "Terminal snapshot ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, token) == 0, "Terminal token offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, phase) == 8, "Terminal phase offset changed.");
@@ -367,6 +379,31 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitPlan(
  */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SetSuspended(
 	uint8_t suspended);
+
+/**
+ * Publishes authoritative event-time recipes without enabling transformed replay.
+ * Returns ErgoptiReplay_Status, or ERGOPTI_NAV_TERMINAL_ROUTE_BUSY while capture
+ * owns debt. The caller supplies a neutral Caps baseline and declares only
+ * routes whose handler cohort it owns. Unknown startup modifiers, Caps toggles
+ * and unconverted edges veto later text recipes rather than inventing state.
+ * Rejected registration preserves the owner, registry and held recipes.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_RegisterTerminalRoutes(
+	uint64_t owner, uint64_t generation, uint64_t layout_id,
+	const ErgoptiReplay_Route *routes, uint32_t route_count);
+
+/**
+ * Lists retained held recipe IDs only while the native capture FIFO is debt-free.
+ * A caller may retire its older model recipes after a successful registration
+ * only when this query succeeds; BUSY/error must preserve all retained recipes.
+ * Capacity is at most ERGOPTI_REPLAY_MAX_HELD_KEYS; no partial list is written.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ListTerminalHeldRecipes(
+	uint64_t owner, uint64_t *out_recipes, uint32_t capacity, uint32_t *out_count);
+
+/** Copies one queued immutable recipe; never consumes or acknowledges its edge. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
+	uint64_t token, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot);
 
 /** Starts one bounded physical-keyboard capture for terminal paced output. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
@@ -606,6 +643,9 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetOsModifierKeys(
 	uint8_t enabled,
 	const uint16_t *down_vks,
 	uint32_t count);
+
+/** Supplies the native raw-event DWORD clock to hook-free capture regressions. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetHookTime(uint32_t time);
 
 /** Enables public terminal-capture APIs without installing a hook. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetRunning(uint8_t running);

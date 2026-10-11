@@ -118,6 +118,7 @@ function run(argv) {
 		execute(compiler, [
 			...flags,
 			path.join(SOURCE, 'nav_event_owner.c'),
+			path.join(SOURCE, 'replay_route_core.c'),
 			path.join(SOURCE, 'nav_event_owner_test.c'),
 			path.join(SUPPORT, 'runtime.c'),
 			'-o',

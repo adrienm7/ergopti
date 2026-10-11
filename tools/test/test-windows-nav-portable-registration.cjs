@@ -35,6 +35,7 @@ const EXPECTED = [
 	'menu mask survives multiple Win holds',
 	'stop drain balances consumed holds',
 	'terminal capture replays exact physical edges',
+	'terminal route snapshots retain exact suffix (todo49-route-fifo)',
 	'terminal replay cannot promote lower integrity (todo49-replay-provenance)',
 	'terminal replay retains effective modifiers (todo49-replay-modifiers)',
 	'terminal replay survives crossed modifier releases (todo49-replay-modifiers)',
@@ -54,9 +55,9 @@ const EXPECTED = [
 
 /** Requires the complete authored census, including the explicitly native-only case. */
 function checkCensus(names) {
-	assert.equal(EXPECTED.length, 38);
+	assert.equal(EXPECTED.length, 39);
 	assert.deepEqual(names, EXPECTED, 'A native registration was lost, added or reordered.');
-	assert.equal(names.filter((name) => name !== 'native editor receiver matrix').length, 37);
+	assert.equal(names.filter((name) => name !== 'native editor receiver matrix').length, 38);
 }
 
 /** Creates an independent source fixture with the parser's documented table shape. */
@@ -88,6 +89,6 @@ assert.throws(
 	/registration/
 );
 console.log(
-	'Portable navigation registration: 38 authored cases and 6 negative selection controls passed.'
+	'Portable navigation registration: 39 authored cases and 6 negative selection controls passed.'
 );
 console.log('Source selection only; no C execution or Windows native qualification.');

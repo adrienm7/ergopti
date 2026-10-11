@@ -73,6 +73,17 @@ global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS := 3
 global LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS := 3
 global _LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
 global _LLM_NavEventOwnerReportTimes := Map()
+global _LLM_NavEventOwnerTerminalRouteOwner := A_ScriptHwnd
+global _LLM_NavEventOwnerTerminalRouteGeneration := 0
+global _LLM_NavEventOwnerTerminalRouteNextRecipe := 0
+global _LLM_NavEventOwnerTerminalRouteNextLayout := 1
+global _LLM_NavEventOwnerTerminalRouteRefreshing := false
+global _LLM_NavEventOwnerTerminalRouteRecipes := Map()
+global _LLM_NavEventOwnerTerminalRouteModels := Map()
+global _LLM_NavEventOwnerTerminalRouteCoverage := Map(
+	"generation", 0, "layout_id", 0, "registered", 0,
+	"cohort_complete", false, "transformed_output_enabled", false,
+	"unconverted", ["unregistered terminal route cohorts"])
 
 _LLM_NavEventOwnerPortFn(Name, Port := 0) {
 	global _LLM_NavEventOwnerPort
@@ -2278,6 +2289,523 @@ _LLM_NavEventOwnerPublishCurrentProfileSurface(
 	return (Status is Integer) && Status == 1
 }
 
+/**
+ * Refreshes authoritative terminal-route metadata without enabling typed replay.
+ * @param {Map|Integer} Port - Optional source and native-registration boundaries.
+ * @returns {Boolean} True only after the exact native registration ACK.
+ */
+LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
+	global _LLM_NavEventOwnerTerminalRouteRefreshing
+	global _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	global _LLM_NavEventOwnerTerminalRouteRecipes
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_NavEventOwnerTerminalRouteRefreshing
+			return false
+		_LLM_NavEventOwnerTerminalRouteRefreshing := true
+		try {
+			SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
+			Source := HasMethod(SourceFn, "Call")
+				? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
+			_LLM_NavEventOwnerTerminalRouteGeneration += 1
+			if _LLM_NavEventOwnerTerminalRouteGeneration <= 0
+				throw Error("Terminal route registration generation overflowed.")
+			Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+			Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation)
+			Bindings := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
+			RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
+			Status := HasMethod(RegisterFn, "Call")
+				? RegisterFn.Call(_LLM_NavEventOwnerTerminalRouteOwner,
+					Generation, Candidate["layout_id"], Bindings, Candidate["routes"].Length)
+				: _LLM_NavEventOwnerNativeRegisterTerminalRoutes(
+					_LLM_NavEventOwnerTerminalRouteOwner, Generation,
+					Candidate["layout_id"], Bindings, Candidate["routes"].Length)
+			if !(Status is Integer)
+				throw Error("Terminal route registration returned a malformed ACK.")
+			if Status == -11
+				return false
+			_LLM_NavEventOwnerNativeRequireOk(Status, "Terminal route registration")
+			for RecipeId, Admission in Candidate["recipes"]
+				_LLM_NavEventOwnerTerminalRouteRecipes[RecipeId] := Admission
+			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
+				"generation", Generation, "layout_id", Candidate["layout_id"],
+				"registered", Candidate["routes"].Length,
+				"cohort_complete", false, "transformed_output_enabled", false,
+				"unconverted", Candidate["unconverted"])
+			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port)
+			return true
+		} finally _LLM_NavEventOwnerTerminalRouteRefreshing := false
+	} finally Critical(PreviousCritical)
+}
+
+/**
+ * Retains current registrations and exact native held identities only. The
+ * registration ACK establishes a debt-free boundary; Critical prevents this
+ * script from starting capture between publication and the held-identity query.
+ * A failed or malformed query retains every reference for a later safe retry.
+ */
+_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port) {
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	try {
+		HeldFn := _LLM_NavEventOwnerPortFn("list_terminal_held_recipes", Port)
+		; An injected registration without a held-reference boundary cannot prove
+		; retirement. Do not reach the real DLL through an incomplete test port.
+		if !HasMethod(HeldFn, "Call")
+				&& HasMethod(_LLM_NavEventOwnerPortFn("register_terminal_routes", Port), "Call")
+			return false
+		HeldBuffer := Buffer(64 * 8, 0)
+		Reply := HasMethod(HeldFn, "Call")
+			? HeldFn.Call(_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
+			: _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
+				_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
+		if !(Reply is Map) || !(Reply.Get("status", "") is Integer)
+			throw Error("Held terminal recipe query returned a malformed ACK.")
+		if Reply["status"] != 0
+			throw Error("Held terminal recipe query refused with status " . Reply["status"] . ".")
+		if !(Reply.Get("count", "") is Integer) || Reply["count"] < 0 || Reply["count"] > 64
+			throw Error("Held terminal recipe query returned an invalid count.")
+		Keep := Map()
+		for RecipeId in Candidate["recipes"]
+			Keep[RecipeId] := true
+		Held := Map()
+		Loop Reply["count"] {
+			RecipeId := NumGet(HeldBuffer, (A_Index - 1) * 8, "UInt64")
+			if RecipeId <= 0 || Held.Has(RecipeId)
+					|| !_LLM_NavEventOwnerTerminalRouteRecipes.Has(RecipeId)
+				throw Error("Held terminal recipe query returned an unknown or duplicate identity.")
+			Held[RecipeId] := true
+			Keep[RecipeId] := true
+		}
+		; Compute both retirement sets before mutating either ownership map.
+		KeepModels := Map()
+		if Source.Get("model", 0) is Map
+			KeepModels[ObjPtr(Source["model"])] := true
+		RetireRecipes := []
+		for RecipeId, Admission in _LLM_NavEventOwnerTerminalRouteRecipes {
+			if !Keep.Has(RecipeId) {
+				RetireRecipes.Push(RecipeId)
+				continue
+			}
+			Recipe := Admission.Get("recipe", 0)
+			if Recipe is Map && Recipe.Get("model", 0) is Map
+				KeepModels[ObjPtr(Recipe["model"])] := true
+		}
+		RetireModels := []
+		for Identity in _LLM_NavEventOwnerTerminalRouteModels {
+			if !KeepModels.Has(Identity)
+				RetireModels.Push(Identity)
+		}
+		for RecipeId in RetireRecipes
+			_LLM_NavEventOwnerTerminalRouteRecipes.Delete(RecipeId)
+		for Identity in RetireModels
+			_LLM_NavEventOwnerTerminalRouteModels.Delete(Identity)
+		return true
+	} catch Error as Err {
+		_LLM_NavEventOwnerReport("Terminal route recipe retirement deferred: " . Err.Message)
+		return false
+	}
+}
+
+/** Returns diagnostic coverage, never permission for partial transformed output. */
+LLM_NavEventOwner_TerminalRouteCoverage() {
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	Coverage := _LLM_NavEventOwnerTerminalRouteCoverage.Clone()
+	Coverage["unconverted"] := Coverage["unconverted"].Clone()
+	return Coverage
+}
+
+_LLM_NavEventOwnerTerminalRouteSource() {
+	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_State
+	Caps := GetKeyState("CapsLock", "T") ? 1 : 0
+	if !IsSet(KLE_Model) || !(KLE_Model is Map)
+		return Map("active", false, "caps", Caps)
+	return Map("active", KeylayoutEmulation_LayerIsActive("ergopti_base") ? 1 : 0,
+		"caps", Caps, "model", KLE_Model, "layout_name", KLE_Id,
+		"keys", KLE_KeyCodes.Clone(), "composition_state", KLE_State,
+		"capture", KeylayoutEmulation_CaptureReplayRoute,
+		"eligible", _KLE_BaseCriterion)
+}
+
+_LLM_NavEventOwnerTerminalRouteNextRecipeId() {
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe
+	_LLM_NavEventOwnerTerminalRouteNextRecipe += 1
+	if _LLM_NavEventOwnerTerminalRouteNextRecipe <= 0
+		throw Error("Terminal route recipe identity overflowed.")
+	return _LLM_NavEventOwnerTerminalRouteNextRecipe
+}
+
+_LLM_NavEventOwnerTerminalRouteLayoutId(Model) {
+	global _LLM_NavEventOwnerTerminalRouteNextLayout
+	global _LLM_NavEventOwnerTerminalRouteModels
+	Identity := ObjPtr(Model)
+	if _LLM_NavEventOwnerTerminalRouteModels.Has(Identity)
+		return _LLM_NavEventOwnerTerminalRouteModels[Identity]["id"]
+	_LLM_NavEventOwnerTerminalRouteNextLayout += 1
+	if _LLM_NavEventOwnerTerminalRouteNextLayout <= 1
+		throw Error("Terminal route layout identity overflowed.")
+	Id := _LLM_NavEventOwnerTerminalRouteNextLayout
+	; Retaining the model also prevents an object pointer from being reused for
+	; another layout while old native snapshots still name its recipes.
+	_LLM_NavEventOwnerTerminalRouteModels[Identity] := Map("model", Model, "id", Id)
+	return Id
+}
+
+_LLM_NavEventOwnerTerminalRouteDescriptor(RecipeId, RouteId, Axis, Code,
+		Kind, Modifiers := 0, EffectiveLR := 0, TargetVk := 0, TargetScan := 0) {
+	return Map("recipe_id", RecipeId, "route_id", RouteId,
+		"required_prefixes", 0, "prefix_bit", 0,
+		"required_dead_key_id", 0, "next_dead_key_id", 0,
+		"code", Code, "target_vk", TargetVk, "target_scan", TargetScan,
+		"axis", Axis, "kind", Kind, "required_modifiers", Modifiers,
+		"effective_modifiers_lr", EffectiveLR)
+}
+
+_LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
+	global KEYLAYOUT_NEUTRAL_STATE
+	if !(Source is Map) || !Source.Has("active") || !Source.Has("caps")
+			|| !(Source["active"] is Integer) || Source["active"] < 0 || Source["active"] > 1
+			|| !(Source["caps"] is Integer) || Source["caps"] < 0 || Source["caps"] > 1
+			|| !(Generation is Integer) || Generation <= 0
+		throw ValueError("Terminal route source ownership is invalid.")
+	LayoutId := Source["active"] && Source.Has("model") && Source["model"] is Map
+		? _LLM_NavEventOwnerTerminalRouteLayoutId(Source["model"]) : 1
+	Routes := []
+	Recipes := Map()
+	Unconverted := ["CapsLock", "AltGr", "dead-key sequences", "tap-hold transforms",
+		"shortcut chords", "prefix layers", "direct-digit overrides", "pre-registration holds"]
+	NaturalScans := Map()
+	for Modifier in [[0xA2, 0x01, 0x01D], [0xA3, 0x02, 0x11D],
+			[0xA4, 0x04, 0x038], [0xA5, 0x08, 0x138], [0xA0, 0x10, 0x02A],
+			[0xA1, 0x20, 0x036], [0x5B, 0x40, 0x15B], [0x5C, 0x80, 0x15C]] {
+		NaturalScans[Modifier[3]] := true
+		for Axis in [2, 1] {
+			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
+			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(
+				Id, Routes.Length + 1, Axis, Axis == 2 ? Modifier[3] : Modifier[1],
+				4, 0, Modifier[2], Axis == 1 ? Modifier[1] : 0, Axis == 2 ? Modifier[3] : 0)
+			Routes.Push(Route)
+			Recipes[Id] := Map("recipe", 0, "route", Route.Clone(),
+				"generation", Generation, "layout_id", LayoutId)
+		}
+	}
+	if !Source["active"] || Source["caps"] {
+		Unconverted.Push(Source["caps"] ? "CapsLock active at registration" : "KLE base inactive")
+		return Map("layout_id", LayoutId, "routes", Routes,
+			"recipes", Recipes, "unconverted", Unconverted)
+	}
+	for Name in ["model", "layout_name", "keys", "composition_state", "capture", "eligible"]
+		if !Source.Has(Name)
+			throw ValueError("The authoritative KLE source is incomplete.")
+	if !(Source["model"] is Map) || !(Source["keys"] is Map)
+			|| !(Source["layout_name"] is String) || Source["layout_name"] == ""
+			|| !(Source["composition_state"] is String)
+			|| !HasMethod(Source["capture"], "Call") || !HasMethod(Source["eligible"], "Call")
+		throw ValueError("The authoritative KLE source is malformed.")
+	if Source["composition_state"] != KEYLAYOUT_NEUTRAL_STATE {
+		Unconverted.Push("KLE composition active at registration")
+		return Map("layout_id", LayoutId, "routes", Routes,
+			"recipes", Recipes, "unconverted", Unconverted)
+	}
+	Names := ""
+	for Sc, _ in Source["keys"] {
+		if !(Sc is String) || !RegExMatch(Sc, "i)^SC[0-9A-F]{3}$")
+			throw ValueError("The authoritative KLE scan identity is malformed.")
+		Names .= Sc . "`n"
+	}
+	Loop Parse, Sort(RTrim(Names, "`n")), "`n" {
+		Sc := A_LoopField
+		if Sc == ""
+			continue
+		if NaturalScans.Has(Integer("0x" . SubStr(Sc, 3))) {
+			Unconverted.Push(Sc . ":natural modifier identity")
+			continue
+		}
+		for Shift in [0, 1] {
+			if !Source["eligible"].Call(Sc, Shift) {
+				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":another owner")
+				continue
+			}
+			Recipe := Source["capture"].Call(Sc, Shift, false, false)
+			if !(Recipe is Map) || !Recipe.Has("model") || !(Recipe["model"] is Map)
+					|| ObjPtr(Recipe["model"]) != ObjPtr(Source["model"])
+					|| Recipe.Get("layout_id", 0) != Source["layout_name"]
+					|| Recipe.Get("scan", 0) != Sc
+				throw ValueError("KLE registration changed its model during capture.")
+			Resolved := Keylayout_Resolve(Recipe["model"], Recipe["index"], Recipe["keycode"])
+			if Resolved["Kind"] != "text" {
+				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":" . Resolved["Kind"])
+				continue
+			}
+			if Routes.Length >= 128 {
+				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":registration capacity")
+				continue
+			}
+			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
+			Kind := RegExMatch(Resolved["Text"], "^[0-9]$") ? 2 : 1
+			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(
+				Id, Routes.Length + 1, 2, Integer("0x" . SubStr(Sc, 3)), Kind, Shift ? 4 : 0)
+			Routes.Push(Route)
+			Recipes[Id] := Map("recipe", Recipe.Clone(), "route", Route.Clone(),
+				"generation", Generation, "layout_id", LayoutId)
+		}
+	}
+	return Map("layout_id", LayoutId, "routes", Routes,
+		"recipes", Recipes, "unconverted", Unconverted)
+}
+
+_LLM_NavEventOwnerTerminalRouteValidate(Route) {
+	if !(Route is Map)
+		throw ValueError("A typed terminal route is required.")
+	Limits := Map("recipe_id", 0x7FFFFFFFFFFFFFFF, "route_id", 0xFFFFFFFF,
+		"required_prefixes", 0xFFFFFFFF, "prefix_bit", 0xFFFFFFFF,
+		"required_dead_key_id", 0xFFFFFFFF, "next_dead_key_id", 0xFFFFFFFF,
+		"code", 0x1FF, "target_vk", 0xFF, "target_scan", 0x1FF,
+		"axis", 2, "kind", 5, "required_modifiers", 15, "effective_modifiers_lr", 255)
+	for Name, Maximum in Limits
+		if !Route.Has(Name) || !(Route[Name] is Integer)
+				|| Route[Name] < 0 || Route[Name] > Maximum
+			throw ValueError("The terminal route contains an invalid typed field.")
+	if Route["recipe_id"] == 0 || Route["route_id"] == 0 || Route["code"] == 0
+			|| Route["axis"] == 0 || Route["kind"] == 0
+			|| (Route["axis"] == 1 && Route["code"] > 255)
+			|| (Route["target_vk"] != 0 && Route["target_scan"] != 0)
+		throw ValueError("The terminal route key identity is invalid.")
+	Transform := Route["kind"] == 4 || Route["kind"] == 5
+	if Transform {
+		if Route["required_modifiers"] || Route["required_prefixes"]
+				|| Route["required_dead_key_id"] || Route["next_dead_key_id"]
+			throw ValueError("A held terminal transform cannot depend on a chord.")
+		if Route["kind"] == 4 {
+			if !Route["effective_modifiers_lr"] || Route["prefix_bit"]
+				throw ValueError("The terminal modifier transform is invalid.")
+		} else if Route["effective_modifiers_lr"] || !Route["prefix_bit"]
+				|| (Route["prefix_bit"] & (Route["prefix_bit"] - 1))
+			throw ValueError("The terminal prefix transform is invalid.")
+	} else if Route["effective_modifiers_lr"] || Route["prefix_bit"]
+			|| (Route["kind"] == 3 && !Route["required_dead_key_id"] && !Route["next_dead_key_id"])
+		throw ValueError("The terminal character transition is invalid.")
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRouteMarshal(Routes) {
+	if !(Routes is Array) || Routes.Length > 128
+		throw ValueError("The terminal route registry exceeds its supported subset.")
+	Loop Routes.Length
+		if !Routes.Has(A_Index)
+			throw ValueError("The terminal route registry contains a missing entry.")
+	Bindings := Buffer(Routes.Length * 40, 0)
+	Ids := Map()
+	Families := Map()
+	Selectors := Map()
+	for Index, Route in Routes {
+		if !Routes.Has(Index)
+			throw ValueError("The terminal route registry contains a missing entry.")
+		_LLM_NavEventOwnerTerminalRouteValidate(Route)
+		if Ids.Has(Route["route_id"])
+			throw ValueError("The terminal route registry repeats an identity.")
+		Ids[Route["route_id"]] := true
+		Family := Route["axis"] . "|" . Route["code"]
+		Transform := Route["kind"] == 4 || Route["kind"] == 5
+		if Families.Has(Family) && (Families[Family] || Transform)
+			throw ValueError("The terminal route registry overlaps a held transform.")
+		Families[Family] := Transform
+		Selector := Family . "|" . Route["required_modifiers"] . "|"
+			. Route["required_prefixes"] . "|" . Route["required_dead_key_id"]
+		if Selectors.Has(Selector)
+			throw ValueError("The terminal route registry repeats an event selector.")
+		Selectors[Selector] := true
+		Offset := (Index - 1) * 40
+		NumPut("UInt64", Route["recipe_id"], "UInt", Route["route_id"],
+			"UInt", Route["required_prefixes"], "UInt", Route["prefix_bit"],
+			"UInt", Route["required_dead_key_id"], "UInt", Route["next_dead_key_id"],
+			"UShort", Route["code"], "UShort", Route["target_vk"],
+			"UShort", Route["target_scan"], "UChar", Route["axis"],
+			"UChar", Route["kind"], "UChar", Route["required_modifiers"],
+			"UChar", Route["effective_modifiers_lr"], Bindings, Offset)
+	}
+	return Bindings
+}
+
+_LLM_NavEventOwnerTerminalRouteRead(BufferSource, Offset) {
+	Route := Map("recipe_id", NumGet(BufferSource, Offset, "UInt64"),
+		"route_id", NumGet(BufferSource, Offset + 8, "UInt"),
+		"required_prefixes", NumGet(BufferSource, Offset + 12, "UInt"),
+		"prefix_bit", NumGet(BufferSource, Offset + 16, "UInt"),
+		"required_dead_key_id", NumGet(BufferSource, Offset + 20, "UInt"),
+		"next_dead_key_id", NumGet(BufferSource, Offset + 24, "UInt"),
+		"code", NumGet(BufferSource, Offset + 28, "UShort"),
+		"target_vk", NumGet(BufferSource, Offset + 30, "UShort"),
+		"target_scan", NumGet(BufferSource, Offset + 32, "UShort"),
+		"axis", NumGet(BufferSource, Offset + 34, "UChar"),
+		"kind", NumGet(BufferSource, Offset + 35, "UChar"),
+		"required_modifiers", NumGet(BufferSource, Offset + 36, "UChar"),
+		"effective_modifiers_lr", NumGet(BufferSource, Offset + 37, "UChar"))
+	_LLM_NavEventOwnerTerminalRouteValidate(Route)
+	return Route
+}
+
+_LLM_NavEventOwnerTerminalRouteComposition(BufferSource, Offset) {
+	return Map("generation", NumGet(BufferSource, Offset, "UInt64"),
+		"layout_id", NumGet(BufferSource, Offset + 8, "UInt64"),
+		"dead_key_id", NumGet(BufferSource, Offset + 16, "UInt"))
+}
+
+/** Decodes the exact native FIFO metadata ABI without authorizing output. */
+_LLM_NavEventOwnerTerminalRouteDecode(Receipt, ExpectedToken := 0) {
+	if !(Receipt is Buffer) || Receipt.Size != 184
+		throw ValueError("The terminal route receipt ABI size is invalid.")
+	Token := NumGet(Receipt, 0, "UInt64")
+	Sequence := NumGet(Receipt, 8, "UInt64")
+	Status := NumGet(Receipt, 64, "Int")
+	if Token <= 0 || Sequence <= 0 || (ExpectedToken != 0 && Token != ExpectedToken)
+			|| Status < -10 || Status > 2
+		throw ValueError("The terminal route receipt identity is invalid.")
+	Event := Map("timestamp", NumGet(Receipt, 120, "UInt64"),
+		"source_id", NumGet(Receipt, 128, "UInt64"),
+		"vk", NumGet(Receipt, 136, "UShort"), "scan", NumGet(Receipt, 138, "UShort"),
+		"origin", NumGet(Receipt, 140, "UChar"), "key_up", NumGet(Receipt, 141, "UChar"),
+		"repeat", NumGet(Receipt, 142, "UChar"))
+	if Event["timestamp"] < 0 || Event["source_id"] < 0
+			|| Event["vk"] > 255 || Event["scan"] > 511 || (!Event["vk"] && !Event["scan"])
+			|| Event["origin"] < 1 || Event["origin"] > 4
+			|| Event["key_up"] > 1 || Event["repeat"] > 1
+			|| (Event["key_up"] && Event["repeat"])
+		throw ValueError("The terminal route event provenance is invalid.")
+	Snapshot := Map("token", Token, "sequence", Sequence, "status", Status,
+		"owner", NumGet(Receipt, 16, "UInt64"),
+		"observed_generation", NumGet(Receipt, 24, "UInt64"),
+		"observed_layout_id", NumGet(Receipt, 32, "UInt64"),
+		"route_generation", NumGet(Receipt, 40, "UInt64"),
+		"route_layout_id", NumGet(Receipt, 48, "UInt64"),
+		"prefixes_before", NumGet(Receipt, 56, "UInt"),
+		"prefixes_after", NumGet(Receipt, 60, "UInt"),
+		"modifiers_lr_before", NumGet(Receipt, 68, "UChar"),
+		"modifiers_lr_after", NumGet(Receipt, 69, "UChar"),
+		"composition_before", _LLM_NavEventOwnerTerminalRouteComposition(Receipt, 72),
+		"composition_after", _LLM_NavEventOwnerTerminalRouteComposition(Receipt, 96),
+		"event", Event, "metadata_only", true,
+		"cohort_complete", false, "transformed_output_enabled", false)
+	for Name in ["owner", "observed_generation", "observed_layout_id",
+			"route_generation", "route_layout_id"]
+		if Snapshot[Name] < 0
+			throw ValueError("The terminal route registration identity overflowed.")
+	for Name in ["composition_before", "composition_after"] {
+		Composition := Snapshot[Name]
+		if Composition["generation"] < 0 || Composition["layout_id"] < 0
+				|| (Composition["dead_key_id"] == 0
+					&& (Composition["generation"] != 0 || Composition["layout_id"] != 0))
+				|| (Composition["dead_key_id"] != 0
+					&& (Composition["generation"] <= 0 || Composition["layout_id"] <= 0))
+			throw ValueError("The terminal route composition ownership is invalid.")
+	}
+	RecipeId := NumGet(Receipt, 144, "UInt64")
+	if Status == 0 || RecipeId != 0 {
+		if Snapshot["owner"] <= 0 || Snapshot["route_generation"] <= 0
+				|| Snapshot["route_layout_id"] <= 0
+				|| Snapshot["observed_generation"] < Snapshot["route_generation"]
+				|| (Status == 0 && Event["origin"] > 2) || Status == 1
+			throw ValueError("The terminal route admission ownership is invalid.")
+		Snapshot["route"] := _LLM_NavEventOwnerTerminalRouteRead(Receipt, 144)
+	} else
+		Snapshot["route"] := 0
+	return Snapshot
+}
+
+/** Peeks one zero-based FIFO metadata entry without consuming native ACK debt. */
+LLM_NavEventOwner_PeekTerminalRoute(Token, Index, Port := 0) {
+	if !(Token is Integer) || Token <= 0 || !(Index is Integer) || Index < 0
+		throw ValueError("A terminal route token and zero-based index are required.")
+	Receipt := Buffer(184, 0)
+	Fn := _LLM_NavEventOwnerPortFn("peek_terminal_route", Port)
+	Status := HasMethod(Fn, "Call") ? Fn.Call(Token, Index, Receipt)
+		: _LLM_NavEventOwnerNativePeekTerminalRoute(Token, Index, Receipt)
+	if !(Status is Integer)
+		throw Error("Terminal route peek returned a malformed ACK.")
+	if Status == 4 || Status == 8
+		return 0
+	_LLM_NavEventOwnerNativeRequireOk(Status, "Terminal route metadata peek")
+	return _LLM_NavEventOwnerTerminalRouteDecode(Receipt, Token)
+}
+
+/**
+ * Resolves an admitted metadata recipe through its retained KLE model only.
+ * @param {Map} Snapshot - Decoded FIFO receipt while its queue or hold still owns
+ *   the recipe. Retired diagnostic copies intentionally lose stepping permission.
+ * @param {String} State - Explicit neutral composition state of this subset.
+ * @returns {Map} Canonical diagnostic Next/Output, never a delivery permission.
+ */
+LLM_NavEventOwner_StepTerminalRoute(Snapshot, State) {
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	global _LLM_NavEventOwnerTerminalRouteRecipes, KEYLAYOUT_NEUTRAL_STATE
+	if !(Snapshot is Map) || !(State is String) || State != KEYLAYOUT_NEUTRAL_STATE
+			|| Snapshot.Get("status", -1) != 0
+			|| Snapshot.Get("owner", 0) != _LLM_NavEventOwnerTerminalRouteOwner
+			|| !(Snapshot.Get("route", 0) is Map) || !(Snapshot.Get("event", 0) is Map)
+			|| Snapshot["event"].Get("key_up", 1) != 0
+			|| !(Snapshot.Get("composition_before", 0) is Map)
+			|| Snapshot["composition_before"].Get("dead_key_id", -1) != 0
+		throw ValueError("The terminal recipe is outside the admitted neutral subset.")
+	for Name in ["owner", "route_generation", "route_layout_id", "status"]
+		if !Snapshot.Has(Name) || !(Snapshot[Name] is Integer)
+			throw ValueError("The terminal recipe receipt has an invalid typed identity.")
+	Event := Snapshot["event"]
+	for Name in ["origin", "key_up", "repeat", "vk", "scan"]
+		if !Event.Has(Name) || !(Event[Name] is Integer)
+			throw ValueError("The terminal recipe event is malformed.")
+	if Event["origin"] < 1 || Event["origin"] > 2 || Event["repeat"] < 0 || Event["repeat"] > 1
+		throw ValueError("The terminal recipe event provenance is unsupported.")
+	Route := Snapshot["route"]
+	_LLM_NavEventOwnerTerminalRouteValidate(Route)
+	if (Route["axis"] == 2 && Event["scan"] != Route["code"])
+			|| (Route["axis"] == 1 && Event["vk"] != Route["code"])
+		throw ValueError("The terminal recipe no longer describes its captured key.")
+	Id := Route["recipe_id"]
+	if !_LLM_NavEventOwnerTerminalRouteRecipes.Has(Id)
+		throw ValueError("The terminal recipe identity is not retained.")
+	Admission := _LLM_NavEventOwnerTerminalRouteRecipes[Id]
+	if Admission["generation"] != Snapshot.Get("route_generation", 0)
+			|| Admission["layout_id"] != Snapshot.Get("route_layout_id", 0)
+			|| !(Admission["recipe"] is Map)
+			|| (Route["kind"] != 1 && Route["kind"] != 2)
+		throw ValueError("The terminal recipe registration ownership is invalid.")
+	for Name, Value in Admission["route"]
+		if !Route.Has(Name) || Route[Name] != Value
+			throw ValueError("The terminal recipe differs from its admitted descriptor.")
+	Step := KeylayoutEmulation_StepReplayRoute(Admission["recipe"], State)
+	if Step["Next"] != KEYLAYOUT_NEUTRAL_STATE
+		throw ValueError("The terminal recipe unexpectedly entered composition.")
+	return Map("Next", Step["Next"], "Output", Step["Output"],
+		"metadata_only", true, "cohort_complete", false, "transformed_output_enabled", false)
+}
+
+_LLM_NavEventOwnerNativeRegisterTerminalRoutes(Owner, Generation, LayoutId, Bindings, Count) {
+	if !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation <= 0
+			|| !(LayoutId is Integer) || LayoutId <= 0 || !(Count is Integer) || Count < 0
+			|| Count > 128 || !(Bindings is Buffer) || Bindings.Size != Count * 40
+		throw ValueError("The terminal route native registration ABI is invalid.")
+	return DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_RegisterTerminalRoutes"),
+		"UInt64", Owner, "UInt64", Generation, "UInt64", LayoutId,
+		"Ptr", Bindings, "UInt", Count, "Int")
+}
+
+_LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, Ids, Capacity) {
+	if !(Owner is Integer) || Owner <= 0 || !(Capacity is Integer)
+			|| Capacity < 0 || Capacity > 64 || !(Ids is Buffer) || Ids.Size != Capacity * 8
+		throw ValueError("The held terminal recipe output buffer is invalid.")
+	Count := 0
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_ListTerminalHeldRecipes"),
+		"UInt64", Owner, "Ptr", Ids.Ptr, "UInt", Capacity, "UInt*", &Count, "Int")
+	return Map("status", Status, "count", Count)
+}
+
+_LLM_NavEventOwnerNativePeekTerminalRoute(Token, Index, Receipt) {
+	return DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_PeekTerminalRoute"),
+		"UInt64", Token, "UInt", Index, "Ptr", Receipt, "Int")
+}
+
 ; Native adapter functions are implemented below the domain-facing bridge so
 ; unit tests can replace each boundary through a Map port without loading the
 ; DLL or installing a hook.
@@ -2291,6 +2819,8 @@ _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
 	}
 	_LLM_NavEventOwnerNativeRequireOk(Status,
 		"Navigation owner start")
+	if !LLM_NavEventOwner_RefreshTerminalRoutes()
+		throw Error("Terminal route metadata registration was not admitted at startup.")
 	return 1
 }
 
@@ -2350,6 +2880,8 @@ _LLM_NavEventOwnerNativeCanStop() {
 }
 
 _LLM_NavEventOwnerNativeBeginTerminalCapture(Token) {
+	if !LLM_NavEventOwner_RefreshTerminalRoutes()
+		return 0
 	Status := DllCall(_LLM_NavEventOwnerNativeExport(
 		"ErgoptiNav_BeginTerminalCapture"), "UInt64", Token, "Int")
 	if Status == 5
@@ -2703,6 +3235,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded() {
 		"ErgoptiNav_CommitTerminalCapture",
 		"ErgoptiNav_AbortTerminalCapture",
 		"ErgoptiNav_GetTerminalCapture",
+		"ErgoptiNav_RegisterTerminalRoutes", "ErgoptiNav_PeekTerminalRoute",
+		"ErgoptiNav_ListTerminalHeldRecipes",
 		"ErgoptiNav_BeginOwnerSwap",
 		"ErgoptiNav_CommitOwnerSwap", "ErgoptiNav_AbortOwnerSwap",
 		"ErgoptiNav_ClaimOwner",
