@@ -1964,3 +1964,112 @@ helpers.describe("relative-loader simultaneous source admission (controlled tran
 		end)
 	end
 end)
+
+
+helpers.describe("original Manager pair action after genuine Logger callback (controlled transport)", function()
+	local Fixture = require("tests.support.input_owner_fixture")
+	local function logger_session(mode)
+		local previous_logger, previous_shim = package.loaded.logger, package.loaded["logger.shim"]
+		-- Fresh genuine core: no replacement debug method or invented effect ACK.
+		package.loaded.logger, package.loaded["logger.shim"] = nil, nil
+		local logger = require("logger")
+		logger.set_level("debug")
+		package.loaded["logger.shim"] = logger
+		local called, reason = pcall(function()
+			Fixture.with_manager_session({ before_manager = function(s)
+				s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+			end }, function(s)
+				local sink_calls = 0
+				logger.set_sink(function(line)
+					if line:find("[platform.remap.tap_hold_manager] Tap action 'copy'.", 1, true) then
+						sink_calls = sink_calls + 1
+						if mode == "source" then
+							s.bytes = s.bytes:gsub('combo = "copy"', 'combo = "paste"')
+						elseif mode == "pause" then
+							s.pause_result = s.manager.set_paused(true)
+						end
+					end
+				end)
+				s.edge("a", 58, 1, 1000)
+				s.edge("a", 15, 1, 1010)
+				helpers.assert_eq(sink_calls, 1, "original Manager log must reach the genuine sink")
+				if mode == "positive" then
+					helpers.assert_eq(s.actions, { { "copy", "combination__tab_then_caps_lock" } })
+				else
+					helpers.assert_eq(s.actions, {}, "a revoked pair cannot execute after its original Logger callback")
+					if mode == "pause" then
+						helpers.assert_eq(s.pause_result, false, "busy retirement refusal is preserved; it is not an ACK")
+					else
+						helpers.assert_contains(s.bytes, 'combo = "paste"')
+					end
+				end
+				s.edge("a", 15, 0, 1011)
+				s.edge("a", 58, 0, 1012)
+				helpers.assert_eq(s.rows, {}, "consumed pair edges do not fabricate standalone replay")
+			end)
+		end)
+		logger.set_sink(nil)
+		package.loaded.logger, package.loaded["logger.shim"] = previous_logger, previous_shim
+		if not called then error(reason, 0) end
+	end
+	for _, mode in ipairs({ "source", "pause", "positive" }) do
+		helpers.it("(pair-manager-log-rejoin) preserves original action admission for " .. mode, function()
+			logger_session(mode)
+		end)
+	end
+end)
+
+
+helpers.describe("original Manager terminal pair identity (controlled transport)", function()
+	helpers.it("(pair-manager-identity-rejoin) rejects real restored aliases without invoking __eq", function()
+		local Fixture = require("tests.support.input_owner_fixture")
+		for _, role in ipairs({ "combinations", "engine" }) do
+			local previous_logger, previous_shim = package.loaded.logger, package.loaded["logger.shim"]
+			package.loaded.logger, package.loaded["logger.shim"] = nil, nil
+			local logger = require("logger")
+			logger.set_level("debug")
+			package.loaded["logger.shim"] = logger
+			local original, original_metatable, altered_metatable, previous_eq
+			local called, reason = pcall(function()
+				Fixture.with_manager_session({ before_manager = function(s)
+					s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+				end }, function(s)
+					local sink_calls, eq_calls, restore_result = 0, 0, nil
+					logger.set_sink(function(line)
+						if line:find("[platform.remap.tap_hold_manager] Tap action 'copy'.", 1, true) then
+							sink_calls = sink_calls + 1
+							local snapshot = s.manager.configuration_snapshot()
+							original = snapshot[role]
+							original_metatable = getmetatable(original)
+							altered_metatable = original_metatable or {}
+							previous_eq = rawget(altered_metatable, "__eq")
+							altered_metatable.__eq = function()
+								eq_calls = eq_calls + 1
+								return true
+							end
+							setmetatable(original, altered_metatable)
+							snapshot[role] = setmetatable({}, altered_metatable)
+							restore_result = s.manager.restore_configuration(snapshot)
+						end
+					end)
+					s.edge("a", 58, 1, 1000)
+					s.edge("a", 15, 1, 1010)
+					helpers.assert_eq(sink_calls, 1, "the real original Manager sink must restore its observed snapshot")
+					helpers.assert_eq(restore_result, false, "unknown owner or busy original engine retirement must remain refused")
+					helpers.assert_eq(eq_calls, 0, role .. " identity admission cannot invoke a caller metamethod")
+					helpers.assert_eq(s.actions, {}, "a refused replacement does not authorize stale execution")
+					s.edge("a", 15, 0, 1011)
+					s.edge("a", 58, 0, 1012)
+					helpers.assert_eq(s.rows, {}, "original consumed edges retain suppression and cleanup")
+				end)
+			end)
+			logger.set_sink(nil)
+			if original then
+				altered_metatable.__eq = previous_eq
+				setmetatable(original, original_metatable)
+			end
+			package.loaded.logger, package.loaded["logger.shim"] = previous_logger, previous_shim
+			if not called then error(reason, 0) end
+		end
+	end)
+end)
