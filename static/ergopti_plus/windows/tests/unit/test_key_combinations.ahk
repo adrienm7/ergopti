@@ -918,8 +918,26 @@ _KCT_AltGrChildDone(Capture, Code, Stdout, Stderr) {
 	Capture["stderr"] := Stderr
 }
 
+; Keep failed child diagnostics inside the runner's uploaded receipt directory.
+_KCT_AltGrEvidenceParent() {
+	Requested := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	if Requested == ""
+		return A_Temp
+	SplitPath(Requested, , &Parent)
+	if Parent == "" || !DirExist(Parent)
+		throw ValueError("Native hook evidence requires an existing receipt directory.")
+	return Parent
+}
+
+_KCT_AltGrWriteDiagnostics(Root, Mode, Capture, ChildPid, Cleaned) {
+	FileAppend("exit=" . Capture["exit"] . " completions=" . Capture["count"]
+		. " pid=" . ChildPid . " closed=" . Cleaned . "`n"
+		. Capture["stdout"] . "`n" . Capture["stderr"] . "`n" . Capture["cleanup"],
+		Root . "\" . Mode . "-diagnostics.txt", "UTF-8-RAW")
+}
+
 _KCT_AltGrNativePriority() {
-	Root := A_Temp . "\ergopti-kct-hook-" . DllCall("GetCurrentProcessId", "uint")
+	Root := _KCT_AltGrEvidenceParent() . "\ergopti-kct-hook-" . DllCall("GetCurrentProcessId", "uint")
 		. "-" . A_TickCount . "-" . Random(100000, 999999)
 	AssertTrue(DllCall("CreateDirectoryW", "str", Root, "ptr", 0, "int"),
 		"the parent must exclusively own native hook evidence")
@@ -950,10 +968,7 @@ _KCT_AltGrNativePriority() {
 					Capture["cleanup"] := Err.Message
 				if !Cleaned
 					CleanupDebt := true
-				FileAppend("exit=" . Capture["exit"] . " completions=" . Capture["count"]
-					. " pid=" . ChildPid . " closed=" . Cleaned . "`n"
-					. Capture["stdout"] . "`n" . Capture["stderr"] . "`n" . Capture["cleanup"],
-					Root . "\" . Mode . "-diagnostics.txt", "UTF-8-RAW")
+				_KCT_AltGrWriteDiagnostics(Root, Mode, Capture, ChildPid, Cleaned)
 			}
 			AssertTrue(Cleaned, "native child cleanup debt retains evidence at " . Root)
 			AssertEqual(1, Capture["count"], "one exact native child completion; evidence=" . Root)
@@ -1077,3 +1092,45 @@ _KCT_RegisterAltGrUnsetCases() {
 			_KCT_AltGrSuffixUnsetState.Bind(Missing))
 }
 _KCT_RegisterAltGrUnsetCases()
+
+
+; This file-only control retains failed-child diagnostics without launching a child.
+_KCT_AltGrFailedDiagnosticsRemainWithReceipt() {
+	Base := A_Temp . "\ergopti-kct-evidence-" . DllCall("GetCurrentProcessId", "uint")
+		. "-" . A_TickCount . "-" . Random(100000, 999999)
+	AssertTrue(DllCall("CreateDirectoryW", "str", Base, "ptr", 0, "int"))
+	Previous := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	try {
+		Receipt := Base . "\cohort.txt"
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", Receipt)
+		AssertEqual(Base, _KCT_AltGrEvidenceParent(), "child evidence shares the actual cohort receipt directory")
+		Root := _KCT_AltGrEvidenceParent() . "\failed-child"
+		AssertTrue(DllCall("CreateDirectoryW", "str", Root, "ptr", 0, "int"))
+		Capture := Map("exit", 124, "count", 0, "stdout", "owned child stdout",
+			"stderr", "owned child stderr", "cleanup", "retirement refused")
+		_KCT_AltGrWriteDiagnostics(Root, "candidate", Capture, 123, false)
+		Expected := "exit=124 completions=0 pid=123 closed=0`nowned child stdout`nowned child stderr`nretirement refused"
+		AssertEqual(Expected, FileRead(Root . "\candidate-diagnostics.txt", "UTF-8-RAW"),
+			"failed child status and every retained diagnostic are actual file bytes")
+		AssertTrue(InStr(FileExist(Root), "D"), "a failed observation retains its owned evidence directory")
+		AssertFalse(FileExist(Receipt), "diagnostic capture cannot manufacture a completed cohort receipt")
+		Source := FileRead(A_LineFile, "UTF-8")
+		Body := _DriverExtractFunctionBody(&Source, "_KCT_AltGrNativePriority")
+		Assert(Body != "", "the actual child owner must exist")
+		AssertContains(Body, "_KCT_AltGrEvidenceParent()", "the real child uses the exercised evidence selector")
+		AssertContains(Body, "_KCT_AltGrWriteDiagnostics(Root, Mode, Capture, ChildPid, Cleaned)",
+			"the native finally uses the exercised diagnostic writer")
+		AssertContains(Body, "if Passed && !CleanupDebt", "failed child evidence cannot enter successful cleanup")
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", "cohort.txt")
+		AssertThrows(_KCT_AltGrEvidenceParent, "a configured receipt without a directory refuses")
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", Base . "\absent\cohort.txt")
+		AssertThrows(_KCT_AltGrEvidenceParent, "a configured missing directory cannot fall back to ambient temp")
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", "")
+		AssertEqual(A_Temp, _KCT_AltGrEvidenceParent(), "ordinary manual execution keeps its temporary-directory fallback")
+	} finally {
+		try EnvSet("ERGOPTI_AHK_RESULTS_FILE", Previous)
+		finally DirDelete(Base, true)
+	}
+}
+Test("key combinations: failed child diagnostics remain with the cohort receipt (altgr-child-evidence)",
+	_KCT_AltGrFailedDiagnosticsRemainWithReceipt)
