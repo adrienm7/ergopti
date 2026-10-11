@@ -501,10 +501,144 @@ const LINUX_AI_PARENT_ALGORITHM =
 /** Proves a Linux AI parent from its real declaration, whole producer and tray caller. */
 
 /** Refuses executable module-root additions and replacement/escaped native exports. */
+/** The new caption import owns only its real magic-key notification receiving seam.
+ * This finite Source obligation grants no native effect or additional root-row authority.
+ */
+function declaredLinuxNativeCaptionOwner(unit) {
+	const { positions, rootPositions, body } = luaPublicationParser();
+	if (!unit) return false;
+	const imported = 'local NativePresentation = require("infra.native_presentation")';
+	const captured =
+		'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title';
+	const captureAt = rootPositions(unit, captured),
+		importAt = rootPositions(unit, imported);
+	if (captureAt.length !== 1 || importAt.length !== 1 || importAt[0] >= captureAt[0]) return false;
+	const layouts = body(unit, 'local function _build_layouts(ctx)');
+	const provider = body(layouts, 'providers["magic_key_source"] = function()');
+	const signature = 'local function notify(key, level)';
+	const notify = body(provider, signature);
+	const expected = `local function notify(key, level)
+ local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
+ if ok_notifier then
+  local body = i18n_safe(key)
+  local receipt = PrepareNativePresentation("magic_key_source_notice", "notification")
+  local title = receipt and NativePresentationTitle(receipt) or nil
+  if title == nil then return false end
+  Notifier.send(body, { title = title, level = level })
+ else
+  Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
+ end
+end`;
+	const expectedTokens = scriptTokens(expected, '.lua');
+	const signatureTokens = scriptTokens(signature, '.lua');
+	const expectedBody = expectedTokens.slice(signatureTokens.length, -1);
+	const shape = (tokens, text) =>
+		tokens.map((token) => [
+			token.kind,
+			token.value,
+			token.kind === 'string' ? text.slice(token.start, token.end) : null
+		]);
+	if (
+		!notify ||
+		!isDeepStrictEqual(shape(notify.tokens, notify.text), shape(expectedBody, expected))
+	)
+		return false;
+	const notifyAt = positions(unit, expected);
+	if (notifyAt.length !== 1) return false;
+	const allowed = new Set();
+	const names = new Set([
+		'NativePresentation',
+		'PrepareNativePresentation',
+		'NativePresentationTitle'
+	]);
+	for (const [at, fragment] of [
+		[importAt[0], imported],
+		[captureAt[0], captured],
+		[notifyAt[0], expected]
+	]) {
+		const wanted = scriptTokens(fragment, '.lua');
+		for (let offset = 0; offset < wanted.length; offset++)
+			if (wanted[offset].kind === 'identifier' && names.has(wanted[offset].value))
+				allowed.add(at + offset);
+	}
+	// Only the exact import/capture and authenticated physical provider body may borrow these ports.
+	// Extra shadows, writes, observer arguments, container captures and duplicate owners refuse.
+	return unit.tokens.every(
+		(token, at) => token.kind !== 'identifier' || !names.has(token.value) || allowed.has(at)
+	);
+}
+
+/** Actual captured removal captions belong only to their native command and About handler.
+ * These source intervals grant no extra root rows or renderer/native effect authority.
+ */
+const LINUX_UNINSTALL_CAPTION_LOCALS = {
+	uninstall_caption_factory:
+		'type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")',
+	uninstall_caption_i18n: 'rawget(separator_modules, "infra.i18n")',
+	uninstall_caption_get:
+		'type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")'
+};
+const LINUX_UNINSTALL_CAPTION_FACADE_SOURCE =
+	'local function uninstall_caption_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu\n\t\tand type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory\n\t\tand type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil\n\t\tand rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n\n\t\tand type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get\nend';
+const LINUX_UNINSTALL_CAPTION_COMMAND_SOURCE =
+	'local function _uninstall_command(ctx)\n\tlocal receive, current\n\tif uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end\n\treturn function()\n\t\tif not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end\n\t\tlocal run = require("ui.menu.uninstall").run\n\t\tlocal title = receive()\n\t\tif title == nil or not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal confirmation = i18n_safe("dialog.uninstall.confirm")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal failure = i18n_safe("dialog.uninstall.failed")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\tlocal options = {\n\t\t\ttitle = title,\n\t\t\tconfirmation = confirmation,\n\t\t\tfailure = failure,\n\t\t\tconfirm = function(title, text)\n\t\t\t\treturn ask_yes_no(title, zenity_plain(text),\n\t\t\t\t\ti18n_safe("button.remove"), i18n_safe("button.cancel"))\n\t\t\tend,\n\t\t\tfail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,\n\t\t\tquit = function()\n\t\t\t\tif type(ctx.on_quit) ~= "function" then\n\t\t\t\t\tLogger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")\n\t\t\t\t\treturn\n\t\t\t\tend\n\t\t\t\tctx.on_quit()\n\t\t\tend,\n\t\t}\n\t\tif not uninstall_caption_facade_current() or not current() then return false end\n\t\trun(options)\n\tend\nend';
+
+const LINUX_UNINSTALL_CAPTION_ABOUT_SOURCE =
+	'local function _build_about(ctx)\n\tlocal root, top, section, parent, fields = about_source(ManifestMenu, "linux")\n\tif root == nil then return nil end\n\tlocal render_ctx = {}\n\tfor key, value in pairs(ctx) do render_ctx[key] = value end\n\trender_ctx.commands = {\n\t\t["start_at_login"] = function()\n\t\t\tif not require("ui.menu.start_at_login").toggle() then\n\t\t\t\tshow_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))\n\t\t\tend\n\t\t\tif type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end\n\t\tend,\n\t\t["uninstall"] = _uninstall_command(ctx),\n\t\t-- Opens the release notes. It used to log one line to a file the user\n\t\t-- never sees and call that an About box — while ui/changelog/ was written,\n\t\t-- registered in webview_manager\'s bridge table and given a window title,\n\t\t-- with no caller anywhere. The page existed and nothing could reach it.\n\t\t["about_changelog"] = function()\n\t\t\tif type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then\n\t\t\t\tLogger.error(LOG, "No webview manager — the release notes cannot open.")\n\t\t\t\treturn\n\t\t\tend\n\t\t\tctx.webview.show("changelog")\n\t\tend,\n\t\t["about_releases_page"] = function()\n\t\t\tif type(ctx.updater) ~= "table" then\n\t\t\t\tLogger.error(LOG, "No updater module — the releases page URL is unknown.")\n\t\t\t\treturn\n\t\t\tend\n\t\t\tlocal url = ctx.updater.releases_page_url()\n\t\t\tLogger.info(LOG, "Opening releases page: %s", url)\n\t\t\tpcall(function() os.execute("xdg-open " .. shell_quote(url) .. " 2>/dev/null &") end)\n\t\tend,\n\t}\n\n\t-- A local version run from source has nothing to uninstall: the row stays,\n\t-- greyed, and says why (the manifest\'s disabled_reason_key).\n\tlocal getters = {}\n\tfor key, getter in pairs(type(render_ctx.state_getters) == "table" and render_ctx.state_getters or {}) do\n\t\tgetters[key] = getter\n\tend\n\tgetters["installed_build"] = function() return not Installation.is_source_run() end\n\tgetters["startup_command_available"] = function()\n\t\treturn require("ui.menu.start_at_login").command_available() ~= false\n\tend\n\tgetters["start_at_login_enabled"] = function()\n\t\treturn require("ui.menu.start_at_login").enabled() == true\n\tend\n\trender_ctx.state_getters = getters\n\n\tlocal rows = ManifestMenu\n\t\tand ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {\n\t\t\t["about_updates"] = function() return _about_update_rows(ctx) end,\n\t\t})\n\t\tor {}\n\tif not about_dense(rows, true) then return nil end\n\tlocal current_root, current_top, current_section, current_parent = about_source(ManifestMenu, "linux")\n\tif not rawequal(root, current_root) or not rawequal(top, current_top)\n\t\tor not rawequal(section, current_section) or not rawequal(parent, current_parent)\n\t\tor not about_parent_unchanged(parent, fields) then return nil end\n\treturn ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)\nend';
+
+function declaredLinuxUninstallCaptionOwner(unit) {
+	if (!unit) return false;
+	const { positions, rootPositions, body } = luaPublicationParser();
+	const fragments = [
+		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+		'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end',
+		'local separator_modules = package.loaded',
+		...Object.entries(LINUX_UNINSTALL_CAPTION_LOCALS).map(
+			([name, value]) => 'local ' + name + ' = ' + value
+		),
+		LINUX_UNINSTALL_CAPTION_FACADE_SOURCE,
+		LINUX_UNINSTALL_CAPTION_COMMAND_SOURCE
+	];
+	const names = new Set([
+		...Object.keys(LINUX_UNINSTALL_CAPTION_LOCALS),
+		'uninstall_caption_facade_current',
+		'_uninstall_command'
+	]);
+	const allowed = new Set();
+	let previousEnd = -1;
+	for (const fragment of fragments) {
+		const found = positions(unit, fragment);
+		if (found.length !== 1 || rootPositions(unit, fragment).length !== 1 || found[0] <= previousEnd)
+			return false;
+		const wanted = scriptTokens(fragment, '.lua');
+		previousEnd = found[0] + wanted.length - 1;
+		for (let offset = 0; offset < wanted.length; offset++)
+			if (wanted[offset].kind === 'identifier' && names.has(wanted[offset].value))
+				allowed.add(found[0] + offset);
+	}
+	const aboutAt = rootPositions(unit, 'local function _build_about(ctx)');
+	if (aboutAt.length !== 1 || aboutAt[0] <= previousEnd) return false;
+	const physicalAbout = rootPositions(unit, LINUX_UNINSTALL_CAPTION_ABOUT_SOURCE);
+	if (physicalAbout.length !== 1 || physicalAbout[0] !== aboutAt[0]) return false;
+	const about = body(unit, 'local function _build_about(ctx)');
+	const call = '["uninstall"] = _uninstall_command(ctx),';
+	if (!about || rootPositions(about, call).length !== 1) return false;
+	const found = positions(unit, call);
+	if (found.length !== 1) return false;
+	const wanted = scriptTokens(call, '.lua');
+	for (let offset = 0; offset < wanted.length; offset++)
+		if (wanted[offset].value === '_uninstall_command') allowed.add(found[0] + offset);
+	// Every actual owner reference remains inside its declared capture, receiver or About call.
+	return unit.tokens.every(
+		(token, at) => token.kind !== 'identifier' || !names.has(token.value) || allowed.has(at)
+	);
+}
+
 function closedModuleExport(unit, lex, rootPositions) {
 	if (!unit) return false;
 	const imports = {
 		WindowTitles: 'window_titles',
+		NativePresentation: 'infra.native_presentation',
 		NumberRowPolicy: 'layout.number_row_policy',
 		ParameterLabel: 'action_parameter_label',
 		RowDialect: 'menu.row_dialect',
@@ -569,9 +703,23 @@ function closedModuleExport(unit, lex, rootPositions) {
 			const name = tokens[at + 1];
 			if (name?.kind !== 'identifier' || locals.has(name.value)) return false;
 			locals.add(name.value);
-			if (name.value === 'ok_mm') {
+			if (name.value === 'PrepareNativePresentation') {
+				if (!declaredLinuxNativeCaptionOwner(unit) || locals.has('NativePresentationTitle'))
+					return false;
+				locals.add('NativePresentationTitle');
+				at = take(
+					at,
+					'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title'
+				);
+			} else if (name.value === 'ok_mm') {
 				at = take(at, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")');
 			} else {
+				if (Object.hasOwn(LINUX_UNINSTALL_CAPTION_LOCALS, name.value)) {
+					if (!declaredLinuxUninstallCaptionOwner(unit)) return false;
+					at = take(at, 'local ' + name.value + ' = ' + LINUX_UNINSTALL_CAPTION_LOCALS[name.value]);
+					if (at === null) return false;
+					continue;
+				}
 				if (Object.hasOwn(LINUX_HEADER_LOCALS, name.value)) {
 					if (!declaredLinuxHeaderOwner(unit)) return false;
 					at = take(at, 'local ' + name.value + ' = ' + LINUX_HEADER_LOCALS[name.value]);
@@ -588,6 +736,8 @@ function closedModuleExport(unit, lex, rootPositions) {
 				const value = tokens[at + 3];
 				if (value?.value === 'require') {
 					if (imports[name.value] !== tokens[at + 5]?.value) return false;
+					if (name.value === 'NativePresentation' && !declaredLinuxNativeCaptionOwner(unit))
+						return false;
 					if (
 						tokens[at + 4]?.value !== '(' ||
 						tokens[at + 5]?.kind !== 'string' ||
@@ -786,6 +936,20 @@ function closedSiblingRendererBindings(unit) {
 		]) {
 			const wanted = scriptTokens(fragment, '.lua'),
 				found = positions(unit, fragment);
+			if (found.length !== 1) return false;
+			for (let offset = 0; offset < wanted.length; offset++)
+				if (wanted[offset].value === 'ManifestMenu') rawFacadePorts.add(found[0] + offset);
+		}
+	}
+	if (declaredLinuxUninstallCaptionOwner(unit)) {
+		for (const fragment of [
+			...Object.entries(LINUX_UNINSTALL_CAPTION_LOCALS).map(
+				([name, value]) => 'local ' + name + ' = ' + value
+			),
+			LINUX_UNINSTALL_CAPTION_FACADE_SOURCE
+		]) {
+			const wanted = scriptTokens(fragment, '.lua');
+			const found = positions(unit, fragment);
 			if (found.length !== 1) return false;
 			for (let offset = 0; offset < wanted.length; offset++)
 				if (wanted[offset].value === 'ManifestMenu') rawFacadePorts.add(found[0] + offset);

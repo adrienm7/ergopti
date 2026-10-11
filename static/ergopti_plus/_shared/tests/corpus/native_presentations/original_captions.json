@@ -1,0 +1,361 @@
+{
+	"caption_policy": "native helpers return original unprefixed translated title; existing receivers retain branding/urgency policy",
+	"captured_before_proposal": true,
+	"locale_order_sha256": "ced2aa13eadae6005222bc45f9ef3217c09c559bedcc50a15538c8b1ecca0c22",
+	"locales": {
+		"ar": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "المفتاح الفعلي للمفتاح السحري",
+					"original_native_caption": "ErgoptiPlus — المفتاح الفعلي للمفتاح السحري",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ المفتاح الفعلي للمفتاح السحري"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "اختصار الملف الشخصي",
+					"original_native_caption": "اختصار الملف الشخصي",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 282428,
+			"source_sha256": "37c0dafcbd004891f766617ff80f1c0b1ada849cf29aecb6078995f948fa7870"
+		},
+		"cs": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Fyzická kouzelná klávesa",
+					"original_native_caption": "ErgoptiPlus — Fyzická kouzelná klávesa",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Fyzická kouzelná klávesa"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Zkratka profilu",
+					"original_native_caption": "Zkratka profilu",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 239207,
+			"source_sha256": "80488b2d9d0b5aca836488bc7976d6b35613258c8077592968ae11103e8c83fd"
+		},
+		"da": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Fysisk magisk tast",
+					"original_native_caption": "ErgoptiPlus — Fysisk magisk tast",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Fysisk magisk tast"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Profilgenvej",
+					"original_native_caption": "Profilgenvej",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 231557,
+			"source_sha256": "a92a0c9f1cbc8b1642e1a1da4340578649e670e2ace1341a7fa2d2482d4b00aa"
+		},
+		"de": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Physische magische Taste",
+					"original_native_caption": "ErgoptiPlus — Physische magische Taste",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Physische magische Taste"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Profil-Tastenkombination",
+					"original_native_caption": "Profil-Tastenkombination",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 243553,
+			"source_sha256": "0e095da40684398f518f5def0c5a392947d9a2b55877bb411959f4da1c5a1647"
+		},
+		"en": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Physical magic key",
+					"original_native_caption": "ErgoptiPlus — Physical magic key",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Physical magic key"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Profile Shortcut",
+					"original_native_caption": "Profile Shortcut",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 225271,
+			"source_sha256": "afa1f565cb71ef6be23a99e37e10f1f33eecfaca222458d3beea51f64f491711"
+		},
+		"es": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Tecla mágica física",
+					"original_native_caption": "ErgoptiPlus — Tecla mágica física",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Tecla mágica física"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Atajo del perfil",
+					"original_native_caption": "Atajo del perfil",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 241096,
+			"source_sha256": "cc0e45af2116db3e0201eb4280516e956e782edf3d0e34cd14af9777a584bfa8"
+		},
+		"fr": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Touche magique physique",
+					"original_native_caption": "ErgoptiPlus — Touche magique physique",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Touche magique physique"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Raccourci du profil",
+					"original_native_caption": "Raccourci du profil",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 247287,
+			"source_sha256": "9223151848fa12e88a85a69dc656d7e7167866e1da6738a453bbb612af567754"
+		},
+		"he": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "מקש קסם פיזי",
+					"original_native_caption": "ErgoptiPlus — מקש קסם פיזי",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ מקש קסם פיזי"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "קיצור פרופיל",
+					"original_native_caption": "קיצור פרופיל",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 263437,
+			"source_sha256": "3ae615024b65eb80cbe2a336f581fc1d50249b2f249504bc0d85b51eff312337"
+		},
+		"hi": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "भौतिक जादुई कुंजी",
+					"original_native_caption": "ErgoptiPlus — भौतिक जादुई कुंजी",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ भौतिक जादुई कुंजी"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "प्रोफ़ाइल शॉर्टकट",
+					"original_native_caption": "प्रोफ़ाइल शॉर्टकट",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 363596,
+			"source_sha256": "f10aff6a966b8fb65a70fb31609f3a57b738b84f129743f1bfba708579359fe7"
+		},
+		"it": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Tasto magico fisico",
+					"original_native_caption": "ErgoptiPlus — Tasto magico fisico",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Tasto magico fisico"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Scorciatoia profilo",
+					"original_native_caption": "Scorciatoia profilo",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 240429,
+			"source_sha256": "2ac2fef43128ca3cad6813600583d8fe6eec8e5d98626d4ec1247e06f68c7557"
+		},
+		"ja": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "物理マジックキー",
+					"original_native_caption": "ErgoptiPlus — 物理マジックキー",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ 物理マジックキー"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "プロファイルショートカット",
+					"original_native_caption": "プロファイルショートカット",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 269920,
+			"source_sha256": "16d0e825daaa6df07dce02464da3a3cc58abc8ff3e6de6e91b458bc9962b8b16"
+		},
+		"ko": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "물리 매직 키",
+					"original_native_caption": "ErgoptiPlus — 물리 매직 키",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ 물리 매직 키"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "프로필 단축키",
+					"original_native_caption": "프로필 단축키",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 246794,
+			"source_sha256": "6873672ca6d3affd207f3e00f749213224b11351ddaea5856e911c99f0624368"
+		},
+		"nl": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Fysieke magische toets",
+					"original_native_caption": "ErgoptiPlus — Fysieke magische toets",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Fysieke magische toets"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Profielsneltoets",
+					"original_native_caption": "Profielsneltoets",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 237618,
+			"source_sha256": "da604d0034d9476bd21a191c5d98332e25b81f1fd9d0b236cfce5c09ee0d79c2"
+		},
+		"no": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Fysisk magisk tast",
+					"original_native_caption": "ErgoptiPlus — Fysisk magisk tast",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Fysisk magisk tast"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Profilsnarvei",
+					"original_native_caption": "Profilsnarvei",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 231501,
+			"source_sha256": "cbb326f7f8ed43f1f58113ad50934c493aaa3e027f16a7cd4a58eb6fddf4ed6d"
+		},
+		"pl": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Fizyczny klawisz magiczny",
+					"original_native_caption": "ErgoptiPlus — Fizyczny klawisz magiczny",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Fizyczny klawisz magiczny"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Skrót profilu",
+					"original_native_caption": "Skrót profilu",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 240746,
+			"source_sha256": "00b6ccff5c8469604e825c113994ef1e569e28b387ce234f1e6016339effb90c"
+		},
+		"pt": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Tecla mágica física",
+					"original_native_caption": "ErgoptiPlus — Tecla mágica física",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Tecla mágica física"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Atalho de perfil",
+					"original_native_caption": "Atalho de perfil",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 240964,
+			"source_sha256": "5392d0f54712e2f6538941cc4dd6251d989c67167bcd7640d063e4f88d438c8b"
+		},
+		"ru": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Физическая волшебная клавиша",
+					"original_native_caption": "ErgoptiPlus — Физическая волшебная клавиша",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Физическая волшебная клавиша"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Сочетание для профиля",
+					"original_native_caption": "Сочетание для профиля",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 314256,
+			"source_sha256": "a002a9e77d08948ad1274af95a75aac0dd9d74105f5dac57d03f74caf9d41771"
+		},
+		"sv": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Fysisk magisk tangent",
+					"original_native_caption": "ErgoptiPlus — Fysisk magisk tangent",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Fysisk magisk tangent"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Profilgenväg",
+					"original_native_caption": "Profilgenväg",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 235388,
+			"source_sha256": "70ec81f54dda0f0b68be91fb77df204d60ef4312a3012b0e2807c29aa7a0509d"
+		},
+		"tr": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Fiziksel sihirli tuş",
+					"original_native_caption": "ErgoptiPlus — Fiziksel sihirli tuş",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Fiziksel sihirli tuş"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Profil Kısayolu",
+					"original_native_caption": "Profil Kısayolu",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 239791,
+			"source_sha256": "6314a34237a17e86cd0990b2c98dc548f8fef0dd9f7c144b129d0e0eb5845466"
+		},
+		"uk": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "Фізична чарівна клавіша",
+					"original_native_caption": "ErgoptiPlus — Фізична чарівна клавіша",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ Фізична чарівна клавіша"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "Скорочення для профілю",
+					"original_native_caption": "Скорочення для профілю",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 311136,
+			"source_sha256": "f1ec90b6778f77faf64204080e4cad0fd914650d00163732a18fca3cade7e4b6"
+		},
+		"zh": {
+			"captions": {
+				"magic_key_source_notice": {
+					"original_bare_caption": "物理魔法键",
+					"original_native_caption": "ErgoptiPlus — 物理魔法键",
+					"original_warning_native_caption": "ErgoptiPlus — ⚠ 物理魔法键"
+				},
+				"profile_shortcut_dialog": {
+					"original_bare_caption": "配置快捷键",
+					"original_native_caption": "配置快捷键",
+					"original_warning_native_caption": null
+				}
+			},
+			"source_bytes": 220918,
+			"source_sha256": "303e51b21133107619a4838c3a908209d0d37863bbcd49f9ccef51332671053b"
+		}
+	},
+	"ports": {
+		"magic_key_source_notice": {
+			"kind": "notification",
+			"platform": "linux",
+			"source": "static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"title_key": "dialog.magic_key_source.title"
+		},
+		"profile_shortcut_dialog": {
+			"kind": "dialog",
+			"platform": "hs",
+			"source": "static/ergopti_plus/macos/ui/menu/menu_llm/profiles_manager.lua",
+			"title_key": "menu.profiles.shortcut_title"
+		}
+	},
+	"window_title_policy": {
+		"prefix": "ErgoptiPlus",
+		"separator": " — "
+	}
+}

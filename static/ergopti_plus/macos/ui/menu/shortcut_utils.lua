@@ -13,6 +13,8 @@ local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local SendInput = require("send_input")
+local NativePresentation = require("infra.native_presentation")
+local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 
 local LOG = "menu.shortcut_utils"
 
@@ -231,13 +233,27 @@ end
 function M.prompt_shortcut(opts)
 	if type(opts) ~= "table" or type(opts.on_apply) ~= "function" then return false end
 
-	local title = type(opts.title) == "string" and opts.title or i18n.get("shortcuts.shortcut_label")
+	local receipt, title
+	if opts.native_presentation_id ~= nil then
+		if opts.title ~= nil then return false end
+		receipt = PrepareNativePresentation(opts.native_presentation_id, "dialog")
+		title = receipt and NativePresentationTitle(receipt) or nil
+		if title == nil then return false end
+	else
+		title = type(opts.title) == "string" and opts.title or i18n.get("shortcuts.shortcut_label")
+	end
 	local message = type(opts.message) == "string"
 		and opts.message
 		or i18n.get("shortcuts.shortcut_format_hint")
 
 	local current = M.shortcut_to_config_string(opts.current_shortcut)
-	local ok_prompt, button, raw = pcall(dialog.text_prompt, title, message, current, "OK", i18n.get("common.cancel"))
+	local prompt = dialog.text_prompt
+	local cancel_label = i18n.get("common.cancel")
+	if receipt ~= nil then
+		title = NativePresentationTitle(receipt)
+		if title == nil then return false end
+	end
+	local ok_prompt, button, raw = pcall(prompt, title, message, current, "OK", cancel_label)
 	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
 
 	local cleaned = raw:match("^%s*(.-)%s*$")

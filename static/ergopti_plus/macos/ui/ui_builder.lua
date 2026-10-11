@@ -37,6 +37,8 @@ local WindowTitleComposeOwner = rawget(WindowTitles, "compose")
 local WindowPresentationOwner = rawget(WindowTitles, "presentation_for_app")
 local Presentation = require("webview.presentation")
 local PresentationPrepareOwner = rawget(Presentation, "prepare")
+local PresentationTitlePrepareOwner = rawget(Presentation, "prepare_window_title")
+local PresentationContextPrepareOwner = rawget(Presentation, "prepare_contextual_title")
 local PresentationI18n = require("infra.i18n")
 local PresentationLocale = require("infra.locale")
 local PresentationTranslateOwner = rawget(PresentationI18n, "get")
@@ -47,6 +49,7 @@ local PresentationCoreGetOwner = rawget(PresentationLocaleCore, "get")
 local PresentationCoreCurrentOwner = rawget(PresentationLocaleCore, "current_locale")
 local _presentation_receipts = setmetatable({}, { __mode = "k" })
 local PresentationPrepareApi, PresentationFieldsApi, PresentationCurrentApi, PresentationShowApi
+local PresentationTitlePrepareApi, PresentationContextPrepareApi
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
@@ -664,10 +667,14 @@ local function presentation_owners_current()
 		and rawget(WindowTitles, "presentation_for_app") == WindowPresentationOwner
 		and rawget(WindowTitles, "compose") == WindowTitleComposeOwner
 		and rawget(Presentation, "prepare") == PresentationPrepareOwner
+		and rawget(Presentation, "prepare_window_title") == PresentationTitlePrepareOwner
+		and rawget(Presentation, "prepare_contextual_title") == PresentationContextPrepareOwner
 		and rawget(PresentationI18n, "get") == PresentationTranslateOwner
 		and rawget(PresentationLocale, "get") == PresentationLocaleGetOwner
 		and rawget(PresentationLocale, "current_locale") == PresentationLocaleCurrentOwner
 		and rawget(M, "prepare_app_presentation") == PresentationPrepareApi
+		and rawget(M, "prepare_app_window_title") == PresentationTitlePrepareApi
+		and rawget(M, "prepare_app_contextual_title") == PresentationContextPrepareApi
 		and rawget(M, "presentation_fields") == PresentationFieldsApi
 		and rawget(M, "presentation_current") == PresentationCurrentApi
 		and rawget(M, "show_webview") == PresentationShowApi
@@ -690,6 +697,47 @@ function M.prepare_app_presentation(app_id, presentation_id)
 		app_id = app_id, presentation_id = presentation_id,
 		title = prepared.title, label = prepared.label, caption = prepared.caption,
 		current = prepared.current,
+	}
+	return receipt
+end
+
+--- Prepares an explicit native-title context using this factory's exact receipt.
+--- @param app_id string Canonical app identity.
+--- @param presentation_id string Explicit window_title context identity.
+--- @return table|nil Opaque factory-owned receiving receipt without a page label.
+function M.prepare_app_window_title(app_id, presentation_id)
+	if type(WindowPresentationOwner) ~= "function" or type(PresentationTitlePrepareOwner) ~= "function"
+		or not presentation_owners_current() then return nil end
+	local ok, prepared = pcall(PresentationTitlePrepareOwner, WindowTitles, PresentationI18n,
+		PresentationLocale, app_id, presentation_id, "hs", presentation_owners_current)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not presentation_owners_current()
+		or prepared.current() ~= true or rawget(prepared, "label") ~= nil then return nil end
+	local receipt = {}
+	_presentation_receipts[receipt] = {
+		app_id = app_id, presentation_id = presentation_id,
+		title = prepared.title, caption = prepared.caption, current = prepared.current,
+	}
+	return receipt
+end
+
+--- Prepares ordinary suffix display data through a genuine contextual declaration.
+--- @param app_id string Canonical app identity.
+--- @param presentation_id string Explicit contextual_title identity.
+--- @param suffix string Ordinary one-line display data.
+--- @return table|nil Opaque factory-owned receipt for page and native caption.
+function M.prepare_app_contextual_title(app_id, presentation_id, suffix)
+	if type(WindowPresentationOwner) ~= "function" or type(PresentationContextPrepareOwner) ~= "function"
+		or not presentation_owners_current() then return nil end
+	local ok, prepared = pcall(PresentationContextPrepareOwner, WindowTitles, PresentationI18n,
+		PresentationLocale, app_id, presentation_id, "hs", suffix, presentation_owners_current)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not presentation_owners_current()
+		or prepared.current() ~= true or rawget(prepared, "label") ~= nil then return nil end
+	local receipt = {}
+	_presentation_receipts[receipt] = {
+		app_id = app_id, presentation_id = presentation_id,
+		title = prepared.title, caption = prepared.caption, current = prepared.current,
 	}
 	return receipt
 end
@@ -717,6 +765,8 @@ function M.presentation_fields(receipt)
 end
 
 PresentationPrepareApi = M.prepare_app_presentation
+PresentationTitlePrepareApi = M.prepare_app_window_title
+PresentationContextPrepareApi = M.prepare_app_contextual_title
 PresentationFieldsApi = M.presentation_fields
 PresentationCurrentApi = M.presentation_current
 
