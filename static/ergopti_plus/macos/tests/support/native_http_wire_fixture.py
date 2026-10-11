@@ -67,6 +67,8 @@ class WireFixture:
         self.trust_attempted = False
         self.trust_removal_deadline = None
         self.trust_query_executable = None
+        self.trust_query_owner = None
+        self.trust_query_output = None
         self.authorization_observation = False
         self.command_file_debt = []
         self.command_group_debt = []
@@ -745,6 +747,9 @@ class WireFixture:
     def _observe_admin_trust(self, deadline, *, after=False, after_install=False):
         if self.trust_query_executable is None:
             return
+        owner = getattr(self, "trust_query_owner", None)
+        if owner is not None and owner.verify() != self.trust_query_executable:
+            raise FixtureFailure("Native admin trust query ownership refused")
         fact = {"version": 1, "observed": 0}
         try:
             with self.ca.open("rb") as certificate:
@@ -764,7 +769,7 @@ class WireFixture:
             # This new optional query must preserve the existing worker's exact
             # cancellation. Other settled query refusals remain observations.
             if (
-                after_install
+                (after_install or owner is not None)
                 and type(refused) is FixtureFailure
                 and refused.args == ("Native fixture cancelled",)
             ):
@@ -784,7 +789,11 @@ class WireFixture:
                 # PAC owns stdout exclusively for its original JSON replies.
                 print(prefix + json.dumps(fact, sort_keys=True), file=sys.stderr, flush=True)
             else:
-                print(prefix + json.dumps(fact, sort_keys=True), flush=True)
+                print(
+                    prefix + json.dumps(fact, sort_keys=True),
+                    file=getattr(self, "trust_query_output", None),
+                    flush=True,
+                )
         except (OSError, ValueError):
             pass
 
