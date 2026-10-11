@@ -1,0 +1,29 @@
+{
+	"qualification": "PORTABLE_CHANGE_SCOPED_ALL_REQUIRED_GATES_PASS_NO_NATIVE_CREDIT",
+	"exit_code": 0,
+	"log_sha256": "dc4bfb1412bbf36922fd5700ce12871475dc4e775d2a4bc9e1f61403427a98c6",
+	"format_files": 379,
+	"js_checks": 410,
+	"hs_pass": 18599,
+	"hs_fail": 0,
+	"hs_modules": 1571,
+	"head_and_all_nine_owned_hashes_stable": true,
+	"logical_index_tree_stable": true,
+	"pre_gate": {
+		"head": "9db1e28bebb65ee7f4a2d261ff857c5aa62cb66a",
+		"logical_index_tree": "22b6d63244039adfa4d36fd39d8aeabef242f238",
+		"source_sha256": {
+			"docs/ERGOPTIPLUS_TODO.md": "caef98bb0e383a2dd08e6cc090ef3ba79d5b814974d06248504ecd6dbccc7e8b",
+			"docs/handovers/2026-10-11-group6-cloud/README.md": "a74fce74773405829288b4517b06d5207a2a78334698121c8b99f80ee8211167",
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "57ea990ad3626c3dd91e27fc17088325b270d1f707d5c38f6a2016e225639cf3",
+			"tools/test/macos_native_http_receiving_facts_test.py": "65d8dbbe235dbac2ef9e681e3e82735e0f78847df35a6e93d388391cdddef37c",
+			"tools/test/test-managed-ollama-protocol.cjs": "4fd559b30105eb473bdd4362a69914b49f6fde387a1353c54c301adf8b6dbbf1",
+			"docs/handovers/2026-10-11-group6-cloud/command-guard90-portable-proposal.json": "dbfa4a7270659bb5fe9c772b2fdf98007c234e085ef099048cb977a954f1dfce",
+			"docs/handovers/2026-10-11-group6-cloud/command-guard90-portable-proposal.tar.gz": "32b3d0fe0e6c8a7cccead7f2b112330d8f72d192e58cbd25532fd7c756e0b3ba",
+			"docs/handovers/2026-10-11-group6-cloud/postinstall72-portable-proposal.json": "04f85d92f6c8d8cc9d7d9627d06dd9fa608e308d20d58ffad1669ea8e51e9264",
+			"docs/handovers/2026-10-11-group6-cloud/postinstall72-portable-proposal.tar.gz": "9707facc98068d367b91d8a1ad14d984dfd56195e5fea6c7d9658daab29ba4ea"
+		}
+	},
+	"published_commit": "0aa6b8e9b88451fc66954d7f9e6083ecd71adea5",
+	"all_nine_gate_postimages_match_published_commit": true
+}

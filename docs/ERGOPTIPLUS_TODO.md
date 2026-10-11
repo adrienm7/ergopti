@@ -6913,7 +6913,7 @@ different CA is absent after timed-out add; admin authorization succeeds but
 restoration removal exits one with debt. These observations establish no
 causal trust-policy fix. Real Linux 262 streaming/48 API and portable 63 HTTP
 controls pass without Mac native credit. The handed-off post-install adaptation
-is adopted with bounded receiving and strict90 canonical enrollment. Its
+is adopted with bounded receiving and strict103 canonical enrollment. Its
 original15-second budget, primary add outcome and stderr-only diagnostic remain.
 Two real SIGINT/SIGTERM interaction methods reproduce four swallowed-cancellation
 assertions in the frozen70 predecessor; corrected72 passes without errors/skips.
@@ -6923,8 +6923,21 @@ counterexamples require an additional same-owner cleanup guard. Its original
 sole settlement requires identity True; retained child debt blocks new commands
 and root deletion, and real cancellation stays visible. Unchanged72 and new18
 controls pass; full canonical qualification is recorded in the handover. This is
-portable receiving, not Darwin qualification. Timeout75 and combined84 proposals
-remain inactive; PAC query-callee enrollment is separate and absent. Model,
+portable receiving, not Darwin qualification. The settled-capture successor
+retains bounded existing stderr before its original closure, only after the
+same owner's strong settlement/reap. All90 originals and retained12 bodies
+remain exact; the additive technical-refusal control brings the census to103.
+Original, cancellation-frozen and broad-catch controls fail their intended
+assertions. The first declaration-order103 pass did not cover canonical discovery:
+the physical owning command retained six constructor errors, zero assertion
+failures/skips, caused by its additive setup patching the original type allocator.
+A fresh R2-only subclass leaves that original type intact; corrected alphabetical
+103 passes with zero failures/errors/skips. The first full gate remains retained
+as failed (JS409/one failure, two JSON format failures; Hammerspoon18599/zero).
+The corrective capsule preserves the historical packet and all original bodies;
+the final live canonical gate must be received separately. No new query,
+owner, permission or command budget is acquired. PAC query-callee enrollment
+is separate and absent. Model,
 package/install, Windows-PC and enterprise acceptance remain required. See the
 [cloud continuation](handovers/2026-10-11-group6-cloud/README.md). Item 62 stays open.
 

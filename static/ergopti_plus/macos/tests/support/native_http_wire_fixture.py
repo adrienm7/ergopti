@@ -162,6 +162,7 @@ class WireFixture:
         group_settled = False
         security_failure = None
         trust_callee = None
+        trust_install_stream = {"observed": False}
         try:
             if self.command_file_debt:
                 phase = "settle"
@@ -303,6 +304,27 @@ class WireFixture:
                 errors,
                 output,
             )
+            if trust_operation == "add":
+                # A timeout still owns its captures until exact native settlement.
+                # Inspect that existing stderr once before its original close.
+                try:
+                    if (
+                        group_settled is True
+                        and owned is not None
+                        and getattr(owned, "reaped", False) is True
+                    ):
+                        trust_install_stream = self._trust_install_stream(errors)
+                except BaseException as observation_failure:
+                    # Preserve the original primary. A fresh control interruption
+                    # on success still flows through original file closure below.
+                    if failure is None and (
+                        not isinstance(observation_failure, Exception)
+                        or (
+                            type(observation_failure) is FixtureFailure
+                            and observation_failure.args == ("Native fixture cancelled",)
+                        )
+                    ):
+                        failure = observation_failure
             for stream in streams:
                 if stream is None or any(
                     debt["stream"] is stream and debt["uncertain"]
@@ -342,6 +364,46 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        if trust_operation == "add":
+            try:
+                if self.groups:
+                    child_settled = (
+                        group_settled is True
+                        and owned is not None
+                        and getattr(owned, "reaped", False) is True
+                    )
+                    child_status = getattr(process, "returncode", None) if child_settled else None
+                    fact = {
+                        "version": 1,
+                        "action": "add_trusted_cert",
+                        "domain": "admin",
+                        "keychain": "owned_private",
+                        "phase": self.command_fact["phase"],
+                        "child_settled": child_settled,
+                        "child_exit_status": child_status
+                        if type(child_status) is int and -(2**31) <= child_status < 2**31
+                        else None,
+                        "streams_closed": not closure_refused
+                        and all(stream is None or stream.closed for stream in streams),
+                        "command_file_debt": bool(self.command_file_debt),
+                        "stderr": trust_install_stream,
+                    }
+                    print(
+                        "# native_http_trust_install " + json.dumps(fact, sort_keys=True),
+                        file=sys.stderr,
+                        flush=True,
+                    )
+            except BaseException as observation_failure:
+                # Technical observations cannot replace command results; genuine
+                # control interruptions preserve cancellation on prior success.
+                if failure is None and (
+                    not isinstance(observation_failure, Exception)
+                    or (
+                        type(observation_failure) is FixtureFailure
+                        and observation_failure.args == ("Native fixture cancelled",)
+                    )
+                ):
+                    failure = observation_failure
         if trust_operation in ("add", "remove"):
             # stderr is outside the unchanged one-line JSON reply transport.
             # Cache the exact original outcome before a later restoration command
@@ -394,6 +456,41 @@ class WireFixture:
         if failure is not None:
             raise failure
         return result
+
+    @staticmethod
+    def _trust_install_stream(stream):
+        """Project the existing settled capture without retaining private bytes."""
+        if stream is None:
+            return {"observed": False}
+        stream.seek(0)
+        raw = stream.read(1025)
+        callee = None
+        category = "empty" if not raw else "unknown"
+        if type(raw) is bytes and len(raw) <= 1024:
+            for name in (
+                b"SecTrustSettingsSetTrustSettings",
+                b"SecKeychainItemImport",
+                b"SecKeychainUnlock",
+            ):
+                for prefix in (name + b": ", b"security: " + name + b": "):
+                    if raw.startswith(prefix):
+                        callee = name.decode("ascii")
+                        category = {
+                            b"User interaction is not allowed.\n": "user_interaction_required",
+                            b"The keychain is locked.\n": "keychain_locked",
+                            b"Access denied.\n": "access_denied",
+                            b"Authorization denied.\n": "access_denied",
+                        }.get(raw[len(prefix) :], "unknown")
+                        break
+                if callee is not None:
+                    break
+        return {
+            "observed": True,
+            "captured_bytes": min(1024, len(raw)),
+            "truncated": len(raw) > 1024,
+            "callee": callee,
+            "category": category,
+        }
 
     @staticmethod
     def _trust_callee_fact(raw, operation):

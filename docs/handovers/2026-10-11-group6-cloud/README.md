@@ -268,3 +268,65 @@ and its receiving registry must match the recorded preimages before adoption.
 Only the actual HTTP registry changes to 90; the unrelated Linux package's
 72-vector condition corpus is preserved byte-exact. This capsule supplements
 the earlier postinstall72 packet rather than rewriting its historical evidence.
+
+## Completed guard90 gate and settled stderr receiving
+
+Commit `0aa6b8e9b88451fc66954d7f9e6083ecd71adea5` publishes the guard90
+correction. Its actual change-scoped gate completed with format379, all410 JS
+checks and 18,599 Hammerspoon passes, zero failures, across1,571 modules. JS and
+Hammerspoon ran serially. The source fence retained the pre-gate HEAD, logical
+index tree and all nine owned postimage hashes. The
+[joined portable gate receipt](command-guard90-canonical-gate.json) binds those
+postimages to the published commit; it does not turn a working-tree gate into
+a native tested-SHA claim. Ordinary Dev imports through `9f26bd3` preserve the
+three guard code postimages. All exact-SHA automatic workflow censuses after
+these feature pushes are empty; no manual workflow is cancelled.
+
+The next three-path correction observes the original add-command stderr only
+after identity-True settlement and the same owner's literal reaped flag, before
+original file closure. It reads at most1,025 bytes once and publishes only a
+closed category, public callee name and bounded child/closure facts on stderr.
+It retains neither raw private output nor a guessed Security OSStatus. It adds
+no query, process owner, permission operation or clock. Original primary errors
+dominate; actual cancellation on prior success remains visible through original
+capture closure, while technical optional-observation refusals remain optional.
+
+Every guard90 helper/test body and the retained12 R2 bodies remains byte-exact.
+One additive technical-refusal method raises the strict owning census to103;
+the unrelated Linux72 condition corpus remains untouched. The two retained R2
+classes deliberately allocate without the constructor. Their additive scoped
+setup supplies only its exact fresh `command_group_debt` literal through a
+fresh R2-only subclass and a scoped module reference. It leaves the original
+type allocator, retained helpers and production initialization untouched.
+
+Portable receiving records original90 omissions as four failed methods/ten
+assertion events out of five, the frozen cancellation catches as three failed
+methods/ten events out of six, and the broad technical catch as one failed
+method/two events. All have zero unittest errors/skips. The first unprepared103
+attempt retains its caught missing-constructor-literal failures separately;
+all90 originals passed there. The declaration-order103 pass in40.700 seconds
+was insufficient: the actual physical owning command subsequently produced six
+constructor errors, zero assertion failures/skips. The first canonical full gate
+also failed: JS409 passed/one failed, two independent JSON formatting failures,
+and Hammerspoon18,599 passed/zero failed. Its original raw log remains retained.
+
+The additive setup had patched the original type's `__new__` descriptor; after
+restoration, CPython still refused six later constructors. Its replacement uses
+one fresh subclass and restores only the module reference. Corrected default
+alphabetical discovery passes103 with zero failures/errors/skips in41.051
+seconds, with original type/allocator identity and dictionary keys received.
+The parent independently verifies all40 safe regular corrective capsule members,
+exact preimages and the whole three-path inverse back to guard90. Its embedded
+historical47-member packet remains byte-exact; its private-order qualification
+is explicitly limited. Every original90 and retained12 helper/test body is exact.
+The physical live command and full selected gate require a separate current-source
+receipt; the isolated capsule alone does not qualify either gate.
+
+[The settled-capture source capsule](timeout-capture103-portable-proposal.tar.gz)
+and [its immutable binding](timeout-capture103-portable-proposal.json) retain
+the exact patch/inverses, full source-body proofs and red/green raw receipts.
+It supersedes the inactive historical timeout75 preparation without rewriting
+that evidence. Native Darwin clocks, same-CA visibility, HTTP/model trust setup
+and restoration, PAC14 on both architectures, packaging/installation, ordinary
+Automation consent, Brew6 and enterprise/Windows-PC acceptance remain unrun
+for this successor. Items36/62 and transversal16/38 remain open.
