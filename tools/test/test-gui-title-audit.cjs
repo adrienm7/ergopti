@@ -1240,3 +1240,299 @@ try {
 		'Declared keyboard slot picker: original 21 locale title/prompt values and explicit projection guards.'
 	);
 }
+
+// Window-title contexts are explicit; existing title/label contexts stay strict.
+{
+	const original = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				repository,
+				'static/ergopti_plus/macos/tests/fixtures/hf_window_title_original_presentation.json'
+			),
+			'utf8'
+		)
+	);
+	const projected = titles.projectPresentations(sharedManifest.apps);
+	assert.deepEqual(projected.token_prompt.hf_login, {
+		kind: 'window_title',
+		title_key: 'mlx.hf_login_title',
+		platforms: ['hs']
+	});
+	assert.equal(Object.keys(original.locales).length, 21);
+	for (const [code, expected] of Object.entries(original.locales)) {
+		const strings = JSON.parse(fs.readFileSync(path.join(localeDirectory, code + '.json'), 'utf8'));
+		assert.equal(strings['mlx.hf_login_title'], expected.original_hf_native_label);
+		assert.equal(strings['token_prompt.title'], expected.original_page_heading);
+		assert.equal(strings['token_prompt.window_title'], expected.original_page_document_title);
+		assert.equal(strings['token_prompt.label'], expected.original_input_label);
+	}
+	assert.notEqual(
+		original.locales.es.original_hf_native_label,
+		original.locales.es.original_page_document_title
+	);
+	for (const invalid of [
+		{ title_key: 'mlx.hf_login_title', platforms: ['hs'] },
+		{
+			kind: 'window_title',
+			title_key: 'mlx.hf_login_title',
+			label_key: 'token_prompt.title',
+			platforms: ['hs']
+		},
+		{ kind: 'unknown', title_key: 'mlx.hf_login_title', platforms: ['hs'] },
+		{ kind: 'window_title', title_key: 'bad key', platforms: ['hs'] },
+		{ kind: 'window_title', title_key: 'mlx.hf_login_title', platforms: [] },
+		{ kind: 'window_title', title_key: 'mlx.hf_login_title', platforms: ['hs', 'hs'] },
+		{ kind: 'window_title', title_key: 'mlx.hf_login_title', platforms: ['foreign'] },
+		{ kind: 'window_title', title_key: 'mlx.hf_login_title', platforms: ['hs'], fallback: true }
+	])
+		assert.throws(
+			() => titles.validatePresentations({ token_prompt: { hf_login: invalid } }),
+			TypeError
+		);
+	const sparse = [];
+	sparse.length = 1;
+	sparse.named = 'hs';
+	assert.throws(
+		() =>
+			titles.validatePresentations({
+				token_prompt: {
+					hf_login: {
+						kind: 'window_title',
+						title_key: 'mlx.hf_login_title',
+						platforms: sparse
+					}
+				}
+			}),
+		TypeError
+	);
+	const bare = titles.render(sharedManifest.window_title, {});
+	const declared = titles.render(sharedManifest.window_title, {}, projected);
+	assert.equal(declared.ahk, bare.ahk, 'Windows composer bytes remain unchanged');
+	assert.equal(declared.swift, bare.swift, 'Swift composer bytes remain unchanged');
+	assert.match(
+		declared.lua,
+		/\["hf_login"\] = \{ kind = "window_title", title_key = "mlx.hf_login_title", platforms = \{"hs"\} \}/
+	);
+	assert.match(
+		declared.lua,
+		/return \{ kind = "window_title", title_key = rawget\(entry, "title_key"\), platforms = declared_platforms \}/
+	);
+	assert.match(
+		declared.lua,
+		/return \{ title_key = rawget\(entry, "title_key"\), label_key = rawget\(entry, "label_key"\), platforms = declared_platforms \}/
+	);
+	// Metadata additions preserve the actual geometry/title-key ports of all three hosts.
+	const before = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				repository,
+				'static/ergopti_plus/macos/tests/fixtures/hf_window_title_original_app.json'
+			),
+			'utf8'
+		)
+	);
+	const received = { ...sharedManifest.apps.token_prompt };
+	delete received.presentations;
+	assert.deepEqual(received, before);
+	assert.equal(sharedManifest.apps.token_prompt.title_key, 'token_prompt.window_title');
+	console.log(
+		'Declared HF native title: original21 captions, strict discriminant and unchanged host metadata/composers.'
+	);
+}
+
+// Contextual suffixes are display data; both original prefix inventories stay literal.
+{
+	const original = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				repository,
+				'static/ergopti_plus/macos/tests/fixtures/contextual_picker_original_prefixes.json'
+			),
+			'utf8'
+		)
+	);
+	assert.deepEqual(original.suffix_cases, ['K1', 'é', '左 Ctrl']);
+	assert.equal(Object.keys(original.locales).length, 21);
+	const projected = titles.projectPresentations(sharedManifest.apps);
+	const expected = {
+		keyboard_slot_action: {
+			kind: 'contextual_title',
+			title_key: 'dialog.keyboard_shortcut.title_prefix',
+			platforms: ['hs']
+		},
+		tap_hold_action: {
+			kind: 'contextual_title',
+			title_key: 'tap_hold.picker.title_prefix',
+			platforms: ['linux']
+		}
+	};
+	for (const [id, declaration] of Object.entries(expected)) {
+		assert.deepEqual(projected.action_picker[id], declaration);
+		const withdrawn = structuredClone(sharedManifest.apps);
+		delete withdrawn.action_picker.presentations[id];
+		assert.equal(
+			titles.projectPresentations(withdrawn).action_picker[id],
+			undefined,
+			'a removed context cannot borrow its sibling declaration'
+		);
+		withdrawn.action_picker.presentations[id] = structuredClone(declaration);
+		assert.deepEqual(
+			titles.projectPresentations(withdrawn).action_picker[id],
+			declaration,
+			'exact source repair restores the original selected declaration'
+		);
+		for (const invalid of [
+			{ ...declaration, kind: 'window_title_typo' },
+			{ ...declaration, title_key: 'foreign key' },
+			{ ...declaration, label_key: 'dialog.action_picker.label' },
+			{ ...declaration, platforms: [] },
+			{ ...declaration, platforms: [declaration.platforms[0], declaration.platforms[0]] },
+			{ ...declaration, platforms: ['foreign'] },
+			{ ...declaration, suffix: 'an invented policy grant' }
+		])
+			assert.throws(
+				() => titles.validatePresentations({ action_picker: { [id]: invalid } }),
+				TypeError
+			);
+		const sparse = [];
+		sparse.length = 1;
+		sparse.named = declaration.platforms[0];
+		assert.throws(
+			() =>
+				titles.validatePresentations({
+					action_picker: { [id]: { ...declaration, platforms: sparse } }
+				}),
+			TypeError
+		);
+		assert.deepEqual(
+			titles.validatePresentations({ action_picker: { [id]: declaration } }).action_picker[id],
+			declaration
+		);
+	}
+	for (const [code, expected] of Object.entries(original.locales)) {
+		const strings = JSON.parse(fs.readFileSync(path.join(localeDirectory, code + '.json'), 'utf8'));
+		assert.equal(strings['dialog.keyboard_shortcut.title_prefix'], expected.mac_prefix);
+		assert.equal(strings['tap_hold.picker.title_prefix'], expected.linux_prefix);
+		assert.equal(strings['dialog.action_picker.label'], expected.picker_label);
+		assert.equal(
+			'ErgoptiPlus — ' + strings['dialog.action_picker.label'],
+			expected.linux_native_caption
+		);
+	}
+	const before = titles.render(sharedManifest.window_title, {});
+	const after = titles.render(sharedManifest.window_title, {}, projected);
+	assert.equal(after.ahk, before.ahk);
+	assert.equal(after.swift, before.swift);
+	assert.match(
+		after.lua,
+		/kind = "contextual_title", title_key = "dialog.keyboard_shortcut.title_prefix", platforms = \{"hs"\}/
+	);
+	assert.match(
+		after.lua,
+		/kind = "contextual_title", title_key = "tap_hold.picker.title_prefix", platforms = \{"linux"\}/
+	);
+	assert.match(
+		after.lua,
+		/return \{ kind = "contextual_title", title_key = rawget\(entry, "title_key"\), platforms = declared_platforms \}/
+	);
+	console.log(
+		'Declared contextual titles: original21 prefixes, typed suffix DATA and strict contexts; host composers unchanged.'
+	);
+}
+
+// Native dialogs/notices have their own kind and retain their existing native branding.
+{
+	const original = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				repository,
+				'static/ergopti_plus/_shared/tests/corpus/native_presentations/original_captions.json'
+			),
+			'utf8'
+		)
+	);
+	const declared = sharedManifest.native_presentations;
+	assert.deepEqual(declared, {
+		profile_shortcut_dialog: {
+			kind: 'dialog',
+			title_key: 'menu.profiles.shortcut_title',
+			platforms: ['hs']
+		},
+		magic_key_source_notice: {
+			kind: 'notification',
+			title_key: 'dialog.magic_key_source.title',
+			platforms: ['linux']
+		}
+	});
+	assert.equal(titles.validateNativePresentations(declared), declared);
+	assert.equal(Object.keys(original.locales).length, 21);
+	for (const [code, expected] of Object.entries(original.locales)) {
+		const strings = JSON.parse(fs.readFileSync(path.join(localeDirectory, code + '.json'), 'utf8'));
+		for (const [id, port] of Object.entries(original.ports)) {
+			assert.equal(strings[port.title_key], expected.captions[id].original_bare_caption);
+			assert.equal(declared[id].title_key, port.title_key);
+			assert.equal(declared[id].kind, port.kind);
+			assert.deepEqual(declared[id].platforms, [port.platform]);
+		}
+		assert.equal(
+			expected.captions.profile_shortcut_dialog.original_native_caption,
+			expected.captions.profile_shortcut_dialog.original_bare_caption
+		);
+	}
+	for (const invalid of [
+		{ title_key: 'menu.profiles.shortcut_title', platforms: ['hs'] },
+		{ kind: 'window_title', title_key: 'menu.profiles.shortcut_title', platforms: ['hs'] },
+		{ kind: 'command', title_key: 'menu.profiles.shortcut_title', platforms: ['hs'] },
+		{
+			kind: 'dialog',
+			title_key: 'menu.profiles.shortcut_title',
+			label_key: 'foreign.label',
+			platforms: ['hs']
+		},
+		{ kind: 'dialog', title_key: 'bad key', platforms: ['hs'] },
+		{ kind: 'dialog', title_key: 'menu.profiles.shortcut_title', platforms: [] },
+		{ kind: 'dialog', title_key: 'menu.profiles.shortcut_title', platforms: ['hs', 'hs'] },
+		{ kind: 'dialog', title_key: 'menu.profiles.shortcut_title', platforms: ['foreign'] },
+		{ kind: 'dialog', title_key: 'menu.profiles.shortcut_title', platforms: ['hs'], fallback: true }
+	])
+		assert.throws(
+			() => titles.validateNativePresentations({ profile_shortcut_dialog: invalid }),
+			TypeError
+		);
+	const sparse = [];
+	sparse.length = 1;
+	sparse.named = 'hs';
+	assert.throws(
+		() =>
+			titles.validateNativePresentations({
+				profile_shortcut_dialog: {
+					kind: 'dialog',
+					title_key: 'menu.profiles.shortcut_title',
+					platforms: sparse
+				}
+			}),
+		TypeError
+	);
+	const appContexts = titles.projectPresentations(sharedManifest.apps);
+	const withoutNative = titles.render(sharedManifest.window_title, {}, appContexts);
+	const withNative = titles.render(sharedManifest.window_title, {}, appContexts, declared);
+	assert.equal(withNative.ahk, withoutNative.ahk, 'no Windows native consumer or composer change');
+	assert.equal(
+		withNative.swift,
+		withoutNative.swift,
+		'no launcher native consumer or composer change'
+	);
+	assert.match(withNative.lua, /function M.native_presentation\(presentation_id, kind, platform\)/);
+	assert.match(withNative.lua, /rawget\(entry, "kind"\) ~= kind/);
+	assert.match(
+		withNative.lua,
+		/\["profile_shortcut_dialog"\] = \{ kind = "dialog", title_key = "menu.profiles.shortcut_title", platforms = \{"hs"\} \}/
+	);
+	assert.match(
+		withNative.lua,
+		/\["magic_key_source_notice"\] = \{ kind = "notification", title_key = "dialog.magic_key_source.title", platforms = \{"linux"\} \}/
+	);
+	console.log(
+		'Native declarations: original21 bare captions, separate dialog/notice kinds and unchanged Windows/launcher composers.'
+	);
+}

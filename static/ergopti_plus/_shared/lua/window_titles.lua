@@ -31,8 +31,18 @@ local TITLE_KEYS = {
 }
 local PRESENTATIONS = {
 	["action_picker"] = {
+		["keyboard_slot_action"] = { kind = "contextual_title", title_key = "dialog.keyboard_shortcut.title_prefix", platforms = {"hs"} },
 		["keyboard_slot_selection"] = { title_key = "dialog.keyboard_shortcut.title_prefix", label_key = "dialog.keyboard_shortcut.prompt", platforms = {"hs"} },
+		["tap_hold_action"] = { kind = "contextual_title", title_key = "tap_hold.picker.title_prefix", platforms = {"linux"} },
 	},
+	["token_prompt"] = {
+		["hf_login"] = { kind = "window_title", title_key = "mlx.hf_login_title", platforms = {"hs"} },
+	},
+}
+
+local NATIVE_PRESENTATIONS = {
+	["magic_key_source_notice"] = { kind = "notification", title_key = "dialog.magic_key_source.title", platforms = {"linux"} },
+	["profile_shortcut_dialog"] = { kind = "dialog", title_key = "menu.profiles.shortcut_title", platforms = {"hs"} },
 }
 
 --- Compose a native caption from an already-translated, brandless label.
@@ -68,7 +78,34 @@ function M.presentation_for_app(app_id, presentation_id, platform)
 		if native == platform then
 			local declared_platforms = {}
 			for index, value in ipairs(platforms) do declared_platforms[index] = value end
+			if rawget(entry, "kind") == "contextual_title" then
+		return { kind = "contextual_title", title_key = rawget(entry, "title_key"), platforms = declared_platforms }
+	end
+	if rawget(entry, "kind") == "window_title" then
+				return { kind = "window_title", title_key = rawget(entry, "title_key"), platforms = declared_platforms }
+			end
 			return { title_key = rawget(entry, "title_key"), label_key = rawget(entry, "label_key"), platforms = declared_platforms }
+		end
+	end
+	return nil
+end
+
+--- Projects a declared native notification/dialog title without app geometry.
+--- @param presentation_id string Exact native presentation identity.
+--- @param kind string Notification or dialog identity.
+--- @param platform string Native platform identity.
+--- @return table|nil Fresh source projection without branding or a page label.
+function M.native_presentation(presentation_id, kind, platform)
+	if type(presentation_id) ~= "string" or type(kind) ~= "string" or type(platform) ~= "string" then return nil end
+	local entry = rawget(NATIVE_PRESENTATIONS, presentation_id)
+	if type(entry) ~= "table" or getmetatable(entry) ~= nil or rawget(entry, "kind") ~= kind then return nil end
+	local platforms = rawget(entry, "platforms")
+	if type(platforms) ~= "table" or getmetatable(platforms) ~= nil then return nil end
+	for _, native in ipairs(platforms) do
+		if native == platform then
+			local declared_platforms = {}
+			for index, value in ipairs(platforms) do declared_platforms[index] = value end
+			return { kind = rawget(entry, "kind"), title_key = rawget(entry, "title_key"), platforms = declared_platforms }
 		end
 	end
 	return nil

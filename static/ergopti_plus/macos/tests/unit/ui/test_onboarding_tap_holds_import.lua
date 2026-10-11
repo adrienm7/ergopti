@@ -305,3 +305,169 @@ helpers.describe("the wizard's reload always happens or says why", function()
 		end)
 	end)
 end)
+
+-- The real DeferredWork and TimerScheduler turn a refused native start into
+-- false; only hs.timer candidates are controlled. No successful scheduler or
+-- reload receipt is invented by the fixture.
+--- @param exercise function Actual Finish and native callback observations.
+local function with_wizard_timeout_native_refusal(exercise)
+	with_finish({}, function(state)
+		local previous_hs = rawget(_G, "hs")
+		local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+		local previous_deferred = package.loaded["infra.deferred_work"]
+		local previous_after = previous_deferred.after
+		local scheduler, deferred, original_after
+		local handles, nodes, cleanup_errors = {}, {}, {}
+		local native_hs = { timer = {} }
+		local control = { refuse_timeout = true }
+		function native_hs.timer.new(delay, callback)
+			local node = { delay = delay, callback = callback, active = false, starts = 0, stops = 0 }
+			function node:start()
+				self.starts = self.starts + 1
+				if delay == 30 and control.refuse_timeout then return false end
+				self.active = true
+				return self
+			end
+			function node:stop() self.stops = self.stops + 1; self.active = false; return self end
+			function node:running() return self.active end
+			nodes[#nodes + 1] = node
+			return node
+		end
+		function control.active(delay)
+			local count = 0
+			for _, node in ipairs(nodes) do if node.delay == delay and node.active then count = count + 1 end end
+			return count
+		end
+		function control.deliver(delay)
+			for _, node in ipairs(nodes) do
+				if node.delay == delay and node.active then node.callback(); return true end
+			end
+			return false
+		end
+		control.nodes = nodes
+		local function attempt(label, callback)
+			local okay, detail = pcall(callback)
+			if not okay then cleanup_errors[#cleanup_errors + 1] = label .. ": " .. tostring(detail) end
+		end
+		local outcome = table.pack(pcall(function()
+			_G.hs = native_hs
+			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["infra.deferred_work"] = nil
+			scheduler = require("adapters.timer_scheduler")
+			original_after = scheduler.after
+			-- Forward every call to the actual producer, retaining only its exact
+			-- returned handles for this fresh fixture's finally cleanup.
+			scheduler.after = function(...)
+				local result = table.pack(original_after(...))
+				handles[#handles + 1] = result[1]
+				return table.unpack(result, 1, result.n)
+			end
+			deferred = require("infra.deferred_work")
+			previous_deferred.after = deferred.after
+			return exercise(state, control)
+		end))
+		-- Drain every exact returned handle while its native port is still held;
+		-- assertion failure cannot skip cancellation or module/facade restoration.
+		if scheduler then
+			for _, handle in ipairs(handles) do
+				attempt("exact timer cancellation", function() assert(scheduler.cancel(handle) == true) end)
+			end
+			attempt("owned scheduler drain", function() assert(scheduler.activeCount() == 0) end)
+			attempt("scheduler method restoration", function() scheduler.after = original_after end)
+		end
+		attempt("held DeferredWork facade restoration", function() previous_deferred.after = previous_after end)
+		attempt("DeferredWork module restoration", function() package.loaded["infra.deferred_work"] = previous_deferred end)
+		attempt("scheduler module restoration", function() package.loaded["adapters.timer_scheduler"] = previous_scheduler end)
+		attempt("native namespace restoration", function() assert(rawget(_G, "hs") == native_hs); _G.hs = previous_hs end)
+		if #cleanup_errors > 0 then
+			if not outcome[1] then
+				pcall(function() io.stderr:write("wizard timeout fixture cleanup: " .. table.concat(cleanup_errors, "; ") .. "\n") end)
+			else
+				error(table.concat(cleanup_errors, "; "), 0)
+			end
+		end
+		if not outcome[1] then error(outcome[2], 0) end
+	end)
+end
+
+helpers.describe("the wizard requires its native import timeout before remap effects", function()
+	helpers.it("refuses a retained live import when native timer start fails and still applies other answers (wizard-timeout-admission)", function()
+		with_wizard_timeout_native_refusal(function(state, control)
+			local remap = package.loaded["platform.remap"]
+			local held = 0
+			remap.is_running = function() return true end
+			remap.import_recommended_keys = function() held = held + 1; return true end
+			state.finish(answers({ caps_lock = true }))
+			assert_only_config_rows(state)
+			helpers.assert_eq(held, 0, "an import with no bounded completion owner never starts")
+			helpers.assert_eq(#state.imports, 0)
+			helpers.assert_eq(#state.saves, 0)
+			helpers.assert_eq(#state.backups, 0)
+			helpers.assert_eq(control.nodes[1].delay, 30)
+			helpers.assert_eq(control.nodes[1].starts, 1)
+			helpers.assert_eq(control.nodes[1].stops, 1, "the actual adapter retires its refused native candidate")
+			helpers.assert_eq(control.active(30), 0)
+			helpers.assert_eq(#state.alerts, 0, "the existing notice remains deferred")
+			helpers.assert_true(control.deliver(0))
+			helpers.assert_eq(state.alerts[1].body, "onboarding.error.tap_holds_import")
+			helpers.assert_eq(control.active(1.5), 1)
+			helpers.assert_true(control.deliver(1.5))
+			helpers.assert_eq(#state.reloads, 1, "the saved non-remap answers still reach the real reload continuation")
+			helpers.assert_eq(state.notifications, 1)
+		end)
+	end)
+
+	helpers.it("does not create a navigation layer or save remap keys without the timeout owner (wizard-timeout-admission)", function()
+		with_wizard_timeout_native_refusal(function(state, control)
+			state.finish(answers({ left_command = true }))
+			assert_only_config_rows(state)
+			helpers.assert_eq(state.layer_imports, {}, "no layer cleanup debt is acquired for a refused import")
+			helpers.assert_eq(state.layer_undos, {})
+			helpers.assert_eq(state.saves, {})
+			helpers.assert_eq(state.backups, {})
+			helpers.assert_true(control.deliver(0))
+			helpers.assert_eq(state.alerts[1].body, "onboarding.error.tap_holds_import")
+			helpers.assert_true(control.deliver(1.5))
+			helpers.assert_eq(#state.reloads, 1)
+		end)
+	end)
+
+	helpers.it("the same actual Finish retries after native timer repair with the original live import and single reload (wizard-timeout-admission)", function()
+		with_wizard_timeout_native_refusal(function(state, control)
+			local remap = package.loaded["platform.remap"]
+			local imports, completion = 0, nil
+			remap.is_running = function() return true end
+			remap.import_recommended_keys = function(request, callback)
+				imports = imports + 1
+				state.backups[#state.backups + 1] = request.backup_path
+				completion = callback
+				return true
+			end
+			state.finish(answers({ left_command = true }))
+			helpers.assert_eq(imports, 0)
+			helpers.assert_true(control.deliver(0))
+			helpers.assert_true(control.deliver(1.5))
+			helpers.assert_eq(#state.reloads, 1)
+			local retired = control.nodes[1]
+			control.refuse_timeout = false
+			state.finish(answers({ left_command = true }))
+			helpers.assert_eq(#state.writes, 2, "the original claimed Finish remains retryable")
+			helpers.assert_eq(imports, 1)
+			assert_one_backup(state)
+			helpers.assert_eq(state.layer_imports, { Fixture.CONFIG_DIR })
+			helpers.assert_eq(state.layer_undos, {})
+			helpers.assert_eq(control.active(30), 1)
+			retired.callback()
+			helpers.assert_eq(#state.alerts, 1, "a refused native candidate cannot dispatch stale user work")
+			helpers.assert_type(completion, "function")
+			completion(true, "ready", 1)
+			helpers.assert_eq(control.active(1.5), 1)
+			helpers.assert_true(control.deliver(30), "the acknowledged import's timer retires without another notice")
+			helpers.assert_eq(#state.alerts, 1)
+			helpers.assert_true(control.deliver(1.5))
+			helpers.assert_eq(#state.reloads, 2)
+			helpers.assert_eq(state.notifications, 2)
+			helpers.assert_eq(state.layer_undos, {})
+		end)
+	end)
+end)

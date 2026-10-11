@@ -2915,6 +2915,14 @@ remain required, separately from the local gates.
   chosen-folder writers and rerun preservation. Remaining acceptance includes
   the installed fresh/existing/moved-folder wizard and actual trigger/runtime
   restart on each OS; portable or historical CI alone does not complete it.
+  The macOS wizard now requires a committed native import timeout before
+  acquiring navigation-layer or remap work. A refused timer start takes the
+  existing translated notice and reload continuation for answers already saved;
+  the same Finish can retry after timer repair. The complete portable owning
+  module passes 18 cases, including three new genuine DeferredWork and
+  TimerScheduler admission controls; all 15 original subjects are retained.
+  Predecessor comparison, final selected gates and native installed restart
+  receiving remain separate requirements; this does not complete item 7.
   The tap-holds page lists each engine's recommended keys from the
   shared tap-hold catalogue and imports only the checked ones through each
   driver's tap-hold writer: Windows renders them into the tap_hold.toml beside
@@ -3004,7 +3012,7 @@ does not establish native WebView transport or installed-device acceptance.
 
 The wizard WAL control now observes the current terminal-bundle token that owns the actual candidate path during hand-off, with exact token identity and unrelated-path refusal checks. It retains the ordinary Busy=false contract for an active terminal bundle and all original wizard assertions. Native Windows execution and real first-run device acceptance remain pending.
 
-Actual Linux wizard acceptance now covers real GTK/WebKit, Xvfb and DBus, using the production Manager, HostBridge and writer under isolated XDG directories and the saved GTK namespace selector. Three fresh processes passed cancellation (8/8 native assertions), seven-page Finish with every answer set to No (42/42), and persisted-folder/English-locale startup plus explicit rerun (47/47); the controller separately passed 34/34 independent file checks. The moved-folder config retains schema 12, the four declared default-off masters, and explicit typed false for default-on key combinations. Fresh-process DOM controls show the four masters off; rerun cancellation preserves exact config/bootstrap bytes. All three native sessions and owned Xvfb cleanup were acknowledged, with no cleanup errors; the 654 pinned runtime sources matched at final reconciliation. Evidence: V4 actual receipt `4a799953eaecb670a166f6aea94d03a23b6da8eff926bb00a9863e66bde4998e`. Both earlier V3 FAIL receipts remain preserved (missing namespace selector, then private policy-key interpretation). Native Browse, physical input, Wayland, installed-daemon restart, and Windows/macOS acceptance remain UNRUN. Recommended Tap-Hold import and every locale's rendered translations remain outside this scenario. Item 7 and transversal items 16/38 remain open.
+Actual Linux wizard acceptance now covers real GTK/WebKit, Xvfb and DBus, using the production Manager, HostBridge and writer under isolated XDG directories and the saved GTK namespace selector. Three fresh processes passed cancellation (8/8 native assertions), seven-page Finish with every answer set to No (42/42), and persisted-folder/English-locale startup plus explicit rerun (47/47); the controller separately passed 34/34 independent file checks. The moved-folder config retains schema 12, the four declared default-off masters, and explicit typed false for default-on key combinations. Fresh-process DOM controls show the four masters off; rerun cancellation preserves exact config/bootstrap bytes. All three native sessions and owned Xvfb cleanup were acknowledged, with no cleanup errors; the 654 pinned runtime sources matched at final reconciliation. Evidence: V4 actual receipt `4a799953eaecb670a166f6aea94d03a23b6da8eff926bb00a9863e66bde4998e`. Both earlier V3 FAIL receipts remain preserved (missing namespace selector, then private policy-key interpretation). This historical V4 scenario did not qualify Browse, recommendations or all locales. Subsequent genuine V7 receiving on the published title sources passes five fresh processes: cancel 8/8, all-No Finish 42/42, reopen 47/47, 21-locale DOM/title rendering 1,435/1,435, and recommended import 35/35, plus 114 independent file assertions. Genuine chooser V5 passes cancel/accept/cancel/retry with 55 native assertions and 94 controller checks, including exactly 21 product-file/empty-target checks. Manager retirement, owned-session disposal and source/index/HEAD reconciliation pass. GSettings memory and disabled Mesa disk caching isolate native preference writes; physical input, Wayland, installed-daemon restart and Windows/macOS device acceptance remain unexecuted. The preserved failed chooser attempt and original assertions are retained in [the October 11 Group 1 handover](handovers/2026-10-11-config-menus/README.md). Item 7 and transversal items 16/38 remain open.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
@@ -5510,9 +5518,19 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 19, macOS 3, Linux 4, each
+  drivers still build (current baseline: Windows 19, macOS 2, Linux 1, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero.
+  The shared application-title owner now declares contextual keyboard-slot
+  and tap-hold picker page titles, bare native dialog and notification captions,
+  and the strict HF native-window title context. Genuine owner generation and
+  the GUI audit preserve the original 21-language captions and unchanged
+  Windows/Swift title composer output. The actual menu-row census falls from
+  19/3/4 to 19/2/1 after the macOS keyboard-slot title, Linux magic-key
+  notification, tap-hold picker title and uninstall declaration changes. Group4 HF/profile/numeric producer
+  changes remain excluded pending explicit handoff; reusable metadata alone
+  does not complete their receiving. Final selected gates, native CI and
+  installed/physical acceptance remain separate requirements for this slice.
   Windows Agent System1/System2 now hand completed row DATA to Windows-only
   shared list declarations and the actual central Build list receiver. The
   original macOS/Linux dynamic projection and Group4 frames, callbacks,
@@ -9072,9 +9090,9 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 19, macOS 3 and Linux 4 rows are still built by the
+  Windows 19, macOS 2 and Linux 1 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
-  was regenerated by its owning generator on 2026-10-10. The sites are of four kinds, and three need the
+  was regenerated by its owning generator on 2026-10-11. The sites are of four kinds, and three need the
   manifest to say more than it can today:
   (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
   `append` and `add`: the WPM widget rows of Metrics, the AI menus):
@@ -9542,7 +9560,7 @@ tests. One additive saved-locale initialization control retains all original
 31 subjects and passes the complete focused 32-subject replay. Native
 boot/WebKit, packaging and installed-device acceptance remain pending.
 
-The personal-hotstring section caption and check policy now come from the shared declaration, with additive withdrawal, repair and physical-source custody controls. Original fixture predicates and assertion count remain intact; missing helper calls were replaced by the existing strict equality assertion, without changing the expected false values. The genuine native-site census remains Windows 19, macOS 3 and Linux 4. The seven Mac/Linux residual sites are notification, dialog and window title options, rather than seven tray-row constructors. They still need shared presentation declarations and genuine receiving; dynamic slot/key titles also need bounded formatting policy. This remaining work is software implementation as well as native/device validation, so neither 54 nor 81 is complete.
+The personal-hotstring section caption and check policy now come from the shared declaration, with additive withdrawal, repair and physical-source custody controls. Original fixture predicates and assertion count remain intact; missing helper calls were replaced by the existing strict equality assertion, without changing the expected false values. That earlier tranche retained a genuine census of Windows 19, macOS 3 and Linux 4. The contextual/native-title tranche described above reduces it to Windows 19, macOS 2 and Linux 1 through shared presentation declarations and bounded slot/key title formatting. The remaining three Mac/Linux producers require the explicit Group4 handoff and genuine receiving; Windows retains 19 native sites. Software ownership, native CI and installed/device acceptance remain open, so neither 54 nor 81 is complete.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
