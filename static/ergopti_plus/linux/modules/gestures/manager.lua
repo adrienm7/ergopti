@@ -119,8 +119,11 @@ end
 -- Publish binding identity only from both complete generated inventories.
 -- Runtime assignments and manifest defaults cannot prove a retired slot.
 local parameter_binding_catalogue = { prefix = "", slots = {} }
+local parameter_source_slots = Catalogue.slots
+local parameter_source_arrays, parameter_source_values, parameter_source_counts = {}, {}, {}
 for _, family in ipairs({ "single", "axis" }) do
 	local slots = Catalogue.slots[family]
+	parameter_source_arrays[family], parameter_source_values[family] = slots, {}
 	assert(type(slots) == "table" and next(slots) ~= nil,
 		"generated gesture " .. family .. " slots must be a nonempty dense string array")
 	local count = 0
@@ -131,11 +134,40 @@ for _, family in ipairs({ "single", "axis" }) do
 		assert(parameter_binding_catalogue.slots[slot] == nil,
 			"generated gesture slot occurs more than once: " .. slot)
 		parameter_binding_catalogue.slots[slot] = true
+		parameter_source_values[family][index] = slot
 		count = count + 1
 	end
 	for index = 1, count do
 		assert(slots[index] ~= nil, "generated gesture " .. family .. " slots must be dense")
 	end
+	parameter_source_counts[family] = count
+end
+
+--- Returns only the constructor's complete genuine generated binding image.
+--- Public runtime copies do not certify identities. A replaced package owner,
+--- accessor or private generated source withdraws judgment without IO.
+--- @return table|nil catalogue Detached native gesture identities.
+function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("gesture", "modules.gestures.manager", M)
+		or not rawequal(rawget(package.loaded, "_generated.action_catalogue"), Catalogue)
+		or getmetatable(Catalogue) ~= nil
+		or not rawequal(rawget(Catalogue, "slots"), parameter_source_slots)
+		or type(parameter_source_slots) ~= "table" or getmetatable(parameter_source_slots) ~= nil then return nil end
+	for _, family in ipairs({ "single", "axis" }) do
+		local slots = rawget(parameter_source_slots, family)
+		if not rawequal(slots, parameter_source_arrays[family])
+			or type(slots) ~= "table" or getmetatable(slots) ~= nil then return nil end
+		local count, expected = 0, parameter_source_counts[family]
+		for index in next, slots do
+			if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or index > expected
+				or not rawequal(rawget(slots, index), parameter_source_values[family][index]) then return nil end
+			count = count + 1
+		end
+		if count ~= expected then return nil end
+	end
+	local publication = { prefix = parameter_binding_catalogue.prefix, slots = {} }
+	for slot, present in next, parameter_binding_catalogue.slots do publication.slots[slot] = present end
+	return publication
 end
 
 -- A confirmation is chained in front of a shell command (system_actions), so
@@ -1580,7 +1612,8 @@ function M.action_parameter_binding_fits(binding)
 		local catalogue = BindingPublication.current("script", "modules.shortcuts.script_chords", chords)
 		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
 	end
-	return BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue), BindingIdentity.RETIRED_GESTURE
+	local catalogue = BindingPublication.current("gesture", "modules.gestures.manager", M)
+	return BindingIdentity.gesture_binding_fits(binding, catalogue), BindingIdentity.RETIRED_GESTURE
 end
 
 --- Builds a validated detached row for the canonical parameter publisher.
@@ -2357,5 +2390,7 @@ function M.parameter_configuration_inventory(document, recognizes)
 	end
 	return paths, legacy
 end
+
+BindingPublication.register("gesture", "modules.gestures.manager", M, M.published_binding_catalogue)
 
 return M
