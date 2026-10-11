@@ -6939,6 +6939,20 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
 
 - [ ] **62.** Downloads on managed company networks: system trust and
 
+2026-10-11 official reusable-job metadata correction. Actual attempt-scoped
+38166806073/5173 API names include the parent macOS prefix. The strict reader
+now binds only those two exact architecture/name pairs; it never normalizes
+actual metadata or accepts bare aliases. All31 unrelated controls,23 other
+functions and every original assertion remain. One original positive literal
+is corrected from independent API/source evidence, with17 causal refusals and
+an AMD positive. The
+[immutable proposal](handovers/2026-10-11-group6-cloud/native-clock-official-job-prefix-proposal.tar.gz)
+retains complete preimages/inverses and genuine original-red/candidate32-green
+receiving. Final canonical qualification is separate. Actual16 native clock
+samples do not fix PAC14/trust restoration, Brew consent, the separate hosted
+facts156 timeout or installed/enterprise acceptance. Kernel identity remains
+unknown, factory HELD and item62 open.
+
 2026-10-11 actual native clock workflow enrollment. Only the managed-native
 independent client and its adjacent evidence upload acquire the reviewed clock
 bracket. Original first-two commands, five-minute cap, separate command/capture
