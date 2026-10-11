@@ -652,3 +652,40 @@ _G4B_RejectArrayTags() {
 	} finally F.Close()
 }
 Test("managed bootstrap: model receipt uses actual normalized-name set contract (groups247-managed)", _G4B_RejectArrayTags)
+
+/** A superseded deferred retry must tolerate callbacks cleared by prior success. */
+_G4B_OptionalRetryCallbacks() {
+	global _LLM_Deps_Epoch
+	AssertFalse(LLM_Deps_AsyncCheck("", , , false, _LLM_Deps_Epoch - 1))
+}
+Test("managed bootstrap: stale retry accepts absent callbacks (groups247-optional-callbacks)", _G4B_OptionalRetryCallbacks)
+
+/** Failure publication remains usable after the one-shot callback was retired. */
+_G4B_OptionalFailureCallback() {
+	global _LLM_Deps_Epoch
+	AssertFalse(LLM_Deps_Fail("Synthetic superseded failure", , _LLM_Deps_Epoch - 1))
+}
+Test("managed bootstrap: stale failure accepts absent callback (groups247-optional-callbacks)", _G4B_OptionalFailureCallback)
+
+/** The real deferred callback must not read an unset retired observer. */
+_G4B_OptionalDeferredRetry() {
+	global _LLM_Deps_Epoch, _LLM_Deps_Checking, _LLM_Deps_State
+	Saved := [_LLM_Deps_Epoch, _LLM_Deps_Checking, _LLM_Deps_State]
+	Errors := []
+	Handler := (Err, *) => Errors.Push(Err.Message)
+	OnError(Handler)
+	try {
+		_LLM_Deps_Checking := false
+		LLM_Deps_CheckAndInstall("", , , false)
+		_LLM_Deps_Epoch += 1
+		Sleep(150)
+		AssertEqual(Errors.Length, 0, "A superseded callback must retire before any network dispatch.")
+	} finally {
+		OnError(Handler, 0)
+		_LLM_Deps_Epoch := Saved[1]
+		_LLM_Deps_Checking := Saved[2]
+		_LLM_Deps_State := Saved[3]
+	}
+}
+Test("managed bootstrap: deferred retry preserves absent callbacks (groups247-optional-callbacks)", _G4B_OptionalDeferredRetry)
+
