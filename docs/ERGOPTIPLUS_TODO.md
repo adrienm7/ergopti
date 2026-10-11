@@ -10828,10 +10828,32 @@ by the redacted log.
       fixture took 111,742 ms for apply and 96,690 ms for refusal, while its 32
       direct guard calls took 386 ms. Source review finds full-cohort validation
       repeated around each callback; it does not establish an exclusive I/O or
-      CPU cause. The finite suite watchdog now budgets the complete 11,197-case
-      corpus, with a 55-minute cap and a 60-minute job bound. Canonical watchdog
-      receiving passes two cases; this harness change does not improve product
-      latency or qualify the full Windows suite.
+      CPU cause. Two later finite runs were incomplete: the full local run
+      reached 4,186 passes before its watchdog, and a fresh suffix reached
+      1,213 passes and 75 failures before its own watchdog. Four actual 32 MiB
+      recovery controls took 164 to 184 seconds each. The registry-derived
+      watchdog now has a 120-minute cap and the CI step a 125-minute bound.
+      Both canonical watchdog controls and twelve static accept/refuse profiles
+      pass. Complete hosted execution must still establish capacity; this
+      harness correction does not improve product latency.
+
+The subsequent 298-case Windows selection completed with 297 passes and one
+failure. That failure exposed a production AI-enable caller using the legacy
+flat TOML writer for a semantic configuration update. Its real default-path
+regression failed before the caller was changed to `TOML_ConfigBatchWrite`.
+The corrected caller and eleven existing AI admission cases now pass, including
+the held loopback response and stale/refused ownership cases. macOS and Linux
+already use their semantic preference writers. Two gesture persistence cases
+also pass after the fixture restores both original Map identities; a new
+identity assertion failed before that restoration. These fourteen controls
+are targeted evidence, not full-suite qualification.
+
+The remaining 297-case evidence covers corrected source-admission fixtures and
+their preserved refusal assertions. The earlier full and suffix transcripts
+remain incomplete, and seven previously refused local native trust experiments
+remain NOT_RUN locally and mandatory in hosted CI. The current local JavaScript
+baseline contains ten failed Windows-host/fixture checks. No v1.0.1 publication
+or complete green source/native qualification is claimed at this checkpoint.
 
 The maintainer has since confirmed that one enable click and one disable click
 both update the live Windows AI checkmark after five-second waits. This is useful
