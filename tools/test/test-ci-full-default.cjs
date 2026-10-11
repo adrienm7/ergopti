@@ -48,11 +48,12 @@ check('every scoped full body remains owned; all other product scripts remain ex
 	for (const entry of source)
 		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
 			jobs++;
-			assert.equal(Full.field(Full.job(job.id), 'if'), Raw.field(job.body, 'if'));
+			const retainedJob = Full.job(job.id);
+			assert.equal(Full.field(retainedJob, 'if'), Raw.field(job.body, 'if'));
 			for (const step of Raw.steps(job.body)) {
 				if (!step.name) continue;
 				steps++;
-				const retained = Full.step(Full.job(job.id), step.name);
+				const retained = Full.step(retainedJob, step.name);
 				const slot = Scoped.contract.slots.find(
 					(slot) => slot.file === entry.rel && slot.job === job.id && slot.step === step.name
 				);
