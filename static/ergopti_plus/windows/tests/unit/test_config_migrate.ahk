@@ -1371,7 +1371,9 @@ _CMJ_SnapshotObserver(Kind) {
 				Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
 			case "snapshot-own-count":
 				Owner := Snapshot, Name := "OwnPropCount"
-				Original := Object.Prototype.OwnPropCount.Call(Owner)
+				Original := 0
+				for Field in ObjOwnProps(Owner)
+					Original += 1
 				Owner.DefineProp(Name, { Call: (*) => (Hits.count += 1, Original) })
 			case "cache-map-enumerator":
 				Owner := Snapshot.Cache, Name := "__Enum"
