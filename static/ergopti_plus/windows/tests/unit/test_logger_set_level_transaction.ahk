@@ -72,11 +72,13 @@ _LSLT_TerminalBarrierLeavesLoggerStateUnchanged() {
 	global _LSLT_SeenUpdates, _LSLT_WriterResult
 	global _LSLT_ObservedLevel, _LSLT_ObservedSeverity
 	SavedPath := ConfigurationFile
+	Fixture := 0
 	SavedLevel := LOGGER_MIN_LEVEL
 	Bundle := false
 	try {
 		_LSLT_Reset()
-		ConfigurationFile := A_Temp . "\ergopti_logger_level.toml"
+		Fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Fixture.path
 		TargetLevel := SavedLevel = "ERROR" ? "DEBUG" : "ERROR"
 		Bundle := _ConfigWriteTerminalTryAcquire(
 			[A_Temp . "\ergopti_unrelated_terminal.toml"])
@@ -129,6 +131,8 @@ _LSLT_TerminalBarrierLeavesLoggerStateUnchanged() {
 		LOGGER_MIN_LEVEL := SavedLevel
 		_LoggerRefreshFastFlags()
 		_LSLT_Reset()
+		if Fixture is Object
+			_ScopeOwnerCleanup(Fixture)
 	}
 }
 
@@ -141,10 +145,12 @@ _LSLT_InheritedCriticalStopsAtLoggerAction() {
 	global _LSLT_WriterResult, _LSLT_WriterCritical, _LSLT_NotifyCritical
 	global _LSLT_RebuildCritical
 	SavedPath := ConfigurationFile
+	Fixture := 0
 	SavedLevel := LOGGER_MIN_LEVEL
 	SavedCritical := A_IsCritical
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_logger_level_critical.toml"
+		Fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Fixture.path
 		TargetLevel := SavedLevel = "ERROR" ? "DEBUG" : "ERROR"
 		_LSLT_Reset()
 		Critical("On")
@@ -181,7 +187,10 @@ _LSLT_InheritedCriticalStopsAtLoggerAction() {
 		LOGGER_MIN_LEVEL := SavedLevel
 		_LoggerRefreshFastFlags()
 		_LSLT_Reset()
-		Critical(SavedCritical)
+		try {
+			if Fixture is Object
+				_ScopeOwnerCleanup(Fixture)
+		} finally Critical(SavedCritical)
 	}
 }
 Test("logger level: action defuses inherited Critical through post-commit menu "
@@ -284,6 +293,7 @@ _LSLT_MenuOrderAndRefusal() {
 	global _LSLT_RebuildCalls, _LSLT_SeenUpdates
 	SavedLevel := LOGGER_MIN_LEVEL
 	SavedPath := ConfigurationFile
+	Fixture := 0
 	Corpus := _LSLT_MenuCorpus()
 	Declaration := 0
 	for Row in _MR_GetManifestRoot()["debug_menu"] {
@@ -302,7 +312,8 @@ _LSLT_MenuOrderAndRefusal() {
 		Declaration["choices"].Push(Map("value", Value, "label", Labels[Value]))
 	try {
 		_LSLT_Reset()
-		ConfigurationFile := A_Temp . "\ergopti_logger_menu_refusal.toml"
+		Fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Fixture.path
 		LOGGER_MIN_LEVEL := "INFO"
 		_LoggerRefreshFastFlags()
 		Row := _LSLT_NativeRow(Owned, _LSLT_MenuCommit)
@@ -322,6 +333,8 @@ _LSLT_MenuOrderAndRefusal() {
 		for Built in Owned
 			_CTC_ReleaseMenu(Built)
 		_LSLT_Reset()
+		if Fixture is Object
+			_ScopeOwnerCleanup(Fixture)
 	}
 }
 Test("logger level: shared Debug ordering preserves the actual writer refusal", _LSLT_MenuOrderAndRefusal)
