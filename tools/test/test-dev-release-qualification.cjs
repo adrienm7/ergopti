@@ -812,7 +812,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	);
 }
 
-// One-candidate signature permission never defers any tests.
+// Standing stable signature permission never defers any tests.
 {
 	const Signing = require('../ci/windows-stable-signing.cjs');
 	const context = {
@@ -828,13 +828,16 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	};
 	const source = 'a'.repeat(40),
 		hash = 'b'.repeat(64),
-		clock = new Date('2026-10-11T06:59:59.999Z');
+		clock = new Date('2026-10-11T09:00:00Z');
 	const proposed = { ...Signing.POLICY, authorized: true };
 	assert.equal(typeof Signing.POLICY.authorized, 'boolean');
 	if (!Signing.POLICY.authorized)
 		assert.throws(() => Signing.admit(context, source, source, clock));
 	else Signing.admit(context, source, source, clock);
 	Signing.admit(context, source, source, clock, proposed);
+	Signing.admit(context, source, source, clock, proposed);
+	Signing.admit(context, source, source, new Date('2027-10-11T07:00:00Z'), proposed);
+	Signing.admit({ ...context, tag: 'v1.0.2', version: '1.0.2' }, source, source, clock, proposed);
 	Signing.requireFreshUnsigned('true');
 	for (const value of ['false', undefined, '', true]) {
 		assert.throws(() => Signing.requireFreshUnsigned(value));
@@ -855,9 +858,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	}
 	assert.throws(() => Signing.admit(context, source, 'c'.repeat(40), clock, proposed));
 	assert.throws(() => Signing.admit(context, 'A'.repeat(40), 'A'.repeat(40), clock, proposed));
-	assert.throws(() =>
-		Signing.admit(context, source, source, new Date('2026-10-11T07:00:00Z'), proposed)
-	);
+	Signing.admit(context, source, source, new Date('2026-10-11T07:00:00Z'), proposed);
 	assert.throws(() => Signing.admit(context, source, source, new Date('invalid'), proposed));
 	assert.throws(() =>
 		Signing.admit(context, source, source, clock, { ...Signing.POLICY, authorized: false })
@@ -886,18 +887,30 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert(Signing.notice(source).includes('UNSIGNED / qualified:false'));
-	assert(Signing.notice(source).includes('SignPath Foundation'));
+	assert(Signing.notice(source, context.tag).includes('UNSIGNED / qualified:false'));
+	assert(Signing.notice(source, context.tag).includes('SignPath Foundation'));
 	assert.equal(value.tests, 'mandatory');
-	assert(Signing.notice(source).includes('v1.0.1/windows-signing-qualification.json'));
-	assert(Signing.notice(source).includes('All tests, build, package'));
+	assert(Signing.notice(source, context.tag).includes('v1.0.1/windows-signing-qualification.json'));
+	assert(Signing.notice(source, context.tag).includes('All tests, build, package'));
+	for (const version of [
+		'1.0.2-dev.1',
+		'01.0.2',
+		'1.0',
+		'',
+		undefined,
+		{ toString: () => '1.0.2' }
+	]) {
+		assert.throws(() =>
+			Signing.admit({ ...context, tag: 'v' + version, version }, source, source, clock, proposed)
+		);
+	}
+	assert(Signing.notice(source, 'v1.0.2').includes('v1.0.2/windows-signing-qualification.json'));
+	assert.throws(() => Signing.notice(source, 'v1.0.2-dev.1'));
+	assert.throws(() => Signing.validatePolicy({ ...proposed, expires_at: '2027-01-01T00:00:00Z' }));
 	assert.throws(() =>
-		Signing.admit({ ...context, tag: 'v1.0.2', version: '1.0.2' }, source, source, clock, proposed)
+		Signing.admit(context, source, source, new Date('2026-10-10T23:59:59.999Z'), proposed)
 	);
-	assert.throws(() =>
-		Signing.admit(context, source, source, new Date('2026-10-09T23:59:59.999Z'), proposed)
-	);
-	console.log('[OK] one-candidate unsigned signature permission and source-bound receipt guards.');
+	console.log('[OK] standing unsigned signature permission and source-bound receipt guards.');
 }
 
 // Suite deferrals carry empty execution counts and cannot waive package/install evidence.
