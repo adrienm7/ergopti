@@ -149,6 +149,7 @@ class WireFixture:
         deadline=None,
         merge_errors=False,
         security_failure_observation=False,
+        trust_operation=None,
     ):
         phase = "setup"
         status = None
@@ -158,6 +159,7 @@ class WireFixture:
         result = None
         closure_refused = False
         security_failure = None
+        trust_callee = None
         try:
             if self.command_file_debt:
                 phase = "settle"
@@ -253,6 +255,14 @@ class WireFixture:
                     raise failure
                 status = child.returncode
             phase = "exit"
+            if trust_operation in ("add", "remove") and status != 0:
+                # Observe only this original command's already-owned error file.
+                # Failure to observe never replaces the original native outcome.
+                try:
+                    errors.seek(0)
+                    trust_callee = self._trust_callee_fact(errors.read(1025), trust_operation)
+                except BaseException:
+                    trust_callee = None
             if status != 0 and not tolerate:
                 if security_failure_observation:
                     try:
@@ -312,6 +322,31 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        if trust_operation in ("add", "remove"):
+            # stderr is outside the unchanged one-line JSON reply transport.
+            # Cache the exact original outcome before a later restoration command
+            # replaces command_fact. No additional trust/query/clock is acquired.
+            try:
+                fact = {
+                    "version": 1,
+                    "operation": trust_operation,
+                    **self.command_fact,
+                    "primary": "none"
+                    if failure is None
+                    else "deadline"
+                    if isinstance(failure, subprocess.TimeoutExpired)
+                    else "exception",
+                    "closure_refused": closure_refused,
+                    "command_file_debt": bool(self.command_file_debt),
+                    "callee": None if closure_refused else trust_callee,
+                }
+                print(
+                    "# native_http_trust_outcome " + json.dumps(fact, sort_keys=True),
+                    file=sys.stderr,
+                    flush=True,
+                )
+            except BaseException:
+                pass  # Optional publication never replaces the exact primary.
         if security_failure is not None:
             # Closed categories are observations, never a command success or an
             # API OSStatus. Publication follows exact child and file retirement.
@@ -330,6 +365,22 @@ class WireFixture:
         if failure is not None:
             raise failure
         return result
+
+    @staticmethod
+    def _trust_callee_fact(raw, operation):
+        # Exact public Apple callee spellings only; never copy a localized
+        # message, path, certificate or guessed OSStatus from command stderr.
+        if type(raw) is not bytes or len(raw) > 1024:
+            return None
+        if operation == "add" and re.fullmatch(
+            rb"SecTrustSettingsSetTrustSettings: [\x20-\x7e]+\n", raw
+        ):
+            return "trust_settings_set"
+        if operation == "remove" and re.fullmatch(
+            rb"SecTrustSettingsRemoveTrustSettings: [\x20-\x7e]+\n", raw
+        ):
+            return "trust_settings_remove"
+        return None
 
     @staticmethod
     def _security_failure_fact(raw):
@@ -450,7 +501,8 @@ class WireFixture:
                     "-k",
                     str(self.keychain),
                     str(self.ca),
-                ]
+                ],
+                trust_operation="add",
             )
         elif self.trust_attempted:
             arguments = [
@@ -480,7 +532,12 @@ class WireFixture:
                 raise subprocess.TimeoutExpired(arguments, 15)
             self.command_fact = None
             try:
-                self._command(arguments, deadline=deadline, security_failure_observation=True)
+                self._command(
+                    arguments,
+                    deadline=deadline,
+                    security_failure_observation=True,
+                    trust_operation="remove",
+                )
             except BaseException as primary:
                 removal_fact = self.command_fact
                 if removal_fact is not None and removal_fact["phase"] == "exit":

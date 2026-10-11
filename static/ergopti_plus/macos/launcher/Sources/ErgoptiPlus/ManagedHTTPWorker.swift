@@ -318,7 +318,51 @@ enum ManagedProxyLookup {
 
 /// Native error codes only. URLs, certificate subjects and authentication
 /// challenges are deliberately absent from the receiving protocol.
+#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+/// Observations of an already-delivered error only. No message, URL, certificate
+/// or arbitrary userInfo key is read; the original failure policy is unchanged.
+func managedHTTPNativeErrorFacts(_ error: NSError) -> [String] {
+	func integer(_ value: Any?) -> Int32? {
+		guard let number = value as? NSNumber,
+			CFGetTypeID(number) != CFBooleanGetTypeID(),
+			["c", "C", "s", "S", "i", "I", "l", "L", "q", "Q"].contains(String(cString: number.objCType)),
+			number.doubleValue >= Double(Int32.min), number.doubleValue <= Double(Int32.max)
+		else { return nil }
+		return Int32(exactly: number.int64Value)
+	}
+	var current = error
+	var seen = Set<ObjectIdentifier>()
+	var result: [String] = []
+	while result.count < 4 && seen.insert(ObjectIdentifier(current)).inserted {
+		let domain: String
+		switch current.domain {
+		case NSURLErrorDomain: domain = "url"
+		case NSPOSIXErrorDomain: domain = "posix"
+		case NSOSStatusErrorDomain: domain = "osstatus"
+		case kCFErrorDomainCFNetwork as String: domain = "cfnetwork"
+		default: domain = "unknown"
+		}
+		let code = domain == "unknown" ? nil : Int32(exactly: current.code)
+		var streamDomain: Int32?
+		var streamCode: Int32?
+		if domain == "cfnetwork" || domain == "url" {
+			if let admittedDomain = integer(current.userInfo["_kCFStreamErrorDomainKey"]),
+				let admittedCode = integer(current.userInfo["_kCFStreamErrorCodeKey"]) {
+				streamDomain = admittedDomain; streamCode = admittedCode
+			}
+		}
+		result.append("# native_http_error_chain node=\(result.count) domain=\(domain) code=\(code.map(String.init) ?? "none") stream_domain=\(streamDomain.map(String.init) ?? "none") stream_code=\(streamCode.map(String.init) ?? "none")")
+		guard let underlying = current.userInfo[NSUnderlyingErrorKey] as? NSError else { break }
+		current = underlying
+	}
+	return result
+}
+#endif
+
 func managedHTTPFailure(_ error: NSError) -> String {
+	#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+	for fact in managedHTTPNativeErrorFacts(error) { _ = fputs(fact + "\n", stderr) }
+	#endif
 	guard error.domain == NSURLErrorDomain else { return "unavailable" }
 	let code = error.code
 	switch code {
@@ -502,11 +546,22 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 	private func answer(_ challenge: URLAuthenticationChallenge,
 		completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
 		if challenge.protectionSpace.isProxy() { proxyAuthenticationObserved = true }
+		#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+			_ = fputs("# native_http_trust_challenge mode=\(certificates.isEmpty ? "system" : "extra")\n", stderr)
+		}
+		#endif
 		if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, !certificates.isEmpty {
 			guard let trust = challenge.protectionSpace.serverTrust,
 				ManagedCertificateAuthorities.evaluate(trust, adding: certificates) else {
+				#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+				_ = fputs("# native_http_extra_trust result=refused\n", stderr)
+				#endif
 				failure = "certificate"; completionHandler(.cancelAuthenticationChallenge, nil); return
 			}
+			#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+			_ = fputs("# native_http_extra_trust result=accepted\n", stderr)
+			#endif
 			completionHandler(.useCredential, URLCredential(trust: trust)); return
 		}
 		completionHandler(.performDefaultHandling, nil)

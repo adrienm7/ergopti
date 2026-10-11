@@ -56,6 +56,44 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		XCTAssertEqual(managedHTTPFailure(NSError(domain: NSURLErrorDomain,
 			code: NSURLErrorTimedOut, userInfo: privateData)), "deadline")
 		XCTAssertEqual(managedHTTPFailure(NSError(domain: "foreign", code: 1, userInfo: privateData)), "unavailable")
+		#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		// Synthetic errors test privacy/admission; they are never real TLS evidence.
+		let underlying = NSError(domain: kCFErrorDomainCFNetwork as String, code: -1202,
+			userInfo: ["_kCFStreamErrorDomainKey": 3, "_kCFStreamErrorCodeKey": -9807,
+				NSLocalizedDescriptionKey: "reserved-private-underlying"])
+		let original = NSError(domain: NSURLErrorDomain, code: -1202,
+			userInfo: privateData.merging([NSUnderlyingErrorKey: underlying]) { _, new in new })
+		XCTAssertEqual(managedHTTPNativeErrorFacts(original), [
+			"# native_http_error_chain node=0 domain=url code=-1202 stream_domain=none stream_code=none",
+			"# native_http_error_chain node=1 domain=cfnetwork code=-1202 stream_domain=3 stream_code=-9807"
+		])
+		XCTAssertFalse(managedHTTPNativeErrorFacts(original).joined().contains("reserved"))
+		XCTAssertFalse(managedHTTPNativeErrorFacts(original).joined().contains("https"))
+		let rejectedFields: [[String: Any]] = [
+			["_kCFStreamErrorDomainKey": true, "_kCFStreamErrorCodeKey": -9807],
+			["_kCFStreamErrorDomainKey": 3.0, "_kCFStreamErrorCodeKey": -9807],
+			["_kCFStreamErrorDomainKey": "3", "_kCFStreamErrorCodeKey": -9807],
+			["_kCFStreamErrorDomainKey": 3],
+			["_kCFStreamErrorDomainKey": 3, "_kCFStreamErrorCodeKey": Int64(Int32.max) + 1]
+		]
+		for fields in rejectedFields {
+			XCTAssertEqual(managedHTTPNativeErrorFacts(NSError(domain: NSURLErrorDomain,
+				code: -1202, userInfo: fields)), [
+				"# native_http_error_chain node=0 domain=url code=-1202 stream_domain=none stream_code=none"
+			])
+		}
+		XCTAssertEqual(managedHTTPNativeErrorFacts(NSError(domain: "reserved-private-domain",
+			code: 17, userInfo: privateData)), [
+			"# native_http_error_chain node=0 domain=unknown code=none stream_domain=none stream_code=none"
+		])
+		var deep = NSError(domain: NSPOSIXErrorDomain, code: 1)
+		for _ in 0..<6 { deep = NSError(domain: NSURLErrorDomain, code: -1202,
+			userInfo: [NSUnderlyingErrorKey: deep]) }
+		XCTAssertEqual(managedHTTPNativeErrorFacts(deep).count, 4)
+		XCTAssertEqual(managedHTTPNativeErrorFacts(ManagedHTTPDiagnosticCycleError()), [
+			"# native_http_error_chain node=0 domain=url code=-1202 stream_domain=none stream_code=none"
+		])
+		#endif
 	}
 
 	func testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries() throws {
@@ -254,3 +292,12 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		print("PAC_ARGUMENT_SHAPE purpose=\(scheme) type=\(proxyType) port=\(code)")
 	}
 }
+
+#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+/// Test-owned cyclic synthetic error; never a native trust or network claim.
+private final class ManagedHTTPDiagnosticCycleError: NSError, @unchecked Sendable {
+	init() { super.init(domain: NSURLErrorDomain, code: -1202, userInfo: nil) }
+	required init?(coder: NSCoder) { super.init(coder: coder) }
+	override var userInfo: [String: Any] { [NSUnderlyingErrorKey: self] }
+}
+#endif

@@ -6132,5 +6132,214 @@ class TimeoutEvidenceMissingCapabilityControls(unittest.TestCase):
         self.assertEqual(hasattr(probe.os, "O_NOFOLLOW"), present)
 
 
+class FirstDiscoveryFactControls(unittest.TestCase):
+    """Literal closed projections and actual C scope core with a modeled CF/AX port."""
+
+    @staticmethod
+    def packet():
+        return {
+            "schema": 1,
+            "ax_trusted": True,
+            "requester_qualified": True,
+            "scanned_agents": 1,
+            "windows": 1,
+            "nodes": 0,
+            "candidates": 0,
+            "matches": 0,
+            "first_agent": -1,
+            "first_attribute": "none",
+            "first_type": "none",
+            "first_error": 0,
+        }
+
+    def test_completed_scopes_are_observations_without_candidate_or_action_credit(self):
+        for scope, sender, receiver in (
+            ("unrelated", False, False),
+            ("refused", True, False),
+            ("refused", False, True),
+            ("candidate", True, True),
+        ):
+            packet = self.packet()
+            packet["discovery"] = {
+                "schema": 1,
+                "scope": scope,
+                "sender": sender,
+                "receiver": receiver,
+                "complete": True,
+                "nodes": 8,
+            }
+            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+            self.assertEqual(packet["candidates"], 0)
+            self.assertEqual(packet["matches"], 0)
+            self.assertEqual(packet["nodes"], 0)
+
+    def test_incomplete_discovery_keeps_partial_bits_without_claiming_scope(self):
+        for nodes in (0, 1, 256, 257):
+            packet = self.packet()
+            packet["discovery"] = {
+                "schema": 1,
+                "scope": "refused",
+                "sender": nodes >= 2,
+                "receiver": False,
+                "complete": False,
+                "nodes": nodes,
+            }
+            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+
+    def test_scalar_types_bounds_noise_and_completion_laws_refuse(self):
+        original = {
+            "schema": 1,
+            "scope": "unrelated",
+            "sender": False,
+            "receiver": False,
+            "complete": True,
+            "nodes": 8,
+        }
+        changes = (
+            {"schema": True},
+            {"scope": "approved"},
+            {"sender": 1},
+            {"receiver": 0},
+            {"complete": 1},
+            {"nodes": True},
+            {"nodes": -1},
+            {"nodes": 258},
+            {"nodes": 0},
+            {"nodes": 257},
+            {"sender": True},
+            {"receiver": True},
+            {"complete": False},
+            {"scope": "candidate"},
+            {"raw_text": "forbidden"},
+            {"scope": "refused", "complete": False, "sender": True, "nodes": 0},
+            {"scope": "candidate", "sender": True, "receiver": True, "nodes": 1},
+        )
+        for change in changes:
+            packet = self.packet()
+            packet["discovery"] = {**original, **change}
+            with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
+                probe._validate_owned_automation_ui_fact(packet)
+        packet = self.packet()
+        packet["windows"] = 0
+        packet["discovery"] = original
+        with self.assertRaises(probe.AdmissionError):
+            probe._validate_owned_automation_ui_fact(packet)
+
+    def test_discovery_coexists_with_prior_refused_button_and_identity_facts(self):
+        packet = PassiveWindowIdentityControls.packet()
+        packet["windows"] = 1
+        packet["discovery"] = {
+            "schema": 1,
+            "scope": "candidate",
+            "sender": True,
+            "receiver": True,
+            "complete": True,
+            "nodes": 9,
+        }
+        original_button = dict(packet["first_button"])
+        original_identity = dict(packet["identity"])
+        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+        self.assertEqual(packet["first_button"], original_button)
+        self.assertEqual(packet["identity"], original_identity)
+        self.assertEqual(packet["first_error"], -25205)
+
+    def test_actual_c_scope_serializes_only_first_existing_traversal(self):
+        # Reuse only the pre-existing literal CF/AX interface declarations, never
+        # derive a result or expected JSON from either implementation.
+        tree = ast.parse(Path(__file__).read_text())
+        classes = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.ClassDef)
+            and node.name == "IndependentWindowDiscoveryScopeControls"
+        ]
+        self.assertEqual(len(classes), 1, "One original CF/AX port owner is required")
+        methods = [
+            node
+            for node in classes[0].body
+            if isinstance(node, ast.FunctionDef)
+            and node.name
+            == "test_actual_scope_core_and_original_dispatch_keep_unknown_and_owned_refusals"
+        ]
+        self.assertEqual(len(methods), 1, "One original scope control is required")
+        ports = [
+            node.value.value
+            for node in methods[0].body
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "port"
+            and isinstance(node.value, ast.Constant)
+            and type(node.value.value) is str
+        ]
+        self.assertEqual(len(ports), 1, "One literal CF/AX interface port is required")
+        port = ports[0]
+        source = Path(probe.__file__).with_name("native_appleevent_consent.m").read_text()
+        begin = source.index("enum OwnedWindowScope {")
+        end = source.index("// Passive traversal of only the retained refused window.", begin)
+        body = source[begin:end]
+        clock_begin = body.index("static bool scope_before_deadline(void) {")
+        clock_end = body.index("static AXError scope_copy_attribute(", clock_begin)
+        body = body[:clock_begin] + body[clock_end:]
+        cases = r"""static struct Object sender_name={.kind=TYPE_STRING,.text="sender"};
+static struct Object receiver_name={.kind=TYPE_STRING,.text="receiver"};
+static int check(int which, const char *expected, enum OwnedWindowScope expected_scope) {
+    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&scope_window_role};
+    struct Object text={.kind=TYPE_STRING,.text=which==2 ? "sender" : "sender receiver"};
+    struct Object leaf={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&text};
+    struct Object *items[]={&leaf};
+    struct Object children={.kind=TYPE_ARRAY,.items=items,.count=1};
+    if (which==1 || which==2) root.children=&children;
+    if (which==3) root.pid_error=kAXErrorInvalidUIElement;
+    remaining=which==4 ? 0 : 1; deadline_calls=0; expire_after=-1;
+    discoveryObserved=false;
+    enum OwnedWindowScope scope=discover_window_scope(&root,&sender_name,&receiver_name,31337);
+    if (scope!=expected_scope || references!=0) return 1;
+    char encoded[256]; int length=owned_discovery_fact(encoded,sizeof(encoded));
+    if (length!=(int)strlen(expected) || strcmp(encoded,expected)!=0) return 2;
+    // A later different window must not replace the retained first observation.
+    remaining=1;
+    struct Object second={.kind=TYPE_AX,.pid=31337,.role=&scope_window_role};
+    if (discover_window_scope(&second,&sender_name,&receiver_name,31337)!=OwnedWindowScopeUnrelated)
+        return 3;
+    if (owned_discovery_fact(encoded,sizeof(encoded))!=length || strcmp(encoded,expected)!=0 || references!=0)
+        return 4;
+    return 0;
+}
+int main(void) {
+    char absent[256];
+    if (owned_discovery_fact(absent,sizeof(absent))!=0) return 1;
+    const char *expected[]={
+        ",\"discovery\":{\"schema\":1,\"scope\":\"unrelated\",\"sender\":false,\"receiver\":false,\"complete\":true,\"nodes\":1}",
+        ",\"discovery\":{\"schema\":1,\"scope\":\"candidate\",\"sender\":true,\"receiver\":true,\"complete\":true,\"nodes\":2}",
+        ",\"discovery\":{\"schema\":1,\"scope\":\"refused\",\"sender\":true,\"receiver\":false,\"complete\":true,\"nodes\":2}",
+        ",\"discovery\":{\"schema\":1,\"scope\":\"refused\",\"sender\":false,\"receiver\":false,\"complete\":false,\"nodes\":1}",
+        ",\"discovery\":{\"schema\":1,\"scope\":\"refused\",\"sender\":false,\"receiver\":false,\"complete\":false,\"nodes\":0}"
+    };
+    const enum OwnedWindowScope scopes[]={OwnedWindowScopeUnrelated,OwnedWindowScopeCandidate,
+        OwnedWindowScopeRefused,OwnedWindowScopeRefused,OwnedWindowScopeRefused};
+    for (int which=0;which<5;which++) if (check(which,expected[which],scopes[which])) return 2+which;
+    puts("discovery_same_traversal_controls=5");
+    return 0;
+}
+"""
+        compiler = probe.shutil.which("cc")
+        self.assertIsNotNone(compiler, "Actual compiler required for the explicit CF/AX port")
+        with TemporaryDirectory() as directory:
+            model, binary = Path(directory) / "scope.c", Path(directory) / "scope"
+            model.write_text(port + body + cases)
+            built = subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Werror", str(model), "-o", str(binary)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(built.returncode, 0, built.stderr)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "discovery_same_traversal_controls=5\n")
+            self.assertEqual(result.stderr, "")
+
+
 if __name__ == "__main__":
     unittest.main()
