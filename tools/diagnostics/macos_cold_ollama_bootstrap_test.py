@@ -85,6 +85,144 @@ class ColdReceiptTests(unittest.TestCase):
             },
         }
 
+    def test_actual_lua_cold_client_receipt_validates_without_daemon_launch(self):
+        """Execute the real fixture over controlled ports; no native/macOS credit."""
+        directory = Path(self.root.name)
+        config = dict(
+            self.config,
+            home=str(directory / "home"),
+            shared=str(directory / "shared"),
+            helper=str(directory / "controlled-native-helper"),
+            result=str(directory / "actual-lua-result.json"),
+            denied_runtime_paths=[str(directory / "absent-controlled-runtime")],
+        )
+        Path(config["home"]).mkdir()
+        inputs = {
+            "config": config,
+            "nonce": "independent-nonce",
+            "source_sha256": self.result["source_sha256"],
+            "receipt_path": self.result["receipt_path"],
+            "physical_receipt": copy.deepcopy(self.result["physical_receipt"]),
+            "observations": str(directory / "controlled-observations.json"),
+        }
+        inputs_path = directory / "inputs.json"
+        inputs_path.write_text(json.dumps(inputs))
+        script = r"""
+local actual, inputs_path, root = arg[1], arg[2], arg[3]
+package.path = root .. "/static/ergopti_plus/_shared/lua/?.lua;"
+  .. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+local Json = require("json")
+local function read(path)
+  local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); assert(file:close())
+  return assert(Json.decode(bytes))
+end
+local function write(value, path)
+  local file = assert(io.open(path, "wb")); assert(file:write(assert(Json.encode(value))))
+  assert(file:close()); return true
+end
+local input = read(inputs_path)
+local config = input.config
+local counts = { daemon_calls = 0, prepare_calls = 0, task_calls = 0, start_calls = 0, settle_calls = 0 }
+local installed = false
+hs = {
+  json = { read = function(path) assert(path == inputs_path); return config end,
+    decode = Json.decode, write = write },
+  processInfo = { arch = "x86_64" },
+  fs = { attributes = function(path) assert(path == config.install_dir); return nil end,
+    symlinkAttributes = function(path)
+      local file = io.open(path, "rb"); if file then file:close(); return {} end
+      return nil
+    end },
+  task = { new = function() counts.task_calls = counts.task_calls + 1; return { pid = function() return 123 end } end },
+}
+package.preload["adapters.python_interpreter"] = function()
+  return { resolve = function() return nil, { kind = "python_missing" } end,
+    native_candidates = function() return {} end }
+end
+package.preload["modules.llm.ollama_binary"] = function()
+  return { SOURCE_MANAGED = "controlled-official-client", resolve = function()
+    if installed then return config.install_dir .. "/ollama", nil, "controlled-official-client" end
+    return nil
+  end }
+end
+local handle = {
+  executable = config.helper, arguments = { "--managed-pty-worker", "1800000" },
+  input = assert(Json.encode({ source_path = config.driver .. "/modules/llm/ensure-ollama-deps.sh",
+    source_sha256 = input.source_sha256, nonce = input.nonce, receipt_path = input.receipt_path,
+    environment = { { "PROJECT_ROOT", config.driver }, { "ERGOPTI_NATIVE_ARCH", "x86_64" },
+      { "ERGOPTI_NATIVE_PYTHONS", "" }, { "ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN", "" },
+      { "ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR", config.install_dir }, { "ERGOPTI_BOOTSTRAP_PYTHON", "" } } })),
+  settle = function(code)
+    assert(code == 0); counts.settle_calls = counts.settle_calls + 1
+    assert(os.remove(input.receipt_path)); return true
+  end,
+}
+package.preload["adapters.native_bootstrap_pty"] = function()
+  return { prepare = function() counts.prepare_calls = counts.prepare_calls + 1; return handle, true end }
+end
+package.preload["adapters.task_lifecycle"] = function()
+  return { start = function(task) assert(task ~= nil); counts.start_calls = counts.start_calls + 1; return true end }
+end
+package.preload["modules.llm.ollama_deps_checker"] = function()
+  return {
+    get_state = function() return "ready" end,
+    install_for_selection = function(callback)
+      -- Count the actual fixture's installed presentation stub, forwarding it
+      -- unchanged if called. The controlled client route never requests it.
+      local api = assert(package.loaded["modules.llm.api_ollama"])
+      local original = assert(api.ensure_running)
+      api.ensure_running = function(...)
+        counts.daemon_calls = counts.daemon_calls + 1; return original(...)
+      end
+      local native, ready = require("adapters.native_bootstrap_pty").prepare()
+      assert(ready == true)
+      local task = hs.task.new(native.executable, function() end, function() end, native.arguments)
+      assert(require("adapters.task_lifecycle").start(task, "controlled-client"))
+      write(input.physical_receipt, input.receipt_path)
+      assert(native.settle(0))
+      installed = true
+      callback(true)
+      return true
+    end,
+  }
+end
+assert(loadfile(actual))()
+write(counts, input.observations)
+"""
+        environment = dict(os.environ)
+        environment.update(HOME=config["home"], ERGOPTI_COLD_BOOTSTRAP_CONFIG=str(inputs_path))
+        result = subprocess.run(
+            [
+                "lua5.4",
+                "-",
+                str(Path(__file__).with_name("macos_cold_ollama_bootstrap.lua")),
+                str(inputs_path),
+                str(Path(__file__).resolve().parents[2]),
+            ],
+            input=script,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "")
+        self.assertEqual(
+            json.loads(Path(inputs["observations"]).read_text()),
+            {
+                "daemon_calls": 0,
+                "prepare_calls": 1,
+                "task_calls": 1,
+                "start_calls": 1,
+                "settle_calls": 1,
+            },
+        )
+        actual = json.loads(Path(config["result"]).read_text())
+        self.assertNotIn("error", actual)
+        self.assertNotIn("ui_failure", actual)
+        validate(actual, config)
+
     def test_real_source_inventory_contains_the_loadable_shared_receipt(self):
         self.assertIn("_shared/lua/core/llm/native_pty_receipt.lua", SOURCE_PATHS)
         self.assertNotIn("_shared/core/llm/native_pty_receipt.lua", SOURCE_PATHS)

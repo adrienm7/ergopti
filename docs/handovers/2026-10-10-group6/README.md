@@ -751,3 +751,20 @@ listener-cancellation regression; all44 predecessor bodies and every exit,
 summary, no-skip and timeout assertion remain. No native listener or whole-job
 success is inferred. Exact-source native receiving remains required and item62
 stays open.
+
+## Cold caller initial-state receiving correction
+
+2026-10-11 cold caller initial-state correction. Exact716 cold artifact
+11686038953 omits caller.daemon_validation, which its original Python validator
+requires as not-executed. All six environment inputs and eleven bundled source
+pins match; the actual official-client installation route correctly skips the
+daemon stub where the fixture previously initialized this field. The fixture
+now starts with the closed not-executed value. Production selection, source
+pins, physical retirement and original validator predicates remain unchanged.
+The same35 portable controls preserve34 old passes and refuse the genuine
+predecessor at the new strict missing-field check; the corrected35 pass. All
+source inputs stay exact and the original command owner exits0 without retained
+children. This does not emulate Hammerspoon or qualify installation. The actual
+worker exits0 and retires its receipt, but later archive/version checks were
+unrun after refusal. Corrected native cold receiving, model, packaging and
+installation remain required; item62 and transversal16/38 stay open.
