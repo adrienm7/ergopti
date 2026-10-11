@@ -10786,8 +10786,18 @@ only the original private final-byte omission and unchanged native expectations.
 Controlled component receiving passes all 53 original controls. The first
 51-control composition run retained 50 passes and one fixture allocation error;
 the successor passes all 51 controls by isolating each negative projection
-without removing either refusal assertion. Committed generator admission, hosted native expected-failure
-receiving, forced output, installation and physical delivery remain required.
+without removing either refusal assertion. The committed generator and preparer
+CLI now pass on actual 7836727b4; their current99/historical99 projected inputs
+are byte-exact with the reviewed component receiving. The generator metadata
+digest 0ecbffdb is independently received, not derived from a native result.
+The hosted omission step now enrolls historical53/current51 controls and the
+unchanged twelve-case native eleven-PASS/one-named-expected-FAIL receiver.
+The independent Shortcuts SDK observer/upload pair sits after all existing
+managed-job steps with explicit manual/no-release predicates. All six incoming
+Group5 workflow/catalogue images retain complete insertion inverses.
+Hosted native expected-failure receiving, forced output, installation and
+physical delivery remain required. Neither source enrollment nor diagnostic
+SDK constants qualify the native Swift Shortcuts product or remote invocation.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
