@@ -47,6 +47,7 @@ _RDGE_SaveState() {
 	Hotstrings := Features["hotstrings"]
 	return {
 		ConfigurationFile: ConfigurationFile,
+		fixture: 0,
 		MagicKey: ScriptInformation["MagicKey"],
 		RepeatEnabled: HSE_RepeatEnabled,
 		RepeatFeatureHad: Hotstrings.Has("repeat_key_enabled"),
@@ -112,9 +113,11 @@ _RDGE_RestoreState(Saved) {
 	_RDGE_RepeatWriterSnapshots := []
 	_RDGE_DelimiterWriterSnapshots := []
 	_RDGE_DelimiterReplaceSnapshots := []
+	if Saved.fixture is Object
+		_ScopeOwnerCleanup(Saved.fixture)
 }
 
-_RDGE_SeedDecisionState(Name) {
+_RDGE_SeedDecisionState(Name, Saved) {
 	global ConfigurationFile, Features, ScriptInformation
 	global _RDGE_RepeatWriterSnapshots, _RDGE_DelimiterWriterSnapshots
 	global _RDGE_DelimiterReplaceSnapshots
@@ -125,8 +128,8 @@ _RDGE_SeedDecisionState(Name) {
 	global _HotstringsOverridesPath, _HotstringsOverrides
 	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-	ConfigurationFile := A_Temp . "\ergopti_runtime_decision_config_"
-		. Name . ".toml"
+	Saved.fixture := _ScopeOwnerFixture()
+	ConfigurationFile := Saved.fixture.path
 	_HotstringsOverridesPath := A_Temp . "\ergopti_runtime_decision_override_"
 		. Name . ".toml"
 	_HotstringsOverrides := Map()
@@ -242,7 +245,7 @@ _RDGE_RepeatPublisherInvalidatesCanonicalDecision() {
 	global _RDGE_RepeatWriterSnapshots
 	Saved := _RDGE_SaveState()
 	try {
-		_RDGE_SeedDecisionState("repeat")
+		_RDGE_SeedDecisionState("repeat", Saved)
 		Candidate := _RDGE_CreateRepeatCandidate("runtimeepochx")
 		BeforeRuntime := HSE_RuntimeDecisionGeneration
 		BeforeRegistry := HSE_RegistryGeneration
@@ -306,7 +309,7 @@ _RDGE_DelimiterPublishersInvalidateCanonicalDecision() {
 	global _RDGE_DelimiterReplaceSnapshots
 	Saved := _RDGE_SaveState()
 	try {
-		_RDGE_SeedDecisionState("delimiters")
+		_RDGE_SeedDecisionState("delimiters", Saved)
 		WordCandidate := _RDGE_CreateRepeatCandidate("runtimeepochx")
 		BeforeWordRuntime := HSE_RuntimeDecisionGeneration
 		BeforeRegistry := HSE_RegistryGeneration

@@ -137,6 +137,7 @@ _EGB20260813_SaveState() {
 	Hotstrings := Features["hotstrings"]
 	return {
 		path: ConfigurationFile,
+		fixture: 0,
 		magic: ScriptInformation["MagicKey"],
 		trigger_had: Hotstrings.Has("trigger_char"),
 		trigger: Hotstrings.Get("trigger_char", ""),
@@ -162,11 +163,17 @@ _EGB20260813_RestoreState(Saved) {
 		Hotstrings["repeat_key_enabled"] := Saved.repeat_feature
 	else if Hotstrings.Has("repeat_key_enabled")
 		Hotstrings.Delete("repeat_key_enabled")
+	if Saved.fixture is Object {
+		PreviousCritical := Critical("Off")
+		try _ScopeOwnerCleanup(Saved.fixture)
+		finally Critical(PreviousCritical)
+	}
 }
 
-_EGB20260813_SeedFixture() {
+_EGB20260813_SeedFixture(Saved) {
 	global ConfigurationFile, ScriptInformation, Features, HSE_RepeatEnabled
-	ConfigurationFile := A_Temp . "\ergopti_editor_global_barrier.toml"
+	Saved.fixture := _ScopeOwnerFixture()
+	ConfigurationFile := Saved.fixture.path
 	ScriptInformation["MagicKey"] := "★"
 	Features["hotstrings"]["trigger_char"] := "★"
 	Features["shortcuts"]["gpt"]["link"] := "https://old.example/"
@@ -205,7 +212,7 @@ _EGB20260813_UnrelatedTerminalRefusesAllEditors() {
 	Saved := _EGB20260813_SaveState()
 	Barrier := false
 	try {
-		_EGB20260813_SeedFixture()
+		_EGB20260813_SeedFixture(Saved)
 		_EGB20260813_Reset()
 		Barrier := _ConfigWriteTerminalTryAcquire(
 			A_Temp . "\ergopti_editor_unrelated_terminal.toml")
@@ -234,7 +241,7 @@ _EGB20260813_WriterFailurePublishesNoState() {
 	global _EGB20260813_WriteResult, _EGB20260813_MagicGui, _EGB20260813_LinkGui
 	Saved := _EGB20260813_SaveState()
 	try {
-		_EGB20260813_SeedFixture()
+		_EGB20260813_SeedFixture(Saved)
 		_EGB20260813_Reset(false)
 		AssertFalse(ModifyMagicKey(_EGB20260813_MagicGui, "#",
 			_EGB20260813_Writer, _EGB20260813_Notify, _EGB20260813_Reload))
@@ -259,7 +266,7 @@ _EGB20260813_ReloadFailuresStayContainedAndKeepEditorsOpen() {
 	global _EGB20260813_MagicGui, _EGB20260813_LinkGui
 	Saved := _EGB20260813_SaveState()
 	try {
-		_EGB20260813_SeedFixture()
+		_EGB20260813_SeedFixture(Saved)
 		_EGB20260813_Reset(true)
 		AssertFalse(ModifyMagicKey(_EGB20260813_MagicGui, "#",
 			_EGB20260813_Writer, _EGB20260813_Notify,
@@ -287,7 +294,7 @@ _EGB20260813_RebuildFailuresStayContained() {
 	global _EGB20260813_WriteCalls, _EGB20260813_RebuildCalls
 	Saved := _EGB20260813_SaveState()
 	try {
-		_EGB20260813_SeedFixture()
+		_EGB20260813_SeedFixture(Saved)
 		_EGB20260813_Reset(true)
 		AssertFalse(ToggleRepeatKeyEnabled(
 			_EGB20260813_Writer, _EGB20260813_Notify,
@@ -311,7 +318,7 @@ _EGB20260813_DestroyFailureStaysContained() {
 	global ScriptInformation, _EGB20260813_ReloadCalls
 	Saved := _EGB20260813_SaveState()
 	try {
-		_EGB20260813_SeedFixture()
+		_EGB20260813_SeedFixture(Saved)
 		_EGB20260813_Reset(true)
 		AssertFalse(ModifyMagicKey(_EGB20260813_ThrowingGui(), "#",
 			_EGB20260813_Writer, _EGB20260813_Notify, _EGB20260813_Reload),
@@ -340,7 +347,7 @@ _EGB20260813_DurableSuccessPublishesAfterWriter() {
 	global _EGB20260813_MagicGui, _EGB20260813_LinkGui
 	Saved := _EGB20260813_SaveState()
 	try {
-		_EGB20260813_SeedFixture()
+		_EGB20260813_SeedFixture(Saved)
 		_EGB20260813_Reset(true)
 		AssertTrue(ModifyMagicKey(_EGB20260813_MagicGui, "#",
 			_EGB20260813_Writer, _EGB20260813_Notify, _EGB20260813_Reload))
@@ -383,7 +390,7 @@ _EGB20260813_InheritedCriticalStopsAtEditorBoundary() {
 	Saved := _EGB20260813_SaveState()
 	SavedCritical := A_IsCritical
 	try {
-		_EGB20260813_SeedFixture()
+		_EGB20260813_SeedFixture(Saved)
 		_EGB20260813_Reset(true)
 		Critical("On")
 		AssertTrue(ModifyMagicKey(_EGB20260813_MagicGui, "#",
