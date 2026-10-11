@@ -37,7 +37,12 @@ local function setup(backend)
 	package.loaded["modules.llm.api_entries"] = {
 		list = function() return state.entries end,
 		active = function() return state.active end,
-		set_active = function(id) for _, e in ipairs(state.entries) do if e.id == id then state.active = e end end return true end,
+		set_active = function(id)
+			state.selection_sets = (state.selection_sets or 0) + 1
+			if state.refuse_selection then return false end
+			for _, e in ipairs(state.entries) do if e.id == id then state.active = e end end
+			return true
+		end,
 		add = function(fields)
 			local entry = { id = "e" .. (#state.entries + 1), provider = fields.provider, label = fields.label,
 				token = fields.token, model = fields.model, base_url = fields.base_url }
@@ -46,6 +51,8 @@ local function setup(backend)
 			return entry
 		end,
 		remove = function(id)
+			state.removal_sets = (state.removal_sets or 0) + 1
+			if state.refuse_removal then return false end
 			for index, e in ipairs(state.entries) do if e.id == id then table.remove(state.entries, index) end end
 			state.active = nil
 			return true
@@ -55,6 +62,7 @@ local function setup(backend)
 		get_backend = function() return state.backend end,
 		get_current_model = function() return state.model end,
 		set_backend = function(kind)
+			if state.refuse_backend then return false end
 			state.backend = kind
 			state.backend_sets = (state.backend_sets or 0) + 1
 			return true
@@ -125,6 +133,37 @@ helpers.describe("AI menu: the backend choice", function()
 		helpers.assert_eq(state.backend, "api")
 	end)
 
+end)
+
+helpers.describe("AI menu publication acknowledgement (ai-menu-selection-ack)", function()
+	for _, backend in ipairs({ "api", "ollama" }) do
+		for _, refused in ipairs({ false, true }) do
+			helpers.it("(ai-menu-selection-ack) returns the backend writer acknowledgement for " .. backend .. " refusal=" .. tostring(refused), function()
+				local previous = backend == "api" and "ollama" or "api"
+				local build, state, restore = setup(previous)
+				state.refuse_backend = refused
+				local rows = build()
+				local result = rows[backend == "ollama" and 2 or 3].action()
+				restore()
+				helpers.assert_eq(state.backend, refused and previous or backend)
+				helpers.assert_eq(state.changed or 0, refused and 0 or 1)
+				helpers.assert_eq(result, not refused)
+			end)
+		end
+	end
+	for _, refused in ipairs({ false, true }) do
+		helpers.it("(ai-menu-selection-ack) returns the private entry writer acknowledgement refusal=" .. tostring(refused), function()
+			local build, state, restore = setup("api")
+			local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
+			state.entries, state.refuse_selection = { entry }, refused
+			local result = exact(build(), "cerebras/qwen").action()
+			restore()
+			if refused then helpers.assert_nil(state.active) else helpers.assert_eq(state.active, entry) end
+			helpers.assert_eq(state.selection_sets, 1)
+			helpers.assert_eq(state.changed or 0, refused and 0 or 1)
+			helpers.assert_eq(result, not refused)
+		end)
+	end
 end)
 
 helpers.describe("AI menu: the selected-model row (menu.llm.model_label)", function()
@@ -311,6 +350,35 @@ helpers.describe("AI menu: a key for the agent's System 1 only (Jev)", function(
 end)
 
 
+helpers.describe("Non-chat API removal acknowledgement", function()
+	for _, refused in ipairs({ false, true }) do
+		helpers.it("(ai-menu-removal-ack) publishes only the non-chat private writer ACK refusal=" .. tostring(refused), function()
+			local build, state, restore = setup("api")
+			local entry = { id = "held", provider = "typesafe", model = "jev-latest", base_url = "", token = "inert" }
+			state.entries, state.confirm, state.refuse_removal = { entry }, true, refused
+			local result = exact(build(), "typesafe/jev-latest").items[2].action()
+			restore()
+			helpers.assert_eq(state.removal_sets, 1)
+			helpers.assert_eq(#state.entries, refused and 1 or 0)
+			helpers.assert_eq(state.changed or 0, refused and 0 or 1)
+			helpers.assert_eq(result, not refused)
+		end)
+	end
+	for _, answer in ipairs({ false, "yes" }) do
+		helpers.it("(ai-menu-removal-ack) refuses non-Boolean confirmation " .. tostring(answer), function()
+			local build, state, restore = setup("api")
+			state.entries = { { id = "held", provider = "typesafe", model = "jev-latest", base_url = "", token = "inert" } }
+			state.confirm = answer
+			local result = exact(build(), "typesafe/jev-latest").items[2].action()
+			restore()
+			helpers.assert_eq(state.removal_sets or 0, 0)
+			helpers.assert_eq(#state.entries, 1)
+			helpers.assert_eq(state.changed or 0, 0)
+			helpers.assert_eq(result, false)
+		end)
+	end
+end)
+
 helpers.describe("Local API optional-auth tray consumer", function()
 	helpers.it("stores an explicitly empty local key and tests the selected model (local-api-optional-auth-ui)", function()
 		local build, state, restore = setup("api")
@@ -386,6 +454,67 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			helpers.assert_eq(active ~= nil, refused)
 			helpers.assert_eq(foreign, true, "unknown root data survives successful removal")
 			if refused then helpers.assert_eq(after, original, "refusal preserves exact source bytes") end
+		end)
+	end
+end)
+
+helpers.describe("AI menu selection through the private writer (ai-menu-selection-native-ack)", function()
+	for _, refused in ipairs({ true, false }) do
+		helpers.it("(ai-menu-selection-native-ack) preserves the actual store on refusal=" .. tostring(refused), function()
+			local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local path = assert(os.tmpname())
+			local rename = os.rename
+			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert-key","model":"qwen","base_url":"","future":{"retained":true}}],"active_id":"","future":{"kept":true}}]]
+			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
+			local changes, stages, result, active, after, mode = 0, 0
+			local ok, failure = pcall(function()
+				package.loaded["modules.llm.api_remote"] = {
+					provider_config_receipt = function() return { published = false, ids = { cerebras = true } } end,
+					provider = function() return { default_model = "qwen", base_url = "https://example.invalid/v1" } end,
+					providers = function() return {} end,
+					serves = function() return true end,
+					test = function() error("selection must not dispatch a request") end,
+				}
+				local owner = helpers.load_module("modules.llm.api_entries")
+				owner._set_path_for_test(path)
+				os.rename = function(from, to)
+					if to == path then
+						stages = stages + 1
+						if refused then return nil, "owned selection publication refused" end
+					end
+					return rename(from, to)
+				end
+				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
+					{ get_backend = function() return "api" end }, {},
+					function() changes = changes + 1 end, function() return {} end)
+				result = exact(rows, "cerebras/qwen").action()
+				active = owner.active()
+				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
+				local stat = assert(io.popen("stat -c %a '" .. path .. "'")); mode = stat:read("*l"); assert(stat:close())
+			end)
+			os.rename = rename
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			local staging = io.open(path .. ".tmp", "rb")
+			if staging then staging:close() end
+			assert(os.remove(path))
+			helpers.assert_eq(ok, true, tostring(failure))
+			helpers.assert_eq(stages, 1)
+			helpers.assert_eq(changes, refused and 0 or 1)
+			helpers.assert_eq(result, not refused)
+			helpers.assert_nil(staging, "the real writer retires its staging file")
+			local retained = require("json").decode(after)
+			helpers.assert_eq(retained.future.kept, true)
+			helpers.assert_eq(retained.entries[1].future.retained, true)
+			if refused then
+				helpers.assert_nil(active)
+				helpers.assert_eq(after, original)
+			else
+				helpers.assert_eq(active.id, "chosen")
+				helpers.assert_eq(retained.active_id, "chosen")
+				helpers.assert_eq(mode, "600")
+			end
 		end)
 	end
 end)

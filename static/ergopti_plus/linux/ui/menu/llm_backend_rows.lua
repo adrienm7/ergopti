@@ -195,6 +195,11 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
 	local backend = llm.get_backend()
 	local function changed() if type(on_changed) == "function" then on_changed() end end
+	local function select_backend(kind)
+		if llm.set_backend(kind) ~= true then return false end
+		changed()
+		return true
+	end
 
 	-- The selected model heads the list under the key macOS and Windows give
 	-- their model row, so the three trays name it with one wording.
@@ -207,12 +212,12 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 		{
 			label = "Ollama 🦙 — " .. tr("menu.llm.backend_ollama_suffix"),
 			checked = backend == "ollama",
-			action = function() llm.set_backend("ollama"); changed() end,
+			action = function() return select_backend("ollama") end,
 		},
 		{
 			label = "API 🌐 — " .. tr("menu.llm.backend_api_suffix"),
 			checked = backend == "api",
-			action = function() llm.set_backend("api"); changed() end,
+			action = function() return select_backend("api") end,
 		},
 	}
 	local boundary = ManifestMenu.template_rows("llm_backend_choice_boundary", {}, {}, {})
@@ -248,7 +253,11 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 			rows[#rows + 1] = {
 				label = label,
 				checked = active ~= nil and entry.id == active.id,
-				action = function() entries.set_active(entry.id); changed() end,
+				action = function()
+					if entries.set_active(entry.id) ~= true then return false end
+					changed()
+					return true
+				end,
 			}
 		else
 			-- Never the predictions' entry: its own test and removal instead.
@@ -256,9 +265,10 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 				{ label = tr("menu.llm.api_test_entry"), action = function() run_test(remote, dialogs, entry, label) end },
 				{ label = "🗑️ " .. tr("menu.llm.api_remove_entry"), action = function()
 					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
-					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return end
-					entries.remove(entry.id)
+					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+					if entries.remove(entry.id) ~= true then return false end
 					changed()
+					return true
 				end },
 			} }
 		end
