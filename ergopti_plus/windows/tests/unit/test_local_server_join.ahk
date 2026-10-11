@@ -22,6 +22,36 @@
 ; ======================================
 ; ======================================
 
+class _LSJ_ReadyChild extends _LSM_ChildReceipt {
+	__New(Fixture, OnDone) {
+		super.__New()
+		this.Fixture := Fixture
+		this.OnDone := OnDone
+		this.ResponseDelivered := false
+		this.ResponseStatus := 0
+		this.ResponseBody := ""
+	}
+
+	start() {
+		super.start()
+		Fixture := this.Fixture
+		Request := Fixture.Requests[Fixture.Requests.Length]
+		Id := Fixture.Order[Mod(Fixture.Children.Length - 1, Fixture.Order.Length) + 1]
+		this.ResponseStatus := 200
+		this.ResponseBody := Id == "lmstudio"
+			? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
+		; Deliver while the exact controlled child is owned, before other targets yield.
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 Fixture`r`n`r`n"))
+		this.OnDone.Call(0, this.ResponseBody, "")
+		this.ResponseDelivered := true
+		return true
+	}
+}
+
+_LSJ_ReadyChildFactory(Fixture, OnDone) {
+	return _LSJ_ReadyChild(Fixture, OnDone)
+}
+
 class _LSJ_Fixture extends _LSM_Fixture {
 	__New() {
 		super.__New()
@@ -97,24 +127,43 @@ class _LSJ_Fixture extends _LSM_Fixture {
 	}
 
 	Prepare() {
-		AssertTrue(this.Native.Rescan())
-		AssertEqual(this.Order.Length, this.Requests.Length, "the real catalogue admits every local target")
-		for Index, Id in this.Order {
-			Body := Id == "lmstudio" ? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
-			this.Complete(Index, 200, Body)
+		SavedSpawn := this.NativeSpawn
+		; Explicit child owners retain their cancellation and refusal scenarios.
+		if !HasMethod(SavedSpawn, "Call")
+			this.NativeSpawn := _LSJ_ReadyChildFactory.Bind(this)
+		try {
+			AssertTrue(this.Native.Rescan())
+			AssertEqual(this.Order.Length, this.Requests.Length, "the real catalogue admits every local target")
+			for Index, Id in this.Order {
+				Body := Id == "lmstudio" ? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
+				this.Complete(Index, 200, Body)
+			}
+			AssertFalse(this.Native.Controller.IsSweeping())
+			AssertEqual(0, this.Native.Jobs.Count)
+			AssertEqual(1, this.Publications.Length)
+			AssertEqual("independent-joined", this.Native.Result("lmstudio")["models"][1])
+			this.OtherSource := this.World.Owner.Capture()
+			AssertTrue(this.OtherSource is LLM_Menu_ApiPrivateSourceReceipt)
+			this.Native.BeginView()
+			this.Receipt := this.Native.Capture("lmstudio")
+			AssertTrue(IsObject(this.Receipt))
+			AssertTrue(this.Native.IsCurrent(this.Receipt, "independent-joined"))
+			this.NativeConfiguration := this.Native.ConfigurationGeneration
+			this.OriginalController := this.Native.Controller.Generation
+		} finally this.NativeSpawn := SavedSpawn
+	}
+
+	Complete(Index, Status, Body) {
+		Child := this.Children[Index]
+		if Child is _LSJ_ReadyChild {
+			; Validate the original callback receipt without replaying a retired request.
+			AssertTrue(Child.ResponseDelivered)
+			AssertEqual(Status, Child.ResponseStatus)
+			AssertEqual(Body, Child.ResponseBody)
+			AssertTrue(this.Requests[Index].Completed)
+			return
 		}
-		AssertFalse(this.Native.Controller.IsSweeping())
-		AssertEqual(0, this.Native.Jobs.Count)
-		AssertEqual(1, this.Publications.Length)
-		AssertEqual("independent-joined", this.Native.Result("lmstudio")["models"][1])
-		this.OtherSource := this.World.Owner.Capture()
-		AssertTrue(this.OtherSource is LLM_Menu_ApiPrivateSourceReceipt)
-		this.Native.BeginView()
-		this.Receipt := this.Native.Capture("lmstudio")
-		AssertTrue(IsObject(this.Receipt))
-		AssertTrue(this.Native.IsCurrent(this.Receipt, "independent-joined"))
-		this.NativeConfiguration := this.Native.ConfigurationGeneration
-		this.OriginalController := this.Native.Controller.Generation
+		super.Complete(Index, Status, Body)
 	}
 
 	Persist(Id, Fields, Source, Admission, SelectModel) {

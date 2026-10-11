@@ -50,6 +50,7 @@ local function world()
 		return memory.write_if_unchanged(path,content,source)
 	end
 	local routed={}
+	function routed.write_refusal(path)return Writer.write_refusal(path)end
 	function routed.read_classified(path)return Writer.read_classified(path,memory)end
 	function routed.prepare_batch(path,rows,_,expected)return Writer.prepare_batch(path,rows,memory,expected)end
 	function routed.batch_write(path,rows,_,expected,on_error,admission)
@@ -287,6 +288,15 @@ end)
 test('continuously changing classified source is unavailable without native admission',function()
 	local v=world();v.on_read=function()v.bytes=v.bytes..'# changed source\n'end
 	eq(v.source.capture(),nil);eq(v.writes,0)
+end)
+
+test('canonical protected writer refuses runtime publication without effects',function()
+	local v=world();local before=v.bytes
+	Writer.refuse_writes('/memory/config.toml','future schema protected')
+	eq(v.preferences.admit(),false)
+	eq(v.preferences.set('llm.enabled',true),false)
+	eq(v.source.capture(),nil);eq(v.writes,0);eq(v.bytes,before)
+	eq(v.state.enabled,false);eq(v.profiles.is_enabled(),false)
 end)
 
 end

@@ -207,7 +207,7 @@ if !_DriverIsDetachedWorker
 ; well-formed.
 global CapsWordEnabled := False
 ; Capture genuine hardware intent before any parse-time callback can run.
-global _HardwareCapsLockOn := GetKeyState("CapsLock", "T") ? true : false
+global _HardwareCapsLockOn := KS_CapsLockToggleState()
 global LayerEnabled := False
 global TapHold := Map("keys", Map())
 ; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which

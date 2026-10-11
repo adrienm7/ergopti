@@ -4,12 +4,14 @@
 ; a native timer or touching PrecisionTouchPad registry settings.
 _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 	global _PersonalShortcutsRegistry, KeyboardShortcutAssignments, GestureActionParameters, _SharedDir
-	global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS
+	global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS, ConfigurationFile
 	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
 	OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
-	Fixture := _HotstringsScopeFixture()
-	Original := '[gestures]`nenabled = true`ntap_4 = "open_url"`nauto_configure_on_next_start = true`nunknown_user = "keep"`n[private]`ncredential = "keep"`n'
+	OldConfigurationFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	; Author the intended preferences before the genuine current-schema boot.
+	Fixture := _HotstringsScopeFixture(1, '[gestures]`nenabled = true`ntap_4 = "open_url"`nauto_configure_on_next_start = true`nunknown_user = "keep"`n')
+	Original := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Original))
 	TapPath := Fixture.directory . "\tap_hold.toml"
 	Assert(FSWriteDurable(TapPath, '[tap_hold.keys.space]`ntap_action = "open_url"`n'))
@@ -57,6 +59,11 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 			AssertEqual(Original, FSReadUtf8Exact(Fixture.path), "refusal restores the exact queued intent")
 		RestartPath := Fixture.directory . "\restart-config.toml"
 		Assert(FSWriteDurable(RestartPath, FSReadUtf8Exact(Fixture.path)))
+		; A restart copy acquires its own genuine startup admission before mutation.
+		RestartBoot := ConfigMigrateBoot(RestartPath)
+		AssertEqual("current", RestartBoot["status"])
+		AssertEqual(0, RestartBoot["read_only"])
+		ConfigurationFile := RestartPath
 		Parsed := TOML_ParseFreshFile(RestartPath)
 		AssertEqual("keep", Parsed["gestures"]["unknown_user"])
 		AssertEqual("keep", Parsed["private"]["credential"])
@@ -77,6 +84,7 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 		if Expected == 0
 			Assert(!Parsed["gestures"].Has("auto_configure_on_next_start"), "Clear must remain sparse")
 	} finally {
+		ConfigurationFile := IsSet(OldConfigurationFile) ? OldConfigurationFile : unset
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
 		_PersonalShortcutsRegistry := IsSet(OldRegistry) ? OldRegistry : unset

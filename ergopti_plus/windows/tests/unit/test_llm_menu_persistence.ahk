@@ -707,6 +707,7 @@ _LLM_Persist_AssertNestedArrayRejected(Section, Key, Slug) {
 	try {
 		try FileDelete(Path)
 		FileAppend(Toml, Path, "UTF-8")
+		_CMJFixtureReadonly(Path)
 		Cache := ParseTomlFile(Path)
 		Raw := IniCacheGet(Cache, Section, Key)
 		Assert(Raw is Array && Raw.Length = 1 && (Raw[1] is Array),
