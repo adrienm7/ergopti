@@ -2,7 +2,73 @@
 
 # Group 1: configuration and menus
 
-The latest runtime correction is integrated without squash in Dev
+The current integrated Dev is `8d6e3a1198a16645e41b7d4bf0f56a013be6072a`.
+It includes bootstrap native-adapter ownership `63d750f` and the shared shortcut
+extension result frame `20dc87a`. All six Group 1 items remain partial. The genuine
+source census is **17 Windows, two Mac and one Linux sites**; Windows sites are
+actual shared-renderer append consumers, not 17 undeclared menus.
+
+Official all-OS manual
+[38153717614](https://github.com/adrienm7/ergopti/actions/runs/38153717614) tests that
+exact Dev SHA. Its terminal result is **28 successful, seven failed and six
+skipped jobs; Release skipped**. Core passes **410 JS and 27 properties**. Linux
+passes **13,247 units, 193 virtual-keyboard E2E scenarios**, the separate native
+E2E job, packaging and **all 17 installation jobs**. Repeated native summaries
+are retained separately, not summed. Mac passes **18,599 stubbed units and 101
+stubbed E2E scenarios**; these do not qualify Cocoa or installed input. Both
+Managed Ollama native architecture lanes and the native archive lane fail;
+Mac packaging/installation are skipped.
+
+Windows plans **11,133 cases**: **2,053 start, 2,052 pass, zero assertions fail,
+one started case has no terminal result and 9,080 never start** at the unchanged
+1,320,000 ms watchdog. The unfinished subject is the twelve-store global Restore
+case; no individual hang cause is proved. Case 1306 passes in 3,837.856 ms.
+Extension receiving remains UNRUN in this official monolith; Windows E2E,
+packaging and installation are skipped. Authentic receiving review `982cf81c…`
+preserves the original whole-run logs and exact source accounting. Personal CI
+results are not transferred to this official verdict.
+
+Corrected private Windows diagnostic
+[38157020236](https://github.com/adrienm7/ergopti/actions/runs/38157020236) genuinely
+passes **20/20 targeted native extension cases**, with **nine exact zero-error
+owned-fixture cleanup reports, 12 distinct native children closed with exit zero,
+and 1,952 before/after Source pins exact**. Independent original-artifact review
+`eab07fb1…` confirms the original TAP, report windows and disposal receipts; a
+successful workflow step alone is not the evidence. The earlier 11-PASS/9-FAIL
+reporter attempt remains failed historical evidence.
+
+That personal run still fails as a whole: **two successful, four failed and six
+skipped jobs; Release skipped**. Its full native suite has **2,054 passes, zero
+assertion failures, 2,055 started of 11,133 planned, and 9,079 nonterminal cases**
+(one unfinished; 9,078 never started) at the unchanged watchdog/exit two. The
+20 extension cases are not reached in that monolith. Personal Core has **408
+passes and two original private-workflow guard failures**. These personal counts
+are separate from the official Dev run's 2,052 passes.
+
+The reporter-only correction is committed and pushed on `feat/config-menus` as
+`6d84b8660867e99768ad317fdbd16e3bf9bdac9a`, parent `8d6e3a`. Its canonical local
+gates pass **410 JS, formatting for 379 files and encoding for 1,894 AHK files**,
+with Source/index/HEAD fences intact. Private workflow/helper overlays are absent
+from this shipping commit. It is **not yet integrated into Dev**; the G6 next
+integration queue is preserved. Bounded fixture cleanup PASS establishes neither
+universal resource lifetime nor installed/physical acceptance.
+
+Pending software remains: the separate private String diagnostic
+[38156006001](https://github.com/adrienm7/ergopti/actions/runs/38156006001) has **one
+native PASS and one FAIL**, with expected zero nested foreign observations versus
+actual three. No production optimization is admitted or qualified by that result.
+The private file-caption V6 has reviewed Source and portable parity PASS, but G2
+custody, native receiving and canonical generation/gates remain pending. It is not
+integrated. All six items remain partial; these are software gaps as well as
+installed/device checks.
+
+[REMAINING-WORK.md](REMAINING-WORK.md) distinguishes feasible software, producer
+ownership and installed/device acceptance. The earlier proof archives and
+reproduction instructions below remain unchanged historical evidence.
+
+## Earlier integrated receiving
+
+The earlier restart correction is integrated without squash in Dev
 `9f26bd3da1c0cc9fb9e5e9632730e32ca960ed17`, with parents
 `fa1049e4d65e9766984163df4bdf0fe468304a96` and feature
 `56f9fbb516ad6bf5315f7b529c4fecec6c372246`. Atomic
@@ -93,14 +159,14 @@ Integrated manual all-OS CI [38124170676](https://github.com/adrienm7/ergopti/ac
 | 54   | Remaining shared presentation ownership and installed native menu/title acceptance.                                                                          |
 | 81   | Finish actual shared data/policy migration and cross-OS equivalence, preserving native adapters and callbacks.                                               |
 
-The census is **19 Windows, two Mac and one Linux sites**. Windows work is assigned to the maintainer; several sites already consume shared frames, so inspect actual ownership before rewriting them. Mac HF-token and profile-shortcut titles, and the Linux numeric page caption, still need explicit G4 producer handoff. These are remaining software tasks, not merely device tests.
+The current census is **17 Windows, two Mac and one Linux sites**. All 17 Windows entries place genuine shared-renderer output; remaining dynamic caption/check/outcome DATA must be assessed separately from this placement count. Continue feasible software and Windows CI receiving before device acceptance. Mac HF-token and profile-shortcut titles and the Linux numeric page caption still need explicit G4 producer handoff. The adjacent personal folder-caption DATA needs G2 custody and an original oracle freeze; the installed-tag check/action shape needs G4 custody and proof that typed receiving preserves the original tag domain. No wrapper relocation, scanner exemption or ratchet weakening qualifies this work.
 
 ## Windows receiving
 
 1. Fetch the final integrated Dev SHA, preserve local changes, and use a private test profile with the repository’s pinned AHK/runtime. Read AGENTS, configuration memory and verify-change.
 2. Run the genuine manifest collector and runner. Replay `config-scope:`, `config migrate:`, `terminator-records:` and `onboarding`, then run the complete native suite. Keep assertions and the watchdog unchanged.
 3. Check item 5 defaults/delays/Script/backup/retry and item 33 catalogue withdrawal/repair. Invalid schemas must refuse migrations and writes; retired keys survive until explicit cleanup.
-4. Item 42's bounded case 1306 now passes with the issued native port unchanged and actual capture before an acknowledged foreign write. Replay its conflict/retry/compensation and acknowledged-retirement assertions. The personal run records 1,981 passes, zero failures and 9,140 uncompleted cases at the unchanged watchdog; the last case has only 4.780 seconds. Complete the full native suite and deterministic editor/external-writer E2E without weakening source guards, assertions or the watchdog.
+4. Item 42's bounded case 1306 passes with the issued native port unchanged and actual capture before an acknowledged foreign write, including the current official run. Replay conflict/retry/compensation and acknowledged retirement. The current official suite records 2,052 passes, zero assertion failures and 9,081 nonterminal cases. Complete the full native suite and deterministic editor/external-writer E2E without weakening source guards, assertions or the watchdog.
 5. Exercise installed wizard cancel/Finish, Browse/moved folder, kept/customized keys, recommendation, clear/global actions and restart. Report unit, E2E, packaging, installation and physical-input results separately.
 
 ## Work Mac and pending packets

@@ -1,0 +1,153 @@
+{
+	"origin": "Independent handwritten literal expectations from the unchanged current _HS_RenderTree folder-parent expression, frozen before any folder-caption implementation.",
+	"expression": "FolderName . (FolderTotal > 0 ? \" (\" . FmtCount(FolderTotal) . \")\" : \"\")",
+	"domain": "Original expression output only. No native filesystem, Win32 Menu acceptance or successful whole-frame handoff is claimed.",
+	"receipts": [
+		{
+			"name": "zero_plain",
+			"folder_name": "Folder",
+			"total": 0,
+			"formatted_count": null,
+			"fmt_count_called": false,
+			"expected": "Folder"
+		},
+		{
+			"name": "negative_plain",
+			"folder_name": "Folder",
+			"total": -1,
+			"formatted_count": null,
+			"fmt_count_called": false,
+			"expected": "Folder"
+		},
+		{
+			"name": "positive",
+			"folder_name": "Folder",
+			"total": 2,
+			"formatted_count": "2",
+			"fmt_count_called": true,
+			"expected": "Folder (2)"
+		},
+		{
+			"name": "grouped_positive",
+			"folder_name": "many",
+			"total": 1234,
+			"formatted_count": "1 234",
+			"fmt_count_called": true,
+			"expected": "many (1 234)"
+		},
+		{
+			"name": "zero_empty_name",
+			"folder_name": "",
+			"total": 0,
+			"formatted_count": null,
+			"fmt_count_called": false,
+			"expected": ""
+		},
+		{
+			"name": "positive_empty_name",
+			"folder_name": "",
+			"total": 2,
+			"formatted_count": "2",
+			"fmt_count_called": true,
+			"expected": " (2)"
+		},
+		{
+			"name": "scalar_numeric_name_zero",
+			"folder_name": 7,
+			"total": 0,
+			"formatted_count": null,
+			"fmt_count_called": false,
+			"expected": "7"
+		},
+		{
+			"name": "scalar_numeric_name_positive",
+			"folder_name": 7,
+			"total": 2,
+			"formatted_count": "2",
+			"fmt_count_called": true,
+			"expected": "7 (2)"
+		},
+		{
+			"name": "literal_tokens_zero",
+			"folder_name": "%s {1} 100%",
+			"total": 0,
+			"formatted_count": null,
+			"fmt_count_called": false,
+			"expected": "%s {1} 100%"
+		},
+		{
+			"name": "literal_tokens_positive",
+			"folder_name": "%s {1} 100%",
+			"total": 2,
+			"formatted_count": "%s",
+			"fmt_count_called": true,
+			"expected": "%s {1} 100% (%s)"
+		},
+		{
+			"name": "literal_ampersand",
+			"folder_name": "a&b",
+			"total": 2,
+			"formatted_count": "2",
+			"fmt_count_called": true,
+			"expected": "a&b (2)"
+		},
+		{
+			"name": "del_unit",
+			"folder_name": "a\u007fb",
+			"total": 2,
+			"formatted_count": "2",
+			"fmt_count_called": true,
+			"expected": "a\u007fb (2)"
+		},
+		{
+			"name": "control_units",
+			"folder_name": "a\t\r\nb",
+			"total": 2,
+			"formatted_count": "2",
+			"fmt_count_called": true,
+			"expected": "a\t\r\nb (2)"
+		},
+		{
+			"name": "isolated_high_utf16_unit",
+			"folder_units": [97, 55296, 98],
+			"total": 2,
+			"formatted_count": "2",
+			"fmt_count_called": true,
+			"expected_units": [97, 55296, 98, 32, 40, 50, 41]
+		},
+		{
+			"name": "isolated_low_utf16_unit_zero",
+			"folder_units": [97, 56320, 98],
+			"total": 0,
+			"formatted_count": null,
+			"fmt_count_called": false,
+			"expected_units": [97, 56320, 98]
+		},
+		{
+			"name": "positive_empty_cached_count",
+			"folder_name": "x",
+			"total": 2,
+			"formatted_count": "",
+			"fmt_count_called": true,
+			"expected": "x ()"
+		},
+		{
+			"name": "positive_scalar_cached_count",
+			"folder_name": "x",
+			"total": 2,
+			"formatted_count": 7,
+			"fmt_count_called": true,
+			"expected": "x (7)"
+		}
+	],
+	"exception_and_order_obligations": [
+		"The genuine _HS_NodeTotal completes after the actual child frame was filled and before caption expression evaluation; preserve its adopted-owner/fallback reads and recursive effects exactly.",
+		"Only the selected positive branch invokes FmtCount. Zero and negative totals do not observe its cache, even when that cache would throw.",
+		"For a positive total, FmtCount and its native suffix concatenation coercion complete before the outer FolderName concatenation coercion. This differs from the original file-parent expression's stem-first order.",
+		"An object returned by FmtCount is refused by the original inner native concatenation. An object FolderName is refused only at the original outer concatenation, after positive-branch FmtCount has already been observed.",
+		"Retain original thrown count/getter/formatter primary identity and the exact unpublished child cleanup path. No String(), trimming, Unicode normalization, control filtering or new numeric-domain restriction.",
+		"Direct integer-unit assertions must prove each synthetic UTF-16 input and returned caption, not merely compare strings constructed through the same transport helper.",
+		"Original concatenation allocation/error coordinates and AHK interruption schedules are not independently qualified by this source oracle."
+	],
+	"runtime": "UNRUN; no expected value was generated from a candidate implementation."
+}
