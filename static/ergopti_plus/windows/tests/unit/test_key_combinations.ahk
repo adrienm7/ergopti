@@ -457,30 +457,30 @@ _KCT_SlotsAreWrittenToTheConfiguration() {
 	; The real picker writes the selected configuration, not a generic data file.
 	ConfigurationFile := Fixture.path
 	Reloads := []
-	Reload := () => (Reloads.Push("reload"), true)
+	ReloadFn := () => (Reloads.Push("reload"), true)
 	Section() {
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		return Parsed.Has("shortcuts.key_combination_holds") ? Parsed["shortcuts.key_combination_holds"] : Map()
 	}
 	try {
-		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "ctrl+shift", Fixture.path, Reload))
+		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "ctrl+shift", Fixture.path, ReloadFn))
 		AssertEqual("ctrl+shift", Section().Get("left_alt_then_caps_lock", ""), "the hold slot is written")
 		AssertEqual(1, Reloads.Length, "the driver reloads so the pair hotkeys read it")
-		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "none", Fixture.path, Reload))
+		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "none", Fixture.path, ReloadFn))
 		AssertFalse(Section().Has("left_alt_then_caps_lock"), "an empty hold slot leaves no key")
-		AssertThrows(() => SetKeyCombinationHold("left_alt_then_caps_lock", "hyper", Fixture.path, Reload),
+		AssertThrows(() => SetKeyCombinationHold("left_alt_then_caps_lock", "hyper", Fixture.path, ReloadFn),
 			"a hold the picker does not offer is refused")
-		AssertThrows(() => SetKeyCombinationHold("left_alt_then_left_alt", "ctrl", Fixture.path, Reload),
+		AssertThrows(() => SetKeyCombinationHold("left_alt_then_left_alt", "ctrl", Fixture.path, ReloadFn),
 			"a pair of one key twice is refused")
 		Assert(FSWriteDurable(Fixture.path, _CMJFixtureCurrentSource('[shortcuts.key_combination_taps]`nspace_then_enter = "caps_word"`n'
 			. 'left_alt_then_caps_lock = "caps_lock"`n[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`n')))
-		AssertTrue(ClearKeyCombination("space_then_enter", Fixture.path, Reload))
+		AssertTrue(ClearKeyCombination("space_then_enter", Fixture.path, ReloadFn))
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		Taps := Parsed.Has("shortcuts.key_combination_taps") ? Parsed["shortcuts.key_combination_taps"] : Map()
 		AssertFalse(Taps.Has("space_then_enter"), "the clear row empties the tap slot")
 		AssertEqual("caps_lock", Taps.Get("left_alt_then_caps_lock", ""), "and leaves the other pairs")
 		AssertFalse(Section().Has("space_then_enter"), "the clear row empties the hold slot")
-		AssertTrue(ClearKeyCombination("left_alt_then_caps_lock", Fixture.path, Reload))
+		AssertTrue(ClearKeyCombination("left_alt_then_caps_lock", Fixture.path, ReloadFn))
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		Taps := Parsed.Has("shortcuts.key_combination_taps") ? Parsed["shortcuts.key_combination_taps"] : Map()
 		AssertFalse(Taps.Has("left_alt_then_caps_lock"), "a declared pair goes back to its empty default")

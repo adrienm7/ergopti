@@ -37,14 +37,14 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 		}
 		if Quote != "" {
 			if StrLen(Quote) == 3 && Triple == Quote {
-				Run := 3
-				while SubStr(Text, Position + Run, 1) == Char
-					Run += 1
-				if Run > 5
+				QuoteRunLength := 3
+				while SubStr(Text, Position + QuoteRunLength, 1) == Char
+					QuoteRunLength += 1
+				if QuoteRunLength > 5
 					throw ValueError("Invalid TOML multiline string closure")
-				SpanEnd := Position + Run - 1
-				Result .= SubStr(Text, Position, Run)
-				Position += Run
+				SpanEnd := Position + QuoteRunLength - 1
+				Result .= SubStr(Text, Position, QuoteRunLength)
+				Position += QuoteRunLength
 				Quote := ""
 				continue
 			}
