@@ -5014,6 +5014,20 @@ and physical receiving remain separate. The bounded original receipts and source
 chain are in the [current handover](handovers/2026-10-11-config-menus/README.md).
 Item 42 remains partial.
 
+The integrated native run actually passes the original conflict case in
+5,224.538 ms, then reaches six queued-gesture restart failures at the same marker
+consumer. It completes 2,081 passes and six failures before the unchanged global
+watchdog, leaving 9,034 cases without terminal results. The restart fixture now
+selects its independently copied file as the actual configuration destination,
+checks its typed current schema and genuine native startup, and preserves the
+copied bytes before invoking the original marker consumer. Its inner protected
+scope restores the previous configuration path, including unset, before outer
+cleanup. All eight subjects and original assertions remain; production writers,
+source protection and watchdogs are unchanged. Independent source review passes;
+selected local and actual Windows successor validation remain pending. This does
+not qualify full-suite coverage, packaging, installation or physical gestures.
+Item 42 remains partial.
+
 The shared canonical-hash test hook previously survived its foreign-source
 fault and contaminated later transition admission. The bounded fixture successor
 restores the genuine callback first, attempts every existing cleanup, and
