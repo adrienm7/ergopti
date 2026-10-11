@@ -21,6 +21,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../support/altgr_probe_ordinary_owner.ahk
 
 
 
@@ -1134,3 +1135,21 @@ _KCT_AltGrFailedDiagnosticsRemainWithReceipt() {
 }
 Test("key combinations: failed child diagnostics remain with the cohort receipt (altgr-child-evidence)",
 	_KCT_AltGrFailedDiagnosticsRemainWithReceipt)
+
+
+_KCT_AltGrOrdinaryOwnerIsOnlyItsAssertedSuffix() {
+	for _, HotkeyName in ["SC01D", "*SC01D", "SC001", "SC11D", "~SC01D & ~SC138"]
+		AssertFalse(_KCT_ProbeOrdinaryOwner(HotkeyName, true),
+			"focused " . HotkeyName . " cannot claim the unobserved ordinary owner")
+	for _, HotkeyName in ["SC138", "*SC138", "sc138"] {
+		AssertTrue(_KCT_ProbeOrdinaryOwner(HotkeyName, true), "the actual ordinary suffix remains independently eligible")
+		AssertFalse(_KCT_ProbeOrdinaryOwner(HotkeyName, false), "an unfocused suffix cannot own input")
+	}
+	Source := FileRead(A_ScriptDir . "\fixtures\key_combination_altgr_suffix_probe.ahk", "UTF-8")
+	Body := _DriverExtractFunctionBody(&Source, "KeyCombinationOwnsHotkey")
+	Assert(Body != "", "the actual hook fixture criterion must exist")
+	AssertContains(Body, "_KCT_ProbeOrdinaryOwner(A_ThisHotkey, ProbeHasFocus())",
+		"the actual fixture uses the exercised suffix predicate and current focus fence")
+}
+Test("key combinations: the hook probe ordinary owner admits only its asserted suffix (altgr-probe-ordinary-owner)",
+	_KCT_AltGrOrdinaryOwnerIsOnlyItsAssertedSuffix)
