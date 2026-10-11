@@ -26,3 +26,4 @@
 #Include llm_nav_event_owner/test_stop_diagnostics.ahk
 #Include llm_nav_event_owner/test_val_chord_insert.ahk
 #Include llm_nav_event_owner/test_terminal_route_metadata.ahk
+#Include llm_nav_event_owner/test_terminal_output_preview.ahk
