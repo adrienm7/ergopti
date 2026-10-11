@@ -2836,6 +2836,136 @@ static bool TestTerminalRouteSnapshotsRetainExactSuffix(void)
 
 
 
+/** Authenticates canonical previews without acknowledging or sending any edge. */
+static bool TestTerminalOutputPreviewIsAuthenticatedAndGuarded(void)
+{
+	const char *name = "terminal output preview is authenticated and guarded (todo49-output-preview)";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TerminalCaptureSnapshot before, after;
+	ErgoptiNav_TerminalRouteSnapshot snapshots[5];
+	ErgoptiNav_TerminalOutputPreview preview;
+	ErgoptiOutput_Unit units[4];
+	ErgoptiNav_TestEvent replayed[5];
+	ErgoptiReplay_Route routes[2];
+	uint64_t generation = 0;
+	uint32_t index, replayed_count = 0;
+	uint8_t mask = 0, passed = 0, ordered = 0;
+	const uint16_t ascii[1] = { 0x78 };
+	const uint16_t supplementary[2] = { 0xD83D, 0xDE00 };
+	const uint16_t malformed[1] = { 0xD83D };
+	const uint16_t vks[5] = { VK_LSHIFT, VK_LSHIFT, 'A', 'A', 'B' };
+	const uint16_t scans[5] = { 0x2A, 0x2A, 0x1E, 0x1E, 0x30 };
+	const uint8_t edges[5] = {
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_EVENT_DOWN
+	};
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	memset(routes, 0, sizeof(routes));
+	routes[0].recipe_id = 1100;
+	routes[0].route_id = 1;
+	routes[0].code = 0x2A;
+	routes[0].axis = ERGOPTI_REPLAY_SCAN;
+	routes[0].target_scan = 0x2A;
+	routes[0].kind = ERGOPTI_REPLAY_MODIFIER;
+	routes[0].effective_modifiers_lr = ERGOPTI_REPLAY_LSHIFT;
+	routes[1].recipe_id = 2200;
+	routes[1].route_id = 2;
+	routes[1].code = 0x1E;
+	routes[1].axis = ERGOPTI_REPLAY_SCAN;
+	routes[1].kind = ERGOPTI_REPLAY_CHARACTER;
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11,
+		routes, 2) == ERGOPTI_REPLAY_OK);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+		== ERGOPTI_NAV_STATUS_OK);
+	for (index = 0; index < 5; ++index) {
+		TEST_ASSERT(name, TestHookFlow(name, vks[index], scans[index], edges[index],
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+		TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, index,
+			&snapshots[index]) == ERGOPTI_NAV_STATUS_OK);
+	}
+	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &before)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[2].sequence, 2, ascii, 1, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, preview.owner == TEST_OWNER_A && preview.token == TEST_OWNER_B);
+	TEST_ASSERT(name, preview.sequence == snapshots[2].sequence && preview.plan_id != 0);
+	TEST_ASSERT(name, preview.planner_status == ERGOPTI_OUTPUT_DIAGNOSTIC);
+	TEST_ASSERT(name, preview.dispatchable == 0 && preview.unit_count == 2);
+	TEST_ASSERT(name, preview.reserved == 0 && preview.reserved_tail[0] == 0);
+	for (index = 0; index < 2; ++index) {
+		TEST_ASSERT(name, units[index].kind == ERGOPTI_OUTPUT_UNICODE);
+		TEST_ASSERT(name, units[index].utf16 == 0x78 && units[index].key_up == index);
+		TEST_ASSERT(name, units[index].vk == 0 && units[index].scan == 0 && units[index].repeat == 0);
+	}
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[2].sequence, 2, supplementary, 2, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, preview.unit_count == 4 && preview.dispatchable == 0);
+	for (index = 0; index < 4; ++index) {
+		TEST_ASSERT(name, units[index].utf16 == supplementary[index / 2]);
+		TEST_ASSERT(name, units[index].key_up == index % 2);
+	}
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[2].sequence, 2, ascii, 1, &preview, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, preview.unit_count == 2 && preview.dispatchable == 0);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[3].sequence, 3, NULL, 0, &preview, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, preview.unit_count == 0 && preview.dispatchable == 0);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[0].sequence, 0, NULL, 0, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, preview.unit_count == 1 && preview.dispatchable == 0);
+	TEST_ASSERT(name, units[0].kind == ERGOPTI_OUTPUT_NATIVE_EDGE);
+	TEST_ASSERT(name, units[0].scan == 0x2A && units[0].vk == 0 && units[0].key_up == 0);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[4].sequence, 4, NULL, 0, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, preview.unit_count == 0 && preview.dispatchable == 0);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_B, TEST_OWNER_B,
+		snapshots[2].sequence, 2, ascii, 1, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_A,
+		snapshots[2].sequence, 2, ascii, 1, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[2].sequence + 1, 2, ascii, 1, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[2].sequence, 5, ascii, 1, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_NOT_FOUND);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[2].sequence, 2, malformed, 1, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[2].sequence, 2, ascii, 1, &preview, units, 1)
+		== ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, memcmp(&before, &after, sizeof(before)) == 0);
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, 1, replayed, 5, &replayed_count)
+		== ERGOPTI_NAV_STATUS_OS_ERROR);
+	TEST_ASSERT(name, replayed_count == 1);
+	/* An array index cannot authorize a preview after an accepted prefix moved it. */
+	TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		snapshots[0].sequence, 0, NULL, 0, &preview, units, 4)
+		== ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, replayed, 5, &replayed_count)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, replayed_count == 4);
+	return true;
+}
+
+
+
 /** Rejects a replay marker when Win32 reports lower-integrity injection. */
 static bool TestTerminalReplayCannotPromoteLowerIntegrity(void)
 {
@@ -4169,6 +4299,8 @@ int main(int argc, char **argv)
 			TestTerminalCaptureReplaysExactPhysicalEdges},
 		{"terminal route snapshots retain exact suffix (todo49-route-fifo)",
 			TestTerminalRouteSnapshotsRetainExactSuffix},
+		{"terminal output preview is authenticated and guarded (todo49-output-preview)",
+			TestTerminalOutputPreviewIsAuthenticatedAndGuarded},
 		{"terminal replay cannot promote lower integrity (todo49-replay-provenance)",
 			TestTerminalReplayCannotPromoteLowerIntegrity},
 		{"terminal replay retains effective modifiers (todo49-replay-modifiers)",

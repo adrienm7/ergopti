@@ -638,6 +638,8 @@ $vendorDir = Join-Path $repoRoot "static\ergopti_plus\windows\vendor"
 $sourcePath = Join-Path $sourceDir "nav_event_owner.c"
 $editorSourcePath = Join-Path $sourceDir "editor_replace.c"
 $replaySourcePath = Join-Path $sourceDir "replay_route_core.c"
+$outputSourcePath = Join-Path $sourceDir "terminal_output_plan.c"
+$outputTestSourcePath = Join-Path $sourceDir "terminal_output_plan_test.c"
 $replayTestSourcePath = Join-Path $sourceDir "replay_route_core_test.c"
 $headerPath = Join-Path $sourceDir "nav_event_owner.h"
 $definitionPath = Join-Path $sourceDir "nav_event_owner.def"
@@ -645,6 +647,7 @@ $testSourcePath = Join-Path $sourceDir "nav_event_owner_test.c"
 $editorTestSourcePath = Join-Path $sourceDir "editor_replace_test.c"
 $cmakePath = Join-Path $sourceDir "CMakeLists.txt"
 $testExePath = Join-Path $buildDir "ergopti_nav_event_owner_test.exe"
+$outputTestExePath = Join-Path $buildDir "ergopti_terminal_output_plan_test.exe"
 $replayTestExePath = Join-Path $buildDir "ergopti_replay_route_core_test.exe"
 $buildDllPath = Join-Path $buildDir "ergopti_nav_owner.dll"
 $vendorDllPath = Join-Path $vendorDir "ergopti_nav_owner.dll"
@@ -653,7 +656,7 @@ $manifestSchemaVersion = 1
 $vendorDllRelativePath = "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll"
 $buildScriptRelativePath = "tools/build/build_windows_nav_owner.ps1"
 
-foreach ($requiredSource in @($sourcePath, $editorSourcePath, $replaySourcePath, $replayTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
+foreach ($requiredSource in @($sourcePath, $editorSourcePath, $replaySourcePath, $replayTestSourcePath, $outputSourcePath, $outputTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
 	if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
 		throw "Required native source is missing: $requiredSource"
 	}
@@ -700,6 +703,7 @@ $dllRecipeArguments = $commonCompilerRecipeFlags + @(
 	"{source_dir}\nav_event_owner.c",
 	"{source_dir}\editor_replace.c",
 	"{source_dir}\replay_route_core.c",
+	"{source_dir}\terminal_output_plan.c",
 	"/link",
 	"/DEF:{source_dir}\nav_event_owner.def",
 	"/OUT:{build_dir}\ergopti_nav_owner.dll",
@@ -729,6 +733,16 @@ New-Item -ItemType Directory -Force -Path $vendorDir | Out-Null
 
 Push-Location $buildDir
 try {
+	$outputTestArguments = $commonCompilerFlags + @(
+		$replaySourcePath,
+		$outputSourcePath,
+		$outputTestSourcePath,
+		"/Fe:$outputTestExePath",
+		"/link"
+	) + $commonLinkerFlags
+	Invoke-CheckedNative -Label "Compiling the terminal output planner test" -Executable "cl.exe" -Arguments $outputTestArguments
+	Invoke-CheckedNative -Label "Running the terminal output planner test" -Executable $outputTestExePath -Arguments @()
+
 	$replayTestArguments = $commonCompilerFlags + @(
 		$replaySourcePath,
 		$replayTestSourcePath,
@@ -745,6 +759,7 @@ try {
 		$sourcePath,
 		$editorSourcePath,
 		$replaySourcePath,
+		$outputSourcePath,
 		"/Fe:$testExePath",
 		"/link"
 	) + $commonLinkerFlags

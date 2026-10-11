@@ -16,6 +16,7 @@ EXPORTS
 	ErgoptiNav_SetSuspended
 	ErgoptiNav_RegisterTerminalRoutes
 	ErgoptiNav_ListTerminalHeldRecipes
+	ErgoptiNav_PreviewTerminalOutput
 	ErgoptiNav_PeekTerminalRoute
 	ErgoptiNav_BeginTerminalCapture
 	ErgoptiNav_CommitTerminalCapture

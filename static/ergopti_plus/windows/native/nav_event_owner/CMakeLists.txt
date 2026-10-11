@@ -17,6 +17,7 @@ endif()
 add_library(ergopti_nav_owner SHARED
 	nav_event_owner.c
 	replay_route_core.c
+	terminal_output_plan.c
 	editor_replace.c
 	nav_event_owner.def
 )
@@ -29,6 +30,7 @@ add_executable(ergopti_nav_event_owner_test
 	editor_replace_test.c
 	nav_event_owner.c
 	replay_route_core.c
+	terminal_output_plan.c
 	editor_replace.c
 )
 
@@ -43,6 +45,13 @@ add_executable(ergopti_replay_route_core_test
 )
 target_compile_features(ergopti_replay_route_core_test PRIVATE c_std_11)
 
+add_executable(ergopti_terminal_output_plan_test
+	replay_route_core.c
+	terminal_output_plan.c
+	terminal_output_plan_test.c
+)
+target_compile_features(ergopti_terminal_output_plan_test PRIVATE c_std_11)
+
 if(MSVC)
 	set_property(TARGET ergopti_nav_owner PROPERTY
 		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -53,12 +62,17 @@ if(MSVC)
 	set_property(TARGET ergopti_replay_route_core_test PROPERTY
 		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 	target_compile_options(ergopti_replay_route_core_test PRIVATE /W4 /WX /wd5105)
+	set_property(TARGET ergopti_terminal_output_plan_test PROPERTY
+		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+	target_compile_options(ergopti_terminal_output_plan_test PRIVATE /W4 /WX /wd5105)
 	target_compile_options(ergopti_nav_owner PRIVATE /W4 /WX /wd5105)
 	target_compile_options(ergopti_nav_event_owner_test PRIVATE /W4 /WX /wd5105)
 endif()
 
 include(CTest)
 if(BUILD_TESTING)
+	add_test(NAME ergopti_terminal_output_plan_test
+		COMMAND ergopti_terminal_output_plan_test)
 	add_test(NAME ergopti_replay_route_core_test
 		COMMAND ergopti_replay_route_core_test)
 	add_test(NAME ergopti_nav_event_owner_test

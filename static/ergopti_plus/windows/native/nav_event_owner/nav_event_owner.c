@@ -3013,6 +3013,69 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
 
 
 
+/** Authenticates and previews one canonical plan without touching FIFO debt. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PreviewTerminalOutput(
+	uint64_t owner, uint64_t token, uint64_t sequence, uint32_t index,
+	const uint16_t *text, uint32_t text_length,
+	ErgoptiNav_TerminalOutputPreview *out_preview,
+	ErgoptiOutput_Unit *out_units, uint32_t capacity)
+{
+	ErgoptiOutput_State plan = ERGOPTI_OUTPUT_STATE_INIT;
+	ErgoptiOutput_Key key;
+	ErgoptiNav_TerminalOutputPreview preview;
+	int32_t status;
+	uint32_t count = 0, dispatchable = 0;
+	if (owner == 0 || token == 0 || sequence == 0 || out_preview == NULL
+			|| text_length > ERGOPTI_OUTPUT_MAX_UTF16
+			|| (text_length != 0 && text == NULL)
+			|| capacity > ERGOPTI_OUTPUT_MAX_UNITS
+			|| (capacity != 0 && out_units == NULL))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (g_nav_state.terminal_routes.owner != owner
+			|| g_nav_state.terminal_token != token) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	}
+	if (index >= g_nav_state.terminal_queued) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_NOT_FOUND;
+	}
+	if (g_nav_state.terminal_events[index].sequence != sequence) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_STATE;
+	}
+	status = ErgoptiOutput_Initialize(&plan, owner);
+	if (status == ERGOPTI_OUTPUT_OK)
+		status = ErgoptiOutput_Plan(&plan, owner, token, sequence,
+			&g_nav_state.terminal_routes, &g_nav_state.terminal_events[index].route,
+			text, text_length, 0, &key);
+	if (status != ERGOPTI_OUTPUT_DIAGNOSTIC) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_STATE;
+	}
+	status = ErgoptiOutput_Inspect(&plan, owner, &key, out_units, capacity,
+		&count, &dispatchable);
+	if (status != ERGOPTI_OUTPUT_OK || dispatchable != 0) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	}
+	memset(&preview, 0, sizeof(preview));
+	preview.owner = owner;
+	preview.token = key.token;
+	preview.sequence = key.sequence;
+	preview.plan_id = key.plan_id;
+	preview.unit_count = count;
+	preview.planner_status = ERGOPTI_OUTPUT_DIAGNOSTIC;
+	memcpy(out_preview, &preview, sizeof(preview));
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
 /** Implements ErgoptiNav_BeginTerminalCapture. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
 	uint64_t token)

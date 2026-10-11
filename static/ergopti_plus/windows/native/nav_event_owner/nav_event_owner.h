@@ -17,6 +17,7 @@
 #include <stdint.h>
 
 #include "replay_route_core.h"
+#include "terminal_output_plan.h"
 
 #if !defined(_WIN32)
 #error "The Ergopti navigation event owner requires Win32."
@@ -258,6 +259,19 @@ typedef struct ErgoptiNav_TerminalRouteSnapshot {
 	ErgoptiReplay_Snapshot route;
 } ErgoptiNav_TerminalRouteSnapshot;
 
+/** A non-delivering authenticated output preview; all reserved fields are zero. */
+typedef struct ErgoptiNav_TerminalOutputPreview {
+	uint64_t owner;
+	uint64_t token;
+	uint64_t sequence;
+	uint64_t plan_id;
+	uint32_t unit_count;
+	uint32_t reserved;
+	int32_t planner_status;
+	uint8_t dispatchable;
+	uint8_t reserved_tail[3];
+} ErgoptiNav_TerminalOutputPreview;
+
 #pragma pack(pop)
 
 #if defined(__cplusplus)
@@ -303,6 +317,8 @@ ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TestEvent) == 16, "Test event ABI si
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TestEvent, extra_info) == 8, "Test event marker offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_DispatchResult) == 12, "Dispatch result ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_DispatchResult, receipt_sequence) == 4, "Dispatch sequence offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalOutputPreview) == 48, "Output preview ABI size changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalOutputPreview, planner_status) == 40, "Output preview status offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalRouteSnapshot) == 184, "Terminal route snapshot ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalRouteSnapshot, route) == 16, "Terminal route offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalCaptureSnapshot) == 28, "Terminal snapshot ABI size changed.");
@@ -404,6 +420,18 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ListTerminalHeldRecipes(
 /** Copies one queued immutable recipe; never consumes or acknowledges its edge. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
 	uint64_t token, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot);
+
+/**
+ * Plans canonical supplied UTF16 against the authenticated immutable FIFO edge.
+ * This diagnostic call hardcodes cohort completeness to false, never sends input
+ * and never acknowledges an original edge or transformed unit. A NULL units
+ * pointer with capacity zero queries the required count; no partial copy occurs.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PreviewTerminalOutput(
+	uint64_t owner, uint64_t token, uint64_t sequence, uint32_t index,
+	const uint16_t *text, uint32_t text_length,
+	ErgoptiNav_TerminalOutputPreview *out_preview,
+	ErgoptiOutput_Unit *out_units, uint32_t capacity);
 
 /** Starts one bounded physical-keyboard capture for terminal paced output. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
