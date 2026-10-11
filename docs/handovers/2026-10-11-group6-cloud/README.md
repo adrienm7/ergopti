@@ -190,3 +190,81 @@ maintainer-PC continuation; real corporate-network acceptance is separate.
 No production qualification guard, timeout, independent corpus or original
 assertion is weakened. Continue from the feature branch; final integration
 and deletion require the authorized serialized protocol and honest receiving.
+
+## Bounded post-install receiving and same-owner cleanup
+
+After the ordinary Dev imports through `fa1049e4d65e9766984163df4bdf0fe468304a96`,
+the three exact preimages still match. The granted bounded fixture/test spans
+and their necessary unique registry enrollment are adopted on the feature
+branch. Coordination is recorded in
+[comment 6108631133](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6108631133).
+All other registry entries, exact census/status/no-skip predicates and budgets
+remain unchanged. The initial receiver requires exactly 72 methods; the
+same-owner cleanup correction below adds 18 methods to the strict census.
+
+The original 15-second installation budget also bounds the optional exact-CA
+query; it cannot renew the clock. Settled technical query refusals retain the
+original successful add fact, while unsettled query authority and capture debt
+remain blocking. The post-install diagnostic uses stderr. Two additive methods
+use the worker's exact existing handler and real SIGINT/SIGTERM both before
+query acquisition and after a real portable query closes. Frozen70 fails both
+methods with four signal assertion records, zero errors/skips. Corrected72
+passes all 72 methods, zero failures/errors/skips. Every original63 and retained
+post-install7 helper/test body remains byte-exact. In this intermediate source,
+`_command` retains its original body. The narrow cancellation guard applies to the new post-install role
+and preserves the exact cancellation exception without changing ordinary query
+refusal handling or pre-existing removal roles.
+
+[The receiving capsule](postinstall72-portable-proposal.tar.gz) and
+[its hash/length binding](postinstall72-portable-proposal.json) retain exact
+preimages, candidate hashes, the three-path adoption patch, source inverses,
+original-red and corrected raw receipts, and reproduction instructions. Verify
+safe members and all bindings before reproducing outside the checkout. This
+supersedes the standalone70 adoption preparation above; its historical packet
+remains unchanged. TimeoutR2 and combined84 are separate inactive preparations.
+PAC has no qualified exact-CA query callee in its current execution order, so
+this change grants no PAC/WPAD CA-visibility or native trust-policy acceptance.
+Darwin SDK/PAC14/HTTP/model setup and restoration, package/install, ordinary
+Automation consent, Brew6 and managed-network/device acceptance remain required.
+Items 36/62 and transversal16/38 remain open; no final Dev integration is claimed.
+
+Before committing that intermediate source, actual POSIX receiving exposes two
+additional defects. An unsettled original owner is forgotten between `_command`
+and `close`; subsequent cleanup can overwrite its fact and remove the root while
+the original actual child is still alive. Separately, a real SIGINT/SIGTERM at
+the optional successful add-outcome publication is swallowed before the new
+query. Security and native settlement are explicitly modeled in these controls;
+every actual outer child is independently terminated and reaped. These results
+do not establish a historical Darwin trust or Automation cause.
+
+The correction retains the same acquired owner, including interruption before
+its registration record is persisted. The original sole `settle` call must return
+identity `True` before that record is retired. Outstanding child debt refuses new
+captures/acquisitions and prevents `close` from deleting the root; capture-file
+debt remains independent. It adds neither an owner proxy, second settlement call,
+permission operation nor clock. Actual cancellation at successful optional
+publication propagates before the query; an existing primary still dominates,
+and a technical sink refusal remains optional. All original trust/removal/query
+roles, worker signal handlers and server cleanup bodies remain unchanged.
+
+Portable receiving passes the unchanged72 and additive18 controls, zero failures,
+errors or skips. Three frozen-prototype controls reproduce malformed-ACK and
+registration-interruption assertion failures before correction. The first new
+test attempt's incorrect demand for a removal acquisition after its mandatory
+query refuses debt is retained separately; the corrected additive test checks
+the original trust cleanup invocation and keychain cleanup attempt. No original
+test assertion is changed. Canonical full-gate and native results are recorded
+at their actual completed source checkpoints below.
+
+[The guard90 capsule](command-guard90-portable-proposal.tar.gz) and
+[its inventory/binding](command-guard90-portable-proposal.json) retain the exact
+three-path patch and inverse, original72 byte preservation, final90 receiving,
+four canonical72 causal assertion failures without helper errors, the three
+frozen-prototype failures, initial authoring errors and rejected unrelated count
+preparation, and independently reaped POSIX counterexamples. All 68 unique
+members are regular relative files. After verified safe extraction, use
+`python3 -I -B reproduce90.py` from the extracted packet; the canonical fixture
+and its receiving registry must match the recorded preimages before adoption.
+Only the actual HTTP registry changes to 90; the unrelated Linux package's
+72-vector condition corpus is preserved byte-exact. This capsule supplements
+the earlier postinstall72 packet rather than rewriting its historical evidence.
