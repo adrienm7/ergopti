@@ -226,12 +226,15 @@ _HBC_WithScratchConfig(Gates, Body) {
 	SavedCategories := CategoryEnabled
 	SavedOwner := MasterGateState().Clone()
 	ReloadsBefore := _Stub_SentText.Length
-	ConfigPath := A_Temp . "\ergopti_hbc_whole_tree_" . A_ScriptHwnd . "_" . A_TickCount . ".toml"
-	try FileDelete(ConfigPath)
+	ConfigPath := "", Fixture := 0
 	try {
+		; The scratch file is genuinely boot-admitted before any section transaction.
+		Fixture := _ScopeOwnerFixture("")
+		ConfigPath := Fixture.path
 		_FLAT_HOTSTRING_V1_CATS := ["Rolls"]
 		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
 		ConfigurationFile := ConfigPath
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigPath), "whole-tree selection starts from its real current source")
 		Features := ManifestBuildFeaturesMap()
 		CategoryEnabled := CategoryEnabled.Clone()
 		for Gate, Value in Gates
@@ -253,7 +256,8 @@ _HBC_WithScratchConfig(Gates, Body) {
 			_Stub_SentText.Pop()
 		if _ParseTomlCache.Has(ConfigPath)
 			_ParseTomlCache.Delete(ConfigPath)
-		try FileDelete(ConfigPath)
+		if IsObject(Fixture)
+			_ScopeOwnerCleanup(Fixture)
 	}
 }
 

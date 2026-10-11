@@ -266,11 +266,16 @@ _CTC_MetricsMenuFirstRowIsCheckbox() {
 
 ; IA: the first row is the manifest's llm_toggle, not the retired on/off labels.
 _CTC_LlmMenuFirstRowIsCheckbox() {
-	global _LLM_Menu, _LLM_Menu_Handle
+	global _LLM_Menu, _LLM_Menu_Handle, ConfigurationFile
+	SavedPath := ConfigurationFile, Fixture := 0
 	Saved := _LLM_Menu
 	SavedHandle := (IsSet(_LLM_Menu_Handle) && IsObject(_LLM_Menu_Handle)) ? _LLM_Menu_Handle : ""
 	Label := t("menu.llm.enable")
 	try {
+		; A rendered enabled row consumes real persistence admission, not just menu state.
+		Fixture := _ScopeOwnerFixture("[llm]`nenabled = true`n")
+		ConfigurationFile := Fixture.path
+		AssertTrue(ConfigFullStateCanPersist(), "the checkbox premise has genuine current-source persistence admission")
 		for State in [true, false] {
 			_LLM_Menu := _CTC_LlmFixture(State)
 			_LLM_Menu_Handle := Menu()
@@ -283,6 +288,9 @@ _CTC_LlmMenuFirstRowIsCheckbox() {
 		_LLM_Menu := Saved
 		if (SavedHandle != "")
 			_LLM_Menu_Handle := SavedHandle
+		ConfigurationFile := SavedPath
+		if IsObject(Fixture)
+			_ScopeOwnerCleanup(Fixture)
 	}
 }
 
