@@ -54,7 +54,7 @@
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases and one final verdict. Linux keeps one entry; Windows starts its
+ *    phases and one final verdict. Linux and Windows start their
  *    two suites independently. macOS has five entries: the scoped native
  *    archive, independent unit/E2E tests, managed Ollama and cold bootstrap.
  *    Its native tooltip canvas still waits for both suites.
@@ -1178,7 +1178,11 @@ function graphProblems(files) {
 									? []
 									: rel === MACOS_BOX && id === 'package-macos'
 										? ['test-hs', 'e2e-hs', 'managed-ollama-native']
-										: [sequence[index - 1]];
+										: rel === LINUX_BOX && id === 'e2e-linux'
+											? []
+											: rel === LINUX_BOX && id === 'package-linux'
+												? ['test-linux', 'e2e-linux']
+												: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
@@ -1186,7 +1190,7 @@ function graphProblems(files) {
 				index === 4
 					? 'always()'
 					: rel === LINUX_BOX && id === 'package-linux'
-						? "${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+						? "${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 						: null;
 			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
 				problems.push(
@@ -1253,14 +1257,11 @@ function graphProblems(files) {
 					`${rel} must have exactly the five declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
-		} else if (rel === WINDOWS_BOX) {
-			const expectedEntries = ['test-ahk', 'e2e-ahk'];
+		} else {
+			const expectedEntries =
+				rel === WINDOWS_BOX ? ['test-ahk', 'e2e-ahk'] : ['test-linux', 'e2e-linux'];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries))
 				problems.push(`${rel} must retain exactly the independent unit and E2E entries`);
-		} else if (entries.length !== 1) {
-			problems.push(
-				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
-			);
 		}
 		const expectedExits = rel === MACOS_BOX ? ['item36-native', 'macos-ok'] : [sequence[4]];
 		if (
@@ -1339,6 +1340,30 @@ for (const [what, from, to] of [
 	]
 ])
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
+// Independent Linux suites still gate packaging and the mandatory verdict.
+for (const [what, from, to] of [
+	[
+		'Linux E2E is coupled to units again',
+		"  e2e-linux:\n    name: 'E2E tests'\n",
+		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n"
+	],
+	['Linux package omits units', '    needs: [test-linux, e2e-linux]\n', '    needs: [e2e-linux]\n'],
+	['Linux package omits E2E', '    needs: [test-linux, e2e-linux]\n', '    needs: [test-linux]\n'],
+	['Linux package forgives failed units', "needs.test-linux.result == 'success' && ", ''],
+	[
+		'Linux package drops manual failed-E2E diagnostics',
+		" || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
+		''
+	],
+	[
+		'Linux package admits failed E2E automatically',
+		"(github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
+		"(needs.e2e-linux.result == 'failure')"
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, graphProblems);
+}
+
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
@@ -1403,7 +1428,7 @@ for (const [what, rel, from, to] of [
 		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n    needs: test-hs\n"
 	],
 	[
-		'a second entry in the Linux lane',
+		'a third entry in the Linux lane',
 		LINUX_BOX,
 		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
 		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"

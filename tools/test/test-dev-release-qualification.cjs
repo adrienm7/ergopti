@@ -496,7 +496,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'item36-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
 		'macos-ok': 'always()',
 		'package-linux':
-			"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+			"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
 		'linux-ok': 'always()'
 	};
 	let jobs = 0,

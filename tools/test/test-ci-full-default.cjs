@@ -413,20 +413,34 @@ check('release keeps real full predicates and implicit successful dependency adm
 check('full Linux package retains cancellation and manual receiving allowance', () => {
 	const expression = Raw.field(Raw.job('package-linux'), 'if')
 		.slice(3, -2)
+		.replaceAll('needs.test-linux.result', "needs['test-linux'].result")
 		.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
 	const evaluate = new Function('needs', 'github', 'cancelled', `return (${expression});`);
+	const accepted = new Set([
+		'push:success:success:false',
+		'pull_request:success:success:false',
+		'workflow_dispatch:success:success:false',
+		'workflow_dispatch:success:failure:false',
+		'schedule:success:success:false',
+		'unknown:success:success:false',
+		'null:success:success:false'
+	]);
 	let cases = 0;
 	for (const event of ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown', null])
-		for (const result of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
-			for (const cancelled of [false, true]) {
-				assert.equal(
-					evaluate({ 'e2e-linux': { result } }, { event_name: event }, () => cancelled),
-					!cancelled &&
-						(result === 'success' || (event === 'workflow_dispatch' && result === 'failure'))
-				);
-				cases++;
-			}
-	assert.equal(cases, 72);
+		for (const unitResult of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
+			for (const result of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
+				for (const cancelled of [false, true]) {
+					assert.equal(
+						evaluate(
+							{ 'test-linux': { result: unitResult }, 'e2e-linux': { result } },
+							{ event_name: event },
+							() => cancelled
+						),
+						accepted.has(`${event}:${unitResult}:${result}:${cancelled}`)
+					);
+					cases++;
+				}
+	assert.equal(cases, 432);
 });
 check('package duplicate HTTP receiving scopes only the native wire command', () => {
 	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(

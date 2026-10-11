@@ -1499,12 +1499,12 @@ assert.deepStrictEqual(
 // Manual diagnostics can qualify packages after failed E2E receiving, while
 // both the mandatory verdict and automatic release admission remain strict.
 const manualPackageJob = pipeline.job('package-linux');
-assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['e2e-linux']);
-assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['test-linux']);
+assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['test-linux', 'e2e-linux']);
+assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), []);
 assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), null);
 assert.strictEqual(
 	pipeline.field(manualPackageJob, 'if'),
-	"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+	"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
 	'manual packaging must retain unit admission, cancellation and automatic E2E admission'
 );
 // The frozen acceptance table is independent of the workflow expression.
@@ -1512,37 +1512,42 @@ assert.strictEqual(
 const diagnosticEvents = ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown'];
 const diagnosticResults = ['success', 'failure', 'cancelled', 'skipped', null, 'unknown'];
 const admittedPackageCases = new Set([
-	'push:success:false',
-	'pull_request:success:false',
-	'workflow_dispatch:success:false',
-	'workflow_dispatch:failure:false',
-	'schedule:success:false',
-	'unknown:success:false'
+	'push:success:success:false',
+	'pull_request:success:success:false',
+	'workflow_dispatch:success:success:false',
+	'workflow_dispatch:success:failure:false',
+	'schedule:success:success:false',
+	'unknown:success:success:false'
 ]);
 const diagnosticExpression = pipeline
 	.field(manualPackageJob, 'if')
 	.slice(3, -2)
-	.replace('needs.e2e-linux.result', "needs['e2e-linux'].result")
-	.replace('needs.e2e-linux.result', "needs['e2e-linux'].result");
+	.replaceAll('needs.test-linux.result', "needs['test-linux'].result")
+	.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
 let diagnosticCaseCount = 0;
 for (const event of diagnosticEvents) {
-	for (const result of diagnosticResults) {
-		for (const cancelled of [false, true]) {
-			const actual = require('node:vm').runInNewContext(
-				diagnosticExpression,
-				{
-					cancelled: () => cancelled,
-					needs: { 'e2e-linux': { result } },
-					github: { event_name: event }
-				},
-				{ timeout: 100 }
-			);
-			assert.strictEqual(actual, admittedPackageCases.has(`${event}:${result}:${cancelled}`));
-			diagnosticCaseCount++;
+	for (const unitResult of diagnosticResults) {
+		for (const result of diagnosticResults) {
+			for (const cancelled of [false, true]) {
+				const actual = require('node:vm').runInNewContext(
+					diagnosticExpression,
+					{
+						cancelled: () => cancelled,
+						needs: { 'test-linux': { result: unitResult }, 'e2e-linux': { result } },
+						github: { event_name: event }
+					},
+					{ timeout: 100 }
+				);
+				assert.strictEqual(
+					actual,
+					admittedPackageCases.has(`${event}:${unitResult}:${result}:${cancelled}`)
+				);
+				diagnosticCaseCount++;
+			}
 		}
 	}
 }
-assert.strictEqual(diagnosticCaseCount, 60);
+assert.strictEqual(diagnosticCaseCount, 360);
 
 assert.strictEqual(
 	pipeline.field(pipeline.job('release'), 'if'),

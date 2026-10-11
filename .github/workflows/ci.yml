@@ -5,7 +5,7 @@
 # and (on main) mutation tests independently, each on a fresh shallow checkout.
 #
 # Every OS follows the same visible sequence:
-#   unit tests -> E2E tests -> package -> install and launch -> verdict
+#   parallel unit/E2E tests -> package -> install and launch -> verdict
 # Installation variants stay inside one matrix. Each verdict rejects missing
 # mandatory work. The release waits for core and all three verdicts, and keeps
 # its direct dependency on validate so reruns cannot lose the release plan.
