@@ -249,6 +249,15 @@ the full buffer when range information is unavailable, so new files still
 format without rewriting an ordinary tracked legacy file. Both editors prefer
 LF for new files. Lua and AutoHotkey remain outside automatic formatting.
 
+### project-private-payloads-need-explicit-formatter-config
+
+Prettier resolves configuration from the target file, even when its executable
+comes from the repository. Formatting a payload outside the checkout without
+`--config <checkout>/.prettierrc` therefore changed quotes and indentation across
+otherwise untouched source. Pass the explicit repository configuration for
+private payloads, then compare their diff against the original bytes; AST
+equivalence alone does not detect unrelated formatting churn.
+
 ## Agent context
 
 ### feedback-never-restart-a-running-workflow
