@@ -435,12 +435,21 @@ class VerdictTests(unittest.TestCase):
 
         receiver = step("Receive actual native model create, pull, inference and retirement")
         self.assertIn("        id: managed-ollama-model-receiving\n", receiver)
-        capture = step("Retain passive security service logs after native model failure")
+        for name, identifier in (
+            ("Qualify actual native PAC and WPAD XCTest controls", "managed-ollama-pac-receiving"),
+            (
+                "Receive actual independent managed HTTP native clients",
+                "managed-ollama-http-receiving",
+            ),
+        ):
+            with self.subTest(receiver=name):
+                self.assertIn(f"        id: {identifier}\n", step(name))
+        capture = step("Retain passive security service logs after native receiving failure")
         conditions = re.findall(r"^        if: (.*)$", capture, re.M)
         self.assertEqual(
             conditions,
             [
-                "${{ !cancelled() && failure() && steps.managed-ollama-model-receiving.outcome == 'failure' }}"
+                "${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.managed-ollama-http-receiving.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}"
             ],
         )
         self.assertIn("from macos_launch_gate import collect_security_logs", capture)
@@ -460,6 +469,53 @@ class VerdictTests(unittest.TestCase):
             job.index("Retain passive security service logs"),
             job.index("Upload qualified native inputs"),
         )
+
+    def test_security_log_workflow_covers_each_failed_native_receiver(self):
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci-macos.yml"
+        text = workflow.read_text(encoding="utf-8")
+        blocks = re.findall(
+            r"^      - name: Retain passive security service logs after native receiving failure\n"
+            r"(.*?)(?=^      - |\Z)",
+            text,
+            re.M | re.S,
+        )
+        self.assertEqual(len(blocks), 1)
+        conditions = re.findall(r"^        if: (.*)$", blocks[0], re.M)
+        self.assertEqual(len(conditions), 1)
+        condition = conditions[0]
+        clauses = re.findall(r"steps\.([\w-]+)\.outcome == '([^']+)'", condition)
+        identifiers = (
+            "managed-ollama-pac-receiving",
+            "managed-ollama-http-receiving",
+            "managed-ollama-model-receiving",
+        )
+        self.assertEqual(clauses, [(identifier, "failure") for identifier in identifiers])
+        self.assertEqual(
+            condition,
+            "${{ !cancelled() && failure() && ("
+            + " || ".join(f"steps.{identifier}.outcome == 'failure'" for identifier in identifiers)
+            + ") }}",
+        )
+
+        # Closed GitHub outcome model reads the actual source clauses. This is
+        # workflow admission evidence, never native Security service proof.
+        def observes(cancelled, failed, outcomes):
+            return (
+                not cancelled
+                and failed
+                and any(outcomes.get(identifier) == expected for identifier, expected in clauses)
+            )
+
+        for first in ("success", "skipped", "failure"):
+            for second in ("success", "skipped", "failure"):
+                for third in ("success", "skipped", "failure"):
+                    values = (first, second, third)
+                    outcomes = dict(zip(identifiers, values))
+                    with self.subTest(outcomes=values):
+                        self.assertEqual(observes(False, True, outcomes), "failure" in values)
+                        self.assertFalse(observes(True, True, outcomes))
+                        self.assertFalse(observes(False, False, outcomes))
+        self.assertFalse(observes(False, True, {}))
 
     def test_security_failure_logs_reuse_only_bounded_default_redacted_capture(self):
         for outcome in ("success", "refused", "timeout"):
