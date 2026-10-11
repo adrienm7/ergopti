@@ -259,13 +259,17 @@ _TED_RealSharingSink() {
 	SavedSession := _ED_Session, SavedReset := _ED_ResetDone, SavedEpoch := _ED_WindowEpoch
 	try {
 		Snapshot := _TED_SharingSnapshot()
+		Snapshot["sections"]["paths"]["diagnostics_dir"] := "C:\synthetic-owner\diagnostics"
 		Fields := _ErrorDialog_BuildReport(Map("kind", "error", "module", "synthetic",
 			"message", "CANARY-private.invalid/notes", "time", "local"), (*) => Snapshot)
 		Assert(Fields["snapshot"] == Snapshot, "the builder retains the exact captured host snapshot")
 		AssertContains(Fields["report"]["text"], "CANARY", "local detailed report remains available")
-		Copied := [], Opened := []
+		Copied := [], Opened := [], Saved := [], Revealed := [], Order := []
 		Overrides := Map("identity", (*) => Map("home", "C:\synthetic-owner", "user", "synthetic"),
-			"copy", (Text) => (Copied.Push(Text), true), "open_url", (Url) => (Opened.Push(Url), true))
+			"copy", (Text) => (Order.Push("copy"), Copied.Push(Text), true),
+			"save", (Dir, Name, Text) => (Order.Push("save"), Saved.Push(Map("dir", Dir, "name", Name, "text", Text)), Dir . "\" . Name),
+			"reveal", (Path) => (Order.Push("reveal"), Revealed.Push(Path), true),
+			"open_url", (Url) => (Order.Push("browser"), Opened.Push(Url), true))
 		Perform := (Action, Paths, Config, Unused := 0, Retained := 0) => HealthCheck_PerformAction(Action, Paths, Config, Overrides, Retained)
 		_ED_Session := Fields
 		_ED_ResetDone := true ; The response port refuses before any WebView use.
@@ -273,6 +277,14 @@ _TED_RealSharingSink() {
 		_ErrorDialog_Perform(_ED_WindowEpoch, "report", Perform)
 		AssertEqual(2, Copied.Length, "both callers reach the actual approved copy sink")
 		AssertEqual(1, Opened.Length, "the actual issue builder opens after copying")
+		AssertEqual(1, Saved.Length, "the complete reviewed report has one attachment before browser launch")
+		AssertEqual("C:\synthetic-owner\diagnostics", Saved[1]["dir"], "the host owns the synthetic attachment destination")
+		AssertEqual(Copied[2], Saved[1]["text"], "the attachment contains the same approved complete report")
+		AssertEqual(1, Revealed.Length, "the saved attachment is revealed exactly once")
+		AssertEqual(Saved[1]["dir"] . "\" . Saved[1]["name"], Revealed[1], "only the returned owned attachment is revealed")
+		AssertEqual(5, Order.Length, "copy action and complete report action reach only their admitted ports")
+		for Index, Expected in ["copy", "copy", "save", "reveal", "browser"]
+			AssertEqual(Expected, Order[Index], "browser admission follows attachment save and reveal")
 		AssertEqual(Copied[1], Copied[2], "both actions use the same retained projection")
 		AssertFalse(InStr(Copied[1], "CANARY"), "private error details never leave")
 		AssertContains(Copied[1], "-1744", "admitted technical status remains useful")
@@ -280,6 +292,9 @@ _TED_RealSharingSink() {
 		Overrides["copy"] := (*) => false
 		_ErrorDialog_Perform(_ED_WindowEpoch, "report", Perform)
 		AssertEqual(1, Opened.Length, "copy refusal prevents another browser action")
+		AssertEqual(1, Saved.Length, "copy refusal reaches no new attachment writer")
+		AssertEqual(1, Revealed.Length, "copy refusal reaches no new reveal port")
+		AssertEqual(5, Order.Length, "copy refusal leaves the complete port ordering unchanged")
 	} finally {
 		_ED_Session := SavedSession, _ED_ResetDone := SavedReset, _ED_WindowEpoch := SavedEpoch
 	}
