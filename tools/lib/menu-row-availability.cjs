@@ -315,6 +315,21 @@ function translatedCountPolicyFits(row) {
 }
 
 function validateChildTemplates(menu, captionFormat) {
+	if (Object.hasOwn(menu, 'hotstring_personal_file_caption')) {
+		const policy = menu.hotstring_personal_file_caption;
+		if (
+			!plainPolicyObject(policy) ||
+			Object.keys(policy).length !== 1 ||
+			!Object.hasOwn(policy, 'format') ||
+			typeof policy.format !== 'string' ||
+			/[\x00-\x1f\x7f]/.test(policy.format) ||
+			!policy.format.isWellFormed() ||
+			nativeCountSlots(policy.format) !== 2
+		)
+			throw new Error(
+				'menu.hotstring_personal_file_caption needs one literal format and two scalar slots'
+			);
+	}
 	validateNativeCompositions(menu);
 	function inertCaptionFits(row) {
 		if (row.caption_getter === undefined && row.caption_getters === undefined) return true;

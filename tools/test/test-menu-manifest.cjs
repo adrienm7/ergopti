@@ -13908,3 +13908,45 @@ console.log(
 		'the genuine receiving uses the same native row materializer as former AppendRows'
 	);
 }
+
+// The finite filename/count DATA is pinned to an independently frozen native donor.
+{
+	const assert = require('node:assert/strict');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const current = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const donor = JSON.parse(
+		readFileSync(
+			resolve(SHARED, 'tests/corpus/menus/windows_personal_file_parent_caption_original.json'),
+			'utf8'
+		)
+	);
+	assert.deepEqual(current.hotstring_personal_file_caption, {
+		format: '%s (%s)'
+	});
+	assert.equal(
+		donor.original_expression,
+		'TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")"'
+	);
+	assert.equal(donor.receipts[0].expected, ' (0)');
+	assert.equal(donor.receipts[1].expected, 'late_label (2)');
+	assert.deepEqual(donor.receipts[7].expected_units, [97, 55296, 98, 32, 40, 50, 41]);
+	for (const policy of [
+		{ format: '%s' },
+		{ format: '%s (%d)' },
+		{ format: 1 },
+		{ format: '%s (%s)', foreign: true },
+		Object.defineProperty({}, 'format', {
+			enumerable: true,
+			get() {
+				throw new Error('foreign policy getter');
+			}
+		})
+	])
+		assert.throws(() => validateChildTemplates({ hotstring_personal_file_caption: policy }));
+	validateChildTemplates({
+		hotstring_personal_file_caption: { format: '%s [%s]' }
+	});
+	console.log(
+		'[OK] finite personal-file caption DATA: frozen donor domain and closed declaration refusal.'
+	);
+}

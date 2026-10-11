@@ -8577,6 +8577,10 @@ i18n = "menu.hotstrings.no_group_loaded"
 platforms = ["linux"]
 unavailable = "hide"
 
+# One Windows file parent consumes completed literal stem/count receipts.
+[menu.hotstring_personal_file_caption]
+format = "%s (%s)"
+
 [[menu.hotstring_personal_file_frame]]
 type = "include"
 section = "hotstring_file_commands"
