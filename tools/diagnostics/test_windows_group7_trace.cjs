@@ -54,8 +54,8 @@ function fixture() {
 					qpc: String(first + index + 2),
 					channel,
 					case_id: caseId,
-					vk: 65,
-					sc: 30,
+					...(['down', 'up'].includes(channel) ? { vk: 65, sc: 30 } : {}),
+					...(['hotif', 'hotkey'].includes(channel) ? { registered_fixture: 'a' } : {}),
 					...(channel === 'char' ? { codepoint: 97 } : {}),
 					...(channel === 'hotif' ? { decision: true } : {})
 				});
@@ -120,6 +120,7 @@ assert.equal(result.cases.length, 6);
 assert.equal(result.hook_order_qualified, false);
 assert.equal(result.physical_qualified, false);
 assert.equal(result.production_qualified, false);
+assert.equal(result.ahk_attribution_semantics, 'owned-case-and-qpc-window');
 
 // Reentrant completion order can reverse entry-QPC order. Preserve both honestly.
 const reentered = fixture();
@@ -245,6 +246,24 @@ const mutations = [
 		rows[0].unexpected = true;
 	}
 ];
+// Callback signatures expose Vk/Sc only for InputHook key-down/key-up.
+for (const channel of ['char', 'hotif', 'hotkey']) {
+	mutations.push((rows) => {
+		const row = rows.find((item) => item.type === 'ahk' && item.channel === channel);
+		row.vk = 65;
+		row.sc = 30;
+	});
+}
+for (const channel of ['down', 'up']) {
+	for (const field of ['vk', 'sc'])
+		mutations.push((rows) => {
+			const row = rows.find((item) => item.type === 'ahk' && item.channel === channel);
+			delete row[field];
+		});
+}
+mutations.push((rows) => {
+	rows.find((item) => item.type === 'ahk' && item.channel === 'hotkey').registered_fixture = 'b';
+});
 for (const mutate of mutations) {
 	const rows = fixture();
 	mutate(rows);

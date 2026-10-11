@@ -72,13 +72,16 @@ TraceCheck() {
 		throw Error("Turn CapsLock off before synthetic hook tracing.")
 }
 
-TraceObserve(Channel, Vk := 65, Sc := 30, Codepoint := 0, ObservedQpc := 0) {
+TraceObserve(Channel, Vk := 0, Sc := 0, Codepoint := 0, ObservedQpc := 0) {
 	global TraceRecording, TraceInvalid, TraceCurrentCase
 	global TraceEvents, TraceAhkSequence
 	if !TraceRecording
 		return
 	EntryQpc := ObservedQpc ? ObservedQpc : TraceQpc()
-	if !TraceOwned() || TraceCurrentCase == "" || Vk != 65 || Sc != 30
+	ObservedKey := Channel == "down" || Channel == "up"
+	if !TraceOwned() || TraceCurrentCase == ""
+			|| (ObservedKey && (Vk != 65 || Sc != 30))
+			|| (!ObservedKey && (Vk != 0 || Sc != 0))
 			|| (Channel == "char" && Codepoint != 97) || TraceEvents.Length >= 256 {
 		; Refuse unknown input without logging its character or third-party text.
 		TraceInvalid := true
@@ -87,7 +90,12 @@ TraceObserve(Channel, Vk := 65, Sc := 30, Codepoint := 0, ObservedQpc := 0) {
 	TraceAhkSequence += 1
 	Json := '{"type":"ahk","sequence":"' . TraceAhkSequence
 		. '","qpc":"' . EntryQpc . '","channel":"' . Channel
-		. '","case_id":"' . TraceCurrentCase . '","vk":' . Vk . ',"sc":' . Sc
+		. '","case_id":"' . TraceCurrentCase . '"'
+	; Case/QPC attribution is a fixture window, never a native event receipt.
+	if ObservedKey
+		Json .= ',"vk":' . Vk . ',"sc":' . Sc
+	if Channel == "hotif" || Channel == "hotkey"
+		Json .= ',"registered_fixture":"a"'
 	if Channel == "char"
 		Json .= ',"codepoint":' . Codepoint
 	if Channel == "hotif"
@@ -99,12 +107,12 @@ TraceCriterion(*) {
 	EntryQpc := TraceQpc()
 	if !TraceOwned()
 		return false
-	TraceObserve("hotif", 65, 30, 0, EntryQpc)
+	TraceObserve("hotif", 0, 0, 0, EntryQpc)
 	return true
 }
 
 TraceHotkey(*) {
-	TraceObserve("hotkey", 65, 30, 0, TraceQpc())
+	TraceObserve("hotkey", 0, 0, 0, TraceQpc())
 }
 
 TraceDown(Input, Vk, Sc) {
@@ -124,7 +132,7 @@ TraceChar(Input, Text) {
 		TraceInvalid := true
 		return
 	}
-	TraceObserve("char", 65, 30, 97, EntryQpc)
+	TraceObserve("char", 0, 0, Ord(Text), EntryQpc)
 }
 
 TraceInstallAhk() {
