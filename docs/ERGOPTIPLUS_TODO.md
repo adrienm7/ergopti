@@ -6939,6 +6939,30 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
 
 - [ ] **62.** Downloads on managed company networks: system trust and
 
+2026-10-11 actual native clock workflow enrollment. Only the managed-native
+independent client and its adjacent evidence upload acquire the reviewed clock
+bracket. Original first-two commands, five-minute cap, separate command/capture
+statuses and every native assertion remain; Package's duplicate receiving is
+unchanged. Full admission exports bounded source/image/raw/epoch evidence and
+requires the artifact; genuine deferral exports none. The fixed status program
+uses literal Bash/Node transport, preserving every original statement. Both
+normal registered owning guards now check actual two-step equality and retain
+all existing tuples/controls. Portable32 and the focused default/pipeline
+receiving pass on the reviewed proposal; canonical final-source receiving is
+separate. Actual Foundation/Python clocks, TLS/restoration, PAC14/SDK49 on both
+architectures and installed/enterprise qualification remain unrun on this
+successor. The Swift45 factory stays held; item62 remains open.
+
+The first canonical enrollment gate passes format386 and411/412 JS checks,
+with one original Homebrew command-form refusal and an unchanged source/index
+fence. The bounded control correction preserves all38 other callbacks, original
+Python29/Package/deferral assertions and exact command/capture fatality. Actual
+focused receiving reproduces the old failure and passes the corrected callback
+with17 genuine assertion refusals; final canonical receiving remains separate.
+The [correction proof](handovers/2026-10-11-group6-cloud/native-clock-workflow-canonical-correction.tar.gz)
+retains failed raw7338, the immutable proposal and complete inverse. No native
+acceptance or item closure is inferred.
+
 2026-10-11 replacement-container receiving checkpoint. Original `5f7` PAC
 artifacts match official API hashes and each SourcePAC10 receipt's 402 Git pins.
 Both PAC14 cohorts have 12 passing/two failing methods, zero skips. WPAD's
