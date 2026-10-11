@@ -4068,6 +4068,14 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-12 local native qualification is mapped to the existing source-bound
+Windows/macOS entry points and exact workflow recipes, without adding a competing
+runner or changing any original assertion/clock. The [local procedure](handovers/2026-10-11-group6-cloud/LOCAL-VALIDATION.md)
+records real session/tool/consent requirements, current-source prerequisites and
+separate native/build/install results. Its commands are unexecuted on this Linux
+host; the current Windows receiver/profile still needs coordinated enrollment.
+Item36 remains open until actual package and installation acceptance succeeds.
+
 2026-10-11 current-source portable qualification is preserved at feature
 `c3a49a115c`, merged without squash from current Dev `da74809cd1`. All six
 selected format/JS/Lua/Linux gates pass; virtual E2E is not native desktop or
@@ -6966,6 +6974,16 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-12 HTTP-clock source tracking now admits the same complete rosters in
+bounded Git batches. Per-file committed bytes, regular-file checks and original
+before/final source procedures remain; all32 independent controls and the60s
+boundary are unchanged. The exact final source passes32 in11.365s. Earlier actual
+baseline/candidate rounds measure17.744s/11.609s and9,857/5,164 child calls.
+A missing builder now refuses its list before15 earlier reads; no accepted source
+pin is omitted. The hosted timeout is not reproduced or claimed repaired.
+See the [source and local validation checkpoint](handovers/2026-10-11-group6-cloud/README.md).
+Native trust/company/installed acceptance and item62 remain open.
 
 2026-10-11 removal custody correction: Root explicitly released the exact
 fixture projection, additive nine-case class and single156-to165 literal in
