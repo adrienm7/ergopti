@@ -8133,3 +8133,60 @@ function languageParentSource(source, driver) {
 		'[OK] personal-file caption: complete genuine donor route, original single late expression and retained shared projection.'
 	);
 }
+
+// The retained native folder frame only changes admitted scalar projection.
+{
+	const assert = require('node:assert/strict');
+	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8');
+	const {
+		personalFolderCaptionPublication: bound
+	} = require('../lib/menu-hotstring-language-binding.cjs');
+	assert.equal(
+		bound(source),
+		true,
+		'complete genuine original folder owner plus only two caption edits'
+	);
+	const marker = '_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {';
+	const begin = source.indexOf(marker),
+		end = source.indexOf('\n; Release only returned native menus', begin);
+	assert(begin >= 0 && end > begin, 'nonempty actual complete folder native owner exists');
+	const original = source.slice(begin, end);
+	const alteredOwners = [
+		'class Foreign {\n' + original + '\n}',
+		original.replace('\n\ttry {', '\n\tif false\n\ttry {'),
+		original.replace(
+			'\n\t\tif MenuRenderer_AppendTemplate(FolderMenu,',
+			'\n\t\tif false\n\t\tif MenuRenderer_AppendTemplate(FolderMenu,'
+		),
+		original.replace(
+			'\n\t\tFolderTotal := _HS_NodeTotal(Node)',
+			'\n\t\tif false\n\t\tFolderTotal := _HS_NodeTotal(Node)'
+		),
+		original.replace(
+			'FolderCount := FolderPositive ? FmtCount(FolderTotal) . "" : ""',
+			'FolderCount := FmtCount(FolderTotal) . ""'
+		),
+		original.replace(
+			'CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu)',
+			'Foreign.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu)'
+		)
+	];
+	for (const altered of alteredOwners) {
+		assert.notEqual(altered, original, 'causal original physical route actually altered');
+		const refused = source.slice(0, begin) + altered + source.slice(end);
+		assert.equal(
+			bound(refused),
+			false,
+			'foreign/dead fill/dead total/unconditional count/foreign receiving refuses'
+		);
+		assert.equal(
+			refused.replace(altered, original),
+			source,
+			'exact causal inverse restores original route'
+		);
+	}
+	assert.equal(bound(source + '\n' + marker + '}\n'), false, 'duplicate root folder owner refuses');
+	console.log(
+		'[OK] personal-folder caption: entire original traversal and real fill/late total path retained; optional count observation cannot move.'
+	);
+}

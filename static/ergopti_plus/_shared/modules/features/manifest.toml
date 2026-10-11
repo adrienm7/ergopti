@@ -8581,6 +8581,11 @@ unavailable = "hide"
 [menu.hotstring_personal_file_caption]
 format = "%s (%s)"
 
+# Windows folder captions consume the observed positive-count fact and literal receipts.
+[menu.hotstring_personal_folder_caption]
+positive_format = "%s (%s)"
+nonpositive_format = "%s"
+
 [[menu.hotstring_personal_file_frame]]
 type = "include"
 section = "hotstring_file_commands"
