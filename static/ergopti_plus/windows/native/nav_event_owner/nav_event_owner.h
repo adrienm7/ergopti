@@ -433,6 +433,33 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PreviewTerminalOutput(
 	ErgoptiNav_TerminalOutputPreview *out_preview,
 	ErgoptiOutput_Unit *out_units, uint32_t capacity);
 
+/**
+ * Retains one canonical plan for the authenticated FIFO head. Admission remains
+ * disabled in production until the complete nonhook handler/observer cohort
+ * qualifies natively. No public parameter or setter bypasses that guard.
+ * Successful plans exclude raw commit/abort and shutdown until settled/cancelled.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
+	uint64_t owner, uint64_t token, uint64_t sequence,
+	const uint16_t *text, uint32_t length, ErgoptiOutput_Key *out_key);
+
+/** Copies an immutable unsent suffix and acquires one exact attempt identity. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalOutputAttempt(
+	uint64_t owner, const ErgoptiOutput_Key *key, ErgoptiOutput_Unit *units,
+	uint32_t capacity, uint32_t *out_count, uint64_t *out_attempt);
+
+/** Reports the exact accepted prefix; zero leaves every output unit retryable. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AcknowledgeTerminalOutput(
+	uint64_t owner, const ErgoptiOutput_Key *key, uint64_t attempt, uint32_t accepted);
+
+/** Removes one original FIFO edge only after every output unit is settled. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ConsumeTerminalOutput(
+	uint64_t owner, const ErgoptiOutput_Key *key);
+
+/** Cancels only a plan with no accepted output and no outstanding attempt. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CancelTerminalOutput(
+	uint64_t owner, const ErgoptiOutput_Key *key);
+
 /** Starts one bounded physical-keyboard capture for terminal paced output. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
 	uint64_t token);
@@ -677,6 +704,9 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetHookTime(uint32_t time);
 
 /** Enables public terminal-capture APIs without installing a hook. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetRunning(uint8_t running);
+
+/** Testing-only cohort grant; not compiled or exported by the shipped DLL. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestAdmitTerminalOutput(uint8_t admitted);
 
 /** Callback invoked by the deterministic replay sink before accepting input. */
 typedef void (*ErgoptiNav_TerminalReplayObserver)(void *context);
