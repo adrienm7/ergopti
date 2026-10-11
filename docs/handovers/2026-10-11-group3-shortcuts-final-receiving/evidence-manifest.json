@@ -1,0 +1,263 @@
+{
+	"capsule": {
+		"files": 36,
+		"bytes": 10263935,
+		"entries": [
+			{
+				"proposed_member": "evidence/local/command.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/selected-final-sources-v1/command.json",
+				"bytes": 405,
+				"sha256": "591fd1a4dbd8142ef3684b2a6fb2a0bf093ea24aa6ff333be1d4b037c932cb21",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/local/plan.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/selected-final-sources-v1/plan.raw.log",
+				"bytes": 1024,
+				"sha256": "31dc07e6d1824c7b0627a3ebe984cbd33cf7684fdfa2bca43f32f58f5daf9cb7",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/local/source-pins.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/selected-final-sources-v1/source-pins.json",
+				"bytes": 387,
+				"sha256": "30873d9a73d6907aa71a145e2dcd01ca2118317e13cf7d0b3099e0f61433ae52",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/local/terminal.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/selected-final-sources-v1/terminal.json",
+				"bytes": 379,
+				"sha256": "ed50b4d2815ceb86363f5c0627ff787f133894f2c4c88832ab52fb3880d25489",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/local/selected.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/selected-final-sources-v1/selected.raw.log",
+				"bytes": 3658925,
+				"sha256": "efd5ce599da377c7a31d01587c0269fcce7f16c8ee16806f24476231dc867c10",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/local/final-selected-verdict.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-selected-verdict.json",
+				"bytes": 750,
+				"sha256": "9f70bed8b022098c134356913de1a797eb5a05009678ec2d230406d34034e7ca",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/source/adopted-three-path.patch.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/adopted-three-path.patch",
+				"bytes": 8264,
+				"sha256": "cc0f26786471726d507f3b7fec81f3c67898b4e7c653cc0d85575b1d9c71d67c",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/source/root-adoption-review.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/root-adoption-review.json",
+				"bytes": 1422,
+				"sha256": "aa5927349b6496206360be6192b94494a33a02537bfbea5468293eadb50924ee",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/source/merged-source-review.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/reviews/shortcuts-callback-identity-merged-receiving-v1/review.json",
+				"bytes": 2426,
+				"sha256": "41cd20e987d5c5b1af3afb325fa5a7c0fc83831fed840efffa71dae8f0cb7471",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/ci/received-run.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/received-run.json",
+				"bytes": 14158,
+				"sha256": "5bc266af2a4ce1e61c82129a3a2448c24136fc78db82fa925e3ee372ce7842c5",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/ci/terminal-receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/terminal-receiving-v1/receipt.json",
+				"bytes": 3205,
+				"sha256": "1f86a87d180eaedb77c13c2c6083a0227ef3bdb8ff772e08ef5dd2670d2e41c5",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/ci/run-final.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/terminal-receiving-v1/run-after.json",
+				"bytes": 14166,
+				"sha256": "043c355a44bd6dbe5e0981c70b5469565ddfbb338015d059667dede5c659dedb",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/ci/all-jobs.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/terminal-receiving-v1/all-jobs.json",
+				"bytes": 66491,
+				"sha256": "2bb4782397843206273eec3ee333f399661fef9fc63f43b441d0a4d8f470f6ff",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/ci/modeled-units.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/completed-logs-receiving-v1/units.raw.log",
+				"bytes": 5414103,
+				"sha256": "1612e19cfeef7e5be7187f508e1ac49867a806b027747eee466d68fd1d687243",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/ci/modeled-e2e.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/completed-logs-receiving-v1/e2e.raw.log",
+				"bytes": 39829,
+				"sha256": "370fc5ffa738e824f704f961600ea335f1097adedc3cec25bb86092748277883",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/ci/completed-log-receipt.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/completed-logs-receiving-v1/receipt.json",
+				"bytes": 670,
+				"sha256": "7cf1d4c09beb431b97797242af7bda9bae1ef3fb746a219b3835e5c456e18702",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/archive.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/native-archive-arm64-receiving-v1/archive-job.raw.log",
+				"bytes": 231527,
+				"sha256": "f4dfe877086bc8df0aafc772d6c61069e29f900c5542ce0eb24f5af975587406",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/archive-counts.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/native-archive-arm64-receiving-v1/archive-failure-receiving.json",
+				"bytes": 848,
+				"sha256": "d95985e60ca2215cf1788b58ed376a2641355b5d2b088185ab44b04f3348efe4",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/managed-arm64.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/managed-arm64-failure-receiving-v1/job.raw.log",
+				"bytes": 360816,
+				"sha256": "fb25f2cef92e9a01b3136b79810b622f528dd26387fa95044346794125a1c957",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/managed-amd64.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/completed-logs-receiving-v1/managed-amd64.raw.log",
+				"bytes": 348766,
+				"sha256": "55ed1102428e1c7895bf5ef287f341c9159d8188403a447ff19e10bbc50e6a4f",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/managed-arm64-counts.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/completed-logs-receiving-v1/arm64-native-counts.json",
+				"bytes": 25166,
+				"sha256": "7144a09dba56a254a8f0d1b6181195ae55e22abef67e90483a26c0d0d2d4057c",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/managed-amd64-counts.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/completed-logs-receiving-v1/amd64-native-counts.json",
+				"bytes": 25166,
+				"sha256": "369ca061257e8724ab160ea589300deaaf3567908e044e48903002d2c15e0fa4",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/merge-object.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/integrated-dev/merge-object.json",
+				"bytes": 408,
+				"sha256": "7618f2a8c11ebd0d61035285fe1aa59335acd802e4c9c288417a35d9525ee0e9",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/dev-push-and-cancel.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/integrated-dev/push-and-cancel.raw.log",
+				"bytes": 1176,
+				"sha256": "23d1c26a156224c40145c5c8bdfcb50571f5ff810e81d7c3dc46b88f14290d76",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/ci-ref-push-and-cancel.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/ci-ref-push-and-cancel.raw.log",
+				"bytes": 1353,
+				"sha256": "4e46dae9721ddff2d3bcdcd0d5db7533f35ae98c0edc66a8ba97ae1cd1efc08a",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/owned-lock-object.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/owned-lock-object.json",
+				"bytes": 989,
+				"sha256": "120e75e5bdf17541c629d8d78981670386eee5e3ff5c3b9145d9beb4e369a4ef",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/owner-release-intent.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/owner-release/intent.json",
+				"bytes": 665,
+				"sha256": "6d8714f65553d6b1aead8e0f7f959fefcbb11c0f651d82b2502909a274a8df06",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/owner-release-result.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/owner-release/result.json",
+				"bytes": 226,
+				"sha256": "c3a24dc66bee93189ee0b7922558f577bec0b5aec8492e9b47c801599f99dec0",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/owner-delete.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/owner-release/delete.raw.log",
+				"bytes": 323,
+				"sha256": "5fe1d716a238584ce5dabffc6cb97d8f813f83cc325ceb895ac075eaa185a162",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/integration/owner-delete-automatic-census.raw.log.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/owner-release/delete-exact-sha-automatic-census.raw.log",
+				"bytes": 376,
+				"sha256": "e969cd705b57981cfec8f2d4e01569b97c3ccac707493c74350b831d6580a9a4",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/Carbon-arm64/metadata.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/number-row-arm64-receiving-v1/metadata.json",
+				"bytes": 792,
+				"sha256": "097d0a0805a8fade2f79d3cd11b572629f277f130fa569f0c79877155a5e11e4",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/Carbon-arm64/artifact.zip.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/number-row-arm64-receiving-v1/artifact.zip",
+				"bytes": 17771,
+				"sha256": "a268aa19c85b5489ae545271e556343f0318dfb469d588313786218ecf55c83a",
+				"role": "Original inert evidence; ZIP members preserve binary transport, logs preserve original bytes."
+			},
+			{
+				"proposed_member": "evidence/native/Carbon-arm64/received-native-verdict.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/number-row-arm64-receiving-v1/received-native-verdict.json",
+				"bytes": 544,
+				"sha256": "417629331de43160d46f1951e2357edc7d7202f56bf4f53f90d2bd4e42e511aa",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/Carbon-amd64/metadata.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/number-row-amd64-receiving-v1/metadata.json",
+				"bytes": 792,
+				"sha256": "6fd126bb5d4540e120c0ede2796aa8b942e9f841ba4ada3fde621e1de4e5d911",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			},
+			{
+				"proposed_member": "evidence/native/Carbon-amd64/artifact.zip.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/number-row-amd64-receiving-v1/artifact.zip",
+				"bytes": 19013,
+				"sha256": "82a1e4d83fa3d5066a65f2a520eed23cb68d3675601781933a9c0bf7f46cc4ba",
+				"role": "Original inert evidence; ZIP members preserve binary transport, logs preserve original bytes."
+			},
+			{
+				"proposed_member": "evidence/native/Carbon-amd64/received-native-verdict.json.txt",
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/group3-goal-continuation-v1/final-integration-phase-v1/manual-macos/number-row-amd64-receiving-v1/received-native-verdict.json",
+				"bytes": 614,
+				"sha256": "10e2ffa115e516fc1a30edc2fbaa5aa3a570293a06a1f10a1ed42d7cd2ca4ae0",
+				"role": "Original inert source, metadata, receipt or raw log; do not execute."
+			}
+		]
+	},
+	"tested_source": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+	"generated_by": "docs/handovers/2026-10-10-group3-continuation/generate_capsule.py",
+	"original_evidence_preserved": true
+}
