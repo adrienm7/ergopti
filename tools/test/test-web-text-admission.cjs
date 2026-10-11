@@ -48,7 +48,23 @@ accepted = "yes"`);
 	assert.equal(parsed.accepted, 'yes');
 }
 
-const controls = { decode: checkDecoding };
+function checkQuotedParsing(line) {
+	context.input = line;
+	const refused = vm.runInContext('parseTomlMagic(input)', context, {
+		timeout: 1000
+	});
+	assert.equal(
+		Object.keys(refused).length,
+		0,
+		'unterminated quoted input is refused within a finite parser budget'
+	);
+}
+
+const controls = {
+	decode: checkDecoding,
+	simple: () => checkQuotedParsing(`plain = "${'\\!'.repeat(65536)}`),
+	object: () => checkQuotedParsing(`"object" = { output = "${'\\!'.repeat(65536)} }`)
+};
 const requested = process.argv.slice(2);
 const selected = requested.length ? requested : Object.keys(controls);
 assert.ok(
