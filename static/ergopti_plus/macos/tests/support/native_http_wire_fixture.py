@@ -153,6 +153,16 @@ class WireFixture:
         trust_install_observation=False,
     ):
         phase = "setup"
+        milestones = {
+            "acquisition_entered": False,
+            "child_acquired": False,
+            "wait_entered": False,
+            "wait_returned": False,
+            "retirement_attempted": False,
+            "retirement_result": "not_acquired",
+            "failure_phase": None,
+        }
+        self.command_milestone_fact = None
         status = None
         self.command_fact = None
         output = errors = owned = child = input_owner = input_observer = None
@@ -176,9 +186,11 @@ class WireFixture:
                 def register(value):
                     nonlocal owned
                     owned = value
+                    milestones["child_acquired"] = True
 
                 try:
                     phase = "acquire"
+                    milestones["acquisition_entered"] = True
                     self.groups.acquire_owned(
                         arguments,
                         self.native_groups,
@@ -202,58 +214,80 @@ class WireFixture:
                             )
                         raise
                     phase = "wait"
+                    milestones["wait_entered"] = True
                     owned.wait_for_exit(
                         timeout if deadline is None else max(0, deadline - time.monotonic())
                     )
+                    milestones["wait_returned"] = True
                 except BaseException as primary:
                     failure = primary
+                    milestones["failure_phase"] = phase
                 finally:
                     try:
-                        if owned is not None and not owned.settle():
-                            raise FixtureFailure("Native fixture child closure refused")
+                        if owned is not None:
+                            milestones["retirement_attempted"] = True
+                            retirement = owned.settle()
+                            milestones["retirement_result"] = (
+                                "acknowledged" if retirement is True else "not_confirmed"
+                            )
+                            if not retirement:
+                                raise FixtureFailure("Native fixture child closure refused")
                     except BaseException as refused:
+                        if milestones["retirement_attempted"]:
+                            milestones["retirement_result"] = "refused"
                         phase = "settle"
                         closure_refused = True
                         if failure is None:
                             failure = refused
+                            milestones["failure_phase"] = phase
                 if failure is not None:
                     raise failure
                 status = owned.process.returncode
             else:
                 phase = "acquire"
+                milestones["acquisition_entered"] = True
                 child = subprocess.Popen(
                     arguments,
                     stdin=subprocess.PIPE,
                     stdout=output,
                     stderr=output if merge_errors else errors,
                 )
+                milestones["child_acquired"] = True
                 input_owner = child.stdin
                 input_observer = CommandInputOwner(input_owner)
                 child.stdin = input_observer
                 try:
                     phase = "wait"
+                    milestones["wait_entered"] = True
                     child.communicate(
                         input_bytes,
                         timeout=timeout
                         if deadline is None
                         else max(0, deadline - time.monotonic()),
                     )
+                    milestones["wait_returned"] = True
                 except BaseException as primary:
                     failure = primary
+                    milestones["failure_phase"] = phase
                 finally:
                     if input_observer.close_failure is not None:
                         closure_refused = True
                         if failure is None:
                             failure = input_observer.close_failure
                     try:
+                        milestones["retirement_attempted"] = True
                         if child.poll() is None:
                             child.kill()
                         child.wait()
+                        milestones["retirement_result"] = "acknowledged"
                     except BaseException as refused:
+                        if milestones["retirement_attempted"]:
+                            milestones["retirement_result"] = "refused"
                         phase = "settle"
                         closure_refused = True
                         if failure is None:
                             failure = refused
+                            milestones["failure_phase"] = phase
                 if failure is not None:
                     raise failure
                 status = child.returncode
@@ -275,6 +309,7 @@ class WireFixture:
         except BaseException as refused:
             if failure is None:
                 failure = refused
+                milestones["failure_phase"] = phase
         finally:
             process = owned.process if owned is not None else child
             if input_observer is not None and input_observer.close_uncertain:
@@ -335,6 +370,24 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        if security_failure_observation:
+            self.command_milestone_fact = {
+                "version": 1,
+                "action": "security_cleanup",
+                "phase": self.command_fact["phase"],
+                "status": self.command_fact["status"],
+                **milestones,
+            }
+            # Passive closed milestones cannot replace a command verdict or primary error.
+            try:
+                print(
+                    "# native_http_security_milestones "
+                    + json.dumps(self.command_milestone_fact, sort_keys=True),
+                    flush=True,
+                    file=sys.stderr,
+                )
+            except BaseException:
+                pass
         if trust_install_observation:
             pid = getattr(process, "pid", None)
             exit_status = getattr(process, "returncode", None)

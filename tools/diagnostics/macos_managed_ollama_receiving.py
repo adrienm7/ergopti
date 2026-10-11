@@ -458,20 +458,26 @@ class Receiver:
         }
 
     def prepare(self):
+        self.prepare_phase = "receiver_admission"
         require(
             getattr(self, "fixture", None) is None
             and getattr(self, "outgoing_context", None) is None,
             "actual_receiver_duplicate_prepare",
         )
+        self.prepare_phase = "peer_load"
         wire = load(
             "ollama_real_native_peers", self.mac / "tests/support/native_http_wire_fixture.py"
         )
+        self.prepare_phase = "peer_acquisition"
         self.fixture = wire.WireFixture(native=True)
+        self.prepare_phase = "peer_registry"
         self.registry = Registry(self.fixture)
         self.http_app = self.work / "OwnedOutgoingHTTP.app"
         self.api_app = self.work / "OwnedListenerAPI.app"
+        self.prepare_phase = "payload_copy"
         self.http_payload = self.payload(self.http_app)
         self.api_payload = self.payload(self.api_app)
+        self.prepare_phase = "outgoing_sources"
         http_binary = self.http_app / "Contents/MacOS/ErgoptiPlus"
         http_binary.parent.mkdir(parents=True)
         worker = self.work / "ManagedHTTPWorker.swift"
@@ -549,6 +555,7 @@ class Receiver:
             inputs.append((self.root / relative, destination, self.source_hashes[relative]))
         module_map = compatibility_module / "module.modulemap"
         inputs.append((module_map, module_map, digest(module_map)))
+        self.prepare_phase = "outgoing_qualification"
         self.outgoing_context = QUALIFIED.OwnedOutgoingWorkerQualification.build(
             http_binary,
             inputs,
@@ -571,6 +578,7 @@ class Receiver:
             self.fixture._command,
             register=lambda owner: setattr(self, "outgoing_context", owner),
         )
+        self.prepare_phase = "listener_copy"
         api_binary = self.api_app / "Contents/MacOS/ErgoptiPlus"
         api_binary.parent.mkdir(parents=True)
         shutil.copy2(self.options.launcher, api_binary)
@@ -578,11 +586,16 @@ class Receiver:
         frameworks.mkdir()
         shutil.copytree(self.options.framework, frameworks / "Sparkle.framework", symlinks=True)
         for binary in (api_binary,):
+            self.prepare_phase = "listener_sign"
             self.fixture._command(["/usr/bin/codesign", "--force", "--sign", "-", str(binary)])
+            self.prepare_phase = "listener_verify"
             self.fixture._command(["/usr/bin/codesign", "--verify", "--strict", str(binary)])
+        self.prepare_phase = "trust_add"
         self.fixture.trust(True)
+        self.prepare_phase = "post_trust"
         self.home = self.work / "home"
         self.home.mkdir(mode=0o700)
+        self.prepare_phase = "environment"
         policy = load(
             "ollama_fixture_proxy_policy",
             self.http_payload / "_shared/python/network_proxy_policy.py",
@@ -613,6 +626,7 @@ class Receiver:
             "ollama_fixture_real_runtime",
             self.http_payload / "macos/modules/llm/managed_ollama_runtime.py",
         )
+        self.prepare_phase = "archive_admission"
         archive = self.options.archive.resolve(strict=True)
         require(
             archive.name
@@ -638,11 +652,13 @@ class Receiver:
                     shutil.copyfileobj(stream, self.wfile, 65536)
                 self.close_connection = True
 
+        self.prepare_phase = "asset_peer"
         server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), Asset)
         server.daemon_threads = True
         self.fixture.servers.append(server)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.fixture.started_servers.append(server)
+        self.prepare_phase = "runtime_install"
         with patch.dict(os.environ, self.http_environment, clear=True):
             self.binary = self.runtime.install(
                 time.monotonic() + 600,
@@ -651,6 +667,7 @@ class Receiver:
                 connect_timeout=30,
                 minimum_bytes_per_second=1024,
             )
+        self.prepare_phase = "api_load"
         self.api = load(
             "ollama_fixture_bound_api",
             self.api_payload / "macos/platform/network/native_ollama_api.py",
@@ -672,6 +689,8 @@ class Receiver:
         self.receipt["source_hashes"] = self.source_hashes
         self.receipt["outgoing_worker_sha256"] = digest(http_binary)
         self.receipt["listener_worker_sha256"] = digest(api_binary)
+
+        self.prepare_phase = "complete"
 
     def make_empty_session(self, deadline, port):
         with patch.dict(os.environ, self.http_environment, clear=True):
@@ -1024,6 +1043,42 @@ class Receiver:
         shutil.rmtree(self.work)
 
 
+PREPARE_PHASES = frozenset(
+    (
+        "receiver_admission",
+        "peer_load",
+        "peer_acquisition",
+        "peer_registry",
+        "payload_copy",
+        "outgoing_sources",
+        "outgoing_qualification",
+        "listener_copy",
+        "listener_sign",
+        "listener_verify",
+        "trust_add",
+        "post_trust",
+        "environment",
+        "archive_admission",
+        "asset_peer",
+        "runtime_install",
+        "api_load",
+        "complete",
+    )
+)
+
+
+def _observe_prepare_phase(owner):
+    """Best-effort closed checkpoint adds no native action or success authority."""
+    try:
+        if owner.stage == "prepare":
+            phase = getattr(owner, "prepare_phase", None)
+            owner.receipt["prepare_phase"] = (
+                phase if type(phase) is str and phase in PREPARE_PHASES else "unknown"
+            )
+    except BaseException:
+        pass
+
+
 def _failure_observation(error):
     """Preserve closed failure facts without private paths, output or traceback."""
     public_classes = {
@@ -1135,6 +1190,7 @@ def main():
         failure = "native_receiving_failed"
         owner.receipt["failed_stage"] = owner.stage
         owner.receipt["primary_failure"] = _failure_observation(error)
+        _observe_prepare_phase(owner)
     try:
         owner.close()
     except BaseException as error:
