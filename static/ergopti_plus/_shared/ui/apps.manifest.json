@@ -10,6 +10,18 @@
 			"height_ratio": 0.75
 		}
 	},
+	"native_presentations": {
+		"profile_shortcut_dialog": {
+			"kind": "dialog",
+			"title_key": "menu.profiles.shortcut_title",
+			"platforms": ["hs"]
+		},
+		"magic_key_source_notice": {
+			"kind": "notification",
+			"title_key": "dialog.magic_key_source.title",
+			"platforms": ["linux"]
+		}
+	},
 	"apps": {
 		"config_cleanup": {
 			"title_key": "dialog.unused_keys.title",
@@ -31,6 +43,16 @@
 					"title_key": "dialog.keyboard_shortcut.title_prefix",
 					"label_key": "dialog.keyboard_shortcut.prompt",
 					"platforms": ["hs"]
+				},
+				"keyboard_slot_action": {
+					"kind": "contextual_title",
+					"title_key": "dialog.keyboard_shortcut.title_prefix",
+					"platforms": ["hs"]
+				},
+				"tap_hold_action": {
+					"kind": "contextual_title",
+					"title_key": "tap_hold.picker.title_prefix",
+					"platforms": ["linux"]
 				}
 			}
 		},
@@ -176,7 +198,14 @@
 			"height": 155,
 			"min_width": 720,
 			"min_height": 155,
-			"vhost": "ergopti.tokenprompt"
+			"vhost": "ergopti.tokenprompt",
+			"presentations": {
+				"hf_login": {
+					"kind": "window_title",
+					"title_key": "mlx.hf_login_title",
+					"platforms": ["hs"]
+				}
+			}
 		},
 		"update_check": {
 			"title_key": "update_check.window_title",

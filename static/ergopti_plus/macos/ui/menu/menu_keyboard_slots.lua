@@ -149,7 +149,8 @@ local function choose_action_for(slot_id, ctx)
 	local editor = ShortcutUtils.picker_parameter_fields(ctx.gestures, items,
 		KbShortcuts.keyboard_binding_id(slot_id))
 	ActionPicker.open({
-		title   = i18n.get("dialog.keyboard_shortcut.title_prefix") .. KbShortcuts.get_keyboard_slot_label(slot_id),
+		presentation_id = "keyboard_slot_action",
+		presentation_suffix = KbShortcuts.get_keyboard_slot_label(slot_id),
 		current = KbShortcuts.get_keyboard_action(slot_id),
 		items   = items,
 		send_vocabulary   = editor.send_vocabulary,

@@ -25,6 +25,8 @@
 
 local M = {}
 local WindowTitles = require("window_titles")
+local NativePresentation = require("infra.native_presentation")
+local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 local NumberRowPolicy = require("layout.number_row_policy")
 local ParameterLabel = require("action_parameter_label")
 local RowDialect = require("menu.row_dialect")
@@ -97,6 +99,21 @@ local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "
 local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")
 local header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")
 local header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")
+local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")
+local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")
+local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")
+
+--- Retains only the actual caption facade and translator used by removal options.
+--- @return boolean current
+local function uninstall_caption_facade_current()
+	return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
+		and rawget(package, "loaded") == separator_modules
+		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+		and type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory
+		and type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil
+		and rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n
+		and type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get
+end
 
 --- Refuses facade or function withdrawal without invoking its replacement.
 --- @return boolean
@@ -625,7 +642,11 @@ local function _build_layouts(ctx)
 		local function notify(key, level)
 			local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
 			if ok_notifier then
-				Notifier.send(i18n_safe(key), { title = i18n_safe("dialog.magic_key_source.title"), level = level })
+				local body = i18n_safe(key)
+				local receipt = PrepareNativePresentation("magic_key_source_notice", "notification")
+				local title = receipt and NativePresentationTitle(receipt) or nil
+				if title == nil then return false end
+				Notifier.send(body, { title = title, level = level })
 			else
 				Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
 			end
@@ -4102,7 +4123,8 @@ local function _build_tap_holds(ctx)
 		end
 		table.sort(items, function(left, right) return left.label < right.label end)
 		Picker.open({
-			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(catalog_entry),
+			presentation_id = "tap_hold_action",
+			presentation_suffix = _tap_hold_key_label(catalog_entry),
 			current = current == "" and "__native__" or current,
 			allow_native = true,
 			native_label = i18n_safe("tap_hold.tap.none"),
@@ -4777,11 +4799,21 @@ M._about_update_rows = _about_update_rows
 --- @param ctx table Menu context.
 --- @return function
 local function _uninstall_command(ctx)
+	local receive, current
+	if uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end
 	return function()
-		require("ui.menu.uninstall").run({
-			title = i18n_safe("menu.global.uninstall"),
-			confirmation = i18n_safe("dialog.uninstall.confirm"),
-			failure = i18n_safe("dialog.uninstall.failed"),
+		if not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end
+		local run = require("ui.menu.uninstall").run
+		local title = receive()
+		if title == nil or not uninstall_caption_facade_current() or not current() then return false end
+		local confirmation = i18n_safe("dialog.uninstall.confirm")
+		if not uninstall_caption_facade_current() or not current() then return false end
+		local failure = i18n_safe("dialog.uninstall.failed")
+		if not uninstall_caption_facade_current() or not current() then return false end
+		local options = {
+			title = title,
+			confirmation = confirmation,
+			failure = failure,
 			confirm = function(title, text)
 				return ask_yes_no(title, zenity_plain(text),
 					i18n_safe("button.remove"), i18n_safe("button.cancel"))
@@ -4794,7 +4826,9 @@ local function _uninstall_command(ctx)
 				end
 				ctx.on_quit()
 			end,
-		})
+		}
+		if not uninstall_caption_facade_current() or not current() then return false end
+		run(options)
 	end
 end
 

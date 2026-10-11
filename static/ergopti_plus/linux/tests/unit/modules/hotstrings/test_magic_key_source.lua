@@ -960,3 +960,211 @@ helpers.describe("editor source: retained Capture RAM owner", function()
 		end)
 	end)
 end)
+
+
+-- Native notice title policy does not own the physical source or its body.
+local native_caption_file = assert(io.open(helpers.driver_root()
+	.. "/../_shared/tests/corpus/native_presentations/original_captions.json", "rb"))
+local native_caption_read, native_caption_bytes = pcall(function() return native_caption_file:read("*a") end)
+local native_caption_closed, native_caption_close = pcall(function() return native_caption_file:close() end)
+if not native_caption_read then error(native_caption_bytes, 0) end
+assert(native_caption_closed and native_caption_close ~= nil and native_caption_close ~= false)
+local native_caption_corpus = assert(Json.decode(native_caption_bytes))
+
+local magic_notice_module_names = { "ui.menu.menu_builder", "infra.native_presentation", "adapters.application_notifier",
+	"infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+
+-- A caller catching an expected primary must also consume cleanup_failures.
+-- Normal positive subjects fail on any cleanup refusal after all attempts finish.
+local function with_magic_notice(body, cleanup_failures)
+	cleanup_failures = cleanup_failures or {}
+	local cache, saved = package.loaded, {}
+	for _, name in ipairs(magic_notice_module_names) do saved[name] = rawget(cache, name) end
+	local Locale, I18n, previous_locale, locale_captured, policy, lookup_owner, lookup_captured
+	local function restore(operation, fn)
+		local restored, failure = pcall(fn)
+		if not restored then cleanup_failures[#cleanup_failures + 1] = { operation = operation, failure = failure } end
+	end
+	-- Protection starts before the first owned cache edit, including setup imports.
+	local ok, failure = pcall(function()
+		for _, name in ipairs(magic_notice_module_names) do rawset(cache, name, nil) end
+		Locale, I18n = require("infra.locale"), require("infra.i18n")
+		previous_locale = Locale.current_locale()
+		locale_captured = true
+		policy = require("window_titles")
+		lookup_owner, lookup_captured = policy.native_presentation, true
+		local notices = {}
+		rawset(cache, "adapters.application_notifier", { send = function(message, options)
+			notices[#notices + 1] = { message = message, title = options.title, level = options.level }
+			return true
+		end })
+		with_source(nil, function(Source)
+			local settled, primary = pcall(function()
+				local calls = wire(Source, { active = true, replace = true, typed_ok = true })
+				local Builder = require("ui.menu.menu_builder")
+				local changed = 0
+				local items = Builder.build({ on_quit = function() end, magic_key_source = Source,
+					on_menu_changed = function() changed = changed + 1 end })
+				local capture
+				local function find(rows)
+					for _, row in ipairs(rows or {}) do
+						if row.title == I18n.get("menu.layout.magic_key_source.capture") then capture = row.fn end
+						find(row.menu)
+					end
+				end
+				find(items)
+				helpers.assert_type(capture, "function", "actual physical capture command must exist")
+				body({ source = Source, calls = calls, capture = capture, notices = notices,
+					locale = Locale, i18n = I18n, changed = function() return changed end,
+					policy = policy, native = require("infra.native_presentation") })
+			end)
+			-- The genuine reset returns nil; only a thrown failure is refusal here.
+			restore("physical_source_reset", function() Source._reset_for_test() end)
+			if not settled then error(primary, 0) end
+		end)
+	end)
+	if lookup_captured then
+		restore("native_policy_lookup", function()
+			policy.native_presentation = lookup_owner
+			assert(rawequal(policy.native_presentation, lookup_owner), "native policy lookup was not restored")
+		end)
+	end
+	if locale_captured then
+		restore("locale_selection", function()
+			Locale.set_locale(previous_locale)
+			assert(Locale.current_locale() == previous_locale, "fixture locale was not restored")
+		end)
+	end
+	for _, name in ipairs(magic_notice_module_names) do
+		restore("package.loaded:" .. name, function()
+			rawset(cache, name, saved[name])
+			assert(rawequal(rawget(cache, name), saved[name]), "fixture module cache was not restored")
+		end)
+	end
+	if not ok then error(failure, 0) end
+	if #cleanup_failures > 0 then error(cleanup_failures[1].failure, 0) end
+end
+
+helpers.describe("declared physical magic notice captions", function()
+	for code, original in pairs(native_caption_corpus.locales) do
+		helpers.it("(native-magic-caption) receives original notice title/body through actual capture in " .. code, function()
+			with_magic_notice(function(f)
+				f.locale.set_locale(code)
+				f.capture()
+				helpers.assert_eq(f.notices[1], { title = original.captions.magic_key_source_notice.original_bare_caption,
+					message = f.i18n.get("dialog.magic_key_source.prompt"), level = "info" })
+				helpers.assert_true(f.source.on_key({ code = 57, mods = {} }))
+				run_due(f.calls)
+				helpers.assert_eq(f.notices[2], { title = original.captions.magic_key_source_notice.original_bare_caption,
+					message = f.i18n.get("dialog.magic_key_source.not_a_candidate"), level = "warning" })
+				helpers.assert_eq(f.source.get(), "auto")
+				helpers.assert_eq(f.changed(), 0)
+				helpers.assert_eq(f.calls.typed, {})
+			end)
+		end)
+	end
+	helpers.it("(native-magic-caption) actual declaration withdrawal refuses delivery and exact repair preserves capture", function()
+		with_magic_notice(function(f)
+			local original, observed = f.policy.native_presentation, 0
+			f.policy.native_presentation = function() observed = observed + 1; return {} end
+			f.capture()
+			helpers.assert_eq(f.notices, {})
+			helpers.assert_eq(observed, 0)
+			helpers.assert_true(f.source.on_key({ code = 1, mods = {} }))
+			run_due(f.calls)
+			f.policy.native_presentation = original
+			f.capture()
+			helpers.assert_eq(#f.notices, 1)
+			helpers.assert_eq(f.notices[1].title, f.i18n.get("dialog.magic_key_source.title"))
+			helpers.assert_eq(f.source.get(), "auto")
+		end)
+	end)
+	helpers.it("(native-magic-caption) wrong kind, platform, borrowed receipt and locale drift refuse bare titles", function()
+		with_magic_notice(function(f)
+			helpers.assert_nil(f.native.prepare("magic_key_source_notice", "dialog"))
+			helpers.assert_nil(f.native.prepare("profile_shortcut_dialog", "dialog"))
+			helpers.assert_nil(f.native.title({}))
+			f.locale.set_locale("fr")
+			local receipt = f.native.prepare("magic_key_source_notice", "notification")
+			helpers.assert_type(receipt, "table")
+			f.locale.set_locale("es")
+			helpers.assert_nil(f.native.title(receipt))
+			f.locale.set_locale("fr")
+			helpers.assert_eq(f.native.title(receipt), native_caption_corpus.locales.fr.captions.magic_key_source_notice.original_bare_caption)
+		end)
+	end)
+end)
+
+local function magic_notice_cache_snapshot()
+	local saved = {}
+	for _, name in ipairs(magic_notice_module_names) do saved[name] = rawget(package.loaded, name) end
+	return saved
+end
+
+local function assert_magic_notice_cache_restored(saved)
+	for _, name in ipairs(magic_notice_module_names) do
+		helpers.assert_true(rawequal(rawget(package.loaded, name), saved[name]), "exact original module restored: " .. name)
+	end
+end
+
+helpers.describe("physical magic notice fixture lifecycle", function()
+	helpers.it("(native-magic-caption-lifecycle) setup import failure restores every owned cache entry", function()
+		local saved, primary, secondary = magic_notice_cache_snapshot(), {}, {}
+		local preload, original = package.preload, package.preload["infra.locale"]
+		local ok, failure = pcall(function()
+			rawset(preload, "infra.locale", function() error(primary, 0) end)
+			with_magic_notice(function() error("setup failure must prevent scenario entry", 0) end, secondary)
+		end)
+		local restored, restore_failure = pcall(function() rawset(preload, "infra.locale", original) end)
+		helpers.assert_true(restored, restore_failure)
+		helpers.assert_true(rawequal(rawget(preload, "infra.locale"), original))
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(rawequal(failure, primary), "setup primary object must survive independent cleanup")
+		helpers.assert_eq(secondary, {})
+		assert_magic_notice_cache_restored(saved)
+	end)
+	helpers.it("(native-magic-caption-lifecycle) scenario primary survives real policy locale and cache restoration", function()
+		local saved, primary, secondary = magic_notice_cache_snapshot(), {}, {}
+		local owner, lookup, locale, previous
+		local ok, failure = pcall(function()
+			with_magic_notice(function(f)
+				owner, lookup, locale, previous = f.policy, f.policy.native_presentation, f.locale, f.locale.current_locale()
+				f.policy.native_presentation = function() return {} end
+				f.locale.set_locale(previous == "es" and "fr" or "es")
+				error(primary, 0)
+			end, secondary)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(rawequal(failure, primary))
+		helpers.assert_eq(secondary, {})
+		helpers.assert_true(rawequal(owner.native_presentation, lookup))
+		helpers.assert_eq(locale.current_locale(), previous)
+		assert_magic_notice_cache_restored(saved)
+	end)
+	helpers.it("(native-magic-caption-lifecycle) simultaneous reset failure remains separate while later restores complete", function()
+		local saved, primary, cleanup_primary, secondary = magic_notice_cache_snapshot(), {}, {}, {}
+		local source, reset, owner, lookup, locale, previous
+		local ok, failure = pcall(function()
+			with_magic_notice(function(f)
+				source, reset = f.source, f.source._reset_for_test
+				owner, lookup, locale, previous = f.policy, f.policy.native_presentation, f.locale, f.locale.current_locale()
+				source._reset_for_test = function() reset(); error(cleanup_primary, 0) end
+				f.policy.native_presentation = function() return {} end
+				f.locale.set_locale(previous == "es" and "fr" or "es")
+				error(primary, 0)
+			end, secondary)
+		end)
+		-- Restore the control's own function replacement even if the scenario failed.
+		local restored, restore_failure = pcall(function() source._reset_for_test = reset end)
+		helpers.assert_true(restored, restore_failure)
+		helpers.assert_true(rawequal(source._reset_for_test, reset))
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(rawequal(failure, primary), "cleanup failure must not replace the scenario primary")
+		helpers.assert_eq(#secondary, 1)
+		helpers.assert_eq(secondary[1].operation, "physical_source_reset")
+		helpers.assert_true(rawequal(secondary[1].failure, cleanup_primary))
+		helpers.assert_true(rawequal(owner.native_presentation, lookup))
+		helpers.assert_eq(locale.current_locale(), previous)
+		assert_magic_notice_cache_restored(saved)
+	end)
+end)

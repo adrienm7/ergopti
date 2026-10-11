@@ -45,6 +45,48 @@ function validatePresentations(presentations) {
 			throw new TypeError('Window presentations require canonical app contexts.');
 		for (const [id, entry] of Object.entries(variants)) {
 			if (
+				/^[a-z][a-z0-9_]*$/.test(id) &&
+				entry &&
+				typeof entry === 'object' &&
+				!Array.isArray(entry) &&
+				entry.kind === 'contextual_title'
+			) {
+				if (
+					Object.keys(entry).sort().join(',') !== 'kind,platforms,title_key' ||
+					typeof entry.title_key !== 'string' ||
+					!/^[a-z][a-z0-9_.]*$/.test(entry.title_key) ||
+					!Array.isArray(entry.platforms) ||
+					entry.platforms.length === 0 ||
+					Object.keys(entry.platforms).length !== entry.platforms.length ||
+					Object.keys(entry.platforms).some((key, index) => key !== String(index)) ||
+					new Set(entry.platforms).size !== entry.platforms.length ||
+					!entry.platforms.every((platform) => ['ahk', 'hs', 'linux'].includes(platform))
+				)
+					throw new TypeError('Contextual-title context fields and platforms must be explicit.');
+				continue;
+			}
+			if (
+				/^[a-z][a-z0-9_]*$/.test(id) &&
+				entry &&
+				typeof entry === 'object' &&
+				!Array.isArray(entry) &&
+				entry.kind === 'window_title'
+			) {
+				if (
+					Object.keys(entry).sort().join(',') !== 'kind,platforms,title_key' ||
+					typeof entry.title_key !== 'string' ||
+					!/^[a-z][a-z0-9_.]*$/.test(entry.title_key) ||
+					!Array.isArray(entry.platforms) ||
+					entry.platforms.length === 0 ||
+					Object.keys(entry.platforms).length !== entry.platforms.length ||
+					Object.keys(entry.platforms).some((key, index) => key !== String(index)) ||
+					new Set(entry.platforms).size !== entry.platforms.length ||
+					!entry.platforms.every((platform) => ['ahk', 'hs', 'linux'].includes(platform))
+				)
+					throw new TypeError('Window-title context fields and platforms must be explicit.');
+				continue;
+			}
+			if (
 				!/^[a-z][a-z0-9_]*$/.test(id) ||
 				!entry ||
 				typeof entry !== 'object' ||
@@ -66,6 +108,32 @@ function validatePresentations(presentations) {
 	return presentations;
 }
 
+/** Validate native notification/dialog declarations without webview app metadata. */
+function validateNativePresentations(presentations) {
+	if (!presentations || typeof presentations !== 'object' || Array.isArray(presentations))
+		throw new TypeError('Native presentations require an explicitly keyed object.');
+	for (const [id, entry] of Object.entries(presentations)) {
+		if (
+			!/^[a-z][a-z0-9_]*$/.test(id) ||
+			!entry ||
+			typeof entry !== 'object' ||
+			Array.isArray(entry) ||
+			Object.keys(entry).sort().join(',') !== 'kind,platforms,title_key' ||
+			!['notification', 'dialog'].includes(entry.kind) ||
+			typeof entry.title_key !== 'string' ||
+			!/^[a-z][a-z0-9_.]*$/.test(entry.title_key) ||
+			!Array.isArray(entry.platforms) ||
+			entry.platforms.length === 0 ||
+			Object.keys(entry.platforms).length !== entry.platforms.length ||
+			Object.keys(entry.platforms).some((key, index) => key !== String(index)) ||
+			new Set(entry.platforms).size !== entry.platforms.length ||
+			!entry.platforms.every((platform) => ['ahk', 'hs', 'linux'].includes(platform))
+		)
+			throw new TypeError('Native presentations require explicit kind, title key and platforms.');
+	}
+	return presentations;
+}
+
 /** Project only declared contexts from the same canonical app registry. */
 function projectPresentations(apps) {
 	const result = Object.create(null);
@@ -75,7 +143,8 @@ function projectPresentations(apps) {
 }
 
 /** Build equivalent native host composers from one validated policy. */
-function render(policy, titleKeys = {}, presentations = {}) {
+function render(policy, titleKeys = {}, presentations = {}, nativePresentations = {}) {
+	validateNativePresentations(nativePresentations);
 	validatePresentations(presentations);
 	validate(policy);
 	for (const [app, key] of Object.entries(titleKeys)) {
@@ -108,11 +177,24 @@ ${Object.entries(presentations)
 		([app, variants]) =>
 			`\t[${JSON.stringify(app)}] = {\n${Object.entries(variants)
 				.sort(([a], [b]) => a.localeCompare(b))
-				.map(
-					([id, entry]) =>
-						`\t\t[${JSON.stringify(id)}] = { title_key = ${JSON.stringify(entry.title_key)}, label_key = ${JSON.stringify(entry.label_key)}, platforms = {${entry.platforms.map((platform) => JSON.stringify(platform)).join(', ')}} },`
+				.map(([id, entry]) =>
+					entry.kind === 'contextual_title'
+						? `\t\t[${JSON.stringify(id)}] = { kind = "contextual_title", title_key = ${JSON.stringify(entry.title_key)}, platforms = {${entry.platforms.map((platform) => JSON.stringify(platform)).join(', ')}} },`
+						: entry.kind === 'window_title'
+							? `\t\t[${JSON.stringify(id)}] = { kind = "window_title", title_key = ${JSON.stringify(entry.title_key)}, platforms = {${entry.platforms.map((platform) => JSON.stringify(platform)).join(', ')}} },`
+							: `\t\t[${JSON.stringify(id)}] = { title_key = ${JSON.stringify(entry.title_key)}, label_key = ${JSON.stringify(entry.label_key)}, platforms = {${entry.platforms.map((platform) => JSON.stringify(platform)).join(', ')}} },`
 				)
 				.join('\n')}\n\t},`
+	)
+	.join('\n')}
+}
+
+local NATIVE_PRESENTATIONS = {
+${Object.entries(nativePresentations)
+	.sort(([a], [b]) => a.localeCompare(b))
+	.map(
+		([id, entry]) =>
+			`\t[${JSON.stringify(id)}] = { kind = ${JSON.stringify(entry.kind)}, title_key = ${JSON.stringify(entry.title_key)}, platforms = {${entry.platforms.map((platform) => JSON.stringify(platform)).join(', ')}} },`
 	)
 	.join('\n')}
 }
@@ -150,7 +232,34 @@ function M.presentation_for_app(app_id, presentation_id, platform)
 		if native == platform then
 			local declared_platforms = {}
 			for index, value in ipairs(platforms) do declared_platforms[index] = value end
+			if rawget(entry, "kind") == "contextual_title" then
+		return { kind = "contextual_title", title_key = rawget(entry, "title_key"), platforms = declared_platforms }
+	end
+	if rawget(entry, "kind") == "window_title" then
+				return { kind = "window_title", title_key = rawget(entry, "title_key"), platforms = declared_platforms }
+			end
 			return { title_key = rawget(entry, "title_key"), label_key = rawget(entry, "label_key"), platforms = declared_platforms }
+		end
+	end
+	return nil
+end
+
+--- Projects a declared native notification/dialog title without app geometry.
+--- @param presentation_id string Exact native presentation identity.
+--- @param kind string Notification or dialog identity.
+--- @param platform string Native platform identity.
+--- @return table|nil Fresh source projection without branding or a page label.
+function M.native_presentation(presentation_id, kind, platform)
+	if type(presentation_id) ~= "string" or type(kind) ~= "string" or type(platform) ~= "string" then return nil end
+	local entry = rawget(NATIVE_PRESENTATIONS, presentation_id)
+	if type(entry) ~= "table" or getmetatable(entry) ~= nil or rawget(entry, "kind") ~= kind then return nil end
+	local platforms = rawget(entry, "platforms")
+	if type(platforms) ~= "table" or getmetatable(platforms) ~= nil then return nil end
+	for _, native in ipairs(platforms) do
+		if native == platform then
+			local declared_platforms = {}
+			for index, value in ipairs(platforms) do declared_platforms[index] = value end
+			return { kind = rawget(entry, "kind"), title_key = rawget(entry, "title_key"), platforms = declared_platforms }
 		end
 	end
 	return nil
@@ -209,7 +318,10 @@ function main(root = ROOT) {
 		titleKeys[app] = entry.title_key;
 	}
 	const presentations = projectPresentations(manifest.apps);
-	if (Object.keys(presentations).length > 0) {
+	const nativePresentations = validateNativePresentations(
+		Object.hasOwn(manifest, 'native_presentations') ? manifest.native_presentations : {}
+	);
+	if (Object.keys(presentations).length > 0 || Object.keys(nativePresentations).length > 0) {
 		const localeRoot = path.join(root, 'static/ergopti_plus/_shared/data');
 		const order = JSON.parse(
 			fs.readFileSync(path.join(localeRoot, 'locale_order.json'), 'utf8')
@@ -227,7 +339,11 @@ function main(root = ROOT) {
 			);
 			for (const variants of Object.values(presentations))
 				for (const entry of Object.values(variants))
-					for (const field of ['title_key', 'label_key']) {
+					for (const field of entry.kind === 'contextual_title'
+						? ['title_key']
+						: entry.kind === 'window_title'
+							? ['title_key']
+							: ['title_key', 'label_key']) {
 						const value = strings[entry[field]];
 						if (
 							typeof value !== 'string' ||
@@ -239,9 +355,21 @@ function main(root = ROOT) {
 								`Window presentation ${code}:${entry[field]} requires its original plain caption.`
 							);
 					}
+			for (const entry of Object.values(nativePresentations)) {
+				const value = strings[entry.title_key];
+				if (
+					typeof value !== 'string' ||
+					value === '' ||
+					!value.isWellFormed() ||
+					/[\x00-\x1F\x7F\u2028\u2029]/.test(value)
+				)
+					throw new TypeError(
+						`Native presentation ${code}:${entry.title_key} requires its original plain caption.`
+					);
+			}
 		}
 	}
-	const outputs = render(manifest.window_title, titleKeys, presentations);
+	const outputs = render(manifest.window_title, titleKeys, presentations, nativePresentations);
 	for (const [file, content] of [
 		[LUA_OUTPUT, outputs.lua],
 		[AHK_OUTPUT, '\uFEFF' + outputs.ahk],
@@ -256,6 +384,7 @@ module.exports = {
 	render,
 	main,
 	validatePresentations,
+	validateNativePresentations,
 	projectPresentations,
 	SOURCE,
 	LUA_OUTPUT,

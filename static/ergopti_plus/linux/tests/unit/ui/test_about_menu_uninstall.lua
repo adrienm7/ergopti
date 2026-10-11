@@ -19,6 +19,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local table_unpack = table.unpack or unpack
+local function packed(...) return { n = select("#", ...), ... } end
 
 --- The head of a translated reason, cut as the renderers cut it: the text
 --- before its first colon, ASCII or full-width.
@@ -227,6 +229,11 @@ local function with_about_parent(code, options, body)
 			get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end,
 		}
+		-- Install the actual observer before the production renderer captures its translator.
+		if type(options.caption_get) == "function" then
+			local get = package.loaded["infra.i18n"].get
+			package.loaded["infra.i18n"].get = function(key) return options.caption_get(key, get) end
+		end
 		local renderer = require("infra.manifest_menu")
 		local root, parent, quit, boundary = renderer.get_root()
 		for _, row in ipairs(root.top_level) do
@@ -435,4 +442,316 @@ helpers.describe("Linux About startup command ownership", function()
 			helpers.assert_eq(#state.removals, 0)
 		end)
 	end)
+end)
+
+
+--- Restores only a field on this fixture's private cached source/renderer owner.
+--- The original assertion error remains the pending error after exact restoration.
+local function with_uninstall_caption_field(owner, key, replacement, body)
+	local previous = rawget(owner, key)
+	rawset(owner, key, replacement)
+	local outcome = packed(pcall(body))
+	rawset(owner, key, previous)
+	if not outcome[1] then error(outcome[2], 0) end
+	return table_unpack(outcome, 2, outcome.n)
+end
+
+--- Selects the actual original command, never an invented duplicate fixture row.
+local function actual_uninstall_caption_source(root)
+	local selected
+	for _, item in ipairs(root.about_menu) do
+		if item.id == "uninstall" then
+			helpers.assert_nil(selected, "the original uninstall command is unique")
+			selected = item
+		end
+	end
+	helpers.assert_type(selected, "table", "the actual uninstall command exists")
+	return selected
+end
+
+helpers.describe("Linux uninstall receives its actual late shared command caption", function()
+	for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko",
+		"nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+		helpers.it("hands the independent original caption to removal " .. code .. " (uninstall-declared-caption)", function()
+			with_about_parent(code, nil, function(items, state)
+				local hand = about_parent_corpus().locales[code]
+				local parent = assert(about_parent_at(items, hand.about_parent))
+				helpers.assert_nil(parent.menu[7].fn(), "the original callback does not expose the worker result")
+				helpers.assert_eq(#state.removals, 1)
+				helpers.assert_eq(state.removals[1].title, hand.uninstall)
+				helpers.assert_eq(#state.removals, 1, "one actual native transaction receives the title")
+			end)
+		end)
+	end
+
+	helpers.it("reads the actual declared key instead of the original driver literal (uninstall-declared-caption)", function()
+		with_about_parent("en", { before = function(root)
+			actual_uninstall_caption_source(root).i18n = "menu.global.quit"
+		end }, function(items, state, labels)
+			local parent = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
+			helpers.assert_eq(parent.menu[7].title, labels["menu.global.quit"])
+			helpers.assert_nil(parent.menu[7].fn())
+			helpers.assert_eq(#state.removals, 1)
+			helpers.assert_eq(state.removals[1].title, labels["menu.global.quit"],
+				"the genuine shared declaration is the caption authority")
+		end)
+	end)
+
+	helpers.it("reads translation at the original click boundary (uninstall-declared-caption)", function()
+		with_about_parent("en", nil, function(items, state, labels)
+			local parent = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
+			with_uninstall_caption_field(labels, "menu.global.uninstall", labels["menu.global.quit"], function()
+				helpers.assert_nil(parent.menu[7].fn())
+				helpers.assert_eq(state.removals[1].title, labels["menu.global.quit"])
+			end)
+		end)
+	end)
+
+	for _, mutation in ipairs({
+		{ name = "withdrawn identity", key = "id", value = "retired_uninstall" },
+		{ name = "wrong kind", key = "type", value = "group" },
+		{ name = "changed caption", key = "i18n", value = "menu.global.quit" },
+		{ name = "empty caption", key = "i18n", value = "" },
+		{ name = "hidden command", key = "platforms", value = { "hs" } },
+	}) do
+		helpers.it("refuses the retained callback after " .. mutation.name .. " then repairs (uninstall-declared-caption)", function()
+			with_about_parent("en", nil, function(items, state, _, root)
+				local item = actual_uninstall_caption_source(root)
+				local parent = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
+				local action = parent.menu[7].fn
+				with_uninstall_caption_field(item, mutation.key, mutation.value, function()
+					helpers.assert_eq(action(), false)
+					helpers.assert_eq(#state.removals, 0, "no transaction or confirmation is delegated")
+					helpers.assert_eq(state.quits, 0)
+				end)
+				helpers.assert_nil(action())
+				helpers.assert_eq(#state.removals, 1, "repair restores the same actual callback")
+			end)
+		end)
+	end
+
+	helpers.it("refuses a replaced translation owner without observing it (uninstall-declared-caption)", function()
+		with_about_parent("en", nil, function(items, state)
+			local parent = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
+			local translator = package.loaded["infra.i18n"]
+			local get = translator.get
+			local hits = 0
+			with_uninstall_caption_field(translator, "get", function(key)
+				hits = hits + 1
+				return get(key)
+			end, function()
+				helpers.assert_eq(parent.menu[7].fn(), false)
+				helpers.assert_eq(hits, 0)
+				helpers.assert_eq(#state.removals, 0)
+			end)
+			helpers.assert_nil(parent.menu[7].fn())
+			helpers.assert_eq(#state.removals, 1)
+		end)
+	end)
+
+	helpers.it("receives a caption without constructing an unused menu row (uninstall-declared-caption)", function()
+		with_about_parent("en", nil, function(_, _, _, root)
+			local renderer = package.loaded["infra.manifest_menu"]
+			helpers.assert_type(renderer.command_caption_receiver, "function",
+				"the actual shared receiver is required; the old producer must fail")
+			local receive, current = renderer.command_caption_receiver("about_menu", "uninstall")
+			helpers.assert_type(receive, "function")
+			helpers.assert_type(current, "function")
+			local hits = 0
+			local function foreign() hits = hits + 1; error("unused row construction") end
+			with_uninstall_caption_field(renderer, "command_row", foreign, function()
+				with_uninstall_caption_field(renderer, "template_rows", foreign, function()
+					with_uninstall_caption_field(renderer, "render_rows", foreign, function()
+						helpers.assert_eq(current(), true)
+						helpers.assert_eq(receive(), about_parent_corpus().locales.en.uninstall)
+						helpers.assert_eq(hits, 0)
+					end)
+				end)
+			end)
+			helpers.assert_eq(actual_uninstall_caption_source(root).i18n, "menu.global.uninstall")
+		end)
+	end)
+end)
+
+--- Copies the actual source fields; no substitute command or caption is invented.
+local function copy_uninstall_caption_source(item)
+	local copy = {}
+	for key, value in next, item do copy[key] = value end
+	return copy
+end
+
+helpers.describe("Linux uninstall caption current source and native delivery boundary", function()
+	helpers.it("refuses a duplicate visible command before caption admission (uninstall-declared-caption)", function()
+		with_about_parent("en", { before = function(root)
+			local item = actual_uninstall_caption_source(root)
+			root.about_menu[#root.about_menu + 1] = copy_uninstall_caption_source(item)
+		end }, function(_, state)
+			local renderer = package.loaded["infra.manifest_menu"]
+			helpers.assert_type(renderer.command_caption_receiver, "function")
+			local receive, current = renderer.command_caption_receiver("about_menu", "uninstall")
+			helpers.assert_nil(receive)
+			helpers.assert_nil(current)
+			helpers.assert_eq(#state.removals, 0)
+		end)
+	end)
+
+	helpers.it("retires a retained callback when a duplicate visible owner appears then repairs (uninstall-declared-caption)", function()
+		with_about_parent("en", nil, function(items, state, _, root)
+			local item = actual_uninstall_caption_source(root)
+			local action = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7].fn
+			with_uninstall_caption_field(root.about_menu, #root.about_menu + 1, copy_uninstall_caption_source(item), function()
+				helpers.assert_eq(action(), false)
+				helpers.assert_eq(#state.removals, 0)
+			end)
+			helpers.assert_nil(action())
+			helpers.assert_eq(#state.removals, 1)
+		end)
+	end)
+
+	helpers.it("selects the real native-visible command rather than a hidden invalid sibling (uninstall-declared-caption)", function()
+		with_about_parent("en", { before = function(root)
+			local sibling = copy_uninstall_caption_source(actual_uninstall_caption_source(root))
+			sibling.platforms, sibling.unavailable, sibling.type, sibling.i18n = { "hs" }, "hide", "group", ""
+			root.about_menu[#root.about_menu + 1] = sibling
+		end }, function(items, state)
+			local hand = about_parent_corpus().locales.en
+			local parent = assert(about_parent_at(items, hand.about_parent))
+			helpers.assert_eq(#parent.menu, 7, "the hidden sibling does not become a native row")
+			helpers.assert_eq(parent.menu[7].title, hand.uninstall)
+			helpers.assert_nil(parent.menu[7].fn())
+			helpers.assert_eq(#state.removals, 1)
+			helpers.assert_eq(state.removals[1].title, hand.uninstall)
+		end)
+	end)
+
+	for _, key in ipairs({ "menu.global.uninstall", "dialog.uninstall.confirm", "dialog.uninstall.failed" }) do
+		helpers.it("refuses actual source reentry during " .. key .. " then repairs (uninstall-declared-caption)", function()
+			local control = { armed = false, reads = 0 }
+			with_about_parent("en", { caption_get = function(request, get)
+				local value = get(request)
+				if control.armed and request == key then
+					control.reads = control.reads + 1
+					control.item.i18n = "menu.global.quit"
+				end
+				return value
+			end }, function(items, state, _, root)
+				control.item = actual_uninstall_caption_source(root)
+				local action = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7].fn
+				control.armed = true
+				with_uninstall_caption_field(control.item, "i18n", control.item.i18n, function()
+					helpers.assert_eq(action(), false)
+					helpers.assert_eq(control.reads, 1, "the genuine captured translator was reached")
+					helpers.assert_eq(#state.removals, 0, "no native transaction observes stale option state")
+					helpers.assert_eq(state.quits, 0)
+				end)
+				control.armed = false
+				helpers.assert_nil(action())
+				helpers.assert_eq(#state.removals, 1)
+				helpers.assert_eq(state.removals[1].title, about_parent_corpus().locales.en.uninstall)
+			end)
+		end)
+	end
+
+	helpers.it("preserves the original late translation error identity before native delivery (uninstall-declared-caption)", function()
+		local control, failure = { armed = false }, {}
+		with_about_parent("en", { caption_get = function(key, get)
+			if control.armed and key == "menu.global.uninstall" then error(failure, 0) end
+			return get(key)
+		end }, function(items, state)
+			local action = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7].fn
+			control.armed = true
+			local ok, detail = pcall(action)
+			control.armed = false
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(rawequal(detail, failure), "no wrapping or success fallback replaces the original error")
+			helpers.assert_eq(#state.removals, 0)
+			helpers.assert_nil(action())
+			helpers.assert_eq(#state.removals, 1)
+		end)
+	end)
+
+	for _, mode in ipairs({ "missing", "empty", "key echo" }) do
+		helpers.it("refuses a late " .. mode .. " translation then repairs (uninstall-declared-caption)", function()
+			local control = { armed = false }
+			with_about_parent("en", { caption_get = function(key, get)
+				if control.armed and key == "menu.global.uninstall" then
+					if mode == "missing" then return nil end
+					if mode == "empty" then return "" end
+					return key
+				end
+				return get(key)
+			end }, function(items, state)
+				local action = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7].fn
+				control.armed = true
+				local outcome = packed(pcall(function()
+					helpers.assert_eq(action(), false)
+					helpers.assert_eq(#state.removals, 0)
+				end))
+				control.armed = false
+				if not outcome[1] then error(outcome[2], 0) end
+				helpers.assert_nil(action())
+				helpers.assert_eq(#state.removals, 1)
+			end)
+		end)
+	end
+
+	for _, name in ipairs({ "receiver API", "renderer facade", "translator facade" }) do
+		helpers.it("refuses replacement of the actual " .. name .. " without observing it then repairs (uninstall-declared-caption)", function()
+			with_about_parent("en", nil, function(items, state)
+				local action = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7].fn
+				local renderer = package.loaded["infra.manifest_menu"]
+				local hits = 0
+				local function foreign() hits = hits + 1; error("foreign caption owner was observed") end
+				local owner, key, replacement
+				if name == "receiver API" then owner, key, replacement = renderer, "command_caption_receiver", foreign
+				elseif name == "renderer facade" then
+					owner, key, replacement = package.loaded, "infra.manifest_menu", { command_caption_receiver = foreign }
+				else owner, key, replacement = package.loaded, "infra.i18n", { get = foreign } end
+				with_uninstall_caption_field(owner, key, replacement, function()
+					helpers.assert_eq(action(), false)
+					helpers.assert_eq(hits, 0)
+					helpers.assert_eq(#state.removals, 0)
+				end)
+				helpers.assert_nil(action())
+				helpers.assert_eq(#state.removals, 1)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("Linux uninstall does not observe a retired option translator", function()
+	for _, name in ipairs({ "getter", "facade" }) do
+		helpers.it("refuses " .. name .. " replacement during actual confirmation read then repairs (uninstall-declared-caption)", function()
+			local control = { armed = false, reads = 0, foreign_hits = 0 }
+			with_about_parent("en", { caption_get = function(key, get)
+				local value = get(key)
+				if control.armed and key == "dialog.uninstall.confirm" then
+					control.reads = control.reads + 1
+					rawset(control.owner, control.key, control.replacement)
+				end
+				return value
+			end }, function(items, state)
+				local action = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7].fn
+				local function foreign()
+					control.foreign_hits = control.foreign_hits + 1
+					return "foreign option translator"
+				end
+				if name == "getter" then
+					control.owner, control.key, control.replacement = package.loaded["infra.i18n"], "get", foreign
+				else
+					control.owner, control.key, control.replacement = package.loaded, "infra.i18n", { get = foreign }
+				end
+				control.armed = true
+				with_uninstall_caption_field(control.owner, control.key, rawget(control.owner, control.key), function()
+					helpers.assert_eq(action(), false)
+					helpers.assert_eq(control.reads, 1, "the actual retained confirmation translator ran")
+					helpers.assert_eq(control.foreign_hits, 0, "the retired failure translator is never called")
+					helpers.assert_eq(#state.removals, 0)
+				end)
+				control.armed = false
+				helpers.assert_nil(action())
+				helpers.assert_eq(#state.removals, 1)
+			end)
+		end)
+	end
 end)
