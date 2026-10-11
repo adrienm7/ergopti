@@ -1458,7 +1458,16 @@ function permissionProblems(files) {
 	return problems;
 }
 
-errors.push(...topJobProblems(pipeline.files()), ...permissionProblems(pipeline.files()));
+// The independent benchmark also receives a repository token on every main push.
+// Include it here even though it is not called by the release workflow.
+const benchmarkWorkflow = {
+	rel: '.github/workflows/bench.yml',
+	text: fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/bench.yml'), 'utf8')
+};
+errors.push(
+	...topJobProblems(pipeline.files()),
+	...permissionProblems([...pipeline.files(), benchmarkWorkflow])
+);
 for (const [what, from, to] of [
 	['if: false on the Windows caller', '  windows:\n', '  windows:\n    if: false\n'],
 	[
@@ -1484,6 +1493,7 @@ for (const [what, from, to] of [
 	mustCatch(what, ENTRY, from, to, topJobProblems);
 }
 for (const [what, rel, from, to] of [
+	['missing token permissions', ENTRY, 'permissions:\n  contents: read\n', ''],
 	[
 		'write-all at the top of ci.yml',
 		ENTRY,
