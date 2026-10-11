@@ -80,9 +80,9 @@ function checkWorkflow(body) {
 	assert.equal(pipeline.stepField(native, 'timeout-minutes'), '25');
 	assert.equal(pipeline.stepField(native, 'if'), null);
 	assert.equal(pipeline.stepField(native, 'continue-on-error'), null);
-	assert.ok(body.indexOf(main) < body.indexOf(native));
 	assert.ok(body.indexOf(native) < body.indexOf(receipt));
 	assert.ok(body.indexOf(receipt) < body.indexOf(upload));
+	assert.ok(body.indexOf(upload) < body.indexOf(main));
 	assert.equal(pipeline.stepField(receipt, 'if'), 'always()');
 	assert.equal(pipeline.stepField(receipt, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(receipt, 'continue-on-error'), null);
@@ -166,6 +166,13 @@ assert.throws(() =>
 checkRunner(runner);
 const body = admittedNativeWorkflow(pipeline.files());
 checkWorkflow(body);
+for (const stepName of ['Run native desktop AHK cohorts', 'Publish native desktop AHK evidence']) {
+	const early = pipeline.step(body, stepName);
+	const main = pipeline.step(body, 'Run AHK test suite');
+	const late = body.replace(early, '').replace(main, main + early);
+	assert.notEqual(late, body);
+	assert.throws(() => checkWorkflow(late));
+}
 for (const [before, after] of [
 	['  macos:', '  omitted-macos:'],
 	['  core:', '  omitted-core:']
