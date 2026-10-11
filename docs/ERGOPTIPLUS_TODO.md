@@ -3947,6 +3947,8 @@ copied wrappers, observer refusal, actual rollback retention and cleanup. Their
 34-case Windows native qualification remains unexecuted; portable source review
 alone does not prove the complete transactional writer or migrations.
 
+The shipped schema-10 fanout now retains the three retired caps source leaves until explicit cleanup: only those three registry deletes are removed, while all nine copy-if-absent operations, occupied destinations, generic delete semantics and strict invalid/newer schema refusal remain. The two independent handwritten expected models gain their original retained values under the explicit retirement policy; no expectations are regenerated from implementation and no assertions are removed. Genuine Linux boot, backup, publication and reread receiving passes 45/45 checks on LuaJIT and Lua 5.4, against 42 passes/3 retirement failures on the original and restored-original registries. Current schema-11/12 behavior, unknown neighbors and refused ordinary writes are checked; this cannot recover values deleted by older releases. Full corpus and three-driver CI qualification remain pending; item 33 stays partial.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

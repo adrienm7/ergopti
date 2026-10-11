@@ -4,6 +4,8 @@ owner = "foreign root"
 schema_version = 12
 
 [hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.875
 future = "retain the legacy unknown leaf"
 
 [hotstrings.autocorrection.names]
@@ -19,6 +21,7 @@ enabled = true
 time_activation_seconds = 0.875
 
 [hotstrings.modules.autocorrection]
+caps = false
 names = true
 abbreviations = false
 technical_terms = false

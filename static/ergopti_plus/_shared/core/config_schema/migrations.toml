@@ -282,9 +282,6 @@ ops = [
 	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "enabled", to_section = "hotstrings.autocorrection.technical_terms" },
 	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds", to_section = "hotstrings.autocorrection.technical_terms" },
 	{ op = "copy_if_absent", section = "hotstrings.modules.autocorrection", key = "caps", to_key = "technical_terms" },
-	{ op = "delete", section = "hotstrings.autocorrection.caps", key = "enabled" },
-	{ op = "delete", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds" },
-	{ op = "delete", section = "hotstrings.modules.autocorrection", key = "caps" },
 ]
 
 # Preserve helper-backed Windows variants and independent source/layer ownership.
