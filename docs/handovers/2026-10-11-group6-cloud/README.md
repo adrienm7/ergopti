@@ -786,3 +786,72 @@ repairs missing failure evidence; it does not identify the historical hosted
 Python timeout cause, adopt the separate poll proposal, qualify native trust or
 complete item 62. Existing test locations, fixtures and ordering are preserved
 for the local AHK audit's coordinated migration.
+
+## Published diagnostics and unadopted native successors
+
+Commit `72b29be3999a8666938736e1fb5fc25defb6c263` publishes the portable failure
+diagnostic above. Its final serial gate passes format386 and all412 JavaScript
+checks in676.257 seconds. HEAD, index and91 source hashes agree before and after
+the gate; this is not a claim that drift controls never temporarily change their
+fixtures. The39,390-byte raw log hashes
+`70da6b8cda4782bd6ad20588d0f2611a3151b5048fa0f33b657dbfa4d514d800`.
+Four exact-SHA, all-event censuses find no automatic workflow. The feature is
+pushed; no new Dev integration or native qualification follows from this change.
+
+The [removal successor packet](native-removal-r2-controls-proposal.tar.gz) is
+299,893 bytes, SHA256
+`086876e32237cf8d30e291cf46486f7a580d32811c359aa4eedcea3dfd0eb207`.
+Independent receiving joins43 safe regular members and42 inventory entries.
+It preserves the original positional ADD call and scopes the retained stderr
+projection to REMOVE. All250 original function texts and156 case identities
+remain; nine additive focused controls pass and the original real SIGINT/SIGTERM
+interaction control passes. The original predecessor produces27 assertion
+failures across those nine cases, with no execution error. Full165-case, selected
+JS/Lua and native receiving remain unrun. This is UNADOPTED: Root/G4 ownership of
+the exact native-command spans is still required. Its registry proposal must be
+spliced onto the current diagnostic wrapper, never copied over that wrapper.
+The same exact bytes are publicly recoverable as
+[Git blob957f6bcc91b552b691b4b8d911432d51effa1eaf](https://api.github.com/repos/adrienm7/ergopti/git/blobs/957f6bcc91b552b691b4b8d911432d51effa1eaf).
+
+The [publisher extraction packet](root-cli-receiver-extraction-proposal.tar.gz)
+is257,176 bytes, SHA256
+`e3869596c8e4d7e3b23f29162edf7af01d2ee537f0de7eff843806c225846382`.
+Independent receiving joins30 safe regular members and29 inventory entries.
+It extracts the genuine `f1db72eabfb7960cd78b788ae9adbd2b5f8d1a38` PowerShell
+CLI and embedded JavaScript receiver into two exported modules, with finite
+changes to their two original wrappers. All ten original PowerShell helpers and
+the original complete stage/consumer bodies remain recoverable through explicit
+binding inverses; import does not start the cohort or acquire compiler/evidence
+resources. Software receiving passes21 Node controls and four Linux PowerShell
+7.4.11 controls. These modeled and import checks do not qualify Windows, a
+compiler, the actual producer ZIP or the original23 cohort. Its exact bytes are
+also recoverable as
+[Git blob501ea4cdebfa746f5b7b93330777bdf24ec33630](https://api.github.com/repos/adrienm7/ergopti/git/blobs/501ea4cdebfa746f5b7b93330777bdf24ec33630).
+
+This extraction is UNADOPTED and enrollment is incomplete. Root's historical
+3,262-row profile joins all21 historical updater pins, but only19 of the21
+current pins. The held constructor successor joins the current21; retain both
+`85b7f0f55e` constructor corrections. Do not import the old input profile or
+regenerate an independent oracle. Future composition needs reviewed shared
+publication ownership, a generated and frozen CURRENT source census including
+new module/loader/input/workflow bindings, and the stronger G6 acquired/final-held
+reader. The original committed image and exactly two authenticated producer
+outputs must remain separate; LICENSE and every other source stay exact.
+Ordinary Root hash/read calls cannot substitute for this stronger reader.
+Authentic PREBUILD/POSTBUILD, raw compiled/header/compiler receipts, original23
+child/oracle/budget/retirement and full unit/E2E/package/install receiving remain
+necessary. The old3,259 and F7's2,894 commitments remain distinct.
+
+New official artifacts11714423296 and11715250676 bind the same `f1db` attempt1
+of run38173146839. API sizes/digests are received; the actual ZIP downloads return
+HTTP403 with zero bytes through `productionresultssa4.blob.core.windows.net`.
+No native assertion or PRE/POST proof is independently received from those
+downloads. Network draft12 adds only that exact host and preserves all five
+earlier custom hosts, presets, install/start scripts, repositories, secrets and
+runtime settings. The [safe draft receipt](network-draft12-receiving.json)
+records saved/read-back state, not activation. Environment Settings must save
+and publish the draft before the new allowlist is active. Alternatively, the
+producer owner may provide the exact safe ZIP bytes through immutable Git API
+blobs for official size/digest comparison; no signed URL or credential is shared.
+No unchanged403 retry, CI ref, workflow or release is created by these proposals.
+Items36/62, transversal16/38 and the deliberate exclusion of22 remain unchanged.
