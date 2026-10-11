@@ -10612,6 +10612,17 @@ ACK, pending retirement debt, private payload rules and deadlines remain exact.
 This is software admission evidence only: native catalogue, TCC, service
 invocation and final package/installation qualification remain open.
 
+The callback-identity correction `7c9cfa47` is integrated without squash in
+Dev `5f7a8467`. Final selected source validation passes format379, JS410,
+controlled Hammerspoon18599 and virtual E2E101 with one original skip. Manual
+Mac CI38129586139 on that exact integrated source is terminal FAILURE:
+seven successful/five failed/five skipped jobs, no release; authentic modeled
+unit/E2E logs retain the same counts. Native Brew and both managed-network jobs
+fail, leaving package/install unexecuted. The [final receiving checkpoint](handovers/2026-10-11-group3-shortcuts-final-receiving/README.md)
+retains complete raw proofs, exact scope and the released owner lock. This
+qualifies the software correction, not native catalogue, consent or invocation;
+item106 and all transverse requirements remain open.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
@@ -10705,6 +10716,17 @@ invocation and final package/installation qualification remain open.
   2. Join all-ten capability and row registration/dispatch only after that owner is composed and qualified; a preview, dead-key descriptor or text fallback must not grant output or clear unknown composition state.
   3. Receive registered native before/after cases with independent French/US ten-key symbols, Shift digits, Caps/dead states, AltGr/Ctrl/Win pass-through, repeats, focus/source changes, pause/reload and failed retirement, checking actual receiver/key-state/caret and closure.
   4. Validate physical number-row delivery on the user's Windows PC.
+
+Fresh exact-source native receiving on Dev `5f7a8467` / CI38129586139 now
+observes the unchanged original Carbon cohort as twelve PASS/zero FAIL/zero SKIP
+on each ARM64 and AMD64 architecture, with all seven original inner/outer TIS
+restoration pairs closed on each. Official artifact digests and original
+producer/test blobs are authenticated in the [final receiving checkpoint](handovers/2026-10-11-group3-shortcuts-final-receiving/README.md).
+The older genuine AMD64 ten-PASS/two-FAIL outcome remains preserved; unchanged
+Swift/workflow bytes establish no source cause for runner variation. This is
+read-only SDK/TIS positive qualification only. The held omission enrollment,
+fresh native eleven-PASS/one-named-expected-FAIL receiving, forced output,
+installed acceptance and physical delivery remain open. Item107 is not removed.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
