@@ -10766,6 +10766,18 @@ read-only SDK/TIS positive qualification only. The held omission enrollment,
 fresh native eleven-PASS/one-named-expected-FAIL receiving, forced output,
 installed acceptance and physical delivery remain open. Item107 is not removed.
 
+The diagnostic source composition now receives the two independently reviewed
+Group5 guardian build inputs from actual commit `69fcb820`, while retaining the
+other 97 original package inputs and the immutable 99-row historical recipe.
+The historical 53-control cohort uses an explicitly historical projection;
+the current native projection uses the actual composed sources. Both retain
+only the original private final-byte omission and unchanged native expectations.
+Controlled component receiving passes all 53 original controls. The first
+51-control composition run retained 50 passes and one fixture allocation error;
+the successor passes all 51 controls by isolating each negative projection
+without removing either refusal assertion. Committed generator admission, hosted native expected-failure
+receiving, forced output, installation and physical delivery remain required.
+
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
   Win/Super on Windows/Linux. Implemented: one ordinary editable conditional
