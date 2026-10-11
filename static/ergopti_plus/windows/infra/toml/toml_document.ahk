@@ -59,8 +59,8 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 			else if StrLen(Quote) == 1 && (Char == Chr(10) || Char == Chr(13))
 				throw ValueError("A single-line TOML string contains a newline")
 		} else if Char == "#" {
-			while Position <= Length && SubStr(Text, Position, 1) != Chr(10)
-				Position += 1
+			NextLine := RegExMatch(Text, Chr(10), , Position)
+			Position := NextLine ? NextLine : Length + 1
 			continue
 		} else if (Triple == Chr(34) . Chr(34) . Chr(34))
 				|| (Triple == Chr(39) . Chr(39) . Chr(39)) {
