@@ -662,6 +662,8 @@ _CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
 	}
 	try {
 		AssertTrue(FSWriteDurable(Path, Source))
+		; Custom migration ports exercise the algorithm, not native read authority.
+		AssertEqual(ExpectedStatus, ConfigMigrateBoot(Path)["status"])
 		Result := ConfigMigrateRun(Path, 0, "semantic-snapshot", Backup, Publish)
 		AssertEqual(ExpectedStatus, Result["status"])
 		AssertEqual(0, Calls.Backup)
@@ -671,7 +673,7 @@ _CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
 			"the reader consumes the admitted setting without inventing stamp authority")
 		if ExpectedStatus == "current" {
 			AssertEqual("", TOML_WriteRefusal(Path))
-			AssertTrue(TOML_BatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "@" }]))
+			AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "@" }]))
 		} else {
 			AssertEqual(1, Result["read_only"])
 			Reason := TOML_WriteRefusal(Path)
@@ -683,7 +685,7 @@ _CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
 			AssertEqual("error", Built["status"])
 		}
 		AssertTrue(FSUtf8ExactMatches(Path, Source), "boot consumption must not rewrite any source bytes")
-	} finally DirDelete(Dir, true)
+	} finally _CMJ_Cleanup(Dir, Path)
 }
 _CMG_SemanticCurrentSourceConsumesRootSettings() {
 	_CMG_SemanticSnapshotKeepsStampAuthority(String(ConfigMigrateCurrentVersion()), "current")
