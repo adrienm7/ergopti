@@ -154,7 +154,7 @@ HealthCheck_Config() {
 		throw ValueError("The diagnostics schema is not a version 2 schema.")
 	; Export labels come from canonical English, independently of UI locale.
 	Schema["export_strings"] := Map()
-	English := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+	English := JsonParse(FSReadStrict(_SharedDir . "\data\locales\en.json"))
 	for Key, Value in English
 		if SubStr(Key, 1, 12) == "healthcheck."
 			Schema["export_strings"][Key] := Value
