@@ -6898,12 +6898,20 @@ negative, then positive trust-add reaches the deadline. Independent HTTP's
 different CA is absent after timed-out add; admin authorization succeeds but
 restoration removal exits one with debt. These observations establish no
 causal trust-policy fix. Real Linux 262 streaming/48 API and portable 63 HTTP
-controls pass without Mac native credit. Inactive post-install70/timeout75
-preparations preserve every original63 method; matching canonical enrollment,
-composition review and Darwin qualification remain outstanding. Group1 handed
-off the bounded post-install fixture/test spans; registry/timeout coordination
-continues. Model, package/install, Windows-PC and enterprise acceptance remain
-required. See the
+controls pass without Mac native credit. The handed-off post-install adaptation
+is adopted with bounded receiving and strict90 canonical enrollment. Its
+original15-second budget, primary add outcome and stderr-only diagnostic remain.
+Two real SIGINT/SIGTERM interaction methods reproduce four swallowed-cancellation
+assertions in the frozen70 predecessor; corrected72 passes without errors/skips.
+Every original63 and retained seven test/helper body is byte-exact. Before the
+feature commit, actual child/root and successful-publication cancellation
+counterexamples require an additional same-owner cleanup guard. Its original
+sole settlement requires identity True; retained child debt blocks new commands
+and root deletion, and real cancellation stays visible. Unchanged72 and new18
+controls pass; full canonical qualification is recorded in the handover. This is
+portable receiving, not Darwin qualification. Timeout75 and combined84 proposals
+remain inactive; PAC query-callee enrollment is separate and absent. Model,
+package/install, Windows-PC and enterprise acceptance remain required. See the
 [cloud continuation](handovers/2026-10-11-group6-cloud/README.md). Item 62 stays open.
 
 2026-10-11 integrated component receiving. Exact2e4d manual38106361453
