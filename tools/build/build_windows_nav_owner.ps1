@@ -639,6 +639,8 @@ $sourcePath = Join-Path $sourceDir "nav_event_owner.c"
 $editorSourcePath = Join-Path $sourceDir "editor_replace.c"
 $replaySourcePath = Join-Path $sourceDir "replay_route_core.c"
 $outputSourcePath = Join-Path $sourceDir "terminal_output_plan.c"
+$traceSourcePath = Join-Path $sourceDir "hook_trace.c"
+$traceTestSourcePath = Join-Path $sourceDir "hook_trace_test.c"
 $outputTestSourcePath = Join-Path $sourceDir "terminal_output_plan_test.c"
 $replayTestSourcePath = Join-Path $sourceDir "replay_route_core_test.c"
 $headerPath = Join-Path $sourceDir "nav_event_owner.h"
@@ -648,6 +650,7 @@ $editorTestSourcePath = Join-Path $sourceDir "editor_replace_test.c"
 $cmakePath = Join-Path $sourceDir "CMakeLists.txt"
 $testExePath = Join-Path $buildDir "ergopti_nav_event_owner_test.exe"
 $outputTestExePath = Join-Path $buildDir "ergopti_terminal_output_plan_test.exe"
+$traceTestExePath = Join-Path $buildDir "ergopti_hook_trace_test.exe"
 $replayTestExePath = Join-Path $buildDir "ergopti_replay_route_core_test.exe"
 $buildDllPath = Join-Path $buildDir "ergopti_nav_owner.dll"
 $vendorDllPath = Join-Path $vendorDir "ergopti_nav_owner.dll"
@@ -656,7 +659,7 @@ $manifestSchemaVersion = 1
 $vendorDllRelativePath = "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll"
 $buildScriptRelativePath = "tools/build/build_windows_nav_owner.ps1"
 
-foreach ($requiredSource in @($sourcePath, $editorSourcePath, $replaySourcePath, $replayTestSourcePath, $outputSourcePath, $outputTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
+foreach ($requiredSource in @($sourcePath, $editorSourcePath, $traceSourcePath, $traceTestSourcePath, $replaySourcePath, $replayTestSourcePath, $outputSourcePath, $outputTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
 	if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
 		throw "Required native source is missing: $requiredSource"
 	}
@@ -704,6 +707,7 @@ $dllRecipeArguments = $commonCompilerRecipeFlags + @(
 	"{source_dir}\editor_replace.c",
 	"{source_dir}\replay_route_core.c",
 	"{source_dir}\terminal_output_plan.c",
+	"{source_dir}\hook_trace.c",
 	"/link",
 	"/DEF:{source_dir}\nav_event_owner.def",
 	"/OUT:{build_dir}\ergopti_nav_owner.dll",
@@ -752,6 +756,15 @@ try {
 	Invoke-CheckedNative -Label "Compiling the event-time replay route core test" -Executable "cl.exe" -Arguments $replayTestArguments
 	Invoke-CheckedNative -Label "Running the event-time replay route core test" -Executable $replayTestExePath -Arguments @()
 
+	$traceTestArguments = $commonCompilerFlags + @(
+		$traceSourcePath,
+		$traceTestSourcePath,
+		"/Fe:$traceTestExePath",
+		"/link"
+	) + $commonLinkerFlags
+	Invoke-CheckedNative -Label "Compiling the bounded diagnostic trace test" -Executable "cl.exe" -Arguments $traceTestArguments
+	Invoke-CheckedNative -Label "Running the bounded diagnostic trace test" -Executable $traceTestExePath -Arguments @()
+
 	$testArguments = $commonCompilerFlags + @(
 		"/DERGOPTI_NAV_TESTING=1",
 		$testSourcePath,
@@ -760,6 +773,7 @@ try {
 		$editorSourcePath,
 		$replaySourcePath,
 		$outputSourcePath,
+		$traceSourcePath,
 		"/Fe:$testExePath",
 		"/link"
 	) + $commonLinkerFlags

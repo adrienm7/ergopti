@@ -4471,6 +4471,53 @@ static bool TestPlanValidationIsAtomic(void)
 // =============================
 // =============================
 
+/** Refusal paths never establish foreground ownership or overwrite output. */
+static bool TestHookTraceRefusesUnauthenticatedSessions(void)
+{
+	const char *name = "hook trace refuses unauthenticated sessions (todo49-hook-trace)";
+	ErgoptiTrace_Entry entry, saved_entry;
+	ErgoptiTrace_Receipt receipt, saved_receipt;
+	memset(&entry, 0x55, sizeof(entry)); saved_entry = entry;
+	memset(&receipt, 0xAA, sizeof(receipt)); saved_receipt = receipt;
+	TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, ErgoptiNav_StartHookTrace(0, 81, 1) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_StartHookTrace(TEST_OWNER_A, 0, 1) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_StartHookTrace(TEST_OWNER_A, 81, 0) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	/* A semantic test token is not an owned foreground HWND on any platform. */
+	TEST_ASSERT(name, ErgoptiNav_StartHookTrace(TEST_OWNER_A, 81, 1) == ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+	TEST_ASSERT(name, ErgoptiNav_ReadHookTrace(0, 81, 1, 0, &entry, 1, &receipt)
+		== ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_ReadHookTrace(TEST_OWNER_A, 81, 1, 0, &entry, 257, &receipt)
+		== ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_ReadHookTrace(TEST_OWNER_A, 81, 1, 0, &entry, 1, &receipt)
+		== ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, ErgoptiNav_StopHookTrace(0, 81, 1) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_StopHookTrace(TEST_OWNER_A, 81, 1) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, memcmp(&entry, &saved_entry, sizeof(entry)) == 0);
+	TEST_ASSERT(name, memcmp(&receipt, &saved_receipt, sizeof(receipt)) == 0);
+	return true;
+}
+
+/** Hook-shaped deterministic dispatch must never create authenticated evidence. */
+static bool TestHookTraceDoesNotQualifyTestDispatch(void)
+{
+	const char *name = "hook trace excludes deterministic dispatch (todo49-hook-trace)";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 2, 1);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiTrace_Receipt receipt, saved;
+	uint64_t generation;
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, TestDispatch(name, (uint16_t)'A', ERGOPTI_NAV_EVENT_DOWN, 0, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, TestDispatch(name, (uint16_t)'A', ERGOPTI_NAV_EVENT_UP, 0, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	memset(&receipt, 0xAA, sizeof(receipt)); saved = receipt;
+	TEST_ASSERT(name, ErgoptiNav_ReadHookTrace(TEST_OWNER_A, 81, 1, 0, NULL, 0, &receipt)
+		== ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, memcmp(&receipt, &saved, sizeof(receipt)) == 0);
+	return true;
+}
+
 /**
  * Runs every deterministic native navigation-owner regression.
  *
@@ -4551,6 +4598,10 @@ int main(int argc, char **argv)
 			TestStalePhysicalModifierCannotArmRoutes},
 		{"terminal output custody preserves fault debt (todo49-output-custody)",
 			TestTerminalOutputCustodyPreservesFaultDebt},
+		{"hook trace refuses unauthenticated sessions (todo49-hook-trace)",
+			TestHookTraceRefusesUnauthenticatedSessions},
+		{"hook trace excludes deterministic dispatch (todo49-hook-trace)",
+			TestHookTraceDoesNotQualifyTestDispatch},
 		{"native editor receiver matrix", ErgoptiEditor_TestReplacements}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));

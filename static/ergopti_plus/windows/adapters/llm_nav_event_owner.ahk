@@ -3235,6 +3235,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded() {
 		"ErgoptiNav_CommitTerminalCapture",
 		"ErgoptiNav_AbortTerminalCapture",
 		"ErgoptiNav_GetTerminalCapture",
+		"ErgoptiNav_StartHookTrace", "ErgoptiNav_ReadHookTrace", "ErgoptiNav_StopHookTrace",
 		"ErgoptiNav_RegisterTerminalRoutes", "ErgoptiNav_PeekTerminalRoute",
 		"ErgoptiNav_ListTerminalHeldRecipes", "ErgoptiNav_PreviewTerminalOutput",
 		"ErgoptiNav_PlanTerminalOutput", "ErgoptiNav_BeginTerminalOutputAttempt",

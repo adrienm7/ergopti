@@ -10,6 +10,9 @@ EXPORTS
 	ErgoptiEditor_Decide
 	ErgoptiEditor_Close
 	ErgoptiNav_Start
+	ErgoptiNav_StartHookTrace
+	ErgoptiNav_ReadHookTrace
+	ErgoptiNav_StopHookTrace
 	ErgoptiNav_Stop
 	ErgoptiNav_PreparePlan
 	ErgoptiNav_CommitPlan

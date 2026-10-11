@@ -44,6 +44,42 @@ _Noreturn intptr_t ErgoptiPortable_Unsupported(const char *operation, ...)
 	abort();
 }
 
+/** Portable execution cannot establish Windows desktop ownership or raw QPC. */
+BOOL QueryPerformanceCounter(LARGE_INTEGER *counter)
+{
+	if (counter != NULL) counter->QuadPart = 0;
+	SetLastError(ERROR_ACCESS_DENIED);
+	return FALSE;
+}
+HWND GetForegroundWindow(void)
+{
+	return NULL;
+}
+DWORD GetWindowThreadProcessId(HWND window, DWORD *process_id)
+{
+	(void)window;
+	if (process_id != NULL) *process_id = 0;
+	return 0;
+}
+DWORD GetCurrentProcessId(void)
+{
+	return 0;
+}
+
+BOOL GetGUIThreadInfo(DWORD thread_id, GUITHREADINFO *information)
+{
+	(void)thread_id;
+	(void)information;
+	SetLastError(ERROR_ACCESS_DENIED);
+	return FALSE;
+}
+BOOL IsChild(HWND parent, HWND child)
+{
+	(void)parent;
+	(void)child;
+	return FALSE;
+}
+
 BOOL InitOnceExecuteOnce(PINIT_ONCE once,
 	BOOL (*callback)(PINIT_ONCE, PVOID, PVOID *), PVOID parameter, PVOID *context)
 {
