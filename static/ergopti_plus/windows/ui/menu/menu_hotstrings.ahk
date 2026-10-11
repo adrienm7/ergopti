@@ -1080,6 +1080,9 @@ _HS_TomlFileRow(TF) {
 	TFMenu := Menu(), HandedOff := false
 	PrimaryFailure := 0
 	try {
+	CaptionPolicy := MenuRenderer_PersonalFileCaptionPolicy()
+	if !(CaptionPolicy is Map)
+		return false
 	ControlRows := [], SectionRows := []
 	Owner := PersonalFileControls.ForPath(TF.path)
 	if Owner is PersonalFileAdoptedOwner {
@@ -1105,9 +1108,14 @@ _HS_TomlFileRow(TF) {
 		return false
 	if MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted
 		return false
-	Result := Map(
-		"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",
-		"submenu", TFMenu)
+	; Keep original late reads and native concatenation coercion before projection.
+	Result := (FileStem := TF.stem . "",
+		FileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",
+		CaptionOwner := CaptionPolicy["parent"],
+		CaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
+			? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))
+	if !(Result is Map)
+		return false
 	HandedOff := true
 	return Result
 	} catch as ErrorInfo {
@@ -1224,6 +1232,9 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 		OwnedMenus := []
 	PrimaryFailure := 0
 	try {
+	CaptionPolicy := MenuRenderer_PersonalFolderCaptionPolicy()
+	if !(CaptionPolicy is Map)
+		return false
 	FolderNames := []
 	for FolderName in Tree
 		FolderNames.Push(FolderName)
@@ -1283,8 +1294,16 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 		if MenuRenderer_AppendTemplate(FolderMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != SubfolderRows.Length + FileRows.Length || !WholeTreeAdmitted
 			return false
 		FolderTotal := _HS_NodeTotal(Node)
-		FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
-		FolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))
+		; Preserve positive count coercion before the original outer name coercion.
+		FolderRow := (FolderPositive := FolderTotal > 0,
+			FolderCount := FolderPositive ? FmtCount(FolderTotal) . "" : "",
+			FolderNameReceipt := FolderName . "",
+			CaptionOwner := CaptionPolicy["parent"],
+			CaptionOwner != MenuRenderer_PersonalFolderParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
+				? false : CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu))
+		if !(FolderRow is Map)
+			return false
+		FolderRows.Push(FolderRow)
 	}
 	Providers := Map("personal_folders", (*) => FolderRows, "personal_files", (*) => [])
 	Getters := Map("personal_folder_file_boundary", (*) => false)
