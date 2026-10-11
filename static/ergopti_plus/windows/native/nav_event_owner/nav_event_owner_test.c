@@ -2582,6 +2582,197 @@ static bool TestTerminalCaptureReplaysExactPhysicalEdges(void)
 
 
 
+/** Rejects a replay marker when Win32 reports lower-integrity injection. */
+static bool TestTerminalReplayCannotPromoteLowerIntegrity(void)
+{
+	const char *name = "terminal replay cannot promote lower integrity (todo49-replay-provenance)";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	uint64_t generation = 0;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_LOWER_INTEGRITY,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	return true;
+}
+
+
+
+/** Keeps replay modifiers independent of the asynchronous physical-key snapshot. */
+static bool TestTerminalReplayRetainsEffectiveModifiers(void)
+{
+	const char *name = "terminal replay retains effective modifiers (todo49-replay-modifiers)";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	uint64_t generation = 0;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	/* The physical key may already be up: the replayed down still owns Alt. */
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, result.receipt_created == 1);
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'2', 0x03, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	return true;
+}
+
+
+
+/** Retires only the replay modifier owner when a physical release crosses it. */
+static bool TestTerminalReplaySurvivesCrossedModifierReleases(void)
+{
+	const char *name = "terminal replay survives crossed modifier releases (todo49-replay-modifiers)";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	uint64_t generation = 0;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, result.receipt_created == 1);
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'2', 0x03, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	return true;
+}
+
+
+
+/** Records the replayed modifier before the production FIFO acknowledgement. */
+typedef struct NavReplayModifierProbe {
+	const char *name;
+	bool accepted;
+} NavReplayModifierProbe;
+
+
+
+/** Exercises the actual hook converter during the deterministic send boundary. */
+static void TestReplayHeldModifierObserver(void *context)
+{
+	NavReplayModifierProbe *probe = context;
+	ErgoptiNav_DispatchResult result;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	probe->accepted = TestHookFlow(
+		probe->name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD,
+		ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered);
+}
+
+
+
+/** Hands a replayed still-held modifier back to its later physical release. */
+static bool TestTerminalReplayHandsOffHeldModifier(void)
+{
+	const char *name = "terminal replay hands off held modifier (todo49-replay-modifiers)";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TestEvent replayed;
+	NavReplayModifierProbe probe = { name, false };
+	uint64_t generation = 0;
+	uint32_t replayed_count = 0;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCaptureObserved(
+		TEST_OWNER_B, ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT, UINT32_MAX,
+		&replayed, 1, &replayed_count, TestReplayHeldModifierObserver, &probe)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, probe.accepted && replayed_count == 1);
+	/* The capture ended while Alt was held. Its ordinary up must finish it. */
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LMENU, 0x38, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	return true;
+}
+
+
+
 /** Proves partial replay retains the exact FIFO suffix and lifecycle debt. */
 static bool TestTerminalCapturePartialReplayIsRetryable(void)
 {
@@ -3722,6 +3913,14 @@ int main(int argc, char **argv)
 			TestStopDrainBalancesConsumedHolds},
 		{"terminal capture replays exact physical edges",
 			TestTerminalCaptureReplaysExactPhysicalEdges},
+		{"terminal replay cannot promote lower integrity (todo49-replay-provenance)",
+			TestTerminalReplayCannotPromoteLowerIntegrity},
+		{"terminal replay retains effective modifiers (todo49-replay-modifiers)",
+			TestTerminalReplayRetainsEffectiveModifiers},
+		{"terminal replay survives crossed modifier releases (todo49-replay-modifiers)",
+			TestTerminalReplaySurvivesCrossedModifierReleases},
+		{"terminal replay hands off held modifier (todo49-replay-modifiers)",
+			TestTerminalReplayHandsOffHeldModifier},
 		{"terminal capture partial replay is retryable",
 			TestTerminalCapturePartialReplayIsRetryable},
 		{"terminal capture admission and overflow",

@@ -180,6 +180,7 @@
 		"test:app-switch-labels": "node ./tools/test/test-app-switch-labels.cjs",
 		"test:automation-query-ci-publisher": "node ./tools/test/test-automation-query-ci-publisher.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
+		"test:windows-nav-portable": "node tools/test/run-nav-event-owner-portable.cjs",
 		"test:touchpad-registry": "node ./tools/test/test-touchpad-registry-single-source.cjs",
 		"test:gui-title-audit": "node ./tools/test/test-gui-title-audit.cjs",
 		"test:error-dialog-page": "node ./tools/test/test-error-dialog-page.cjs",

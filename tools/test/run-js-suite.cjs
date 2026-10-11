@@ -37,6 +37,13 @@ const CHECKS = [
 		repro: 'node tools/test/test-windows-managed-bootstrap.cjs'
 	},
 	{
+		name: 'Windows navigation portable census retains every native and portable case',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-nav-portable-registration.cjs'],
+		repro: 'node tools/test/test-windows-nav-portable-registration.cjs'
+	},
+
+	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],
