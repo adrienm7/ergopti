@@ -10853,6 +10853,74 @@ test precondition failure, not a Lua defect or a successful permission grant.
   child construction. Native verification after installing that correction and
   the real enable/disable click latency remain open.
 
+## Release-first CI optimization and cross-platform convergence
+
+The maintainer's October 11 priority is to publish the next actual stable
+release first. Do not delay that publication to integrate additional test
+optimizations. Afterwards, this workstream owns CI speed, test quality and
+cross-platform convergence; non-native work in groups 2, 4 and 7 is delegated
+separately. Preserve their unfinished native qualification requirements.
+
+- [ ] Publish and verify v1.0.1: actual tag, source, assets, integrity, mandatory
+      installation checks and explicit existing qualification limits. The
+      run `38165477221` on `47e7308da0` exposed one obsolete serial Linux
+      prerequisite assertion among 410 Core checks. Its correction preserves
+      both mandatory suites before packaging and still needs hosted receiving.
+- [ ] Record elapsed time by default for every CI step, suite and test,
+      including failure and timeout outcomes. Preserve source, OS and
+      architecture with machine-readable results and a readable slowest-test
+      summary. Distinguish setup, execution and cleanup; do not add nested
+      durations twice or expose personal data in diagnostic output.
+- [ ] Group the GitHub Actions graph into four parallel lanes: Common, Windows,
+      macOS and Linux. Each lane must show Unit tests, E2E tests, Build, then
+      Test the build; all four terminal results converge into Release. Split
+      unit and E2E phases into isolated parallel lots balanced by measured
+      duration, and require all unit lots before the E2E phase. Keep macOS Ollama, MLX
+      and other native checks inside its Tests group, alongside unit and E2E
+      checks. Preserve parallel execution inside each group and strict result
+      propagation. Verify the rendered GitHub graph so tests are not scattered
+      among peer boxes and redundant transitive edges do not obscure the
+      intended sequence. Test real outputs in the Common build stage as well;
+      do not add decorative no-op gates just to obtain the desired shape.
+- [ ] Define parallel lots by meaningful feature boundaries, such as
+      configuration, menus, typing/hotstrings, AI and updates. Balance measured
+      durations within those boundaries rather than slicing arbitrary numeric
+      ranges. Preserve shared-state and ordering dependencies within a lot;
+      the earlier contiguous three-shard proposal is not acceptable unchanged.
+- [ ] Optimize the measured slow paths and distribute independent work across
+      isolated jobs. Prove complete test coverage with every selected case
+      executed exactly once, strict failure propagation and owned cleanup.
+      Use the complete measurements in
+      [the Windows test performance report](audits/performance/ahk/2026_10_11/report.md)
+      as the baseline, not the number of test names alone.
+- [ ] Remove only demonstrated duplicate coverage. Preserve distinct failure,
+      lifecycle and native boundary scenarios; do not reduce workloads or
+      assertions solely to obtain a faster green run.
+- [ ] Make failures actionable: identify the failing stage and invariant,
+      expected and actual results, a safe reproduction command, relevant
+      retained evidence and the responsible module. Distinguish unavailable
+      host prerequisites from product failures without silently waiving either.
+- [ ] Extend the existing shared contracts and scenario corpora into common
+      behavioral tests executed through the real Windows, macOS and Linux
+      adapters. Convergence of features and observable behavior is the goal,
+      not merely matching function names or passing against common mocks.
+- [ ] Cover the same user journeys on all three drivers: available settings
+      and defaults, activation, prediction generation and selection, shortcuts,
+      text insertion, cancellation, errors and cleanup. Define expected results
+      independently of each implementation; shared expectations must expose a
+      driver that diverges.
+- [ ] Keep platform-specific native acceptance for focus, clipboard, keyboard
+      injection, permissions and lifecycle. Any unavoidable OS difference must
+      have an explicit capability reason and tested behavior; do not conceal
+      a feature gap with an ignored common test or a successful model result.
+- [ ] Maintain causal regressions and deterministic fixtures. Prove the original
+      defect fails its regression and keep useful negative controls, clear
+      timeout diagnostics and complete results when a suite aborts.
+
+Private AHK sharding, workflow graph simplification and recovery-copy
+optimization proposals remain unadopted pending review and actual receiving
+after publication. They are not part of the current release's evidence.
+
 ## Current patch release qualification
 
 The maintainer explicitly selected v1.0.1 despite two feature-labelled commits
