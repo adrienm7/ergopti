@@ -42,7 +42,8 @@ local function with_boundary_owner(helpers, platform, source, top_level, body)
 	helpers.assert_eq(renderer.get_root().top_level, top_level,
 		"the native source excerpt consumes the same complete canonical input as the original actor contract")
 	local start = assert(source:find("local separator_modules = package.loaded", 1, true))
-	local finish = assert(source:find("\nend\n", start, true)) + #"\nend\n" - 1
+	local current_start = assert(source:find("local function separator_facade_current()", start, true))
+	local finish = assert(source:find("\nend\n", current_start, true)) + #"\nend\n" - 1
 	local imported = source:sub(start, finish)
 	local modules, previous = package.loaded, rawget(package.loaded, "infra.manifest_menu")
 	local outcome = pack_values(xpcall(function()

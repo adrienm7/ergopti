@@ -28,6 +28,7 @@ local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
 local ProgramProviderPicker = require("program_provider_picker")
 local PresentationPrepareOwner = rawget(ui_builder, "prepare_app_presentation")
+local PresentationContextPrepareOwner = rawget(ui_builder, "prepare_app_contextual_title")
 local PresentationFieldsOwner = rawget(ui_builder, "presentation_fields")
 local PresentationCurrentOwner = rawget(ui_builder, "presentation_current")
 local PresentationShowOwner = rawget(ui_builder, "show_webview")
@@ -118,6 +119,8 @@ end
 function M.open(opts, on_confirm)
 	opts = type(opts) == "table" and opts or {}
 	local presentation_id = rawget(opts, "presentation_id")
+	local presentation_suffix = rawget(opts, "presentation_suffix")
+	if presentation_suffix ~= nil and presentation_id == nil then return false end
 	local presentation_receipt, presentation_title, presentation_label, presentation_live
 	local replacement_serial
 	if presentation_id ~= nil then
@@ -127,8 +130,11 @@ function M.open(opts, on_confirm)
 		local function owners_live()
 			return getmetatable(opts) == nil and rawget(opts, "presentation_id") == presentation_id
 				and rawget(opts, "title") == nil and rawget(opts, "label") == nil
+				and rawget(opts, "presentation_suffix") == presentation_suffix
 				and getmetatable(ui_builder) == nil and rawget(package.loaded, "ui.ui_builder") == ui_builder
 				and rawget(ui_builder, "prepare_app_presentation") == PresentationPrepareOwner
+				and (presentation_suffix == nil or (type(PresentationContextPrepareOwner) == "function"
+					and rawget(ui_builder, "prepare_app_contextual_title") == PresentationContextPrepareOwner))
 				and rawget(ui_builder, "presentation_fields") == PresentationFieldsOwner
 				and rawget(ui_builder, "presentation_current") == PresentationCurrentOwner
 				and rawget(ui_builder, "show_webview") == PresentationShowOwner
@@ -140,7 +146,11 @@ function M.open(opts, on_confirm)
 		end
 		if not owners_live() then return false end
 		local previous, serial = _active_session, _session_serial
-		presentation_receipt = PresentationPrepareOwner("action_picker", presentation_id)
+		if presentation_suffix ~= nil then
+			presentation_receipt = PresentationContextPrepareOwner("action_picker", presentation_id, presentation_suffix)
+		else
+			presentation_receipt = PresentationPrepareOwner("action_picker", presentation_id)
+		end
 		if presentation_receipt == nil or not owners_live() or _active_session ~= previous
 			or _session_serial ~= serial then return false end
 		presentation_live = function()
@@ -148,7 +158,9 @@ function M.open(opts, on_confirm)
 		end
 		if not presentation_live() then return false end
 		presentation_title, presentation_label = PresentationFieldsOwner(presentation_receipt)
-		if type(presentation_title) ~= "string" or type(presentation_label) ~= "string"
+		if type(presentation_title) ~= "string"
+			or (presentation_suffix == nil and type(presentation_label) ~= "string")
+			or (presentation_suffix ~= nil and presentation_label ~= nil)
 			or not presentation_live() or _active_session ~= previous or _session_serial ~= serial then return false end
 		replacement_serial = serial
 	end

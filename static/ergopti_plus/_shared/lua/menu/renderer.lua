@@ -1065,6 +1065,60 @@ function M.new(deps)
 		return nil
 	end
 
+	--- Captures a simple translated command caption without constructing a row.
+	--- Translation stays at the caller's delivery boundary; admission allocates no native row.
+	--- @param manifest_key string Owning shared declaration.
+	--- @param row_id string Unique native-visible command identity.
+	--- @return function|nil receive Late translated caption reader.
+	--- @return function|nil current Pure captured-owner admission.
+	function R.command_caption_receiver(manifest_key, row_id)
+		if type(manifest_key) ~= "string" or manifest_key == "" or type(row_id) ~= "string" or row_id == "" then return nil end
+		local root = get_manifest_root()
+		if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+		local rows = rawget(root, manifest_key)
+		if type(rows) ~= "table" or getmetatable(rows) ~= nil then return nil end
+		local source = reasoned_group_snapshot(rows)
+		if not source then return nil end
+		local count, maximum = 0, 0
+		for index, item in next, rows do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or type(item) ~= "table" then return nil end
+			count, maximum = count + 1, math.max(maximum, index)
+			local platforms = rawget(item, "platforms")
+			if platforms ~= nil then
+				if type(platforms) ~= "table" then return nil end
+				local tokens, last = 0, 0
+				for position, token in next, platforms do
+					if type(position) ~= "number" or position % 1 ~= 0 or position < 1 or type(token) ~= "string" then return nil end
+					tokens, last = tokens + 1, math.max(last, position)
+				end
+				if tokens ~= last then return nil end
+			end
+		end
+		if count == 0 or count ~= maximum then return nil end
+		local item = find_item_by_id(manifest_key, row_id)
+		if not item or rawget(item, "type") ~= "command" then return nil end
+		local key = rawget(item, "i18n")
+		if type(key) ~= "string" or key == "" then return nil end
+		-- Decorated, formatted and native captions need their own existing receiver.
+		local fields = { type = true, id = true, i18n = true, disabled_when = true,
+			disabled_reason_key = true, platforms = true, unavailable = true, reason_key = true }
+		for field in next, item do if not fields[field] then return nil end end
+		local owner, translate = rawget(R, "command_caption_receiver"), rawget(i18n, "get")
+		if getmetatable(R) ~= nil or getmetatable(i18n) ~= nil or type(owner) ~= "function" or type(translate) ~= "function" then return nil end
+		local function current()
+			return getmetatable(R) == nil and rawget(R, "command_caption_receiver") == owner
+				and getmetatable(i18n) == nil and rawget(i18n, "get") == translate
+				and _cache == root and getmetatable(root) == nil and rawget(root, manifest_key) == rows
+				and reasoned_group_current(source) and find_item_by_id(manifest_key, row_id) == item
+		end
+		return function()
+			if not current() then return nil end
+			local caption = translate(key)
+			if not current() or type(caption) ~= "string" or caption == "" or caption == key then return nil end
+			return caption
+		end, current
+	end
+
 	--- Supplies an ordered declared child template as provider data.
 	--- Includes reuse the original command declaration and retained readiness gate.
 	--- Native owners provide only callbacks, current caption values and child data.

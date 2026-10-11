@@ -247,3 +247,165 @@ helpers.describe("Production Linux program provider picker sessions", function()
 		end)
 	end)
 end)
+
+-- Actual Manager/bridge subjects below use faithful Gtk/WebKit boundary ports.
+-- They prove Source receiving behavior in unit execution, not live desktop GTK.
+local function contextual_native_fixture(body)
+	isolated(function()
+		for _, name in ipairs({ "ui.webview_manager", "ui.action_picker.bridge", "ui.webkit_host",
+			"infra.i18n", "infra.locale", "locale.core", "window_titles", "webview.presentation",
+			"program_provider_picker" }) do package.loaded[name] = nil end
+		package.loaded["logger.shim"] = helpers.make_logger_stub()
+		package.loaded["adapters.program_providers"] = {}
+		package.loaded["adapters.event_loop"] = { add_idle_handler = function() end }
+		local state = { creates = 0, windows = {}, scripts = {}, signals = {}, confirmations = 0 }
+		local window_type = setmetatable({}, { __call = function(_, properties)
+			state.creates = state.creates + 1
+			local window = { properties = properties }
+			function window:set_size_request() end
+			function window:show_all() end
+			function window:present() end
+			function window:add() end
+			function window:destroy() if self.on_destroy then self.on_destroy() end end
+			state.windows[#state.windows + 1] = window
+			return window
+		end })
+		package.loaded.lgi = {
+			Gtk = { Window = window_type, WindowType = { TOPLEVEL = 1 }, WindowPosition = { CENTER = 1 } },
+			GLib = {},
+			GObject = {
+				signal_handler_disconnect = function(_, id) state.signals[id] = nil end,
+				signal_handler_is_connected = function(_, id) return state.signals[id] ~= nil end,
+			},
+			WebKit2 = {
+				LoadEvent = { FINISHED = 1 },
+				UserContentManager = function()
+					local content = {}
+					content.on_script_message_received = { connect = function(_, callback)
+						local id = #state.signals + 1; state.signals[id] = callback; return id
+					end }
+					function content:register_script_message_handler(name)
+						helpers.assert_eq(name, "action_picker_bridge"); return true
+					end
+					function content:unregister_script_message_handler(name)
+						helpers.assert_eq(name, "action_picker_bridge")
+					end
+					return content
+				end,
+				WebView = function()
+					local view = {}
+					function view:load_html() end
+					function view:run_javascript(script) state.scripts[#state.scripts + 1] = script end
+					function view:destroy() if self.on_destroy then self.on_destroy() end end
+					return view
+				end,
+			},
+		}
+		local locale = require("infra.locale")
+		local i18n = require("infra.i18n")
+		local core = require("locale.core")
+		local original_get = core.get
+		core.get = function(key)
+			if state.translate_hook then state.translate_hook(key) end
+			return original_get(key)
+		end
+		local manager = require("ui.webview_manager")
+		manager.build_page_html = function()
+			if state.html_hook then state.html_hook() end
+			return "<html>inert boundary fixture</html>"
+		end
+		local picker = require("ui.action_picker.bridge")
+		local titles = require("window_titles")
+		function state.open(suffix, id)
+			return picker.open({ presentation_id = id or "tap_hold_action", presentation_suffix = suffix,
+				items = {}, current = "__native__", allow_native = true, native_label = "original native label" }, function()
+				state.confirmations = state.confirmations + 1; return true
+			end)
+		end
+		local ok, failure = xpcall(function() body(state, manager, picker, locale, titles, i18n) end, debug.traceback)
+		state.translate_hook, state.html_hook = nil, nil
+		local clean_ok, clean = pcall(manager.shutdown)
+		if not ok then error(failure, 0) end
+		helpers.assert_eq(clean_ok and clean == true, true, "Exact fixture native lifecycle cleanup acknowledged")
+	end)
+end
+
+local contextual_file = assert(io.open(helpers.driver_root() .. "/../macos/tests/fixtures/contextual_picker_original_prefixes.json", "rb"))
+local contextual_original = assert(require("json").decode(contextual_file:read("*a")))
+contextual_file:close()
+helpers.describe("declared Linux tap action page-title receiving", function()
+	for code, expected in pairs(contextual_original.locales) do
+		for _, suffix in ipairs(contextual_original.suffix_cases) do
+			helpers.it("keeps original page prefix and generic native caption in " .. code .. ": " .. suffix, function()
+				contextual_native_fixture(function(state, _, picker, locale)
+					locale.set_locale(code)
+					helpers.assert_true(state.open(suffix))
+					helpers.assert_eq(state.creates, 1)
+					helpers.assert_eq(state.windows[1].properties.title, expected.linux_native_caption)
+					local page = picker.build_init_payload(picker.pending_opts)
+					helpers.assert_eq(page.title, expected.linux_prefix .. suffix)
+					helpers.assert_eq(page.label, expected.picker_label)
+					helpers.assert_eq(page.current, "__native__")
+					helpers.assert_eq(page.allowNative, true)
+					helpers.assert_eq(page.nativeLabel, "original native label")
+					helpers.assert_eq(state.confirmations, 0, "Title receipt grants no action or Writer effect")
+					picker.on_message({ action = "ready" }, {})
+					helpers.assert_eq(#state.scripts, 1)
+					local pushed = assert(require("json").decode(state.scripts[1]:match("^init%((.*)%)$")))
+					helpers.assert_eq(pushed.title, expected.linux_prefix .. suffix)
+				end)
+			end)
+		end
+	end
+	for _, suffix in ipairs({ "", "bad\nline", "bad\tline", string.rep("x", 1025), true, {}, 1 }) do
+		helpers.it("refuses invalid Linux title suffix before allocation: " .. type(suffix) .. tostring(suffix), function()
+			contextual_native_fixture(function(state)
+				helpers.assert_eq(state.open(suffix), false); helpers.assert_eq(state.creates, 0)
+				helpers.assert_true(state.open("K1")); helpers.assert_eq(state.creates, 1)
+			end)
+		end)
+	end
+	helpers.it("refuses the Mac context and forged native receiving receipt then repairs", function()
+		contextual_native_fixture(function(state, manager)
+			helpers.assert_eq(state.open("K1", "keyboard_slot_action"), false)
+			helpers.assert_eq(manager.show("action_picker", nil, {}), false)
+			helpers.assert_eq(state.creates, 0)
+			helpers.assert_true(state.open("K1")); helpers.assert_eq(state.creates, 1)
+		end)
+	end)
+	for _, boundary in ipairs({ "page HTML", "generic native caption" }) do
+		helpers.it("retains title declaration custody across " .. boundary .. " then exact repair", function()
+			contextual_native_fixture(function(state, _, _, _, titles)
+				local original, observed = titles.presentation_for_app, 0
+				local function withdraw()
+					titles.presentation_for_app = function() observed = observed + 1; return nil end
+				end
+				if boundary == "page HTML" then state.html_hook = withdraw else
+					state.translate_hook = function(key) if key == "dialog.action_picker.label" then withdraw() end end
+				end
+				local ok, failure = pcall(function()
+					helpers.assert_eq(state.open("K1"), false)
+					helpers.assert_eq(state.creates, 0); helpers.assert_eq(observed, 0)
+				end)
+				state.html_hook, state.translate_hook = nil, nil; titles.presentation_for_app = original
+				if not ok then error(failure, 0) end
+				helpers.assert_true(state.open("K1")); helpers.assert_eq(state.creates, 1)
+			end)
+		end)
+	end
+	helpers.it("withdraws held page-title dependency before init without foreign lookup or page push", function()
+		contextual_native_fixture(function(state, _, picker, _, titles)
+			helpers.assert_true(state.open("K1"))
+			local original, observed = titles.presentation_for_app, 0
+			titles.presentation_for_app = function() observed = observed + 1; return nil end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(picker.on_message({ action = "ready" }, {}), nil)
+				helpers.assert_eq(#state.scripts, 0); helpers.assert_eq(observed, 0)
+			end)
+			titles.presentation_for_app = original
+			if not ok then error(failure, 0) end
+			picker.on_message({ action = "ready" }, {})
+			helpers.assert_eq(#state.scripts, 1)
+		end)
+	end)
+end)
