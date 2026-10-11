@@ -120,11 +120,17 @@ _TED_UntickedKeepsQuiet() {
 Test("error window: nothing opens while the setting is unticked (error-dialog-windows)", _TED_UntickedKeepsQuiet)
 
 _TED_DisablingCancelsPending() {
-	global _TED_Timers, _ED_Busy, _DriverBootPhase, _DriverStartupSmokeDir
+	global _TED_Timers, _ED_Busy, _DriverBootPhase, _DriverStartupSmokeDir, ConfigurationFile
 	HadPhase := IsSet(_DriverBootPhase), SavedPhase := HadPhase ? _DriverBootPhase : ""
 	HadSmoke := IsSet(_DriverStartupSmokeDir), SavedSmoke := HadSmoke ? _DriverStartupSmokeDir : ""
+	HadPath := IsSet(ConfigurationFile), SavedPath := HadPath ? ConfigurationFile : ""
+	Fixture := 0
 	_TED_Reset()
 	try {
+		; Recording writers do not mint the native source authority they consume.
+		Fixture := _ScopeOwnerFixture("[script]`nshow_error_dialog = true`n")
+		ConfigurationFile := Fixture.path
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile), "cancellation starts from the genuine current source before its writer port")
 		_DriverBootPhase := "ready"
 		_DriverStartupSmokeDir := "error-dialog-cancellation-test"
 		ErrorDialog_OnError("old", "Old failure", "Old failure", "t")
@@ -141,9 +147,15 @@ _TED_DisablingCancelsPending() {
 		_TED_Timers[2]["fn"].Call()
 		AssertEqual(false, _ED_Busy, "the current callback reaches the headless presentation guard")
 	} finally {
-		_DriverBootPhase := HadPhase ? SavedPhase : unset
-		_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
-		_TED_Restore()
+		try {
+			_DriverBootPhase := HadPhase ? SavedPhase : unset
+			_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
+			ConfigurationFile := HadPath ? SavedPath : unset
+			_TED_Restore()
+		} finally {
+			if IsObject(Fixture)
+				_ScopeOwnerCleanup(Fixture)
+		}
 	}
 }
 Test("error window: disabling invalidates queued windows across reactivation (error-dialog-cancel)",
@@ -163,10 +175,14 @@ Test("error window: nothing before initialisation (error-dialog-windows)", _TED_
 
 _TED_SettingPersists() {
 	global _ED_Enabled, ConfigurationFile
-	SavedPath := ConfigurationFile
+	HadPath := IsSet(ConfigurationFile), SavedPath := HadPath ? ConfigurationFile : ""
+	Fixture := 0
 	_TED_Reset()
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_error_dialog_setting.toml"
+		; Preserve the existing ACK ports beneath the actual selected source owner.
+		Fixture := _ScopeOwnerFixture("[script]`nshow_error_dialog = true`n")
+		ConfigurationFile := Fixture.path
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile), "the setting writer receives genuine source/schema admission")
 		Seen := []
 		Quiet := (*) => 0
 		Refused := (Path, Updates) => false
@@ -179,8 +195,13 @@ _TED_SettingPersists() {
 		AssertEqual("script", Seen[1][1].Section)
 		AssertEqual("show_error_dialog", Seen[1][1].Key)
 	} finally {
-		ConfigurationFile := SavedPath
-		_TED_Restore()
+		try {
+			ConfigurationFile := HadPath ? SavedPath : unset
+			_TED_Restore()
+		} finally {
+			if IsObject(Fixture)
+				_ScopeOwnerCleanup(Fixture)
+		}
 	}
 }
 Test("error window: the setting is saved to config.toml (error-dialog-windows)", _TED_SettingPersists)
