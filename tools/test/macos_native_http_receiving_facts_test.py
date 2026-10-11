@@ -3943,5 +3943,17 @@ NATIVE_CLIENT_ROOT_CONTROLS = load(
 ) = NATIVE_CLIENT_ROOT_CONTROLS.enrolled_cases()
 
 
+# Fixed-path clock frame/context enrollment. These portable13 controls do not
+# execute the native TestCase or qualify Darwin samples, recipe or clock epoch.
+NATIVE_FIXTURE_CLOCK_CONTROLS = load(
+    "macos_native_http_clock_contract_controls",
+    ROOT / "tools/test/macos_native_http_clock_contract_controls.py",
+)
+(
+    NativeFixtureClockFrameContractControls,
+    NativeFixtureClockContextContractControls,
+) = NATIVE_FIXTURE_CLOCK_CONTROLS.enrolled_cases()
+
+
 if __name__ == "__main__":
     unittest.main()

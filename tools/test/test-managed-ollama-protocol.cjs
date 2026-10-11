@@ -299,7 +299,23 @@ if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
 	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 20]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 143]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 156]);
+	cases.push(['tools/test/macos_native_http_clock_passive_receiving_controls.py', 21]);
+	const clockResult = spawnSync(
+		process.execPath,
+		[path.join(__dirname, 'test-native-http-clock-evidence.cjs')],
+		{
+			cwd: path.resolve(__dirname, '../..'),
+			encoding: 'utf8',
+			timeout: 60000
+		}
+	);
+	assert.equal(clockResult.error, undefined, 'The independent clock receiver controls must start.');
+	assert.equal(clockResult.signal, null, 'The independent clock receiver controls must retire.');
+	assert.equal(clockResult.status, 0, clockResult.stderr || clockResult.stdout);
+	assert.match(clockResult.stdout, /^CLOCK_RECEIVER controls=32 native=false official=false$/m);
+	process.stdout.write(clockResult.stdout);
+	process.stdout.write(clockResult.stderr);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 23]);
 	cases.push(['tools/test/managed_ollama_sessions_test.py', 11]);

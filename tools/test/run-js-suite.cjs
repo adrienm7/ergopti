@@ -1932,6 +1932,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-managed-ollama-protocol.cjs'
 	},
 	{
+		name: 'Native HTTP clock evidence retains source and command receiving boundaries',
+		cmd: process.execPath,
+		args: ['tools/test/test-native-http-clock-evidence.cjs'],
+		repro: 'npm run test:native-http-clock-evidence'
+	},
+	{
 		name: 'managed Ollama catalogue preserves native source and publication admission',
 		cmd: process.execPath,
 		args: ['tools/test/test-macos-managed-ollama-catalogue.cjs'],

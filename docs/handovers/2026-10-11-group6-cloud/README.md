@@ -419,3 +419,112 @@ retain the final review, exact failed/positive raw receipts and whole two-path
 inverse. Parent receiving verifies all48 safe regular members and the exact
 live postimages. The immutable physical143 capsule remains separately retained;
 the correction grants no native or full-suite credit.
+
+## Published builder gate and passive clock evidence
+
+Published `4dd97e10cb88e85ff5379becbef0376289b8bd68` passes the complete selected
+gate: format382, JS410/zero failures and Hammerspoon18,599/zero failures across
+1,571 modules. All19 owned hashes, HEAD and logical index remain exact; every
+published blob joins the tested source. The [successful binding](native-client-builder143-canonical-gate.json)
+and [unaltered raw log](native-client-builder143-canonical-gate.log.gz) preserve
+that actual result separately from the first failed gate. Four exact-SHA
+automatic-run censuses are empty after publication. No manual run or official
+validation ref is moved or cancelled.
+
+The [qualified clock156 capsule](native-clock156-portable-proposal.tar.gz) and
+[parent binding](native-clock156-portable-proposal.json) preserve original143
+function bodies and13 independent frame/context controls. Actual physical156
+passes with no failures/errors/skips; five parser omissions fail their intended
+assertions. The fixed diagnostic-only Swift role emits exactly16 Foundation
+system-uptime samples; the existing signed builder and command owner retain all
+original budgets. Epoch, architecture, raw bounds and every interior sample are
+checked. Actual native Swift compilation, common Python/Foundation epoch and
+ARM/AMD receiving remain unexecuted. The production Swift45 factory is held.
+
+The [passive evidence capsule](native-clock-passive-portable-proposal.tar.gz)
+and [independent parent composition](native-clock-passive-portable-proposal.json)
+retain102 safe regular members, all member hashes/lengths, exact preimages,
+five whole literal inverses and73 preserved helper bodies. Optional bounded
+memory observation follows the original same-owner strong settlement and closed
+captures. It reads only already-held owner facts and adds no process, query,
+clock, signal, reap, stream reread or retirement authority. Original60/15/15
+compile/sign/strict-verification limits and primary/cancellation precedence stay
+intact. File publication happens after the original clock after-reading.
+
+Physical original156, passivePython21 and independentCJS32 pass. Five source
+omissions and one proposed-fixture omission fail meaningful assertions; the
+first selector accidentally executed32 rather than21 and is retained as a
+rejected census, with the corrected21 receiving separate. Failed heredoc syntax
+is likewise retained before the corrected actual Node/Bash syntax checks.
+The CJS omission receivers fail fast; later controls are not executed, not
+passing. Native compiler/signing/Security and command ports remain modeled.
+
+The independent collector binds original raw frame, signed image and source
+receipt bytes to19 fixed source inputs, staged recipe, actual clean Git
+before/after/final snapshots and separately acquired loader inputs. A fresh
+private cache with isolated Python flags prevents reuse of ordinary bytecode;
+native interpreter compatibility remains unrun. Plain JSON/hash consistency,
+actual command observations and official API metadata are distinct. Neither
+metadata agreement nor codesign status proves kernel executable identity or
+permits factory activation. Bounded pathname guards are not atomic concurrent
+replacement guarantees.
+
+The new4,145-byte fixture contains only the two reviewed proposed workflow
+steps. All independently authored status, ordering, field and syntax assertions
+remain; its final32 replay uses the unchanged old live workflow. This is
+prospective workflow behavior, not live wiring. Shared `ci-macos.yml` remains
+held pending the other groups' published postimages, ownership handoff and an
+additional actual-live-step receiving control. The proposal preserves genuine
+deferral while requiring artifacts for attempted full execution. No native or
+official API qualification is claimed. Original native14/SDK49 corpora are intact.
+
+The first composed selected gate is terminal red: format384 passes, JS407
+passes and three checks fail, while Hammerspoon18,599 passes with zero failures
+across1,571 modules. All nineteen owned source hashes, HEAD and logical index
+remain equal before and after. The [failed receipt](native-clock-passive-first-gate.json)
+and [unaltered raw output](native-clock-passive-first-gate.log.gz) preserve that
+result separately from the earlier builder success. Bare Bash calls require the
+existing shared resolver, and the strict reachability check requires a real
+direct runner entry. Neither assertion is removed or weakened.
+
+The [corrective source packet](native-clock-canonical-correction-portable-proposal.tar.gz)
+and [parent receiving](native-clock-canonical-correction-portable-proposal.json)
+join all21 safe regular members and the whole-source inverse. All32 original
+control bodies and assertions remain, with only two resolver expressions
+changed. A Windows deferral occurs before filesystem work and reports32 skipped,
+not32 passes. Its retained first POSIX32 receiving used Node24. The actual pinned
+Node22 replay passes32 unique controls; Bash-resolution and false-green guards
+also pass. The second complete selected gate is terminal red: format384
+passes, JS410 passes and one npm-alias parity check fails. Hammerspoon18,599
+passes with zero failures across1,571 modules. All26 owned source hashes, HEAD
+and logical index remain exact. The [second failed receipt](native-clock-passive-second-gate.json)
+and [unaltered output](native-clock-passive-second-gate.log.gz) remain separate.
+Owner custody6111341548 permits the missing canonical npm alias and only its
+corresponding runner reproduction command. All original package scripts,
+dependencies and lockfile bytes remain exact. The alias correction still needs
+its proportional selected gate; the failed whole command is not a success.
+The owner releases the shared runner after terminal receiving in comment6111144663. One real CHECKS object enrolls the new test. Its whole-source inverse preserves every previous object/order/loop, and an independent union preserves the peer lease-silence row.
+
+Five platform bytecode files from the failed gate are retained outside source.
+Actual preceding143 and new passive21 controls each pass with default Python
+and with `-B`, creating none of those five files. Five unchanged preceding
+legacy diagnostic scripts then pass19/22/39/14/19 cases under both settings:
+226 passing cases total, zero failures/errors/skips. Their default imports
+reproduce exactly the five top-level files plus two network-subtree caches;
+`-B` writes no source bytecode. The unchanged collector starts these scripts with
+ordinary Python arguments. The [causal capsule](native-clock-bytecode-causal-receiving.tar.gz)
+and [parent source binding](native-clock-bytecode-causal-receiving.json) join58
+safe regular members,11 preceding Git files and595 composed software closure
+pins. This comparison identifies the cache writer while retaining the strict census.
+
+Cloud activation now exports `PYTHONDONTWRITEBYTECODE=1`, with actual inheritance
+through Node-spawned Python verified. Saved environment draft revision6 updates
+only installation and startup instructions; networking and repository settings
+remain unchanged. This has not published or verified a fresh-task restoration.
+The deliberate private `py_compile` receiver still exercises cached-bytecode
+refusal. No native or complete corrected canonical result is inferred.
+
+Remaining requirements include genuine source-bound native clocks, TLS trust
+and restoration, PAC14/SDK49 on both architectures, ordinary Automation consent,
+Brew6, Windows/enterprise receiving and E2E/packaging/installation. Items36/62
+and transversal16/38 remain open;22 stays intentionally excluded.
