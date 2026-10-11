@@ -31,6 +31,13 @@
 			"bytes": 3149725,
 			"members": 132,
 			"member_manifest": "COMPOSED-PROOF-MANIFEST.json"
+		},
+		{
+			"path": "windows-genuine-source-conflict-qualified-proof.tar.gz",
+			"sha256": "c7f57725fc3a26a1aa122c588c4360c48cb7c24501bcb4f094326aa0c9ad3298",
+			"bytes": 3567094,
+			"members": 39,
+			"member_manifest": "WINDOWS-CONFLICT-PROOF-MANIFEST.json"
 		}
 	]
 }
