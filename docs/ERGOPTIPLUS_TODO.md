@@ -9496,6 +9496,16 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
   refusals and four placement refusals are required; native receiving remains
   UNRUN until the source-specific hosted dispatch.
 
+  Integrated-source manual38096169276 on259270594 preserves all three
+  original C property-cookie cases and observes all29 real LuaJIT ABI
+  comparisons. The new diagnostic fails at stage3 with zero cookie cases
+  and cleanup=false; its original full-family evidence confirms server
+  retirement. Source review identifies two incorrect XSync return assertions:
+  Xlib returns1, not the X11 Success constant0. The diagnostic now requires1
+  at both synchronization sites, preserving every cookie/readback, XFree,
+  peer-FD, cleanup and deadline assertion. The original failed receipt stays
+  retained; corrective native receiving remains UNRUN. Item93 stays partial.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
