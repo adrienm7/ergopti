@@ -4040,6 +4040,24 @@ and transport assertion remains intact. Native XCTest requalification and
 the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
+
+2026-10-11 integrated permission-history correction. Exact manual38106361453
+on2e4d798e executes25 archive cases:24 pass, one Homebrew case fails, none
+skip. Sparkle wrong-key preservation, valid retry and relaunch pass; the separate
+no-prompt SDK case passes without granting fixture consent. The fresh artifact
+contains65 complete first traversals of seven nodes without either exact name
+match. Both fixture owners close without helper debt. The original Automation
+prompt deadline remains the primary refusal; the six Brew scenarios are unrun.
+
+The permission stage is unknown because the256-record history filled before
+its final observation and later checkpoints overwrote it. The correction carries
+the first strictly validated, copied worker fact into subsequent bounded
+checkpoints. It changes no API call, process, deadline, consent or acceptance
+law. All203 original controls remain exact;205 portable controls pass without
+skips. Both new controls fail against the exact predecessor. Corrected native
+receiving, ordinary consent, Brew6 and full package/install remain required;
+item36 stays open.
+
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
 2026-10-11 typed worker and first-traversal receiving. Exact manual38103825010
@@ -6744,6 +6762,18 @@ presentation subjects pass. This is not installed Hammerspoon/WebKit, packaging
 or physical-device acceptance.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-11 integrated component receiving. Exact2e4d manual38106361453
+actually passes SDK49, daily7, logger42 and sourcePAC10 on both architectures.
+Both PAC14 runs have12 passes and two failures. Fresh cold MLX/official Ollama
+artifacts qualify27 source pins, signed bundle identity and physical ownership
+closure; daemon/model remain not-executed. Both native HTTP trust setups and model
+setups still refuse. Whole CI finishes with7 successful jobs,5 failed and5
+skipped, none cancelled; Release, package and install actually skip. These component
+results do not turn the incomplete whole native lane into a pass. The unrelated
+late permission-history correction retains the existing network production
+guards and Windows/macOS continuation steps; item62 remains open.
+
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
       offline/disk/permission causes and useful recovery actions in all21 locales.
