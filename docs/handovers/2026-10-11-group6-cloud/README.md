@@ -757,3 +757,32 @@ paths. Agree on a movement table covering those joins and generated inventories
 before moving anything. The next coordination checkpoint is the current manual
 run's terminal receiving; the source correction is already published. The local
 session's main v1.0.1 publication is separate and has not been modified.
+
+## Portable receiver failure diagnostics
+
+The actual registered `test-managed-ollama-protocol.cjs` now prints one bounded
+failure fact before its original spawn assertions. It retains the last 8,192
+UTF-16 code units of each captured stream, script, status, signal and error code.
+Diagnostic-sink refusal leaves the original assertion authoritative. The Python
+selector, exact argv, 60,000 ms limit, complete case roster/counts and every original
+success-loop write remain unchanged. No verbose-mode or native-source change is
+included.
+
+The additive same-file control executes the actual loop with results from real
+closed children. Six controls pass on Linux: unchanged success output, nonzero
+exit, POSIX signal, missing executable, callback-flushed bounded tails and actual
+timeout. The private control uses 3,000 ms; a separate real original 60,000 ms timeout
+returns ETIMEDOUT after 60,010.5 ms with its child reaped. The actual predecessor
+fails the new output-loss assertion, with zero writes instead of one. Windows
+retains five mandatory controls and explicitly skips the POSIX signal case;
+Windows/macOS execution is unrun here. Full selected receiving follows adoption.
+
+The [immutable proposal](portable-receiver-failure-output-proposal.tar.gz) is 29,776
+bytes, SHA256 `c019dee3e7af0ddcc8823c9abc6407c5a25788d043639d568e87e4592917447e`.
+All 27 members are safe regular files and 26 inventory joins pass independently.
+Removing the two finite additions recovers the entire original file byte-for-byte.
+Both forward/inverse application and final syntax/format controls pass. This
+repairs missing failure evidence; it does not identify the historical hosted
+Python timeout cause, adopt the separate poll proposal, qualify native trust or
+complete item 62. Existing test locations, fixtures and ordering are preserved
+for the local AHK audit's coordinated migration.

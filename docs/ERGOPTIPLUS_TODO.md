@@ -6948,6 +6948,17 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
 
 - [ ] **62.** Downloads on managed company networks: system trust and
 
+2026-10-11 portable receiver failure diagnostics. Failed, signalled and timed-out
+Python children now emit bounded captured-output tails before the unchanged
+original assertions. The original executable, argv, case roster, success writes
+and 60,000 ms boundary remain exact. Six registered portable controls pass locally,
+with a genuine old-source output-loss refusal and an independently observed
+60000ms timeout; Windows explicitly skips only the POSIX signal observation.
+The [reviewed packet](handovers/2026-10-11-group6-cloud/portable-receiver-failure-output-proposal.tar.gz)
+retains complete preimages, inverse and physical child receiving. Final selected
+qualification is separate; no historical hosted cause or native trust repair is
+claimed. Item 62 remains open.
+
 2026-10-11 native producer and portable timeout receiving are now durably
 preserved. The strict reader correction589991aeb8 passes final format/412JS with
 an unchanged84-source/index fence. Actual AMD16 clock samples, closed original
