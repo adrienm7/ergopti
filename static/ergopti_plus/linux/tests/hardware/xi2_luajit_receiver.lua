@@ -125,7 +125,7 @@ local passed = pcall(function()
             local text = phase == 0 and "owned-one" or "owned-two"
             Xi.XIChangeProperty(control, device, property, 31, 8, 0, text, #text)
         end
-        assert(X.XSync(control, 0) == 0)
+        assert(X.XSync(control, 0) == 1)
         local expected
         if phase < 2 then expected = phase == 0 and "owned-one" or "owned-two" end
         assert(readback(expected))
@@ -154,7 +154,7 @@ if bytes ~= nil then cleanup_ok = pcall(ffi.C.free, bytes) and cleanup_ok end
 if keymap ~= nil then cleanup_ok = pcall(K.xkb_keymap_unref, keymap) and cleanup_ok end
 if context ~= nil then local ok, value = pcall(K.xkb_context_unref, context); cleanup_ok = ok and value == nil and cleanup_ok end
 if control ~= nil and property ~= nil and device then
-    local ok = pcall(function() Xi.XIDeleteProperty(control, device, property); assert(X.XSync(control, 0) == 0); assert(readback(nil)) end)
+    local ok = pcall(function() Xi.XIDeleteProperty(control, device, property); assert(X.XSync(control, 0) == 1); assert(readback(nil)) end)
     cleanup_ok = ok and cleanup_ok
 end
 local close_called = pcall(Probe.close)
