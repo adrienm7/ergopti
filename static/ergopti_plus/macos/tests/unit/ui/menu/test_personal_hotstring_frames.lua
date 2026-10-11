@@ -293,3 +293,260 @@ helpers.describe("shared personal default-category leaf policy", function()
 		end)
 	end)
 end)
+
+--- Runs the actual registry and file-scope admission on one owned physical source.
+--- Native Hammerspoon stat primitives use real lfs observations; the existing
+--- frame's preference/notification ports record delivery, not durable Mac IO.
+--- @param frame table Existing genuine personal-provider fixture.
+--- @param scenario function Actual native registered-section observations.
+--- @param posture string|nil ready, paused or group_off.
+local function with_registered_personal_sections(frame, scenario, posture)
+	local failed, primary
+	local cleanup = {}; frame.section_fixture_cleanup = cleanup
+	local scoped, scope_error = pcall(helpers.with_stub_scope, {
+		"modules.keymap", "modules.keymap.init", "modules.keymap.state",
+		"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+		"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
+		"modules.keymap.terminator_replay", "infra.personal_hotstrings", "infra.personal_file_controls",
+	}, function()
+		local lfs = require("lfs")
+		local paths = require("infra.config_paths")
+		local original_get = paths.get
+		local original_attributes, original_symlink_attributes = hs.fs.attributes, hs.fs.symlinkAttributes
+		local root, path, state_module, original_new, native_keymap
+		local ok, result = xpcall(function()
+			root = assert(os.tmpname()); assert(os.remove(root)); assert(lfs.mkdir(root))
+			path = root .. "/section.toml"
+			local source = '[[alpha]]\n"alf" = { output = "Alpha", is_case_sensitive = true, is_case_sensitive_strict = true }\n[[beta]]\n"bet" = { output = "Beta", is_case_sensitive = true, is_case_sensitive_strict = true }\n'
+			local function with_source_stream(mode, operation)
+				local file = assert(io.open(path, mode))
+				local completed, value = xpcall(function() return operation(file) end, function(err) return err end)
+				local closed, close_result, close_error = pcall(file.close, file)
+				-- A failed read/write keeps its exact primary after the owned close attempt.
+				if not completed then error(value, 0) end
+				if not closed then error(close_result, 0) end
+				assert(close_result, close_error)
+				return value
+			end
+			local function write_source()
+				with_source_stream("wb", function(file) return assert(file:write(source)) end)
+			end
+			local function read_source()
+				return with_source_stream("rb", function(file) return assert(file:read("*a")) end)
+			end
+			write_source()
+			hs.fs.attributes, hs.fs.symlinkAttributes = lfs.attributes, lfs.symlinkattributes
+			paths.get = function(key)
+				if key == "PersonalHotstringsDir" then return root end
+				return original_get(key)
+			end
+			local registry = require("modules.keymap.registry")
+			state_module = require("modules.keymap.state")
+			original_new = state_module.new
+			local state, received_defaults, received_delays
+			-- Observe the genuine first boot allocation; never construct a competing state.
+			state_module.new = function(defaults, delays, ...)
+				local actual = original_new(defaults, delays, ...)
+				assert(state == nil, "one genuine Keymap CoreState allocation")
+				state, received_defaults, received_delays = actual, defaults, delays
+				return actual
+			end
+			local loaded, value = pcall(require, "modules.keymap")
+			state_module.new = original_new
+			if not loaded then error(value, 0) end
+			native_keymap = value
+			assert(type(state) == "table" and rawequal(received_defaults, native_keymap.DEFAULT_STATE)
+				and rawequal(received_delays, native_keymap.DELAYS_DEFAULT), "actual boot state and canonical defaults")
+			assert(rawequal(rawget(package.loaded, "modules.keymap.registry"), registry), "actual retained registry cohort")
+			local name = "personal_ext_section"
+			local descriptor = require("hotstrings.personal_files").describe({ "section.toml" })
+			assert(registry.load_toml(name, path, nil, descriptor) == true)
+			assert(registry.disable_section(name, "beta") == true)
+			if posture == "group_off" then assert(registry.disable_group(name) == true) end
+			local record = { name = name, path = path, personal_source = descriptor }
+			frame.context.keymap, frame.context.hotfiles = registry, { name }
+			frame.context.personal_root, frame.context.personal_files = root, { record }
+			frame.context.hotfile_paths = { [name] = path }
+			frame.context.state.hotstrings[name] = posture ~= "group_off"
+			frame.context.paused = posture == "paused"
+			local notices = 0
+			frame.context.notify_feature = function() notices = notices + 1 end
+			local current = require("infra.personal_file_scope").bind(frame.context, record)
+			assert(current() == true, "the genuine registered descriptor and actual physical source admit this section owner")
+			scenario({ frame = frame, registry = registry, state = state, name = name, path = path,
+				current = current, read = read_source, repair = write_source, source = source,
+				notices = function() return notices end })
+		end, function(err) return err end)
+		if state_module and original_new then state_module.new = original_new end
+		cleanup.state_new_restored = state_module ~= nil and rawequal(state_module.new, original_new)
+		local keymap_released, keymap_error = pcall(function()
+			if native_keymap then assert(native_keymap.stop(true) == true, "genuine Keymap teardown commits") end
+		end)
+		cleanup.keymap_stopped = native_keymap ~= nil and keymap_released
+		cleanup.native_keymap_loaded = native_keymap ~= nil
+		paths.get = original_get
+		hs.fs.attributes, hs.fs.symlinkAttributes = original_attributes, original_symlink_attributes
+		local file_released, file_error = pcall(function()
+			if path and lfs.symlinkattributes(path) ~= nil then assert(os.remove(path)) end
+		end)
+		local root_released, root_error = pcall(function()
+			if root then assert(lfs.rmdir(root)) end
+		end)
+		cleanup.file_released, cleanup.root_released = file_released, root_released
+		-- Keep the raw primary inside the scope so both traceback wrappers restore
+		-- their actual owners before it is raised outside them.
+		if not ok then failed, primary = true, result
+		elseif not keymap_released then failed, primary = true, keymap_error
+		elseif not file_released then failed, primary = true, file_error
+		elseif not root_released then failed, primary = true, root_error end
+	end)
+	cleanup.scope_restored = scoped
+	if not scoped and not failed then failed, primary = true, scope_error end
+	-- Receiver consumes every real cleanup port independently of expected-red
+	-- assertion names/counts. Missing or false records cannot qualify a phase.
+	local reported, report_error = pcall(print, string.format(
+		"ERGOPTI_PERSONAL_SECTION_CLEANUP native_keymap_loaded=%s state_new_restored=%s scope_restored=%s keymap_stopped=%s file_released=%s root_released=%s",
+		tostring(cleanup.native_keymap_loaded == true), tostring(cleanup.state_new_restored == true),
+		tostring(cleanup.scope_restored == true), tostring(cleanup.keymap_stopped == true),
+		tostring(cleanup.file_released == true), tostring(cleanup.root_released == true)))
+	if not reported and not failed then failed, primary = true, report_error end
+	if failed then error(primary, 0) end
+end
+
+--- Restores this genuine Mac-only declaration after every scenario.
+--- @param frame table Existing shared renderer fixture.
+--- @param scenario function Receives the unchanged original source.
+local function with_personal_section_declaration(frame, scenario)
+	local key = "hotstring_personal_section_choice"
+	local original = rawget(frame.root, key)
+	assert(type(original) == "table" and #original == 1, "one genuine generated native section declaration")
+	assert(original[1].platforms[1] == "hs" and #original[1].platforms == 1)
+	local ok, result = xpcall(function() return scenario(key, original) end, function(err) return err end)
+	rawset(frame.root, key, original)
+	if not ok then error(result, 0) end
+	return result
+end
+
+--- Finds actual rendered section commands below the real extension file.
+--- @param frame table Existing actual provider fixture.
+--- @return table alpha
+--- @return table beta
+local function registered_section_rows(frame)
+	local file = find(assert(frame.build()).submenu, "section (1)")
+	helpers.assert_eq(#file.menu, 6, "the original actual file frame retains every control and both section leaves")
+	helpers.assert_eq(file.menu[1].title, frame.translate("menu.hotstrings.scope_enable_all"))
+	helpers.assert_eq(file.menu[2].title, frame.translate("menu.hotstrings.scope_disable_all"))
+	helpers.assert_eq(file.menu[3].title, frame.translate("menu.hotstrings.open_file"))
+	helpers.assert_eq(file.menu[4].title, "-")
+	helpers.assert_eq(file.menu[5].title, "alpha (1)"); helpers.assert_eq(file.menu[6].title, "beta (1)")
+	return file.menu[5], file.menu[6]
+end
+
+helpers.describe("shared personal section leaf policy", function()
+	for _, kind in ipairs({ "missing", "kind", "caption" }) do
+		helpers.it("refuses the actual registered section provider with " .. kind .. " source and repairs exactly", function()
+			with_personal_frame(function(frame)
+				with_registered_personal_sections(frame, function(f)
+					with_personal_section_declaration(frame, function(key, original)
+						registered_section_rows(frame)
+						local changed = {}
+						if kind ~= "missing" then
+							local row = {}; for field, value in pairs(original[1]) do row[field] = value end
+							if kind == "kind" then row.type = "label"
+							else row.caption_getter = "unavailable_personal_section_caption" end
+							changed[1] = row
+						end
+						rawset(frame.root, key, changed)
+						helpers.assert_nil(frame.build(), "a refused section leaf cannot publish a partial real personal file")
+						helpers.assert_eq(f.read(), f.source)
+						helpers.assert_eq({ frame.calls.saves, frame.calls.updates, f.notices() }, { 0, 0, 0 })
+						helpers.assert_true(f.registry.is_section_enabled(f.name, "alpha"))
+						helpers.assert_eq(f.registry.is_section_enabled(f.name, "beta"), false)
+						rawset(frame.root, key, original)
+						local alpha, beta = registered_section_rows(frame)
+						helpers.assert_eq(alpha.checked, true); helpers.assert_nil(beta.checked)
+						helpers.assert_type(alpha.fn, "function"); helpers.assert_type(beta.fn, "function")
+					end)
+				end)
+			end)
+		end)
+	end
+	for _, posture in ipairs({ "ready", "paused", "group_off" }) do
+		helpers.it("preserves actual registered section captions checks and nil transport while " .. posture, function()
+			with_personal_frame(function(frame)
+				with_registered_personal_sections(frame, function(f)
+					local alpha, beta = registered_section_rows(frame)
+					helpers.assert_eq(alpha.checked, true); helpers.assert_nil(beta.checked)
+					for _, row in ipairs({ alpha, beta }) do
+						helpers.assert_nil(row.menu, "section leaves remain commands rather than submenus")
+						if posture == "ready" then
+							helpers.assert_nil(row.disabled); helpers.assert_type(row.fn, "function")
+						else
+							helpers.assert_eq(row.disabled, true); helpers.assert_nil(row.fn)
+						end
+					end
+					helpers.assert_eq(f.read(), f.source)
+					helpers.assert_eq({ frame.calls.saves, frame.calls.updates, f.notices() }, { 0, 0, 0 },
+						"pure closure acquisition does not deliver the business delegate")
+				end, posture)
+			end)
+		end)
+	end
+	helpers.it("held actual section refuses missing declaration and delivers its native delegate after repair", function()
+		with_personal_frame(function(frame)
+			with_registered_personal_sections(frame, function(f)
+				with_personal_section_declaration(frame, function(key, original)
+					local alpha = registered_section_rows(frame)
+					local mapping = assert(f.state.mappings[1])
+					rawset(frame.root, key, {})
+					helpers.assert_eq(alpha.fn(), false)
+					helpers.assert_true(f.registry.is_section_enabled(f.name, "alpha"))
+					helpers.assert_true(rawequal(f.state.mappings[1], mapping))
+					helpers.assert_eq({ frame.calls.saves, frame.calls.updates, f.notices() }, { 0, 0, 0 })
+					rawset(frame.root, key, original)
+					helpers.assert_nil(alpha.fn(), "the original section delegate retains its void success return")
+					helpers.assert_eq(f.registry.is_section_enabled(f.name, "alpha"), false)
+					helpers.assert_eq(#f.state.mappings, 0)
+					helpers.assert_eq({ frame.calls.saves, frame.calls.updates, f.notices() }, { 1, 1, 1 })
+					helpers.assert_eq(f.read(), f.source, "section publication never rewrites the user's rules file")
+				end)
+			end)
+		end)
+	end)
+		helpers.it("held genuine descriptor admission refuses a missing physical source and retries after repair", function()
+		with_personal_frame(function(frame)
+			with_registered_personal_sections(frame, function(f)
+				local alpha = registered_section_rows(frame)
+				assert(os.remove(f.path)); helpers.assert_eq(f.current(), false)
+				helpers.assert_eq(alpha.fn(), false)
+				helpers.assert_true(f.registry.is_section_enabled(f.name, "alpha"))
+				helpers.assert_eq({ frame.calls.saves, frame.calls.updates, f.notices() }, { 0, 0, 0 })
+				f.repair(); helpers.assert_eq(f.current(), true)
+				helpers.assert_nil(alpha.fn())
+				helpers.assert_eq(f.registry.is_section_enabled(f.name, "alpha"), false)
+				helpers.assert_eq({ frame.calls.saves, frame.calls.updates, f.notices() }, { 1, 1, 1 })
+				helpers.assert_eq(f.read(), f.source)
+			end)
+		end)
+	end)
+		helpers.it("restores actual section fixture paths stat ports and module owners after a scenario raises", function()
+		with_personal_frame(function(frame)
+			local paths = require("infra.config_paths")
+			local before_get, before_attributes, before_links = paths.get, hs.fs.attributes, hs.fs.symlinkAttributes
+			local before_registry = rawget(package.loaded, "modules.keymap.registry")
+			local path, primary = nil, { message = "personal section scenario sentinel" }
+			local ok, detail = pcall(with_registered_personal_sections, frame, function(f)
+				path = f.path; registered_section_rows(frame); error(primary, 0)
+			end)
+			helpers.assert_eq(ok, false); helpers.assert_true(rawequal(detail, primary))
+			local cleanup = assert(frame.section_fixture_cleanup)
+			helpers.assert_true(cleanup.state_new_restored and cleanup.scope_restored)
+			helpers.assert_true(cleanup.keymap_stopped and cleanup.file_released and cleanup.root_released)
+			helpers.assert_true(rawequal(paths.get, before_get))
+			helpers.assert_true(rawequal(hs.fs.attributes, before_attributes))
+			helpers.assert_true(rawequal(hs.fs.symlinkAttributes, before_links))
+			helpers.assert_true(rawequal(rawget(package.loaded, "modules.keymap.registry"), before_registry))
+			helpers.assert_nil(require("lfs").symlinkattributes(path))
+		end)
+	end)
+end)

@@ -7008,5 +7008,23 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"hotstring_personal_section_choice": [
+		{
+			"type": "check",
+			"id": "personal_section_toggle",
+			"caption_source": "native",
+			"caption_getter": "personal_section_label",
+			"checked_when": [
+				"personal_section_selected"
+			],
+			"disabled_when": [
+				"personal_section_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

@@ -39,6 +39,34 @@ function M.register(helpers, corpus)
 			helpers.assert_throws(function() Identity.gesture_binding_fits("tap_3", { prefix = "", slots = false }) end)
 		end)
 	end)
+	helpers.describe("shared complete ordered-pair binding identity", function()
+		helpers.it("combination-source-identity: projects all ordered native pairs without active assignments", function()
+			local keys = { { id = "space" }, { id = "tab" }, { id = "win" } }
+			local catalogue = Identity.combination_binding_catalogue(keys)
+			helpers.assert_eq(catalogue, { prefix = "combination__", slots = {
+				space_then_tab = true, space_then_win = true, tab_then_space = true,
+				tab_then_win = true, win_then_space = true, win_then_tab = true,
+			} })
+			keys[1].id = "withdrawn"
+			helpers.assert_eq(catalogue.slots.space_then_tab, true, "projection is detached")
+			helpers.assert_eq(Identity.combination_binding_fits("combination__space_then_tab", catalogue), true)
+			helpers.assert_eq(Identity.combination_binding_fits("combination__tab_then_space", catalogue), true)
+			helpers.assert_eq(Identity.combination_binding_fits("combination__space_then_space", catalogue), false)
+			helpers.assert_eq(Identity.combination_binding_fits("combination__removed_then_tab", catalogue), false)
+			helpers.assert_nil(Identity.combination_binding_fits("keyboard__space_then_tab", catalogue))
+			helpers.assert_nil(Identity.combination_binding_fits("combination__removed_then_tab", nil))
+		end)
+		for _, vector in ipairs({ { "empty", {} }, { "singleton", { { id = "space" } } },
+			{ "duplicate", { { id = "space" }, { id = "space" } } },
+			{ "sparse", { [1] = { id = "space" }, [3] = { id = "tab" } } },
+			{ "qualified", { { id = "space__foreign" }, { id = "tab" } } } }) do
+			local invalid = vector[2]
+			helpers.it("combination-source-identity: refuses " .. vector[1] .. " ordered-pair key source", function()
+				helpers.assert_throws(function() Identity.combination_binding_catalogue(invalid) end)
+			end)
+		end
+	end)
+
 end
 
 return M

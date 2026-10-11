@@ -3949,6 +3949,17 @@ alone does not prove the complete transactional writer or migrations.
 
 The shipped schema-10 fanout now retains the three retired caps source leaves until explicit cleanup: only those three registry deletes are removed, while all nine copy-if-absent operations, occupied destinations, generic delete semantics and strict invalid/newer schema refusal remain. The two independent handwritten expected models gain their original retained values under the explicit retirement policy; no expectations are regenerated from implementation and no assertions are removed. Genuine Linux boot, backup, publication and reread receiving passes 45/45 checks on LuaJIT and Lua 5.4, against 42 passes/3 retirement failures on the original and restored-original registries. Current schema-11/12 behavior, unknown neighbors and refused ordinary writes are checked; this cannot recover values deleted by older releases. Full corpus and three-driver CI qualification remain pending; item 33 stays partial.
 
+The Linux combination parameter classifier now receives a complete detached catalogue from the original native constructor and loaded key domain, independent of active assignments, pause or installation. Original constructor, pair callable, accessor, instance and source receipts must remain current; replacing them withdraws classification, while exact repair restores it. Genuine cached-reader, obsolete reporter and ordinary setter controls preserve retired source until explicit cleanup. Both LuaJIT and Lua 5.4 pass all nine new real-file controls, against five passes/four failures with the old and restored-old implementations. All original assertions and the native manager prefix remain intact. This is logical configuration acceptance, not physical input or complete three-driver qualification; item 33 remains partial.
+
+The genuine gesture-actions fixture now owns the shared ordered-pair policy
+loaded transitively by configuration identity. All 36 original assertion lines
+and 11 subjects remain. Original and fixture-only-inverse portable replay each
+pass 2 and fail 9; the repaired focused cohort passes 11 with zero failures.
+This fixes fixture cleanup without changing native action or combination
+behavior. The first joined selected run retains its nine macOS unit failures
+and environment-blocked native window gate; final selected and three-OS
+qualification remain required.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -6755,6 +6766,8 @@ German captions through genuine persistence and initialization; all 32
 presentation subjects pass. This is not installed Hammerspoon/WebKit, packaging
 or physical-device acceptance.
 
+The macOS personal-hotstring section enable control now consumes its own shared check declaration before native composition. Existing 21-language captions, readiness flags, nil-return transport and genuine section callbacks remain owned by their original providers. Complete portable receiving passes 18/18 cases, retaining all nine original cases; the old and restored-old producers each pass 14/18 with the same four declaration/callback refusals failing. A genuine owner generation preserves startup output and adds only the section declaration; the independent AST/source controls pass 74 checks. Actual Cocoa, durable preferences, installed delivery and final joined-source CI remain required; item 54 stays partial.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -9353,6 +9366,8 @@ Final selected gates pass 408 JS, 18,224 portable macOS and 13,017 Linux unit
 tests. One additive saved-locale initialization control retains all original
 31 subjects and passes the complete focused 32-subject replay. Native
 boot/WebKit, packaging and installed-device acceptance remain pending.
+
+The personal-hotstring section caption and check policy now come from the shared declaration, with additive withdrawal, repair and physical-source custody controls. Original fixture predicates and assertion count remain intact; missing helper calls were replaced by the existing strict equality assertion, without changing the expected false values. The genuine native-site census remains Windows 19, macOS 3 and Linux 4. The seven Mac/Linux residual sites are notification, dialog and window title options, rather than seven tray-row constructors. They still need shared presentation declarations and genuine receiving; dynamic slot/key titles also need bounded formatting policy. This remaining work is software implementation as well as native/device validation, so neither 54 nor 81 is complete.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
