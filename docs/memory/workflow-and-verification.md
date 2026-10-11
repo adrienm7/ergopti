@@ -260,6 +260,26 @@ equivalence alone does not detect unrelated formatting churn.
 
 ## Agent context
 
+### project-codeql-last-instance-is-not-the-fixing-commit
+
+GitHub CodeQL keeps `most_recent_instance.commit_sha` at the last detected
+vulnerable source after a finding becomes fixed. Verify the completed analysis
+source separately from each alert's `state` and `fixed_at`; requiring that
+instance field to equal the fixing commit falsely rejects a successful rescan.
+A test-only finding still needs source-to-consumer review before dismissal.
+Bounded original-code oracles can intentionally retain a defective expression;
+prove their input bounds and keep large adversarial inputs on the corrected
+production implementation. Dismiss only the specific reviewed finding with
+its rationale, never the query or an entire test directory.
+
+CodeQL's Go autobuilder can synthesize a repository-root module when it finds
+none. Its `./...` package pattern then ignores directories beginning with `_`,
+including `_shared`, and an apparently successful build can extract zero
+packages. Shared Go code needs a discoverable module at its package root and
+physical `go:embed` inputs before extraction. Generate those inputs from their
+canonical owners and preserve the upstream application's separate module when
+copying the package into a native build.
+
 ### feedback-never-restart-a-running-workflow
 
 A multi-agent workflow must not be stopped, edited and resumed to inject a
