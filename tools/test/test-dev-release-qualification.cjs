@@ -1016,7 +1016,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'macos-native-http',
 		'macos-brew-archive',
 		'macos-native-model-receiving',
-		'macos-shortcuts-discovery'
+		'macos-shortcuts-discovery',
+		'macos-launch-appleevents'
 	];
 	const selected = q.authorizeQualificationProfile(q.STABLE_V101_PROFILE_ID, context, clock);
 	assert.deepEqual(q.deferredScopes(selected), scopes);
@@ -1062,7 +1063,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'linux-e2e-suite',
 		'macos-stubbed-unit',
 		'macos-stubbed-e2e',
-		'macos-launch-appleevents'
+		'macos-launch-appleevents-unadmitted'
 	]) {
 		assert.equal(q.resolveQualificationProfile(context, clock, scope), null);
 		assert.throws(() => q.qualificationReceipt(selected, scope, { source_sha: sha }));
@@ -1126,6 +1127,56 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const missingShortcuts = structuredClone(approved);
 	delete missingShortcuts.scopes['macos-shortcuts-discovery'];
 	assert.throws(() => q.validateStableV101Policy(missingShortcuts));
+	const launchMatrix = approved.scopes['macos-launch-appleevents'];
+	assert.deepEqual(launchMatrix.scenarios, ['clean', 'karabiner_config']);
+	assert.deepEqual(launchMatrix.runners, ['macos-15', 'macos-15-intel']);
+	for (const patch of [
+		{ scenarios: ['clean'] },
+		{ scenarios: ['clean', 'karabiner_config', 'foreign'] },
+		{ runners: ['macos-15'] },
+		{ runners: ['macos-15', 'macos-15-intel', 'foreign'] },
+		{ path: 'tools/diagnostics/foreign.py' },
+		{ args: [] }
+	]) {
+		const altered = structuredClone(approved);
+		Object.assign(altered.scopes['macos-launch-appleevents'], patch);
+		assert.throws(() => q.validateStableV101Policy(altered));
+	}
+	for (const scenario of launchMatrix.scenarios) {
+		for (const runner of launchMatrix.runners) {
+			const receipt = q.launchQualificationReceipt(selected, scenario, runner, { source_sha: sha });
+			assert.equal(receipt.qualified, false);
+			assert.equal(receipt.status, 'deferred');
+			assert.equal(
+				q.validateLaunchQualificationReceipt(receipt, scenario, runner, sha, context, clock),
+				receipt
+			);
+			for (const patch of [
+				{ source_sha: 'b'.repeat(40) },
+				{ qualified: true },
+				{ scenario: 'foreign' },
+				{ runner: 'foreign' }
+			])
+				assert.throws(() =>
+					q.validateLaunchQualificationReceipt(
+						{ ...receipt, ...patch },
+						scenario,
+						runner,
+						sha,
+						context,
+						clock
+					)
+				);
+		}
+	}
+	assert.equal(
+		q.launchQualificationReceipt(selected, 'other_scenario', 'macos-15', { source_sha: sha })
+			.status,
+		'full'
+	);
+	assert.throws(() =>
+		q.launchQualificationReceipt(selected, 'clean', 'foreign', { source_sha: sha })
+	);
 	assert.deepEqual(q.STABLE_V101_PAC_METHODS, approved.scopes['macos-native-pac'].methods);
 	assert.deepEqual(q.STABLE_V101_BREW_METHODS, {
 		HomebrewArchiveAcceptanceTests: [approved.scopes['macos-brew-archive'].name]
@@ -1147,7 +1198,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		assert(notice.includes(literal));
 	assert(notice.includes(sha));
 	console.log(
-		'[OK] v1.0.1 exact five scopes, mandatory siblings, context/expiry/source/metadata refusals.'
+		'[OK] v1.0.1 exact six scopes, mandatory siblings, context/expiry/source/metadata refusals.'
 	);
 
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-v101-qualification-'));
@@ -1170,6 +1221,20 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			fs.writeFileSync(file, raw);
 			return { file, raw };
 		});
+		for (const scenario of launchMatrix.scenarios) {
+			for (const runner of launchMatrix.runners) {
+				const file = path.join(
+					owner,
+					'stable-macos-launch-appleevents-' + scenario + '-' + runner + '.json'
+				);
+				const raw = JSON.stringify(
+					q.launchQualificationReceipt(selected, scenario, runner, { source_sha: sha })
+				);
+				fs.writeFileSync(file, raw);
+				files.push({ file, raw });
+			}
+		}
+		assert.equal(files.length, 12);
 		q.admitCommandReceipts(owner, context, sha, clock);
 		for (const entry of files) {
 			fs.unlinkSync(entry.file);
@@ -1184,7 +1249,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		q.admitCommandReceipts(owner, context, sha, clock);
 		assert.throws(() => q.admitCommandReceipts(owner, context, sha, approved.expires_at));
 		console.log(
-			'[OK] all eight actual publication receipt filenames required; every missing/foreign source refuses.'
+			'[OK] all twelve actual publication receipt filenames required; every missing/foreign source refuses.'
 		);
 
 		// Run the real CLI entry with a fixed test clock, retaining all source and file operations.

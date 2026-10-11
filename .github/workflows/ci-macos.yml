@@ -1700,10 +1700,30 @@ jobs:
           echo "runner machine: $(uname -m)"
 
       - name: Record the launch qualification scope
-        run: >
-          node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents
-          --scenario "${{ matrix.scenario }}" --runner "${{ matrix.runner }}"
-          --receipt "$RUNNER_TEMP/launch-qualification.json"
+        run: |
+          set -euo pipefail
+          node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents \
+              --scenario "${{ matrix.scenario }}" --runner "${{ matrix.runner }}" \
+              --receipt "$RUNNER_TEMP/launch-qualification.json"
+          node - "$RUNNER_TEMP/launch-qualification.json" "${{ matrix.scenario }}" "${{ matrix.runner }}" <<'NODE'
+          const fs = require('node:fs');
+          const policy = require('./tools/ci/dev-release-qualification.cjs');
+          const scenario = process.argv[3], runner = process.argv[4];
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          policy.validateLaunchQualificationReceipt(receipt, scenario, runner, process.env.GITHUB_SHA, policy.environmentContext());
+          fs.writeFileSync(
+            require('node:path').join(process.env.RUNNER_TEMP, 'stable-macos-launch-appleevents-' + scenario + '-' + runner + '.json'),
+            JSON.stringify(receipt) + '\n', { flag: 'wx' }
+          );
+          NODE
+
+      - name: Retain source-bound AppleEvent launch qualification receipt
+        if: ${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-launch-macos-${{ matrix.runner }}-${{ matrix.scenario }}
+          path: ${{ runner.temp }}/stable-macos-launch-appleevents-${{ matrix.scenario }}-${{ matrix.runner }}.json
+          if-no-files-found: error
 
       - name: Launch over the user state and judge it
         run: >

@@ -452,6 +452,12 @@ const STEP_CONDITIONS = [
 	[MACOS_BOX, 'launch', 'Retain launch evidence', 'always()'],
 	[
 		MACOS_BOX,
+		'launch',
+		'Retain source-bound AppleEvent launch qualification receipt',
+		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+	],
+	[
+		MACOS_BOX,
 		'tooltip-canvas',
 		'Retain native captures, source, provisioning and retirement receipts',
 		'always()'
