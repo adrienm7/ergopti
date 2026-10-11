@@ -3,6 +3,8 @@
 	"version": "3.0.0",
 	"private": true,
 	"scripts": {
+		"test:windows-key-combination-cohorts": "node ./tools/test/test-windows-key-combination-cohorts.cjs",
+		"test:lease-silence-xctest-evidence": "node ./tools/test/test-lease-silence-xctest-evidence.cjs",
 		"test:linux:nix-native": "node ./tools/test/run-linux-nix-native.cjs",
 		"test:linux:nix-source": "node ./tools/test/test-linux-nix-native.cjs",
 		"predev": "node ./tools/dev/write-branch.js",
@@ -482,6 +484,7 @@
 		"test:bootstrap-retry-projection": "node ./tools/test/test-bootstrap-retry-projection.cjs",
 		"test:macos-guardian-signature-flags": "node ./tools/test/test-macos-guardian-signature-flags.cjs",
 		"test:managed-ollama-protocol": "node ./tools/test/test-managed-ollama-protocol.cjs",
+		"test:native-http-clock-evidence": "node ./tools/test/test-native-http-clock-evidence.cjs",
 		"test:macos-managed-ollama-catalogue": "node ./tools/test/test-macos-managed-ollama-catalogue.cjs",
 		"test:macos-release-stage-native-receiving-controls": "node ./tools/test/test-macos-release-stage-native-receiving.cjs",
 		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs",

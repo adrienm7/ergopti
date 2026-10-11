@@ -1,0 +1,193 @@
+{
+	"qualification": "FOCUSED_PORTABLE_ONLY; full selected gate and native acceptance pending",
+	"archive": "native-client-builder143-contract-relocation.tar.gz",
+	"sha256": "f640023929ed65a46b7c0d1dedcb2e6ee6e241f5938b59bb88fe5cfa3dde92a7",
+	"bytes": 54290,
+	"safe_regular_members": 48,
+	"manifest_sha256": "6ae8e7575fb6b2aa74fa11c9d815b5c1e99c0208ec13694a133fe151fb6b0e24",
+	"source_review": {
+		"qualification": "SOURCE_ONLY_UNRUN",
+		"paths": [
+			{
+				"path": "tools/diagnostics/macos_native_wire_swift_dependencies_test.py",
+				"before_sha256": "d2190fc344c0a02ac32639eff07b01746d156d97673392414617a2ef7bfc1d25",
+				"after_sha256": "a5559f78f40aaa2661ed104f1290550f005cd21b1be0831e2b7fcb622d02faef"
+			},
+			{
+				"path": "tools/test/test-native-pac-source-contract.cjs",
+				"before_sha256": "554d38fc41ec6952d81a75bdcc6c44d45d2eff895c6c71fcef31495331205eef",
+				"after_sha256": "7a71d2c98243194cf71a7579cd1645ebc8849c0bbd1e8d7b7022d65f377f7df3"
+			}
+		],
+		"assertion_provenance": {
+			"setUp": {
+				"before_assertion_count": 1,
+				"after_assertion_count": 2,
+				"exact_assertions": false,
+				"body_exact": false
+			},
+			"run_recipe": {
+				"before_assertion_count": 0,
+				"after_assertion_count": 1,
+				"exact_assertions": false,
+				"body_exact": false
+			},
+			"assert_retired": {
+				"before_assertion_count": 2,
+				"after_assertion_count": 2,
+				"exact_assertions": true,
+				"body_exact": true
+			},
+			"test_compiler_receives_exact_real_certificate_and_generated_policy_sources": {
+				"before_assertion_count": 13,
+				"after_assertion_count": 13,
+				"exact_assertions": true,
+				"body_exact": true
+			},
+			"test_modified_certificate_copy_refuses_before_compiler": {
+				"before_assertion_count": 3,
+				"after_assertion_count": 3,
+				"exact_assertions": false,
+				"body_exact": false
+			},
+			"test_modified_generated_policy_copy_refuses_before_compiler": {
+				"before_assertion_count": 3,
+				"after_assertion_count": 3,
+				"exact_assertions": false,
+				"body_exact": false
+			},
+			"test_compile_time_source_change_refuses_before_signature_admission": {
+				"before_assertion_count": 3,
+				"after_assertion_count": 3,
+				"exact_assertions": false,
+				"body_exact": false
+			},
+			"missing_source": {
+				"before_assertion_count": 4,
+				"after_assertion_count": 4,
+				"exact_assertions": true,
+				"body_exact": false
+			},
+			"test_missing_real_certificate_source_retires_before_compiler": {
+				"before_assertion_count": 0,
+				"after_assertion_count": 0,
+				"exact_assertions": true,
+				"body_exact": true
+			},
+			"test_missing_real_generated_policy_retires_before_compiler": {
+				"before_assertion_count": 0,
+				"after_assertion_count": 0,
+				"exact_assertions": true,
+				"body_exact": true
+			},
+			"test_root_acquisition_failure_retires_fixture_without_foreign_cleanup": {
+				"before_assertion_count": 4,
+				"after_assertion_count": 4,
+				"exact_assertions": true,
+				"body_exact": false
+			},
+			"test_compiler_receives_exact_real_pac_source_owner": {
+				"before_assertion_count": 5,
+				"after_assertion_count": 5,
+				"exact_assertions": true,
+				"body_exact": true
+			},
+			"test_modified_pac_source_copy_refuses_before_compiler": {
+				"before_assertion_count": 3,
+				"after_assertion_count": 3,
+				"exact_assertions": false,
+				"body_exact": false
+			},
+			"test_missing_real_pac_source_retires_before_compiler": {
+				"before_assertion_count": 0,
+				"after_assertion_count": 0,
+				"exact_assertions": true,
+				"body_exact": true
+			}
+		},
+		"native_client_sha256": "0f6c7df65975ff6eb73b9809e20f22011c7437d58728e3e4a78424fb3a137ab4",
+		"native_builder_sha256": "fa9f8da12f8f2db25a3bcda19e980c55d1f48bfc61e35be6d746297331b0cc6d"
+	},
+	"parent_receiving": {
+		"qualification": "PARENT_SOURCE_RECEIVING_ONLY; no native or full-suite credit",
+		"paths": {
+			"tools/diagnostics/macos_native_wire_swift_dependencies_test.py": [
+				"d2190fc344c0a02ac32639eff07b01746d156d97673392414617a2ef7bfc1d25",
+				"a5559f78f40aaa2661ed104f1290550f005cd21b1be0831e2b7fcb622d02faef"
+			],
+			"tools/test/test-native-pac-source-contract.cjs": [
+				"554d38fc41ec6952d81a75bdcc6c44d45d2eff895c6c71fcef31495331205eef",
+				"7a71d2c98243194cf71a7579cd1645ebc8849c0bbd1e8d7b7022d65f377f7df3"
+			]
+		},
+		"whole_forward_inverse": true,
+		"ten_case_identities_exact": true,
+		"five_whole_case_ASTs_exact": [
+			"test_compiler_receives_exact_real_certificate_and_generated_policy_sources",
+			"test_missing_real_certificate_source_retires_before_compiler",
+			"test_missing_real_generated_policy_retires_before_compiler",
+			"test_compiler_receives_exact_real_pac_source_owner",
+			"test_missing_real_pac_source_retires_before_compiler"
+		],
+		"six_cases_assertion_ASTs_exact": true,
+		"PAC_outside_relocated_recipe_span_exact": true,
+		"temporary_tree_retired": true
+	},
+	"qualification_detail": {
+		"native_credit": false,
+		"two_final_sources_formatted_unchanged": true,
+		"Ruff_format_check": "PASS",
+		"Ruff_lint": "PASS",
+		"Prettier_check": "PASS",
+		"focused_original10": {
+			"errors": 10,
+			"failures": 0,
+			"skips": 0,
+			"retained_private_roots": 9,
+			"exact_outer_cleanup_complete": true
+		},
+		"focused_candidate10": {
+			"pass": 10,
+			"failures": 0,
+			"errors": 0,
+			"skips": 0
+		},
+		"PAC_scope": "one actual owning check including unchanged model3; complete JS suite NOT EXECUTED here",
+		"PAC_original": "ASSERT_FAIL",
+		"PAC_candidate": "PASS",
+		"bounded_AST_and_noop_mutants": 5,
+		"physical_existing_case_mutants": [
+			{
+				"label": "physical-staged-guard-omission-red",
+				"status": 1,
+				"actual_mutant_sha256": "2753b98a5b871515a2dbf60a8a119f5298e6e1240f1cfb3e35228756daaf962a",
+				"failures": 1,
+				"errors": 0,
+				"skips": 0,
+				"caller_private_root_cleanup_complete": true
+			},
+			{
+				"label": "physical-compiler-pac-omission-red",
+				"status": 1,
+				"actual_mutant_sha256": "cc99bd83e921ea2dece9b611df53e8de5097827cb54ec07e824aeff233a55c2b",
+				"failures": 1,
+				"errors": 0,
+				"skips": 0,
+				"caller_private_root_cleanup_complete": true
+			}
+		],
+		"all_children_terminal": true,
+		"all_outer_receiving_trees_retired": true,
+		"native_sources_unchanged": {
+			"client": "0f6c7df65975ff6eb73b9809e20f22011c7437d58728e3e4a78424fb3a137ab4",
+			"builder": "fa9f8da12f8f2db25a3bcda19e980c55d1f48bfc61e35be6d746297331b0cc6d"
+		},
+		"immutable143_capsule": {
+			"path": "../group6-native-client-root-closure-concern/qualified143-proposal.tar.gz",
+			"sha256": "8e9a42f0ea401ae8f51bd96c1b9da0bdb99dffd7beb84d848b672d761e1b4979"
+		},
+		"SourcePAC10_original_cohort_and_402_receipt": "UNCHANGED_NO_NEW_CREDIT"
+	},
+	"custody": "https://github.com/adrienm7/ergopti/issues/86#issuecomment-6110169035",
+	"immutable143_archive_sha256": "8e9a42f0ea401ae8f51bd96c1b9da0bdb99dffd7beb84d848b672d761e1b4979"
+}

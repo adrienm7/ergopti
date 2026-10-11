@@ -1014,6 +1014,12 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		/Controlled JXA cases: 13 passed, 0 failed; native execution untested/.test(controls.stdout),
 		'all thirteen independent Shortcuts API controls execute'
 	);
+	check(
+		/SDK constant transport JXA controls: 7 passed, 0 failed; native execution UNRUN/.test(
+			controls.stdout
+		),
+		'all seven additive SDK constant transport controls execute without native authority'
+	);
 	const parser = spawnSync(
 		process.platform === 'win32' ? 'python' : 'python3',
 		[
@@ -1036,10 +1042,54 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		!parser.error && parser.signal === null && parser.status === 0,
 		'Shortcuts parser and owned registration controls complete'
 	);
+	const windowsSDKScope = process.platform === 'win32';
+	const parserCount = windowsSDKScope ? 35 : 51;
 	check(
-		/Ran 35 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
-		'all eighteen original, twelve same-principal, three failure-refinement and two budget controls execute without skip'
+		new RegExp(`Ran ${parserCount} tests in `).test(parser.stderr) &&
+			/\nOK\s*$/.test(parser.stderr),
+		windowsSDKScope
+			? 'all thirty-five original portable Shortcuts controls execute without skip'
+			: 'all thirty-five original and sixteen POSIX SDK controls execute without skip'
 	);
+	if (windowsSDKScope) {
+		const sdkFilesystemCases = [
+			'SDKCanonicalEnvelopeControls.test_noncanonical_valid_values_cannot_enter_the_jxa_channel',
+			'SDKCanonicalEnvelopeControls.test_owned_sdk_lookup_resolves_real_alias_and_refuses_malformed_path',
+			'SDKCanonicalEnvelopeControls.test_symlink_compiler_output_cannot_chmod_a_foreign_target',
+			'SDKConstantTransportControls.test_constant_and_discovery_use_one_budget_and_exact_literal_projection_argv',
+			'SDKConstantTransportControls.test_constant_retirement_consumes_shared_budget_before_osascript_acquisition',
+			'SDKConstantTransportControls.test_constant_schema_uint32_endpoints_are_typed_canonical_and_closed',
+			'SDKConstantTransportControls.test_controlled_build_records_real_capture_retirement_and_source_image_leases',
+			'SDKConstantTransportControls.test_expired_constant_capture_retires_without_acquiring_osascript',
+			'SDKConstantTransportControls.test_expired_or_invalid_absolute_deadline_never_acquires_a_group',
+			'SDKConstantTransportControls.test_in_capture_same_byte_inode_replacement_refuses_before_osascript',
+			'SDKConstantTransportControls.test_late_discovery_cannot_gain_a_second_twenty_second_budget',
+			'SDKConstantTransportControls.test_lease_replacement_same_bytes_and_mutation_refuse_without_new_acquisition',
+			'SDKConstantTransportControls.test_malformed_open_oversized_and_non_uint32_constants_refuse_before_osascript',
+			'SDKConstantTransportControls.test_nonzero_unclean_and_unretired_constant_group_cannot_reach_osascript',
+			'SDKConstantTransportControls.test_post_capture_lease_mutation_refuses_and_retains_exact_retired_operations',
+			'SDKConstantTransportControls.test_source_changed_before_build_refuses_without_any_acquisition'
+		];
+		const expectedScope = {
+			case_names: sdkFilesystemCases,
+			collected: 16,
+			executed: 0,
+			native: 'UNRUN',
+			status: 'UNRUN_UNSUPPORTED'
+		};
+		check(
+			parser.stdout === 'Shortcuts SDK filesystem scope: ' + JSON.stringify(expectedScope) + '\n',
+			'Windows collects all sixteen exact SDK filesystem cases as explicitly UNRUN_UNSUPPORTED'
+		);
+		console.log(
+			'Shortcuts SDK filesystem controls: 16 collected, 0 executed; UNRUN_UNSUPPORTED; native=UNRUN'
+		);
+	} else {
+		check(
+			!parser.stdout.includes('UNRUN_UNSUPPORTED'),
+			'Linux and Darwin may not omit SDK filesystem execution'
+		);
+	}
 	const parserSource = fs.readFileSync(
 		path.join(ROOT, 'tools/diagnostics/apple_shortcuts_probe/test_probe.py'),
 		'utf8'

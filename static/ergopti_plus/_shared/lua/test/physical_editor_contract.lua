@@ -517,4 +517,124 @@ return function(helpers, Editor, Window, Model)
 			eq(s.writes, 1); eq(s.refresh_labels, 1); eq(#s.messages, messages, "retired native page receives no result")
 		end)
 	end)
+	helpers.describe("Physical editor retained request cancellation", function()
+		local function fixture()
+			local s = { receipt = {}, original_calls = 0, foreign_calls = 0, acquired = 0, emitted = 0 }
+			local options = { model = Model, parameter_section = "gesture_parameters", positions = {},
+				catalogue = { is_assignable = function(action) return action == "none" end,
+					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+					split_action_parameter_key = function() end },
+				capture = function() return { assignments = {}, parameters = {} }, s.receipt end,
+				current = function(receipt) return rawequal(receipt, s.receipt) end,
+				commit = function() error("observation retirement never publishes") end,
+				picker = function() return false end, label = function(action) return action end,
+				emit = function() return true end, position_field = "evdev",
+				position_available = function() return true end }
+			options.emit_position = function() s.emitted = s.emitted + 1; return true end
+			options.capture_position = function(current, receive)
+				s.acquired = s.acquired + 1
+				s.active, s.native_current, s.receive = {}, current, receive
+				if s.on_capture then s.on_capture() end
+				return s.active
+			end
+			options.cancel_position = function(token)
+				s.original_calls = s.original_calls + 1
+				eq(token, s.active, "the original cancellation receives its exact acquired token")
+				if s.on_cancel then s.on_cancel() end
+				if s.refuse then return false end
+				s.active = nil
+				return true
+			end
+			s.foreign = function() s.foreign_calls = s.foreign_calls + 1; return true end
+			s.original, s.options = options.cancel_position, options
+			s.owner = Editor.new(options)
+			eq(type(s.owner.open()), "table")
+			return s
+		end
+		local function enroll(s, request)
+			eq(s.owner.capture_position({ request_id = request or 1 }), true)
+			eq(type(s.active), "table")
+		end
+		helpers.it("foreign success cannot replace the acquired request cancellation", function()
+			local s = fixture(); enroll(s)
+			s.options.cancel_position = s.foreign
+			eq(s.owner.close(), true); eq(s.original_calls, 1); eq(s.foreign_calls, 0)
+			eq(s.active, nil, "success requires actual retirement by the acquired request owner")
+			eq(s.owner.close(), true); eq(s.original_calls, 1, "completed request is not retired twice")
+		end)
+		helpers.it("removed noncallable and throwing replacements do not lose original retirement", function()
+			for _, kind in ipairs({ "nil", "false", "throw" }) do
+				local s = fixture(); enroll(s)
+				if kind == "nil" then s.options.cancel_position = nil
+				elseif kind == "false" then s.options.cancel_position = false
+				else s.options.cancel_position = function() s.foreign_calls = s.foreign_calls + 1; error("foreign callback") end end
+				eq(s.owner.close(), true); eq(s.original_calls, 1); eq(s.foreign_calls, 0); eq(s.active, nil)
+			end
+		end)
+		helpers.it("original refusal retains the exact token and original retry port", function()
+			local s = fixture(); enroll(s); local token = s.active
+			s.refuse = true; s.options.cancel_position = s.foreign
+			eq(s.owner.close(), false); eq(s.original_calls, 1); eq(s.active, token); eq(s.foreign_calls, 0)
+			eq(s.receive({ native_code = 36, mods = {} }), false, "closed page cannot emit during retirement debt")
+			s.refuse = false
+			eq(s.owner.close(), true); eq(s.original_calls, 2); eq(s.active, nil); eq(s.foreign_calls, 0)
+		end)
+		helpers.it("original exception retains the request for the same cancellation retry", function()
+			local s = fixture(); enroll(s); local token = s.active
+			s.on_cancel = function() error("original controlled refusal") end
+			s.options.cancel_position = nil
+			eq(s.owner.close(), false); eq(s.original_calls, 1); eq(s.active, token)
+			s.on_cancel = nil
+			eq(s.owner.close(), true); eq(s.original_calls, 2); eq(s.active, nil)
+		end)
+		helpers.it("capture constructor replacement cannot substitute the retained cancellation", function()
+			local s = fixture();
+			s.on_capture = function() s.options.cancel_position = s.foreign end
+			enroll(s)
+			eq(s.owner.close(), true); eq(s.original_calls, 1); eq(s.foreign_calls, 0); eq(s.active, nil)
+		end)
+		helpers.it("replacement before enrollment remains the optional port for that request", function()
+			local s = fixture(); local selected_calls = 0
+			s.options.cancel_position = function(token)
+				selected_calls = selected_calls + 1; eq(token, s.active); s.active = nil; return true
+			end
+			enroll(s); s.options.cancel_position = s.foreign
+			eq(s.owner.close(), true); eq(selected_calls, 1); eq(s.original_calls, 0)
+			eq(s.foreign_calls, 0); eq(s.active, nil)
+		end)
+		helpers.it("retained cancellation refuses recursive close and successor enrollment", function()
+			local s = fixture(); enroll(s); local nested_close, nested_capture
+			s.on_cancel = function()
+				nested_close = s.owner.close()
+				nested_capture = s.owner.capture_position({ request_id = 2 })
+			end
+			s.options.cancel_position = s.foreign
+			eq(s.owner.close(), true); eq(nested_close, false); eq(nested_capture, false)
+			eq(s.original_calls, 1); eq(s.foreign_calls, 0); eq(s.acquired, 1); eq(s.active, nil)
+		end)
+		helpers.it("prior retirement removing the next port refuses before another acquisition", function()
+			local s = fixture(); enroll(s)
+			s.on_cancel = function() s.options.cancel_position = nil end
+			eq(s.owner.capture_position({ request_id = 2 }), false)
+			eq(s.original_calls, 1); eq(s.acquired, 1, "no resource is acquired without its cancellation port")
+			eq(s.active, nil); eq(s.owner.close(), true)
+		end)
+		helpers.it("successive requests retain separate original cancellation functions", function()
+			local s = fixture(); enroll(s); local stale = s.receive
+			eq(s.owner.cancel_position(), true); eq(s.original_calls, 1)
+			local next_calls = 0
+			s.options.cancel_position = function(token) next_calls = next_calls + 1; eq(token, s.active); s.active = nil; return true end
+			enroll(s, 2); local successor = s.active; s.options.cancel_position = s.foreign
+			eq(stale({ native_code = 36, mods = {} }), false); eq(s.active, successor)
+			eq(s.owner.close(), true); eq(next_calls, 1); eq(s.original_calls, 1)
+			eq(s.foreign_calls, 0); eq(s.acquired, 2); eq(s.active, nil)
+		end)
+		helpers.it("post-constructor source refusal retires through the acquired request port", function()
+			local s = fixture()
+			s.on_capture = function() s.options.cancel_position = s.foreign; s.receipt = {} end
+			eq(s.owner.capture_position({ request_id = 1 }), false)
+			eq(s.acquired, 1); eq(s.original_calls, 1); eq(s.foreign_calls, 0); eq(s.active, nil)
+			eq(s.owner.close(), true); eq(s.original_calls, 1)
+		end)
+	end)
 end

@@ -1,6 +1,9 @@
 """Portable physical peers and passive owned-child receiving facts."""
 
 import hashlib
+import builtins
+import shutil
+import signal
 import re
 import importlib.util
 import contextlib
@@ -821,11 +824,80 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
         self.assertIn("defer { lock.unlock() }", fixture)
         self.assertNotIn("lock.lock()", fixture)
         self.assertIn("FixtureHTTPObservation.owner?.mark(stage)", fixture)
-        compiler = (SUPPORT / "native_http_wire_client_receiving.py").read_text(encoding="utf-8")
-        self.assertIn(
-            '"-D",\n                    "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",',
-            compiler,
+        import ast
+
+        compiler = ast.parse(
+            (SUPPORT / "native_http_fixture_builder.py").read_text(encoding="utf-8")
         )
+        builder = next(
+            node
+            for node in compiler.body
+            if isinstance(node, ast.ClassDef) and node.name == "OwnedFixtureBuild"
+        )
+        build = next(
+            node
+            for node in builder.body
+            if isinstance(node, ast.FunctionDef) and node.name == "build"
+        )
+        compiler_calls = [
+            node
+            for node in ast.walk(build)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and ast.unparse(node.func) == "self._command"
+            and node.args
+            and isinstance(node.args[0], ast.List)
+            and len(node.args[0].elts) >= 5
+            and isinstance(node.args[0].elts[0], ast.Constant)
+            and node.args[0].elts[0].value == "/usr/bin/xcrun"
+        ]
+        self.assertEqual(len(compiler_calls), 1)
+        self.assertEqual(
+            [node.value for node in compiler_calls[0].args[0].elts[:5]],
+            [
+                "/usr/bin/xcrun",
+                "swiftc",
+                "-parse-as-library",
+                "-D",
+                "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",
+            ],
+        )
+        caller = ast.parse(
+            (SUPPORT / "native_http_wire_client_receiving.py").read_text(encoding="utf-8")
+        )
+        receiving = next(
+            node
+            for node in caller.body
+            if isinstance(node, ast.ClassDef) and node.name == "RealNativeClientReceiving"
+        )
+        bootstrap = next(
+            node
+            for node in receiving.body
+            if isinstance(node, ast.FunctionDef) and node.name == "setUpClass"
+        )
+        calls = [node for node in ast.walk(bootstrap) if isinstance(node, ast.Call)]
+        fixed_loads = [
+            node
+            for node in calls
+            if ast.unparse(node.func) == "importlib.util.spec_from_file_location"
+        ]
+        self.assertEqual(
+            [(ast.unparse(node.args[0]), ast.unparse(node.args[1])) for node in fixed_loads],
+            [
+                (
+                    "'owned_native_http_build'",
+                    "Path(__file__).with_name('native_http_fixture_builder.py')",
+                ),
+                ("'actual_native_managed_http'", "native / 'managed_http.py'"),
+            ],
+        )
+        for expression in (
+            "importlib.util.module_from_spec(build_spec)",
+            "build_spec.loader.exec_module(builder)",
+            "builder.OwnedFixtureBuild(cls.fixture)",
+            "cls.build.build()",
+        ):
+            self.assertEqual(sum(ast.unparse(node) == expression for node in calls), 1)
 
 
 class NativeAdminTrustObservationTests(unittest.TestCase):
@@ -2608,6 +2680,1279 @@ class TrustCauseDiagnosticEnrollmentTests(unittest.TestCase):
         original = trust_cause_diagnostic_projection(source)
         with self.assertRaises(ValueError):
             historical_pac_ownership_projection(original + "\n// unapproved\n")
+
+
+class NativePostInstallTrustObservationTests(unittest.TestCase):
+    # Actual portable children qualify capture/closure only, never Apple trust.
+    def setUp(self):
+        self.fixture = WIRE.WireFixture(native=False)
+        self.addCleanup(self.close_fixture)
+        self.fixture.native = True
+        self.fixture.trust_query_executable = "portable-owned-query"
+
+    def close_fixture(self):
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+        self.fixture.close()
+
+    @staticmethod
+    def receipt():
+        return b'{"version":1,"export_status":0,"entry_count":1,"owned_status":0,"owned_present":1}'
+
+    def test63ActualSuccessfulAddAndQueryShareBudgetAndRetireBeforeStderrReceipt(self):
+        original = self.fixture._command
+        children, requests = [], []
+        real_popen = subprocess.Popen
+        stdout, stderr = io.StringIO(), io.StringIO()
+
+        def acquire(*arguments, **options):
+            child = real_popen(*arguments, **options)
+            child.output_owner, child.error_owner = options["stdout"], options["stderr"]
+            children.append(child)
+            return child
+
+        def command(arguments, input_bytes=b"", **options):
+            requests.append((arguments, input_bytes, options, time.monotonic()))
+            if arguments[0] == "portable-owned-query":
+                script = (
+                    "import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write("
+                    + repr(self.receipt())
+                    + ")"
+                )
+            else:
+                self.assertEqual(arguments[3:5], ["add-trusted-cert", "-d"])
+                script = "import sys; sys.stdout.buffer.write(b'original add output')"
+            return original([sys.executable, "-I", "-B", "-c", script], input_bytes, **options)
+
+        before = time.monotonic()
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch.object(WIRE.subprocess, "Popen", side_effect=acquire):
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    self.fixture.trust(True)
+        after = time.monotonic()
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(requests[1][0], ["portable-owned-query", "--fixture-admin-trust-query"])
+        self.assertEqual(requests[1][1], ssl.PEM_cert_to_DER_cert(self.fixture.ca.read_text()))
+        add_deadline = requests[0][2]["deadline"]
+        self.assertGreaterEqual(add_deadline, before + 15)
+        self.assertLessEqual(add_deadline, after + 15)
+        self.assertLessEqual(requests[1][2]["deadline"], add_deadline)
+        self.assertLessEqual(requests[1][2]["deadline"], requests[1][3] + 2)
+        self.assertEqual(len(children), 2)
+        for child in children:
+            self.assertEqual(child.returncode, 0)
+            self.assertTrue(child.stdin.closed)
+            self.assertTrue(child.output_owner.closed)
+            self.assertTrue(child.error_owner.closed)
+        self.assertEqual(stdout.getvalue(), "")
+        lines = stderr.getvalue().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[0].startswith("# native_http_trust_outcome "))
+        self.assertTrue(lines[1].startswith("# native_http_admin_trust_installed "))
+        self.assertEqual(
+            json.loads(lines[1].removeprefix("# native_http_admin_trust_installed "))[
+                "owned_present"
+            ],
+            1,
+        )
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(self.fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertEqual(self.fixture.command_file_debt, [])
+
+    def test64ExactAddFailureDoesNotAcquireQueryOrReplacePrimary(self):
+        primary = subprocess.TimeoutExpired("owned original add", 15)
+        with mock.patch.object(WIRE.time, "monotonic", return_value=100):
+            with mock.patch.object(self.fixture, "_command", side_effect=primary) as command:
+                with mock.patch.object(self.fixture, "_observe_admin_trust") as query:
+                    with self.assertRaises(subprocess.TimeoutExpired) as caught:
+                        self.fixture.trust(True)
+        self.assertIs(caught.exception, primary)
+        self.assertEqual(command.call_count, 1)
+        self.assertEqual(command.call_args.kwargs.get("deadline"), 115)
+        query.assert_not_called()
+        self.assertTrue(self.fixture.trust_attempted)
+
+    def test65UnavailableCalleeDoesNotAcquireObservationOrNewClock(self):
+        self.fixture.trust_query_executable = None
+        with mock.patch.object(WIRE.time, "monotonic") as clock:
+            with mock.patch.object(
+                self.fixture, "_command", return_value=(0, b"original")
+            ) as command:
+                with mock.patch.object(self.fixture, "_observe_admin_trust") as query:
+                    self.fixture.trust(True)
+        clock.assert_not_called()
+        self.assertEqual(command.call_count, 1)
+        self.assertIsNone(command.call_args.kwargs.get("deadline"))
+        query.assert_not_called()
+        self.assertTrue(self.fixture.trust_attempted)
+
+    def test66ActualSettledRefusedQueryCannotOverwriteSuccessfulAddFact(self):
+        original = self.fixture._command
+        stdout, stderr = io.StringIO(), io.StringIO()
+
+        def command(arguments, **options):
+            if arguments[0] == "portable-owned-query":
+                return original(
+                    [
+                        sys.executable,
+                        "-I",
+                        "-B",
+                        "-c",
+                        "import sys; sys.stdin.buffer.read(); sys.exit(7)",
+                    ],
+                    **options,
+                )
+            self.fixture.command_fact = {"phase": "complete", "status": 0}
+            return 0, b"original"
+
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                self.fixture.trust(True)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertTrue(stderr.getvalue().startswith("# native_http_admin_trust_installed "))
+        self.assertEqual(
+            json.loads(stderr.getvalue().removeprefix("# native_http_admin_trust_installed ")),
+            {"version": 1, "observed": 0},
+        )
+        self.assertEqual(self.fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertEqual(self.fixture.command_file_debt, [])
+        self.assertTrue(self.fixture.trust_attempted)
+
+    def test67UnsettledQueryPreservesExactPrimaryAndBlockingFact(self):
+        primary = RuntimeError("exact controlled query settlement refusal")
+
+        def command(arguments, **options):
+            if arguments[0] == "portable-owned-query":
+                self.fixture.command_fact = {"phase": "settle", "status": None}
+                raise primary
+            self.fixture.command_fact = {"phase": "complete", "status": 0}
+            return 0, b"original"
+
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch("builtins.print") as output:
+                with self.assertRaises(RuntimeError) as caught:
+                    self.fixture.trust(True)
+        self.assertIs(caught.exception, primary)
+        self.assertEqual(self.fixture.command_fact, {"phase": "settle", "status": None})
+        self.assertTrue(self.fixture.trust_attempted)
+        output.assert_not_called()
+
+    def test68ExpiredInstallationBudgetCannotAcquireQueryChildOrRenewClock(self):
+        original = self.fixture._command
+
+        def command(arguments, **options):
+            if arguments[0] == "portable-owned-query":
+                self.assertEqual(options["deadline"], 115)
+                return original(arguments, **options)
+            self.assertEqual(options.get("deadline"), 115)
+            self.fixture.command_fact = {"phase": "complete", "status": 0}
+            return 0, b"original"
+
+        stderr = io.StringIO()
+        with mock.patch.object(WIRE.time, "monotonic", side_effect=[100, 115, 115]):
+            with mock.patch.object(self.fixture, "_command", side_effect=command):
+                with mock.patch.object(WIRE.subprocess, "Popen") as acquire:
+                    with contextlib.redirect_stderr(stderr):
+                        self.fixture.trust(True)
+        acquire.assert_not_called()
+        self.assertEqual(
+            json.loads(stderr.getvalue().removeprefix("# native_http_admin_trust_installed ")),
+            {"version": 1, "observed": 0},
+        )
+        self.assertEqual(self.fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertTrue(self.fixture.trust_attempted)
+
+    def test69RefusedDiagnosticSinkCannotInvalidateSettledSuccessfulAdd(self):
+        def command(arguments, **options):
+            self.fixture.command_fact = {"phase": "complete", "status": 0}
+            return (
+                (0, self.receipt()) if arguments[0] == "portable-owned-query" else (0, b"original")
+            )
+
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch("builtins.print", side_effect=OSError("controlled closed stderr")):
+                self.fixture.trust(True)
+        self.assertEqual(self.fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(self.fixture.command_file_debt, [])
+
+
+class NativePostInstallCancellationInteractionTests(unittest.TestCase):
+    setUp = NativePostInstallTrustObservationTests.setUp
+    close_fixture = NativePostInstallTrustObservationTests.close_fixture
+    receipt = staticmethod(NativePostInstallTrustObservationTests.receipt)
+
+    @staticmethod
+    def actual_signal_handler():
+        # Acquire the exact existing worker handler without running its main role.
+        import ast
+
+        source = (SUPPORT / "native_http_wire_fixture.py").read_text()
+        main = next(
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef) and node.name == "main"
+        )
+        handler = next(
+            node
+            for node in main.body
+            if isinstance(node, ast.FunctionDef) and node.name == "interrupted"
+        )
+        namespace = {"FixtureFailure": WIRE.FixtureFailure}
+        exec(
+            compile(
+                ast.Module(body=[handler], type_ignores=[]), "existing-wire-signal-handler", "exec"
+            ),
+            namespace,
+        )
+        return namespace["interrupted"]
+
+    def interrupted_installation(self, signum, actor):
+        import signal
+
+        previous = signal.getsignal(signum)
+        signal.signal(signum, self.actual_signal_handler())
+        interrupted = []
+        children = []
+        requests = []
+        original = self.fixture._command
+        acquire_original = subprocess.Popen
+        stderr, stdout = io.StringIO(), io.StringIO()
+
+        def dispatch(*args):
+            try:
+                os.kill(os.getpid(), signum)
+            except BaseException as failure:
+                interrupted.append(failure)
+                raise
+
+        def acquire(*arguments, **options):
+            child = acquire_original(*arguments, **options)
+            child.output_owner, child.error_owner = options["stdout"], options["stderr"]
+            children.append(child)
+            return child
+
+        def command(arguments, input_bytes=b"", **options):
+            requests.append((arguments, input_bytes, options))
+            if arguments[0] == "portable-owned-query":
+                if actor == "before_query":
+                    dispatch()
+                script = (
+                    "import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write("
+                    + repr(self.receipt())
+                    + ")"
+                )
+            else:
+                script = "import sys; sys.stdout.buffer.write(b'original add output')"
+            return original([sys.executable, "-I", "-B", "-c", script], input_bytes, **options)
+
+        refusal = None
+        try:
+            parse = (
+                mock.patch.object(self.fixture, "_admin_trust_fact", side_effect=dispatch)
+                if actor == "after_query"
+                else contextlib.nullcontext()
+            )
+            with parse, mock.patch.object(self.fixture, "_command", side_effect=command):
+                with mock.patch.object(WIRE.subprocess, "Popen", side_effect=acquire):
+                    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                        try:
+                            self.fixture.trust(True)
+                        except BaseException as failure:
+                            refusal = failure
+        finally:
+            signal.signal(signum, previous)
+        # Observe real original add/query closure before asserting cancellation.
+        self.assertEqual(len(requests), 2)
+        self.assertLessEqual(requests[1][2]["deadline"], requests[0][2]["deadline"])
+        self.assertEqual(len(children), 2 if actor == "after_query" else 1)
+        for child in children:
+            self.assertEqual(child.returncode, 0)
+            self.assertTrue(child.stdin.closed)
+            self.assertTrue(child.output_owner.closed)
+            self.assertTrue(child.error_owner.closed)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(self.fixture.command_file_debt, [])
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(self.fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertEqual(len(interrupted), 1)
+        self.assertEqual(type(interrupted[0]), WIRE.FixtureFailure)
+        self.assertEqual(interrupted[0].args, ("Native fixture cancelled",))
+        self.assertIs(refusal, interrupted[0])
+        self.assertNotIn("# native_http_admin_trust_installed ", stderr.getvalue())
+
+    def test82ActualSIGINTAndSIGTERMAfterSettledQueryCannotBecomeUnknownSuccess(self):
+        import signal
+
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signum=int(signum)):
+                self.interrupted_installation(signum, "after_query")
+
+    def test83ActualSIGINTAndSIGTERMBeforeQueryCannotBecomeUnknownSuccess(self):
+        import signal
+
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signum=int(signum)):
+                self.interrupted_installation(signum, "before_query")
+
+
+# Actual POSIX child ownership and actual existing main-handler signals.
+# Native settlement acknowledgements and Security command bodies are explicitly
+# modeled; these controls do not qualify Darwin or change system trust.
+NATIVE_GUARD_QUERY = "EXPLICIT-PORTABLE-QUERY-IMAGE-NOT-NATIVE"
+NATIVE_GUARD_FACT = {
+    "version": 1,
+    "export_status": 0,
+    "entry_count": 1,
+    "owned_status": 0,
+    "owned_present": 1,
+}
+NATIVE_GUARD_CLEANUP = []
+
+
+class NativeCommandGuardProtocolModel:
+    """No native executable runs; exact Popen handles retire every actual child."""
+
+    def __init__(
+        self,
+        ack=True,
+        primary=None,
+        partial=False,
+        refuse=False,
+        postinstall=False,
+        add_status=0,
+        uncertain_capture=False,
+    ):
+        self.ack = ack
+        self.primary = primary
+        self.partial = partial
+        self.refuse = refuse
+        self.postinstall = postinstall
+        self.add_status = add_status
+        self.uncertain_capture = uncertain_capture
+        self.children = []
+        self.arguments = []
+        self.queries = 0
+
+    def acquire_owned(self, arguments, native, register, **options):
+        self.arguments.append(arguments)
+        if self.refuse:
+            raise self.primary
+        query = arguments == [NATIVE_GUARD_QUERY, "--fixture-admin-trust-query"]
+        if query:
+            self.queries += 1
+        unsettled = self.ack is False or self.postinstall and query and self.queries == 1
+        body = "import time; time.sleep(60)" if unsettled else "import sys; sys.stdin.buffer.read()"
+        if query and not unsettled:
+            body += "; import json; sys.stdout.write(json.dumps(" + repr(NATIVE_GUARD_FACT) + "))"
+        if arguments[:3] == ["/usr/bin/sudo", "-n", "/usr/bin/security"]:
+            assert arguments[3] in ("add-trusted-cert", "remove-trusted-cert")
+            if arguments[3] == "add-trusted-cert":
+                body += "; sys.exit(" + str(self.add_status) + ")"
+        process = subprocess.Popen(
+            [sys.executable, "-I", "-B", "-c", body], start_new_session=True, **options
+        )
+        process.output_capture = options["stdout"]
+        process.error_capture = options["stderr"]
+        if self.uncertain_capture:
+            stream = process.stdin
+
+            class UncertainClose:
+                def __getattr__(self, name):
+                    return getattr(stream, name)
+
+                def close(self):
+                    stream.close()
+                    raise OSError("EXPLICIT physical descriptor closed but ACK refused")
+
+            process.stdin = UncertainClose()
+        model = self
+
+        class Owner:
+            reaped = False
+
+            def __init__(self):
+                self.process = process
+                self.settle_calls = 0
+
+            def wait_for_exit(self, timeout):
+                if unsettled:
+                    if model.primary is None:
+                        model.primary = subprocess.TimeoutExpired(
+                            "EXPLICIT modeled owned wait", timeout
+                        )
+                    raise model.primary
+                process.wait(timeout=timeout)
+
+            def settle(self):
+                self.settle_calls += 1
+                ack = False if unsettled else model.ack
+                if isinstance(ack, BaseException):
+                    raise ack
+                if ack is True:
+                    if process.poll() is None:
+                        process.terminate()
+                    process.wait(timeout=5)
+                    self.reaped = True
+                return ack
+
+        owner = Owner()
+        self.children.append(owner)
+        register(owner)
+        if self.partial:
+            raise self.primary
+        return owner
+
+
+def native_guard_actual_main_handlers():
+    previous = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+    captured = {}
+
+    class Stop(Exception):
+        pass
+
+    def stop(*args, **kwargs):
+        captured.update({sig: signal.getsignal(sig) for sig in previous})
+        raise Stop()
+
+    try:
+        with (
+            mock.patch.object(WIRE, "WireFixture", side_effect=stop),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            try:
+                WIRE.main()
+            except Stop:
+                pass
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+    assert len(captured) == 2 and all(callable(value) for value in captured.values())
+    return captured
+
+
+class NativeCommandGuardTests(unittest.TestCase):
+    def setUp(self):
+        self.out, self.err = io.StringIO(), io.StringIO()
+        self.stdout = contextlib.redirect_stdout(self.out)
+        self.stderr = contextlib.redirect_stderr(self.err)
+        self.stdout.__enter__()
+        self.stderr.__enter__()
+        self.fixture = WIRE.WireFixture(native=False)
+        self.root = self.fixture.root
+        self.model = None
+        self.close_called = False
+
+    def activate(self, **options):
+        self.model = NativeCommandGuardProtocolModel(**options)
+        self.fixture.native = True
+        self.fixture.groups = self.model
+        self.fixture.native_groups = object()
+        self.fixture.trust_query_executable = NATIVE_GUARD_QUERY
+        return self.model
+
+    def close_refuses(self):
+        self.close_called = True
+        with self.assertRaisesRegex(
+            WIRE.FixtureFailure, "^Owned native fixture restoration refused$"
+        ):
+            self.fixture.close()
+        self.assertFalse(self.fixture.closed)
+        self.assertTrue(self.root.is_dir())
+
+    def assert_owner_debt(self, owner):
+        self.assertEqual(len(self.fixture.command_group_debt), 1)
+        self.assertIs(self.fixture.command_group_debt[0], owner)
+        self.assertEqual(owner.settle_calls, 1)
+
+    def tearDown(self):
+        before_outer = {
+            "fixture_closed_before_outer_cleanup": self.fixture.closed,
+            "root_exists_before_outer_cleanup": self.root.exists(),
+            "child_live_before_outer_cleanup": []
+            if self.model is None
+            else [owner.process.poll() is None for owner in self.model.children],
+            "retained_owner_count_before_outer_cleanup": len(
+                getattr(self.fixture, "command_group_debt", ())
+            ),
+        }
+        try:
+            if not self.close_called and not self.fixture.closed:
+                try:
+                    self.fixture.close()
+                except WIRE.FixtureFailure:
+                    pass
+            children = [] if self.model is None else self.model.children
+            for owner in children:
+                process = owner.process
+                if process.poll() is None:
+                    process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+                if process.stdin is not None and not process.stdin.closed:
+                    process.stdin.close()
+                for capture in (process.output_capture, process.error_capture):
+                    if not capture.closed:
+                        capture.close()
+            assert all(owner.process.returncode is not None for owner in children)
+            # Outer private test owner removes only after exact real child reaps.
+            # This does not pay the modeled native ACK debt or clear its record.
+            if self.root.exists():
+                self.fixture._retire_servers()
+                if hasattr(self.fixture, "refused"):
+                    self.fixture.refused.close()
+                shutil.rmtree(self.root)
+            NATIVE_GUARD_CLEANUP.append(
+                {
+                    "test": self.id(),
+                    **before_outer,
+                    "actual_children": len(children),
+                    "all_exact_outer_children_reaped": True,
+                    "settle_calls": [owner.settle_calls for owner in children],
+                }
+            )
+        finally:
+            self.stderr.__exit__(None, None, None)
+            self.stdout.__exit__(None, None, None)
+
+    def test_unsettled_actual_child_retains_root_and_refuses_new_capture(self):
+        model = self.activate(ack=False)
+        with self.assertRaises(subprocess.TimeoutExpired) as caught:
+            self.fixture._command(["EXPLICIT-MODELED-COMMAND"])
+        self.assertIs(caught.exception, model.primary)
+        owner = model.children[0]
+        self.assertIsNone(owner.process.poll())
+        self.assertEqual(self.fixture.command_file_debt, [])
+        self.close_refuses()
+        self.assertIsNone(owner.process.poll())
+        self.assert_owner_debt(owner)
+        with mock.patch.object(
+            WIRE.tempfile,
+            "TemporaryFile",
+            side_effect=AssertionError("capture must not be acquired"),
+        ):
+            with self.assertRaisesRegex(
+                WIRE.FixtureFailure, "^Native fixture child closure debt remains$"
+            ):
+                self.fixture._command(["SECOND-MUST-NOT-ACQUIRE"])
+        self.assertEqual(len(model.arguments), 1)
+
+    def test_postinstall_query_retains_actual_child_root_and_original_primary(self):
+        model = self.activate(postinstall=True)
+        with self.assertRaises(subprocess.TimeoutExpired) as caught:
+            self.fixture.trust(True)
+        self.assertIs(caught.exception, model.primary)
+        self.assertEqual(model.queries, 1)
+        self.assertTrue(self.fixture.trust_attempted)
+        owner = model.children[-1]
+        self.assertIsNone(owner.process.poll())
+        self.fixture.keychain_created = True
+        self.fixture.foreign_keychains = []
+        with (
+            mock.patch.object(self.fixture, "_command", wraps=self.fixture._command) as attempts,
+            mock.patch.object(self.fixture, "trust", wraps=self.fixture.trust) as trust_cleanup,
+        ):
+            self.close_refuses()
+        trust_cleanup.assert_called_once_with(False)
+        arguments = [call.args[0] for call in attempts.call_args_list]
+        self.assertIn([NATIVE_GUARD_QUERY, "--fixture-admin-trust-query"], arguments)
+        self.assertTrue(any("delete-keychain" in argument for argument in arguments))
+        self.assertEqual(model.queries, 1)
+        self.assertEqual(len(model.arguments), 2)
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertTrue(self.fixture.keychain_created)
+        self.assertIsNone(owner.process.poll())
+        self.assert_owner_debt(owner)
+
+    def test_partial_registration_failure_retains_exact_owner_and_primary(self):
+        primary = RuntimeError("EXACT partial registration primary")
+        model = self.activate(ack=False, partial=True, primary=primary)
+        with self.assertRaises(RuntimeError) as caught:
+            self.fixture._command(["EXPLICIT-PARTIAL-REGISTRATION"])
+        self.assertIs(caught.exception, primary)
+        self.assert_owner_debt(model.children[0])
+        self.close_refuses()
+
+    def test_refusal_before_registration_fabricates_no_owner_debt(self):
+        primary = RuntimeError("EXACT acquisition refusal")
+        model = self.activate(refuse=True, primary=primary)
+        with self.assertRaises(RuntimeError) as caught:
+            self.fixture._command(["EXPLICIT-ACQUISITION-REFUSAL"])
+        self.assertIs(caught.exception, primary)
+        self.assertEqual(model.children, [])
+        self.assertEqual(getattr(self.fixture, "command_group_debt", []), [])
+        self.fixture.close()
+        self.assertTrue(self.fixture.closed)
+        self.assertFalse(self.root.exists())
+
+    def test_none_ack_refuses(self):
+        model = self.activate(ack=None)
+        with self.assertRaisesRegex(WIRE.FixtureFailure, "^Native fixture child closure refused$"):
+            self.fixture._command(["EXPLICIT-UNKNOWN-NONE-ACK"])
+        self.assert_owner_debt(model.children[0])
+        self.close_refuses()
+
+    def test_truthy_string_ack_refuses(self):
+        model = self.activate(ack="unknown")
+        with self.assertRaisesRegex(WIRE.FixtureFailure, "^Native fixture child closure refused$"):
+            self.fixture._command(["EXPLICIT-UNKNOWN-STRING-ACK"])
+        self.assert_owner_debt(model.children[0])
+        self.close_refuses()
+
+    def test_truthy_integer_ack_refuses(self):
+        model = self.activate(ack=1)
+        with self.assertRaisesRegex(WIRE.FixtureFailure, "^Native fixture child closure refused$"):
+            self.fixture._command(["EXPLICIT-UNKNOWN-INTEGER-ACK"])
+        self.assert_owner_debt(model.children[0])
+        self.close_refuses()
+
+    def test_settle_exception_preserves_original_wait_primary_and_owner(self):
+        primary = RuntimeError("EXACT original wait primary")
+        model = self.activate(ack=False, primary=primary)
+
+        def refuse():
+            owner.settle_calls += 1
+            raise OSError("EXACT settlement refusal")
+
+        original_acquire = model.acquire_owned
+
+        def acquire(*args, **kwargs):
+            nonlocal owner
+            value = original_acquire(*args, **kwargs)
+            owner = value
+            owner.settle = refuse
+            return value
+
+        owner = None
+        model.acquire_owned = acquire
+        with self.assertRaises(RuntimeError) as caught:
+            self.fixture._command(["EXPLICIT-WAIT-AND-SETTLE-REFUSAL"])
+        self.assertIs(caught.exception, primary)
+        self.assert_owner_debt(owner)
+        self.close_refuses()
+
+    def test_ordinary_success_strong_ack_leaves_no_group_debt(self):
+        model = self.activate()
+        self.assertEqual(
+            self.fixture._command(["EXPLICIT-SUCCESS"], input_bytes=b"owned input"), (0, b"")
+        )
+        self.assertEqual(getattr(self.fixture, "command_group_debt", []), [])
+        self.assertEqual(self.fixture.command_file_debt, [])
+        self.assertEqual(model.children[0].settle_calls, 1)
+        self.assertIsNotNone(model.children[0].process.returncode)
+        self.fixture.close()
+        self.assertTrue(self.fixture.closed)
+        self.assertFalse(self.root.exists())
+
+    def test_strong_child_ack_does_not_pay_distinct_capture_debt(self):
+        model = self.activate(uncertain_capture=True)
+        with self.assertRaisesRegex(OSError, "physical descriptor closed"):
+            self.fixture._command(["EXPLICIT-CAPTURE-DEBT"])
+        self.assertEqual(getattr(self.fixture, "command_group_debt", []), [])
+        self.assertEqual(len(self.fixture.command_file_debt), 1)
+        self.assertTrue(self.fixture.command_file_debt[0]["uncertain"])
+        self.assertTrue(self.fixture.command_file_debt[0]["stream"].closed)
+        self.assertEqual(model.children[0].settle_calls, 1)
+        self.close_refuses()
+        self.assertEqual(len(self.fixture.command_file_debt), 1)
+
+    def registration_signal(self, sig):
+        model = self.activate(ack=False)
+        handlers = native_guard_actual_main_handlers()
+        previous = signal.signal(sig, handlers[sig])
+        fired = []
+        source = Path(WIRE.__file__).resolve()
+        lines = source.read_text().splitlines()
+
+        def trace(frame, event, arg):
+            if (
+                event == "line"
+                and frame.f_code.co_filename == str(source)
+                and frame.f_code.co_name == "register"
+                and lines[frame.f_lineno - 1].strip() == "self.command_group_debt.append(value)"
+                and not fired
+            ):
+                fired.append(True)
+                os.kill(os.getpid(), sig)
+            return trace
+
+        previous_trace = sys.gettrace()
+        try:
+            sys.settrace(trace)
+            with self.assertRaisesRegex(WIRE.FixtureFailure, "^Native fixture cancelled$"):
+                self.fixture._command(["EXPLICIT-REGISTRATION-SIGNAL"])
+        finally:
+            sys.settrace(previous_trace)
+            signal.signal(sig, previous)
+        self.assertEqual(fired, [True])
+        self.assert_owner_debt(model.children[0])
+        self.close_refuses()
+        self.assertIsNone(model.children[0].process.poll())
+
+    def test_real_sigint_before_registration_persistence_retains_owner(self):
+        self.registration_signal(signal.SIGINT)
+
+    def test_real_sigterm_before_registration_persistence_retains_owner(self):
+        self.registration_signal(signal.SIGTERM)
+
+    def publication(self, primary, kind):
+        model = self.activate(add_status=7 if primary else 0)
+        handlers = native_guard_actual_main_handlers()
+        previous = None if kind == "technical" else signal.signal(kind, handlers[kind])
+        real_print = print
+        events = []
+
+        def publish(*args, **kwargs):
+            if (
+                len(args) == 1
+                and isinstance(args[0], str)
+                and args[0].startswith("# native_http_trust_outcome ")
+            ):
+                fact = json.loads(args[0].removeprefix("# native_http_trust_outcome "))
+                if fact["operation"] == "add":
+                    child = model.children[-1].process
+                    self.assertEqual(child.returncode, 7 if primary else 0)
+                    self.assertTrue(
+                        child.stdin.closed
+                        and child.output_capture.closed
+                        and child.error_capture.closed
+                    )
+                    self.assertEqual(getattr(self.fixture, "command_group_debt", []), [])
+                    events.append("exact original child and captures closed before sink")
+                    if kind == "technical":
+                        raise RuntimeError("EXPLICIT optional technical publication refusal")
+                    os.kill(os.getpid(), kind)
+            return real_print(*args, **kwargs)
+
+        caught = None
+        try:
+            with mock.patch.object(builtins, "print", side_effect=publish):
+                try:
+                    self.fixture.trust(True)
+                except BaseException as failure:
+                    caught = failure
+        finally:
+            if previous is not None:
+                signal.signal(kind, previous)
+        self.assertEqual(events, ["exact original child and captures closed before sink"])
+        if primary:
+            self.assertIs(type(caught), WIRE.FixtureFailure)
+            self.assertEqual(caught.args, ("Native fixture command refused",))
+            self.assertEqual(model.queries, 0)
+        elif kind == "technical":
+            self.assertIsNone(caught)
+            self.assertEqual(model.queries, 1)
+        else:
+            self.assertIs(type(caught), WIRE.FixtureFailure)
+            self.assertEqual(caught.args, ("Native fixture cancelled",))
+            self.assertEqual(model.queries, 0)
+
+    def test_real_sigint_at_success_publication_propagates_before_query(self):
+        self.publication(False, signal.SIGINT)
+
+    def test_real_sigterm_at_success_publication_propagates_before_query(self):
+        self.publication(False, signal.SIGTERM)
+
+    def test_original_primary_dominates_sigint_at_publication(self):
+        self.publication(True, signal.SIGINT)
+
+    def test_original_primary_dominates_sigterm_at_publication(self):
+        self.publication(True, signal.SIGTERM)
+
+    def test_success_technical_publication_refusal_remains_optional(self):
+        self.publication(False, "technical")
+
+    def test_original_primary_dominates_technical_publication_refusal(self):
+        self.publication(True, "technical")
+
+
+class NativeTimedAddCaptureObservationTests(unittest.TestCase):
+    # Model only the native owner ACK. Existing captures are genuine private files.
+    def receive(
+        self,
+        raw=b"private native output",
+        *,
+        settle=True,
+        timeout=True,
+        hostile=False,
+        sink_failure=False,
+    ):
+        fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+        fixture.native = True
+        fixture.ca = Path("owned-private/ca.pem")
+        fixture.keychain = Path("owned-private/owned.keychain-db")
+        fixture.command_file_debt = []
+        fixture.trust_query_executable = None
+        fixture.trust_attempted = False
+        child = SimpleNamespace(stdin=io.BytesIO(), returncode=None)
+        owner = SimpleNamespace(process=child, reaped=False)
+        primary = subprocess.TimeoutExpired("exact original native command", 15)
+        calls, captures = [], []
+        real_temporary = tempfile.TemporaryFile
+
+        class CapturedFile:
+            def __init__(self):
+                self.original = real_temporary()
+                self.closed = False
+
+            def __getattr__(self, name):
+                return getattr(self.original, name)
+
+            def seek(self, *args):
+                if hostile and not owner.reaped:
+                    raise AssertionError("Unsettled writer retains the shared capture offset")
+                return self.original.seek(*args)
+
+            def read(self, *args):
+                if hostile and not owner.reaped:
+                    raise AssertionError("Unsettled writer still owns capture bytes")
+                calls.append(("capture_read", args))
+                return self.original.read(*args)
+
+            def close(self):
+                self.original.close()
+                self.closed = True
+
+        def new_capture():
+            value = CapturedFile()
+            captures.append(value)
+            return value
+
+        def acquire(arguments, native, register, **ports):
+            calls.append(("acquire", arguments))
+            register(owner)
+            ports["stdout"].write(b"original output")
+            ports["stderr"].write(raw)
+
+        def wait(budget):
+            calls.append(("wait", budget))
+            if timeout:
+                raise primary
+            child.returncode = 0
+
+        def retire():
+            calls.append(("settle",))
+            owner.reaped = settle
+            if settle and child.returncode is None:
+                child.returncode = -15
+            return settle
+
+        owner.wait_for_exit, owner.settle = wait, retire
+        fixture.groups = SimpleNamespace(acquire_owned=acquire)
+        fixture.native_groups = object()
+        stdout, stderr = io.StringIO(), io.StringIO()
+        refusal, result = None, None
+        with mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=new_capture):
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                with (
+                    mock.patch("builtins.print", side_effect=OSError("closed diagnostic sink"))
+                    if sink_failure
+                    else contextlib.nullcontext()
+                ):
+                    try:
+                        result = fixture._command(
+                            ["original", "owned", "add"], trust_operation="add"
+                        )
+                    except BaseException as failure:
+                        refusal = failure
+        self.assertEqual(stdout.getvalue(), "")
+        return fixture, owner, child, primary, refusal, result, calls, captures, stderr.getvalue()
+
+    def installed_fact(self, output):
+        lines = [
+            line for line in output.splitlines() if line.startswith("# native_http_trust_install ")
+        ]
+        self.assertEqual(len(lines), 1)
+        return json.loads(lines[0].removeprefix("# native_http_trust_install "))
+
+    def test63SettledOriginalTimeoutRetainsClosedCaptureAndChildFactsWithoutRawBytes(self):
+        fixture, owner, child, primary, refusal, result, calls, captures, output = self.receive()
+        self.assertIs(refusal, primary)
+        self.assertIsNone(result)
+        self.assertTrue(owner.reaped)
+        self.assertEqual(child.returncode, -15)
+        self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+        self.assertEqual(fixture.command_file_debt, [])
+        self.assertTrue(all(value.closed for value in captures))
+        fact = self.installed_fact(output)
+        self.assertEqual(fact["phase"], "deadline")
+        self.assertTrue(fact["child_settled"])
+        self.assertTrue(fact["streams_closed"])
+        self.assertEqual(fact["child_exit_status"], -15)
+        self.assertEqual(
+            fact["stderr"],
+            {
+                "observed": True,
+                "captured_bytes": 21,
+                "truncated": False,
+                "callee": None,
+                "category": "unknown",
+            },
+        )
+        self.assertEqual(calls[1:3], [("wait", 15), ("settle",)])
+        self.assertEqual(
+            [value for value in calls if value[0] == "capture_read"], [("capture_read", (1025,))]
+        )
+        self.assertNotIn("private native output", output)
+        self.assertFalse(hasattr(primary, "trust_install_output"))
+
+    def test64UnsettledOwnerCannotSeekOrReadCaptureOrDischargeOriginalDebt(self):
+        fixture, owner, _, primary, refusal, _, calls, _, output = self.receive(
+            settle=False, hostile=True
+        )
+        self.assertIs(refusal, primary)
+        self.assertFalse(owner.reaped)
+        self.assertEqual(fixture.command_fact, {"phase": "settle", "status": None})
+        self.assertEqual([value for value in calls if value[0] == "capture_read"], [])
+        fact = self.installed_fact(output)
+        self.assertFalse(fact["child_settled"])
+        self.assertFalse(fact["streams_closed"])
+        self.assertIsNone(fact["child_exit_status"])
+        self.assertEqual(fact["stderr"], {"observed": False})
+
+    def test65ClosedCategoryIsLiteralAndTruncationPreservesUnknown(self):
+        for raw, category, callee in [
+            (b"", "empty", None),
+            (
+                b"SecTrustSettingsSetTrustSettings: User interaction is not allowed.\n",
+                "user_interaction_required",
+                "SecTrustSettingsSetTrustSettings",
+            ),
+            (
+                b"security: SecKeychainUnlock: The keychain is locked.\n",
+                "keychain_locked",
+                "SecKeychainUnlock",
+            ),
+            (b"SecKeychainItemImport: Access denied.\n", "access_denied", "SecKeychainItemImport"),
+            (
+                b"SecTrustSettingsSetTrustSettings: Authorization denied.\n",
+                "access_denied",
+                "SecTrustSettingsSetTrustSettings",
+            ),
+            (
+                b"SecKeychainUnlock: private/path token@example.test\n",
+                "unknown",
+                "SecKeychainUnlock",
+            ),
+            (b"SecKeychainUnlock: The keychain is locked.\n" + b"x" * 1024, "unknown", None),
+        ]:
+            with self.subTest(category=category, length=len(raw)):
+                _, _, _, primary, refusal, _, _, _, output = self.receive(raw)
+                self.assertIs(refusal, primary)
+                fact = self.installed_fact(output)["stderr"]
+                self.assertEqual(fact["category"], category)
+                self.assertEqual(fact["callee"], callee)
+                self.assertEqual(fact["captured_bytes"], min(len(raw), 1024))
+                self.assertEqual(fact["truncated"], len(raw) > 1024)
+                self.assertNotIn("token@example.test", output)
+
+    def test66RefusedSinkNeverReplacesOriginalTimeoutOrSuccessfulOutcome(self):
+        for timeout in (True, False):
+            with self.subTest(timeout=timeout):
+                fixture, _, _, primary, refusal, result, _, _, output = self.receive(
+                    timeout=timeout, sink_failure=True
+                )
+                if timeout:
+                    self.assertIs(refusal, primary)
+                    self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+                else:
+                    self.assertIsNone(refusal)
+                    self.assertEqual(result, (0, b"original output"))
+                    self.assertEqual(fixture.command_fact, {"phase": "complete", "status": 0})
+                self.assertEqual(output, "")
+                self.assertFalse(hasattr(primary, "trust_install_output"))
+
+    def test67RefusedOptionalCaptureNeverReplacesOriginalOutcome(self):
+        original = RuntimeError("controlled optional capture refusal")
+        with mock.patch.object(WIRE.WireFixture, "_trust_install_stream", side_effect=original):
+            for timeout in (True, False):
+                with self.subTest(timeout=timeout):
+                    _, _, _, primary, refusal, result, _, _, output = self.receive(timeout=timeout)
+                    self.assertIs(refusal, primary) if timeout else self.assertIsNone(refusal)
+                    if not timeout:
+                        self.assertEqual(result, (0, b"original output"))
+                    self.assertEqual(self.installed_fact(output)["stderr"], {"observed": False})
+
+    def test68SettledSuccessKeepsOriginalStdoutReturnAndPerCommandOutcome(self):
+        fixture, _, _, _, refusal, result, _, _, output = self.receive(timeout=False)
+        self.assertIsNone(refusal)
+        self.assertEqual(result, (0, b"original output"))
+        self.assertEqual(fixture.command_fact, {"phase": "complete", "status": 0})
+        fact = self.installed_fact(output)
+        self.assertEqual(fact["child_exit_status"], 0)
+        self.assertEqual(fact["phase"], "complete")
+        original = [
+            line for line in output.splitlines() if line.startswith("# native_http_trust_outcome ")
+        ]
+        self.assertEqual(len(original), 1)
+        self.assertEqual(
+            json.loads(original[0].removeprefix("# native_http_trust_outcome ")),
+            {
+                "version": 1,
+                "operation": "add",
+                "phase": "complete",
+                "status": 0,
+                "primary": "none",
+                "closure_refused": False,
+                "command_file_debt": False,
+                "callee": None,
+            },
+        )
+
+
+class NativeTimedAddCancellationTests(unittest.TestCase):
+    receive = NativeTimedAddCaptureObservationTests.receive
+    installed_fact = NativeTimedAddCaptureObservationTests.installed_fact
+
+    @staticmethod
+    def actual_signal_handler():
+        # Acquire the exact existing worker handler without running its main role.
+        import ast
+
+        source = (SUPPORT / "native_http_wire_fixture.py").read_text()
+        main = next(
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef) and node.name == "main"
+        )
+        handler = next(
+            node
+            for node in main.body
+            if isinstance(node, ast.FunctionDef) and node.name == "interrupted"
+        )
+        namespace = {"FixtureFailure": WIRE.FixtureFailure}
+        exec(
+            compile(
+                ast.Module(body=[handler], type_ignores=[]), "existing-wire-signal-handler", "exec"
+            ),
+            namespace,
+        )
+        return namespace["interrupted"]
+
+    def signal_control(self, signum, actor, timeout):
+        import signal
+
+        prior = signal.getsignal(signum)
+        signal.signal(signum, self.actual_signal_handler())
+        interrupted = []
+        original_print = print
+
+        def dispatch(*args):
+            try:
+                os.kill(os.getpid(), signum)
+            except BaseException as failure:
+                interrupted.append(failure)
+                raise
+
+        def publish(value, **options):
+            if value.startswith("# native_http_trust_install "):
+                dispatch()
+            else:
+                original_print(value, **options)
+
+        try:
+            port = (
+                mock.patch.object(WIRE.WireFixture, "_trust_install_stream", side_effect=dispatch)
+                if actor == "capture"
+                else mock.patch("builtins.print", side_effect=publish)
+            )
+            with port:
+                result = self.receive(timeout=timeout)
+        finally:
+            signal.signal(signum, prior)
+        self.assertEqual(len(interrupted), 1)
+        self.assertEqual(type(interrupted[0]), WIRE.FixtureFailure)
+        self.assertEqual(interrupted[0].args, ("Native fixture cancelled",))
+        return interrupted[0], result
+
+    def test69ActualSIGINTAndSIGTERMCaptureCancellationCannotReturnSuccess(self):
+        import signal
+
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signum=int(signum)):
+                interruption, result = self.signal_control(signum, "capture", False)
+                _, owner, _, _, refusal, returned, _, captures, _ = result
+                self.assertIs(refusal, interruption)
+                self.assertIsNone(returned)
+                self.assertTrue(owner.reaped)
+                self.assertTrue(all(value.closed for value in captures))
+
+    def test70ActualSIGINTAndSIGTERMPublicationCancellationCannotReturnSuccess(self):
+        import signal
+
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signum=int(signum)):
+                interruption, result = self.signal_control(signum, "publication", False)
+                _, owner, _, _, refusal, returned, _, captures, _ = result
+                self.assertIs(refusal, interruption)
+                self.assertIsNone(returned)
+                self.assertTrue(owner.reaped)
+                self.assertTrue(all(value.closed for value in captures))
+
+    def test71ExistingTimeoutPrimarySurvivesActualSignalDuringBothObservers(self):
+        import signal
+
+        for actor in ("capture", "publication"):
+            with self.subTest(actor=actor):
+                interruption, result = self.signal_control(signal.SIGTERM, actor, True)
+                fixture, _, _, primary, refusal, returned, _, captures, _ = result
+                self.assertIsNot(refusal, interruption)
+                self.assertIs(refusal, primary)
+                self.assertIsNone(returned)
+                self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+                self.assertTrue(all(value.closed for value in captures))
+
+    def test72KeyboardInterruptSystemExitAndBaseExceptionCannotBecomeSuccess(self):
+        for actor in ("capture", "publication"):
+            for failure in (KeyboardInterrupt(), SystemExit(75), BaseException("controlled stop")):
+                with self.subTest(actor=actor, category=type(failure).__name__):
+                    original_print = print
+
+                    def publish(value, **options):
+                        if value.startswith("# native_http_trust_install "):
+                            raise failure
+                        original_print(value, **options)
+
+                    port = (
+                        mock.patch.object(
+                            WIRE.WireFixture, "_trust_install_stream", side_effect=failure
+                        )
+                        if actor == "capture"
+                        else mock.patch("builtins.print", side_effect=publish)
+                    )
+                    with port:
+                        _, _, _, _, refusal, returned, _, captures, _ = self.receive(timeout=False)
+                    self.assertIs(refusal, failure)
+                    self.assertIsNone(returned)
+                    self.assertTrue(all(value.closed for value in captures))
+
+    def test73ControlInterruptionCannotReplaceAnAlreadyFailedCommand(self):
+        for failure in (
+            KeyboardInterrupt(),
+            SystemExit(75),
+            WIRE.FixtureFailure("Native fixture cancelled"),
+        ):
+            with self.subTest(category=type(failure).__name__):
+                with mock.patch.object(
+                    WIRE.WireFixture, "_trust_install_stream", side_effect=failure
+                ):
+                    fixture, _, _, primary, refusal, returned, _, captures, _ = self.receive()
+                self.assertIs(refusal, primary)
+                self.assertIsNone(returned)
+                self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+                self.assertTrue(all(value.closed for value in captures))
+
+    def test74ThrowingNativeObservationGuardIsOptionalAndStillClosesCaptures(self):
+        original = getattr
+
+        def observe(owner, name, default=None):
+            if name == "reaped":
+                raise RuntimeError("controlled passive field refusal")
+            return original(owner, name, default)
+
+        with mock.patch.object(WIRE, "getattr", side_effect=observe, create=True):
+            _, _, _, _, refusal, returned, _, captures, _ = self.receive(timeout=False)
+        self.assertIsNone(refusal)
+        self.assertEqual(returned, (0, b"original output"))
+        self.assertTrue(all(value.closed for value in captures))
+
+    def test75TechnicalFixtureFailureAtSettledCaptureAndPublicationRemainsOptional(self):
+        for actor in ("capture", "publication"):
+            for timeout in (False, True):
+                with self.subTest(actor=actor, timeout=timeout):
+                    technical = WIRE.FixtureFailure("controlled optional observation refusal")
+                    original_print = print
+
+                    def publish(value, **options):
+                        if value.startswith("# native_http_trust_install "):
+                            raise technical
+                        original_print(value, **options)
+
+                    port = (
+                        mock.patch.object(
+                            WIRE.WireFixture, "_trust_install_stream", side_effect=technical
+                        )
+                        if actor == "capture"
+                        else mock.patch("builtins.print", side_effect=publish)
+                    )
+                    with port:
+                        fixture, owner, _, primary, refusal, returned, _, captures, _ = (
+                            self.receive(timeout=timeout)
+                        )
+                    if timeout:
+                        self.assertIs(refusal, primary)
+                        self.assertIsNone(returned)
+                        self.assertEqual(
+                            fixture.command_fact, {"phase": "deadline", "status": None}
+                        )
+                    else:
+                        self.assertIsNone(refusal)
+                        self.assertEqual(returned, (0, b"original output"))
+                        self.assertEqual(fixture.command_fact, {"phase": "complete", "status": 0})
+                    self.assertTrue(owner.reaped)
+                    self.assertEqual(fixture.command_group_debt, [])
+                    self.assertTrue(all(value.closed for value in captures))
+
+
+def r2_guard_constructor_literal_setup(self):
+    # These two retained R2 classes deliberately bypass native construction.
+    # Supply its new exact literal in a fresh subclass, without touching the
+    # original type's allocator slot or any ACK, owner, policy or result.
+    original = WIRE.WireFixture
+
+    class R2AllocatedFixture(original):
+        def __new__(cls):
+            value = object.__new__(cls)
+            value.command_group_debt = []
+            return value
+
+    owner = mock.patch.object(WIRE, "WireFixture", R2AllocatedFixture)
+    owner.start()
+    self.addCleanup(owner.stop)
+
+
+NativeTimedAddCaptureObservationTests.setUp = r2_guard_constructor_literal_setup
+NativeTimedAddCancellationTests.setUp = r2_guard_constructor_literal_setup
+
+
+# Fixed-path independent-builder portable enrollment. The exact selector refuses
+# missing/extra controls; no native clock/factory role is activated by these tests.
+NATIVE_FIXTURE_BUILD_CONTROLS = load(
+    "native_http_fixture_builder_controls",
+    ROOT / "tools/test/macos_native_http_fixture_builder_controls.py",
+)
+(
+    NativeFixtureBuilderControls,
+    NativeFixtureAdmissionControls,
+    NativeFixtureAliasDuringReadControls,
+) = NATIVE_FIXTURE_BUILD_CONTROLS.enrolled_cases()
+
+
+# Fixed-path caller root ownership receiving: original native test bodies remain
+# unchanged; these software controls confer no native execution qualification.
+NATIVE_CLIENT_ROOT_CONTROLS = load(
+    "native_http_client_root_controls",
+    ROOT / "tools/test/macos_native_http_client_root_controls.py",
+)
+(
+    NativeClientRootReplacementControls,
+    NativeClientRootCleanupControls,
+) = NATIVE_CLIENT_ROOT_CONTROLS.enrolled_cases()
+
+
+# Fixed-path clock frame/context enrollment. These portable13 controls do not
+# execute the native TestCase or qualify Darwin samples, recipe or clock epoch.
+NATIVE_FIXTURE_CLOCK_CONTROLS = load(
+    "macos_native_http_clock_contract_controls",
+    ROOT / "tools/test/macos_native_http_clock_contract_controls.py",
+)
+(
+    NativeFixtureClockFrameContractControls,
+    NativeFixtureClockContextContractControls,
+) = NATIVE_FIXTURE_CLOCK_CONTROLS.enrolled_cases()
 
 
 if __name__ == "__main__":

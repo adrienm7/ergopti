@@ -727,5 +727,519 @@ class CaptureBudgetControls(unittest.TestCase):
                 self.assertEqual(observation["elapsed_us"], 20125000)
 
 
+# Additive controlled SDK transport cases; all image and SDK bytes below are fake.
+class SDKConstantTransportControls(unittest.TestCase):
+    """Drive production capture/build/lease code with registered controlled groups."""
+
+    constants = (
+        b'{"event_class":1668248165,"event_id":1734702180,"target_type":1651863140,"version":1}\n'
+    )
+    inventory = b'{"version":1,"status":"observed","choices":[],"truncated":false}'
+
+    def fixture(self):
+        temporary = subject.tempfile.TemporaryDirectory(prefix="controlled-sdk-transport-")
+        self.addCleanup(temporary.cleanup)
+        base = subject.Path(temporary.name)
+        root, output, sdk = base / "root", base / "output", base / "sdk"
+        source = root / "tools/diagnostics/apple_shortcuts_probe/sdk_constants.c"
+        source.parent.mkdir(parents=True)
+        source_bytes = b"/* Controlled fake C bytes: never compiled or native-qualified. */\n"
+        source.write_bytes(source_bytes)
+        output.mkdir()
+        sdk.mkdir()
+        (sdk / "SDKSettings.json").write_bytes(b'{"controlled_fake_sdk":true}\n')
+        header = sdk / "System/Library/Frameworks/CoreServices.framework/Headers/CoreServices.h"
+        header.parent.mkdir(parents=True)
+        header.write_bytes(b"/* CONTROLLED FAKE SDK HEADER; NOT NATIVE PROOF. */\n")
+        compiler = base / "controlled-clang"
+        compiler.write_bytes(b"CONTROLLED FAKE COMPILER IMAGE\n")
+        compiler.chmod(0o700)
+        script = source.with_name("discover.js")
+        script.write_bytes(b"// Controlled JXA path; never executed natively.\n")
+        return SimpleNamespace(
+            root=root,
+            output=output,
+            sdk=sdk,
+            source=source,
+            source_bytes=source_bytes,
+            compiler=compiler,
+            script=script,
+            calls=[],
+            groups=[],
+            now=[0.0],
+            constant_raw=self.constants,
+            constant_error=b"",
+            constant_status=0,
+            constant_elapsed=0.0,
+            discovery_elapsed=0.0,
+            constant_retired=True,
+        )
+
+    def ownership(self, fixture):
+        def acquire(arguments, native, register, **options):
+            arguments = list(arguments)
+            fixture.calls.append({"argv": arguments, "options": options})
+            group = SimpleNamespace(process=SimpleNamespace(pid=321, returncode=None))
+            group.settle_calls = 0
+            group.is_constant = arguments[0].endswith("/sdk_constants")
+            status = fixture.constant_status if group.is_constant else 0
+            group.observe_exit = lambda: SimpleNamespace(si_pid=321, si_code=1, si_status=status)
+
+            def settle():
+                group.settle_calls += 1
+                group.process.returncode = status
+                if group.is_constant:
+                    fixture.now[0] += getattr(fixture, "constant_retirement_elapsed", 0.0)
+                return fixture.constant_retired if group.is_constant else True
+
+            group.settle = settle
+            group.receipt = lambda: {
+                "closed": group.process.returncode is not None,
+                "controlled_fake_group": True,
+            }
+            fixture.groups.append(group)
+            register(group)
+            errors = b""
+            if arguments[:4] == ["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-path"]:
+                raw = str(fixture.sdk).encode() + b"\n"
+            elif arguments[:4] == ["/usr/bin/xcrun", "--sdk", "macosx", "--find"]:
+                self.assertEqual(arguments[4:], ["clang"])
+                raw = str(fixture.compiler).encode() + b"\n"
+            elif arguments[0] == str(fixture.compiler):
+                image = subject.Path(arguments[arguments.index("-o") + 1])
+                image.write_bytes(b"CONTROLLED FAKE COMPILED IMAGE; NOT NATIVE PROOF\n")
+                image.chmod(0o700)
+                raw = b""
+            elif group.is_constant:
+                raw, errors = fixture.constant_raw, fixture.constant_error
+                fixture.now[0] += fixture.constant_elapsed
+            elif arguments[0] == "/usr/bin/osascript":
+                raw = self.inventory
+                errors = b"ASCP:1\nASCP:2\nASCP:3\nASCP:4\n"
+                fixture.now[0] += fixture.discovery_elapsed
+            else:
+                raise AssertionError("unexpected controlled acquisition argv")
+            options["stdout"].write(raw)
+            options["stderr"].write(errors)
+            options["stdout"].flush()
+            options["stderr"].flush()
+            stage = (
+                "constant"
+                if group.is_constant
+                else "discovery"
+                if arguments[0] == "/usr/bin/osascript"
+                else "build"
+            )
+            if getattr(fixture, "mutation_stage", None) == stage:
+                path = fixture.mutation_path
+                if getattr(fixture, "mutation_replacement", False):
+                    other = path.with_name(path.name + ".replacement")
+                    other.write_bytes(path.read_bytes())
+                    other.chmod(path.stat().st_mode & 0o777)
+                    other.replace(path)
+                else:
+                    path.chmod(path.stat().st_mode | 0o200)
+                    path.write_bytes(path.read_bytes() + b"controlled mutation")
+            return group
+
+        return SimpleNamespace(acquire_owned=acquire)
+
+    def build(self, fixture):
+        evidence, ownership = [], self.ownership(fixture)
+        with patch.object(subject.time, "monotonic", side_effect=lambda: fixture.now[0]):
+            build = subject.build_sdk_constants(
+                fixture.root, fixture.output, object(), ownership, evidence, fixture.source_bytes
+            )
+        return build, ownership, evidence
+
+    def discover(self, fixture, build, ownership, evidence):
+        with patch.object(subject.time, "monotonic", side_effect=lambda: fixture.now[0]):
+            return subject.discover_with_sdk_constants(
+                fixture.script, build, object(), ownership, evidence
+            )
+
+    def test_controlled_build_records_real_capture_retirement_and_source_image_leases(self):
+        fixture = self.fixture()
+        build, _, evidence = self.build(fixture)
+        self.assertEqual(
+            set(build["leases"]),
+            {"source", "snapshot", "compiler", "sdk_settings", "sdk_header", "image"},
+        )
+        self.assertEqual(
+            build["image"].read_bytes(), b"CONTROLLED FAKE COMPILED IMAGE; NOT NATIVE PROOF\n"
+        )
+        self.assertEqual(len(evidence), 3)
+        self.assertEqual(evidence[-1]["role"], "sdk_compile")
+        for record, group in zip(evidence, fixture.groups):
+            self.assertEqual(record["registered"], 1)
+            self.assertTrue(record["retirement_ack"])
+            self.assertEqual(group.settle_calls, 1)
+            self.assertEqual(
+                record["observation"]["terminal_before_retirement"],
+                {"pid": 321, "code": 1, "status": 0},
+            )
+        self.assertTrue(fixture.calls[-1]["options"].get("env"))
+        for lease in build["leases"].values():
+            subject.require_lease(lease)
+
+    def test_lease_replacement_same_bytes_and_mutation_refuse_without_new_acquisition(self):
+        for target in ("source", "snapshot", "compiler", "sdk_settings", "sdk_header", "image"):
+            for replacement in (True, False):
+                with self.subTest(target=target, replacement=replacement):
+                    fixture = self.fixture()
+                    build, ownership, evidence = self.build(fixture)
+                    path = build["leases"][target][0]
+                    raw = path.read_bytes()
+                    if replacement:
+                        other = path.with_name(path.name + ".replacement")
+                        other.write_bytes(raw)
+                        other.chmod(path.stat().st_mode & 0o777)
+                        other.replace(path)
+                    else:
+                        path.chmod(path.stat().st_mode | 0o200)
+                        path.write_bytes(raw + b"changed")
+                    before = len(fixture.calls)
+                    with self.assertRaises(ValueError):
+                        self.discover(fixture, build, ownership, evidence)
+                    self.assertEqual(len(fixture.calls), before)
+
+    def test_constant_and_discovery_use_one_budget_and_exact_literal_projection_argv(self):
+        fixture = self.fixture()
+        build, ownership, evidence = self.build(fixture)
+        fixture.constant_elapsed, fixture.discovery_elapsed = 19.0, 0.5
+        raw = self.discover(fixture, build, ownership, evidence)
+        self.assertEqual(raw, self.inventory)
+        self.assertEqual(
+            fixture.calls[-1]["argv"],
+            [
+                "/usr/bin/osascript",
+                "-l",
+                "JavaScript",
+                str(fixture.script),
+                "--permission-preflight",
+                "--sdk-constants",
+                self.constants.decode().rstrip("\n"),
+            ],
+        )
+        self.assertEqual(
+            [record["role"] for record in evidence[-2:]], ["sdk_constants", "discovery"]
+        )
+        self.assertTrue(all(record["retirement_ack"] for record in evidence))
+        self.assertTrue(all(group.settle_calls == 1 for group in fixture.groups))
+        self.assertNotIn("permission_granted", json.dumps(evidence))
+
+    def test_late_discovery_cannot_gain_a_second_twenty_second_budget(self):
+        fixture = self.fixture()
+        build, ownership, evidence = self.build(fixture)
+        fixture.constant_elapsed, fixture.discovery_elapsed = 19.0, 1.125
+        with self.assertRaises(subject.ProbeObservationRefused) as caught:
+            self.discover(fixture, build, ownership, evidence)
+        self.assertEqual(caught.exception.kind, "deadline")
+        self.assertEqual(evidence[-1]["role"], "discovery")
+        self.assertTrue(evidence[-1]["retirement_ack"])
+        self.assertEqual(
+            evidence[-1]["observation"]["terminal_before_retirement"],
+            {"pid": 321, "code": 1, "status": 0},
+        )
+        self.assertEqual(fixture.groups[-1].settle_calls, 1)
+
+    def test_expired_constant_capture_retires_without_acquiring_osascript(self):
+        fixture = self.fixture()
+        build, ownership, evidence = self.build(fixture)
+        fixture.constant_elapsed = 20.0
+        with self.assertRaises(subject.ProbeObservationRefused) as caught:
+            self.discover(fixture, build, ownership, evidence)
+        self.assertEqual(caught.exception.kind, "deadline")
+        self.assertEqual(evidence[-1]["role"], "sdk_constants")
+        self.assertTrue(evidence[-1]["retirement_ack"])
+        self.assertFalse(any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls))
+        self.assertEqual(fixture.groups[-1].settle_calls, 1)
+
+    def test_malformed_open_oversized_and_non_uint32_constants_refuse_before_osascript(self):
+        values = [
+            b"{}",
+            b"null",
+            b"[]",
+            b" " * 1025,
+            self.constants.replace(b'"version":1', b'"version":1,"version":1'),
+            self.constants.replace(b'"version":1', b'"version":1,"extra":0'),
+        ]
+        for field in ("event_class", "event_id", "target_type"):
+            for value in (True, False, "1", None, -1, 0.5, 4294967296):
+                packet = json.loads(self.constants)
+                packet[field] = value
+                values.append(json.dumps(packet, sort_keys=True, separators=(",", ":")).encode())
+        for encoded in values:
+            with self.subTest(encoded=encoded[:100]):
+                fixture = self.fixture()
+                build, ownership, evidence = self.build(fixture)
+                fixture.constant_raw = encoded
+                with self.assertRaises(ValueError):
+                    self.discover(fixture, build, ownership, evidence)
+                self.assertEqual(evidence[-1]["role"], "sdk_constants")
+                self.assertTrue(evidence[-1]["retirement_ack"])
+                self.assertEqual(fixture.groups[-1].settle_calls, 1)
+                self.assertFalse(
+                    any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls)
+                )
+
+    def test_nonzero_unclean_and_unretired_constant_group_cannot_reach_osascript(self):
+        for field, value in (
+            ("constant_status", 3),
+            ("constant_error", b"PRIVATE"),
+            ("constant_retired", False),
+        ):
+            with self.subTest(field=field):
+                fixture = self.fixture()
+                build, ownership, evidence = self.build(fixture)
+                setattr(fixture, field, value)
+                with self.assertRaises(ValueError):
+                    self.discover(fixture, build, ownership, evidence)
+                self.assertEqual(evidence[-1]["role"], "sdk_constants")
+                self.assertEqual(evidence[-1]["retirement_ack"], field != "constant_retired")
+                self.assertEqual(fixture.groups[-1].settle_calls, 1)
+                self.assertFalse(
+                    any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls)
+                )
+                self.assertNotIn("PRIVATE", json.dumps(evidence))
+
+    def test_constant_schema_uint32_endpoints_are_typed_canonical_and_closed(self):
+        for value in (0, 4294967295):
+            packet = {"event_class": value, "event_id": value, "target_type": value, "version": 1}
+            expected = json.dumps(packet, sort_keys=True, separators=(",", ":"))
+            self.assertEqual(subject.validate_sdk_constants((expected + "\n").encode()), expected)
+        for version in (True, "1", 0, 2):
+            packet = json.loads(self.constants)
+            packet["version"] = version
+            with self.assertRaises(ValueError):
+                subject.validate_sdk_constants(json.dumps(packet).encode())
+
+    def test_post_capture_lease_mutation_refuses_and_retains_exact_retired_operations(self):
+        for stage in ("constant", "discovery"):
+            for target in ("source", "snapshot", "compiler", "sdk_settings", "sdk_header", "image"):
+                with self.subTest(stage=stage, target=target):
+                    fixture = self.fixture()
+                    build, ownership, evidence = self.build(fixture)
+                    fixture.mutation_stage = stage
+                    fixture.mutation_path = build["leases"][target][0]
+                    with self.assertRaises(ValueError):
+                        self.discover(fixture, build, ownership, evidence)
+                    self.assertEqual(
+                        evidence[-1]["role"],
+                        "sdk_constants" if stage == "constant" else "discovery",
+                    )
+                    self.assertTrue(evidence[-1]["retirement_ack"])
+                    self.assertEqual(fixture.groups[-1].settle_calls, 1)
+                    self.assertEqual(
+                        any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls),
+                        stage == "discovery",
+                    )
+
+    def test_expired_or_invalid_absolute_deadline_never_acquires_a_group(self):
+        fixture = self.fixture()
+        ownership = self.ownership(fixture)
+        evidence = []
+        with patch.object(subject.time, "monotonic", return_value=0.0):
+            with self.assertRaises(subject.ProbeObservationRefused) as caught:
+                subject.capture(
+                    ["fixture"], object(), ownership, evidence, "sdk_constants", deadline=0.0
+                )
+            self.assertEqual(caught.exception.kind, "deadline")
+            self.assertEqual(evidence[-1]["registered"], 0)
+            self.assertEqual(evidence[-1]["groups"], [])
+            self.assertTrue(evidence[-1]["retirement_ack"])
+            for deadline in (True, float("nan"), float("inf"), 20.001):
+                with self.subTest(deadline=deadline):
+                    before = len(evidence)
+                    with self.assertRaises(ValueError):
+                        subject.capture(
+                            ["fixture"],
+                            object(),
+                            ownership,
+                            evidence,
+                            "sdk_constants",
+                            deadline=deadline,
+                        )
+                    self.assertEqual(len(evidence), before)
+        self.assertEqual(fixture.calls, [])
+
+    def test_in_capture_same_byte_inode_replacement_refuses_before_osascript(self):
+        for target in ("source", "image"):
+            with self.subTest(target=target):
+                fixture = self.fixture()
+                build, ownership, evidence = self.build(fixture)
+                fixture.mutation_stage = "constant"
+                fixture.mutation_path = build["leases"][target][0]
+                fixture.mutation_replacement = True
+                with self.assertRaises(ValueError):
+                    self.discover(fixture, build, ownership, evidence)
+                self.assertEqual(evidence[-1]["role"], "sdk_constants")
+                self.assertTrue(evidence[-1]["retirement_ack"])
+                self.assertEqual(fixture.groups[-1].settle_calls, 1)
+                self.assertFalse(
+                    any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls)
+                )
+
+    def test_constant_retirement_consumes_shared_budget_before_osascript_acquisition(self):
+        fixture = self.fixture()
+        build, ownership, evidence = self.build(fixture)
+        fixture.constant_retirement_elapsed = 20.0
+        with self.assertRaises(subject.ProbeObservationRefused) as caught:
+            self.discover(fixture, build, ownership, evidence)
+        self.assertEqual(caught.exception.kind, "deadline")
+        self.assertEqual(evidence[-1]["role"], "sdk_constants")
+        self.assertTrue(evidence[-1]["retirement_ack"])
+        self.assertEqual(fixture.groups[-1].settle_calls, 1)
+        self.assertFalse(any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls))
+
+    def test_source_changed_before_build_refuses_without_any_acquisition(self):
+        fixture = self.fixture()
+        fixture.source.write_bytes(fixture.source_bytes + b"changed")
+        evidence = []
+        with self.assertRaises(ValueError):
+            subject.build_sdk_constants(
+                fixture.root,
+                fixture.output,
+                object(),
+                self.ownership(fixture),
+                evidence,
+                fixture.source_bytes,
+            )
+        self.assertEqual(fixture.calls, [])
+        self.assertEqual(evidence, [])
+
+
+class SDKCanonicalEnvelopeControls(unittest.TestCase):
+    def test_noncanonical_valid_values_cannot_enter_the_jxa_channel(self):
+        original = b'{"event_class":0,"event_id":0,"target_type":0,"version":1}\n'
+        self.assertEqual(subject.validate_sdk_constants(original), original[:-1].decode())
+        for raw in (
+            original[:-1],
+            b" " + original,
+            original + b"\n",
+            original.replace(b'"event_class":0', b'"event_class": 0'),
+            b'{"version":1,"event_class":0,"event_id":0,"target_type":0}\n',
+            original.replace(b'"event_id":0', b'"event_id":0.0'),
+        ):
+            with self.subTest(raw=raw):
+                with self.assertRaises(ValueError):
+                    subject.validate_sdk_constants(raw)
+
+    def test_owned_sdk_lookup_resolves_real_alias_and_refuses_malformed_path(self):
+        with subject.tempfile.TemporaryDirectory(prefix="controlled-sdk-path-") as directory:
+            path = subject.Path(directory) / "official-lookup-model"
+            path.write_bytes(b"CONTROLLED PATH MODEL; NO SDK OR COMPILER EXECUTION\n")
+            alias = path.with_name("owned-lookup-alias")
+            alias.symlink_to(path)
+            self.assertEqual(subject.sdk_tool_path((str(alias) + "\n").encode()), path)
+            for raw in (
+                b"relative\n",
+                b"",
+                b"/one\n/two\n",
+                b"/nul\0\n",
+                b"/unterminated",
+                b" " * 4097,
+            ):
+                with self.subTest(raw=raw[:30]):
+                    with self.assertRaises(ValueError):
+                        subject.sdk_tool_path(raw)
+            with self.assertRaises(FileNotFoundError):
+                subject.sdk_tool_path((str(path.with_name("absent")) + "\n").encode())
+
+    def test_symlink_compiler_output_cannot_chmod_a_foreign_target(self):
+        model = SDKConstantTransportControls()
+        self.addCleanup(model.doCleanups)
+        fixture = model.fixture()
+        target = fixture.output / "controlled-foreign-target"
+        target.write_bytes(b"UNCHANGED CONTROLLED TARGET\n")
+        target.chmod(0o700)
+        original = model.ownership(fixture).acquire_owned
+
+        def acquire(arguments, native, register, **options):
+            group = original(arguments, native, register, **options)
+            if arguments[0] == str(fixture.compiler):
+                image = subject.Path(arguments[arguments.index("-o") + 1])
+                image.unlink()
+                image.symlink_to(target)
+            return group
+
+        with patch.object(subject.time, "monotonic", side_effect=lambda: fixture.now[0]):
+            with self.assertRaises((ValueError, OSError)):
+                subject.build_sdk_constants(
+                    fixture.root,
+                    fixture.output,
+                    object(),
+                    SimpleNamespace(acquire_owned=acquire),
+                    [],
+                    fixture.source_bytes,
+                )
+        self.assertEqual(target.read_bytes(), b"UNCHANGED CONTROLLED TARGET\n")
+        self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+
+
+# The SDK filesystem model depends on POSIX no-follow and executable modes.
+# Windows still collects every case, but executes the original portable cohort.
+SDK_FILESYSTEM_CASES = (
+    "SDKCanonicalEnvelopeControls.test_noncanonical_valid_values_cannot_enter_the_jxa_channel",
+    "SDKCanonicalEnvelopeControls.test_owned_sdk_lookup_resolves_real_alias_and_refuses_malformed_path",
+    "SDKCanonicalEnvelopeControls.test_symlink_compiler_output_cannot_chmod_a_foreign_target",
+    "SDKConstantTransportControls.test_constant_and_discovery_use_one_budget_and_exact_literal_projection_argv",
+    "SDKConstantTransportControls.test_constant_retirement_consumes_shared_budget_before_osascript_acquisition",
+    "SDKConstantTransportControls.test_constant_schema_uint32_endpoints_are_typed_canonical_and_closed",
+    "SDKConstantTransportControls.test_controlled_build_records_real_capture_retirement_and_source_image_leases",
+    "SDKConstantTransportControls.test_expired_constant_capture_retires_without_acquiring_osascript",
+    "SDKConstantTransportControls.test_expired_or_invalid_absolute_deadline_never_acquires_a_group",
+    "SDKConstantTransportControls.test_in_capture_same_byte_inode_replacement_refuses_before_osascript",
+    "SDKConstantTransportControls.test_late_discovery_cannot_gain_a_second_twenty_second_budget",
+    "SDKConstantTransportControls.test_lease_replacement_same_bytes_and_mutation_refuse_without_new_acquisition",
+    "SDKConstantTransportControls.test_malformed_open_oversized_and_non_uint32_constants_refuse_before_osascript",
+    "SDKConstantTransportControls.test_nonzero_unclean_and_unretired_constant_group_cannot_reach_osascript",
+    "SDKConstantTransportControls.test_post_capture_lease_mutation_refuses_and_retains_exact_retired_operations",
+    "SDKConstantTransportControls.test_source_changed_before_build_refuses_without_any_acquisition",
+)
+
+
+def load_tests(loader, tests, pattern):
+    """Declare the POSIX fixture boundary without skipped or weakened cases."""
+    portable_groups = (
+        (Controls, 8),
+        (CaptureDiagnosticControls, 6),
+        (ObservationPriorityControls, 4),
+        (PermissionPreflightControls, 12),
+        (UnavailableRefinementControls, 3),
+        (CaptureBudgetControls, 2),
+    )
+    portable = unittest.TestSuite()
+    for group, expected in portable_groups:
+        collected = loader.loadTestsFromTestCase(group)
+        if collected.countTestCases() != expected:
+            raise AssertionError("original portable Shortcuts cohort changed")
+        portable.addTests(collected)
+    sdk = []
+    for group in (SDKCanonicalEnvelopeControls, SDKConstantTransportControls):
+        sdk.extend(group.__name__ + "." + name for name in loader.getTestCaseNames(group))
+    if tuple(sorted(sdk)) != SDK_FILESYSTEM_CASES or tests.countTestCases() != 51:
+        raise AssertionError("complete Shortcuts SDK case census changed")
+    if subject.sys.platform == "win32":
+        print(
+            "Shortcuts SDK filesystem scope: "
+            + json.dumps(
+                {
+                    "case_names": list(SDK_FILESYSTEM_CASES),
+                    "collected": 16,
+                    "executed": 0,
+                    "native": "UNRUN",
+                    "status": "UNRUN_UNSUPPORTED",
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return portable
+    if subject.sys.platform not in ("linux", "darwin"):
+        raise AssertionError("unsupported Shortcuts control host")
+    return tests
+
+
 if __name__ == "__main__":
     unittest.main()

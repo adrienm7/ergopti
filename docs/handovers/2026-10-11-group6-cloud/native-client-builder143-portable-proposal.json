@@ -1,0 +1,464 @@
+{
+	"capsule": "native-client-builder143-portable-proposal.tar.gz",
+	"inventory": {
+		"archive": "qualified143-proposal.tar.gz",
+		"bytes": 223610,
+		"members": [
+			{
+				"bytes": 5664,
+				"path": "FINAL_REVIEW.md",
+				"sha256": "7babe7098cdc6073ae96779cc16102e386b3cace0103711ef97d388074a97bb1"
+			},
+			{
+				"bytes": 2784,
+				"path": "README.md",
+				"sha256": "6aa73eaf5d891b2d04cba2ac5e785b4bd7bc3dbc5ccd91b05f05f96bdaec1008"
+			},
+			{
+				"bytes": 2091,
+				"path": "additional-root-cleanup-receiving.json",
+				"sha256": "4b811c67a76f01cb15be6ea79fdc57a71eed29dd085fbe836336f80b83406b0e"
+			},
+			{
+				"bytes": 1328,
+				"path": "additional-root-cleanup.log",
+				"sha256": "1b06469ba7667e6796e9aa985d700c49e5dcc73f04edcbdc4612bbc8d4346371"
+			},
+			{
+				"bytes": 925,
+				"path": "candidate-root-replacement-receiving.json",
+				"sha256": "5661aa31b8ecc06e20386995636ddf49a3d14adea73129e52987da062be8922a"
+			},
+			{
+				"bytes": 262,
+				"path": "candidate-root-replacement.log",
+				"sha256": "a2bcff18641989c24d6f0661841e09fc0c5af22e406b215d8efbaac8e8785918"
+			},
+			{
+				"bytes": 28413,
+				"path": "canonical136.log",
+				"sha256": "5dbf123f3b16ebc95b7106bc47b7c5fdeee73852535a999edc355e0c54a023b0"
+			},
+			{
+				"bytes": 1608,
+				"path": "canonical143/static/ergopti_plus/_shared/modules/network/proxy_policy.json",
+				"sha256": "3922004c7c1424c97a2f15e37e37581113c73e3c70a3c0a85a7d989322b78f71"
+			},
+			{
+				"bytes": 7633,
+				"path": "canonical143/static/ergopti_plus/_shared/python/network_proxy_policy.py",
+				"sha256": "3f587db45a77be9238ad7870e8d2b77b4cde78acef08105aefb077b69942ad2b"
+			},
+			{
+				"bytes": 800,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+				"sha256": "2b9ae8061bece5329e9b472e7657d1d80a123fb73cdf7235358027b4ba8b2117"
+			},
+			{
+				"bytes": 3012,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/LoopbackListenerCompatibility.h",
+				"sha256": "5c211da1fc11c962801a7e6be2f9c145987c0ff2765b008646a15289f9d404d9"
+			},
+			{
+				"bytes": 1659,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedImageAliasCompatibility.h",
+				"sha256": "c3f915f7dbc5296c5c8ac82d6b352aba2af7247a2420ef6dbbe65ec6e9e9e884"
+			},
+			{
+				"bytes": 1312,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedListenerEventCompatibility.h",
+				"sha256": "fde96306726901610bfd692f032026bab1488097c9bba745a19f285b72bd67bf"
+			},
+			{
+				"bytes": 3022,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedProgramCompatibility.h",
+				"sha256": "99b96624a62246ab3b6f4a7a6c95f387e48101208ea4f31e95db9cab93eed9e5"
+			},
+			{
+				"bytes": 938,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedSuspendedImageCompatibility.h",
+				"sha256": "198e8b8e218b7b0b4609e01ef77e4246ffac4a09facf409644e4053b88dcf0ae"
+			},
+			{
+				"bytes": 1220,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift",
+				"sha256": "05b93d2a87b39d46f50125aa6ea8d1db775506ffb307d0e8f14d90a8b2827eba"
+			},
+			{
+				"bytes": 4664,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedCertificateAuthorities.swift",
+				"sha256": "30c6b8ee1bd17a1b70fa56c7a74655d2bc7a18f5e657df59acbf26ff24dd8df6"
+			},
+			{
+				"bytes": 32372,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift",
+				"sha256": "0650c5f3c6ab64b79f324dcf07331286a2c7710fec2734fec93c8d800cddd624"
+			},
+			{
+				"bytes": 13777,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedPACSource.swift",
+				"sha256": "b147c365d5c6c43174a2fa8f91c186cb099168d7d8440a6dfd49d785a45cdbba"
+			},
+			{
+				"bytes": 8267,
+				"path": "canonical143/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWireTests.swift",
+				"sha256": "37e3001e74f5fedb419fcc3e3c08632664c9a97c08e411363208d325837b9d80"
+			},
+			{
+				"bytes": 8988,
+				"path": "canonical143/static/ergopti_plus/macos/platform/network/managed_http.py",
+				"sha256": "fc911d8281ebc09f029b89d5a7d9e777d5c0361af4b45c651bb6421cef85e8cb"
+			},
+			{
+				"bytes": 19959,
+				"path": "canonical143/static/ergopti_plus/macos/platform/network/native_http.py",
+				"sha256": "db1781c62d34aadc39fde55cc2a7a3fa10148747543fa62e1a8f0d3cc95590cf"
+			},
+			{
+				"bytes": 11493,
+				"path": "canonical143/static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py",
+				"sha256": "fa9f8da12f8f2db25a3bcda19e980c55d1f48bfc61e35be6d746297331b0cc6d"
+			},
+			{
+				"bytes": 10588,
+				"path": "canonical143/static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift",
+				"sha256": "fa6b21693f70f70d391ceedf4b47cbab894e06f623c65d704fe30ad8c83a68dc"
+			},
+			{
+				"bytes": 26179,
+				"path": "canonical143/static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py",
+				"sha256": "0f6c7df65975ff6eb73b9809e20f22011c7437d58728e3e4a78424fb3a137ab4"
+			},
+			{
+				"bytes": 60249,
+				"path": "canonical143/static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py",
+				"sha256": "8e5e0eb78c7d00268fa2521066b1bdf0c32773386d63544eb960d7f85a2c056b"
+			},
+			{
+				"bytes": 19070,
+				"path": "canonical143/tools/diagnostics/macos_owned_process.py",
+				"sha256": "9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98"
+			},
+			{
+				"bytes": 17189,
+				"path": "canonical143/tools/test/macos_native_http_client_root_controls.py",
+				"sha256": "303ef0e5e4e55d5667e66f46f970cff7cba64785c98cc3a16cda09683bb48ac8"
+			},
+			{
+				"bytes": 28586,
+				"path": "canonical143/tools/test/macos_native_http_fixture_builder_controls.py",
+				"sha256": "fbf105d904401b17f8c785bfceabc6c0c15a5c136ce94ec9f3e614816e188532"
+			},
+			{
+				"bytes": 186996,
+				"path": "canonical143/tools/test/macos_native_http_receiving_facts_test.py",
+				"sha256": "b2fc84e8704fb883fc91da8c355d711ef7b862ecf01eef1541ef15f9143f6c6e"
+			},
+			{
+				"bytes": 20438,
+				"path": "canonical143/tools/test/test-managed-ollama-protocol.cjs",
+				"sha256": "ec90ed85bf9b79689b4606ae5e0592c603c289e9603976b8e29c2baa4a3cbc56"
+			},
+			{
+				"bytes": 1225,
+				"path": "canonical143.log",
+				"sha256": "d8d83086739e5880835f9bf032a662791c6118648f7cf5700870c0b1b960ea99"
+			},
+			{
+				"bytes": 129,
+				"path": "combined-inverse-review.json",
+				"sha256": "49d2399aab7c6ca3d1b293f0edb42f75ea1c0b222b2f6c84933d5434b049a931"
+			},
+			{
+				"bytes": 78445,
+				"path": "combined-inverse.patch",
+				"sha256": "5e90f85cfa13fc0afd1139216a6e9ca946e3d26d4e1f79f3928fb7e04d85f42a"
+			},
+			{
+				"bytes": 2107,
+				"path": "combined-manifest.json",
+				"sha256": "0fab21bd954da9bf0a119ebbc33147286b77c82c1af9edb5ddc12952d19e13f8"
+			},
+			{
+				"bytes": 30791,
+				"path": "combined-preimage/static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py",
+				"sha256": "191ac2901fbdb9acfc6e5b85618a704fb8ac5b8c022d75c490f19075d3061d55"
+			},
+			{
+				"bytes": 59806,
+				"path": "combined-preimage/static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py",
+				"sha256": "54fc39d4d7d322711337091aea490c44795da7e5fe022d01800ace1201915d9d"
+			},
+			{
+				"bytes": 183513,
+				"path": "combined-preimage/tools/test/macos_native_http_receiving_facts_test.py",
+				"sha256": "3f9d04684b5e3c72f362bdc2aabf59ef10475d2402482ab1bde72121316addc1"
+			},
+			{
+				"bytes": 20438,
+				"path": "combined-preimage/tools/test/test-managed-ollama-protocol.cjs",
+				"sha256": "8e557928fd734473713a7912b62e91ee8b4fa23a47e86fb9aaa4e3fa605a7768"
+			},
+			{
+				"bytes": 78430,
+				"path": "combined-proposal.patch",
+				"sha256": "4b2bde8ca1e2f1d784fc91fb7cd8750d85257502808b840b8f66a3220bfc75ea"
+			},
+			{
+				"bytes": 8664,
+				"path": "combined_capsule.py",
+				"sha256": "531c40f34d9d5ec26a6fdcceaf1f53d7756cf4c5022efe792c82f4d9de88a538"
+			},
+			{
+				"bytes": 3444,
+				"path": "compose136.py",
+				"sha256": "8eb8b90b2cf892699e882febe7a81e065196977b507280f3e9e63294b240c192"
+			},
+			{
+				"bytes": 3052,
+				"path": "durable-root7-receiving.json",
+				"sha256": "729ff69690868ee4b9907b0f463b01a64d98dc45e5b84dde9a29d53bd79949dd"
+			},
+			{
+				"bytes": 1598,
+				"path": "durable-root7.log",
+				"sha256": "07031175c18dfea54010b1897240e164ad61baa3fa0a89026fca76983b26cd76"
+			},
+			{
+				"bytes": 4895,
+				"path": "enroll143.py",
+				"sha256": "aea3058ad2746e3f7ad3efcf5052a1acfe051974f67e0762e7272321bfd9ae98"
+			},
+			{
+				"bytes": 424,
+				"path": "final-relocation-function-review.json",
+				"sha256": "8338de0abe4494f089104ab97bd4bdb44bf13373db909f9de293ff808021f9b0"
+			},
+			{
+				"bytes": 2117,
+				"path": "final-source-review.json",
+				"sha256": "770409fb56c103c796ba8911c5270dd4e06a4cca3bbb882a610f33624e0cc541"
+			},
+			{
+				"bytes": 3928,
+				"path": "freeze_sources.py",
+				"sha256": "7c9321f13915ccdb31c31a4cbe339d8114a85eb04c48ad9aa7d115e975a3ceb4"
+			},
+			{
+				"bytes": 269,
+				"path": "native-owner-preservation.json",
+				"sha256": "77004f97ea8803a3b8994eb37858f307a5f01bdef300db984385b9d8287a8168"
+			},
+			{
+				"bytes": 926,
+				"path": "original-root-replacement-receiving.json",
+				"sha256": "7bf4c49b8e7646f1a8f391e81ad07e729ae20ec5185d364f38f40137660ea910"
+			},
+			{
+				"bytes": 914,
+				"path": "original-root-replacement.log",
+				"sha256": "05e8dfa1a757eb5d6ebd1747182016d13ba92585a2dcd2a457390eaf21260790"
+			},
+			{
+				"bytes": 5289,
+				"path": "physical-runtime-source-closure.json",
+				"sha256": "5222aac089d0c23d1dd772fdc1a6ce21af25c3e57dc53a71ffc68f74b902b0d6"
+			},
+			{
+				"bytes": 8808,
+				"path": "portable_root_cleanup_controls.py",
+				"sha256": "3de152673fc0b26b4c3514b9a333fc22ab61a030a13caa41be359c62cf01b15a"
+			},
+			{
+				"bytes": 9427,
+				"path": "portable_root_replacement_candidate_test.py",
+				"sha256": "e6e9d83c4d8b528731141b5164aa93745505bc9af64b98cbfaf064cb9c800b70"
+			},
+			{
+				"bytes": 9472,
+				"path": "portable_root_replacement_test.py",
+				"sha256": "4509ee7d739beb8ab67e4040fdc9d50273566fe73a9e90258372fcc4feeb4fbf"
+			},
+			{
+				"bytes": 6169,
+				"path": "prepare.py",
+				"sha256": "a381a60f5bbb25a6a4974d683f9b84b15d1484da73b81171b9cc341d13b04fda"
+			},
+			{
+				"bytes": 1187,
+				"path": "qualification.json",
+				"sha256": "06b2cf976e92612752cc15fdc544ba766d8af8d85fd2ab3d453059e23a5596a3"
+			},
+			{
+				"bytes": 4396,
+				"path": "relocate_recipe_assertion.py",
+				"sha256": "bc0430d39e321bf63081560f5f585f59888742512222d6d79128e1aef3d20b88"
+			},
+			{
+				"bytes": 1210,
+				"path": "selector-and-relocation-controls.json",
+				"sha256": "2fc69ba26c2e000ed5c82488a87c3447922111cafbdaa33f1158234824d00ce7"
+			},
+			{
+				"bytes": 3255,
+				"path": "selector-and-relocation-controls.log",
+				"sha256": "ee96c5add27cb4a20589b84d6e714caaf9152fae1f0f20edec57414569d5d4d4"
+			}
+		],
+		"safe_regular_members": 60,
+		"sha256": "8e9a42f0ea401ae8f51bd96c1b9da0bdb99dffd7beb84d848b672d761e1b4979"
+	},
+	"source_manifest": {
+		"apply_paths": {
+			"static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py": {
+				"bytes": 11493,
+				"postimage_sha256": "fa9f8da12f8f2db25a3bcda19e980c55d1f48bfc61e35be6d746297331b0cc6d",
+				"preimage_sha256": null
+			},
+			"static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py": {
+				"bytes": 26179,
+				"postimage_sha256": "0f6c7df65975ff6eb73b9809e20f22011c7437d58728e3e4a78424fb3a137ab4",
+				"preimage_sha256": "191ac2901fbdb9acfc6e5b85618a704fb8ac5b8c022d75c490f19075d3061d55"
+			},
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": {
+				"bytes": 60249,
+				"postimage_sha256": "8e5e0eb78c7d00268fa2521066b1bdf0c32773386d63544eb960d7f85a2c056b",
+				"preimage_sha256": "54fc39d4d7d322711337091aea490c44795da7e5fe022d01800ace1201915d9d"
+			},
+			"tools/test/macos_native_http_client_root_controls.py": {
+				"bytes": 17189,
+				"postimage_sha256": "303ef0e5e4e55d5667e66f46f970cff7cba64785c98cc3a16cda09683bb48ac8",
+				"preimage_sha256": null
+			},
+			"tools/test/macos_native_http_fixture_builder_controls.py": {
+				"bytes": 28586,
+				"postimage_sha256": "fbf105d904401b17f8c785bfceabc6c0c15a5c136ce94ec9f3e614816e188532",
+				"preimage_sha256": null
+			},
+			"tools/test/macos_native_http_receiving_facts_test.py": {
+				"bytes": 186996,
+				"postimage_sha256": "b2fc84e8704fb883fc91da8c355d711ef7b862ecf01eef1541ef15f9143f6c6e",
+				"preimage_sha256": "3f9d04684b5e3c72f362bdc2aabf59ef10475d2402482ab1bde72121316addc1"
+			},
+			"tools/test/test-managed-ollama-protocol.cjs": {
+				"bytes": 20438,
+				"postimage_sha256": "ec90ed85bf9b79689b4606ae5e0592c603c289e9603976b8e29c2baa4a3cbc56",
+				"preimage_sha256": "8e557928fd734473713a7912b62e91ee8b4fa23a47e86fb9aaa4e3fa605a7768"
+			}
+		},
+		"qualification": "PORTABLE_SOURCE_ONLY_NO_NATIVE_CREDIT",
+		"sha256": {
+			"combined-inverse.patch": "5e90f85cfa13fc0afd1139216a6e9ca946e3d26d4e1f79f3928fb7e04d85f42a",
+			"combined-proposal.patch": "4b2bde8ca1e2f1d784fc91fb7cd8750d85257502808b840b8f66a3220bfc75ea"
+		}
+	},
+	"qualification": {
+		"additional_root_controls": {
+			"errors": 0,
+			"failures": 0,
+			"skips": 0,
+			"tests": 6
+		},
+		"corrected_root_counter": {
+			"errors": 0,
+			"failures": 0,
+			"skips": 0,
+			"tests": 1
+		},
+		"durable_root7": {
+			"errors": 0,
+			"failures": 0,
+			"skips": 0,
+			"tests": 7
+		},
+		"finite7wholefile_inverse": "PASS",
+		"historical_receive103_limitation": "Passed object receiving with live source-read root and declaration-order suite; superseded here only by the new physical143 receipt, not relabeled as historical full-source qualification",
+		"native_compile_signing_security_clock_xctest_packaging_installation": "NOT_EXECUTED_NO_NATIVE_CREDIT",
+		"original_root_counter": {
+			"errors": 0,
+			"failures": 1,
+			"skips": 0,
+			"tests": 1
+		},
+		"physical_corrected143": {
+			"errors": 0,
+			"failures": 0,
+			"passed": 143,
+			"seconds": 45.411,
+			"skips": 0,
+			"tests": 143
+		},
+		"physical_original136": {
+			"errors": 0,
+			"failures": 1,
+			"passed": 135,
+			"seconds": 45.876,
+			"skips": 0,
+			"tests": 136
+		},
+		"relocated_assertion_meaningful_mutants": 2,
+		"ruff_check_format": "PASS_ACTUAL_FINAL_BYTES",
+		"selector_refusals": 6
+	},
+	"parent_receiving": {
+		"qualification": "PARENT_INDEPENDENT_SAFE_CAPSULE_PREIMAGE_FULL_FORWARD_INVERSE_FUNCTION_REVIEW",
+		"capsule_bytes": 223610,
+		"capsule_sha256": "8e9a42f0ea401ae8f51bd96c1b9da0bdb99dffd7beb84d848b672d761e1b4979",
+		"safe_regular_members": 60,
+		"paths": {
+			"static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py": {
+				"bytes": 11493,
+				"postimage_sha256": "fa9f8da12f8f2db25a3bcda19e980c55d1f48bfc61e35be6d746297331b0cc6d",
+				"preimage_sha256": null
+			},
+			"static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py": {
+				"bytes": 26179,
+				"postimage_sha256": "0f6c7df65975ff6eb73b9809e20f22011c7437d58728e3e4a78424fb3a137ab4",
+				"preimage_sha256": "191ac2901fbdb9acfc6e5b85618a704fb8ac5b8c022d75c490f19075d3061d55"
+			},
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": {
+				"bytes": 60249,
+				"postimage_sha256": "8e5e0eb78c7d00268fa2521066b1bdf0c32773386d63544eb960d7f85a2c056b",
+				"preimage_sha256": "54fc39d4d7d322711337091aea490c44795da7e5fe022d01800ace1201915d9d"
+			},
+			"tools/test/macos_native_http_client_root_controls.py": {
+				"bytes": 17189,
+				"postimage_sha256": "303ef0e5e4e55d5667e66f46f970cff7cba64785c98cc3a16cda09683bb48ac8",
+				"preimage_sha256": null
+			},
+			"tools/test/macos_native_http_fixture_builder_controls.py": {
+				"bytes": 28586,
+				"postimage_sha256": "fbf105d904401b17f8c785bfceabc6c0c15a5c136ce94ec9f3e614816e188532",
+				"preimage_sha256": null
+			},
+			"tools/test/macos_native_http_receiving_facts_test.py": {
+				"bytes": 186996,
+				"postimage_sha256": "b2fc84e8704fb883fc91da8c355d711ef7b862ecf01eef1541ef15f9143f6c6e",
+				"preimage_sha256": "3f9d04684b5e3c72f362bdc2aabf59ef10475d2402482ab1bde72121316addc1"
+			},
+			"tools/test/test-managed-ollama-protocol.cjs": {
+				"bytes": 20438,
+				"postimage_sha256": "ec90ed85bf9b79689b4606ae5e0592c603c289e9603976b8e29c2baa4a3cbc56",
+				"preimage_sha256": "8e557928fd734473713a7912b62e91ee8b4fa23a47e86fb9aaa4e3fa605a7768"
+			}
+		},
+		"proofs": {
+			"tools/test/macos_native_http_receiving_facts_test.py": {
+				"original_function_spans_exact_except": [
+					"test10FixtureFlagCannotChangeReleaseOperationsOrMoveCausalBoundaries"
+				],
+				"unchanged_spans": 249
+			},
+			"static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py": {
+				"original_function_spans_exact_except": ["setUpClass", "tearDownClass"],
+				"unchanged_spans": 14
+			},
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": {
+				"original_function_spans_exact_except": ["__init__", "_observe_admin_trust"],
+				"unchanged_spans": 39
+			}
+		},
+		"physical_whole_source_closure_received": true,
+		"native_credit": false
+	}
+}
