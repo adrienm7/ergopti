@@ -482,10 +482,9 @@ function M.build_custom(ctx, counts)
 						and sec.description or tostring(sec.name):gsub("_", " ")
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
-					table.insert(cat_choices, {
-						label   = lbl,
-						checked = (state.custom_default_section == sname) or nil,
-						action      = function()
+					local selected = (state.custom_default_section == sname) or nil
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {
+						["personal_default_section"] = function()
 							state.custom_default_section = sname
 							if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 								pcall(ctx.hotstring_editor.set_default_section, sname)
@@ -493,7 +492,12 @@ function M.build_custom(ctx, counts)
 							if ctx.save_prefs() ~= true then return false end
 							ctx.updateMenu()
 						end,
+					}, {
+						personal_default_section_label = function() return lbl end,
+						personal_default_section_selected = function() return selected end,
 					})
+					if type(choice) ~= "table" then return nil end
+					table.insert(cat_choices, choice)
 				end
 			end
 		end
@@ -541,13 +545,22 @@ function M.build_custom(ctx, counts)
 				local lbl = (type(sec.description) == "string" and sec.description ~= "")
 					and sec.description or tostring(sec.name):gsub("_", " ")
 				lbl = ctx.applyTriggerChar(lbl)
-				target[#target + 1] = {
-					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
-					checked  = sec_on or nil,
-					action       = (group_enabled and not paused)
-							   and toggleSectionFn(ctx, group_name, sec.name, lbl, admission) or nil,
-					disabled = not group_enabled or paused or nil,
-				}
+				local ready = group_enabled and not paused
+				local caption = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl
+				-- The original factory only allocates this closure; native effects run on delivery.
+				local action = toggleSectionFn(ctx, group_name, sec.name, lbl, admission)
+				local row = ManifestMenu.check_row("hotstring_personal_section_choice", "personal_section_toggle", {
+					personal_section_toggle = action,
+				}, {
+					personal_section_label = function() return caption end,
+					personal_section_selected = function() return sec_on end,
+					personal_section_ready = function() return ready end,
+				})
+				if type(row) ~= "table" then return false end
+				-- Preserve the native nil fields of the original inert and unchecked leaves.
+				if not ready then row.action = nil end
+				if row.checked == false then row.checked = nil end
+				target[#target + 1] = row
 			end
 			::continue_sec::
 		end

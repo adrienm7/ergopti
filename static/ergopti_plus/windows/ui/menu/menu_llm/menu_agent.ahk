@@ -36,19 +36,22 @@
  * @returns {Object} The submenu the tray's "agent" row opens.
  */
 LLM_Agent_MenuBuild() {
-	return MenuRenderer_Build("agent_menu", "Agent", Map(
-		"agent_system1", _LLM_Agent_MenuSystemSlot.Bind("agent_system1"),
-		"agent_system2", _LLM_Agent_MenuSystemSlot.Bind("agent_system2")), "", Map(),
+	return MenuRenderer_Build("agent_menu", "Agent", Map(), "", Map(
+		"agent_system1", () => _LLM_Agent_MenuSystemRows("agent_system1"),
+		"agent_system2", () => _LLM_Agent_MenuSystemRows("agent_system2")),
 		Map("agent_mode", _LLM_Agent_MenuSetMode, "agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker()),
 		Map("llm.agent_mode", () => LLM_Agent_Setting("agent_mode"),
 			"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount))
 }
 
-; Dynamic slot agent_system1 or agent_system2: its row and its backends.
-_LLM_Agent_MenuSystemSlot(Key, Target, CategoryName) {
+/**
+ * Supplies completed System row DATA; the declared list owns native placement.
+ * @param {String} Key The actual System 1 or System 2 setting identity.
+ * @returns {Array} One declared group row, or empty DATA on refused ownership.
+ */
+_LLM_Agent_MenuSystemRows(Key) {
 	Row := _LLM_Agent_SystemRow(Key)
-	if Row is Map
-		MenuRenderer_AppendRows(Target, "agent_menu", Key, [Row])
+	return Row is Map ? [Row] : []
 }
 
 

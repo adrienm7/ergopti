@@ -4375,11 +4375,29 @@ type = "---"
 type = "dynamic"
 id = "agent_system1"
 i18n = "menu.agent.system1"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "list"
+id = "agent_system1"
+i18n = "menu.agent.system1"
+platforms = ["ahk"]
+unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "dynamic"
 id = "agent_system2"
 i18n = "menu.agent.system2"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "list"
+id = "agent_system2"
+i18n = "menu.agent.system2"
+platforms = ["ahk"]
+unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "---"
@@ -9573,4 +9591,34 @@ i18n = "menu.llm.model_parent_with_health"
 caption_getters = ["llm_model_health_prefix", "llm_model_current_caption"]
 disabled_when = ["llm_model_parent_ready"]
 platforms = ["ahk"]
+unavailable = "hide"
+
+# Runtime personal section inventories retain their native labels and callbacks.
+[[menu.hotstring_personal_default_choice]]
+type = "check"
+id = "personal_default_section"
+caption_source = "native"
+caption_getter = "personal_default_section_label"
+checked_when = ["personal_default_section_selected"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_default_choice]]
+type = "check"
+id = "personal_default_section"
+caption_source = "native"
+caption_getter = "personal_default_section_label"
+checked_when = ["personal_default_section_selected"]
+platforms = ["linux"]
+unavailable = "hide"
+
+# Native personal section leaves keep their genuine registry callbacks and caption values.
+[[menu.hotstring_personal_section_choice]]
+type = "check"
+id = "personal_section_toggle"
+caption_source = "native"
+caption_getter = "personal_section_label"
+checked_when = ["personal_section_selected"]
+disabled_when = ["personal_section_ready"]
+platforms = ["hs"]
 unavailable = "hide"

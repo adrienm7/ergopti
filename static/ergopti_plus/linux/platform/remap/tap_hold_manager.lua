@@ -25,6 +25,10 @@ local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
 local original_combination_constructor = Combinations.new
+local original_combination_instance_current = Combinations.instance_is_current
+local BindingIdentity = require("config_binding_identity")
+local BindingPublication = require("config_binding_publication")
+local original_combination_catalogue = BindingIdentity.combination_binding_catalogue
 local original_engine_constructor = Engine.new
 local original_config_load, original_config_document = Config.load, Config.load_document
 local NativeCatalogue = require("_generated.action_catalogue")
@@ -164,6 +168,7 @@ local function fields_equal(value,captured)
  for key in pairs(value) do if captured[key]==nil then return false end end
  return true
 end
+local original_engine_key_codes = copy_fields(rawget(Engine, "KEY_CODES"))
 local catalogue_snapshot=copy_fields(rawget(NativeCatalogue,"actions"))
 local function managed_owner_current(loaded,combinations)
  local issuer=managed_owners[combinations]
@@ -172,6 +177,44 @@ local function managed_owner_current(loaded,combinations)
   and fields_equal(loaded.catalog,issuer.catalogue) and fields_equal(loaded.keys,issuer.keys)
   and fields_equal(loaded.hold_picker,issuer.holds)
 end
+--- Observes only the original complete logical key catalogue and its issuer.
+--- Pause, installed hooks, enabled assignments and physical frames grant no rights.
+--- @param owner table Exact original Manager-created combinations owner.
+--- @return boolean current No action callbacks, native operations, registration or IO.
+function M.managed_combination_catalogue_current(owner)
+	local issuer = type(owner) == "table" and managed_owners[owner] or nil
+	return issuer ~= nil and _initialized and type(_loaded) == "table" and getmetatable(_loaded) == nil
+		and rawequal(owner, _combinations) and type(owner) == "table"
+		and getmetatable(M) == nil and rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+		and getmetatable(Combinations) == nil
+		and rawequal(package.loaded["modules.shortcuts.key_combinations"], Combinations)
+		and rawget(Combinations, "new") == original_combination_constructor
+		and rawget(Combinations, "instance_is_current") == original_combination_instance_current
+		and original_combination_instance_current(owner, issuer.catalogue) == true
+		and rawequal(package.loaded["platform.remap.tap_hold_loader"], Config)
+		and rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine)
+		and getmetatable(Engine) == nil and rawget(Engine, "new") == original_engine_constructor
+		and fields_equal(rawget(Engine, "KEY_CODES"), original_engine_key_codes)
+		and getmetatable(Config) == nil and rawget(Config, "load") == original_config_load
+		and rawget(Config, "load_document") == original_config_document
+		and managed_owner_current(_loaded, owner)
+end
+local original_logical_catalogue_current = M.managed_combination_catalogue_current
+
+--- Returns a detached complete logical publication from the original build issuer.
+--- @return table|nil catalogue Withdrawn ownership remains unjudged without IO.
+function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("combination", "platform.remap.tap_hold_manager", M)
+		or rawget(M, "managed_combination_catalogue_current") ~= original_logical_catalogue_current
+		or not original_logical_catalogue_current(_combinations)
+		or not rawequal(package.loaded["config_binding_identity"], BindingIdentity)
+		or getmetatable(BindingIdentity) ~= nil
+		or rawget(BindingIdentity, "combination_binding_catalogue") ~= original_combination_catalogue then return nil end
+	local issuer = managed_owners[_combinations]
+	local okay, catalogue = pcall(original_combination_catalogue, issuer.catalogue)
+	return okay and catalogue or nil
+end
+
 local function pair_options(loaded,combinations)
  local issuer=assert(managed_owners[combinations],"original managed pair constructor required")
  assert(issuer.loaded==loaded and getmetatable(combinations)==nil
@@ -689,4 +732,5 @@ function M._reset_for_test()
 	return true
 end
 
+BindingPublication.register("combination", "platform.remap.tap_hold_manager", M, M.published_binding_catalogue)
 return M

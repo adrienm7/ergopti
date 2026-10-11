@@ -11,12 +11,15 @@
 --- ==============================================================================
 
 local M = {}
+local CombinationPolicy = require("tap_hold.key_combinations")
+local original_pair_separator = CombinationPolicy.PAIR_SEPARATOR
 
 --- Detail shared by readers and cleanup for a retired gesture binding.
 M.RETIRED_GESTURE = "no gesture slot of this build has this name"
 M.RETIRED_SCRIPT = "no script chord slot of this build has this name"
 M.RETIRED_TAP = "no number-row tap key of this build has this name"
 M.RETIRED_KEYBOARD = "no keyboard shortcut slot of this build has this name"
+M.RETIRED_COMBINATION = "no ordered key-combination slot of this build has this name"
 
 --- Judges a binding only when its native gesture catalogue is published.
 --- The owner supplies its actual complete slot ids, never an inferred empty
@@ -122,6 +125,41 @@ function M.keyboard_binding_fits(binding, catalogue)
 	assert(type(catalogue) == "table" and catalogue.prefix == "keyboard__"
 		and type(catalogue.slots) == "table" and next(catalogue.slots) ~= nil,
 		"config_binding_identity: invalid published keyboard catalogue")
+	return M.gesture_binding_fits(binding, catalogue)
+end
+
+--- Projects every ordered pair of the complete acknowledged native key source.
+--- Native constructors admit original catalogue ownership before calling this.
+--- @param keys table Dense complete array of native key records.
+--- @return table catalogue Detached identity projection, never active assignments.
+local original_tap_catalogue = M.tap_binding_catalogue
+function M.combination_binding_catalogue(keys)
+	local ids = original_tap_catalogue(keys).slots
+	assert(next(ids) ~= nil and next(ids, next(ids)) ~= nil,
+		"config_binding_identity: at least two native combination keys required")
+	local policy = CombinationPolicy
+	assert(rawequal(rawget(package.loaded, "tap_hold.key_combinations"), policy)
+		and type(policy) == "table" and getmetatable(policy) == nil
+		and rawget(policy, "PAIR_SEPARATOR") == original_pair_separator and original_pair_separator == "_then_",
+		"config_binding_identity: original ordered-pair separator required")
+	local slots = {}
+	for first in pairs(ids) do
+		for second in pairs(ids) do
+			if first ~= second then slots[first .. original_pair_separator .. second] = true end
+		end
+	end
+	return { prefix = "combination__", slots = slots }
+end
+
+--- Judges the fixed combination namespace only after complete native publication.
+--- @param binding any Native binding identity.
+--- @param catalogue table|nil Complete original-constructor catalogue.
+--- @return boolean|nil fits Missing or withdrawn publication remains unjudged.
+function M.combination_binding_fits(binding, catalogue)
+	if catalogue == nil then return nil end
+	assert(type(catalogue) == "table" and catalogue.prefix == "combination__"
+		and type(catalogue.slots) == "table" and next(catalogue.slots) ~= nil,
+		"config_binding_identity: invalid published combination catalogue")
 	return M.gesture_binding_fits(binding, catalogue)
 end
 
