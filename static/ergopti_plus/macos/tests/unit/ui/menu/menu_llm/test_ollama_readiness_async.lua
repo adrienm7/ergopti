@@ -60,6 +60,7 @@ local MODULES = {
 	"infra.text_utils",
 	"modules.llm.api_ollama",
 	"modules.llm.ollama_binary",
+	"modules.llm.ollama_endpoint",
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
 	"adapters.task_lifecycle",
@@ -432,6 +433,11 @@ local function with_fixture(spec, body)
 			end,
 		})
 		package.loaded["modules.llm.api_ollama"] = daemon.api
+		local endpoint_port = spec.ollama_port or 11434
+		package.loaded["modules.llm.ollama_endpoint"] = {
+			get_port = function() return endpoint_port end,
+			get_base_url = function() return "http://127.0.0.1:" .. tostring(endpoint_port) end,
+		}
 
 		-- Own the genuine methods with an independently read native policy path.
 		-- The fixture's other cached adapter doubles cannot select a fake policy.
@@ -470,6 +476,7 @@ local function with_fixture(spec, body)
 
 		body({
 			manager = manager,
+			set_ollama_port = function(port) endpoint_port = port end,
 			daemon = daemon,
 			spawns = spawns,
 			timers = timers,
@@ -1218,6 +1225,48 @@ helpers.describe("HS035 receiver exceptional closure", function()
 			end
 		end)
 	end
+end)
+
+
+helpers.describe("Ollama loadability follows the configured endpoint", function()
+	helpers.it("(ollama-loadability-origin) checks the configured service before publishing a model", function()
+		with_fixture({shared_system_check = accept_model_download, ollama_port = 11470}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_true(accepted)
+			fixture.native_tasks[2].on_done(0, "", "")
+			helpers.assert_eq(fixture.http_callbacks[1].url, "http://127.0.0.1:11470/api/chat")
+			fixture.http_callbacks[1].callback(200, "{}", {})
+			helpers.assert_eq(terminal.successes, 1)
+			helpers.assert_eq(terminal.failures, 0)
+		end)
+	end)
+	helpers.it("(ollama-loadability-origin) rejects success from a superseded configured service", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_true(accepted)
+			fixture.native_tasks[2].on_done(0, "", "")
+			fixture.set_ollama_port(11471)
+			fixture.http_callbacks[1].callback(200, "{}", {})
+			fixture.http_callbacks[1].callback(200, "duplicate", {})
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"stale"})
+		end)
+	end)
+end)
+
+helpers.describe("Ollama pull loadability failure", function()
+	helpers.it("(ollama-loadability-failure) refuses the selected model when post-pull loadability fails", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_true(accepted)
+			fixture.native_tasks[2].on_done(0, "", "")
+			fixture.http_callbacks[1].callback(500, "unable to load model", {})
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"model_load_failed"})
+		end)
+	end)
 end)
 
 return { retained_receivers = retained_receivers }

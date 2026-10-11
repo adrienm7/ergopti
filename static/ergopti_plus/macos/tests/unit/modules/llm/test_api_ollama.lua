@@ -481,6 +481,8 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		with_startup({}, function(api, fixture)
 			helpers.assert_true(set_upvalue(api.is_ready, "_is_ready", true),
 				"the daemon-exit regression must seed the real readiness owner")
+			helpers.assert_true(set_upvalue(api.is_ready, "_ready_origin", api.get_base_url()),
+				"the ready model belongs to the currently configured endpoint")
 			helpers.assert_true(set_upvalue(api.reset_ready, "_warmup_gen", 41),
 				"the daemon-exit regression must seed the real warmup generation")
 			helpers.assert_true(set_upvalue(api.warmup, "_warmup_active", true),
@@ -504,6 +506,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				"daemon death must release the stale warmup intent")
 			helpers.assert_eq(recovery_calls, 1, "the current daemon must delegate exactly one recovery attempt")
 			helpers.assert_true(set_upvalue(api.is_ready, "_is_ready", true))
+			helpers.assert_true(set_upvalue(api.is_ready, "_ready_origin", api.get_base_url()))
 			original.complete(0)
 			helpers.assert_eq(api.is_ready(), true, "a duplicate stale completion must not demote a successor readiness verdict")
 			helpers.assert_eq(recovery_calls, 1, "a duplicate stale completion must not request sibling recovery")

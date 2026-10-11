@@ -189,12 +189,14 @@ M.DEFAULT_STATE = {
 -- Cached result of the last async server health check.
 -- nil = not yet checked, true = server responded, false = server unreachable.
 local _llm_health_status = nil
+local _llm_health_origin = nil
 local _llm_health_generation = 0
 
 --- Revokes every pending health writer and clears the shared display value.
 local function invalidate_llm_health()
 	_llm_health_generation = _llm_health_generation + 1
 	_llm_health_status = nil
+	_llm_health_origin = nil
 end
 
 --- Revokes pending health callbacks and resets the display to not-yet-checked.
@@ -224,15 +226,21 @@ local function probe_llm_health(state, refresh_fn)
 	local backend_at_dispatch = backend
 	local url
 	if backend == "ollama" then
-		url = "http://127.0.0.1:11434/api/version"
+		url = OllamaEndpoint.get_base_url() .. EnableAdmission.VERSION_PATH
 	else
 		-- The MLX health probe follows the configured port via api_mlx.get_base_url()
 		-- (the single source of truth) — no hardcoded port literal.
 		url = ApiMlx.get_base_url() .. "/v1/models"
 	end
 
+	if _llm_health_origin ~= url then _llm_health_status = nil end
+	_llm_health_origin = url
 	hs.http.asyncGet(url, {}, function(status)
 		if generation ~= _llm_health_generation then return end
+		local current_url = backend_at_dispatch == "ollama"
+			and OllamaEndpoint.get_base_url() .. EnableAdmission.VERSION_PATH
+			or ApiMlx.get_base_url() .. "/v1/models"
+		if url ~= current_url then return end
 		if state.llm_backend ~= backend_at_dispatch or state.llm_enabled ~= true then return end
 		-- Any HTTP response (even 4xx) means the server is reachable
 		_llm_health_status = (type(status) == "number" and status > 0)

@@ -15,6 +15,7 @@ local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
 local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local EnableAdmission = require("llm.enable_admission")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
@@ -223,9 +224,11 @@ end
 --- @param callback function|nil Optional callback(backend_name) called when detection completes.
 function M.auto_detect_backend(callback)
 	local now = hs.timer.secondsSinceEpoch()
+	local ollama_origin, mlx_origin = ApiOllama.get_base_url(), ApiMlx.get_base_url()
 
 	-- Return cached result immediately if checked recently (within 10s)
 	if now - CoreState.last_backend_check < CoreState.backend_check_interval
+		and CoreState.last_ollama_origin == ollama_origin and CoreState.last_mlx_origin == mlx_origin
 		and not deferred_profile_warmup_cleanup_pending() then
 		local result = CoreState.backend
 		if type(callback) == "function" then
@@ -233,8 +236,6 @@ function M.auto_detect_backend(callback)
 		end
 		return result
 	end
-
-	CoreState.last_backend_check = now
 
 	-- Capture the generation before launching probes so the closure can detect
 	-- whether set_backend() was called while the probes were in-flight; if it
@@ -257,6 +258,11 @@ function M.auto_detect_backend(callback)
 			Logger.debug(LOG, "auto_detect: user has set a manual backend override — skipping automatic write.")
 			return
 		end
+		if ollama_origin ~= ApiOllama.get_base_url() or mlx_origin ~= ApiMlx.get_base_url() then
+			CoreState.last_backend_check = 0
+			Logger.debug(LOG, "auto_detect: endpoint changed while probing; ignoring stale receipt.")
+			return
+		end
 		-- Prefer Ollama if both are available, otherwise MLX, and only invalidate
 		-- deferred work when the resolved identity actually changes. A same-backend
 		-- health refresh must not cancel an otherwise valid profile warmup.
@@ -277,6 +283,8 @@ function M.auto_detect_backend(callback)
 				return
 			end
 		end
+		CoreState.last_backend_check = now
+		CoreState.last_ollama_origin, CoreState.last_mlx_origin = ollama_origin, mlx_origin
 		CoreState.backend = next_backend
 		if next_backend == "ollama" then
 			-- Ensure the Ollama daemon is running now that we know it is the active
@@ -303,8 +311,8 @@ function M.auto_detect_backend(callback)
 	-- on_both_done() never completes and auto_detect_backend()'s callback is
 	-- silently dropped. Mark the leg done+failed instead, mirroring the
 	-- pattern already used in adapters/http_client.lua's post()/get() (F-MED-5).
-	local ollama_probe_ok = pcall(hs.http.asyncGet, "http://127.0.0.1:11434/api/version", {}, function(status, body)
-		ollama_ok = (status == 200) and type(body) == "string" and body:find('"version"') ~= nil
+	local ollama_probe_ok = pcall(hs.http.asyncGet, ollama_origin .. EnableAdmission.VERSION_PATH, {}, function(status, body)
+		ollama_ok = EnableAdmission.receipt({ ok = status == 200, status = status, body = body }) == true
 		ollama_done = true
 		on_both_done()
 	end)
@@ -318,7 +326,7 @@ function M.auto_detect_backend(callback)
 	-- The MLX probe follows the configured port via api_mlx.get_base_url() — the
 	-- single source of truth. ApiMlx is required at the top of this file, so no
 	-- local re-require and no hardcoded port literal here.
-	local mlx_models_url = ApiMlx.get_base_url() .. "/v1/models"
+	local mlx_models_url = mlx_origin .. "/v1/models"
 	local mlx_probe_ok = pcall(hs.http.asyncGet, mlx_models_url, {}, function(status, body)
 		mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
 		mlx_done = true
@@ -340,7 +348,7 @@ function M.warm_up_connections()
 		-- Parallel async pings to both backends (fire-and-forget). The MLX URL
 		-- follows the configured port via api_mlx.get_base_url() (required at the
 		-- top of this file) — the single source of truth, no hardcoded port.
-		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
+		hs.http.asyncGet(ApiOllama.get_base_url() .. EnableAdmission.VERSION_PATH, {}, function() end)
 		hs.http.asyncGet(ApiMlx.get_base_url() .. "/v1/models", {}, function() end)
 	end)
 end
