@@ -1,0 +1,9 @@
+{
+	"schema": 1,
+	"file": "postinstall-proposal.tar.gz",
+	"bytes": 93918,
+	"sha256": "4a4d7f561533a76c276603d5b8918b455876a2ebefd286cc7331a93ec7e5879d",
+	"source_base": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+	"status": "inactive portable preparation; count-only enrollment unexecuted, custody/canonical/native qualification pending",
+	"members": 30
+}

@@ -1,0 +1,85 @@
+{
+	"capsule": "timeout-capture103-portable-proposal.tar.gz",
+	"bytes": 1027535,
+	"sha256": "bff7ce33da58df8d86036e0f33c260560a68c55b282816b8f61ed5854cf830e0",
+	"qualification": {
+		"qualification": "PORTABLE_CANONICAL_DEFAULT_DISCOVERY_PASS_NO_ADOPTION_NO_NATIVE_CREDIT",
+		"canonical_original": {
+			"exit": 1,
+			"tests": 103,
+			"errors": 6,
+			"failures": 0,
+			"skips": 0,
+			"seconds": 37.291,
+			"method": "unmodified physical canonical python -I -B owning script"
+		},
+		"corrected": {
+			"all_guard_outer_children_reaped": true,
+			"discovery": "actual unittest.defaultTestLoader.loadTestsFromModule alphabetical class ordering",
+			"errors": 0,
+			"failures": 0,
+			"original_allocator_identity_exact": true,
+			"original_type_dictionary_keys_exact": true,
+			"original_type_restored": true,
+			"qualification": "PORTABLE_SOFTWARE_ONLY_NATIVE_ACK_SECURITY_MODELED",
+			"skips": 0,
+			"subject": "candidate",
+			"tests": 103,
+			"exit": 0,
+			"seconds": 41.051
+		},
+		"files": {
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": {
+				"guard90": "57ea990ad3626c3dd91e27fc17088325b270d1f707d5c38f6a2016e225639cf3",
+				"candidate": "54fc39d4d7d322711337091aea490c44795da7e5fe022d01800ace1201915d9d"
+			},
+			"tools/test/macos_native_http_receiving_facts_test.py": {
+				"guard90": "65d8dbbe235dbac2ef9e681e3e82735e0f78847df35a6e93d388391cdddef37c",
+				"candidate": "3f9d04684b5e3c72f362bdc2aabf59ef10475d2402482ab1bde72121316addc1"
+			},
+			"tools/test/test-managed-ollama-protocol.cjs": {
+				"guard90": "4fd559b30105eb473bdd4362a69914b49f6fde387a1353c54c301adf8b6dbbf1",
+				"candidate": "8e557928fd734473713a7912b62e91ee8b4fa23a47e86fb9aaa4e3fa605a7768"
+			}
+		},
+		"whole_guard90_composed_inverse": true,
+		"changed_original_R2_helper_only": "r2_guard_constructor_literal_setup",
+		"historical_capsule": {
+			"members": 47,
+			"sha256": "bfd4f18e3e929ce9e8021e807e8a5f422414309e53c2b131b93e24aca217dcd2",
+			"private_order_qualification": "declaration order; does not prove canonical alphabetical discovery"
+		},
+		"runtime_source_hashes": {
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "54fc39d4d7d322711337091aea490c44795da7e5fe022d01800ace1201915d9d",
+			"static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py": "191ac2901fbdb9acfc6e5b85618a704fb8ac5b8c022d75c490f19075d3061d55",
+			"static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift": "fa6b21693f70f70d391ceedf4b47cbab894e06f623c65d704fe30ad8c83a68dc",
+			"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift": "0650c5f3c6ab64b79f324dcf07331286a2c7710fec2734fec93c8d800cddd624",
+			"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWireTests.swift": "37e3001e74f5fedb419fcc3e3c08632664c9a97c08e411363208d325837b9d80",
+			"tools/diagnostics/macos_owned_process.py": "9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98"
+		},
+		"unexecuted": [
+			"corrected physical live owning command",
+			"full canonical format/JS/hotstring gate after correction",
+			"Darwin native clocks",
+			"Security trust",
+			"SDK49",
+			"PAC14 ARM/AMD",
+			"E2E",
+			"packaging",
+			"installation",
+			"Actions"
+		]
+	},
+	"source_manifest_sha256": "9106979e215ae4c88fc79368cadf823b62959e3be3e414491814145d0b0ea466",
+	"inventory_sha256": "fb3862e07c483ee39c923530f8802bf0caa3f1213786c9e44c4043c2862f4135",
+	"parent_receiving": {
+		"qualification": "PARENT_INDEPENDENT_CORRECTIVE_CAPSULE_PREIMAGE_INVERSE_VERIFIED",
+		"capsule_bytes": 1027535,
+		"capsule_sha256": "bff7ce33da58df8d86036e0f33c260560a68c55b282816b8f61ed5854cf830e0",
+		"safe_regular_members": 40,
+		"sole_changed_helper": "r2_guard_constructor_literal_setup",
+		"whole_three_path_guard90_inverse": true,
+		"runtime_closure_hashes_exact": true,
+		"head": "2c076c37bf58c4f70541fd3be2e70ecfc2d85034"
+	}
+}

@@ -379,6 +379,9 @@ KeyCombinationFire(Second, Ports := 0) {
 		Ports := _KeyCombinationPorts()
 	if !_KeyCombinationTaken.Has(Second)
 		return ""
+	; Keep the acquired press suppressed; a disabled category grants no new effect.
+	if !KeyCombinationsAreOn()
+		return "swallowed"
 	First := _KeyCombinationTaken[Second]
 	PairId := KeyCombinationPairId(First, Second)
 	Tap := KeyCombinationTapOf(PairId)
@@ -394,6 +397,9 @@ KeyCombinationFire(Second, Ports := 0) {
 	_KeyCombinationHandled[Second] := true
 	Ports["take_first"].Call(First, Second)
 	LoggerDebug("KeyCombinations", "Pair '{1}' fired (tap='{2}', hold='{3}').", PairId, Tap, Hold)
+	; First-key ownership and logging may yield to a category publication.
+	if !KeyCombinationsAreOn()
+		return "swallowed"
 	if (Hold == KEY_COMBINATION_NONE) {
 		if (Tap == KEY_COMBINATION_NONE)
 			return ""
@@ -402,6 +408,9 @@ KeyCombinationFire(Second, Ports := 0) {
 	}
 	Seconds := TapHoldDuration(TapHold, Second)
 	if _KeyCombinationHoldIsLayer(Hold) {
+		; Duration lookup may log before this original native acquisition.
+		if !KeyCombinationsAreOn()
+			return "swallowed"
 		Result := Ports["own_layer"].Call(Second, Seconds)
 	} else {
 		ModKey := ResolveHoldModifierKey(Hold, Second)
@@ -409,11 +418,17 @@ KeyCombinationFire(Second, Ports := 0) {
 			LoggerError("KeyCombinations", "Pair '{1}' names a hold that resolves to no key: '{2}'.", PairId, Hold)
 			return ""
 		}
+		; The real modifier resolver logs before returning its native key(s).
+		if !KeyCombinationsAreOn()
+			return "swallowed"
 		Result := Ports["own_modifier"].Call(Second, ModKey, Seconds)
 	}
 	; The hold is taken at key-down, as every tap-hold of this driver takes
 	; it; a release inside the second key's threshold makes the press a tap.
 	if (Result["tap"] && Tap != KEY_COMBINATION_NONE) {
+		; The original owner has already retired; deny only a newly emitted tap.
+		if !KeyCombinationsAreOn()
+			return "swallowed"
 		Ports["run_tap"].Call(First, Second, Tap)
 		return "tap"
 	}

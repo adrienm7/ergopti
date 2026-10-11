@@ -7,6 +7,34 @@ import Darwin
 import Foundation
 import Security
 
+// Fixed fixture-only clock observation. This role never touches native trust,
+// proxy settings, requests or a release entrypoint.
+private func fixtureClockProof() -> Int32 {
+	var samples = [TimeInterval]()
+	for index in 0..<16 {
+		if index > 0 { usleep(10_000) }
+		let sample = ProcessInfo.processInfo.systemUptime
+		guard sample.isFinite, sample > 0 else { return 74 }
+		samples.append(sample)
+	}
+	let fact: [String: Any] = [
+		"version": 1, "system_uptime": samples,
+	]
+	guard let encoded = try? JSONSerialization.data(withJSONObject: fact,
+		options: [.sortedKeys]), encoded.count <= 4_095 else { return 74 }
+	let output = encoded + Data([10])
+	var offset = 0
+	while offset < output.count {
+		let count = output.withUnsafeBytes {
+			Darwin.write(STDOUT_FILENO, $0.baseAddress!.advanced(by: offset), output.count - offset)
+		}
+		if count < 0 && errno == EINTR { continue }
+		guard count > 0 else { return 74 }
+		offset += count
+	}
+	return 0
+}
+
 // This diagnostic reads the exact owned certificate; certificate enumeration in
 // the admin domain can omit private-keychain certificates. Only a validated
 // external trust-list cardinality and the direct certificate lookup are emitted.
@@ -151,6 +179,7 @@ func managedHTTPFixtureRoutes(_ routes: [[String: Any]]) {
 // and signed binary. Production has no settings-file/environment override.
 func fixtureMain() -> Int32 {
 	let arguments = CommandLine.arguments
+	if arguments.count == 2, arguments[1] == "--fixture-clock-proof" { return fixtureClockProof() }
 	if arguments.count == 2, arguments[1] == "--fixture-admin-trust-query" { return fixtureAdminTrustQuery() }
 	let stages = FixtureStages(executable: arguments[0])
 	FixtureHTTPObservation.owner = stages

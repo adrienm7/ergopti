@@ -164,7 +164,7 @@ _UpdaterTest_GlobalTerminalRefusesPreferencesBeforeEffects() {
 	}
 }
 Test("Updater AHK-34: global terminal collision precedes all preference effects (updater-global-config-barrier)",
-	_UpdaterTest_GlobalTerminalRefusesPreferencesBeforeEffects)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_GlobalTerminalRefusesPreferencesBeforeEffects))
 
 _UpdaterTest_ChannelRetainsGlobalBundleThroughReloadRecovery() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL
@@ -257,7 +257,7 @@ _UpdaterTest_ChannelRetainsGlobalBundleThroughReloadRecovery() {
 	}
 }
 Test("Updater AHK-34: channel Reload retains global config ownership through recovery (updater-global-config-barrier)",
-	_UpdaterTest_ChannelRetainsGlobalBundleThroughReloadRecovery)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_ChannelRetainsGlobalBundleThroughReloadRecovery))
 
 _UpdaterTest_IntervalWriterFailureCannotPublishStaleLiveState() {
 	global UPDATER_CHECK_INTERVAL, UPDATER_REQUEST_ORIGIN_MANUAL
@@ -317,7 +317,7 @@ _UpdaterTest_IntervalWriterFailureCannotPublishStaleLiveState() {
 	}
 }
 Test("Updater AHK-34: interval writer owns config before failure publication (updater-global-config-barrier)",
-	_UpdaterTest_IntervalWriterFailureCannotPublishStaleLiveState)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_IntervalWriterFailureCannotPublishStaleLiveState))
 
 _UpdaterTest_IntervalPublicationReassertsDurableCandidate() {
 	global UPDATER_CHECK_INTERVAL, UPDATER_REQUEST_ORIGIN_MANUAL
@@ -356,4 +356,4 @@ _UpdaterTest_IntervalPublicationReassertsDurableCandidate() {
 	}
 }
 Test("Updater AHK-34: interval publication replaces stale reentrant live state (updater-global-config-barrier)",
-	_UpdaterTest_IntervalPublicationReassertsDurableCandidate)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_IntervalPublicationReassertsDurableCandidate))

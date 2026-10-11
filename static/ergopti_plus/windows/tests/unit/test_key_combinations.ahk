@@ -1069,3 +1069,292 @@ _KCT_RegisterAltGrUnsetCases() {
 			_KCT_AltGrSuffixUnsetState.Bind(Missing))
 }
 _KCT_RegisterAltGrUnsetCases()
+
+; Category publication can precede a refused reload. The retained press must
+; still swallow repeats without authorizing another effect from its old slot.
+_KCT_WithCategoryPublication(Body) {
+	global CategoryEnabled
+	OriginalCategories := CategoryEnabled
+	HadOriginalGate := OriginalCategories.Has("KeyCombinations")
+	OriginalGate := OriginalCategories.Get("KeyCombinations", true)
+	OriginalDesired := MasterGateState()["features"]
+	try Body.Call()
+	finally {
+		CategoryEnabled := OriginalCategories
+		if HadOriginalGate
+			CategoryEnabled["KeyCombinations"] := OriginalGate
+		else if CategoryEnabled.Has("KeyCombinations")
+			CategoryEnabled.Delete("KeyCombinations")
+		MasterGateState()["features"] := OriginalDesired
+	}
+}
+
+_KCT_PublishCombinationGate(Enabled) {
+	global CategoryEnabled
+	Candidate := CategoryEnabled.Clone()
+	Candidate["KeyCombinations"] := Enabled
+	_ConfigPublishDesiredState(MasterGateState()["features"], [], Candidate)
+	AssertEqual(Enabled, KeyCombinationsAreOn(), "the original publisher changes the real category admission")
+}
+
+_KCT_RevokedRetainedRepeat() {
+	Body() {
+		global _KeyCombinationTaken, _KeyCombinationHandled
+		Events := []
+		Ports := _KCT_Ports(Events)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("tap", KeyCombinationFire("caps_lock", Ports))
+		Taken := _KeyCombinationTaken
+		Handled := _KeyCombinationHandled
+		_KCT_PublishCombinationGate(false)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["caps_lock", "left_alt"])),
+			"the acquired repeat stays suppressed instead of falling into the ordinary tap-hold")
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", Ports))
+		AssertEqual(2, Events.Length, "category revocation prevents another retained tap")
+		AssertTrue(_KeyCombinationTaken == Taken && _KeyCombinationHandled == Handled,
+			"revocation must not replace the original press records")
+		AssertEqual("left_alt", Taken["caps_lock"])
+		AssertTrue(Handled.Has("caps_lock"))
+		_KCT_PublishCombinationGate(true)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["caps_lock"])))
+		AssertEqual("repeat", KeyCombinationFire("caps_lock", Ports))
+		AssertEqual(3, Events.Length, "unchanged enabled repeats keep their original effect")
+	}
+	Run() => _KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map(), Body)
+	_KCT_WithCategoryPublication(Run)
+}
+Test("key combinations: category publication stops retained repeat effects without surrendering the press (pair-category-revocation)",
+	_KCT_RevokedRetainedRepeat)
+
+_KCT_RevokedBeforeFire() {
+	Body() {
+		global _KeyCombinationTaken, _KeyCombinationHandled
+		Events := []
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		_KCT_PublishCombinationGate(false)
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", _KCT_Ports(Events)))
+		AssertEqual(0, Events.Length, "revocation between criterion and handler permits no first-key or action effect")
+		AssertEqual("left_alt", _KeyCombinationTaken["caps_lock"])
+		AssertFalse(_KeyCombinationHandled.Has("caps_lock"), "a refused handler has performed no first-key effect")
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["caps_lock"])))
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", _KCT_Ports(Events)))
+		AssertEqual(0, Events.Length)
+	}
+	Run() => _KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map(), Body)
+	_KCT_WithCategoryPublication(Run)
+}
+Test("key combinations: published category revocation before Fire permits no new effect (pair-category-revocation)",
+	_KCT_RevokedBeforeFire)
+
+_KCT_RevokedAfterTakeFirst(Hold) {
+	Body() {
+		global _KeyCombinationTaken, _KeyCombinationHandled
+		Events := []
+		Ports := _KCT_Ports(Events)
+		Take(First, Second) {
+			Events.Push("take:" . First)
+			_KCT_PublishCombinationGate(false)
+		}
+		Ports["take_first"] := Take
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", Ports))
+		AssertEqual(1, Events.Length, "the original first-key effect is accounted for, with no later action/native acquisition")
+		AssertEqual("take:left_alt", Events[1])
+		AssertEqual("left_alt", _KeyCombinationTaken["caps_lock"])
+		AssertTrue(_KeyCombinationHandled.Has("caps_lock"), "the completed first-key effect stays recorded")
+	}
+	Run() => _KCT_With(Map("left_alt_then_caps_lock", "caps_word"),
+		Hold == "none" ? Map() : Map("left_alt_then_caps_lock", Hold), Body)
+	_KCT_WithCategoryPublication(Run)
+}
+Test("key combinations: first-key callback revocation prevents the following tap (pair-category-revocation)",
+	_KCT_RevokedAfterTakeFirst.Bind("none"))
+Test("key combinations: first-key callback revocation prevents a new modifier owner (pair-category-revocation)",
+	_KCT_RevokedAfterTakeFirst.Bind("ctrl"))
+Test("key combinations: first-key callback revocation prevents a new layer owner (pair-category-revocation)",
+	_KCT_RevokedAfterTakeFirst.Bind("nav"))
+
+_KCT_RevokedDuringPairLog() {
+	global _LOGGER_TEST_SINK, _LOGGER_DEBUG_ENABLED, _LOGGER_MIN_SEVERITY
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime, _LOGGER_REPEAT_ENABLED
+	Saved := { Sink: _LOGGER_TEST_SINK, Debug: _LOGGER_DEBUG_ENABLED,
+		Severity: _LOGGER_MIN_SEVERITY, Dedup: _LOGGER_DEDUP_KEY, DedupLevel: _LOGGER_DEDUP_LEVEL,
+		DedupCount: _LOGGER_DEDUP_COUNT, LastTime: _LastErrTime, Repeat: _LOGGER_REPEAT_ENABLED }
+	Body() {
+		Events := []
+		Calls := []
+		Observe(Line) {
+			if !InStr(Line, "[KeyCombinations] Pair '")
+				return
+			Calls.Push(Line)
+			_KCT_PublishCombinationGate(false)
+		}
+		LoggerSetTestSink(Observe)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", _KCT_Ports(Events)))
+		AssertEqual(1, Calls.Length, "the actual pair log reaches the controlled callback once")
+		AssertEqual(1, Events.Length, "post-log admission prevents the tap after its first-key effect")
+		AssertEqual("take:left_alt", Events[1])
+	}
+	Run() => _KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map(), Body)
+	try {
+		_LOGGER_DEBUG_ENABLED := true
+		_LOGGER_MIN_SEVERITY := 10
+		_LOGGER_DEDUP_KEY := ""
+		_LOGGER_REPEAT_ENABLED := false
+		_KCT_WithCategoryPublication(Run)
+	} finally {
+		_LOGGER_TEST_SINK := Saved.Sink
+		_LOGGER_DEBUG_ENABLED := Saved.Debug
+		_LOGGER_MIN_SEVERITY := Saved.Severity
+		_LOGGER_DEDUP_KEY := Saved.Dedup
+		_LOGGER_DEDUP_LEVEL := Saved.DedupLevel
+		_LOGGER_DEDUP_COUNT := Saved.DedupCount
+		_LastErrTime := Saved.LastTime
+		_LOGGER_REPEAT_ENABLED := Saved.Repeat
+	}
+}
+Test("key combinations: actual pair-log callback revocation prevents the following tap (pair-category-revocation)",
+	_KCT_RevokedDuringPairLog)
+
+_KCT_CategoryAtOwnerReturn(Hold, Revoke, OwnerTap := true) {
+	Body() {
+		global _KeyCombinationTaken, _KeyCombinationHandled
+		Events := []
+		Ports := _KCT_Ports(Events)
+		Outcome := Map("tap", OwnerTap, "activated", true, "released", true)
+		Modifier(Second, ModKey, Seconds) {
+			Events.Push("modifier-return:" . Second)
+			if Revoke
+				_KCT_PublishCombinationGate(false)
+			return Outcome
+		}
+		Layer(Second, Seconds) {
+			Events.Push("layer-return:" . Second)
+			if Revoke
+				_KCT_PublishCombinationGate(false)
+			return Outcome
+		}
+		Ports["own_modifier"] := Modifier
+		Ports["own_layer"] := Layer
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual(!OwnerTap ? "hold" : Revoke ? "swallowed" : "tap", KeyCombinationFire("caps_lock", Ports))
+		AssertEqual((Revoke || !OwnerTap) ? 2 : 3, Events.Length, "only a still-admitted original owner return may emit its delayed tap")
+		AssertEqual("take:left_alt", Events[1])
+		AssertEqual((Hold == "nav" ? "layer-return:" : "modifier-return:") . "caps_lock", Events[2])
+		AssertTrue(Outcome["tap"] == OwnerTap && Outcome["activated"] && Outcome["released"],
+			"the acknowledged owner result is not rewritten into failed retirement")
+		AssertEqual(3, Outcome.Count, "no ownership or debt fields are manufactured")
+		AssertEqual("left_alt", _KeyCombinationTaken["caps_lock"])
+		AssertTrue(_KeyCombinationHandled.Has("caps_lock"))
+	}
+	Run() => _KCT_With(Map("left_alt_then_caps_lock", "caps_word"),
+		Map("left_alt_then_caps_lock", Hold), Body)
+	_KCT_WithCategoryPublication(Run)
+}
+_KCT_RevokedAtOwnerReturn(Hold) {
+	_KCT_CategoryAtOwnerReturn(Hold, true)
+	_KCT_CategoryAtOwnerReturn(Hold, false)
+}
+Test("key combinations: modifier retirement rejoins category before its delayed tap (pair-category-revocation)",
+	_KCT_RevokedAtOwnerReturn.Bind("ctrl"))
+Test("key combinations: layer retirement rejoins category before its delayed tap (pair-category-revocation)",
+	_KCT_RevokedAtOwnerReturn.Bind("nav"))
+
+Test("key combinations: category revocation does not reclassify completed hold retirement (pair-category-revocation)",
+	_KCT_CategoryAtOwnerReturn.Bind("ctrl", true, false))
+
+; These controls execute the original resolver and duration fallback, not a
+; replacement resolver or owner. Only their final owner ports record effects.
+_KCT_CategoryAtNativeEnrollment(Hold, Revoke) {
+	global TapHold, _LOGGER_TEST_SINK, _LOGGER_DEBUG_ENABLED, _LOGGER_WARN_ENABLED
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime, _LOGGER_REPEAT_ENABLED
+	Saved := { TapHold: TapHold, Sink: _LOGGER_TEST_SINK, Debug: _LOGGER_DEBUG_ENABLED,
+		Warn: _LOGGER_WARN_ENABLED, Dedup: _LOGGER_DEDUP_KEY, DedupLevel: _LOGGER_DEDUP_LEVEL,
+		DedupCount: _LOGGER_DEDUP_COUNT, LastTime: _LastErrTime, Repeat: _LOGGER_REPEAT_ENABLED }
+	Body() {
+		global _KeyCombinationTaken, _KeyCombinationHandled
+		Events := []
+		Calls := []
+		Outcome := Map("tap", false, "activated", true, "released", true)
+		Observe(Line) {
+			Expected := Hold == "nav" ? "[TapHoldLoader] Invalid time_activation_seconds "
+				: "[TapHoldLoader] Resolved hold_modifier "
+			if !InStr(Line, Expected)
+				return
+			Calls.Push(Line)
+			if Revoke
+				_KCT_PublishCombinationGate(false)
+		}
+		Modifier(Second, ModKey, Seconds) {
+			Events.Push("modifier:" . Second)
+			if Hold == "ctrl" {
+				AssertEqual("LCtrl", ModKey, "the original single-modifier resolver supplies its native key")
+			} else {
+				AssertTrue(ModKey is Array)
+				AssertEqual(2, ModKey.Length)
+				AssertEqual("LCtrl", ModKey[1])
+				AssertEqual("LShift", ModKey[2])
+			}
+			return Outcome
+		}
+		Layer(Second, Seconds) {
+			Events.Push("layer:" . Second)
+			AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, Seconds,
+				"the original duration fallback supplies its unchanged threshold")
+			return Outcome
+		}
+		Ports := _KCT_Ports(Events)
+		Ports["own_modifier"] := Modifier
+		Ports["own_layer"] := Layer
+		LoggerSetTestSink(Observe)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		Taken := _KeyCombinationTaken
+		Handled := _KeyCombinationHandled
+		AssertEqual(Revoke ? "swallowed" : "hold", KeyCombinationFire("caps_lock", Ports))
+		AssertEqual(1, Calls.Length, "the genuine resolver/duration callback is actually reached once")
+		AssertEqual(!Revoke, KeyCombinationsAreOn(), "the callback's real category publication is retained")
+		AssertEqual(Revoke ? 1 : 2, Events.Length,
+			"a revoked callback permits the completed first-key effect but no native owner or tap")
+		AssertEqual("take:left_alt", Events[1])
+		if !Revoke
+			AssertEqual((Hold == "nav" ? "layer:" : "modifier:") . "caps_lock", Events[2])
+		AssertTrue(_KeyCombinationTaken == Taken && _KeyCombinationHandled == Handled)
+		AssertEqual("left_alt", Taken["caps_lock"])
+		AssertTrue(Handled.Has("caps_lock"), "the original first-key effect stays accounted for")
+		AssertFalse(Outcome["tap"])
+		AssertTrue(Outcome["activated"] && Outcome["released"])
+		AssertEqual(3, Outcome.Count, "refusal does not manufacture or alter owner debt")
+	}
+	Run() => _KCT_With(Map("left_alt_then_caps_lock", "caps_word"),
+		Map("left_alt_then_caps_lock", Hold), Body)
+	try {
+		_LOGGER_DEBUG_ENABLED := true
+		_LOGGER_WARN_ENABLED := true
+		_LOGGER_DEDUP_KEY := ""
+		_LOGGER_REPEAT_ENABLED := false
+		if Hold == "nav"
+			TapHold := Map("keys", Map("caps_lock", Map("time_activation_seconds", 0)))
+		_KCT_WithCategoryPublication(Run)
+	} finally {
+		TapHold := Saved.TapHold
+		_LOGGER_TEST_SINK := Saved.Sink
+		_LOGGER_DEBUG_ENABLED := Saved.Debug
+		_LOGGER_WARN_ENABLED := Saved.Warn
+		_LOGGER_DEDUP_KEY := Saved.Dedup
+		_LOGGER_DEDUP_LEVEL := Saved.DedupLevel
+		_LOGGER_DEDUP_COUNT := Saved.DedupCount
+		_LastErrTime := Saved.LastTime
+		_LOGGER_REPEAT_ENABLED := Saved.Repeat
+	}
+}
+_KCT_RevokedAtNativeEnrollment(Hold) {
+	_KCT_CategoryAtNativeEnrollment(Hold, true)
+	_KCT_CategoryAtNativeEnrollment(Hold, false)
+}
+Test("key combinations: actual single-modifier resolver log rejoins category before owner acquisition (pair-category-revocation)",
+	_KCT_RevokedAtNativeEnrollment.Bind("ctrl"))
+Test("key combinations: actual multi-modifier resolver log rejoins category before owner acquisition (pair-category-revocation)",
+	_KCT_RevokedAtNativeEnrollment.Bind("ctrl+shift"))
+Test("key combinations: actual duration fallback log rejoins category before layer acquisition (pair-category-revocation)",
+	_KCT_RevokedAtNativeEnrollment.Bind("nav"))

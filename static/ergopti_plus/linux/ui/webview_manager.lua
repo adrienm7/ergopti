@@ -178,7 +178,7 @@ local function notify_document_refusal(private_current)
 			and private_current() == true
 	end
 	local loaded, admitted = pcall(function()
-		local I18n, Notifier = require("infra.i18n"), require("adapters.notifier")
+		local I18n, Notifier = require("infra.i18n"), require("adapters.application_notifier")
 		if type(Notifier.send_owned) ~= "function" or not admit() then return false end
 		local title, message = I18n.get("error_dialog.heading"), I18n.get("error_dialog.intro")
 		if type(title) ~= "string" or title == "" or title == "error_dialog.heading"

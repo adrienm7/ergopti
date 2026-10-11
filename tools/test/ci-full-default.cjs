@@ -32,6 +32,11 @@ const JOBS = [
 		'item36-native',
 		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
 	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
 	['.github/workflows/ci-macos.yml', 'managed-ollama-native', null],
 	['.github/workflows/ci-macos.yml', 'test-hs', null],
 	['.github/workflows/ci-macos.yml', 'e2e-hs', null],
@@ -56,6 +61,36 @@ const JOBS = [
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']
 ];
 const FULL_STEPS = [
+	[
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		'Receive closed lease silence transcript controls',
+		null
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		'Execute the actual paired native silence control',
+		null
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'lease-silence-native',
+		'Retain exact paired-process native receiving',
+		'always()'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Observe independent native Apple Shortcuts SDK preflight and discovery',
+		"${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain independent native Apple Shortcuts SDK observation',
+		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	],
 	[
 		'.github/workflows/ci-linux.yml',
 		'test-linux',
@@ -102,6 +137,18 @@ const FULL_STEPS = [
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
 		'Retain selected number-row Carbon XCTest diagnostics',
+		'always()'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Receive native final-byte number-row causal refusal',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain native final-byte number-row causal diagnostics',
 		'always()'
 	],
 	[
@@ -169,6 +216,12 @@ const FULL_STEPS = [
 		'managed-ollama-native',
 		'Receive actual independent managed HTTP native clients',
 		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain independent native HTTP clock receiving',
+		"${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
@@ -387,6 +440,8 @@ function refuse(message) {
 function requireEqual(actual, expected, label) {
 	if (actual !== expected) refuse(label);
 }
+const LEASE_SILENCE_NATIVE_BODY =
+	"    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt";
 function validateRaw(files) {
 	if (!Array.isArray(files)) refuse('workflow files must be an array');
 	const entries = new Map();
@@ -466,6 +521,14 @@ function validateRaw(files) {
 			`${id}/${name} failure must remain fatal`
 		);
 	}
+	const silence = jobs.find(
+		(job) => job.file === '.github/workflows/ci-macos.yml' && job.id === 'lease-silence-native'
+	);
+	requireEqual(
+		silence.body,
+		LEASE_SILENCE_NATIVE_BODY,
+		'lease silence native exact source/host/artifact owner'
+	);
 	for (const lane of ['macos', 'windows', 'linux']) {
 		const caller = jobs.find((job) => job.file === ENTRY_REL && job.id === lane);
 		requireEqual(

@@ -10,7 +10,7 @@ function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
 	local names = {"lgi","infra.monotonic","infra.timings","infra.managed_http_deadline",
-		"adapters.event_loop","adapters.notifier","ui.webkit_host","ui.webview_manager"}
+		"adapters.event_loop","adapters.notifier","adapters.application_notifier","ui.webkit_host","ui.webview_manager"}
 	for _,name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local real_host = require("ui.webkit_host")
 	local host = setmetatable({}, {__index=real_host})
@@ -110,6 +110,7 @@ function M.new(app_name, handler, state)
 		if c.on_notice_probe then c.on_notice_probe() end
 		if not admit() then return false end
 		c.notices[#c.notices+1]={message=message,title=opts.title};return true end}
+	package.loaded["adapters.application_notifier"]=package.loaded["adapters.notifier"]
 	package.loaded["ui.webkit_host"]=host
 	package.loaded["ui.webview_manager"]=nil
 	Manager=require("ui.webview_manager");c.manager=Manager

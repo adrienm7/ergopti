@@ -1643,6 +1643,21 @@ _UpdaterTest_ProbeChannelWrite(State, Mode, Args*) {
 	return false
 }
 
+; Preference effects need a genuinely constructed current selected source.
+; The callback retains its original ports; this owner restores the selected path
+; even when an assertion or injected effect throws.
+_UpdaterTest_WithCurrentConfiguration(Callback) {
+	global ConfigurationFile
+	SavedPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Fixture := _ScopeOwnerFixture('[updater]`nchannel = "main"`ncheck_interval = 60`n')
+	ConfigurationFile := Fixture.path
+	try return Callback.Call()
+	finally {
+		ConfigurationFile := IsSet(SavedPath) ? SavedPath : unset
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+
 _UpdaterTest_ChannelAdmissionPrecedesPersistenceAndFailureReleases() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL
 	global UPDATER_REQUEST_ORIGIN_MANUAL
@@ -1774,7 +1789,7 @@ _UpdaterTest_ChannelAdmissionPrecedesPersistenceAndFailureReleases() {
 	}
 }
 Test("Updater AHK-31: channel admission precedes persistence and releases on failure (updater-channel-replacement-transaction)",
-	_UpdaterTest_ChannelAdmissionPrecedesPersistenceAndFailureReleases)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_ChannelAdmissionPrecedesPersistenceAndFailureReleases))
 
 _UpdaterTest_CountUnexpectedSettingsWrite(State, Args*) {
 	State.Writes += 1
@@ -1913,7 +1928,7 @@ _UpdaterTest_ActionLeasesSerializeChannelAndSiblingActions() {
 	}
 }
 Test("Updater AHK-31: action leases serialize channel, cadence and install ingress (updater-channel-replacement-transaction)",
-	_UpdaterTest_ActionLeasesSerializeChannelAndSiblingActions)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_ActionLeasesSerializeChannelAndSiblingActions))
 
 _UpdaterTest_AdmissionWrapperTerminal(State, Json, Request, Terminal := 0) {
 	State.Terminals += 1
@@ -2030,7 +2045,7 @@ _UpdaterTest_IntervalLeaseSpansPostcommitCancellation() {
 	}
 }
 Test("Updater AHK-31: interval action lease spans post-commit cancellation (updater-channel-replacement-transaction)",
-	_UpdaterTest_IntervalLeaseSpansPostcommitCancellation)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_IntervalLeaseSpansPostcommitCancellation))
 
 _UpdaterTest_ChannelWritePumpsRetiredTick(State, Mode, Args*) {
 	State.TickResult := State.OldTick.Call()
@@ -2155,7 +2170,7 @@ _UpdaterTest_FailedChannelWriteRestoresExactCadence() {
 	}
 }
 Test("Updater AHK-31: failed channel persistence restores the exact retired cadence (updater-channel-replacement-transaction)",
-	_UpdaterTest_FailedChannelWriteRestoresExactCadence)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_FailedChannelWriteRestoresExactCadence))
 
 _UpdaterTest_BackgroundScheduleRejectsDisarm(State, TimerFn, DelayMs) {
 	Result := _UpdaterTest_BackgroundSchedule(State, TimerFn, DelayMs)
@@ -2442,7 +2457,7 @@ _UpdaterTest_ChannelActionDefusesInheritedCritical() {
 }
 Test("Updater AHK-31: channel action never inherits caller Critical "
 	. "(updater-channel-inherited-critical)",
-	_UpdaterTest_ChannelActionDefusesInheritedCritical)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_ChannelActionDefusesInheritedCritical))
 
 _UpdaterTest_NonLeasedTerminalBlocksDeferredReload() {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
@@ -2745,7 +2760,7 @@ _UpdaterTest_SetterArmFailureHasOneOwnedTerminal() {
 	}
 }
 Test("Updater AHK-31: Setter initial arm failure has one owned terminal (updater-channel-replacement-transaction)",
-	_UpdaterTest_SetterArmFailureHasOneOwnedTerminal)
+	_UpdaterTest_WithCurrentConfiguration.Bind(_UpdaterTest_SetterArmFailureHasOneOwnedTerminal))
 
 _UpdaterTest_ActiveSendLeaseBlocksDeferredReload() {
 	global _UpdaterActiveSendLeaseCount
@@ -4649,3 +4664,29 @@ _UpdaterTest_ChannelBundleReceiptRefusesForeignOperationCase() {
 	} finally _Updater_ReleaseChannelConfigBundle(Bundle)
 }
 Test("Updater channel bundle: foreign operation case cannot fall through to release", _UpdaterTest_ChannelBundleReceiptRefusesForeignOperationCase)
+
+; A later future-schema edit remains refused before the preference writer. The
+; fixture creates valid admission first rather than borrowing a missing source.
+_UpdaterTest_CurrentFixtureRetainsFutureSchemaRefusal() {
+	global ConfigurationFile, UPDATER_REQUEST_ORIGIN_MANUAL
+	SavedPath := ConfigurationFile
+	Writes := 0
+	Body() {
+		Assert(ConfigSchemaCanPrepareWrite(ConfigurationFile))
+		Source := FSReadUtf8Exact(ConfigurationFile)
+		Future := RegExReplace(Source, "m)^_meta\.schema_version = [0-9]+$", "_meta.schema_version = 999", &Changed, 1)
+		AssertEqual(1, Changed)
+		Assert(FSWriteDurable(ConfigurationFile, Future))
+		Writer(Args*) {
+			Writes += 1
+			return true
+		}
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
+		AssertEqual(false, Updater_SetCheckInterval(120, Request, false, (*) => 0, Writer, (*) => true))
+		AssertEqual(0, Writes, "the real future-schema fence precedes the injected writer")
+		AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Future))
+	}
+	_UpdaterTest_WithCurrentConfiguration(Body)
+	AssertEqual(SavedPath, ConfigurationFile, "the selected configuration is restored after the guard control")
+}
+Test("Updater current-source fixture: future schema remains refused before preference effects", _UpdaterTest_CurrentFixtureRetainsFutureSchemaRefusal)
