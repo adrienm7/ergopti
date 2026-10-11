@@ -30,6 +30,13 @@ const EXPORTS = [
 const SC = [0x01d, 1, 0x11d, 2, 0x038, 4, 0x138, 8, 0x02a, 16, 0x036, 32, 0x15b, 64, 0x15c, 128];
 const VK = [0xa2, 1, 0xa3, 2, 0xa4, 4, 0xa5, 8, 0xa0, 16, 0xa1, 32, 0x5b, 64, 0x5c, 128];
 
+const VALUE_BINDINGS = [
+	'AssertThrows(LLM_NavEventOwner_AcknowledgeTerminalOutput.Bind(Handle, Attempt, Prefix))',
+	'_LNTOC_WithState(_LNTOC_UnknownPlanVector.Bind(Mutation, 0))',
+	'_LNTOC_WithState(_LNTOC_UnknownAttemptVector.Bind(Mutation, 0))',
+	'_LNTOC_WithState(_LNTOC_ThrowVector.Bind(Operation))'
+];
+
 /**
  * Require actual ABI bindings and independent fail-closed source boundaries.
  * @param {string} source - Guarded production AHK source.
@@ -100,6 +107,12 @@ function validate(source, tests) {
 		[...text.matchAll(/0x[\da-f]+|\b\d+\b/gi)].map((match) => Number(match[0]));
 	assert.deepEqual(numbers(maps[1]), SC, 'The SC table borrows a VK identity.');
 	assert.deepEqual(numbers(maps[2]), VK, 'The VK table borrows a SC identity.');
+	for (const binding of VALUE_BINDINGS)
+		assert(
+			tests.includes(binding),
+			'Every loop vector must bind its current value before invocation.'
+		);
+
 	assert.equal(
 		(tests.match(/^Test\("terminal output custody:.*\(todo49-output-custody-adapter\)"/gm) || [])
 			.length,
@@ -147,8 +160,13 @@ assert.throws(
 		),
 	/Missing DllCall body/
 );
+for (const binding of VALUE_BINDINGS)
+	assert.throws(
+		() => validate(source, tests.replace(binding, 'RemovedValueBinding()')),
+		/loop vector must bind/
+	);
 console.log(
-	'AHK custody source bindings: 5 native ABI bindings, 12 authored cases and 9 negative controls passed.'
+	'AHK custody source bindings: 5 native ABI bindings, 12 authored cases and 13 negative controls passed.'
 );
 console.log(
 	'Source selection only; all 12 AHK cases and Windows native delivery remain UNRUN here.'

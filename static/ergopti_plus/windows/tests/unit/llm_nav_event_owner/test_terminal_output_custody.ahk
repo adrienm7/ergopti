@@ -219,7 +219,7 @@ _LNTOC_IdentityCase() {
 		Attempt[Name] := Saved
 	}
 	for Prefix in [-1, 3, "1"]
-		AssertThrows(() => LLM_NavEventOwner_AcknowledgeTerminalOutput(Handle, Attempt, Prefix))
+		AssertThrows(LLM_NavEventOwner_AcknowledgeTerminalOutput.Bind(Handle, Attempt, Prefix))
 	Attempt["units"][1]["utf16"] := 0x7A
 	AssertThrows(() => LLM_NavEventOwner_AcknowledgeTerminalOutput(Handle, Attempt, 1))
 	Attempt["units"][1]["utf16"] := 0x61
@@ -303,11 +303,11 @@ _LNTOC_UnknownAttemptVector(Mutation, Status) {
 
 _LNTOC_UnknownReceiptsCase() {
 	for Mutation in ["key_token", "key_sequence", "key_plan", "key_size"]
-		_LNTOC_WithState(() => _LNTOC_UnknownPlanVector(Mutation, 0))
+		_LNTOC_WithState(_LNTOC_UnknownPlanVector.Bind(Mutation, 0))
 	_LNTOC_WithState(() => _LNTOC_UnknownPlanVector("", "0"))
 	_LNTOC_WithState(() => _LNTOC_UnknownPlanVector("", 77))
 	for Mutation in ["attempt_count", "attempt_id", "unit", "reserved", "units_size", "count_size", "attempt_size"]
-		_LNTOC_WithState(() => _LNTOC_UnknownAttemptVector(Mutation, 0))
+		_LNTOC_WithState(_LNTOC_UnknownAttemptVector.Bind(Mutation, 0))
 	_LNTOC_WithState(() => _LNTOC_UnknownAttemptVector("", "0"))
 	_LNTOC_WithState(() => _LNTOC_UnknownAttemptVector("", 77))
 }
@@ -366,7 +366,7 @@ _LNTOC_ThrowVector(Operation) {
 
 _LNTOC_ThrowAfterEffectCase() {
 	for Operation in ["plan", "begin", "acknowledge", "consume", "cancel"]
-		_LNTOC_WithState(() => _LNTOC_ThrowVector(Operation))
+		_LNTOC_WithState(_LNTOC_ThrowVector.Bind(Operation))
 }
 
 _LNTOC_RotateOwner(OriginalOwner, OriginalGeneration, Port) {
