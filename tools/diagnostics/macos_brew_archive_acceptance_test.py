@@ -6636,5 +6636,116 @@ int main(int argc, char **argv) {
             self.assertEqual(request.stderr, self.entry + self.returned + self.joined)
 
 
+class FirstPermissionWorkerRetentionControls(unittest.TestCase):
+    """Actual bounded publication; these facts never grant permission or native closure."""
+
+    def test_late_worker_fact_survives_full_history_and_later_checkpoints_without_grant(self):
+        with FirstCommandTimeoutControls().world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            (_, writer, evidence_root, _, acquired, _, _, _) = world
+            for index in range(260):
+                self.assertTrue(writer.record("pre-worker-" + str(index)))
+            first = {"schema": 1, "stage": "api-call-starting", "api_osstatus": None}
+            self.assertTrue(
+                writer.record(
+                    "automation.permission-worker", status="refused", permission_worker=first
+                )
+            )
+            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
+            self.assertEqual(current.get("first_permission_worker"), first)
+            self.assertFalse(current["ownership_closed"])
+            self.assertEqual(current["status"], "refused")
+            later = {"schema": 1, "stage": "worker-joined", "api_osstatus": 0}
+            self.assertTrue(writer.record("automation.permission-worker", permission_worker=later))
+            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
+            self.assertEqual(current["permission_worker"], later)
+            self.assertEqual(current.get("first_permission_worker"), first)
+            for index in range(260):
+                self.assertTrue(writer.record("post-worker-" + str(index)))
+            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
+            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
+            self.assertEqual(current.get("first_permission_worker"), first)
+            self.assertNotIn("permission_worker", current)
+            self.assertEqual(current["phase"], "candidate.failed")
+            self.assertEqual(current["status"], "refused")
+            self.assertEqual(current["cases"], {})
+            self.assertGreater(current["history_omitted"], 0)
+            self.assertLessEqual(len(json.dumps(current).encode()), 4096)
+            self.assertEqual(len(list(evidence_root.glob("phase-*.json"))), 256)
+            self.assertEqual(len(list(evidence_root.iterdir())), 257)
+            self.assertTrue(
+                all(
+                    "first_permission_worker" not in json.loads(path.read_bytes())
+                    for path in evidence_root.glob("phase-*.json")
+                )
+            )
+            self.assertEqual(acquired, [])
+
+    def test_only_validated_copy_can_seed_first_and_corrupt_replacement_cannot_publish(self):
+        faults = (
+            (
+                "automation.permission-worker",
+                "pending",
+                {"schema": 1, "stage": "PRIVATE", "api_osstatus": None},
+            ),
+            (
+                "automation.permission-worker",
+                "pending",
+                {"schema": True, "stage": "api-call-starting", "api_osstatus": None},
+            ),
+            (
+                "automation.permission-worker",
+                "pending",
+                {"schema": 1, "stage": "api-call-starting", "api_osstatus": 0},
+            ),
+            (
+                "automation.permission-worker",
+                "accepted",
+                {"schema": 1, "stage": "worker-joined", "api_osstatus": 0},
+            ),
+            (
+                "candidate.failed",
+                "refused",
+                {"schema": 1, "stage": "api-call-starting", "api_osstatus": None},
+            ),
+        )
+        for phase, status, fact in faults:
+            with self.subTest(phase=phase, status=status, fact=fact):
+                with FirstCommandTimeoutControls().world() as world:
+                    if timeout_evidence_unavailable_fixture(self, world):
+                        return
+                    (_, writer, evidence_root, _, acquired, _, _, _) = world
+                    self.assertTrue(writer.record("candidate.begin"))
+                    before = (evidence_root / "checkpoint.json").read_bytes()
+                    self.assertFalse(writer.record(phase, status=status, permission_worker=fact))
+                    self.assertIsNone(getattr(writer, "first_permission_worker", None))
+                    self.assertEqual((evidence_root / "checkpoint.json").read_bytes(), before)
+                    self.assertEqual(acquired, [])
+        with FirstCommandTimeoutControls().world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            (_, writer, evidence_root, _, acquired, _, _, _) = world
+            supplied = {"schema": 1, "stage": "api-returned", "api_osstatus": -1744}
+            self.assertTrue(
+                writer.record(
+                    "automation.permission-worker", status="refused", permission_worker=supplied
+                )
+            )
+            supplied["api_osstatus"] = 0
+            expected = {"schema": 1, "stage": "api-returned", "api_osstatus": -1744}
+            self.assertTrue(writer.record("candidate.failed", status="refused"))
+            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
+            self.assertEqual(current.get("first_permission_worker"), expected)
+            self.assertEqual(writer.first_permission_worker, expected)
+            self.assertIsNot(writer.first_permission_worker, supplied)
+            before = (evidence_root / "checkpoint.json").read_bytes()
+            writer.first_permission_worker["private_path"] = "PRIVATE"
+            self.assertFalse(writer.record("cleanup.closed", status="accepted", closed=True))
+            self.assertEqual((evidence_root / "checkpoint.json").read_bytes(), before)
+            self.assertNotIn(b"PRIVATE", before)
+            self.assertEqual(acquired, [])
+
+
 if __name__ == "__main__":
     unittest.main()
