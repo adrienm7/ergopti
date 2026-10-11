@@ -20,6 +20,7 @@
 #Requires AutoHotkey v2.0
 #Warn VarUnset, Off
 #SingleInstance Off
+#Include ../support/altgr_probe_ordinary_owner.ahk
 
 global TapHold := Map()
 global LayerEnabled := false
@@ -101,10 +102,14 @@ ProbeRun() {
 				ProbeCounts[Kind] := 0
 			ProbeDown("LCtrl", "SC01D")
 			ProbeDown("RAlt", "SC138")
+			ProbeReleaseDiagnostic("sleep-before-release-enter")
 			Sleep(80)
+			ProbeReleaseDiagnostic("sleep-before-release-return")
 			if ProbeRelease() != 0
 				throw Error("The controlled hook probe retained injected modifier release debt.")
+			ProbeReleaseDiagnostic("sleep-after-release-enter")
 			Sleep(80)
+			ProbeReleaseDiagnostic("sleep-after-release-return")
 			if !ProbeAdmission()
 				throw Error("The controlled hook observation lost its exact source/foreground fence.")
 			ProbeReceipt .= Scenario . "|" . ProbeCounts["suppress"] . "|" . ProbeCounts["native"]
@@ -149,13 +154,17 @@ ProbeDown(Name, Scan) {
 
 ProbeRelease(*) {
 	global ProbeOwned
-	DiagnosticOk := true
+	DiagnosticOk := ProbeReleaseDiagnostic("release-enter")
 	for _, Name in ["RAlt", "LCtrl"] {
 		if !ProbeOwned.Has(Name)
 			continue
 		try {
 			SendLevel(3)
+			if !ProbeReleaseDiagnostic("release-edge-begin-" . Name)
+				DiagnosticOk := false
 			SendEvent("{Blind}{" . (Name == "RAlt" ? "SC138" : "SC01D") . " Up}")
+			if !ProbeReleaseDiagnostic("release-edge-return-" . Name)
+				DiagnosticOk := false
 			ProbeOwned.Delete(Name)
 		} catch Error as Err {
 			if !ProbeReleaseDiagnostic("release-failed-" . Name, Err.Message . "`n")
@@ -192,7 +201,7 @@ ProbeHasFocus() {
 }
 
 KeyCombinationOwnsHotkey() {
-	return ProbeHasFocus()
+	return _KCT_ProbeOrdinaryOwner(A_ThisHotkey, ProbeHasFocus())
 }
 
 KeyCombinationFireHotkey() {
