@@ -327,3 +327,28 @@ TrayMenuFrameNative(Operation, Target := false, Handle := 0) {
 	}
 	throw ValueError("Unknown owned native menu operation")
 }
+
+_TrayBootstrapNoOp(*) {
+	return 0
+}
+
+/** Publishes the compiled startup row through one native replacement transaction. */
+_InstallSafeBootstrapTray(Label := unset, MenuObj := 0) {
+	Status := _TrayBootstrapProjectedRows("inert", Map())[1]
+	if !IsSet(Label)
+		Label := Status.Label
+	if !(Label is String) or Label == ""
+		throw ValueError("tray bootstrap label must be a non-empty string")
+	if !IsObject(MenuObj)
+		MenuObj := A_TrayMenu
+	PreviousCritical := Critical("On")
+	try {
+		; Own retirement and replacement in one uninterruptible AHK transaction.
+		; A caller-side Delete followed by this helper left a real click/timer seam
+		; in which Windows could display an empty root.
+		MenuObj.Delete()
+		MenuObj.Add(Label, _TrayBootstrapNoOp)
+		MenuObj.Disable(Label)
+		return true
+	} finally Critical(PreviousCritical)
+}

@@ -15,10 +15,6 @@
 ; This surface never claims admission of the mutable live manifest root.
 #Include ../../_shared/modules/menu/startup_tray_projection.ahk
 
-_TrayBootstrapNoOp(*) {
-	return 0
-}
-
 /** Publishes real native lifecycle rows before exposing the tray icon. */
 _InstallNativeStartupTray(RequestFn, MenuObj := 0, RegisterFn := 0) {
 	if !HasMethod(RequestFn, "Call")
@@ -42,26 +38,6 @@ _InstallNativeStartupTray(RequestFn, MenuObj := 0, RegisterFn := 0) {
 		}
 		if !HasMethod(RegisterFn, "Call")
 			MenuDispatcher_PruneMenu(MenuObj)
-		return true
-	} finally Critical(PreviousCritical)
-}
-
-_InstallSafeBootstrapTray(Label := unset, MenuObj := 0) {
-	Status := _TrayBootstrapProjectedRows("inert", Map())[1]
-	if !IsSet(Label)
-		Label := Status.Label
-	if !(Label is String) or Label == ""
-		throw ValueError("tray bootstrap label must be a non-empty string")
-	if !IsObject(MenuObj)
-		MenuObj := A_TrayMenu
-	PreviousCritical := Critical("On")
-	try {
-		; Own retirement and replacement in one uninterruptible AHK transaction.
-		; A caller-side Delete followed by this helper left a real click/timer seam
-		; in which Windows could display an empty root.
-		MenuObj.Delete()
-		MenuObj.Add(Label, _TrayBootstrapNoOp)
-		MenuObj.Disable(Label)
 		return true
 	} finally Critical(PreviousCritical)
 }

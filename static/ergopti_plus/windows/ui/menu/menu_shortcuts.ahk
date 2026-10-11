@@ -156,7 +156,11 @@ _SC_ExtensionRows() {
 						ExtName := NM[1]
 				}
 			}
-			MarkerState := Map("shortcut_extension_name", (*) => ExtId)
+			MarkerOutcome := "populated"
+			MarkerState := Map("shortcut_extension_name", (*) => ExtId,
+				"shortcut_extension_builder_failed", (*) => MarkerOutcome == "failed",
+				"shortcut_extension_builder_empty", (*) => MarkerOutcome == "empty",
+				"shortcut_extension_builder_missing", (*) => MarkerOutcome == "missing")
 			; Admit both possible complete markers before native allocation or builders.
 			ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())
 			EmptyRows := MenuRenderer_TemplateRows("shortcut_extension_empty_frame", Map(), Map(), Map())
@@ -164,6 +168,9 @@ _SC_ExtensionRows() {
 					|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())
 					|| !(EmptyRows is Array) || EmptyRows.Length == 0
 					|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())
+				return []
+			ResultRows := MenuRenderer_TemplateRows("shortcut_extension_result_frame", Map(), MarkerState, Map())
+			if !(ResultRows is Array) || ResultRows.Length != 0
 				return []
 			ExtMenu := Menu()
 			OwnedMenus.Push(ExtMenu)
@@ -188,13 +195,17 @@ _SC_ExtensionRows() {
 						LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
 					; A label and nothing else: the renderer draws it inert and greyed,
 					; which is exactly what a marker is.
-					if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_error_frame", Map(), MarkerState, Map()) == 0
-						throw Error("Shortcut extension error marker was withdrawn during its native builder")
+					MarkerOutcome := BuildFailed ? "failed" : "empty"
 				}
 			} else {
 				LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
-				if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_empty_frame", Map(), Map(), Map()) == 0
-					throw Error("Shortcut extension empty marker was withdrawn before publication")
+				MarkerOutcome := "missing"
+			}
+			if MarkerOutcome != "populated" {
+				if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_result_frame", Map(), MarkerState, Map()) == 0
+					throw Error(MarkerOutcome == "missing"
+						? "Shortcut extension empty marker was withdrawn before publication"
+						: "Shortcut extension error marker was withdrawn during its native builder")
 			}
 			Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
 		}
