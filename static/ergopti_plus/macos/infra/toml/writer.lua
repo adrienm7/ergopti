@@ -24,7 +24,7 @@ function M.write(path, data)
 end
 
 function M.write_if_unchanged(path, data, expected_source)
-	return SharedWriter.write(path, data, FileSystem, false, expected_source)
+	return SharedWriter.write(path, data, FileSystem, false, expected_source, true)
 end
 
 function M.create_if_absent(path, data)
