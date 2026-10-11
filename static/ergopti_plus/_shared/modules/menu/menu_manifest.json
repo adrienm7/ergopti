@@ -4366,6 +4366,23 @@
 			"unavailable": "hide"
 		}
 	],
+	"shortcut_extension_result_frame": [
+		{
+			"type": "include",
+			"section": "shortcut_extension_error_frame",
+			"present_when": "shortcut_extension_builder_failed"
+		},
+		{
+			"type": "include",
+			"section": "shortcut_extension_error_frame",
+			"present_when": "shortcut_extension_builder_empty"
+		},
+		{
+			"type": "include",
+			"section": "shortcut_extension_empty_frame",
+			"present_when": "shortcut_extension_builder_missing"
+		}
+	],
 	"llm_model_action_rows": [
 		{
 			"type": "check",
