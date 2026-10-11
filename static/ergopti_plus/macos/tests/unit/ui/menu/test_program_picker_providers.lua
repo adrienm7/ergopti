@@ -72,6 +72,14 @@ local function with_provider(kind, options, body)
 		package.loaded["infra.dialog_util"] = { text_prompt = function(_, _, _, confirm, cancel)
 			return options.cancel and cancel or confirm, SCALAR
 		end }
+		local original_prompt = package.loaded["infra.dialog_util"].text_prompt
+		package.loaded["infra.dialog_util"].text_prompt = function(...)
+			local button, value = original_prompt(...)
+			return button, options.scalar or value
+		end
+		package.loaded["infra.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
+		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
+		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["infra.deferred_work"] = { after = function(_, callback) callback(); return true end }
 		package.loaded["ui.action_picker"] = { open = function(settings, callback)
 			helpers.assert_eq(settings.items[1].id, "run_program")
@@ -141,6 +149,10 @@ local function with_provider(kind, options, body)
 			}
 			require("ui.menu.menu_shortcuts").build(ctx)
 			rows[1].items[1].action()
+		end
+		if options.scalar and picker_callback then
+			local original = picker_callback
+			picker_callback = function(id) return original(id, options.scalar) end
 		end
 		body(fixture, function()
 			if kind ~= "script" then
@@ -276,3 +288,22 @@ helpers.describe("program fixture final publication admission", function()
 		end)
 	end)
 end)
+
+for _, kind in ipairs({ "keyboard", "tap", "script" }) do
+	helpers.describe("reserved program refusal through actual " .. kind .. " provider", function()
+		helpers.it("preserves every original assignment and parameter before publication", function()
+			with_provider(kind, { scalar = '{"version":1,"executable":"/usr/bin/shortcuts","arguments":["run","11111111-1111-1111-1111-111111111111"]}' }, function(fixture, pick, state)
+				pick()
+				helpers.assert_eq(fixture.action, "none")
+				helpers.assert_eq(fixture.canonical_action, "none")
+				helpers.assert_eq(fixture.parameters, { retained = "unrelated" })
+				helpers.assert_eq(fixture.canonical_parameters, { retained = "unrelated" })
+				helpers.assert_eq(fixture.sets, 0)
+				helpers.assert_eq(fixture.saves, 0)
+				helpers.assert_eq(fixture.updates, 0)
+				helpers.assert_eq(fixture.warning, "platform_reason.program_runner_unavailable")
+				if kind == "script" then helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "none") end
+			end)
+		end)
+	end)
+end
