@@ -67,9 +67,11 @@ LLM_OllamaWarmup(model) {
 	try {
 		_LLM_Ollama_WarmupHttp := CurlAsyncRequest()
 		Request := _LLM_Ollama_WarmupHttp
-		Request.SetManagedRouting(0, () => _LLM_Ollama_WarmupGeneration == gen && _LLM_Ollama_WarmupHttp == Request)
+		Origin := LLM_OllamaRequestOrigin()
+		Request.SetManagedRouting(0, () => _LLM_Ollama_WarmupGeneration == gen && _LLM_Ollama_WarmupHttp == Request
+			&& LLM_OllamaOriginMatches(Origin))
 		Request.SetDeadline(Started, LLM_OLLAMA_WARMUP_TIMEOUT)
-		_LLM_Ollama_WarmupHttp.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", true)
+		_LLM_Ollama_WarmupHttp.Open("POST", Origin "/api/chat", true)
 		_LLM_Ollama_WarmupHttp.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
 			LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT)
 		if !_LLM_Ollama_SendUtf8(_LLM_Ollama_WarmupHttp, payload) {
@@ -78,7 +80,8 @@ LLM_OllamaWarmup(model) {
 			return false
 		}
 		_LLM_Ollama_PollGeneric(_LLM_Ollama_WarmupHttp,
-			(status, _body) => _LLM_Ollama_OnWarmupDone(status, gen),
+			(status, _body) => LLM_OllamaOriginMatches(Origin) ? _LLM_Ollama_OnWarmupDone(status, gen)
+				: _LLM_Ollama_OnWarmupPollFailed("source_withdrawal", gen),
 			() => _LLM_Ollama_OnWarmupPollFailed("timeout", gen),
 			Started, LLM_OLLAMA_WARMUP_TIMEOUT, _LLM_OLLAMA_WARMUP_POLL_MS)
 	} catch as e {

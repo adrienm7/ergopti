@@ -691,6 +691,16 @@ _LLM_Menu_PullModel(name, IsTag := false, BaseUrl := "", RunFn := 0, ScheduleFn 
 	}
 	if !(tag is String) || !RegExMatch(tag, "^[A-Za-z0-9_./:-]+$")
 		return false
+	global _LLM_ManagedBootstrap
+	Flow := _LLM_ManagedBootstrap
+	if !HasMethod(RunFn, "Call") && Flow is OllamaManagedBootstrap && Flow.Runtime.HasOwner() {
+		if BaseUrl != "" && BaseUrl != LLM_OLLAMA_BASE_URL && BaseUrl != Flow.Target["origin"]
+			return false
+		OnDone := HasMethod(ScheduleFn, "Call")
+			? (*) => ScheduleFn.Call(LLM_Menu_RequestBuild.Bind("managed_post_pull"), -LLM_MENU_POST_PULL_REBUILD_MS)
+			: LLM_Menu_RequestBuild.Bind("managed_post_pull")
+		return Flow.PullModel(tag, OnDone)
+	}
 	if BaseUrl == ""
 		BaseUrl := LLM_OLLAMA_BASE_URL
 	if BaseUrl != LLM_OLLAMA_BASE_URL || !RegExMatch(BaseUrl, "^http://localhost:[0-9]+$")
