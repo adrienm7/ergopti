@@ -6729,6 +6729,15 @@ or physical-device acceptance.
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-11 strict serve receiving enrollment. Authentic ARM receiving on716
+executes private5, numericTLS8, API20 and serve45 with all78 portable tests
+passing, but the workflow expects serve44 and rejects the unchanged strict
+summary. Its two count literals now require45 for the independently added
+listener-cancellation regression; all44 predecessor bodies and every exit,
+summary, no-skip and timeout assertion remain. No native listener or whole-job
+success is inferred. Exact-source native receiving remains required and item62
+stays open.
+
 2026-10-11 diagnostic compilation correction. Exact manual38098879182 on
 716bcb602175e4d2a1751318892dbfe80c890873 refuses the new Swift CFNetwork
 error-domain switch before XCTest: the unparenthesized cast is parsed as an
