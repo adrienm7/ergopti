@@ -10,9 +10,9 @@ Some independent fixture checks overlapped, so these measurements do not
 establish exclusive-host latency or an end-to-end CI speedup.
 
 The two JavaScript optimizations are published in `fa94e27337` and
-`1f0d4dd37e`. The AHK comment-scanning candidate remains local pending
-investigation of an earlier grouped custody failure. The release pipeline
-continues independently; no test duration reduction qualifies native behavior.
+`1f0d4dd37e`. The AHK comment-scanning successor has bounded differential and
+native receiving evidence below. Its complete hosted suite remains pending;
+no test duration reduction qualifies native behavior.
 
 ## Repeated menu source classification
 
@@ -62,11 +62,13 @@ results are asserted. This isolates scanning cost, not whole-suite latency.
 
 The successor passes 566 TOML-selected cases in 59.166 seconds, 70 isolated
 native Edit cases, the canonical whole-entry compilation and encoding gates.
-The earlier candidate's nine-case custody group has eight passes and one
-failure in the final durable-write rollback. That callback passes alone;
-the exact immediate predecessor plus callback also pass in 311.910 seconds.
-Neither replay explains the original grouped failure. Publication remains
-on hold while its cause is unresolved.
+The rejected `InStr` candidate's nine-case custody group had eight passes
+and one failure in the final durable-write rollback. The current regex
+successor passes the exact immediate predecessor plus that callback in
+311.910 seconds, including the recovered-old rollback results. This does
+not explain the discarded candidate's grouped failure. The full nine-case
+group still needs execution on the regex successor in hosted CI; the latest
+hosted nine passes belong to the original scanner.
 
 ## Native custody phase measurements
 
@@ -100,7 +102,63 @@ zero. The diagnostic retains 5,158 canonical warnings and a nonempty private
 temporary directory, so its stricter aggregate remains `qualified: false`.
 The selected passing test is not a full-suite or installation qualification.
 
+The retained temporary files are six registration-time metadata listings
+totaling 40,692 bytes; no selected custody directory or WAL remains. The
+warnings are `LocalSameAsGlobal` diagnostics from the canonical include graph,
+including two profiler locals. They remain visible and do not change the
+aggregate qualification result.
+
+A second private measurement wraps the actual `Row.check.Call` boundary,
+preserving its arguments, result, exception propagation and final native
+ownership fence. The same original control passes and retires its actor,
+wrapper and ownership ledgers. All twelve phases complete with unchanged
+tracked source. Its strict aggregate likewise remains false because of the
+warnings and registration-time temporary listings.
+
+| Phase           | Calls | Inclusive check ms | Whole phase ms |
+| --------------- | ----: | -----------------: | -------------: |
+| Commit          |   338 |         56,646.284 |     65,323.669 |
+| Native rollback |   284 |         87,278.442 |    101,293.127 |
+
+These are inclusive call-boundary observations, including argument extraction
+and nested checker work. They are neither exclusive CPU cost nor a paired
+speed comparison with the earlier sample. They identify the repeated guard
+path as the next measurement target; string copying and comparison costs
+have not yet been separated.
+
 ## Hosted Windows timings
+
+Completed run `38154427900` executes all 11,222 planned callbacks: 11,221
+pass and one fails. Callback durations total 4,395.102 seconds (73 minutes
+15 seconds); the AHK step takes 74 minutes 21 seconds and the whole unit
+job 76 minutes 4 seconds. The median callback takes 1.452 milliseconds.
+
+| Workload                      |  Tests | Summed callback time | Share of time |
+| ----------------------------- | -----: | -------------------: | ------------: |
+| Callbacks below one second    | 10,889 |      490.303 seconds |        11.16% |
+| Callbacks above ten seconds   |     80 |    2,757.750 seconds |        62.75% |
+| Nine native custody scenarios |      9 |    1,075.202 seconds |        24.46% |
+| Largest journal capacity case |      1 |      172.152 seconds |         3.92% |
+
+These rows overlap and must not be added. The slow tail dominates; the
+number of small assertions does not explain the runtime. The nine custody
+scenarios retain real ownership, durability and rollback observations, so
+these measurements alone do not justify removing them. Repeated display
+names account for only 0.322 seconds and include distinct files or inputs.
+
+The nine custody scenarios were introduced by `9878870ae5` on October 10
+at 03:01 UTC. They independently rebuild a 32 MiB fixture and perform real
+commit and rollback operations for distinct native callback boundaries.
+The journal capacity case dates to `7d2d80c372` on September 28. These ten
+cases account for 20.789 minutes, but there is no comparable historical
+measurement proving that they alone explain a 10–20 to 75 minute increase.
+
+Case 1981 itself passes in 0.162 milliseconds. The sole failure is case
+7126: a source assertion expects two receipt bootstrap owners after the
+native desktop entry legitimately added a third. This is separate from
+the observed performance cost. Redirecting native stdout can prevent a
+blocked reader, but no current end-to-end speedup is attributed to that
+change: the completed callback durations already explain most elapsed time.
 
 Cancelled run `38147217648` records 5,479 completed passing callbacks totaling
 3,724.668 seconds. The next callback was interrupted and has no completed
@@ -136,3 +194,15 @@ Compact source pins, scripts and receipts are retained under the local
   profiler; `custody-phase-regex-v5-root-20261011/receipt.json` retains its
   actual observations and qualification limits.
 - `ci38147217648-cancelled-windows-input-20261011/` retains hosted timings.
+- `ci38154427900-windows-terminal-input-20261011/` and
+  `windows-test-duration-distribution-input-20261011/` retain the complete
+  hosted callback manifest and duration distribution.
+- `custody-two-case-regex-root-20261011/receipt.json` retains the current
+  regex successor's ordered native receiving.
+- `windows-slow-test-introduction-input-20261011/` retains introduction
+  commits and the repeated native operations behind the measured costs.
+- `windows-custody-row-check-attribution-input-20261011/` retains the private
+  call-boundary instrument; `custody-row-check-attribution-root-20261011/`
+  retains the actual result and unchanged-source proof.
+- `custody-profile-resource-attribution-group2-20261011/` identifies the
+  retained registration files and canonical warning categories.
