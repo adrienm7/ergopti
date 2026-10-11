@@ -330,6 +330,8 @@ class Receiver:
                     env=environment,
                 )
                 owner.wait_for_exit(timeout)
+                # WNOWAIT retains the PID; only exact retirement publishes status.
+                require(owner.settle(), "native_command_retirement")
                 require(owner.process.returncode == 0, "actual_native_command")
                 output.seek(0)
                 return output.read(65536)
