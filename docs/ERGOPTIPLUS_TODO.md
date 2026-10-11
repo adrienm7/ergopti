@@ -28,26 +28,82 @@ production download links now select v1.0.0, while `/dev/` selects dev.157.
 Work now resumes from the latest `dev`, integrating all other groups and the
 stable corrections without discarding published history. Prioritize the
 maintainer's ten-hour v1.0.1 follow-up: maximum verified fixes and restoration
-of full CI. The v1.0.0 qualification and unsigned exceptions do not authorize
-either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
+of full CI. The v1.0.0 exceptions do not carry forward automatically. The
+maintainer has since authorized unsigned Windows executables until signing is
+implemented and the narrow v1.0.1 test deferrals described below. Groups 2, 4
+and 7 and item 133 remain open.
 
 ### v1.0.1 integration receiving
 
-Latest receiving, October 11: `main` is `657bae0467` and
-[CI 38136018539](https://github.com/adrienm7/ergopti/actions/runs/38136018539)
-is still incomplete. The native Apple Silicon MLX bootstrap, Linux units,
-macOS stubbed units/E2E and native tooltip captures pass. Core has one failing
-pipeline-condition guard. Both managed Ollama architectures fail earlier
-PAC/WPAD and independent HTTP receiving; a private CA is untrusted and later
-security commands time out. The model itself has not been received. Passive
-security logs were incorrectly conditional on the later model step alone.
-These failures remain mandatory, with no new test exception or release claim.
+Latest receiving, October 11: `main` is `8c3a3f1dc6` and
+[CI 38141714520](https://github.com/adrienm7/ergopti/actions/runs/38141714520)
+is still incomplete. Core, native Apple Silicon MLX bootstrap, macOS stubbed
+units/E2E and native tooltip captures pass. Linux has 13,075 passing cases and
+one loopback HTTP fixture timeout: its 100 ms transport deadline expired before
+the first connection, despite a refreshed timer. A local fixture correction
+uses its existing 1000 ms completion bound and blocks longer than that deadline
+to preserve the original stale-clock counterexample; native receiving remains
+required. The preceding Windows run passed all 11,222 unit cases, then refused
+the native console receipt because unrelated full-suite registration warnings
+polluted stdout. The local native entry correction retains all eleven desktop
+cases and strict output checks; its registration proof is not native execution.
+The three corrective commits through `2202da416e` are ready for publication:
+the Windows entry, the Linux fixture and the standalone Go build closure.
+Canonical Windows receiving passes 57 selected unit cases, all 70 isolated
+editor E2E cases and production entry compilation. The Go generator and its
+79 registered controls pass; an actual Go build and fresh hosted Go analysis
+remain required. The local complete JS suite was not rerun for this urgent
+publication; the hosted complete Core gate remains mandatory.
+
+Both managed Ollama architectures still fail earlier PAC/WPAD and independent
+HTTP receiving. Complete Intel security logs now prove that `trustd` refused
+the test anchor with missing `modify-anchor-certificates` entitlement
+(`-34018`), although the add command returned zero. Cleanup then requested
+administrator authentication and timed out at a confirmation dialog. No
+supported remedy or complete trust cleanup is proved. The model itself has
+not been received.
+
+On October 11 the maintainer explicitly requested immediate publication even
+if tests must be bypassed. The resulting temporary profile applies only to
+`v1.0.1` from a `main` push and expires at `2026-10-12T07:00:00Z`. It records
+four macOS scopes as **DEFERRED, qualified:false** in source-bound receipts and
+public release notes: the three exact native PAC/WPAD/bootstrap methods,
+independent native HTTP wire clients, the single Homebrew archive acceptance
+method, and native managed-model receiving across its three profiles and both
+architectures. These are not passing tests. The remaining unit and portable
+controls, builds, packaging, asset integrity and ordinary installation/launch
+remain mandatory. Other versions and default contexts execute the full tests;
+no system permission or certificate-trust workaround is adopted. Restoring
+these four native qualifications remains open after publication. v1.0.1 is
+not yet published.
+
+The composed policy, full-default workflow and Swift evidence controls pass
+locally, with unchanged source hashes. The Mac deferral owner passes its 79
+controls before the existing item-36 Windows symlink privilege refusal; the
+Homebrew owner reaches its Python fixtures, which require unavailable native
+host facilities. Those complete owners are not reported as passing here and
+remain mandatory in hosted Core. Formatting and diff checks pass.
 
 Dependabot PRs #91 and #92 were approved and rebase-merged, preserving their
 atomic history. After the corrective main push and rescan, GitHub reports zero
 open Dependabot alerts; all 34 original alerts have an explicit fixed timestamp.
-This does not close the separate 43 CodeQL findings tracked in item 144.
-The latest CodeQL analysis itself succeeded in all three language jobs.
+Fresh hosted CodeQL analysis of `8c3a3f1dc6` also succeeded in all three
+language jobs. Thirteen real findings are fixed; 32 independently reviewed
+false positives have individual dismissal reasons, including the two bounded
+original-regex test oracles. GitHub reports zero open CodeQL findings. No query
+or security test was disabled, and no real defect was dismissed. Item 144 is
+complete. The separately reported old CodeQL Go extraction error is corrected
+locally by a module under `_shared/go/native_http` and canonical generated
+embed inputs. Go must be re-enabled in the existing default setup after this
+source is published, and a fresh successful nonempty analysis must be checked;
+the historical failed analysis is retained.
+
+The latest fetched `dev` is `de83547967`. A finite semantic inventory identifies
+five additional production mechanisms to integrate: shortcut identity reread
+after admission, onboarding timer refusal, stream-task settlement ownership,
+unsigned decimal XID parsing, and live gesture catalogue withdrawal. These
+remain pending; the terminator metadata correction is already covered. Groups
+2, 4 and 7 and complete release qualification remain open.
 
 The following paragraphs retain earlier receiving checkpoints. They do not
 supersede this current state or establish completion of groups 2, 4 or 7.
@@ -10948,29 +11004,6 @@ The generated stable and dev Homebrew casks were published in tap commit
 `ba0fadd9af349eca1b5d1887e034f8bebd6d0092` with only the supported
 `depends_on macos: :big_sur` declaration changed. Published artifact versions,
 URLs and hashes were retained. Native Homebrew acceptance remains separate.
-
-- [ ] **144.** Resolve the current CodeQL findings with causal evidence.
-
-  The October 11 main-branch snapshot contains 43 open findings, distinct from
-  the now-resolved Dependabot alerts. Prioritize production rendering and text
-  parsing before test infrastructure. Preserve all original regression checks;
-  do not silence a query by changing only equivalent source spelling.
-  - Receive and publish the metrics date HTML escaping (#23), diagnostic
-    Markdown escaping (#36), keyboard parsing (#19, #20, #34), icon preview
-    text sink (#22), keylayout whitespace parser (#9), benchmark token
-    permissions (#8) and source-guard regex (#21) corrections.
-  - Qualify Lua fixture quoting (#44, #45, #51, #52), test regex construction
-    (#39, #41), shell argument boundaries (#46) and the Python TLS contexts
-    (#11–#18). Native trust and account experiments previously stopped remain
-    stopped; portable evidence does not qualify their execution.
-  - Review exact source-to-consumer evidence for the URL source ratchets
-    (#47–#50), local script extraction (#24–#30), structural comment removal
-    (#31–#33), Atom Markdown conversion (#35), canonical download URL (#37),
-    diagnostic string (#38), deliberate newline corruption (#40) and GitHub
-    masking command (#10). A proven false positive needs an explicit rationale;
-    a test-file label alone does not make a finding harmless.
-  - Confirm the resulting states with a fresh hosted CodeQL analysis of the
-    published source. No finding is recorded as closed by local tests alone.
 
 ## Time estimate
 
