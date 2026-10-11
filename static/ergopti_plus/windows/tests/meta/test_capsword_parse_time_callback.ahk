@@ -39,8 +39,12 @@ Test("capsword: mouse-cancel callback resolves via a parse-time-safe static acce
 _CPTC_HardwareIntentBeforePump() {
 	PrePump := _HGBS_PrePumpSource()
 	Assert(PrePump != "", "the actual entry and first message-pump boundary must exist")
-	Assert(RegExMatch(PrePump, 'm)^global _HardwareCapsLockOn := GetKeyState\("CapsLock", "T"\) \? true : false$'),
+	Assert(RegExMatch(PrePump, 'm)^global _HardwareCapsLockOn := KS_CapsLockToggleState\(\)$'),
 		"the entry must capture genuine CapsLock intent before the first message pump")
+	Observation := _DriverFuncBody("KS_CapsLockToggleState")
+	Assert(Observation != "", "the native startup observation must resolve before adapter initialization")
+	Assert(RegExMatch(Observation, 's)^KS_CapsLockToggleState\(\) \{\s*return GetKeyState\("CapsLock", "T"\) \? true : false\s*\}$'),
+		"the adapter must retain native toggle mode, boolean conversion and uncaught read refusal without global dependencies")
 	Source := _DriverSourceNoComments()
 	Count := 0, Offset := 1
 	while Position := RegExMatch(Source, "m)^global _HardwareCapsLockOn :=", &Match, Offset) {

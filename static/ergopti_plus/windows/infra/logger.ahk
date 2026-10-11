@@ -357,7 +357,7 @@ _LoggerPrivacyConfig() {
 			throw Error("Logger privacy source changed after admission.")
 		return State["config"]
 	}
-	Rules := JsonParse(FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8"))
+	Rules := JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\redaction.json"))
 	Context := Map("home", EnvGet("USERPROFILE"), "user", A_UserName, "case_insensitive", true)
 	if Context["home"] == "" || Context["user"] == ""
 		throw Error("Logger privacy identity is unavailable.")
