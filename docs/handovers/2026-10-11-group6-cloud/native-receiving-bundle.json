@@ -1,0 +1,10 @@
+{
+	"schema": 1,
+	"file": "native-receiving-5f7a8467.tar.gz",
+	"bytes": 247271,
+	"sha256": "d40205cb8ca7dcef861e39be60b20acf26713acd52b75d28a7ce356e661b0f90",
+	"source": "5f7a8467c9696b26a75de104f6329b39c181b8cb",
+	"run": 38129586139,
+	"members": 9,
+	"scope": "Original source-bound failed native receiving; no causal functional fix or complete acceptance"
+}

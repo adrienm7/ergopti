@@ -4068,6 +4068,41 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-11 held Windows original23 preparation is now durably preserved with
+its actual custody acknowledgment, complete inverses and Root67600 publisher
+comparison. The reviewed runner still requires exact composition for the two
+legitimately generated PAC outputs; no arbitrary binary or clean-source assertion
+is admitted. The actual old5173 Windows unit watchdog leaves only1993/11146
+terminal tests, with E2E/package/install skipped. The independent original23
+proposal remains unadopted and native delivery unqualified; item36 stays open.
+See the [held packet](handovers/2026-10-11-group6-cloud/windows-original23-held-preparation-preservation.tar.gz).
+
+2026-10-11 current-source Windows updater fixture correction. Ten original
+callback registrations now construct an admitted current configuration through
+the original scope fixture and restore the selected path before cleanup. All167
+original function bodies and the nine affected callbacks'129 assertions remain;
+one additive real future-schema control requires refusal before writer effects.
+Root custody6110743845 and the complete source inverse are retained in the
+[reviewed proposal](handovers/2026-10-11-group6-cloud/windows-updater-current-source-proposal.tar.gz).
+This is source adoption, not native acceptance: original23, complete Windows
+unit/E2E/package/install receiving remain unrun on this successor. The separate
+Dev8d6 scope12 nonterminal case and global-watchdog budget pressure are not
+repaired by these two fixture leaves. No assertion or timeout is relaxed;
+item36 stays open.
+
+2026-10-11 replacement-container receiving checkpoint. The official `5f7` archive
+ZIP/log and all 400 archive/403 SDK source pins are independently authenticated.
+Archive25 has 24 passes, one original Homebrew refusal and zero skips. The
+separate no-prompt SDK pass has OSStatus -600 and all qualification flags false.
+Final `first_permission_worker` retains `api-call-starting` after 256 history
+files and 92 omitted records. This qualifies ARM diagnostic retention, without
+proving API entry, blocking or consent. The 73 UI observations contain 67
+complete unrelated seven-node traversals and six missing discovery facts, with
+zero candidates/matches. The original prompt deadline remains primary; Brew6
+is unexecuted and package/install skipped. All 205 portable controls pass;
+source review establishes no causal consent repair. See the
+[cloud continuation](handovers/2026-10-11-group6-cloud/README.md). Item 36 stays open.
+
 2026-10-11 integrated permission-history correction. Exact manual38106361453
 on2e4d798e executes25 archive cases:24 pass, one Homebrew case fails, none
 skip. Sparkle wrong-key preservation, valid retry and relaunch pass; the separate
@@ -6912,6 +6947,170 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-11 native producer and portable timeout receiving are now durably
+preserved. The strict reader correction589991aeb8 passes final format/412JS with
+an unchanged84-source/index fence. Actual AMD16 clock samples, closed original
+command owners and all producer source joins are received; PAC14/native HTTP
+and trust restoration still fail, ARM ZIPs remain blocked, kernel identity is
+unknown and the factory remains held. The unchanged portable156 corpus passes
+locally in45.907s; a private one-hunk server-poll proposal passes the same cases
+in13.716s without raising60s or changing any original helper/test body. Its
+shared fixture custody is pending, it is unadopted and historical hosted cause
+remains unproved. The saved network draft11 is not runtime activation. See the
+[receiving checkpoint](handovers/2026-10-11-group6-cloud/README.md); item62 stays open.
+
+2026-10-11 official reusable-job metadata correction. Actual attempt-scoped
+38166806073/5173 API names include the parent macOS prefix. The strict reader
+now binds only those two exact architecture/name pairs; it never normalizes
+actual metadata or accepts bare aliases. All31 unrelated controls,23 other
+functions and every original assertion remain. One original positive literal
+is corrected from independent API/source evidence, with17 causal refusals and
+an AMD positive. The
+[immutable proposal](handovers/2026-10-11-group6-cloud/native-clock-official-job-prefix-proposal.tar.gz)
+retains complete preimages/inverses and genuine original-red/candidate32-green
+receiving. Final canonical qualification is separate. Actual16 native clock
+samples do not fix PAC14/trust restoration, Brew consent, the separate hosted
+facts156 timeout or installed/enterprise acceptance. Kernel identity remains
+unknown, factory HELD and item62 open.
+
+2026-10-11 actual native clock workflow enrollment. Only the managed-native
+independent client and its adjacent evidence upload acquire the reviewed clock
+bracket. Original first-two commands, five-minute cap, separate command/capture
+statuses and every native assertion remain; Package's duplicate receiving is
+unchanged. Full admission exports bounded source/image/raw/epoch evidence and
+requires the artifact; genuine deferral exports none. The fixed status program
+uses literal Bash/Node transport, preserving every original statement. Both
+normal registered owning guards now check actual two-step equality and retain
+all existing tuples/controls. Portable32 and the focused default/pipeline
+receiving pass on the reviewed proposal; canonical final-source receiving is
+separate. Actual Foundation/Python clocks, TLS/restoration, PAC14/SDK49 on both
+architectures and installed/enterprise qualification remain unrun on this
+successor. The Swift45 factory stays held; item62 remains open.
+
+The first canonical enrollment gate passes format386 and411/412 JS checks,
+with one original Homebrew command-form refusal and an unchanged source/index
+fence. The bounded control correction preserves all38 other callbacks, original
+Python29/Package/deferral assertions and exact command/capture fatality. Actual
+focused receiving reproduces the old failure and passes the corrected callback
+with17 genuine assertion refusals; final canonical receiving remains separate.
+The [correction proof](handovers/2026-10-11-group6-cloud/native-clock-workflow-canonical-correction.tar.gz)
+retains failed raw7338, the immutable proposal and complete inverse. No native
+acceptance or item closure is inferred.
+
+2026-10-11 replacement-container receiving checkpoint. Original `5f7` PAC
+artifacts match official API hashes and each SourcePAC10 receipt's 402 Git pins.
+Both PAC14 cohorts have 12 passing/two failing methods, zero skips. WPAD's
+successful add precedes positive system-trust -1202/-9813; its own CA visibility
+is unobserved. Wire's certificate observation is its deliberate untrusted
+negative, then positive trust-add reaches the deadline. Independent HTTP's
+different CA is absent after timed-out add; admin authorization succeeds but
+restoration removal exits one with debt. These observations establish no
+causal trust-policy fix. Real Linux 262 streaming/48 API and portable 63 HTTP
+controls pass without Mac native credit. The handed-off post-install adaptation
+is adopted with bounded receiving and strict103 canonical enrollment. Its
+original15-second budget, primary add outcome and stderr-only diagnostic remain.
+Two real SIGINT/SIGTERM interaction methods reproduce four swallowed-cancellation
+assertions in the frozen70 predecessor; corrected72 passes without errors/skips.
+Every original63 and retained seven test/helper body is byte-exact. Before the
+feature commit, actual child/root and successful-publication cancellation
+counterexamples require an additional same-owner cleanup guard. Its original
+sole settlement requires identity True; retained child debt blocks new commands
+and root deletion, and real cancellation stays visible. Unchanged72 and new18
+controls pass; full canonical qualification is recorded in the handover. This is
+portable receiving, not Darwin qualification. The settled-capture successor
+retains bounded existing stderr before its original closure, only after the
+same owner's strong settlement/reap. All90 originals and retained12 bodies
+remain exact; the additive technical-refusal control brings the census to103.
+Original, cancellation-frozen and broad-catch controls fail their intended
+assertions. The first declaration-order103 pass did not cover canonical discovery:
+the physical owning command retained six constructor errors, zero assertion
+failures/skips, caused by its additive setup patching the original type allocator.
+A fresh R2-only subclass leaves that original type intact; corrected alphabetical
+103 passes with zero failures/errors/skips. The first full gate remains retained
+as failed (JS409/one failure, two JSON format failures; Hammerspoon18599/zero).
+The corrective capsule preserves the historical packet and all original bodies;
+the final live canonical gate must be received separately. No new query,
+owner, permission or command budget is acquired. PAC query-callee enrollment
+is separate and absent. Model,
+package/install, Windows-PC and enterprise acceptance remain required. See the
+[cloud continuation](handovers/2026-10-11-group6-cloud/README.md). Item 62 stays open.
+
+2026-10-11 independent signed callee/root ownership. R2 is published in6e4e7724
+with actual format379, JS410 and Lua18599/zero failures, stable eight-path fence.
+The next client slice centralizes its original18-input signed recipe, retains
+compile60/sign15/verify15 and the same process owner, and makes source/image
+verification mandatory before optional trust query observation. Acquired-file
+hardlink and actual caller foreign-root controls fail before correction.
+Corrected cleanup preserves the exact primary and foreign root; original
+cleanup still runs with physical child/capture/trust/keychain debt gates.
+Unchanged33 and new7 permanent cases bring the normal census to143. First
+physical136 has135 passes/one relocated-source assertion failure; the reviewed
+predicate checks actual compiler and fixed caller route, retaining all prior
+causal assertions and every other original103 body. Wrong macro/loader mutants
+fail assertions. Physical alphabetical143 passes, zero failures/errors/skips.
+Parent preimages/full inverses/60 safe members and physical18-input closure
+are received. This is portable software evidence; native compile/sign/Security
+were modeled. Swift45 factory remains held. Actual clients, trust/restore,
+source-bound clocks, PAC14/SDK49 both architectures, model, E2E/package/install
+and managed-network/device receiving remain required. Item62 and16/38 stay open.
+
+The first actual selected builder gate fails README formatting and two
+JavaScript checks (408 passes/two failures); Lua18599 passes with zero failures.
+Its thirteen owned files, HEAD and index remain exact. The physical143 owner
+did not cover the separate ten-case standalone diagnostic owner, whose old
+inline compiler instrumentation now errors; four PAC Source assertions also
+require relocation to the actual builder. Failed raw evidence is retained in
+the cloud handover. Their behavioral obligations and mutation sensitivity
+remain required before this slice can be committed. Item62 stays open.
+
+The bounded successor preserves all ten diagnostic identities, command census
+and cleanup semantics, relocating only actual staging/root hooks and four
+genuine refusal messages. Original10 reproduces ten errors; corrected10 passes
+with zero failures/errors/skips. Seven omission/no-op controls fail their
+intended assertions, including actual modified-copy and PAC argv cases.
+Root releases only the four stale PAC recipe predicates; all other PAC checks,
+SourcePAC10/402 and the independent native14 corpus remain exact. The final
+selected gate and genuine native clients/signing/trust are still required.
+
+2026-10-11 published builder qualification and clock-evidence continuation.
+Commit4dd97e10 physically passes format382, JS410 and Hammerspoon18599/zero
+failures across1571 modules; all19 owned source/HEAD/index fences and published
+blob joins match. The original failed gate remains separately retained.
+The clock successor preserves original143 bodies and adds13 independently
+authored frame/context cases; physical156 passes. A fixed diagnostic-only Swift
+role emits16 system-uptime samples through the same signed recipe and original
+command owner. Its actual Darwin compile and Python/Foundation calibration
+remain unexecuted. Factory45 is held; numerical observations cannot activate it.
+
+Optional passive observation occurs only after the same original owner's strong
+ACK and capture closure. Compilation/signing/verification retain60/15/15 budgets;
+the observer adds no query, child, clock or retirement authority. New passive21
+and independent receiver32 controls pass; six deliberate omissions fail their
+intended assertions. The collector joins original raw frame/image/receipt bytes,
+19 source inputs, staged recipe, separate clean Git snapshots and a private
+isolated Python cache context. Metadata consistency never authenticates caller
+JSON or proves kernel executable identity. Its reviewed two-step workflow input
+fixture is prospective; the actual shared workflow remains unchanged and held
+pending peer custody/rebase and genuine native receiving. All73 original helper
+bodies and five literal inverses are received. The first composed canonical gate
+is retained red: format384 passes, JS407 passes/three fail and Hammerspoon18599
+passes/zero fail across1571 modules; all19 source/index/HEAD fences match.
+Independent correction receiving preserves every32 assertion while replacing
+only two bare Bash expressions with the existing resolver and making Windows
+POSIX deferral explicit. A genuine direct runner entry is adopted after the
+other owner's terminal gate and explicit handoff; every previous row is retained. Both original143 and passive21 default/`-B` controls produce none
+of the five retained platform caches. Actual five unchanged legacy diagnostic
+scripts pass226 combined cases and reproduce exactly those files with default
+imports, versus none with `-B`. Cloud activation now exports the no-bytecode
+setting through Node children; installation/startup draft revision6 is saved,
+not published or restored in a fresh task. The second selected gate retains
+format384, JS410 passes/one missing-alias failure and Hammerspoon18599 passes
+with zero failures; all26 source/index/HEAD fences match. Owner custody6111341548
+releases only the missing canonical npm alias and matching reproduction command.
+Its proportional correction gate, both native architectures, actual trust/restore, PAC14/SDK49, E2E/package/install,
+ordinary consent/Brew6 and managed-network/device acceptance remain required.
+Items36/62 and16/38 remain open;22 stays excluded.
 
 2026-10-11 integrated component receiving. Exact2e4d manual38106361453
 actually passes SDK49, daily7, logger42 and sourcePAC10 on both architectures.

@@ -1,0 +1,12 @@
+{
+	"qualification": "ACTUAL_PORTABLE_LEGACY_CACHE_CAUSE_NOT_NATIVE",
+	"capsule": "native-clock-bytecode-causal-receiving.tar.gz",
+	"capsule_sha256": "8cb84534ef7c25dc6d6175a91cd6b919781d332860f951435bbf600067fd7a71",
+	"members": 58,
+	"expanded_bytes": 551691,
+	"all_inventory_members_joined": true,
+	"preceding_git_source_join_count": 11,
+	"composed_current_software_closure_pins": 595,
+	"source_commit": "4dd97e10cb88e85ff5379becbef0376289b8bd68",
+	"native": false
+}

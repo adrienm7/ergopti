@@ -1,0 +1,11 @@
+{
+	"schema": 1,
+	"archive": "postinstall72-portable-proposal.tar.gz",
+	"bytes": 136216,
+	"sha256": "9707facc98068d367b91d8a1ad14d984dfd56195e5fea6c7d9658daab29ba4ea",
+	"qualification": "PORTABLE72_PASS; THREE_CANONICAL_PATHS_ADOPTED; NO_DARWIN_QUALIFICATION",
+	"predecessor_manifest": "manifest.json",
+	"adoption_patch": "combined-adoption.patch",
+	"adoption_patch_sha256": "e0c86d0ee0f795cd1196143dec88cdbbfb75df7473be800f9c59e9bda77b4b92",
+	"note": "Archive retains original red and corrected portable receipts, exact three-path preimages and strict72 enrollment. Canonical source hashes must be independently matched; native PAC query-callee enrollment is separate and absent."
+}

@@ -484,6 +484,7 @@
 		"test:bootstrap-retry-projection": "node ./tools/test/test-bootstrap-retry-projection.cjs",
 		"test:macos-guardian-signature-flags": "node ./tools/test/test-macos-guardian-signature-flags.cjs",
 		"test:managed-ollama-protocol": "node ./tools/test/test-managed-ollama-protocol.cjs",
+		"test:native-http-clock-evidence": "node ./tools/test/test-native-http-clock-evidence.cjs",
 		"test:macos-managed-ollama-catalogue": "node ./tools/test/test-macos-managed-ollama-catalogue.cjs",
 		"test:macos-release-stage-native-receiving-controls": "node ./tools/test/test-macos-release-stage-native-receiving.cjs",
 		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs",

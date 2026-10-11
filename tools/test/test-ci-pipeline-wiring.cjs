@@ -304,6 +304,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Retain independent native HTTP clock receiving',
+		"${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Upload the actual managed native release asset',
 		'inputs.release'
 	],
