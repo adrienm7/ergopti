@@ -1269,4 +1269,56 @@ helpers.describe("Ollama pull loadability failure", function()
 	end)
 end)
 
+helpers.describe("Ollama model-ready presentation owns loadability", function()
+	local function ready_notice_count(fixture)
+		local count = 0
+		for _, notice in ipairs(fixture.notifications) do
+			if notice[2] == "ollama.model_ready" then count = count + 1 end
+		end
+		return count
+	end
+
+	helpers.it("(ollama-ready-toast) waits for a successful loadability receipt and notifies once", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_true(accepted)
+			fixture.native_tasks[2].on_done(0, "", "")
+			helpers.assert_eq(ready_notice_count(fixture), 0,
+				"a downloaded archive cannot qualify a model before its loadability receipt")
+			fixture.http_callbacks[1].callback(200, "{}", {})
+			helpers.assert_eq(terminal.successes, 1)
+			helpers.assert_eq(ready_notice_count(fixture), 1)
+			fixture.http_callbacks[1].callback(200, "duplicate", {})
+			fixture.native_tasks[2].on_done(0, "", "duplicate")
+			helpers.assert_eq(terminal.successes, 1)
+			helpers.assert_eq(ready_notice_count(fixture), 1)
+		end)
+	end)
+
+	helpers.it("(ollama-ready-toast) never presents a downloaded model whose loadability fails as ready", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_true(accepted)
+			fixture.native_tasks[2].on_done(0, "", "")
+			fixture.http_callbacks[1].callback(500, "unable to load model", {})
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(ready_notice_count(fixture), 0)
+		end)
+	end)
+
+	helpers.it("(ollama-ready-toast) never presents a held receipt from the former endpoint as ready", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_true(accepted)
+			fixture.native_tasks[2].on_done(0, "", "")
+			fixture.set_ollama_port(11471)
+			fixture.http_callbacks[1].callback(200, "{}", {})
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(ready_notice_count(fixture), 0)
+		end)
+	end)
+end)
+
 return { retained_receivers = retained_receivers }

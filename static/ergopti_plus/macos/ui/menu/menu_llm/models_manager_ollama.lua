@@ -1657,11 +1657,11 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not current_or_cancel() then return finish_result(false) end
 			if code == 0 then
-				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(owner, true, target_model)
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
+					pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 					settle_success()
 				end, function(reason)
 					settle_cancel(reason == "stale" and "stale" or "model_load_failed")
