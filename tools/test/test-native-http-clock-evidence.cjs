@@ -319,6 +319,30 @@ function assertSelectors(text) {
 		'^CLOCK_RECEIVER controls=32 native=false official=false$'
 	);
 }
+function fixedClockStatusProgram(argument) {
+	let result = '',
+		cursor = 0;
+	while (cursor < argument.length) {
+		const newline = "$'\\n'",
+			apostrophe = '"\'"';
+		if (argument.startsWith(newline, cursor)) {
+			result += '\n';
+			cursor += newline.length;
+		} else if (argument.startsWith(apostrophe, cursor)) {
+			result += "'";
+			cursor += apostrophe.length;
+		} else {
+			assert.equal(argument[cursor], "'", 'Only fixed literal clock-program segments are allowed.');
+			const end = argument.indexOf("'", cursor + 1);
+			assert.ok(end > cursor, 'Fixed program literal must terminate.');
+			result += argument.slice(cursor + 1, end);
+			cursor = end + 1;
+		}
+	}
+	return result;
+}
+const ORIGINAL_CLOCK_STATUS_PROGRAM =
+	"    const fs = require('node:fs');\n    const args = process.argv.slice(2);\n    if (args.length !== 7 || args.slice(1).some(value => !/^(?:0|[1-9][0-9]{0,2})$/.test(value) || Number(value) > 255)) process.exit(1);\n    fs.writeFileSync(args[0], JSON.stringify({schema:1, owned_process:{command:Number(args[1]),capture:Number(args[2])},public_native:{command:Number(args[3]),capture:Number(args[4])},independent_client:{command:Number(args[5]),capture:Number(args[6])}}) + '\\n', {flag:'wx',mode:0o600});\n";
 function workflowDisposition(body, mode, commandStatus = 0, captureStatus = 0) {
 	const root = fs.mkdtempSync(path.join(temporary, 'workflow-')),
 		bin = path.join(root, 'bin');
@@ -771,18 +795,75 @@ try {
 			assert.equal(step['timeout-minutes'], 5);
 			assert.equal(step.shell, 'bash');
 			const statusBodies = [
-				...step.run.matchAll(/<<'CLOCK_STATUS'[^\n]*\n([\s\S]*?)^CLOCK_STATUS$/gm)
+				...step.run.matchAll(
+					/^    node -e (.+) - "\$clock_root\/native-statuses\.json" "\$\{owned_status\[@\]\}" "\$\{public_status\[@\]\}" "\$\{client_status\[@\]\}" \|\| clock_status=1$/gm
+				)
 			];
 			assert.equal(statusBodies.length, 1);
 			const syntaxRoot = fs.mkdtempSync(path.join(temporary, 'workflow-syntax-'));
 			const statusScript = path.join(syntaxRoot, 'clock-status.cjs');
-			fs.writeFileSync(statusScript, statusBodies[0][1]);
+			const actualStatusProgram = fixedClockStatusProgram(statusBodies[0][1]);
+			assert.equal(
+				actualStatusProgram,
+				ORIGINAL_CLOCK_STATUS_PROGRAM,
+				'Actual literal status program must preserve every frozen original statement and LF.'
+			);
+			fs.writeFileSync(statusScript, actualStatusProgram);
 			const statusSyntax = require('node:child_process').spawnSync(
 				process.execPath,
 				['--check', statusScript],
 				{ encoding: 'utf8' }
 			);
 			assert.equal(statusSyntax.status, 0, statusSyntax.stderr);
+			const statusOutput = path.join(syntaxRoot, 'actual-statuses.json');
+			const actualWriter = require('node:child_process').spawnSync(
+				process.execPath,
+				['-e', actualStatusProgram, '-', statusOutput, '7', '9', '11', '13', '15', '255'],
+				{ encoding: 'utf8' }
+			);
+			assert.equal(actualWriter.error, undefined);
+			assert.equal(actualWriter.signal, null);
+			assert.equal(actualWriter.status, 0, actualWriter.stderr);
+			assert.deepEqual(JSON.parse(fs.readFileSync(statusOutput, 'utf8')), {
+				schema: 1,
+				owned_process: { command: 7, capture: 9 },
+				public_native: { command: 11, capture: 13 },
+				independent_client: { command: 15, capture: 255 }
+			});
+			assert.equal(fs.statSync(statusOutput).mode & 0o777, 0o600);
+			const retainedStatusBytes = fs.readFileSync(statusOutput);
+			const duplicateWriter = require('node:child_process').spawnSync(
+				process.execPath,
+				['-e', actualStatusProgram, '-', statusOutput, '0', '0', '0', '0', '0', '0'],
+				{ encoding: 'utf8' }
+			);
+			assert.notEqual(
+				duplicateWriter.status,
+				0,
+				'The actual wx writer must refuse a replaced output authority.'
+			);
+			assert.deepEqual(fs.readFileSync(statusOutput), retainedStatusBytes);
+			for (const [name, values] of [
+				['missing capture', ['0', '0', '0', '0', '0']],
+				['extra capture', ['0', '0', '0', '0', '0', '0', '0']],
+				['float status', ['0', '0', '0', '0', '0', '1.0']],
+				['exponent status', ['0', '0', '0', '0', '0', '1e0']],
+				['negative status', ['0', '0', '0', '0', '0', '-1']],
+				['status above uint255', ['0', '0', '0', '0', '0', '256']]
+			]) {
+				const refusedOutput = path.join(syntaxRoot, name + '.json');
+				const refused = require('node:child_process').spawnSync(
+					process.execPath,
+					['-e', actualStatusProgram, '-', refusedOutput, ...values],
+					{ encoding: 'utf8' }
+				);
+				assert.equal(refused.error, undefined);
+				assert.equal(refused.signal, null);
+				assert.equal(refused.status, 1, name + ': actual unchanged validator must refuse.');
+				assert.equal(fs.existsSync(refusedOutput), false);
+			}
+			for (const invalidLiteral of ['$variable', '$(printf guessed)', '`printf guessed`'])
+				assert.throws(() => fixedClockStatusProgram(invalidLiteral), /fixed literal/);
 			const shellSyntax = require('node:child_process').spawnSync(bashExecutable(), ['-n'], {
 				input: step.run.replace(/\$\{\{[^}]+\}\}/g, 'SYNTAX_ONLY'),
 				encoding: 'utf8'

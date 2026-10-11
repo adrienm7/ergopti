@@ -556,3 +556,65 @@ Linux13254/520 modules pass. All77 source hashes, HEAD, merge parent and logical
 index remain exact. Windows unit/parse/E2E and native Swift are explicitly
 deferred, not passing. Four exact-SHA automatic-run censuses are empty after
 publication. No official CI ref, lock or manual run is moved or cancelled.
+
+## Actual independent native HTTP clock workflow enrollment
+
+The [immutable final portable proposal](native-clock-workflow-enrollment-portable.tar.gz)
+retains95 safe regular members,94 exact inventory joins, six complete
+forward/inverse sources and two complete workflow forward/inverses at published
+Dev8d6 and G3's4260. All six live preimages and the actual4260 workflow join
+before adoption. The parent independently reconstructs every byte in both
+directions; old failed harness and pipeline receipts remain separate.
+
+Only the existing managed-native independent client and adjacent conditional
+artifact upload change. Original first-two commands, five-minute cap and every
+command/capture exit remain mandatory; original Package scope is byte-exact.
+Clock export occurs only on full admission. Deferral emits no clock artifact.
+The literal Node -e argument preserves the original501-byte status program and
+its '-' sentinel, including exact argument/status bounds,0600 and wx refusal.
+Moving the step ID after its unchanged if preserves the original owning guard's
+mutation seam and YAML behavior. No existing assertion or indentation policy
+is weakened.
+
+The normal protocol collector now checks the actual two-step source before
+platform work. The existing default and pipeline owners acquire only the
+required upload tuple/condition plus additive causal controls. No new runner,
+package alias or platform deferral is added. Original test-macos-dev-
+qualification-deferral bytes remain exact. Qualified private receiving has
+physical32 PASS/zero failures/errors/skips, default222 PASS and pipeline128
+conditions received, plus17 focused projection/live-wiring controls with14
+expected assertion refusals. An initial id-before-if pipeline failure and
+receiver-realm/formatter failures remain retained in the proposal. Final local
+canonical receiving must be acquired separately on the adopted source.
+
+Original Python156/passive21 bodies and independent native vectors remain.
+Swift45 stays held. Actual native compilation, interpreter flags, common
+Foundation/Python epoch, signed image/runtime/official receiving, same-CA trust
+and restoration, PAC14/SDK49 both architectures, ordinary Automation consent,
+Brew6, Windows/enterprise E2E/package/install remain required. Items36/62 and
+transversal16/38 are not removed;22 remains withdrawn.
+
+## Clock enrollment canonical failure and Homebrew control correction
+
+The initial ten-path default gate exits1 in680.07s: format386 passes,
+JS411/412 pass, one original Homebrew source assertion fails; source, HEAD and
+index remain unchanged. Raw41786B SHA2567338bb15 is preserved in the
+[correction archive](native-clock-workflow-canonical-correction.tar.gz). The
+assertion requires the predecessor's plain command failure suffix rather than
+the actual reviewed command/capture pipelines. This is a failed canonical gate.
+
+The bounded1179-to-d2f7 correction preserves39 ordered Homebrew callbacks and
+all38 unrelated bodies, the original wrapper, actual Python29 and Package and
+deferral assertions. Its pure helper binds the exact reviewed two steps and
+requires every original command, immediate PIPESTATUS and fatal aggregation.
+Private focused receiving reproduces the old assertion failure after Python29
+passes; the corrected callback passes with Python29,17 genuine assertion
+refusals and three positive source variants. The complete forward/inverse and
+four actual source inputs independently join; both preparation failures remain
+archived. No expected native corpus is regenerated or assertion waived.
+
+Root handback6112376887 and G3 no-overlap6112312913 cover the bounded span;
+G5's separately declared build/catalogue spans remain intact. Final canonical
+receiving follows separately on these adopted sources. Native Foundation/Python
+clocks, TLS/PAC/restoration, Swift45 and release/install/enterprise acceptance
+remain unqualified. Items36/62 and transversal16/38 remain open.

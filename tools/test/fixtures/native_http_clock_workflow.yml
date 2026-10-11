@@ -3,8 +3,8 @@ jobs:
   managed-ollama-native:
     steps:
       - name: Receive actual independent managed HTTP native clients
-        id: native_http_clock
         if: ${{ !cancelled() }}
+        id: native_http_clock
         shell: bash
         run: |
           set -euo pipefail
@@ -35,12 +35,7 @@ jobs:
               for code in "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}"; do
                   if [ "$code" -ne 0 ]; then status=1; fi
               done
-              node - "$clock_root/native-statuses.json" "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}" <<'CLOCK_STATUS' || clock_status=1
-              const fs = require('node:fs');
-              const args = process.argv.slice(2);
-              if (args.length !== 7 || args.slice(1).some(value => !/^(?:0|[1-9][0-9]{0,2})$/.test(value) || Number(value) > 255)) process.exit(1);
-              fs.writeFileSync(args[0], JSON.stringify({schema:1, owned_process:{command:Number(args[1]),capture:Number(args[2])},public_native:{command:Number(args[3]),capture:Number(args[4])},independent_client:{command:Number(args[5]),capture:Number(args[6])}}) + '\n', {flag:'wx',mode:0o600});
-          CLOCK_STATUS
+              node -e '    const fs = require('"'"'node:fs'"'"');'$'\n''    const args = process.argv.slice(2);'$'\n''    if (args.length !== 7 || args.slice(1).some(value => !/^(?:0|[1-9][0-9]{0,2})$/.test(value) || Number(value) > 255)) process.exit(1);'$'\n''    fs.writeFileSync(args[0], JSON.stringify({schema:1, owned_process:{command:Number(args[1]),capture:Number(args[2])},public_native:{command:Number(args[3]),capture:Number(args[4])},independent_client:{command:Number(args[5]),capture:Number(args[6])}}) + '"'"'\n'"'"', {flag:'"'"'wx'"'"',mode:0o600});'$'\n' - "$clock_root/native-statuses.json" "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}" || clock_status=1
               node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ matrix.architecture }}" "$clock_root/clock-verdict.json" || clock_status=1
               if [ "$clock_status" -ne 0 ]; then status=1; fi
               exit "$status"
