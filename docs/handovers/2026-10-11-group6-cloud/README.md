@@ -1027,3 +1027,56 @@ cause or complete acceptance follows from matched source maps. Official CI ref,
 lock/manual, main release and test migration remain untouched. Network draft13
 still needs Environment Settings Review/Save then Publish for activation.
 Items36/62 and transversal16/38 remain open;22 stays deliberately withdrawn.
+
+## Container continuation and local native procedure
+
+2026-10-12 continuation prepares the remaining native work for the maintainer
+while adopting a measured collector optimization. The G3 report6114685288 has
+an original60-second clock32 timeout in its full JS gate, although its direct
+original32 passes. Four actual source-bound private rounds retain identical
+32-control stdout/stderr and the original corpus/budget: baseline17.744s,
+profiled baseline19.990s, candidate11.609s and profiled candidate12.585s.
+Their [bounded receiving packet](clock32-tracking-cost-receiving.tar.gz) retains
+429 source fences, actual child observations, complete forward/inverse and all
+original32 bodies/assertions. Its377,910 bytes hash
+`78a1fbe40ccaf27ef6335c5a3863a2534f3684a263bdbad0a85d51bed9811e5b`,
+with34 safe regular members/33 inventory joins. Git-API POST/GET is byte-exact
+at blob `507b79a1ad7283637b2b0cef5faab8d3f6fd332b`.
+
+The collector now batches the same tracking rosters through unchanged
+`git ls-files --error-unmatch`, with a named64-path tuning constant. Every accepted
+input still undergoes its original per-file acquired-byte/committed-byte/hash
+checks, and the original independent before/final source procedures stay exact.
+It caches no source bytes or Git authority. Profiles measure9,857 to5,164 child
+calls and4,867 to189 tracking calls. A missing builder now refuses its complete
+19-input list earlier, so15 preceding committed-byte reads are unexecuted on
+that refusal; this is not an identical acquisition chronology claim. The final
+named-constant source passes the original32 in11.365s and remains fenced with the
+original test/base procedure/wrapper bytes. Full selected validation is separate.
+The real hosted timeout is not reproduced and its cause stays unknown. HTTP
+server polling is absent from this clock32 execution path; its separate0.05
+proposal cannot be described as this timeout's fix. Native commands, clocks,
+calibration/factory policy and production qualification guards are unchanged.
+
+The [local native procedure](LOCAL-VALIDATION.md) reuses existing execution
+owners and recipe commands. Its [audited source plan](local-native-qualification-plan.tar.gz)
+binds24 committed entry-point/recipe cuts and22 actual workflow step bodies at
+`1f764e33fa`; the instructions describe unexecuted commands, not validation.
+The228,157-byte packet hashes
+`01257a1ff32e4c71481766fc0eca223bdad4582cad60e6a5a64a7a592b9a89e7`,
+with30 regular members/29 joins, also exact Git blob
+`94258e6c2d208bcdaf9e327758039a91cb6fa411`. It adds no competing runner,
+test directory, refreshed oracle or invented GitHub run identity. Existing local
+HTTP receiving supports all three GitHub identity fields absent and explicitly
+records unbound context. That real diagnostic mode does not activate an official
+source/image/clock factory. Bare local commands do not inherit GitHub outer
+supervisor deadlines; their original inner clocks and retained debt still apply.
+
+Root removal custody is resolved. G4 removal/poll overlap, raw producer and
+guard ownership, Root shared-publication/current-source enrollment and the
+strong acquired/final-held receiver remain separate pending coordination.
+Request6114732206 renews those exact finite spans;6114852858 announces the owned
+collector change at a terminal point without modifying a peer gate. Actual
+Windows/macOS source/runtime/GUI/trust/consent/package/install receiving remains
+required. Neither a portable success nor historical Root23 admits this complete
+feature. TODO36/62 and transversal16/38 remain open;22 stays withdrawn.
