@@ -2915,6 +2915,14 @@ remain required, separately from the local gates.
   chosen-folder writers and rerun preservation. Remaining acceptance includes
   the installed fresh/existing/moved-folder wizard and actual trigger/runtime
   restart on each OS; portable or historical CI alone does not complete it.
+  The macOS wizard now requires a committed native import timeout before
+  acquiring navigation-layer or remap work. A refused timer start takes the
+  existing translated notice and reload continuation for answers already saved;
+  the same Finish can retry after timer repair. The complete portable owning
+  module passes 18 cases, including three new genuine DeferredWork and
+  TimerScheduler admission controls; all 15 original subjects are retained.
+  Predecessor comparison, final selected gates and native installed restart
+  receiving remain separate requirements; this does not complete item 7.
   The tap-holds page lists each engine's recommended keys from the
   shared tap-hold catalogue and imports only the checked ones through each
   driver's tap-hold writer: Windows renders them into the tap_hold.toml beside
