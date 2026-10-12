@@ -229,6 +229,7 @@ function repository(name, branch) {
 		'.github/ci/stable_windows_signing_exception.json',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
+		'.github/ci/stable_v101_macos_native_qualification_exception.json',
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
@@ -268,7 +269,18 @@ function runScript(script, cwd, env, prologue = '') {
 	fs.writeFileSync(output, '');
 	const result = spawnSync(BASH, ['--noprofile', '--norc', '-eo', 'pipefail', bashPath(file)], {
 		cwd,
-		env: { ...GIT_ENV, ...env, GITHUB_OUTPUT: bashPath(output) },
+		// Each synthetic release owns its policy context. A main CI caller must not
+		// lend this child another release's signature or qualification authority.
+		env: {
+			...GIT_ENV,
+			ERGOPTI_DEV_RELEASE_RELEASE: '',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: '',
+			ERGOPTI_DEV_RELEASE_CHANNEL: '',
+			ERGOPTI_DEV_RELEASE_TAG: '',
+			ERGOPTI_DEV_RELEASE_VERSION: '',
+			...env,
+			GITHUB_OUTPUT: bashPath(output)
+		},
 		encoding: 'utf8',
 		timeout: 60000
 	});
@@ -643,6 +655,85 @@ check('main: fixes and chores only bump the patch version', () => {
 	releases(mainBump('patch-only', ['fix: a bug', 'chore: tidy']), 'v1.2.4');
 });
 
+check('main: an explicit patch trailer classifies the publication commit', () => {
+	releases(
+		mainBump('explicit-patch', [
+			'feat: improve diagnostics',
+			'chore(release): publish\n\nRelease-As: 1.2.4'
+		]),
+		'v1.2.4'
+	);
+});
+
+check('main: an older patch request does not override a later publication commit', () => {
+	releases(
+		mainBump('old-patch-request', [
+			'feat: improve diagnostics\n\nRelease-As: 1.2.4',
+			'fix: next change'
+		]),
+		'v1.3.0'
+	);
+});
+
+check('main: invalid, duplicate and non-next patch requests refuse publication', () => {
+	for (const [index, value] of [
+		'1.2.3',
+		'1.2.5',
+		'1.3.0',
+		'v1.2.4',
+		'1.2.04',
+		'$(exit 99)',
+		'1.2.4\nRelease-As: 1.2.4'
+	].entries()) {
+		const result = mainBump(`invalid-patch-${index}`, [`fix: a change\n\nRelease-As: ${value}`]);
+		assert.notEqual(result.status, 0, `request ${index} must fail`);
+		assert.match(result.stderr, /Release-As must name the next patch/);
+		assert.equal(result.outputs.release, undefined);
+	}
+});
+
+check('main: an empty explicit patch trailer refuses publication', () => {
+	const result = mainBump('empty-patch-request', ['fix: change\n\nRelease-As:']);
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /Release-As must name the next patch/);
+	assert.equal(result.outputs.release, undefined);
+});
+
+check('main: an empty duplicate cannot disappear through command substitution', () => {
+	const result = mainBump('empty-duplicate-request', [
+		'feat: change\n\nRelease-As: 1.2.4\nRelease-As:'
+	]);
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /Release-As must name the next patch/);
+	assert.equal(result.outputs.release, undefined);
+});
+
+check('main: a patch request cannot conceal a breaking change', () => {
+	const result = mainBump('breaking-patch-request', [
+		'feat!: remove an API',
+		'chore(release): publish\n\nRelease-As: 1.2.4'
+	]);
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /cannot override a breaking change/);
+	assert.equal(result.outputs.release, undefined);
+});
+
+check('main: rerunning a published explicit patch never publishes it again', () => {
+	const work = repository('published-explicit-patch', 'main');
+	git(work, 'tag', 'v1.2.3', commit(work, 'chore: base'));
+	const source = commit(work, 'feat: improve diagnostics\n\nRelease-As: 1.2.4');
+	git(work, 'tag', 'v1.2.4', source);
+	noRelease(plan(work, source, 'refs/heads/main'), /already part of v1\.2\.4/);
+});
+
+check('dev: a stable patch request never changes the prerelease series', () => {
+	const work = repository('dev-explicit-patch', 'dev');
+	releases(
+		plan(work, commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4'), 'refs/heads/dev'),
+		'v0.0.0-dev.1'
+	);
+});
+
 // The glob also matches tags no run publishes; only the series counts, both
 // for "already published" and for the next number.
 check('a tag outside the series, even one the glob matches, does not count as published', () => {
@@ -710,6 +801,35 @@ function uploadPaths(stepBody) {
 	return listed;
 }
 
+/** Expands only the owned launch receipt's two source-bound matrix coordinates. */
+function uploadMatrixPaths(listedPath, entry, job, candidate) {
+	if (!/\$\{\{\s*matrix\b/.test(listedPath)) return [listedPath];
+	assert.equal(entry.rel, '.github/workflows/ci-macos.yml');
+	assert.equal(job.id, 'launch');
+	assert.equal(candidate.name, 'Retain source-bound AppleEvent launch qualification receipt');
+	assert.equal(
+		listedPath,
+		'${{ runner.temp }}/stable-macos-launch-appleevents-${{ matrix.scenario }}-${{ matrix.runner }}.json'
+	);
+	assert.equal(
+		pipeline.stepField(candidate.body, 'if'),
+		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+	);
+	assert(
+		job.body.includes(
+			`        runner: \${{ fromJSON(inputs.release && '["macos-15","macos-15-intel"]' || '["macos-15"]') }}`
+		)
+	);
+	assert(
+		job.body.includes('        scenario: ${{ fromJSON(needs.package-macos.outputs.scenarios) }}')
+	);
+	return ['clean', 'karabiner_config'].flatMap((scenario) =>
+		['macos-15', 'macos-15-intel'].map((runner) =>
+			listedPath.replace('${{ matrix.scenario }}', scenario).replace('${{ matrix.runner }}', runner)
+		)
+	);
+}
+
 /**
  * Where each required asset lands in release-assets, as the real upload steps
  * lay it out: upload-artifact keeps a file's path below the deepest directory
@@ -725,7 +845,8 @@ function uploadedLayout(channel) {
 				if (!/uses:\s*actions\/upload-artifact/.test(candidate.body)) continue;
 				if (!/^ {10}name:\s*assets-/m.test(candidate.body)) continue;
 				const listed = uploadPaths(candidate.body).flatMap((listedPath) => {
-					if (listedPath !== '${{ env.ERGOPTI_OLLAMA_ASSET }}') return [listedPath];
+					if (listedPath !== '${{ env.ERGOPTI_OLLAMA_ASSET }}')
+						return uploadMatrixPaths(listedPath, entry, job, candidate);
 					assert.equal(
 						job.id,
 						'managed-ollama-native',
@@ -812,6 +933,7 @@ function preflight(
 		'.github/ci/stable_windows_signing_exception.json',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
+		'.github/ci/stable_v101_macos_native_qualification_exception.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json'
@@ -1197,6 +1319,35 @@ function createRelease(
 	};
 }
 
+check('synthetic dev publication refuses inherited main-release policy authority', () => {
+	const injected = {
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+	};
+	const saved = Object.fromEntries(
+		Object.keys(injected).map((key) => [key, Object.getOwnPropertyDescriptor(GIT_ENV, key)])
+	);
+	try {
+		Object.assign(GIT_ENV, injected);
+		const result = createRelease('true');
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.equal(
+			result.state.isDraft,
+			false,
+			'The fully verified synthetic dev release publishes.'
+		);
+		assert.ok(result.calls.some((call) => call.includes('--draft=false')));
+	} finally {
+		for (const [key, descriptor] of Object.entries(saved)) {
+			if (descriptor) Object.defineProperty(GIT_ENV, key, descriptor);
+			else delete GIT_ENV[key];
+		}
+	}
+});
+
 check(
 	'full release fixtures admit the real policy with explicit false (release-full-default-policy)',
 	() => {
@@ -1545,6 +1696,53 @@ for (const name of MANAGED_PUBLICATION_ASSETS) {
 		assert.deepEqual(result.ghCalls, [], 'refused bytes cause no publication lookup');
 	});
 }
+check('actual AppleEvent upload expands four closed matrix receipt paths', () => {
+	const entry = pipeline.files().find((file) => file.rel === '.github/workflows/ci-macos.yml');
+	const job = pipeline.jobs(entry.rel).find((row) => row.id === 'launch');
+	const candidate = pipeline
+		.steps(job.body)
+		.find((row) => row.name === 'Retain source-bound AppleEvent launch qualification receipt');
+	const listed = uploadPaths(candidate.body);
+	assert.equal(listed.length, 1);
+	assert.deepEqual(uploadMatrixPaths(listed[0], entry, job, candidate), [
+		'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15.json',
+		'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15-intel.json',
+		'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15.json',
+		'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15-intel.json'
+	]);
+	for (const [changedPath, changedEntry, changedJob, changedCandidate] of [
+		[listed[0].replace('matrix.scenario', 'matrix.foreign'), entry, job, candidate],
+		["${{ matrix['foreign'] }}/receipt.json", entry, job, candidate],
+		[listed[0], { ...entry, rel: '.github/workflows/foreign.yml' }, job, candidate],
+		[listed[0], entry, { ...job, id: 'package-macos' }, candidate],
+		[listed[0], entry, job, { ...candidate, name: 'Foreign uploader' }],
+		[
+			listed[0],
+			entry,
+			job,
+			{ ...candidate, body: candidate.body.replace("matrix.scenario == 'clean'", 'true') }
+		],
+		[
+			listed[0],
+			entry,
+			{ ...job, body: job.body.replace('["macos-15","macos-15-intel"]', '["foreign"]') },
+			candidate
+		],
+		[
+			listed[0],
+			entry,
+			{
+				...job,
+				body: job.body.replace(
+					'fromJSON(needs.package-macos.outputs.scenarios)',
+					'fromJSON(inputs.foreign)'
+				)
+			},
+			candidate
+		]
+	])
+		assert.throws(() => uploadMatrixPaths(changedPath, changedEntry, changedJob, changedCandidate));
+});
 check('both actual native matrix uploads resolve to their exact archive filenames', () => {
 	const layout = uploadedLayout('dev');
 	for (const name of MANAGED_PUBLICATION_ASSETS) {
@@ -1705,15 +1903,15 @@ check(
 			'set -euo pipefail\nnode tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null\nprintf published > unsigned-marker';
 		const env = {
 			GITHUB_ACTIONS: 'true',
-			GITHUB_REPOSITORY: REPOSITORY,
+			GITHUB_REPOSITORY: 'adrienm7/ergopti',
 			GITHUB_EVENT_NAME: 'push',
 			GITHUB_REF: 'refs/heads/main',
 			GITHUB_SHA: sha,
 			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
 			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
 			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
-			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
-			ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+			ERGOPTI_DEV_RELEASE_VERSION: '1.0.1',
 			ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'false'
 		};
 		const refused = runScript(script, work, env);
@@ -1731,6 +1929,51 @@ check(
 			'published',
 			'complete signed configuration retains full defaults'
 		);
+
+		const signing = require(path.join(work, 'tools/ci/windows-stable-signing.cjs'));
+		const context = require(
+			path.join(work, 'tools/ci/dev-release-qualification.cjs')
+		).environmentContext(env);
+		const assets = path.join(work, 'release-assets');
+		fs.mkdirSync(assets, { recursive: true });
+		const bytes = Buffer.from('owned unsigned publication fixture');
+		fs.writeFileSync(path.join(assets, 'ErgoptiPlus.exe'), bytes);
+		const hash = require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+		const evidence = signing.receipt(context, sha, sha, hash);
+		fs.writeFileSync(
+			path.join(assets, 'windows-signing-qualification.json'),
+			JSON.stringify(evidence)
+		);
+		const unsignedEnv = { ...env, ERGOPTI_WINDOWS_CREATE_RELEASE: 'true' };
+		fs.unlinkSync(marker);
+		const admitted = runScript(script, work, unsignedEnv);
+		assert.equal(admitted.status, 0, admitted.stdout + admitted.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'unsigned admission reaches publication'
+		);
+		fs.unlinkSync(marker);
+		const foreign = runScript(script, work, { ...unsignedEnv, GITHUB_REPOSITORY: REPOSITORY });
+		assert.notEqual(foreign.status, 0, 'another repository cannot borrow signature authorization');
+		assert.match(foreign.stderr, /not admitted/);
+		assert.equal(fs.existsSync(marker), false, 'repository refusal cannot reach publication');
+		const configured = runScript(script, work, {
+			...unsignedEnv,
+			ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'true'
+		});
+		assert.notEqual(configured.status, 0, 'configured signing cannot publish an unsigned receipt');
+		assert.match(configured.stderr, /not admitted/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'signed preference refusal cannot reach publication'
+		);
+		fs.writeFileSync(path.join(assets, 'ErgoptiPlus.exe'), 'tampered bytes');
+		const tampered = runScript(script, work, unsignedEnv);
+		assert.notEqual(tampered.status, 0);
+		assert.match(tampered.stderr, /not admitted/);
+		assert.equal(fs.existsSync(marker), false, 'digest refusal cannot reach publication');
 	}
 );
 

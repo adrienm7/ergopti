@@ -14,6 +14,10 @@ local Shell = require("adapters.shell_runner")
 local Loop = require("adapters.event_loop")
 local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-relative-siblings-XXXXXX"))
 local checks, failures, handles, paths, tokens, pids = 0, 0, {}, {}, {}, {}
+-- Cold external curl startup belongs to this existing one-second completion
+-- contract. Blocking longer than the deadline preserves the stale-clock inverse.
+local HTTP_DEADLINE_MS = 1000
+local HTTP_STALE_WORK_MS = HTTP_DEADLINE_MS + 160
 local ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
 -- Passive private observations preserve native arguments, result tuples and
@@ -248,7 +252,7 @@ for _, in_callback in ipairs({ false, true }) do
 		local url, requests = server()
 		local results, start = {}, nil
 		local function arm()
-			uv.sleep(160); start = uv.hrtime()
+			uv.sleep(HTTP_STALE_WORK_MS); start = uv.hrtime()
 			pcall(function()
 				local clock = require("infra.monotonic").backend()
 				active_http_trace = { start = start / 1000000, cached = uv.now(), events = {},
@@ -256,7 +260,7 @@ for _, in_callback in ipairs({ false, true }) do
 					clock = clock == "luv.hrtime" and "luv.hrtime" or "Other" }
 			end)
 			observe_http("public-enter")
-			assert(Http.get(url, {}, { owner = "clock-fixture", timeout_ms = 100 },
+			assert(Http.get(url, {}, { owner = "clock-fixture", timeout_ms = HTTP_DEADLINE_MS },
 				function(result) observe_http("public-callback"); results[#results + 1] = result end))
 			observe_http("public-return")
 			remember_processes()

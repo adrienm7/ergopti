@@ -103,6 +103,7 @@ local _previous_session = nil
 local _log_dir = nil
 local _retention_days = nil
 local _route_line = nil
+local _prepare_line = nil
 local _route_overlap_bytes = DEFAULT_ROUTE_OVERLAP_BYTES
 local _batch_record_limit = MAX_BATCH_RECORDS
 local _on_delivered = nil
@@ -585,6 +586,18 @@ end
 local function prepare_item_step(item)
 	if item.prepared == true then return true, 0 end
 	if item.preparation_stage == nil then
+		local privacy_bytes = 0
+		-- Canonical privacy transforms run only on the owned timer, before routing,
+		-- fragmentation or native publication. Producer admission stays O(1).
+		if _prepare_line then
+			privacy_bytes = #item.line
+			local ok, prepared = pcall(_prepare_line, item.line)
+			if not ok or type(prepared) ~= "string" or prepared == "" or #prepared > MAX_ENQUEUED_LINE_BYTES then
+				set_error("log privacy preparation refused", true)
+				return false, 0
+			end
+			item.line = prepared
+		end
 		item.preparation_stage = "line"
 		item.prepare_cursor = 1
 		item.fragment_count = 0
@@ -593,6 +606,8 @@ local function prepare_item_step(item)
 		item.topics = {}
 		item.topic_seen = {}
 		item.route_tail = ""
+		-- Charge the original input even when secrets shrink to short placeholders.
+		if privacy_bytes > 0 then return true, privacy_bytes end
 	end
 
 	if item.preparation_stage == "line" then
@@ -658,6 +673,9 @@ local function prepare_ready_prefix()
 		and ready_fragments < _batch_record_limit do
 		local item = _queue[queue_index]
 		if item.prepared ~= true then
+			-- Whole-record privacy work must fit the remaining scan budget before
+			-- it begins; subtraction after the callback would admit excess work.
+			if _prepare_line and item.preparation_stage == nil and #item.line > byte_budget then break end
 			local progressed, consumed = prepare_item_step(item)
 			if not progressed then return false end
 			step_budget = step_budget - 1
@@ -1133,6 +1151,9 @@ end
 --- @return boolean committed True only after native ACK plus resource ownership.
 --- @return string|nil error_message
 function M.start(options)
+	if type(options) == "table" and options.prepare_line ~= nil and type(options.prepare_line) ~= "function" then
+		return false, "prepare_line must be a function"
+	end
 	if _active then
 		if _accepting then return true end
 		return false, "logger transport is already draining"
@@ -1211,6 +1232,7 @@ function M.start(options)
 	_previous_session = previous_session
 	_log_dir = options.log_dir
 	_retention_days = retention_days
+	_prepare_line = options.prepare_line
 	_route_line = options.route_line
 	_route_overlap_bytes = route_overlap_bytes
 	_batch_record_limit = batch_record_limit

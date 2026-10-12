@@ -20,6 +20,7 @@
 #Requires AutoHotkey v2.0
 #Warn VarUnset, Off
 #SingleInstance Off
+#Include ../support/altgr_probe_ordinary_owner.ahk
 
 global TapHold := Map()
 global LayerEnabled := false
@@ -33,14 +34,18 @@ global ProbeHkl := DllCall("GetKeyboardLayout", "uint", 0, "ptr")
 global ProbeOwned := Map()
 global ProbeCounts := Map("suppress", 0, "native", 0, "ordinary", 0, "fallback", 0)
 global ProbeReceipt := ""
+global ProbeFailed := false
+global ProbeDiagnosticError := ""
+OnError(ProbeFailure)
 OnExit(ProbeRelease)
-SetTimer(() => ExitApp(124), -5000)
+SetTimer(ProbeDeadline, -5000)
 try {
+	ProbeDiagnostic("started")
 	ProbeRun()
+	ProbeDiagnostic("exit-success")
 	ExitApp(0)
 } catch Error as Err {
-	FileAppend(Err.Message . "`n" . Err.Stack . "`n", "**", "UTF-8")
-	ExitApp(1)
+	ProbeFailure(Err, "main")
 }
 
 ; Keep exactly the main driver's input level and source include order.
@@ -48,6 +53,32 @@ try {
 #Include ../../platform/remap/key_combination_keys.ahk
 #Include ../../platform/remap/altgr.ahk
 #InputLevel 0
+
+; Write directly to the owned evidence path: a timed-out parent deliberately
+; detaches its completion callback and cannot recover child streams through it.
+ProbeDiagnostic(Stage, Detail := "") {
+	global ProbePid, ProbeHkl, ProbeOwned
+	FileAppend("stage=" . Stage . " pid=" . ProbePid . " hkl=" . Format("{:X}", ProbeHkl)
+		. " pending=" . ProbeOwned.Count . " critical=" . A_IsCritical . "`n" . Detail,
+		A_Args[1] . ".diagnostics.txt", "UTF-8-RAW")
+}
+
+ProbeFailure(Err, Mode) {
+	global ProbeFailed
+	ProbeFailed := true
+	ProbeDiagnostic("error-" . Mode, Err.Message . "`n" . Err.Stack . "`n")
+	FileAppend(Err.Message . "`n" . Err.Stack . "`n", "**", "UTF-8")
+	ExitApp(1)
+	; An outstanding release may veto exit, but no new input is then admitted.
+	return 1
+}
+
+ProbeDeadline() {
+	global ProbeFailed
+	ProbeFailed := true
+	ProbeDiagnostic("deadline")
+	ExitApp(124)
+}
 
 ProbeRun() {
 	global ProbeWindow, ProbePair, ProbeNative, ProbeCounts, ProbeReceipt
@@ -59,20 +90,26 @@ ProbeRun() {
 	ProbeWindow.Show("w200 h70")
 	if !WinWaitActive("ahk_id " . ProbeWindow.Hwnd, , 1) || !ProbeAdmission()
 		throw Error("The controlled hook probe could not admit its exact owned foreground.")
+	ProbeDiagnostic("foreground-admitted")
 	ProbeReceipt := A_Args[2] . "|" . ProbePid . "|" . ProbeThread . "|" . ProbeWindow.Hwnd
 		. "|" . Format("{:08X}", ProbeHkl) . "|injected-registration`n"
 	try {
 		for _, Scenario in ["suppress", "native", "fallback"] {
+			ProbeDiagnostic("scenario-" . Scenario)
 			ProbePair := Scenario != "fallback"
 			ProbeNative := Scenario == "native"
 			for Kind in ProbeCounts
 				ProbeCounts[Kind] := 0
 			ProbeDown("LCtrl", "SC01D")
 			ProbeDown("RAlt", "SC138")
+			ProbeReleaseDiagnostic("sleep-before-release-enter")
 			Sleep(80)
+			ProbeReleaseDiagnostic("sleep-before-release-return")
 			if ProbeRelease() != 0
 				throw Error("The controlled hook probe retained injected modifier release debt.")
+			ProbeReleaseDiagnostic("sleep-after-release-enter")
 			Sleep(80)
+			ProbeReleaseDiagnostic("sleep-after-release-return")
 			if !ProbeAdmission()
 				throw Error("The controlled hook observation lost its exact source/foreground fence.")
 			ProbeReceipt .= Scenario . "|" . ProbeCounts["suppress"] . "|" . ProbeCounts["native"]
@@ -86,8 +123,8 @@ ProbeRun() {
 }
 
 ProbeAdmission() {
-	global ProbeWindow, ProbePid, ProbeThread, ProbeHkl, ProbeOwned
-	if !IsObject(ProbeWindow) || DllCall("GetForegroundWindow", "ptr") != ProbeWindow.Hwnd
+	global ProbeWindow, ProbePid, ProbeThread, ProbeHkl, ProbeOwned, ProbeFailed
+	if ProbeFailed || !IsObject(ProbeWindow) || DllCall("GetForegroundWindow", "ptr") != ProbeWindow.Hwnd
 		return false
 	Pid := 0
 	Thread := DllCall("GetWindowThreadProcessId", "ptr", ProbeWindow.Hwnd, "uint*", &Pid, "uint")
@@ -112,27 +149,50 @@ ProbeDown(Name, Scan) {
 	SendLevel(3)
 	ProbeOwned[Name] := true
 	SendEvent(Edge)
+	ProbeDiagnostic("down-" . Name)
 }
 
 ProbeRelease(*) {
 	global ProbeOwned
+	DiagnosticOk := ProbeReleaseDiagnostic("release-enter")
 	for _, Name in ["RAlt", "LCtrl"] {
 		if !ProbeOwned.Has(Name)
 			continue
 		try {
 			SendLevel(3)
+			if !ProbeReleaseDiagnostic("release-edge-begin-" . Name)
+				DiagnosticOk := false
 			SendEvent("{Blind}{" . (Name == "RAlt" ? "SC138" : "SC01D") . " Up}")
+			if !ProbeReleaseDiagnostic("release-edge-return-" . Name)
+				DiagnosticOk := false
 			ProbeOwned.Delete(Name)
 		} catch Error as Err {
-			FileAppend("Injected release debt: " . Name . " " . Err.Message . "`n", "**", "UTF-8")
+			if !ProbeReleaseDiagnostic("release-failed-" . Name, Err.Message . "`n")
+				DiagnosticOk := false
 		}
 	}
-	return ProbeOwned.Count == 0 ? 0 : 1
+	if !ProbeReleaseDiagnostic("release-complete")
+		DiagnosticOk := false
+	return ProbeOwned.Count == 0 && DiagnosticOk ? 0 : 1
+}
+
+; A runtime error inside OnExit terminates the process instead of honoring its
+; release-debt veto. A refused observer therefore latches failure and returns;
+; it must not throw, call ExitApp or prevent remaining owned Up attempts.
+ProbeReleaseDiagnostic(Stage, Detail := "") {
+	global ProbeFailed, ProbeDiagnosticError
+	try ProbeDiagnostic(Stage, Detail)
+	catch Error as Err {
+		ProbeFailed := true
+		ProbeDiagnosticError := Err.Message
+		return false
+	}
+	return true
 }
 
 ProbeHasFocus() {
-	global ProbeWindow, ProbePid, ProbeThread, ProbeHkl
-	if !IsObject(ProbeWindow) || DllCall("GetForegroundWindow", "ptr") != ProbeWindow.Hwnd
+	global ProbeWindow, ProbePid, ProbeThread, ProbeHkl, ProbeFailed
+	if ProbeFailed || !IsObject(ProbeWindow) || DllCall("GetForegroundWindow", "ptr") != ProbeWindow.Hwnd
 		return false
 	Pid := 0
 	Thread := DllCall("GetWindowThreadProcessId", "ptr", ProbeWindow.Hwnd, "uint*", &Pid, "uint")
@@ -141,7 +201,7 @@ ProbeHasFocus() {
 }
 
 KeyCombinationOwnsHotkey() {
-	return ProbeHasFocus()
+	return _KCT_ProbeOrdinaryOwner(A_ThisHotkey, ProbeHasFocus())
 }
 
 KeyCombinationFireHotkey() {

@@ -960,6 +960,8 @@ class PhaseEvidence:
         self.previous = None
         self.first_timeout = None
         self.first_permission_worker = None
+        self.last_native_ui = None
+        self.last_native_ui_elapsed_seconds = None
         if directory is not None:
             require(
                 hasattr(os, "O_NOFOLLOW"),
@@ -1117,10 +1119,23 @@ class PhaseEvidence:
             first_timeout = getattr(self, "first_timeout", None)
             if first_timeout is not None:
                 packet["first_timeout"] = _validate_command_timeout(first_timeout)
+            # The bounded phase history keeps its first256 events. Carry the last
+            # closed UI observation independently through the terminal checkpoint.
+            last_native_ui = getattr(self, "last_native_ui", None)
+            if native_ui is not None:
+                last_native_ui = json.loads(json.dumps(packet["native_ui"]))
+            if last_native_ui is not None:
+                packet["last_native_ui"] = _validate_owned_automation_ui_fact(last_native_ui)
             semantic = json.dumps(packet, sort_keys=True)
-            if semantic == self.previous:
+            if semantic == self.previous and native_ui is None:
                 return not self.failed
             packet["elapsed_seconds"] = round(time.monotonic() - self.started, 6)
+            if last_native_ui is not None:
+                packet["last_native_ui_elapsed_seconds"] = (
+                    packet["elapsed_seconds"]
+                    if native_ui is not None
+                    else self.last_native_ui_elapsed_seconds
+                )
             packet["history_omitted"] = max(0, self.sequence + 1 - 256)
             data = (json.dumps(packet, sort_keys=True) + "\n").encode()
             require(len(data) <= 4096, "Native phase packet exceeds its safe bound")
@@ -1155,6 +1170,9 @@ class PhaseEvidence:
                     os.unlink(temporary, dir_fd=self.descriptor)
                 except FileNotFoundError:
                     pass
+            self.last_native_ui = last_native_ui
+            if last_native_ui is not None:
+                self.last_native_ui_elapsed_seconds = packet["last_native_ui_elapsed_seconds"]
             self.previous = semantic
             self.sequence += 1
             self.ownership_closed = bool(closed)

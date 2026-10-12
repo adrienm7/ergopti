@@ -49,13 +49,14 @@ class _LSP_World {
 		this.OwnedBundle := 0
 		this.CleanupArmed := false
 		this.CleanupRefused := false
+		this.PhysicalFault := 0
 		this.WrongCandidate := true
 		try {
 			; This source fixture owns the canonical boot dependency even when filtered.
 			LLM_Defaults_Load()
 			AssertTrue(LLM_API_PROVIDERS.Has("lmstudio"), "the actual native local-provider catalogue must be present")
 			AssertTrue(LLM_LOCAL_API_SERVERS.Has("lmstudio"))
-			this.ConfigImage := '[llm]`napi_entry_id = "native-active"`n[llm.models]`nselected = "ollama"`n'
+			this.ConfigImage := _LSP_CurrentConfigSource('[llm]`napi_entry_id = "native-active"`n[llm.models]`nselected = "ollama"`n')
 			this.ApiImage := '[{"Id":"native-first","Name":"Original first","Provider":"lmstudio","BaseUrl":"http://127.0.0.1:1234/v1","Token":"private-first-sentinel","Model":"independent-first"},{"Id":"native-active","Name":"Original active","Provider":"lmstudio","BaseUrl":"http://127.0.0.1:1235/v1","Token":"private-active-sentinel","Model":"independent-active"}]'
 			AssertTrue(FSWriteDurable(this.ConfigPath, this.ConfigImage))
 			AssertTrue(FSWriteDurable(this.ApiPath, this.ApiImage))
@@ -80,16 +81,16 @@ class _LSP_World {
 			this.Port["delete"] := ObjBindMethod(this, "Delete")
 			_LSP_AssertOriginalNativePort(NativePort)
 			Owned := IsSet(Options) ? Options.Clone() : Map()
-			Owned["port"] := this.Port
+			Owned["port"] := NativePort
 			Owned["acquire"] := _LMT_Acquire
 			Owned["settle"] := _LMT_Settle
 			Owned["collect"] := ObjBindMethod(this, "Collect")
 			Owned["build_config"] := ObjBindMethod(this, "Build")
 			Owned["serialize"] := ObjBindMethod(this, "Serialize")
 			Owned["apply"] := ObjBindMethod(this, "ApplyCommitted")
-			Owned["notify"] := _LMT_Notify
+			Owned["notify"] := ObjBindMethod(this, "Notify")
 			Owned["pause"] := ObjBindMethod(this, "Pause")
-			this.Owner := LLM_Menu_ApiPrivateSourceOwner(Owned)
+			this.Owner := _LSP_NativeWriteSourceOwner(Owned, this)
 			_LSP_NativeFacts(this, "fixture_acquired")
 		} catch as Err {
 			this.Restore()
@@ -100,21 +101,37 @@ class _LSP_World {
 	Restore() {
 		global LLM_Defaults
 		try {
+			if this.HasOwnProp("PhysicalFault") && this.PhysicalFault is Object
+				this.PhysicalFault.Close()
 			global _LLM_Menu_Loaded, _LifecycleLatestTransition, _LifecycleShutdownReason
 			global _ConfigTransitionRetainedBarrier, _PathsFile
 			; Only this fixture's exclusively created files and exact bundle may be repaired
 			; after the assertions. Real production code never gains this cleanup authority.
 			if (this.OwnedBundle is Object) && _ConfigWriteLeaseState().terminal == this.OwnedBundle {
+				CleanupSettled := false
 				try {
 					if this.HasOwnProp("ConfigCandidate") {
 						FSWriteDurable(this.ConfigPath, this.ConfigCandidate)
 						FSWriteDurable(this.ApiPath, this.ApiCandidate)
 					}
-					ConfigTransitionRollbackOwned(_PathsFile, this.OwnedBundle, ConfigTransitionProductionPort())
+					Rollback := ConfigTransitionRollbackOwned(_PathsFile, this.OwnedBundle, ConfigTransitionProductionPort())
+					if this.CleanupArmed {
+						AssertEqual(0, this.PhysicalFault.Handle, "the exact owned obstruction must be closed before cleanup")
+						AssertTrue(ConfigTransitionResultIs(Rollback, "recovered_old"),
+							"post-close cleanup must acknowledge actual durable rollback")
+						AssertEqual(this.ConfigImage, FSReadUtf8Exact(this.ConfigPath))
+						AssertEqual(this.ApiImage, FSReadUtf8Exact(this.ApiPath))
+						AssertTrue(ConfigTransitionResultIs(ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort()), "absent"),
+							"post-close cleanup must retire the real WAL")
+					}
+					CleanupSettled := true
 				} finally {
-					_ConfigWriteTerminalRelease(this.OwnedBundle)
-					if _ConfigTransitionRetainedBarrier == this.OwnedBundle
-						_ConfigTransitionRetainedBarrier := this.PriorRetained
+					; A refused cleanup preserves the exact owner, debt and private files.
+					if !this.CleanupArmed || CleanupSettled {
+						_ConfigWriteTerminalRelease(this.OwnedBundle)
+						if _ConfigTransitionRetainedBarrier == this.OwnedBundle
+							_ConfigTransitionRetainedBarrier := this.PriorRetained
+					}
 				}
 			}
 			_LLM_Menu_Loaded := this.Loaded
@@ -206,6 +223,12 @@ class _LSP_World {
 
 	Pause(Point) {
 		global _LLM_Menu, _PathsFile
+		if Point == "target:new:1" && this.FailApiMove {
+			AssertTrue(FSReadUtf8Exact(this.ConfigPath) != this.ConfigImage,
+				"the genuine first target must be published before second-target obstruction")
+			this.PhysicalFault := _LSP_PhysicalSourceFault(this, this.ApiPath, this.ApiImage)
+			this.PhysicalFault.Arm()
+		}
 		if Point != "phase:committed_new"
 			return
 		this.OwnedBundle := _ConfigWriteLeaseState().terminal
@@ -226,11 +249,44 @@ class _LSP_World {
 			if !FSWriteDurable(this.ApiPath, this.Replacement)
 				throw Error("The owned durable-stage source replacement was refused.")
 		}
-		if this.Mutation == "cleanup"
+		if this.Mutation == "cleanup" {
 			this.CleanupArmed := true
+			Inspected := ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort())
+			AssertTrue(ConfigTransitionResultIs(Inspected, "ready"))
+			OldArtifact := _ConfigTransitionArtifactPaths(this.ConfigPath, Inspected["record"]["tx_id"])["old"]
+			AssertEqual(this.ConfigImage, FSReadUtf8Exact(OldArtifact),
+				"the actual immutable old artifact must belong to this published transaction")
+			this.PhysicalFault := _LSP_PhysicalSourceFault(this, OldArtifact, this.ConfigImage)
+			this.PhysicalFault.Arm()
+		}
 		if this.Mutation == "wrong_source"
 			this.WrongCandidate := this.Owner.CaptureCandidate(this.OtherReceipt,
 				this.OwnedBundle, this.ConfigCandidate, this.ApiCandidate)
+	}
+
+	Notify(Message, Options) {
+		global _PathsFile
+		if this.FailApiMove && this.PhysicalFault is Object {
+			Result := this.PhysicalFault.Notify(Message, Options)
+			this.MoveRefused := this.PhysicalFault.NativeRefusals == 2
+			return Result
+		}
+		if this.CleanupArmed && this.PhysicalFault is Object {
+			AssertEqual(1, this.ApplyCalls, "cleanup refusal follows real application of durable files")
+			AssertTrue(ConfigTransitionResultIs(ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort()), "ready"))
+			this.PhysicalFault.ObserveNativeRefusal()
+			DeleteRefused := false
+			try FSDeleteStrict(this.PhysicalFault.ApiPath)
+			catch OSError as DeleteError {
+				AssertEqual(32, DeleteError.Number, "the exact held old artifact reports native sharing violation")
+				DeleteRefused := true
+			}
+			AssertTrue(DeleteRefused, "the owned native artifact genuinely refuses deletion")
+			AssertEqual(this.ConfigImage, FSReadUtf8Exact(this.PhysicalFault.ApiPath),
+				"native deletion refusal preserves the exact locked old bytes")
+			this.CleanupRefused := true
+		}
+		return _LMT_Notify(Message, Options)
 	}
 
 	DecryptAndReplace(Token) {
@@ -380,9 +436,13 @@ Test("Local server source: native owner replacement revokes prior receipts (loca
 	(*) => _LSP_WithWorld(_LSP_OwnerReplacement))
 
 _LSP_AbsentAndUnreadable(World) {
-	global _LLM_Menu
+	global _LLM_Menu, ConfigurationFile
 	AssertTrue(FSDeleteStrict(World.ConfigPath))
 	AssertTrue(FSDeleteStrict(World.ApiPath))
+	World.ConfigPath .= ".absent"
+	ConfigurationFile := World.ConfigPath
+	AssertEqual("absent", ConfigMigrateBoot(World.ConfigPath)["status"],
+		"honest empty authority requires its own genuine fresh-missing boot")
 	_LLM_Menu["api_entries"] := []
 	_LLM_Menu["api_entry_id"] := ""
 	Receipt := World.Owner.Capture()
@@ -728,7 +788,8 @@ Test("Local server source: config loader aliases cannot borrow canonical default
 
 _LSP_InvalidSchema(World) {
 	for Version in [0, -1] {
-		Image := "[_meta]`nschema_version = " . Version . "`n" . World.ConfigImage
+		Image := StrReplace(World.ConfigImage, "schema_version = " . ConfigMigrateCurrentVersion(),
+			"schema_version = " . Version)
 		AssertTrue(FSWriteDurable(World.ConfigPath, Image))
 		AssertFalse(World.Owner.Capture(), "an explicit version rejected by native boot cannot mint private authority")
 		AssertEqual(Image, FSReadUtf8Exact(World.ConfigPath))
@@ -800,7 +861,8 @@ Test("Local server publication: inherited Critical restored on refusal (local-se
 
 
 _LSP_IntegralFloatSchema(World) {
-	Image := "[_meta]`nschema_version = 3.0`n" . World.ConfigImage
+	Image := StrReplace(World.ConfigImage, "schema_version = " . ConfigMigrateCurrentVersion(),
+		"schema_version = " . ConfigMigrateCurrentVersion() . ".0")
 	AssertTrue(FSWriteDurable(World.ConfigPath, Image))
 	ParsedVersion := TOML_ParseDocument(FSReadUtf8Exact(World.ConfigPath))["_meta"]["schema_version"]
 	AssertTrue(ParsedVersion is Float, "the independent native source must contain a genuine integral Float")
@@ -1244,7 +1306,7 @@ _LSER_AbsenceAndPending(Fixture, Observed) {
 	_LLM_Menu["api_entry_id"] := ""
 	AssertTrue(FSWriteDurable(Fixture.World.ApiPath, "[]"))
 	AssertTrue(FSWriteDurable(Fixture.World.ConfigPath,
-		'[llm]`napi_entry_id = ""`n[llm.models]`nselected = "ollama"`n'))
+		_LSP_CurrentConfigSource('[llm]`napi_entry_id = ""`n[llm.models]`nselected = "ollama"`n')))
 	Receipt := Fixture.World.Owner.Capture()
 	AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
 	AssertFalse(Fixture.World.Owner.EntryBound("lmstudio", Receipt))
@@ -1347,4 +1409,208 @@ _LSP_AssertOriginalNativePort(NativePort) {
 	AssertTrue(ConfigTransitionProductionPort() == NativePort, "interception never rotates or repairs native authority")
 	for Method, Callback in Expected
 		AssertTrue(NativePort[Method] == Callback, "original native callback identity remains exact: " . Method)
+}
+
+; Observe actual source operations without replacing schema or snapshot producers.
+class _LSP_SourceOperationObserver {
+	__New(World, ReadIndex := 0, Kind := "") {
+		this.World := World
+		this.Owner := World.Owner
+		this.ReadIndex := ReadIndex
+		this.Kind := Kind
+		this.Reads := 0
+		this.FullAdmissions := 0
+		this.Mutated := false
+		this.Registry := ConfigMigrateShippedRegistry()
+		this.Step := this.Registry["steps"][1]
+		this.Reason := this.Step["reason"]
+		this.OriginalAdmit := LLM_Menu_ApiPrivateSourceOwner.Prototype.GetOwnPropDesc("_AdmitNonCritical").Call
+		this.OriginalSnapshot := LLM_Menu_ApiPrivateSourceOwner.Prototype.GetOwnPropDesc("_Snapshot").Call
+		AssertFalse(Object.Prototype.HasOwnProp.Call(this.Owner, "_AdmitNonCritical"))
+		AssertFalse(Object.Prototype.HasOwnProp.Call(this.Owner, "_Snapshot"))
+		this.Owner.DefineProp("_AdmitNonCritical", {Call: ObjBindMethod(this, "Admit")})
+		this.Owner.DefineProp("_Snapshot", {Call: ObjBindMethod(this, "Snapshot")})
+	}
+
+	Admit(Owner) {
+		global _LLM_Menu
+		this.FullAdmissions += 1
+		Accepted := this.OriginalAdmit.Call(Owner)
+		if this.Kind == "final_context" && this.FullAdmissions == 2 && Accepted {
+			_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+			this.Mutated := true
+		}
+		return Accepted
+	}
+
+	Snapshot(Owner, Path) {
+		global _LLM_Menu
+		this.Reads += 1
+		if this.Reads == this.ReadIndex && this.Kind != "final_context" {
+			switch this.Kind {
+				case "source":
+					Content := Path == this.World.ConfigPath
+						? StrReplace(this.World.ConfigImage, "native-active", "changed-active")
+						: StrReplace(this.World.ApiImage, "Original first", "Changed first")
+					AssertTrue(FSWriteDurable(Path, Content))
+				case "registry":
+					this.Step["reason"] := this.Reason . " changed"
+				case "context":
+					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+				case "future":
+					Content := StrReplace(this.World.ConfigImage,
+						"schema_version = " . ConfigMigrateCurrentVersion(),
+						"schema_version = " . (ConfigMigrateCurrentVersion() + 1))
+					AssertTrue(FSWriteDurable(this.World.ConfigPath, Content))
+				case "malformed":
+					AssertTrue(FSWriteDurable(this.World.ConfigPath,
+						this.World.ConfigImage . "schema_version = " . ConfigMigrateCurrentVersion() . "`n"))
+			}
+			this.Mutated := true
+		}
+		return this.OriginalSnapshot.Call(Owner, Path)
+	}
+
+	Restore() {
+		this.Step["reason"] := this.Reason
+		this.Owner.DeleteProp("_AdmitNonCritical")
+		this.Owner.DeleteProp("_Snapshot")
+	}
+}
+
+_LSP_SourceOperationBody(ReadIndex, Kind, World) {
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
+	World.Capture()
+	Observed := _LSP_SourceOperationObserver(World, ReadIndex, Kind)
+	try {
+		if Kind == "nominal" {
+			AssertTrue(World.Owner.Current(World.Receipt))
+			AssertEqual(4, Observed.Reads, "all four external snapshot fences remain active")
+			AssertEqual(2, Observed.FullAdmissions, "one source operation has full initial and final admission")
+		} else if Kind == "default_full" {
+			Held := World.Owner._Held(World.Receipt)
+			AssertTrue(World.Owner._NativeCurrent(Held))
+			AssertEqual(1, Observed.FullAdmissions, "default native checks outside the read operation remain fully admitted")
+			AssertEqual(0, Observed.Reads)
+		} else {
+			AssertFalse(World.Owner.Current(World.Receipt), "changed source, registry or context cannot mint currentness")
+			AssertTrue(Observed.Mutated, "the actual designated external-read or final-admission seam must execute")
+			if Kind == "registry" || Kind == "future" || Kind == "malformed" || Kind == "final_context"
+				AssertEqual(2, Observed.FullAdmissions, "persistent schema or registry refusal is rechecked at the final boundary")
+		}
+		AssertEqual(0, World.ApplyCalls, "read-only validation cannot publish RAM or initiate application")
+	} finally Observed.Restore()
+}
+
+_LSP_RegisterSourceOperationCases() {
+	local Kind, Index
+	for Kind in ["source", "registry", "context"]
+		loop 4 {
+			Index := A_Index
+			Test("Local source operation: " . Kind . " changes at snapshot " . Index . " (source-operation-boundary)",
+				_LSP_WithWorld.Bind(_LSP_SourceOperationBody.Bind(Index, Kind)))
+		}
+	for Kind in ["future", "malformed", "final_context", "nominal", "default_full"]
+		Test("Local source operation: " . Kind . " retains final admission (source-operation-boundary)",
+				_LSP_WithWorld.Bind(_LSP_SourceOperationBody.Bind((Kind == "nominal" || Kind == "default_full") ? 0 : 4, Kind)))
+}
+_LSP_RegisterSourceOperationCases()
+
+; The same read-boundary contract also applies to initial source acquisition.
+_LSP_CaptureOperationBody(ReadIndex, Kind, World) {
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
+	Observed := _LSP_SourceOperationObserver(World, ReadIndex, Kind)
+	try {
+		Receipt := World.Owner.Capture()
+		if Kind == "nominal" {
+			AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+			AssertEqual(6, Observed.Reads, "capture retains its two acquisitions and four external image rechecks")
+			AssertEqual(4, Observed.FullAdmissions, "capture avoids repeating full admission after each initial read")
+		} else {
+			AssertFalse(Receipt is LLM_Menu_ApiPrivateSourceReceipt,
+				"source, registry or context replacement cannot issue initial authority")
+			AssertTrue(Observed.Mutated, "the designated initial-read mutation must actually execute")
+		}
+		AssertEqual(0, World.ApplyCalls)
+	} finally Observed.Restore()
+}
+
+_LSP_RegisterCaptureOperationCases() {
+	local Kind, Index
+	Test("Local capture operation: nominal bounded full admission (capture-operation-boundary)",
+		_LSP_WithWorld.Bind(_LSP_CaptureOperationBody.Bind(0, "nominal")))
+	for Kind in ["source", "context", "registry", "future"]
+		loop 2 {
+			Index := A_Index
+			Test("Local capture operation: " . Kind . " changes at initial snapshot " . Index . " (capture-operation-boundary)",
+				_LSP_WithWorld.Bind(_LSP_CaptureOperationBody.Bind(Index, Kind)))
+		}
+}
+_LSP_RegisterCaptureOperationCases()
+
+
+
+; Authored native source fixtures preserve the same current stamp as their real boot.
+_LSP_CurrentConfigSource(AuthoredImage) {
+	return AuthoredImage . "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
+}
+
+_LSP_AuthoredSchemaAdmission(World) {
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "the authored fixture must retain its genuine current boot admission")
+	World.Capture()
+	Unstamped := StrReplace(World.ConfigImage, "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n")
+	AssertTrue(FSWriteDurable(World.ConfigPath, Unstamped))
+	AssertFalse(ConfigSchemaCanPrepareWrite(World.ConfigPath), "removing the genuine stamp must lose native schema admission")
+	AssertFalse(World.Owner.Capture(), "an unstamped fixture cannot borrow its earlier READY receipt")
+	AssertEqual(Unstamped, FSReadUtf8Exact(World.ConfigPath), "qualification cannot repair an unversioned source")
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "restoring the exact current source is observed afresh")
+	AssertTrue(World.Owner.Current(World.Receipt), "the original receipt remains bound to exact restored source bytes")
+}
+Test("Local server source: authored current stamp and unstamped refusal (local-server-current-schema-fixture)",
+	(*) => _LSP_WithWorld(_LSP_AuthoredSchemaAdmission))
+
+
+; Read interleaving belongs to this test object; it never emits native write authority.
+class _LSP_NativeWriteSourceOwner extends LLM_Menu_ApiPrivateSourceOwner {
+	__New(Options, World) {
+		super.__New(Options)
+		this.World := World
+	}
+
+	_Snapshot(Path) {
+		Result := _ConfigTransitionReadSnapshot(this.World.Port, Path)
+		return ConfigTransitionResultIs(Result, "snapshot") ? Result["snapshot"] : false
+	}
+}
+
+
+; The existing physical publication fixture supplies exact close/probe/rollback evidence.
+class _LSP_PhysicalSourceFault extends _LMT_ApiPhysicalPublicationFault {
+	__New(World, TargetPath, ExpectedImage) {
+		super.__New(false)
+		this.ApiPath := TargetPath
+		this.OldApi := ExpectedImage
+		this.OldConfig := World.ConfigImage
+		this.Bundle := _ConfigWriteLeaseState().terminal
+		this.Published := 1
+	}
+
+	Arm() {
+		AssertTrue(ConfigTransitionProductionPort(this.Port))
+		AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath))
+		; The exact owned file remains readable while native replacement/delete refuses.
+		this.Handle := DllCall("kernel32\CreateFileW", "Str", this.ApiPath,
+			"UInt", 0x80000000, "UInt", 1, "Ptr", 0, "UInt", 3,
+			"UInt", 0x80, "Ptr", 0, "Ptr")
+		NativeError := A_LastError
+		if this.Handle == -1 {
+			this.Handle := 0
+			throw OSError(NativeError, A_ThisFunc, "Cannot acquire the owned publication fault handle.")
+		}
+		AssertTrue(this.Handle != 0)
+		this.ObserveNativeRefusal()
+	}
 }

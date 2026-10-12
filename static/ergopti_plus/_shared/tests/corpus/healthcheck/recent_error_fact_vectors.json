@@ -1,0 +1,210 @@
+{
+	"description": "Synthetic known log failures only. No real user log is copied. Unknown lines and private details remain excluded; facts are log observations and never incident cause or native authority.",
+	"canaries": [
+		"PRIVATE_TOKEN",
+		"PRIVATE_ACCOUNT",
+		"PRIVATE_SECRET",
+		"PRIVATE_HOST",
+		"PRIVATE_ORG",
+		"/Users/",
+		"/home/",
+		"https://"
+	],
+	"vectors": [
+		{
+			"id": "windows-known-and-private-errors",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-10T09:00:00Z",
+				"sections": {
+					"issues": {
+						"warn_count": 0,
+						"err_count": 9,
+						"recent_source": "errors_file",
+						"recent": [
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: watchdog exited unexpectedly (exit 73): /Users/PRIVATE_ACCOUNT/private-org token=PRIVATE_SECRET",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for PONG 5",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for READY",
+							"2026-10-10 09:00:00:000 [ERROR] PRIVATE_HOST | Arbitrary private text https://internal.PRIVATE_ORG.invalid\nTrace /home/PRIVATE_ACCOUNT/doc",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for PONG 9999999999999999999999999",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for READY /Users/PRIVATE_ACCOUNT",
+							"unrelated text watchdog exited unexpectedly (exit 73): PRIVATE_SECRET",
+							"2026-10-10 09:00:00:000 [ERROR] menu_llm | MLX packages are not importable from the installed runtime /Users/PRIVATE_ACCOUNT/env/python (exit=1, cause=PRIVATE_SECRET, path=PRIVATE_ORG): https://PRIVATE_HOST.invalid",
+							"2026-10-10 09:00:00:000 [WARNING] api_mlx | MLX server is missing or unreachable."
+						],
+						"recent_error_facts": {
+							"events": [
+								{
+									"code": "fake_native_success"
+								}
+							]
+						}
+					}
+				}
+			},
+			"expected": {
+				"observed": true,
+				"source": "errors_file",
+				"qualification": "log_observation_only",
+				"examined_entries": 9,
+				"excluded_entries": 4,
+				"events": [
+					{
+						"entry_index": 1,
+						"code": "lease_watchdog_exit",
+						"exit_code": 73
+					},
+					{
+						"entry_index": 2,
+						"code": "lease_pong_timeout",
+						"sequence": 5
+					},
+					{
+						"entry_index": 3,
+						"code": "lease_ready_timeout"
+					},
+					{
+						"entry_index": 8,
+						"code": "mlx_import_failed",
+						"exit_code": 1
+					},
+					{
+						"entry_index": 9,
+						"code": "mlx_server_unreachable"
+					}
+				]
+			}
+		},
+		{
+			"id": "macos-known-and-private-errors",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-10T09:00:00Z",
+				"sections": {
+					"issues": {
+						"warn_count": 0,
+						"err_count": 9,
+						"recent_source": "errors_file",
+						"recent": [
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: watchdog exited unexpectedly (exit 73): /Users/PRIVATE_ACCOUNT/private-org token=PRIVATE_SECRET",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for PONG 5",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for READY",
+							"2026-10-10 09:00:00:000 [ERROR] PRIVATE_HOST | Arbitrary private text https://internal.PRIVATE_ORG.invalid\nTrace /home/PRIVATE_ACCOUNT/doc",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for PONG 9999999999999999999999999",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for READY /Users/PRIVATE_ACCOUNT",
+							"unrelated text watchdog exited unexpectedly (exit 73): PRIVATE_SECRET",
+							"2026-10-10 09:00:00:000 [ERROR] menu_llm | MLX packages are not importable from the installed runtime /Users/PRIVATE_ACCOUNT/env/python (exit=1, cause=PRIVATE_SECRET, path=PRIVATE_ORG): https://PRIVATE_HOST.invalid",
+							"2026-10-10 09:00:00:000 [WARNING] api_mlx | MLX server is missing or unreachable."
+						],
+						"recent_error_facts": {
+							"events": [
+								{
+									"code": "fake_native_success"
+								}
+							]
+						}
+					}
+				}
+			},
+			"expected": {
+				"observed": true,
+				"source": "errors_file",
+				"qualification": "log_observation_only",
+				"examined_entries": 9,
+				"excluded_entries": 4,
+				"events": [
+					{
+						"entry_index": 1,
+						"code": "lease_watchdog_exit",
+						"exit_code": 73
+					},
+					{
+						"entry_index": 2,
+						"code": "lease_pong_timeout",
+						"sequence": 5
+					},
+					{
+						"entry_index": 3,
+						"code": "lease_ready_timeout"
+					},
+					{
+						"entry_index": 8,
+						"code": "mlx_import_failed",
+						"exit_code": 1
+					},
+					{
+						"entry_index": 9,
+						"code": "mlx_server_unreachable"
+					}
+				]
+			}
+		},
+		{
+			"id": "linux-known-and-private-errors",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-10T09:00:00Z",
+				"sections": {
+					"issues": {
+						"warn_count": 0,
+						"err_count": 9,
+						"recent_source": "errors_file",
+						"recent": [
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: watchdog exited unexpectedly (exit 73): /Users/PRIVATE_ACCOUNT/private-org token=PRIVATE_SECRET",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for PONG 5",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for READY",
+							"2026-10-10 09:00:00:000 [ERROR] PRIVATE_HOST | Arbitrary private text https://internal.PRIVATE_ORG.invalid\nTrace /home/PRIVATE_ACCOUNT/doc",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for PONG 9999999999999999999999999",
+							"2026-10-10 09:00:00:000 [ERROR] remap.lease | Karabiner lease PRIVATE_TOKEN failed; fencing before publishing failure: timeout waiting for READY /Users/PRIVATE_ACCOUNT",
+							"unrelated text watchdog exited unexpectedly (exit 73): PRIVATE_SECRET",
+							"2026-10-10 09:00:00:000 [ERROR] menu_llm | MLX packages are not importable from the installed runtime /Users/PRIVATE_ACCOUNT/env/python (exit=1, cause=PRIVATE_SECRET, path=PRIVATE_ORG): https://PRIVATE_HOST.invalid",
+							"2026-10-10 09:00:00:000 [WARNING] api_mlx | MLX server is missing or unreachable."
+						],
+						"recent_error_facts": {
+							"events": [
+								{
+									"code": "fake_native_success"
+								}
+							]
+						}
+					}
+				}
+			},
+			"expected": {
+				"observed": true,
+				"source": "errors_file",
+				"qualification": "log_observation_only",
+				"examined_entries": 9,
+				"excluded_entries": 4,
+				"events": [
+					{
+						"entry_index": 1,
+						"code": "lease_watchdog_exit",
+						"exit_code": 73
+					},
+					{
+						"entry_index": 2,
+						"code": "lease_pong_timeout",
+						"sequence": 5
+					},
+					{
+						"entry_index": 3,
+						"code": "lease_ready_timeout"
+					},
+					{
+						"entry_index": 8,
+						"code": "mlx_import_failed",
+						"exit_code": 1
+					},
+					{
+						"entry_index": 9,
+						"code": "mlx_server_unreachable"
+					}
+				]
+			}
+		}
+	]
+}

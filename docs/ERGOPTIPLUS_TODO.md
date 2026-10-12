@@ -2,14 +2,50 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-10. Latest stable: [v1.0.0](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0)
-at `5ef675e08d9f75b0902026a21f36782e999b3ac2`, published at 01:31:54 UTC.
+Updated: 2026-10-12. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
+at `63cf3d005d371edb4e4093a906da276ced487182`, published and verified by the
+publication owner with [CI 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226).
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
 Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+### October 12 consolidation and macOS issue 94
+
+The maintainer explicitly authorized consolidating the published `main` and
+latest `dev` histories with exceptional merge commits, preserving the original
+34 groups 2/4/7 commits through `97f4e08fff32c43933c09e3d0a7b83abde8b4c9e`.
+Development continues on `dev`; `main` advances by fast-forward only for a
+subsequently authorized release. The private test-optimization branch and its
+feature inventories remain outside this integration.
+
+Issue [94](https://github.com/adrienm7/ergopti/issues/94) and the maintainer's
+three reported macOS symptoms have portable regressions and software corrections:
+
+- Menu tap-hold changes refuse before persistence when the current remap lease
+  cannot deploy them. Ordinary ACTIVE changes regenerate immediately; deliberate
+  paused/disabled settings-only edits remain supported.
+- Symbol wrapping retains the clipboard through the exact synthetic producer's
+  terminal completion and the canonical paste grace, including pause/cancel.
+- Registered ANSI/ISO layout conventions are captured once for logical actions
+  and virtual HID configuration. Existing personal profile fields survive the
+  selective keyboard-form replacement; ISO physical inputs remain distinct
+  from virtual outputs.
+
+These Linux-host Lua checks do not qualify actual Hammerspoon, Karabiner,
+application paste consumption or physical ISO typing. Issue 94 remains pending
+native acceptance. Its issue body was retrieved; the attached diagnostic logs
+remain unread because their download host refused access. Exact reproduction,
+results and native commands are in the
+[dev consolidation handover](handovers/2026-10-12-dev-consolidation/README.md).
+The existing groups 2/4/7 native checklists remain actionable; their TODO items
+stay open. Item 49 additionally retains unfinished production cohort migration,
+not merely native validation; its disabled cohort and stale native DLL are not
+presented as complete.
+
+### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
 finished successfully with 65 successful jobs, the explicitly deferred native
@@ -28,14 +64,135 @@ production download links now select v1.0.0, while `/dev/` selects dev.157.
 Work now resumes from the latest `dev`, integrating all other groups and the
 stable corrections without discarding published history. Prioritize the
 maintainer's ten-hour v1.0.1 follow-up: maximum verified fixes and restoration
-of full CI. The v1.0.0 qualification and unsigned exceptions do not authorize
-either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
+of full CI. The v1.0.0 exceptions do not carry forward automatically. The
+maintainer has since authorized unsigned Windows executables until signing is
+implemented and the narrow v1.0.1 test deferrals described below. Groups 2, 4
+and 7 and item 133 remain open.
 
 ### v1.0.1 integration receiving
 
-The isolated integration branch has received `dev` through `591d59a942`.
+Latest receiving, October 11: `main` is `8c3a3f1dc6` and
+[CI 38141714520](https://github.com/adrienm7/ergopti/actions/runs/38141714520)
+is still incomplete. Core, native Apple Silicon MLX bootstrap, macOS stubbed
+units/E2E and native tooltip captures pass. Linux has 13,075 passing cases and
+one loopback HTTP fixture timeout: its 100 ms transport deadline expired before
+the first connection, despite a refreshed timer. A local fixture correction
+uses its existing 1000 ms completion bound and blocks longer than that deadline
+to preserve the original stale-clock counterexample; native receiving remains
+required. The preceding Windows run passed all 11,222 unit cases, then refused
+the native console receipt because unrelated full-suite registration warnings
+polluted stdout. The local native entry correction retains all eleven desktop
+cases and strict output checks; its registration proof is not native execution.
+The three corrective commits through `2202da416e` are ready for publication:
+the Windows entry, the Linux fixture and the standalone Go build closure.
+Canonical Windows receiving passes 57 selected unit cases, all 70 isolated
+editor E2E cases and production entry compilation. The Go generator and its
+79 registered controls pass; an actual Go build and fresh hosted Go analysis
+remain required. The local complete JS suite was not rerun for this urgent
+publication; the hosted complete Core gate remains mandatory.
+
+Both managed Ollama architectures still fail earlier PAC/WPAD and independent
+HTTP receiving. Complete Intel security logs now prove that `trustd` refused
+the test anchor with missing `modify-anchor-certificates` entitlement
+(`-34018`), although the add command returned zero. Cleanup then requested
+administrator authentication and timed out at a confirmation dialog. No
+supported remedy or complete trust cleanup is proved. The model itself has
+not been received.
+
+On October 11 the maintainer explicitly requested immediate publication even
+if tests must be bypassed. The resulting temporary profile applies only to
+`v1.0.1` from a `main` push and expires at `2026-10-12T07:00:00Z`. It records
+six macOS scopes as **DEFERRED, qualified:false** in source-bound receipts and
+public release notes: the three exact native PAC/WPAD/bootstrap methods,
+independent native HTTP wire clients, the single Homebrew archive acceptance
+method, and native managed-model receiving across its three profiles and both
+architectures, plus native Apple Shortcuts catalogue discovery. CI38147217648
+refused that discovery after 20.19 seconds with permission-preflight constants
+unavailable and no returned catalogue; no permission success is inferred. Eight
+source-bound Mac receipts disclose that missing proof. The unchanged external
+AppleEvent transport also remains DEFERRED for only `clean` and
+`karabiner_config` on `macos-15` and `macos-15-intel`, together with its dependent
+native feature proofs. Four additional source/scenario/runner-bound records
+make twelve Mac qualification receipts; actual installation, quarantine, logger,
+startup, alive, Quit, user-state and the complete launch matrix remain required. These are not passing tests. The remaining unit and portable
+controls, builds, packaging, asset integrity and ordinary installation/launch
+remain mandatory. Other versions and default contexts execute the full tests;
+no system permission or certificate-trust workaround is adopted. Restoring
+these six native qualifications remains open after publication. v1.0.1 is
+not yet published.
+
+The composed policy, full-default workflow and Swift evidence controls pass
+locally, with unchanged source hashes. The Mac deferral owner passes its 79
+controls before the existing item-36 Windows symlink privilege refusal; the
+Homebrew owner reaches its Python fixtures, which require unavailable native
+host facilities. Those complete owners are not reported as passing here and
+remain mandatory in hosted Core. Formatting and diff checks pass.
+
+Dependabot PRs #91 and #92 were approved and rebase-merged, preserving their
+atomic history. After the corrective main push and rescan, GitHub reports zero
+open Dependabot alerts; all 34 original alerts have an explicit fixed timestamp.
+Fresh hosted CodeQL analysis of `8c3a3f1dc6` also succeeded in all three
+language jobs. Thirteen real findings are fixed; 32 independently reviewed
+false positives have individual dismissal reasons, including the two bounded
+original-regex test oracles. GitHub reports zero open CodeQL findings. No query
+or security test was disabled, and no real defect was dismissed. Item 144 is
+complete. The separately reported old CodeQL Go extraction error is corrected
+locally by a module under `_shared/go/native_http` and canonical generated
+embed inputs. Go must be re-enabled in the existing default setup after this
+source is published, and a fresh successful nonempty analysis must be checked;
+the historical failed analysis is retained.
+
+The latest fetched `dev` is `de83547967`. A finite semantic inventory identifies
+five additional production mechanisms to integrate: shortcut identity reread
+after admission, onboarding timer refusal, stream-task settlement ownership,
+unsigned decimal XID parsing, and live gesture catalogue withdrawal. These
+remain pending; the terminator metadata correction is already covered. Groups
+2, 4 and 7 and complete release qualification remain open.
+
+The following paragraphs retain earlier receiving checkpoints. They do not
+supersede this current state or establish completion of groups 2, 4 or 7.
+
+The isolated integration branch has received `dev` through `1e0556e802`.
 The merge retains both histories and the complete test union: 179 Homebrew
 controls and 55 native HTTP controls. `main` remains the published v1.0.0.
+
+The atomic local corrections include provider-menu state publication,
+closed MLX failure facts, removal of unnecessary device identities, complete
+English diagnostic attachments, editable issue fields, stable version/OS/driver
+prefills, and the explicitly authorized v1.0.1 release controls. Canonical
+Windows diagnostics pass 94 cases; the report and bridge callbacks pass 33
+macOS and 42 Linux recording controls. These are bounded receipts, not complete
+native qualification. All new source still needs the integrated release gates.
+
+The Windows logger privacy correction passes all 872 canonical cases selected
+by `Logger`, including existing write/flush/rollback coverage. Linux passes
+55 source and recording controls. Both use the canonical redaction policy;
+multiline bodies cannot forge a second trusted metadata prefix. The macOS
+correction also enforces the remaining per-tick preparation budget before
+redaction and terminates a refused privacy bootstrap. Its 68 registered source
+and recording controls pass; fatal-report redaction adds ten passing controls
+and retains nine passing shutdown controls. Native macOS remains unqualified.
+Existing raw logs, unrelated sinks and arbitrary free-form content are not
+certified anonymous by these changes.
+
+[CI 38045831306](https://github.com/adrienm7/ergopti/actions/runs/38045831306)
+completed with failures on `b6801d2fbe`: Core passed 403 of 407 checks;
+Windows stopped at a reserved PowerShell variable before native component
+receiving; Linux and macOS retained stale English-export fixtures. Nine
+atomic corrections now preserve all original assertions, restore canonical
+privacy IO ownership, fix the controlled PAC worker admission race, and
+retain the latest validated Automation UI observation. Focused receiving
+passes. The complete local pipeline guard remains blocked by Windows symlink
+privilege; it is not counted as passed. The interrupted earlier source gate
+also remains nonqualifying.
+
+[CI 38048288963](https://github.com/adrienm7/ergopti/actions/runs/38048288963)
+is receiving these corrections on `0b1f937f66` with every OS lane enabled.
+No v1.0.1 release has been published. Native cold MLX passed on the preceding
+candidate, but the macOS Automation and PAC/TLS failures remain unresolved.
+The observed TLS code `-1202` does not identify the underlying rejection;
+additional bounded diagnostic evidence is being implemented without changing
+trust policy. Groups 2, 4 and 7 and the complete release gate remain open.
 
 [CI 38025215348](https://github.com/adrienm7/ergopti/actions/runs/38025215348)
 on `de812ab633` has completed Core JavaScript, Linux units, macOS units,
@@ -125,10 +282,10 @@ new complete JavaScript pass. Five atomic local commits retain the relative
 Linux loader correction, macOS fixture stderr, Windows checker enrollment,
 owned downloader output and coherent Ollama components. Native CI is next.
 
-Current Windows Notepad 11.2607.14.0 receiving passed all six actual HSE/LLM
-caller scenarios through the production DLL. All 280 source dependencies and
+Windows Notepad 11.2607.14.0 receiving on `0b1f937f66` passed all six actual HSE/LLM
+caller scenarios through the production DLL. All 283 source dependencies and
 the DLL remained unchanged; the sender exited naturally, stderr was empty,
-and both owned Notepad processes were retired. The receipt retains 55 AHK
+and both owned Notepad processes were retired. The receipt retains 56 AHK
 variable-shadowing warnings. This controlled synthetic-document prerequisite
 does not qualify physical default triggers, navigation, concurrent typing, or
 the full focus/document/retirement matrix; Group 7 remains open.
@@ -3508,6 +3665,26 @@ Hosted Lua owner tests do not qualify physical input.
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 The minimal native lease-silence receiving topic derives from Dev `a2b1fb4be16ff88b9bab755841d744960512b89e`. Its additive DEBUG control uses real outer/inner processes with a fixed no-effect CLI and scripted guardian authority. The source-bound manual ARM/Intel receiver retains the direct Swift child status separately from the PTY and output-capture statuses. Forty-nine portable receiving controls passed on the retained helper packet. Its original 26 transcript assertions plus 14 frozen direct-status cases and one double-LF refusal now run as 41 lasting normal-suite controls; the separate eight source/host controls remain supplemental. All 41 lasting controls and the four strict CI inventories pass. The exact published logger fixture prerequisite `e47c88c23999973b6cd936cfed3db40e2a1cf3a5` is received unchanged so the original covering suite selects its configured sink. Actual native compilation/execution and current package acceptance remain unexecuted. The independent manual-only ARM/Intel CI job is enrolled under explicitly handed-off workflow custody, preserving every existing job, budget, package/install control and release condition. This neither proves the user watchdog exit73 cause nor grants physical input, installed-runtime or shipping authority.
+
+WP3 bounded system-authentication setter receiving now cancels a complete
+held-modifier interval when its effective policy becomes excluded. Disabled
+filtering preserves included durations. A refused settlement retains a private
+admission debt until the exact public setter retry succeeds; it does not admit
+physical or synthetic accounting meanwhile. The genuine Root three-argument
+context tracker and all 32 original accounting cases remain unchanged. Nine
+independent controls give original 35 passes / 6 assertion failures and corrected
+41 / 0; settlement omission restores those six failures, and admission-gate
+omission gives 39 / 2. That last omission stops at admission assertions before
+later synthetic checks; the corrected cases execute their complete sink and
+retry assertions. Broader secure/private/configuration writers, native
+authentication, physical acceptance and lease exit73 remain unqualified. Selected formatting and E2E pass (364 files, 101 cases and one original
+host skip). The complete selected run remains RED: JS 404 / 3 and Lua
+18,197 / 9. Exact unmodified Root replays reproduce two JS failures and all
+nine boot-fixture failures. A test-only recovery measurement correction passes
+all 41 focused cases and removes the third JS false-green ratchet occurrence;
+the complete suites were not rerun afterward. These local baseline outcomes
+do not establish source defects; isolated context or environment causes remain
+possible, and hosted qualification is still required. TODO31 stays partial.
 
 ## Remaining work after the 2026-09-30 releases
 
@@ -11576,6 +11753,7 @@ SDK constants qualify the native Swift Shortcuts product or remote invocation.
   and cover the actual menu/dashboard consumers on Windows, macOS and Linux
   with regression tests. Their local implementations are recorded above;
   publication, native acceptance and media regeneration remain open.
+  Rendered promo media does not qualify a driver correction.
 
 - [ ] **114.** Diagnose and fix recurring Windows prediction-key and script-chord stalls.
 
@@ -12061,8 +12239,16 @@ test precondition failure, not a Lua defect or a successful permission grant.
   publisher verification and explicit failures; never commit certificate or
   key material. The maintainer authorized the current v1.0.0 Windows artifact
   without Authenticode before 2026-10-09T22:00:00Z. Publish its exact artifact
-  hash and unsigned status; this is not a Windows test deferral. Future stable
-  releases require actual signing or a separate explicit maintainer decision.
+  hash and unsigned status; this is not a Windows test deferral. That dated
+  one-candidate decision remains historical evidence. On 2026-10-11 the
+  maintainer separately authorized unsigned stable Windows releases until
+  signing is implemented. Retain source- and artifact-bound public unsigned
+  disclosure; all tests, builds, integrity and installation checks stay full.
+  Prefer valid configured signing, and keep partial secrets, signing errors
+  and invalid publisher verification fatal without an unsigned fallback.
+  Revoke the standing permission in
+  `.github/ci/stable_windows_signing_exception.json` when the SignPath
+  integration is completed and qualified. This decision changes no macOS scope.
 
   The stable assembly retains the separately approved qualification limits
   below and the unresolved Karabiner/live-upgrade reports.
@@ -12133,6 +12319,24 @@ test precondition failure, not a Lua defect or a successful permission grant.
   packaging success does not qualify it. Restore this method with the full
   native PAC scope after correcting the fixture failure.
 
+  Actual stable publication followed on October 10 at 01:31:54 UTC:
+  `v1.0.0`, source `5ef675e08d9f75b0902026a21f36782e999b3ac2`,
+  CI 38011314333 and 33 verified assets. Its thirteen explicit deferrals
+  remain unqualified. Work for v1.0.1 continues on dev with the full default
+  test policy; main remains at the published stable source.
+
+  Full dev CI 38033156889 on `c4e2368308` passed 406 of 407 JavaScript
+  checks. The remaining guard omitted two Windows evidence-retention steps.
+  The Windows prerequisite also exposed Unicode corruption in a PowerShell
+  fixture's native stdout; `debc3dbb07` preserves the original assertions
+  under both OEM and UTF-8 encodings. Native macOS trust installation still
+  times out before managed model qualification. Preserve that failure and
+  add passive, redacted child/stream diagnostics without changing permissions
+  or claiming that a retired child proves successful trust installation.
+  Linux's live-daemon first-word probe expected expansion before the driver
+  had observed a word boundary; its fixture correction must pass the actual
+  kernel test before that lane is qualified.
+
 - [x] **134.** Preserve the website custom domain during Pages deployments.
 
   The main deployment removed the prior gh-pages CNAME while the source had
@@ -12144,6 +12348,445 @@ test precondition failure, not a Lua defect or a successful permission grant.
   of either the trigger or pre-deployment check. Actual successor deployment
   37996719619 completed successfully, retained the root CNAME, and served
   HTTP 200 after publication. This closes that specific domain-loss defect.
+
+- [ ] **135.** Remove the deprecated Homebrew macOS dependency syntax.
+
+  The cask generator emits a quoted comparison for the minimum macOS version.
+  Use the supported unquoted minimum-version symbol for every channel and
+  archive format, preserve the existing OS floor, and add a regression that
+  rejects the former generated declaration. Regenerate the public casks
+  through their owner while retaining each published version, URL and hash.
+  Native Homebrew acceptance and publication remain separate checks.
+
+  The maintainer also reported that `brew upgrade` did not offer stable
+  v1.0.0 from a dev installation. The tap has two distinct packages:
+  `ergoptiplus@dev` currently publishes dev.157, while `ergoptiplus` publishes
+  v1.0.0. A normal upgrade does not switch packages. Document an explicit
+  dev-to-stable switch without `--zap`; retain the user's configuration and
+  never change their subscribed channel implicitly.
+
+- [ ] **136.** Finish the v1.0.0 MLX installation failure investigation.
+
+  The anonymized report shows successful native bootstrap admission and a
+  created interpreter, followed by six native request failures with code 74.
+  Neither a proxy permission defect nor a native worker defect is established.
+  The local correction records a closed English stage, exception class and
+  exact child/terminal outcome after confirmed cleanup. It preserves the
+  original failure exit and excludes addresses, environment values and private
+  error text. Receive a new real Apple Silicon attempt before marking the
+  installation defect fixed.
+
+- [ ] **137.** Publish the selected AI provider before model loading completes.
+
+  In v1.0.0 the macOS local-provider transition updates its core and preferences
+  but delays menu publication until asynchronous model success. The report
+  confirms Ollama in the core while the checkmark still shows MLX. The local
+  correction uses the existing strict publication acknowledgement and rollback
+  for local providers. All fourteen registered behavioral unit cases pass,
+  including pending/failed model requirements and refused menu publication.
+  Windows and Linux already publish after provider commitment. Hosted source
+  qualification and actual model readiness remain separate results.
+
+- [ ] **138.** Export complete English diagnostics and an editable issue.
+
+  Every shared field, check label, result, technical diagnostic and attachment
+  sent to GitHub must be English, independently of the localized application
+  UI. Save one complete, anonymized local report and open a short issue draft
+  explaining how to attach it. Remove diagnostic field values from the URL so
+  GitHub cannot restore those values while the user edits them. Preserve
+  copy/save/close/open failures and open the browser only after the file is
+  available. Include actual in-depth results, separately identified page-side
+  observations, and useful recent error/log facts; do not substitute counters
+  for detailed results or call page checks native qualification. Bind retained
+  results to their actual report generation. Validate Windows, macOS and Linux
+  flows and GitHub field editability. Never upload automatically.
+
+  The current candidate carries complete English copy/save output, an
+  issue URL limited to stable host-derived version/system/driver metadata,
+  acknowledged attachment closure and generation-bound
+  page observations. Host JSON key order no longer changes export acceptance.
+  Recent lease and MLX errors produce closed technical codes and numeric facts;
+  raw messages, private paths and unknown entries remain excluded. This uses
+  the existing bounded recent tail, not a complete day-log attachment. Integrated
+  native receiving and the complete daily-log collection remain open.
+
+- [ ] **139.** Remove personal identities from daily and shared error logs.
+
+  The received macOS log exposed the computer name/device prefix at keylogger
+  startup. Local corrections remove unnecessary identities from startup,
+  database and export diagnostics while preserving stored device identity and
+  transaction refusal behavior. The corrected central sinks on all three OSes
+  admit the canonical redaction policy before output; macOS captures identity
+  without recursively resolving a paths module that logs itself. Generic fatal
+  reports redact their details before persistence. Native local log-link paths
+  remain exact for opening the file and must not enter shared attachments.
+  Preserve useful technical facts without usernames, hostnames, private paths,
+  addresses, credentials or typed content. A redacted export and safer new
+  logging do not rewrite historical originals or prove all free-form text safe.
+  Issue 93, its comment and attachment were archived privately and verified
+  before deletion; GitHub then returned HTTP 410. Revocation of the attachment's
+  direct URL was not established. Do not commit the private archive.
+
+- [ ] **140.** Resolve the recurring macOS lease failure from the v1 report.
+
+  Preserve the observed sequence: an initial PONG timeout, further PONG/READY
+  failures, and watchdog exit 73. These are symptoms, not proof of the watchdog's
+  internal cause. Coordinate with Group 5 and integrate its reviewed fix,
+  or explicitly document a safe authorized workaround. Reload recovery and
+  successful later tap-holds do not close the incident. Retain source-bound
+  native regression and retirement evidence before claiming the lease repaired.
+
+- [ ] **141.** Make newer configuration schemas visibly read-only on every driver.
+
+  Preserve the file and the original migration refusal; never downgrade its
+  schema or offer unknown future keys for cleanup. Disable AI persistence
+  actions with a translated explanation and recheck retained callbacks.
+  Exercise genuine future-schema boot, unchanged bytes, current-schema
+  admission and cross-driver cleanup and menu regressions. The maintainer's
+  local checkout was updated from schema 11 to 12 without editing the profile;
+  the subsequent activation incident below is separate.
+
+- [ ] **142.** Provide an explicit local driver control command for reload.
+
+  The maintainer requested a supported way for tools to request Reload when
+  the native tray exposes no accessible window. Route it through the existing
+  lifecycle owner, preserving pause, configuration transactions, cleanup and
+  successor identity. Report requested, refused and completed separately;
+  never start a duplicate driver or force termination. Cover all three OSes
+  through their native control facilities and add refusal and exact-instance
+  regressions.
+
+- [ ] **143.** Fix AI activation retained behind incomplete Windows startup.
+
+  On October 10, the actual local driver at fe980a298 accepted schema 12 and
+  applied 136 settings with no rejection, but repeated reloads did not reach
+  the ready marker. Bounded content-free tracing and an isolated canonical
+  fixture locate expensive source/schema checks during local-server Rescan:
+  Capture took 2828 ms and Current 1531 ms; the panel call did not finish within
+  180 seconds. The isolated actor was explicitly retired after that timeout;
+  this is failed bounded evidence, not a successful startup qualification.
+  Correct and measure the repeated parsing without caching write authority,
+  dropping source freshness or weakening registry validation. Check the same
+  admission cost on macOS and Linux before declaring cross-driver completion.
+  Source.Current performs seven full schema admissions; the local-server job
+  path nests four Current calls. The classification memo removes redundant
+  decoding but a post-change isolated panel still exceeded 90 seconds; do not
+  present that memo as the startup fix. Preserve its failed receipt and reduce
+  duplicate validation at operation boundaries with real interleaving tests.
+
+  The native menu Reload callback incorrectly waited for input readiness.
+  Its correction retains the existing lifecycle owner; four canonical cases
+  pass and the maintainer confirms that the button now reloads. A separate
+  optional boot-save wake-up reports failure when old auto-execution resumes
+  behind a newly acquired reload barrier; preserve real save errors and user
+  obligations while retiring that optional work. Also move genuine CapsLock
+  intent initialization before parse-time key callbacks: an early Alt press
+  otherwise raises UnsetError during startup. The initialization fix has one
+  canonical regression pass, causal recording controls, valid encoding and a
+  successful full-source compile; live AI activation is still unqualified.
+  The inspected macOS/Linux entry paths have neither the delayed optional
+  full-save caller nor the AHK load-time callback/global ordering defect;
+  their lifecycle and input initialization owners remain unchanged.
+
+  The reviewed Windows correction now removes redundant pending-job observer
+  checks, retains full source admission at the operation boundaries, and reads
+  a detached provider view in one batch. Regression controls cover stale source,
+  context withdrawal, reentry and publication ownership. With actual native
+  job/Models timers and a controlled transport, both timely response and no
+  response settle after two menu builds with all jobs and requests retired.
+  The earlier bounded fixture's first projection took approximately 36 seconds;
+  subsequent builds took 1.5-1.8 seconds. The maintainer now confirms that live
+  enable and disable work, but reported more than ten seconds before menu
+  feedback. The follow-up applies runtime effects before repaint and moves
+  source/view preparation out of row construction. Six composed deferred-view
+  controls and the registered ordering test with six child cases pass; the
+  installed source compiles and passes encoding. Measure the real click again
+  after reload before claiming an immediate response. The existing old panel
+  fixture has the same seven passes and thirteen failures before and after the
+  change; retain that explicit fixture debt. macOS/Linux already apply runtime
+  state before repaint and do not have the duplicate Windows polling observer.
+
+  A read-only performance audit of October 10 logs also identifies remaining
+  work. The earlier observed startup takes 36.47 seconds. Hotstring registration's
+  12.38-second interval contains 6.89 seconds of native menu navigation; its wall
+  time excluding navigation is 5.49 seconds. Prefix-watcher initialization takes
+  2.45 seconds, including a 1.42-second index build. Keep the first-input readiness
+  guarantee while investigating this work. In the latest flushed session,
+  OnChar averages 1.11 ms across 403 samples, while suggestion input-to-visible
+  averages 62.93 ms across 31 samples and reaches 393.58 ms. Investigate the
+  render queue before optimizing character matching. Full guarded configuration
+  writes average 864 ms across eight samples. These are uncontrolled usage
+  observations with overlapping timing scopes, not isolated CPU benchmarks;
+  repeat comparable measurements after the fixes without logging typed text.
+
+  Subsequent local reloads reach ready in 7.54 and 10.49 seconds, with no error
+  recorded after 18:00. Their navigation and load differ, so the timings do not
+  isolate a causal speedup. They expose a separate live defect: root staging
+  rebuilds an already constructed AI child, consumes the prepared view twice
+  and schedules another preparation. The log aggregates 131 repeated builds
+  between 18:01 and 18:10 and another 112 before 18:18. Pass the exact caller-owned
+  child through the root's per-invocation builder map, retain the original final
+  publication authorization, and prove that the queue settles without a second
+  child construction. Native verification after installing that correction and
+  the real enable/disable click latency remain open.
+
+## Release-first CI optimization and cross-platform convergence
+
+The maintainer's October 11 priority is to publish the next actual stable
+release first. Do not delay that publication to integrate additional test
+optimizations. Afterwards, this workstream owns CI speed, test quality and
+cross-platform convergence; non-native work in groups 2, 4 and 7 is delegated
+separately. Preserve their unfinished native qualification requirements.
+
+- [ ] Publish and verify v1.0.1: actual tag, source, assets, integrity, mandatory
+      installation checks and explicit existing qualification limits. The
+      run `38165477221` on `47e7308da0` exposed one obsolete serial Linux
+      prerequisite assertion among 410 Core checks. Its correction preserves
+      both mandatory suites before packaging. Run `38167194052` on `bd198a6eae`
+      passed all 410 Core checks, all 11,225 canonical AHK cases and the Linux
+      and macOS verdicts. The separate native AltGr cohort then failed four
+      cases: three isolated-runner dependency omissions and one child completion
+      timeout. The dependency fix passes the unchanged five noninteractive
+      callbacks with warning-free stdout matching the TAP receipt; 33 related
+      controls and 70 E2E cases also pass. Failed child evidence now remains in
+      the uploaded directory. The native US-layout observation still requires
+      hosted receiving. Local French-layout refusal is not native qualification.
+      Publication remains pending; the six disclosed macOS deferrals remain open.
+- [ ] Record elapsed time by default for every CI step, suite and test,
+      including failure and timeout outcomes. Preserve source, OS and
+      architecture with machine-readable results and a readable slowest-test
+      summary. Distinguish setup, execution and cleanup; do not add nested
+      durations twice or expose personal data in diagnostic output.
+- [ ] Preserve live test progress while retaining file-backed native output.
+      The Windows unit log in run `38167194052` still showed only runner setup
+      after 26 minutes; captured callback output is emitted after the native
+      process returns. Add a safely shared progress channel or bounded tailing,
+      with exact final-drain and failure handling, so an active long test is
+      distinguishable from a stalled process. Preserve the transcript writer's
+      file-sharing contract and avoid restoring the pipe-overflow failure.
+- [ ] Group the GitHub Actions graph into four parallel lanes: Common, Windows,
+      macOS and Linux. Each lane must show Unit tests, E2E tests, Build, then
+      Test the build; all four terminal results converge into Release. Split
+      unit and E2E phases into isolated parallel lots balanced by measured
+      duration, and require all unit lots before the E2E phase. Keep macOS Ollama, MLX
+      and other native checks inside its Tests group, alongside unit and E2E
+      checks. Preserve parallel execution inside each group and strict result
+      propagation. Verify the rendered GitHub graph so tests are not scattered
+      among peer boxes and redundant transitive edges do not obscure the
+      intended sequence. Test real outputs in the Common build stage as well;
+      do not add decorative no-op gates just to obtain the desired shape.
+- [ ] Define parallel lots by meaningful feature boundaries, such as
+      configuration, menus, typing/hotstrings, AI and updates. Balance measured
+      durations within those boundaries rather than slicing arbitrary numeric
+      ranges. Preserve shared-state and ordering dependencies within a lot;
+      the earlier contiguous three-shard proposal is not acceptable unchanged.
+- [ ] Organize test directories by the same feature lots and phases exposed in
+      CI. Give each directory one discoverable runner shared by local and hosted
+      execution. Derive CI enrollment from that structure through one canonical
+      inventory; reject orphaned files, duplicate execution and stale job names.
+      Preserve native platform boundaries while giving corresponding shared
+      scenarios consistent names across drivers. Inventory and move tests with
+      coverage proof before removing the old entry points.
+- [ ] Coordinate the migration with groups 1, 2/4/7, 3, 5 and 6 after their
+      current validation checkpoints. Keep feature work at existing paths until
+      each owner supplies its final commit and test/runner inventory, then agree
+      an explicit old-to-new path map. Preserve shared-file span ownership and
+      test ordering; do not interrupt active workflows or refactor their test
+      directories concurrently. Initial coordination requests were acknowledged
+      on 2026-10-11; no file moves have been agreed yet.
+- [ ] Optimize the measured slow paths and distribute independent work across
+      isolated jobs. Prove complete test coverage with every selected case
+      executed exactly once, strict failure propagation and owned cleanup.
+      Use the complete measurements in
+      [the Windows test performance report](audits/performance/ahk/2026_10_11/report.md)
+      as the baseline, not the number of test names alone.
+- [ ] Remove only demonstrated duplicate coverage. Preserve distinct failure,
+      lifecycle and native boundary scenarios; do not reduce workloads or
+      assertions solely to obtain a faster green run.
+- [ ] Make failures actionable: identify the failing stage and invariant,
+      expected and actual results, a safe reproduction command, relevant
+      retained evidence and the responsible module. Distinguish unavailable
+      host prerequisites from product failures without silently waiving either.
+- [ ] Extend the existing shared contracts and scenario corpora into common
+      behavioral tests executed through the real Windows, macOS and Linux
+      adapters. Convergence of features and observable behavior is the goal,
+      not merely matching function names or passing against common mocks.
+- [ ] Cover the same user journeys on all three drivers: available settings
+      and defaults, activation, prediction generation and selection, shortcuts,
+      text insertion, cancellation, errors and cleanup. Define expected results
+      independently of each implementation; shared expectations must expose a
+      driver that diverges.
+- [ ] Keep platform-specific native acceptance for focus, clipboard, keyboard
+      injection, permissions and lifecycle. Any unavoidable OS difference must
+      have an explicit capability reason and tested behavior; do not conceal
+      a feature gap with an ignored common test or a successful model result.
+- [ ] Maintain causal regressions and deterministic fixtures. Prove the original
+      defect fails its regression and keep useful negative controls, clear
+      timeout diagnostics and complete results when a suite aborts.
+
+Private AHK sharding, workflow graph simplification and recovery-copy
+optimization proposals remain unadopted pending review and actual receiving
+after publication. They are not part of the current release's evidence.
+
+## Current patch release qualification
+
+The maintainer explicitly selected v1.0.1 despite two feature-labelled commits
+in the integrated history. An explicit publication-commit patch request must
+leave automatic defaults, breaking-change handling and published-tag guards
+intact. The earlier candidate-only unsigned Windows permission expired on
+October 11, 2026 at 07:00 UTC. A new explicit maintainer decision on October 11
+authorizes unsigned stable Windows releases until signing is implemented,
+without an arbitrary expiry or per-version renewal. The public notice and
+receipt remain bound to the exact source, release tag and executable digest;
+unsigned status is qualified:false, with every test mandatory. Item 132 tracks
+the signing implementation and revocation of this standing permission.
+The maintainer previously answered "oui" to three exact macOS scopes for
+the same v1.0.1 main-push candidate and expiry: native PAC/WPAD/TLS (including
+the exact bootstrap duplicate), independent native HTTP wire clients, and
+the single native Homebrew ZIP/XZ acceptance method. Their source-bound public
+receipts and release note must state DEFERRED / qualified:false. All other
+tests, builds, applicable signatures, integrity and ordinary verified archive
+installation/launch remain mandatory. The prior thirteen v1.0.0 test deferrals
+are not extended. Item36 workflow dispatch remains full. The three macOS
+scopes also expired on October 11 at 07:00 UTC and are not renewed by the
+standing Windows decision: their original controls now remain mandatory.
+The proposed fourth native model scope remains unapproved and inactive.
+
+- [ ] Diagnose certificate -1202 and trust-retirement debt, then receive the
+      original three PAC/WPAD/bootstrap methods on arm64 and amd64. All twelve
+      ManagedHTTPWorkerTests cases remain mandatory.
+- [ ] Diagnose the independent native wire clients' original 15-second trust
+      installation timeout and receive both clients with exact teardown. The
+      owned-process and client-only controls remain mandatory at both call sites.
+- [ ] Receive the original native Homebrew ZIP installation, XZ upgrade and
+      refusal-preservation method with its owned Automation consent. These native
+      acceptance claims remain unqualified; ordinary verified archive install and
+      launch remain required. Restore these three scopes only after their original
+      controls pass without a permissions, trust or sender workaround.
+
+The macOS profile automatically requires full execution for another version,
+repository, event, ref, channel or expired context. Its exact authorized
+boundary is recorded in
+`.github/ci/stable_v101_macos_native_qualification_exception.json`.
+
+- [ ] Reconcile the maintainer's draft
+      [#87](https://github.com/adrienm7/ergopti/pull/87) against current dev without
+      replaying superseded native owners. Twelve commits are patch-equivalent;
+      the remaining hunks include terminal-menu retirement, brightness module
+      isolation and cross-driver shortcut columns. Retain current fixes and
+      atomic history without force-push or squash. Resolve conflicts, receive
+      the actual tooltip/native controls. The ordinary one-review rule has a
+      configured role-5 exemption; the author cannot self-approve. Use no manual
+      bypass or protection change. No merge or native qualification is claimed,
+      and previous permission/trust stops stay intact.
+
+[CI 38080535633](https://github.com/adrienm7/ergopti/actions/runs/38080535633)
+receives `fbc70b60da7ec545cdfc28c88f90216dc6050829`, including `dev` through
+`9e370a3926f23ff09e0a272fae8fa841afdb4d0b`. Linux units and the native Apple
+Silicon MLX installation pass. Core completes 408 of 409 checks; its remaining
+release fixture inherits the hosted main release's environment. Native Ollama
+preparation separately refuses a planned-release catalogue paired with a local
+fixture URL. Its trust restoration also times out, and that native cause remains
+unproved. Neither failure is covered by the three approved scopes. No v1.0.1
+release has been published at this checkpoint.
+
+The catalogue preparation and inherited release-context defects now have local
+fixes with causal regressions. The complete release fixture passes against the
+hosted main environment. Linux E2E and 16 of 17 installation scenarios pass on
+the preceding source; the remaining RPM `--help` check fails privacy admission.
+Its nonlogin container supplies HOME without USER/LOGNAME. The corrected check
+supplies the actual `id -un` identity and refuses failed or empty queries before
+launch. The complete recording-shell test passes, while native Fedora receiving
+remains mandatory. The exact original private admission failure is not exposed
+by the redacted log.
+
+- [ ] Receive the later `dev` tranche through `d92a72d5c7a575a4a22edead078a15e1d113ebfc`
+      after the current patch candidate. It adds foreground daemon ownership and
+      source migration across 104 files beyond the already integrated `9e370a3926`
+      baseline. Its handover retains native model/trust qualification gaps and
+      contains no trust-removal correction. Preserve the catalogue projection,
+      separate primary/cleanup failures, and exact release-policy boundaries
+      when composing the incoming native listener headers and workflow changes.
+
+- [ ] Measure and reduce repeated source-authority validation in the Windows
+      menu transaction without weakening ownership checks. The current capacity
+      fixture took 111,742 ms for apply and 96,690 ms for refusal, while its 32
+      direct guard calls took 386 ms. Source review finds full-cohort validation
+      repeated around each callback; it does not establish an exclusive I/O or
+      CPU cause. Two later finite runs were incomplete: the full local run
+      reached 4,186 passes before its watchdog, and a fresh suffix reached
+      1,213 passes and 75 failures before its own watchdog. Four actual 32 MiB
+      recovery controls took 164 to 184 seconds each. The registry-derived
+      watchdog now has a 120-minute cap and the CI step a 125-minute bound.
+      Both canonical watchdog controls and twelve static accept/refuse profiles
+      pass. Complete hosted execution must still establish capacity; this
+      harness correction does not improve product latency.
+
+The subsequent 298-case Windows selection completed with 297 passes and one
+failure. That failure exposed a production AI-enable caller using the legacy
+flat TOML writer for a semantic configuration update. Its real default-path
+regression failed before the caller was changed to `TOML_ConfigBatchWrite`.
+The corrected caller and eleven existing AI admission cases now pass, including
+the held loopback response and stale/refused ownership cases. macOS and Linux
+already use their semantic preference writers. Two gesture persistence cases
+also pass after the fixture restores both original Map identities; a new
+identity assertion failed before that restoration. These fourteen controls
+are targeted evidence, not full-suite qualification.
+
+The remaining 297-case evidence covers corrected source-admission fixtures and
+their preserved refusal assertions. The earlier full and suffix transcripts
+remain incomplete, and seven previously refused local native trust experiments
+remain NOT_RUN locally and mandatory in hosted CI. The current local JavaScript
+baseline contains ten failed Windows-host/fixture checks. No v1.0.1 publication
+or complete green source/native qualification is claimed at this checkpoint.
+
+The maintainer has since confirmed that one enable click and one disable click
+both update the live Windows AI checkmark after five-second waits. This is useful
+manual evidence for the resident driver; it does not establish an instantaneous
+response or replace the exact release-source checks.
+
+An earlier source gate completed with formatting and encoding passing and 395 of 407
+JavaScript checks passing. The twelve remaining host/fixture failures remain
+open. The following canonical Windows run reached its existing 1,320,000 ms
+watchdog: 10,146 passed, eight failed and 648 had no completed result. Its transcript
+validator correctly refused the incomplete result. The two additional observed
+failures concern native file filtering and a held loopback HTTP response.
+One held-response run exhausted its four-second original deadline before
+native transport admission; no payload was published and no native receipt
+returned. A later instrumented run passed with only 172 ms left. Source history
+confirms this fixture deadline predates managed admission. The fixture now uses
+the constructor's request budget with all original response, heartbeat and
+cleanup assertions retained. Canonical receiving passes with a validated
+transcript. The prior admission delay's cause remains unproved. These bounded
+receipts do not qualify a release.
+The file-filter harness now retains bounded action/focus/outcome facts before
+its unchanged failing assertion and normal fixture cleanup. The exact native
+file-filter case passed, with a natural exit, an empty Job and unchanged source.
+This single success does not establish the old intermittent failure's cause.
+
+The later rebased source gate finished with 394 of 407 JavaScript checks passing.
+Its remaining Windows-host and fixture failures were retained as failures. The
+subsequent fixes passed their selected controls: generated Lua programs now use
+stdin, the Linux phase model retains its exact Windows receipt boundary, and the
+AHK source-reader ratchet remains at 380 literals. The full rebased Windows run
+reached its unchanged watchdog after 1,913 passes, with no completed failure;
+it was incomplete and does not qualify the release. Its E2E run passed 70 cases.
+
+The menu corrections have separate current regression receipts: 19 startup
+command cases, nine coordinator cases, two root-composition/source-owner cases,
+six deferred-view cases, and both transaction observation controls passed.
+The panel selection initially passed 19 cases and failed two because the fixture
+armed cancellation refusal after the real request deadline had already settled
+its first child. Acquiring that refusal with the child fixed both original
+cases without changing the production timeout or cleanup assertions. Encoding
+checks passed for 1,895 AHK files. The maintainer confirmed that both live AI
+checkbox changes now work; the measured toggle is still not instantaneous.
+These are bounded receipts. The final hosted release CI remains required.
+
+The generated stable and dev Homebrew casks were published in tap commit
+`ba0fadd9af349eca1b5d1887e034f8bebd6d0092` with only the supported
+`depends_on macos: :big_sur` declaration changed. Published artifact versions,
+URLs and hashes were retained. Native Homebrew acceptance remains separate.
 
 ## Time estimate
 

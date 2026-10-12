@@ -129,23 +129,23 @@ _LLM_Menu_EnableWrite(Request, Path, Updates) {
 		return false
 	if !_LLM_Menu_EnableStillCurrent(Request)
 		return false
-	Writer := _LLM_Menu_EnablePort(Request["port"], "writer", TOML_BatchWrite)
+	Writer := _LLM_Menu_EnablePort(Request["port"], "writer", TOML_ConfigBatchWrite)
 	global _LLM_ManagedBootstrap
 	Flow := _LLM_ManagedBootstrap
 	Token := 0
 	if IsObject(Flow) && Flow.Ready && Flow.HasOwnProp("MenuIntent") && !Flow.MenuIntent["enabled"] {
 		; Render before publication from the exact source held by this request.
-		Built := TOML_BuildUpdatedContent(Path, Updates)
+		Built := TOML_BuildConfigUpdatedContent(Path, Updates)
 		if !(Built is Map) || Built.Get("status", "") != "ok"
 				|| !_LLM_Menu_EnableSourceMatches(Request["source"], ReadSource.Call())
 			return false
 		Content := Built["content"]
 		Size := StrPut(Content, "UTF-8") - 1
-		Bytes := Buffer(Size + 3, 0)
-		NumPut("UChar", 0xEF, "UChar", 0xBB, "UChar", 0xBF, Bytes)
+		; The shared renderer returns the complete image, including its BOM.
+		Bytes := Buffer(Size, 0)
 		Encoded := Buffer(Size + 1, 0)
 		StrPut(Content, Encoded, "UTF-8")
-		DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr + 3, "Ptr", Encoded.Ptr, "UPtr", Size)
+		DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", Encoded.Ptr, "UPtr", Size)
 		Token := Flow.PrepareEnableHandoff(Request["source"], Map("path", Path, "bytes", Bytes))
 		if !(Token is Map)
 			return false

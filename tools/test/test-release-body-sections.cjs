@@ -230,11 +230,8 @@ function buildCiBody(
 					crypto.createHash('sha256').update(signingFixture.image).digest('hex'),
 					qualificationNow
 				);
-				notice = signing.notice(env.GITHUB_SHA);
-			} else if (
-				env.ERGOPTI_DEV_RELEASE_TAG === signing.POLICY.tag &&
-				env.ERGOPTI_DEV_RELEASE_CHANNEL === signing.POLICY.channel
-			) {
+				notice = signing.notice(env.GITHUB_SHA, env.ERGOPTI_DEV_RELEASE_TAG);
+			} else if (env.ERGOPTI_DEV_RELEASE_CHANNEL === signing.POLICY.channel) {
 				assert.equal(
 					env.ERGOPTI_WINDOWS_SIGNING_CONFIGURED,
 					'true',
@@ -884,11 +881,11 @@ function checkNativeQualificationBody(modules) {
 }
 
 function checkUnsignedQualificationBody(modules) {
-	const now = new Date('2026-10-09T21:00:00Z');
+	const now = new Date('2026-10-11T09:00:00Z');
 	const env = {
 		...CI_ENV,
-		TAG: 'v1.0.0',
-		VERSION: '1.0.0',
+		TAG: 'v1.0.1',
+		VERSION: '1.0.1',
 		GITHUB_ACTIONS: 'true',
 		GITHUB_EVENT_NAME: 'push',
 		GITHUB_REF: 'refs/heads/main',
@@ -896,8 +893,8 @@ function checkUnsignedQualificationBody(modules) {
 		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
 		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
 		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
-		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
-		ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1',
 		ERGOPTI_WINDOWS_CREATE_RELEASE: 'true'
 	};
 	const image = Buffer.from('independent unsigned fixture bytes, not an executable');
@@ -913,7 +910,10 @@ function checkUnsignedQualificationBody(modules) {
 			now
 		)
 	};
-	env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE = signing.notice(env.GITHUB_SHA);
+	env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE = signing.notice(
+		env.GITHUB_SHA,
+		env.ERGOPTI_DEV_RELEASE_TAG
+	);
 	const body = buildCiBody(env, CHANGELOG_MD, releaseBodyScript(), now, fixture);
 	assert.ok(body.includes(env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE));
 	assert.ok(
@@ -942,16 +942,17 @@ function checkUnsignedQualificationBody(modules) {
 			),
 		/not admitted/
 	);
-	assert.throws(
-		() =>
-			buildCiBody(
-				env,
-				CHANGELOG_MD,
-				releaseBodyScript(),
-				new Date('2026-10-10T02:00:00Z'),
-				fixture
-			),
-		/not admitted/
+	const laterBody = buildCiBody(
+		env,
+		CHANGELOG_MD,
+		releaseBodyScript(),
+		new Date('2027-10-11T07:00:00Z'),
+		fixture
+	);
+	assert.equal(
+		laterBody,
+		body,
+		'standing signature permission does not renew on an arbitrary clock'
 	);
 	assert.throws(
 		() =>

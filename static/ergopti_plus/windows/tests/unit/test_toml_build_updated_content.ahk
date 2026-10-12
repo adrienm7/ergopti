@@ -1211,3 +1211,99 @@ _TBUI_CommentTokenVectors() {
 for _TBUI_CommentTokenCase in _TBUI_CommentTokenVectors()
 	Test("toml-comment-newline-native: " . _TBUI_CommentTokenCase.Id,
 		_TBUI_CommentTokenVector.Bind(_TBUI_CommentTokenCase))
+
+; Comments leave their LF for the existing separator/container owner to consume.
+_TBUI_CommentCursorAndSpans() {
+	for CommentVector in [
+		{Source: "  a # ignored`nnext", Separator: Chr(10), Token: "a", Cursor: 15, First: 3, Last: 3, Split: true},
+		{Source: "  a # ignored`r`nnext", Separator: Chr(10), Token: "a", Cursor: 16, First: 3, Last: 3, Split: true},
+		{Source: " a#junk`rb", Separator: Chr(10), Token: "a", Cursor: 10, First: 2, Last: 2, Split: false},
+		{Source: ' # fake } ] "', Separator: Chr(10), Token: "", Cursor: 14, First: 0, Last: 0, Split: false},
+		{Source: "# comment`nnext", Separator: Chr(10), Token: "", Cursor: 11, First: 0, Last: 0, Split: true},
+		{Source: "a # discarded`nb", Separator: ",", Token: "a `nb", Cursor: 16, First: 1, Last: 15, Split: false},
+		{Source: "[1,# ] fake`n 2],tail", Separator: ",", Token: "[1,`n 2]", Cursor: 17, First: 1, Last: 15, Split: true}
+	] {
+		CommentPosition := 1
+		CommentToken := _TOML_DocumentToken(CommentVector.Source, &CommentPosition,
+			CommentVector.Separator, &CommentSeparated, &CommentStart, &CommentEnd)
+		AssertEqual(CommentVector.Token, CommentToken, "comment skipping preserves the exact decoded token")
+		AssertEqual(CommentVector.Cursor, CommentPosition, "the cursor consumes exactly the original line boundary")
+		AssertEqual(CommentVector.First, CommentStart, "comments cannot acquire a token span start")
+		AssertEqual(CommentVector.Last, CommentEnd, "comments cannot acquire a token span end")
+		AssertEqual(CommentVector.Split, CommentSeparated, "only the original top-level separator splits")
+	}
+	CommentSource := "discarded prefix`n  a # tail`nnext"
+	CommentPosition := 20
+	AssertEqual("a", _TOML_DocumentToken(CommentSource, &CommentPosition,
+		Chr(10), &CommentSeparated, &CommentStart, &CommentEnd))
+	AssertEqual(29, CommentPosition, "native comment search starts at the caller's retained cursor")
+	AssertEqual(20, CommentStart)
+	AssertEqual(20, CommentEnd)
+	AssertTrue(CommentSeparated)
+}
+Test("toml canonical lexer: comment cursor and spans preserve LF CRLF EOF and nested boundaries",
+	_TBUI_CommentCursorAndSpans)
+
+_TBUI_CommentQuoteAndContainerOwnership() {
+	CommentQuote := Chr(34), CommentLiteral := Chr(39)
+	for CommentQuoted in [
+		CommentQuote . "literal#[]{}" . CommentQuote,
+		CommentLiteral . "literal#[]{}" . CommentLiteral,
+		CommentQuote . CommentQuote . CommentQuote . "first#[]`nsecond{}"
+			. CommentQuote . CommentQuote . CommentQuote,
+		CommentLiteral . CommentLiteral . CommentLiteral . "first#[]`nsecond{}"
+			. CommentLiteral . CommentLiteral . CommentLiteral
+	] {
+		CommentSource := "  " . CommentQuoted . " # fake } ] ' " . CommentQuote . "`nnext"
+		CommentPosition := 1
+		AssertEqual(CommentQuoted, _TOML_DocumentToken(CommentSource, &CommentPosition,
+			Chr(10), &CommentSeparated, &CommentStart, &CommentEnd),
+			"quoted hashes and multiline content remain lexical data")
+		AssertEqual(3, CommentStart)
+		AssertEqual(2 + StrLen(CommentQuoted), CommentEnd)
+		AssertEqual("next", SubStr(CommentSource, CommentPosition))
+		AssertTrue(CommentSeparated)
+	}
+	CommentSource := '{ a = "#", # } fake`n b = 2 } remainder'
+	CommentPosition := 1
+	AssertEqual('{ a = "#", `n b = 2 }', _TOML_DocumentToken(CommentSource,
+		&CommentPosition, Chr(0), &CommentSeparated, &CommentStart, &CommentEnd, true),
+		"a closer inside a comment cannot end the actual balanced container")
+	AssertEqual(" remainder", SubStr(CommentSource, CommentPosition))
+	AssertEqual(1, CommentStart)
+	AssertEqual(CommentPosition - 1, CommentEnd)
+	AssertFalse(CommentSeparated)
+	CommentDocument := TOML_ParseDocument("values = [1,# ] fake`n 2] # trailing`nnext = 3`n")
+	AssertEqual(2, CommentDocument["values"].Length)
+	AssertEqual(1, CommentDocument["values"][1])
+	AssertEqual(2, CommentDocument["values"][2])
+	AssertEqual(3, CommentDocument["next"])
+	for CommentInvalid in ["values = [1,# ]", "values = { a = 1,# }", 'value = "# unterminated']
+		AssertThrows(TOML_ParseDocument.Bind(CommentInvalid),
+			"comment text cannot repair an unterminated real quote or container")
+}
+Test("toml canonical lexer: comment skipping preserves quoted data and real container refusal",
+	_TBUI_CommentQuoteAndContainerOwnership)
+
+
+; Comment search must preserve physical LF boundaries beyond an embedded NUL.
+_TBUI_CommentEmbeddedNulBoundary() {
+	NulCommentSource := "#x" . Chr(0) . "y" . Chr(10) . "next=3" . Chr(10)
+	NulCommentPosition := 1
+	NulCommentToken := _TOML_DocumentToken(NulCommentSource, &NulCommentPosition,
+		Chr(10), &NulCommentSeparated, &NulCommentStart, &NulCommentEnd)
+	AssertEqual("", NulCommentToken)
+	AssertEqual(6, NulCommentPosition, "the comment's LF remains the original physical separator")
+	AssertTrue(NulCommentSeparated)
+	AssertEqual(0, NulCommentStart)
+	AssertEqual(0, NulCommentEnd)
+	NulCommentToken := _TOML_DocumentToken(NulCommentSource, &NulCommentPosition,
+		Chr(10), &NulCommentSeparated, &NulCommentStart, &NulCommentEnd)
+	AssertEqual("next=3", NulCommentToken, "the record after the NUL-bearing comment is retained")
+	AssertEqual(13, NulCommentPosition)
+	AssertTrue(NulCommentSeparated)
+	AssertEqual(6, NulCommentStart)
+	AssertEqual(11, NulCommentEnd)
+}
+Test("toml canonical lexer: comment search retains the physical LF beyond embedded NUL",
+	_TBUI_CommentEmbeddedNulBoundary)

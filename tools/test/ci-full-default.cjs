@@ -55,7 +55,7 @@ const JOBS = [
 	[
 		'.github/workflows/ci-linux.yml',
 		'package-linux',
-		"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+		"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 	],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']

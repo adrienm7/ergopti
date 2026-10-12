@@ -1,0 +1,70 @@
+{
+	"schema": 1,
+	"id": "stable-v1-0-1-20261011-four-macos-native-scopes",
+	"authorized": true,
+	"authorization_quote": "il faut vraiment te dépêcher de créer cette release, quitte à bypass des tests",
+	"expires_at": "2026-10-12T07:00:00Z",
+	"repository": "adrienm7/ergopti",
+	"event_name": "push",
+	"ref": "refs/heads/main",
+	"release": true,
+	"prerelease": "false",
+	"channel": "main",
+	"tag": "v1.0.1",
+	"version": "1.0.1",
+	"authorization_note": "Explicit human authorization on 2026-10-11 permits temporary test deferrals to expedite only stable v1.0.1 main publication. Exactly these six scopes remain DEFERRED/qualified:false. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
+	"scopes": {
+		"macos-native-pac": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["managed-ollama-native", "Qualify actual native PAC and WPAD XCTest controls"],
+			"methods": {
+				"ManagedHTTPWireTests": ["testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure"],
+				"ManagedHTTPWPADWireTests": [
+					"testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork"
+				],
+				"ManagedBootstrapDownloadTests": [
+					"testActualNativeBootstrapTLSFullURLPACAndArtifactPublication"
+				]
+			},
+			"reason": "The two native TLS/full-URL PAC and WPAD wire methods and exact bootstrap duplicate remain DEFERRED and qualified:false after certificate -1202; all twelve ManagedHTTPWorkerTests cases remain mandatory."
+		},
+		"macos-native-http": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["managed-ollama-native", "Receive actual independent managed HTTP native clients"],
+			"command": "static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py",
+			"reason": "Only independent native wire clients are DEFERRED and qualified:false after the original trust-install deadline; owned-process/client-only tests remain mandatory at both call sites."
+		},
+		"macos-brew-archive": {
+			"kind": "swift_test_file",
+			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
+			"name": "testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"reason": "The single native Homebrew ZIP installation/XZ upgrade/refusal-preservation acceptance method is DEFERRED and qualified:false after owned Automation consent exceeded its deadline; ordinary verified archive install/launch remains mandatory."
+		},
+		"macos-native-model-receiving": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": [
+				"managed-ollama-native",
+				"Receive actual native model create, pull, inference and retirement"
+			],
+			"architectures": ["arm64", "amd64"],
+			"profiles": ["pac-inline", "pac-url", "explicit-proxy"],
+			"reason": "Native model create, pull, inference, cancellation and retirement remain DEFERRED and qualified:false for arm64/amd64 across pac-inline, pac-url and explicit-proxy after the system-trust fixture was refused; producer/catalogue/assets and portable model controls remain mandatory."
+		},
+		"macos-shortcuts-discovery": {
+			"kind": "command",
+			"path": "tools/diagnostics/apple_shortcuts_probe/run_probe.py",
+			"args": [],
+			"reason": "Native Apple Shortcuts catalogue discovery is DEFERRED and qualified:false after CI38147217648 exceeded its twenty-second native retrieval deadline with unavailable permission-preflight constants; portable Python/JXA controls and ordinary verified install/launch remain mandatory. No permission or catalogue success is inferred."
+		},
+		"macos-launch-appleevents": {
+			"kind": "macos_launch",
+			"path": "tools/diagnostics/macos_launch_gate.py",
+			"scenarios": ["clean", "karabiner_config"],
+			"runners": ["macos-15", "macos-15-intel"],
+			"reason": "Only external AppleEvent transport and its dependent native delayed-timer, Karabiner and ScriptScope feature qualifications are DEFERRED and qualified:false for clean/karabiner_config on macos-15/macos-15-intel after unchanged hosted transport timeouts and unanswered consent. Actual installation, quarantine, logger, startup, alive, Quit, user-state and the complete launch matrix remain mandatory; no permission or runtime workaround is authorized."
+		}
+	}
+}
