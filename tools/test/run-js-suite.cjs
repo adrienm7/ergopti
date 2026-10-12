@@ -406,6 +406,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-menu-reader-line-snapshot.cjs'
 	},
 	{
+		name: 'menu lexical queries retain exact semantics and bounded per-unit repeat work',
+		cmd: 'node',
+		args: ['tools/test/test-menu-lex-unit-query-reuse.cjs'],
+		repro: 'node tools/test/test-menu-lex-unit-query-reuse.cjs'
+	},
+	{
 		name: 'every menu-manifest field and section has a driver that reads it (no decorative declarations)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-manifest-keys-have-readers.cjs'],
