@@ -266,6 +266,32 @@ lock-held DLL/consumer bridge, emitter orchestration and full nonhook
 handler/observer conversion remain software work. No SendEvent/SendInput choice
 or physical acceptance is inferred.
 
+Item 49 also retains the [replay writable-output correction](handovers/2026-10-12-dev-consolidation/pending-replay-output-protection.patch)
+with [receiving commands and source inventory](handovers/2026-10-12-dev-consolidation/replay-output-receiving.md).
+An aliased output formerly erased live state before ownership refusal; exact
+span/overflow protection now preserves it. An independent actual C caller is
+red on the original (state erased, exit 1) and green on the correction (every
+state byte retained, exit 0). All 108 original assertions remain, with 32 added;
+8/8 core, 43/43 production-C/POSIX cases, 7/7 neighboring output matrices and
+full sanitizer checks pass. Five compiled guard mutants fail. This pending
+source patch leaves active C/DLL provenance intact until an actual official
+Windows MSVC rebuild; native SDK/DLL/desktop/hooks are UNRUN. Production observer
+conversion and emission remain software work; item 49 is not closed.
+
+Item 49 now retains the implemented [lock-held native serializer bridge](handovers/2026-10-12-dev-consolidation/native-serializer-bridge.patch)
+and [strict companion source guard](handovers/2026-10-12-dev-consolidation/native-serializer-source-binding.patch),
+with [receiving instructions](handovers/2026-10-12-dev-consolidation/native-serializer-bridge-receiving.md).
+The API authenticates the current FIFO and retained attempt under one lock,
+protects the whole owner from writable aliases, and copies owned packets without
+sending, ACKing or consuming. Existing FAULTED debt remains settleable. All
+1,352 original native assertions remain, with 102 added. The independently
+composed five C cuts now pass 8 core / 11 output matrices / 43 owner cases and
+full sanitizers, actual exit 0; no combined-count expectation is presented as
+proof. The 41-export source guard retains all original assertions and adds
+14 inverse controls. Native SDK/MSVC/DLL/AHK and physical receiving remain UNRUN;
+live source/DLL provenance and closed admission are unchanged. Backend delivery
+and complete observer conversion remain software work, so item 49 stays open.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
@@ -6071,6 +6097,24 @@ cohorts, full units and packaging/install remain unexecuted. Core passes
 424/426 with the retained Lua gsub and macOS layout-default source failures;
 the complete workflow fails with 3 successful, 4 failed and 5 skipped jobs,
 including Release skipped. Item 42 and transversal items 16/38 remain partial.
+
+Current integrated-tree manual
+[38319577074](https://github.com/adrienm7/ergopti/actions/runs/38319577074),
+private `f385e3c7` with the exact Dev `d5a1fe238` tree, receives the corrected
+TOML source: strict console/AltGr desktop cohorts pass 11/11 with no warning
+prefix, and E2E passes 70/70. Snapshot16 then refuses its dry-selection stdout
+before general units; 16 of 11,627 declarations are selected and none executes.
+The complete 1,484,141-byte stdout is not uploaded; only 15 complete tail warning
+tuples are received, so no complete warning inventory is claimed. A read-only
+source handoff proves 31 script-global registration loop headers in 14 fixtures,
+explaining the corresponding local/global collisions. Root owns the registration
+and receiving correction; no warning/assertion/budget is weakened. See the
+[October 12 handoff](handovers/2026-10-12-config-menus/README.md). Full units,
+transaction cohorts, package/install, startup and device acceptance remain open.
+The whole workflow is terminal FAIL: 3 successful, 4 failed and 5 skipped jobs,
+zero cancelled, with Release skipped. Core passes 424/426; the two retained Lua
+source guards still fail (bare gsub return and macOS layout-default delegation). Item 42 and
+transversal items 16/38 remain partial.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
