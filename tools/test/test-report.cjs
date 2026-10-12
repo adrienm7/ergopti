@@ -202,6 +202,86 @@ try {
 		'successful runs emit no failure-details notice',
 		!commands.some((line) => line.startsWith('::notice title=windows-ahk all failures::'))
 	);
+	// A watchdog can leave only successful rows. Missing terminal counts cannot mean zero failures.
+	for (const [name, output] of [
+		[
+			'windows-ahk',
+			'1..2\nok 1 - finished case\n[WATCHDOG] Test suite timed out; force-exiting.\n'
+		],
+		['linux-lua', '  ok   finished case\n'],
+		['macos-lua', 'Passed tests: 1\n'],
+		['empty-output', '']
+	]) {
+		for (const nativeExit of [null, 0, 7]) {
+			fs.writeFileSync(transcript, output);
+			fs.writeFileSync(summary, '');
+			const result = spawnSync(
+				process.execPath,
+				[
+					path.resolve(__dirname, 'report.cjs'),
+					'--name',
+					name,
+					'--json',
+					receipt,
+					'--',
+					...(nativeExit === null
+						? ['PARSE_FILE', transcript]
+						: [process.execPath, runner, transcript, String(nativeExit)])
+				],
+				{
+					encoding: 'utf8',
+					env: { ...process.env, GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: summary }
+				}
+			);
+			assert.ifError(result.error);
+			const terminal = result.stdout
+				.split('\n')
+				.find((line) => line.startsWith('[report:' + name + ']'));
+			check(
+				'incomplete console summary cannot advertise PASS',
+				terminal && !terminal.includes('PASS') && terminal.includes('terminal counts unavailable')
+			);
+			const parsed = parseResults(output);
+			check(
+				'missing footer has unavailable counts',
+				parsed.counts_available === false && parsed.passed === null && parsed.failed === null
+			);
+			const expectedExit = nativeExit === null ? 1 : nativeExit;
+			check(
+				'file-only incomplete summary refuses; wrapped native exit remains exact',
+				result.status === expectedExit
+			);
+			const json = JSON.parse(fs.readFileSync(receipt, 'utf8'));
+			check(
+				'JSON never invents zero counts for a missing footer',
+				json.counts_available === false &&
+					json.passed === null &&
+					json.failed === null &&
+					json.exit_code === expectedExit
+			);
+			check(
+				'notice explicitly reports incomplete counts',
+				result.stdout.includes('INCOMPLETE — terminal counts unavailable')
+			);
+			check(
+				'step summary has no invented green zero counts',
+				fs.readFileSync(summary, 'utf8').includes('INCOMPLETE: terminal counts unavailable') &&
+					!fs.readFileSync(summary, 'utf8').includes('✅')
+			);
+			if (nativeExit !== null)
+				check(
+					'incomplete reporting preserves original child output',
+					result.stdout.startsWith(output)
+				);
+		}
+	}
+	const emptyTerminal = parseResults('# 0 passed, 0 failed\n');
+	check(
+		'explicit zero terminal counts remain available',
+		emptyTerminal.counts_available === true &&
+			emptyTerminal.passed === 0 &&
+			emptyTerminal.failed === 0
+	);
 } finally {
 	fs.rmSync(fixture, { recursive: true, force: true });
 }
