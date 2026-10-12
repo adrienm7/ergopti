@@ -114,7 +114,9 @@ function trace(sources, entry) {
 		admitItem36Selector: () => {},
 		admitRawNativePacSelector: () => {},
 		ITEM36_FILTER: 'ITEM36_FILTER',
-		PAC_FILTER: 'PAC_FILTER'
+		PAC_FILTER: 'PAC_FILTER',
+		// This routing-only sentinel never evaluates the source guard or its native body.
+		PAC_STEP_SOURCE: 'RECORDED_PAC_HEADER\n        shell: bash\nRECORDED_PAC_RUN'
 	};
 	const paths = Object.fromEntries(
 		Object.entries(FILES).map(([name, rel]) => ['./' + path.basename(rel), name])
@@ -140,8 +142,14 @@ function trace(sources, entry) {
 				const expected =
 					name === 'item36'
 						? ['workflow', 'admitItem36Selector', 'ITEM36_FILTER']
-						: ['workflow', 'admitNativePacSelector', 'PAC_FILTER'];
+						: ['workflow', 'admitNativePacSelector', 'PAC_FILTER', 'PAC_STEP_GUARD'];
 				assert.deepEqual(Object.keys(context), expected);
+				if (name === 'pac')
+					assert.equal(
+						context.PAC_STEP_GUARD,
+						values.PAC_STEP_SOURCE.slice(0, values.PAC_STEP_SOURCE.indexOf('        shell: bash')),
+						'PAC context must retain the exact source-derived guard prefix'
+					);
 				counts[name]++;
 				if (name === 'pac') counts.pacHelper++;
 			};
@@ -259,6 +267,37 @@ function checkOwnership(sources) {
 			/deferral owner must not return before its census/,
 			'an early return must not be recorded as completed controls'
 		);
+	}
+
+	const pacAssignments = [];
+	walk(parse(sources.deferral), (node) => {
+		if (node.type === 'Property' && node.key.name === 'PAC_STEP_GUARD') pacAssignments.push(node);
+	});
+	assert.equal(
+		pacAssignments.length,
+		2,
+		'standalone and delegated PAC retain the same guard context'
+	);
+	for (const property of pacAssignments) {
+		const without =
+			sources.deferral.slice(0, property.start) +
+			'PAC_STEP_GUARD: undefined' +
+			sources.deferral.slice(property.end);
+		const whole =
+			sources.deferral.slice(0, property.start) +
+			'PAC_STEP_GUARD: PAC_STEP_SOURCE' +
+			sources.deferral.slice(property.end);
+		const extra =
+			sources.deferral.slice(0, property.start) +
+			'FOREIGN_PAC_STEP_GUARD: PAC_STEP_SOURCE' +
+			sources.deferral.slice(property.end);
+		const entry = property === pacAssignments[0] ? 'deferral' : 'pac';
+		for (const changed of [without, whole, extra])
+			assert.throws(
+				() => trace({ ...sources, deferral: changed }, entry),
+				undefined,
+				'missing/whole/foreign PAC guard context must fail real routing'
+			);
 	}
 
 	const summaries = [];

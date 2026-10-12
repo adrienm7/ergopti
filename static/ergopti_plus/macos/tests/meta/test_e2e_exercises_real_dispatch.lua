@@ -46,6 +46,7 @@ local REPO_ROOT   = DRIVER_ROOT:gsub("[/\\]static[/\\]ergopti_plus[/\\]macos[/\\
 local PIPELINE  = ".github/workflows/ci.yml"
 local MACOS_BOX = ".github/workflows/ci-macos.yml"
 local HARNESS   = "tests/e2e/run_e2e.lua"
+local ROLE_PLAN = "tools/ci/macos-stage-roles.cjs"
 
 --- Reads one repository file, asserting that it exists and is not empty.
 --- @param rel string Repository-relative path.
@@ -67,10 +68,62 @@ local function unquote(raw)
 	return value:match("^'(.*)'$") or value:match('^"(.*)"$') or value
 end
 
+--- Resolves the displayed harness name through its closed static matrix inputs.
+--- The JavaScript role-plan owner independently tests execution of this plan.
+--- @param src string Workflow source.
+--- @param job_at integer Start of the actual parent job.
+--- @param step_at integer Start of the actual harness step.
+--- @param name string Declared job display name.
+--- @param roles string Authored JavaScript role-plan source.
+--- @return string Resolved harness role display name.
+local function matrix_harness_name(src, job_at, step_at, name, roles)
+	local function once(text, literal, reason)
+		local at = text:find(literal, 1, true)
+		helpers.assert_true(at ~= nil and text:find(literal, at + #literal, true) == nil, reason)
+	end
+	helpers.assert_eq(name, "E2E · ${{ matrix.role }} · ${{ matrix.architecture }}",
+		"a dynamic harness name must use the actual role and architecture fields")
+	local job_end = src:find("\n  [%w_%-]+:[ \t]*\n", job_at + 1) or (#src + 1)
+	local job = src:sub(job_at, job_end - 1)
+	once(job, "        include: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}",
+		"the harness matrix must consume the actual Unit plan output")
+	local unit = src:match("\n  test%-hs:\n(.-)\n  [%w_%-]+:[ \t]*\n")
+	helpers.assert_true(unit ~= nil, "the role plan must have one Unit owner")
+	once(unit, "      e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}",
+		"the Unit output must forward its actual role-plan step")
+	once(unit, "        id: stage-plan\n        run: node tools/ci/macos-stage-roles.cjs plan e2e\n",
+		"the Unit step must invoke the canonical E2E plan")
+	local step_end = src:find("\n      %- ", step_at + 1) or (#src + 1)
+	once(src:sub(step_at, step_end - 1),
+		"        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}\n",
+		"the harness must run only in its admitted matrix role")
+	once(roles, "function cell(role, runner, architecture, timeout, scenario = '') {\n"
+		.. "\treturn { role, runner, architecture, timeout_minutes: timeout, scenario };\n}",
+		"matrix role fields must retain their canonical argument mapping")
+	local rows = roles:match("\n\tif %(stage === 'e2e'%) {\n\t\tconst rows = %[(.-)\n\t\t%];")
+	helpers.assert_true(rows ~= nil, "the E2E plan must declare its mandatory literal rows")
+	local architecture, count = nil, 0
+	for line in rows:gmatch("[^\n]+") do
+		local role, runner, label, timeout = line:match(
+			"^%s*cell%('([^']+)', '([^']+)', '([^']+)', (%d+)%),?%s*$")
+		helpers.assert_true(role ~= nil, "the mandatory matrix row must be a literal canonical cell")
+		if role == "e2e-hs" then
+			count = count + 1
+			helpers.assert_eq(runner, "ubuntu-latest", "the replay retains its non-Hammerspoon runner")
+			helpers.assert_eq(timeout, "360", "the replay retains its original bound")
+			architecture = label
+		end
+	end
+	helpers.assert_eq(count, 1, "exactly one mandatory replay role must provide the displayed label")
+	return name:gsub("%$%{%{ matrix%.role %}%}", "e2e-hs")
+		:gsub("%$%{%{ matrix%.architecture %}%}", function() return architecture end)
+end
+
+
 --- Locates the one step that runs the stubbed harness and the job that owns it.
 --- @param src string ci-macos.yml source.
 --- @return table { step_at, step_name, job_id, job_name }
-local function locate_harness(src)
+local function locate_harness(src, roles_source)
 	local run_at = src:find(HARNESS, 1, true)
 	helpers.assert_true(run_at ~= nil, MACOS_BOX .. " must run " .. HARNESS)
 	helpers.assert_true(src:find(HARNESS, run_at + 1, true) == nil,
@@ -106,6 +159,11 @@ local function locate_harness(src)
 		job_name = src:match("^    name:([^\n]*)", job_at + #fast_header)
 	end
 	helpers.assert_true(job_name ~= nil, "the harness job must open with its name: field")
+	job_name = unquote(job_name)
+	if job_name:find("${{", 1, true) then
+		job_name = matrix_harness_name(src, job_at, step_at, job_name,
+			roles_source or read_repo_file(ROLE_PLAN))
+	end
 
 	return {
 		step_at   = step_at,
@@ -224,5 +282,52 @@ helpers.describe("F-HIGH-30: exact temporary fast-header composition", function(
 		local step = locate_harness(fixture(header, nil, "Run real Hammerspoon E2E"))
 		helpers.assert_eq(flags_stub(job.job_name), false)
 		helpers.assert_eq(flags_stub(step.step_name), false)
+	end)
+end)
+
+--- Dynamic names retain the original visible stub disclosure through actual inputs.
+helpers.describe("F-HIGH-30: matrix role name custody", function()
+	local function replace_once(source, before, after)
+		local at = source:find(before, 1, true)
+		helpers.assert_true(at ~= nil and source:find(before, at + #before, true) == nil,
+			"a source mutation must target exactly one actual binding")
+		return source:sub(1, at - 1) .. after .. source:sub(at + #before)
+	end
+	helpers.it("the actual role label resolves and a changed producer label cannot claim stub coverage", function()
+		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
+		local original = locate_harness(workflow, roles)
+		helpers.assert_true(flags_stub(original.job_name))
+		local changed = replace_once(roles,
+			"cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360)",
+			"cell('e2e-hs', 'ubuntu-latest', 'arm64', 360)")
+		helpers.assert_eq(flags_stub(locate_harness(workflow, changed).job_name), false)
+	end)
+	helpers.it("foreign matrix, output, command and role bindings cannot borrow the stub label", function()
+		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
+		for _, mutation in ipairs({
+			{ "fromJSON(needs.test-hs.outputs.e2e_matrix)", "fromJSON(needs.test-hs.outputs.foreign)",
+				"the harness matrix must consume the actual Unit plan output" },
+			{ "e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}", "e2e_matrix: []",
+				"the Unit output must forward its actual role-plan step" },
+			{ "run: node tools/ci/macos-stage-roles.cjs plan e2e", "run: echo fake-plan",
+				"the Unit step must invoke the canonical E2E plan" },
+			{ "Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)\n        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}",
+				"Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)\n        if: ${{ matrix.role == 'foreign' }}",
+				"the harness must run only in its admitted matrix role" },
+		}) do
+			local changed = replace_once(workflow, mutation[1], mutation[2])
+			local accepted, reason = pcall(locate_harness, changed, roles)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_true(type(reason) == "string" and reason:find(mutation[3], 1, true) ~= nil,
+				"source custody must fail for the intended binding")
+		end
+		local duplicate = replace_once(roles,
+			"cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360)",
+			"cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360),\n\t\t\tcell('e2e-hs', 'ubuntu-latest', 'stubbed', 360)")
+		local accepted, reason = pcall(locate_harness, workflow, duplicate)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_true(type(reason) == "string"
+			and reason:find("exactly one mandatory replay role", 1, true) ~= nil,
+			"duplicate role must fail for the intended cardinality")
 	end)
 end)

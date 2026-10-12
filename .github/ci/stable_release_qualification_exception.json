@@ -34,13 +34,13 @@
 		"macos-native-pac": {
 			"kind": "command",
 			"path": ".github/workflows/ci-macos.yml",
-			"args": ["managed-ollama-native", "Qualify actual native PAC and WPAD XCTest controls"],
+			"args": ["e2e-hs", "Qualify actual native PAC and WPAD XCTest controls"],
 			"reason": "Native PAC/WPAD wire tests remain failing or incomplete; native PAC/network qualification is deferred, never inferred from packaging."
 		},
 		"macos-native-http": {
 			"kind": "command",
 			"path": ".github/workflows/ci-macos.yml",
-			"args": ["managed-ollama-native", "Receive actual independent managed HTTP native clients"],
+			"args": ["e2e-hs", "Receive actual independent managed HTTP native clients"],
 			"reason": "Independent native HTTP client receiving remains failing or incomplete; transport qualification is deferred."
 		},
 		"macos-stubbed-unit": {
@@ -93,10 +93,7 @@
 		"macos-native-model-receiving": {
 			"kind": "command",
 			"path": ".github/workflows/ci-macos.yml",
-			"args": [
-				"managed-ollama-native",
-				"Receive actual native model create, pull, inference and retirement"
-			],
+			"args": ["e2e-hs", "Receive actual native model create, pull, inference and retirement"],
 			"reason": "Hosted native model receiving timed out restoring trust after actual producer build and catalogue checks passed. Model receiving remains unqualified; no TLS, trust or permission workaround is authorized."
 		}
 	}

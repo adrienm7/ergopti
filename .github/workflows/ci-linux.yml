@@ -233,6 +233,13 @@ jobs:
     env:
       # Python-owned native children also resolve the production shared modules.
       LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+      ci_unit_result: ${{ needs.test-linux.result }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -3502,14 +3509,26 @@ jobs:
   package-linux:
     name: 'Package'
     runs-on: ubuntu-latest
-    needs: [test-linux, e2e-linux]
-    if: ${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
+    needs: [e2e-linux]
+    if: ${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
 
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Admit genuine preceding scheduler results
+        shell: bash
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci/ci-stage-status.cjs admit-build linux
 
       - name: Install LuaJIT
         # Three readers: the assembly smoke below boots the driver with it,
@@ -3902,6 +3921,12 @@ jobs:
             label: 'Run · AppImage'
             container: ''
     container: ${{ matrix.container }}
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
     steps:
       - name: Prepare the container
         if: matrix.kind == 'install'
@@ -4440,11 +4465,7 @@ jobs:
   linux-ok:
     name: 'Verdict'
     runs-on: ubuntu-latest
-    needs:
-      - test-linux
-      - e2e-linux
-      - package-linux
-      - install-linux
+    needs: [install-linux]
     if: always()
 
     steps:
@@ -4471,6 +4492,7 @@ jobs:
           ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          NEEDS="$(node tools/ci/ci-stage-status.cjs complete linux)"
           node tools/test/linux-ci-evidence.cjs verify \
               --manifest .github/linux-ci-coverage.json \
               --needs "$NEEDS" \

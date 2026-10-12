@@ -11,6 +11,7 @@ const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs'
 const { run } = require('./run-linux-window-switch-receipts.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const ROOT = path.resolve(__dirname, '../..');
+const MacStage = require('./fixtures/macos-stage-source.cjs');
 const raw = fs.readFileSync(q.POLICY_PATH, 'utf8'),
 	policy = q.parseClosedJson(raw);
 const ctx = {
@@ -471,35 +472,22 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 {
 	const pipeline = require('./ci-pipeline.cjs');
 	const workflows = {
-		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'manual-verdict', 'release'],
+		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'publication-plan', 'release'],
 		'ci-common.yml': ['prepare-common', 'shared-validation', 'common-unit-verdict', 'common-e2e'],
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
-		'ci-macos.yml': [
-			'item36-native',
-			'lease-silence-native',
-			'managed-ollama-native',
-			'test-hs',
-			'e2e-hs',
-			'tooltip-canvas',
-			'package-macos',
-			'launch',
-			'cold-bootstrap-native',
-			'macos-ok'
-		],
+		'ci-macos.yml': ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
 		'ci-linux.yml': ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
 	};
 	const ordinaryConditions = {
 		macos: "needs.validate.outputs.lane_macos == 'true'",
 		windows: "needs.validate.outputs.lane_windows == 'true'",
 		linux: "needs.validate.outputs.lane_linux == 'true'",
-		'manual-verdict': "always() && github.event_name == 'workflow_dispatch'",
-		release: "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+		'publication-plan': 'always() && !cancelled()',
+		release: "github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
 		'windows-ok': 'always()',
-		'item36-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
-		'lease-silence-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
 		'macos-ok': 'always()',
 		'package-linux':
-			"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+			"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
 		'linux-ok': 'always()'
 	};
 	let jobs = 0,
@@ -541,17 +529,39 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			}
 		}
 	}
-	assert.equal(
-		pipeline
-			.jobsOfText(
-				fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8'),
-				'.github/workflows/ci-macos.yml'
+	const macosSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8');
+	for (const role of [
+		'e2e-hs',
+		'tooltip-canvas',
+		'managed-ollama-native',
+		'item36-native',
+		'lease-silence-native',
+		'launch',
+		'cold-bootstrap-native'
+	]) {
+		const actualJob = pipeline
+			.jobsOfText(macosSource, '.github/workflows/ci-macos.yml')
+			.find((job) => job.id === MacStage.stage[role]);
+		assert(actualJob, role + ': the actual matrix stage is retained');
+		const retained = MacStage.selected(actualJob.body, role);
+		assert(retained.length > 0, role + ': original role steps cannot disappear');
+		for (const step of retained)
+			assert.equal(pipeline.stepField(step.body, 'continue-on-error'), null);
+		assert.throws(() =>
+			MacStage.selected(
+				actualJob.body.replaceAll("matrix.role == '" + role + "'", "matrix.role == 'foreign'"),
+				role
 			)
-			.filter((job) => job.id === 'lease-silence-native').length,
-		1
-	);
-	assert.equal(jobs - 1, 30);
-	assert.equal(jobs, 31);
+		);
+		assert.throws(() =>
+			MacStage.selected(
+				actualJob.body.replaceAll("steps.stage-admission.outcome == 'success'", 'true'),
+				role
+			)
+		);
+	}
+	assert.equal(jobs - 1, 25);
+	assert.equal(jobs, 26);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');
@@ -559,15 +569,12 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert(release, 'the real release owner is retained');
 	assert.equal(
 		pipeline.field(release.body, 'if'),
-		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	);
-	assert.deepEqual(pipeline.needsOf(release.body), [
-		'validate',
-		'core',
-		'macos',
-		'windows',
-		'linux'
-	]);
+	assert.deepEqual(pipeline.needsOf(release.body), ['publication-plan']);
+	const publicationPlan = rootJobs.find((job) => job.id === 'publication-plan');
+	assert(publicationPlan, 'the ordinary source-bound publication preflight is retained');
+	assert.deepEqual(pipeline.needsOf(publicationPlan.body), ['core', 'macos', 'windows', 'linux']);
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-retired-fast-cli-'));
 	try {
 		for (const event of ['push', 'pull_request', 'workflow_dispatch']) {

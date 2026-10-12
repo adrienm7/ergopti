@@ -14,6 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
+const MacStage = require('./fixtures/macos-stage-source.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
@@ -115,7 +116,11 @@ for (const [label, value] of [
 	]),
 	...[...workflow.matchAll(/\$channel\s*=\s*(.+)/g)].map((match) => ['$channel', match[1].trim()])
 ]) {
-	if (!/^"?\$\{\{\s*(?:inputs\.channel|needs\.validate\.outputs\.channel)\s*\}\}"?$/.test(value)) {
+	if (
+		!/^"?\$\{\{\s*(?:inputs\.channel|needs\.(?:validate|publication-plan)\.outputs\.channel)\s*\}\}"?$/.test(
+			value
+		)
+	) {
 		errors.push(
 			`${label} must read inputs.channel or needs.validate.outputs.channel, got ${value}`
 		);
@@ -126,10 +131,25 @@ for (const [label, value] of [
 // writes no appcast, and the tag and the immutable release used to be created
 // before the feed step noticed.
 for (const name of ['Sign declared archives with Sparkle EdDSA key', 'Generate Sparkle appcast']) {
-	if (!/^\s+if:\s*inputs\.release\s*$/m.test(pipeline.step(macosJob, name))) {
+	if (
+		pipeline.stepField(pipeline.step(macosJob, name), 'if') !==
+		MacStage.condition('package-macos', 'inputs.release')
+	) {
 		errors.push(
-			`"${name}" must run on every release (if: inputs.release), never on the key's presence`
+			`"${name}" must run after predecessor admission on every release, never on the key's presence`
 		);
+	}
+}
+for (const name of ['Sign declared archives with Sparkle EdDSA key', 'Generate Sparkle appcast']) {
+	const step = pipeline.step(macosJob, name);
+	const expected = MacStage.condition('package-macos', 'inputs.release');
+	for (const [from, to] of [
+		["steps.stage-admission.outcome == 'success'", 'true'],
+		['(inputs.release)', '(true)'],
+		['(inputs.release)', "(inputs.release && secrets.SPARKLE_ED_PRIVATE_KEY != '')"]
+	]) {
+		if (!step.includes(from) || pipeline.stepField(step.replace(from, to), 'if') === expected)
+			errors.push(name + ': a withdrawn admission, release gate or missing-key refusal must fail');
 	}
 }
 if (/SPARKLE_ED_PRIVATE_KEY\s*!=\s*''/.test(workflow)) {
@@ -248,7 +268,7 @@ if (!pipeline.step(macosJob, 'Upload the package').includes('build/macos/appcast
 }
 const feedPublishStep = pipeline.step(pipeline.job('release'), 'Publish channel feed for Sparkle');
 if (
-	!/^\s+ERGOPTI_CHANNEL:\s*\$\{\{\s*needs\.validate\.outputs\.channel\s*\}\}\s*$/m.test(
+	!/^\s+ERGOPTI_CHANNEL:\s*\$\{\{\s*needs\.publication-plan\.outputs\.channel\s*\}\}\s*$/m.test(
 		feedPublishStep
 	)
 ) {

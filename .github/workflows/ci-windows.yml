@@ -518,6 +518,12 @@ jobs:
     name: 'E2E tests (engine)'
     needs: [test-ahk]
     runs-on: windows-latest
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -651,12 +657,30 @@ jobs:
   # alters; nothing here disables or restores Defender.
   package-windows:
     name: 'Package'
-    needs: [test-ahk, e2e-ahk]
+    needs: [e2e-ahk]
     runs-on: windows-latest
+
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
 
     steps:
       # A shallow clone: no step of this job reads git history.
       - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - name: Admit genuine preceding scheduler results
+        shell: bash
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci/ci-stage-status.cjs admit-build windows
 
       - name: Build and test native navigation event owner
         shell: pwsh
@@ -670,12 +694,6 @@ jobs:
       - name: Build and test native full-URL PAC evaluator
         shell: pwsh
         run: ./tools/build/build_windows_network_pac.ps1 -Publish
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
 
       - name: Install Node dependencies
         run: npm ci
@@ -893,6 +911,12 @@ jobs:
     name: 'Install and launch'
     needs: [package-windows]
     runs-on: windows-latest
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -1402,7 +1426,7 @@ jobs:
 
   windows-ok:
     name: 'Verdict'
-    needs: [test-ahk, e2e-ahk, package-windows, launch-windows]
+    needs: [launch-windows]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -1425,4 +1449,8 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           RELEASE: ${{ inputs.release }}
-        run: node tools/test/desktop-ci-evidence.cjs verify windows "$RUNNER_TEMP/launch-evidence"
+        run: |
+          set -euo pipefail
+          NEEDS="$(node tools/ci/ci-stage-status.cjs complete windows)"
+          export NEEDS
+          node tools/test/desktop-ci-evidence.cjs verify windows "$RUNNER_TEMP/launch-evidence"

@@ -8,6 +8,10 @@
  * All workflow predicates and unrelated scripts remain unchanged.
  */
 const raw = require('./ci-pipeline.cjs');
+const assert = require('node:assert/strict');
+const YAML = require('yaml');
+const macRole = require('./fixtures/macos-stage-source.cjs');
+const macPlans = require('../ci/macos-stage-roles.cjs');
 const { projectScopedSteps } = require('./fixtures/ci-scoped-full-branches.cjs');
 const ROOT = raw.ROOT;
 const ENTRY_REL = raw.ENTRY_REL;
@@ -21,33 +25,16 @@ const JOBS = [
 	['.github/workflows/ci.yml', 'macos', "needs.validate.outputs.lane_macos == 'true'"],
 	['.github/workflows/ci.yml', 'windows', "needs.validate.outputs.lane_windows == 'true'"],
 	['.github/workflows/ci.yml', 'linux', "needs.validate.outputs.lane_linux == 'true'"],
-	[
-		'.github/workflows/ci.yml',
-		'manual-verdict',
-		"always() && github.event_name == 'workflow_dispatch'"
-	],
+	['.github/workflows/ci.yml', 'publication-plan', 'always() && !cancelled()'],
 	[
 		'.github/workflows/ci.yml',
 		'release',
-		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	],
-	[
-		'.github/workflows/ci-macos.yml',
-		'item36-native',
-		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
-	],
-	[
-		'.github/workflows/ci-macos.yml',
-		'lease-silence-native',
-		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
-	],
-	['.github/workflows/ci-macos.yml', 'managed-ollama-native', null],
 	['.github/workflows/ci-macos.yml', 'test-hs', null],
 	['.github/workflows/ci-macos.yml', 'e2e-hs', null],
-	['.github/workflows/ci-macos.yml', 'tooltip-canvas', null],
 	['.github/workflows/ci-macos.yml', 'package-macos', null],
 	['.github/workflows/ci-macos.yml', 'launch', null],
-	['.github/workflows/ci-macos.yml', 'cold-bootstrap-native', null],
 	['.github/workflows/ci-macos.yml', 'macos-ok', 'always()'],
 	['.github/workflows/ci-windows.yml', 'test-ahk', null],
 	['.github/workflows/ci-windows.yml', 'e2e-ahk', null],
@@ -59,7 +46,7 @@ const JOBS = [
 	[
 		'.github/workflows/ci-linux.yml',
 		'package-linux',
-		"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+		"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 	],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']
@@ -67,33 +54,33 @@ const JOBS = [
 const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
-		'lease-silence-native',
+		'e2e-hs',
 		'Receive closed lease silence transcript controls',
-		null
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'lease-silence-native',
+		'e2e-hs',
 		'Execute the actual paired native silence control',
-		null
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'lease-silence-native',
+		'e2e-hs',
 		'Retain exact paired-process native receiving',
-		'always()'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Observe independent native Apple Shortcuts SDK preflight and discovery',
-		"${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain independent native Apple Shortcuts SDK observation',
-		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 	],
 	[
 		'.github/workflows/ci-linux.yml',
@@ -109,276 +96,291 @@ const FULL_STEPS = [
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Prepare genuine pinned Go toolchain',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Acquire and verify genuine pinned upstream inputs',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Build and admit the actual native source asset',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Qualify actual selected number-row Carbon XCTest controls',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Receive selected-release shell corpus and native guardian cancellation',
-		null
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain selected number-row Carbon XCTest diagnostics',
-		'always()'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Receive native final-byte number-row causal refusal',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain native final-byte number-row causal diagnostics',
-		'always()'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain selected-release native ownership receiving',
-		'always()'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'item36-native',
+		'e2e-hs',
 		'Observe the actual no-prompt SDK permission API independently',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Prepare locked native HTTP receiving clients',
-		null
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Receive actual private-session and numeric TLS peer controls',
-		null
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain actual private-session and numeric TLS peer diagnostics',
-		'always()'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Qualify actual SDK accepted-owner and deadline XCTest controls',
-		null
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Qualify actual native PAC source ownership XCTest controls',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain independent native SDK XCTest diagnostics',
-		'always()'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Qualify actual native PAC and WPAD XCTest controls',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain independent native PAC XCTest diagnostics',
-		'always()'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Receive actual independent managed HTTP native clients',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Retain independent native HTTP clock receiving',
-		"${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Qualify actual explicit curl stream ownership',
-		'${{ !cancelled() }}'
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'managed-ollama-native',
+		'e2e-hs',
 		'Receive actual native model create, pull, inference and retirement',
-		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}"
 	],
-	['.github/workflows/ci-macos.yml', 'package-macos', 'Run reporter lifecycle self-tests', null],
+	[
+		'.github/workflows/ci-macos.yml',
+		'package-macos',
+		'Run reporter lifecycle self-tests',
+		"${{ steps.stage-admission.outcome == 'success' }}"
+	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run owned program XCTest notice constructed-policy controls',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Admit native nonreaping Python prerequisites',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Prepare locked managed HTTP native clients',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Prepare scoped native qualification profile',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run portable Brew ownership and refusal controls',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Verify scoped Swift test target exclusion',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Receive actual managed HTTP native clients',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
-	['.github/workflows/ci-macos.yml', 'package-macos', 'Run Swift launcher tests', null],
+	[
+		'.github/workflows/ci-macos.yml',
+		'package-macos',
+		'Run Swift launcher tests',
+		"${{ steps.stage-admission.outcome == 'success' }}"
+	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain scoped native Brew qualification receipt',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Upload Swift launcher failure transcript',
-		"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
+		"${{ steps.stage-admission.outcome == 'success' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain archive diagnostic session',
-		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
+		"${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain closed TIS diagnostic session',
-		"${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}"
+		"${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run signed Hammerspoon program provider inventory',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native Hammerspoon provider inventory',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Observe native notification constructors',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native notification constructor observations',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Observe native global application switcher',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native global application switcher observations',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Observe native Apple Shortcuts discovery',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native Apple Shortcuts observation',
-		'${{ always() }}'
+		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Remove the launcher log the Swift tests wrote',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
-	['.github/workflows/ci-macos.yml', 'package-macos', 'Self-test the launch verdict', null],
+	[
+		'.github/workflows/ci-macos.yml',
+		'package-macos',
+		'Self-test the launch verdict',
+		"${{ steps.stage-admission.outcome == 'success' }}"
+	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Receive actual cold native MLX bootstrap',
-		null
+		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
-		'inputs.release'
+		"${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain packaged application startup evidence',
-		'always() && inputs.release'
+		"${{ steps.stage-admission.outcome == 'success' && (always() && inputs.release) }}"
 	],
 	['.github/workflows/ci-macos.yml', 'macos-ok', 'Download launch evidence', null],
 	['.github/workflows/ci-macos.yml', 'macos-ok', 'Download native cold bootstrap evidence', null],
@@ -525,13 +527,43 @@ function validateRaw(files) {
 			`${id}/${name} failure must remain fatal`
 		);
 	}
-	const silence = jobs.find(
-		(job) => job.file === '.github/workflows/ci-macos.yml' && job.id === 'lease-silence-native'
+	const macText = entries.get('.github/workflows/ci-macos.yml');
+	const macContract = require('./fixtures/macos-stage-contract.json');
+	assert.deepEqual(
+		Object.entries(YAML.parse(macText).jobs).map(([id, job]) => ({
+			id,
+			metadata: Object.fromEntries(Object.entries(job).filter(([key]) => key !== 'steps'))
+		})),
+		macContract.jobs.map(({ id, metadata }) => ({ id, metadata })),
+		'Mac stage metadata differs.'
 	);
-	requireEqual(
-		silence.body,
-		LEASE_SILENCE_NATIVE_BODY,
-		'lease silence native exact source/host/artifact owner'
+	const originalSilence = YAML.parse('job:\n' + LEASE_SILENCE_NATIVE_BODY).job;
+	const expectedSilenceSteps = originalSilence.steps.map((step) => ({
+		...step,
+		if: macRole.condition('lease-silence-native', step.if ?? null)
+	}));
+	const silenceSteps = YAML.parse(macRole.body(macText, 'lease-silence-native')).steps;
+	assert.deepEqual(
+		silenceSteps,
+		expectedSilenceSteps,
+		'lease silence native exact source/artifact owner'
+	);
+	const context = {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'workflow_dispatch',
+		release: false,
+		scenarios: ['clean']
+	};
+	assert.deepEqual(
+		macPlans.plan('e2e', context).filter((cell) => cell.role === 'lease-silence-native'),
+		originalSilence.strategy.matrix.include.map((cell) => ({
+			role: 'lease-silence-native',
+			...cell,
+			timeout_minutes: 20,
+			scenario: ''
+		})),
+		'lease silence exact host, architecture and timeout owner'
 	);
 	for (const lane of ['macos', 'windows', 'linux']) {
 		const caller = jobs.find((job) => job.file === ENTRY_REL && job.id === lane);

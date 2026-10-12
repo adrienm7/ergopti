@@ -55,6 +55,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
+const MacStage = require('./fixtures/macos-stage-source.cjs');
+const MacRoles = require('../ci/macos-stage-roles.cjs');
 // Throws without bash: this test must fail, never skip, without it.
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const { pythonExecutable } = require('../lib/python.cjs');
@@ -815,20 +817,52 @@ function uploadMatrixPaths(listedPath, entry, job, candidate) {
 	);
 	assert.equal(
 		pipeline.stepField(candidate.body, 'if'),
-		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+		MacStage.condition(
+			'launch',
+			"matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config'"
+		)
 	);
 	assert(
 		job.body.includes(
-			`        runner: \${{ fromJSON(inputs.release && '["macos-15","macos-15-intel"]' || '["macos-15"]') }}`
+			'        include: ${{ fromJSON(needs.package-macos.outputs.testbuild_matrix) }}'
 		)
 	);
+	const producer = pipeline.job('package-macos');
+	const planStep = pipeline.step(producer, 'Resolve exact test-build stage roles');
+	assert.equal(pipeline.stepField(planStep, 'id'), 'stage-plan');
+	assert.equal(pipeline.stepField(planStep, 'if'), null);
+	assert.deepEqual(pipeline.runOf(planStep), [
+		'node tools/ci/macos-stage-roles.cjs plan testbuild'
+	]);
+	assert(planStep.includes('MACOS_LAUNCH_SCENARIOS: ${{ steps.profile.outputs.scenarios }}'));
 	assert(
-		job.body.includes('        scenario: ${{ fromJSON(needs.package-macos.outputs.scenarios) }}')
+		producer.includes('      testbuild_matrix: ${{ steps.stage-plan.outputs.testbuild_matrix }}')
 	);
+	const rows = MacRoles.plan('testbuild', {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'push',
+		release: true,
+		scenarios: ['clean', 'karabiner_config']
+	}).filter((row) => row.role === 'launch');
+	assert.deepEqual(
+		rows.map((row) => [row.runner, row.scenario]),
+		[
+			['macos-15', 'clean'],
+			['macos-15', 'karabiner_config'],
+			['macos-15-intel', 'clean'],
+			['macos-15-intel', 'karabiner_config']
+		]
+	);
+
 	return ['clean', 'karabiner_config'].flatMap((scenario) =>
-		['macos-15', 'macos-15-intel'].map((runner) =>
-			listedPath.replace('${{ matrix.scenario }}', scenario).replace('${{ matrix.runner }}', runner)
-		)
+		rows
+			.filter((row) => row.scenario === scenario)
+			.map((row) =>
+				listedPath
+					.replace('${{ matrix.scenario }}', scenario)
+					.replace('${{ matrix.runner }}', row.runner)
+			)
 	);
 }
 
@@ -851,10 +885,17 @@ function uploadedLayout(channel) {
 						return uploadMatrixPaths(listedPath, entry, job, candidate);
 					assert.equal(
 						job.id,
-						'managed-ollama-native',
+						MacStage.stage['managed-ollama-native'],
 						'the runtime asset has one native producer owner'
 					);
 					assert.equal(candidate.name, 'Upload the actual managed native release asset');
+					assert.equal(
+						pipeline.stepField(candidate.body, 'if'),
+						MacStage.condition('managed-ollama-native', 'inputs.release')
+					);
+					assert(
+						job.body.includes('        include: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}')
+					);
 					// The real matrix uploads each archive alone: both artifact roots are
 					// its filename. Independent filenames model these two actual legs.
 					return MANAGED_PUBLICATION_ASSETS.slice(0, 2);
@@ -1722,12 +1763,36 @@ check('actual AppleEvent upload expands four closed matrix receipt paths', () =>
 			listed[0],
 			entry,
 			job,
+			{
+				...candidate,
+				body: candidate.body.replace("matrix.role == 'launch'", "matrix.role == 'foreign'")
+			}
+		],
+		[
+			listed[0],
+			entry,
+			job,
+			{
+				...candidate,
+				body: candidate.body.replace("steps.stage-admission.outcome == 'success'", 'true')
+			}
+		],
+		[
+			listed[0],
+			entry,
+			job,
 			{ ...candidate, body: candidate.body.replace("matrix.scenario == 'clean'", 'true') }
 		],
 		[
 			listed[0],
 			entry,
-			{ ...job, body: job.body.replace('["macos-15","macos-15-intel"]', '["foreign"]') },
+			{
+				...job,
+				body: job.body.replace(
+					'needs.package-macos.outputs.testbuild_matrix',
+					'needs.foreign.outputs.testbuild_matrix'
+				)
+			},
 			candidate
 		],
 		[
@@ -1736,7 +1801,7 @@ check('actual AppleEvent upload expands four closed matrix receipt paths', () =>
 			{
 				...job,
 				body: job.body.replace(
-					'fromJSON(needs.package-macos.outputs.scenarios)',
+					'fromJSON(needs.package-macos.outputs.testbuild_matrix)',
 					'fromJSON(inputs.foreign)'
 				)
 			},
@@ -1821,17 +1886,17 @@ check("each script's env carries the plan output or preflight decision it reads"
 		[
 			CREATE_RELEASE,
 			[
-				'          TAG: ${{ needs.validate.outputs.tag }}',
-				'          PRERELEASE: ${{ needs.validate.outputs.prerelease }}',
-				'          TITLE: ${{ needs.validate.outputs.title }}',
+				'          TAG: ${{ needs.publication-plan.outputs.tag }}',
+				'          PRERELEASE: ${{ needs.publication-plan.outputs.prerelease }}',
+				'          TITLE: ${{ needs.publication-plan.outputs.title }}',
 				'          GH_TOKEN: ${{ github.token }}'
 			]
 		],
 		[
 			PUBLISH_FEED,
 			[
-				'          ERGOPTI_CHANNEL: ${{ needs.validate.outputs.channel }}',
-				'          TAG: ${{ needs.validate.outputs.tag }}',
+				'          ERGOPTI_CHANNEL: ${{ needs.publication-plan.outputs.channel }}',
+				'          TAG: ${{ needs.publication-plan.outputs.tag }}',
 				"          RESUMED: ${{ steps.preflight.outputs.create_release == 'false' }}",
 				'          GH_TOKEN: ${{ github.token }}'
 			]
@@ -1839,8 +1904,8 @@ check("each script's env carries the plan output or preflight decision it reads"
 		[
 			PREFLIGHT,
 			[
-				'          TAG: ${{ needs.validate.outputs.tag }}',
-				'          CHANNEL: ${{ needs.validate.outputs.channel }}'
+				'          TAG: ${{ needs.publication-plan.outputs.tag }}',
+				'          CHANNEL: ${{ needs.publication-plan.outputs.channel }}'
 			]
 		]
 	]) {
@@ -1849,7 +1914,7 @@ check("each script's env carries the plan output or preflight decision it reads"
 	}
 	assert.match(
 		pipeline.job('release'),
-		/^ {6}LINUX_BUNDLE_ASSET: \$\{\{ needs\.validate\.outputs\.linux_bundle \}\}$/m,
+		/^ {6}LINUX_BUNDLE_ASSET: \$\{\{ needs\.publication-plan\.outputs\.linux_bundle \}\}$/m,
 		'the release job must give the preflight and the notes the bundle name plan resolved'
 	);
 });

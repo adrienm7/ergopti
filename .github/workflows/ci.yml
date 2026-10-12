@@ -7,8 +7,8 @@
 # Every OS follows the same visible sequence:
 #   unit tests -> E2E -> build/package -> install and launch -> verdict
 # Installation variants stay inside one matrix. Each verdict rejects missing
-# mandatory work. The release waits for core and all three verdicts, and keeps
-# its direct dependency on validate so reruns cannot lose the release plan.
+# mandatory work. An ordinary publication preflight joins the four lanes and
+# receives the source-bound original validation artifact before publication.
 #
 # Each package is built once; launch checks consume those same bytes and the
 # release publishes them. Only release receives write permission. Signing
@@ -307,6 +307,30 @@ jobs:
           ERGOPTI_DEV_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
         run: node tools/ci/dev-release-qualification.cjs --publication-select >> "$GITHUB_OUTPUT"
 
+      - name: Persist the exact validated publication plan
+        env:
+          CI_OS_SELECTION: ${{ inputs.os_lanes || 'all' }}
+          CI_PLAN_RELEASE: ${{ steps.meta.outputs.release }}
+          CI_PLAN_VERSION: ${{ steps.meta.outputs.version }}
+          CI_PLAN_TAG: ${{ steps.meta.outputs.tag }}
+          CI_PLAN_TITLE: ${{ steps.meta.outputs.title }}
+          CI_PLAN_PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          CI_PLAN_CHANNEL: ${{ steps.meta.outputs.channel }}
+          CI_PLAN_LINUX_BUNDLE: ${{ steps.contract.outputs.linux_bundle }}
+          CI_PLAN_NATIVE_QUALIFICATION_PROFILE: ${{ steps.qualification.outputs.native_qualification_profile }}
+          CI_PLAN_LANE_WINDOWS: ${{ steps.lanes.outputs.lane_windows }}
+          CI_PLAN_LANE_MACOS: ${{ steps.lanes.outputs.lane_macos }}
+          CI_PLAN_LANE_LINUX: ${{ steps.lanes.outputs.lane_linux }}
+        run: node tools/ci/publication-plan.cjs create ci-publication-plan.json
+
+      - name: Retain the plan for failed-job reruns
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-publication-plan-${{ github.sha }}-${{ github.run_id }}
+          path: ci-publication-plan.json
+          if-no-files-found: error
+          overwrite: true
+
   # ========================================================
   # ========================================================
   # ======= 2/ One lane per OS: tests, package, gate =======
@@ -388,18 +412,26 @@ jobs:
       channel: ${{ needs.validate.outputs.channel }}
       linux_bundle: ${{ needs.validate.outputs.linux_bundle }}
 
-  # A manual subset must still prove every selected lane and shared checks.
-  # This leaf runs even when a needed lane fails or skips; it cannot publish.
-  manual-verdict:
-    name: 'Validate / Selected OS verdict'
+  # Every run proves its selected lanes before receiving the original plan.
+  # Missing retained artifacts or outputs fail this read-only preflight.
+  publication-plan:
+    name: 'Release / Verify all lanes and original plan'
     needs:
-      - validate
       - core
       - macos
       - windows
       - linux
-    if: always() && github.event_name == 'workflow_dispatch'
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      title: ${{ steps.plan.outputs.title }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      channel: ${{ steps.plan.outputs.channel }}
+      linux_bundle: ${{ steps.plan.outputs.linux_bundle }}
+      native_qualification_profile: ${{ steps.plan.outputs.native_qualification_profile }}
     steps:
       - uses: actions/checkout@v4
 
@@ -407,12 +439,18 @@ jobs:
         with:
           node-version-file: '.node-version'
 
-      - name: Assert selected lanes completed
+      - name: Download the original validated plan
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-publication-plan-${{ github.sha }}-${{ github.run_id }}
+          path: publication-plan
+
+      - name: Assert every required lane and the original plan
+        id: plan
         env:
-          CI_EVENT: ${{ github.event_name }}
-          CI_OS_SELECTION: ${{ inputs.os_lanes }}
+          CI_OS_SELECTION: ${{ inputs.os_lanes || 'all' }}
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: node tools/ci/manual-ci-lanes.cjs verdict
+        run: node tools/ci/publication-plan.cjs receive publication-plan/ci-publication-plan.json
 
   # ============================================================
   # ============================================================
@@ -420,35 +458,25 @@ jobs:
   # ============================================================
   # ============================================================
 
-  # No status function in the if: the implicit success() over needs is the
-  # "all three OS are green" gate, and a lane's result is failure as soon as
-  # any of its jobs failed. The event test repeats the plan's rule on purpose:
-  # a regression in the plan script alone must not publish from a pull request
-  # or a dispatch run, where PAT_ERGOPTI is readable.
-  #
-  # release reads the plan from validate itself, which draws one edge from the
-  # root to it. Handing the plan through the lanes instead (each exit job
-  # exporting its inputs as on.workflow_call.outputs) would remove that edge
-  # but make this if and every value below depend on a called workflow's
-  # outputs surviving "Re-run failed jobs", which GitHub does not document
-  # and which open reports show going stale or missing. A missing value would
-  # SKIP this job, not fail it: a half-published release would stop resuming
-  # while the run turned green.
+  # Publication accepts only a successful ordinary preflight and a push event.
+  # Its original plan is persisted by validation and bound to this source/run;
+  # failed-job reruns can retain it without depending on reusable outputs.
+  # A missing plan fails preflight instead of silently skipping publication.
   release:
     name: 'Release / Publish'
-    needs: [validate, core, macos, windows, linux]
-    if: github.event_name == 'push' && needs.validate.outputs.release == 'true'
+    needs: [publication-plan]
+    if: github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      LINUX_BUNDLE_ASSET: ${{ needs.validate.outputs.linux_bundle }}
-      ERGOPTI_NATIVE_QUALIFICATION_PROFILE: ${{ needs.validate.outputs.native_qualification_profile }}
-      ERGOPTI_DEV_RELEASE_RELEASE: ${{ needs.validate.outputs.release }}
-      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
-      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
-      ERGOPTI_DEV_RELEASE_TAG: ${{ needs.validate.outputs.tag }}
-      ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+      LINUX_BUNDLE_ASSET: ${{ needs.publication-plan.outputs.linux_bundle }}
+      ERGOPTI_NATIVE_QUALIFICATION_PROFILE: ${{ needs.publication-plan.outputs.native_qualification_profile }}
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ needs.publication-plan.outputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ needs.publication-plan.outputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.publication-plan.outputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ needs.publication-plan.outputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.publication-plan.outputs.version }}
       ERGOPTI_WINDOWS_SIGNING_CONFIGURED: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 != '' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD != '' && secrets.WINDOWS_SIGNER_SUBJECT != '' && 'true' || 'false' }}
 
     steps:
@@ -530,8 +558,8 @@ jobs:
         id: preflight
         shell: bash
         env:
-          TAG: ${{ needs.validate.outputs.tag }}
-          CHANNEL: ${{ needs.validate.outputs.channel }}
+          TAG: ${{ needs.publication-plan.outputs.tag }}
+          CHANNEL: ${{ needs.publication-plan.outputs.channel }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -663,7 +691,7 @@ jobs:
           set -euo pipefail
           node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
           node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
-          tag="${{ needs.validate.outputs.tag }}"
+          tag="${{ needs.publication-plan.outputs.tag }}"
           sha="${{ github.sha }}"
           gh api repos/${{ github.repository }}/git/refs \
               --method POST \
@@ -682,9 +710,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.validate.outputs.tag }}
-          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
-          TITLE: ${{ needs.validate.outputs.title }}
+          TAG: ${{ needs.publication-plan.outputs.tag }}
+          PRERELEASE: ${{ needs.publication-plan.outputs.prerelease }}
+          TITLE: ${{ needs.publication-plan.outputs.title }}
         run: |
           set -euo pipefail
           node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
@@ -728,8 +756,8 @@ jobs:
         if: steps.preflight.outputs.skip_feed != 'true'
         shell: bash
         env:
-          ERGOPTI_CHANNEL: ${{ needs.validate.outputs.channel }}
-          TAG: ${{ needs.validate.outputs.tag }}
+          ERGOPTI_CHANNEL: ${{ needs.publication-plan.outputs.channel }}
+          TAG: ${{ needs.publication-plan.outputs.tag }}
           RESUMED: ${{ steps.preflight.outputs.create_release == 'false' }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -793,7 +821,7 @@ jobs:
         shell: bash
         env:
           SKIP_FEED: ${{ steps.preflight.outputs.skip_feed }}
-          TAG: ${{ needs.validate.outputs.tag }}
+          TAG: ${{ needs.publication-plan.outputs.tag }}
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           TAP_REPOSITORY: ${{ github.repository_owner }}/homebrew-ergopti
           GH_TOKEN: ${{ github.token }}
@@ -834,7 +862,7 @@ jobs:
         shell: bash
         env:
           EVENT: ${{ github.event_name }}
-          TAG: ${{ needs.validate.outputs.tag }}
+          TAG: ${{ needs.publication-plan.outputs.tag }}
           SHA: ${{ github.sha }}
         run: |
           # Fetch tags so git-describe can resolve the previous release tag.
@@ -855,9 +883,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.validate.outputs.tag }}
-          VERSION: ${{ needs.validate.outputs.version }}
-          CHANNEL: ${{ needs.validate.outputs.channel }}
+          TAG: ${{ needs.publication-plan.outputs.tag }}
+          VERSION: ${{ needs.publication-plan.outputs.version }}
+          CHANNEL: ${{ needs.publication-plan.outputs.channel }}
         run: |
           set -euo pipefail
           body_file="$(mktemp)"
