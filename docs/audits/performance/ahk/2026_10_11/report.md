@@ -11,8 +11,8 @@ establish exclusive-host latency or an end-to-end CI speedup.
 
 The two JavaScript optimizations are published in `fa94e27337` and
 `1f0d4dd37e`. The AHK comment-scanning successor has bounded differential and
-native receiving evidence below. Its complete hosted suite remains pending;
-no test duration reduction qualifies native behavior.
+native receiving evidence below. The published v1.0.1 baseline records its
+subsequent complete hosted run; no duration reduction qualifies native behavior.
 
 ## Repeated menu source classification
 
@@ -165,6 +165,136 @@ Cancelled run `38147217648` records 5,479 completed passing callbacks totaling
 duration. Seven completed custody cases total 810.592 seconds. The largest
 completed case is the 32-file journal at 169.725 seconds. These are partial
 timings; the remaining planned cases cannot be counted as passed.
+
+## Published v1.0.1 baseline
+
+[Run 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226)
+on `63cf3d005d371edb4e4093a906da276ced487182`
+completed successfully and published stable v1.0.1 on October 11 at
+23:29:58 UTC. All 11,227 noninteractive AHK callbacks have passing terminal
+results and durations. The canonical UTF-8 manifest is the name authority:
+the separately captured native stdout uses ANSI and loses characters in
+23 Unicode test names. Its ordinals, statuses and durations still match.
+
+The AHK step lasts 4,359 seconds (72 minutes 39 seconds). Callback durations
+sum to 4,273.145 seconds; the remaining 85.855 seconds cover other work inside
+that step. The median callback is 1.638 ms, p95 is 494.412 ms and p99 is
+8,124.596 ms, using the nearest lower ordered observation for percentiles.
+
+| Workload                         |  Tests | Summed callback time |
+| -------------------------------- | -----: | -------------------: |
+| Callbacks below one second       | 10,882 |      569.242 seconds |
+| Callbacks above ten seconds      |     86 |    2,549.860 seconds |
+| Nine acquired-read custody cases |      9 |      740.573 seconds |
+| Largest journal capacity case    |      1 |      184.013 seconds |
+
+The rows overlap. The nine custody cases now pass with the regex comment
+scanner, closing the older hosted-receiving gap above. Different runs are
+not a matched benchmark, so this observation does not assign their entire
+timing difference to that scanner. The 32-file capacity case spends
+96,829.132 ms in publication and 86,454.582 ms in refusal/compensation;
+fixture creation takes 604.595 ms. Those boundaries guide the next measured
+experiment; removing cases or shortening their workloads is not justified.
+
+The complete manifest is retained as the `windows-ahk-execution-manifest`
+artifact in the linked CI run. Its SHA-256 is
+`a50cf86ec44360afa886803473e95b3e4124ea8345c10796a7004eca4d08e149`.
+Separate native input, compiled startup, upgrade and hotstring checks pass,
+but the release's six disclosed macOS native deferrals remain unqualified.
+
+## Selected menu source filtering
+
+The JavaScript selected-menu publication guard computed each token's line
+by splitting the entire preceding source again. A cursor now advances through
+LF boundaries once per invocation, preserving the existing tokenizer,
+literal-spelling checks and executable-code mask. No result cache is involved.
+
+One matched pair on Node 22.22.2 used the same 29,571-byte AHK menu source
+through the public guard and its existing owner proof. Valid source, a removed
+capture and restored source returned `true`, `false`, `true` on both versions.
+The three calls totaled 265.675 ms before and 36.027 ms after; maximum call
+duration was 91.731 ms before and 17.936 ms after. This is a bounded measurement,
+not a measured reduction of the complete menu test or CI duration.
+
+Thirty lexical inputs and their reverse order preserve all token positions.
+Five altered semantics fail those controls. The registered regression also
+observes requested prefix UTF-16 units on a small boxed input, without changing
+global String behavior or asserting a machine-dependent time threshold. It
+fails on the previous implementation. A wrong-column inverse fails the actual
+new test block; restoring the candidate passes again.
+
+## Default JavaScript timing evidence
+
+The JS runner now writes `timings.ndjson` inside a unique temporary directory
+for each invocation. A suite header, each check's start and result, and a final
+count/duration record distinguish an interrupted run from a completed one.
+Monotonic child durations and the slowest checks include reproduction commands.
+Child stdout, stderr and arbitrary environment values are excluded from the
+timing file. A CI source field identifies the invocation, not local cleanliness.
+
+The Core job retains these diagnostic files after success or failure when its
+artifact step can run. A lost runner can still prevent upload. They are ordinary
+diagnostic artifacts and confer no native qualification or release acceptance.
+The actual-runner regression checks successful, failed, signaled and thrown
+spawns; default/full enrollment; and interrupted result, next-start and footer
+writes. A report-write error prevents a successful aggregate result.
+
+Failures now print their bounded error details and reproduction command before
+the next child starts. The footer lists failed checks without repeating their
+transcripts. The regression observes output at the next spawn boundary; it
+fails against the previous runner and passes against the successor.
+
+## Complete local JavaScript observation
+
+The first selected gate on October 12 ran from 00:03:15 to 00:34:05 UTC.
+All 409 Windows-host checks completed: 399 passed and ten failed. Several
+fixtures could not create symbolic links on this Windows host; other failures
+include Linux-only archive output, an absent C compiler in portable Brew
+receiving and fixture errors. These failures remain open. This observation
+does not qualify the whole local suite or replace the published hosted run.
+
+The full menu parity check took 297.620 seconds, manifest-reader coverage
+111.764 seconds and native-menu census 88.376 seconds. An additional profile
+ran the unchanged complete manifest-reader owner with all original assertions
+and passed 75 fields, 304 sections and 1,078 sources in 145.495 seconds.
+Formatting overlapped the beginning of that profile, so the duration is not
+an isolated comparison. Approximately 94.5 percent of sampled execution fell
+under `readersOf`: repeated source splitting/iteration and matching patterns
+dominated. The delegated-menu helper contributed less than one second.
+
+One subsequent matched whole-owner pair removed repeated preparation of the
+same captured source lines. The original completed in 139.627 seconds and
+the candidate in 93.492 seconds: 46.135 seconds, or 33.0 percent, less time.
+Both exited normally with identical output, empty stderr and all 1,119 source
+and package inputs unchanged. A separate registered regression covers 270
+independently expected lexical queries and observes one split and comment
+classification per captured source. The original fails the work bound; the
+candidate passes. This is one paired observation, not a CI-wide speedup.
+
+The Common workflow extraction preserves the existing matrix, commands and
+acceptance policy. Its 62 registered graph/browser controls, 207 full-default
+controls and qualification policy checks pass. Extraction alone does not
+produce the requested finished graph or shorten the critical path.
+
+## Private configuration lease selection measurements
+
+An uninstrumented original/candidate pair used a genuine 34-target bundle and
+the actual AHK framework, lease and activity modules. Each of six cohorts ran
+ten warm-up calls followed by five samples of ten calls, with identical
+identity and Critical-state checks. Both actors passed all seven controls,
+exited normally and left no temporary files or lease/read state. The 300
+measured selections took 2,595.207 milliseconds originally and 266.575
+milliseconds with the candidate. Middle, last and missing selections had
+89 to 97 percent lower median cost; first and member selections were 3 to
+5 percent slower. These memory-only selections exclude transaction I/O,
+journaling and publication, so no transaction or CI gain is inferred.
+
+Separate original/candidate guards each passed 48 controls. All nine initial
+eligibility observations agree. The candidate deliberately refuses late
+withdrawal during normalization or final producer validation more strictly;
+that difference is not behavioral equivalence. The implementation remains a
+private proposal pending the complete physical transaction and regression
+receiving.
 
 ## Rejected and unmeasured shortcuts
 
