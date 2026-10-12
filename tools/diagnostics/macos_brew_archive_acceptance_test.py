@@ -6906,5 +6906,298 @@ class LastNativeUIEvidenceControls(unittest.TestCase):
             self.assertEqual(len(files), 4)
 
 
+class ActualPromptAdmissionTimeoutControls(unittest.TestCase):
+    world = FirstCommandTimeoutControls.world
+
+    def verify_retired(self, owner, acquired, retired, waits):
+        self.assertEqual(retired, acquired)
+        self.assertEqual(owner.active, [])
+        self.assertEqual(owner.debt, [])
+        self.assertEqual(waits, [])
+        self.assertIsNone(owner._timeout_request_deadline_ns)
+
+    def test_actual_literal_prompt_deadline_keeps_primary_and_publishes_closed_observation(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            owner, writer, root, _, acquired, retired, waits, _ = world
+            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+
+            def callback(process, deadline):
+                probe.approve_owned_automation_prompt(
+                    owner, process, deadline, "sender", "receiver"
+                )
+
+            with (
+                patch.object(probe.time, "monotonic", return_value=40),
+                patch.object(probe, "_owned_automation_ui_run") as native_ui,
+            ):
+                with self.assertRaisesRegex(
+                    probe.AdmissionError, "^Owned Automation prompt exceeded its deadline$"
+                ) as caught:
+                    owner.run(request, timeout=30, after_start=callback)
+                native_ui.assert_not_called()
+            self.assertEqual(
+                caught.exception.args, ("Owned Automation prompt exceeded its deadline",)
+            )
+            self.verify_retired(owner, acquired, retired, waits)
+            expected = {
+                "schema": 1,
+                "command": "permission-request",
+                "stage": "ui-observer",
+                "budget_seconds": 30,
+                "request_deadline_ns": 40_000_000_000,
+                "started_ns": 10_000_000_000,
+                "expired_ns": 10_000_000_000,
+                "spent_ns": 0,
+            }
+            self.assertEqual(writer.first_timeout, expected)
+            packet = json.loads((root / "checkpoint.json").read_bytes())
+            self.assertEqual(packet["first_timeout"], expected)
+            self.assertFalse(packet["ownership_closed"])
+            self.assertNotIn("api_osstatus", packet)
+            self.assertFalse(packet["cases"])
+
+    def test_identical_error_object_is_not_replaced(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            owner, writer, _, _, acquired, retired, waits, _ = world
+            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
+            with self.assertRaises(probe.AdmissionError) as caught:
+                owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
+            self.assertIs(caught.exception, primary)
+            self.verify_retired(owner, acquired, retired, waits)
+            self.assertIsNotNone(writer.first_timeout)
+            self.assertEqual(writer.first_timeout["stage"], "ui-observer")
+
+    def test_optional_publication_errors_never_replace_primary_or_cleanup(self):
+        for secondary in (
+            OSError("PRIVATE_PUBLICATION"),
+            KeyboardInterrupt("PRIVATE_SIGNAL"),
+            SystemExit(9),
+        ):
+            with self.subTest(secondary=type(secondary).__name__), self.world() as world:
+                if timeout_evidence_unavailable_fixture(self, world):
+                    return
+                owner, writer, _, _, acquired, retired, waits, _ = world
+                request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
+                with (
+                    patch.object(writer, "retain_timeout", side_effect=secondary),
+                    self.assertRaises(probe.AdmissionError) as caught,
+                ):
+                    owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
+                self.assertIs(caught.exception, primary)
+                self.verify_retired(owner, acquired, retired, waits)
+                self.assertIsNone(writer.first_timeout)
+
+    def test_private_altered_or_subclass_errors_never_claim_timeout(self):
+        class ForeignAdmission(probe.AdmissionError):
+            pass
+
+        errors = (
+            probe.AdmissionError("PRIVATE_DEADLINE"),
+            probe.AdmissionError("Owned Automation prompt exceeded its deadline", "PRIVATE_ARG"),
+            ForeignAdmission("Owned Automation prompt exceeded its deadline"),
+            KeyboardInterrupt("PRIVATE_SIGNAL"),
+            RuntimeError("Owned Automation prompt exceeded its deadline"),
+        )
+        for primary in errors:
+            with (
+                self.subTest(kind=type(primary).__name__, args=primary.args),
+                self.world() as world,
+            ):
+                if timeout_evidence_unavailable_fixture(self, world):
+                    return
+                owner, writer, root, _, acquired, retired, waits, _ = world
+                request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                with self.assertRaises(type(primary)) as caught:
+                    owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
+                self.assertIs(caught.exception, primary)
+                self.verify_retired(owner, acquired, retired, waits)
+                self.assertIsNone(writer.first_timeout)
+                self.assertNotIn(b"PRIVATE", (root / "checkpoint.json").read_bytes())
+
+    def test_foreign_argument_equality_is_never_called_or_credited(self):
+        for string_subclass in (False, True):
+            for raise_signal in (False, True):
+                with (
+                    self.subTest(string_subclass=string_subclass, raise_signal=raise_signal),
+                    self.world() as world,
+                ):
+                    if timeout_evidence_unavailable_fixture(self, world):
+                        return
+                    owner, writer, _, _, acquired, retired, waits, _ = world
+                    equality_calls = []
+
+                    class PrivateArgument(str if string_subclass else object):
+                        def __eq__(self, other):
+                            equality_calls.append(other)
+                            if raise_signal:
+                                raise KeyboardInterrupt("PRIVATE_COMPARISON_SIGNAL")
+                            return True
+
+                    value = (
+                        PrivateArgument("PRIVATE_ARGUMENT")
+                        if string_subclass
+                        else PrivateArgument()
+                    )
+                    primary = probe.AdmissionError(value)
+                    request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                    observed = None
+                    try:
+                        owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
+                    except BaseException as caught:
+                        observed = caught
+                    self.verify_retired(owner, acquired, retired, waits)
+                    self.assertIs(observed, primary)
+                    self.assertEqual(equality_calls, [])
+                    self.assertIsNone(writer.first_timeout)
+
+    def test_literal_exception_at_exit_wait_does_not_claim_prompt_timeout(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            owner, writer, _, _, acquired, retired, waits, failure = world
+            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
+            failure[0] = primary
+            with self.assertRaises(probe.AdmissionError) as caught:
+                owner.run(request, timeout=30)
+            self.assertIs(caught.exception, primary)
+            self.assertEqual(retired, acquired)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertEqual(len(waits), 1)
+            self.assertIsNone(writer.first_timeout)
+
+    def test_nonrequest_ui_callback_does_not_claim_permission_timeout(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            owner, writer, _, _, acquired, retired, waits, _ = world
+            primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
+            with (
+                patch.object(probe.time, "monotonic", return_value=10),
+                self.assertRaises(probe.AdmissionError) as caught,
+            ):
+                owner.run(["owned"], timeout=30, after_start=Mock(side_effect=primary))
+            self.assertIs(caught.exception, primary)
+            self.assertEqual(retired, acquired)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertEqual(waits, [])
+            self.assertIsNone(writer.first_timeout)
+
+
+class LastUIObservationControls(unittest.TestCase):
+    world = FirstCommandTimeoutControls.world
+
+    @staticmethod
+    def fact():
+        return {
+            "schema": 1,
+            "ax_trusted": True,
+            "requester_qualified": True,
+            "scanned_agents": 1,
+            "windows": 1,
+            "nodes": 0,
+            "candidates": 0,
+            "matches": 0,
+            "first_agent": -1,
+            "first_attribute": "none",
+            "first_type": "none",
+            "first_error": 0,
+            "discovery": {
+                "schema": 1,
+                "scope": "unrelated",
+                "sender": False,
+                "receiver": False,
+                "complete": True,
+                "nodes": 7,
+            },
+        }
+
+    def test_last_scalar_survives_omitted_history_and_original_terminal_cleanup(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            owner, writer, root, _, acquired, retired, _, _ = world
+            first = self.fact()
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=first))
+            prefix = (root / "phase-000.json").read_bytes()
+            for index in range(300):
+                self.assertTrue(writer.record("unchanged-phase-" + str(index)))
+            last = self.fact()
+            last["discovery"]["nodes"] = 9
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=last))
+            self.assertTrue(writer.record("cleanup.closed", status="accepted", closed=True))
+            final = json.loads((root / "checkpoint.json").read_bytes())
+            self.assertEqual(final.get("last_native_ui"), last)
+            self.assertNotIn("native_ui", final)
+            self.assertEqual(final["history_omitted"], 47)
+            self.assertEqual(len(list(root.glob("phase-*.json"))), 256)
+            self.assertEqual((root / "phase-000.json").read_bytes(), prefix)
+            self.assertEqual(json.loads(prefix)["native_ui"], first)
+            self.assertFalse(final["cases"])
+            self.assertEqual(acquired, [])
+            self.assertEqual(retired, [])
+
+    def test_last_observation_is_detached_from_original_nested_discovery(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            _, writer, root, _, _, _, _, _ = world
+            supplied = self.fact()
+            expected = json.loads(json.dumps(supplied))
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=supplied))
+            supplied["discovery"]["private_title"] = "PRIVATE_UI_TITLE"
+            supplied["windows"] = 99
+            self.assertTrue(writer.record("later-phase"))
+            final = json.loads((root / "checkpoint.json").read_bytes())
+            self.assertEqual(final.get("last_native_ui"), expected)
+            self.assertNotIn(b"PRIVATE", (root / "checkpoint.json").read_bytes())
+
+    def test_no_prior_observation_or_missing_legacy_member_never_invents_last_ui(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            _, writer, root, _, _, _, _, _ = world
+            if hasattr(writer, "last_native_ui"):
+                del writer.last_native_ui
+            self.assertTrue(writer.record("legacy-phase"))
+            self.assertNotIn("last_native_ui", json.loads((root / "checkpoint.json").read_bytes()))
+
+    def test_private_candidate_cannot_replace_previously_admitted_last_observation(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            _, writer, root, _, _, _, _, _ = world
+            first = self.fact()
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=first))
+            before = (root / "checkpoint.json").read_bytes()
+            private = self.fact()
+            private["private_title"] = "PRIVATE_UI_TITLE"
+            self.assertFalse(writer.record("automation.ui-observation", native_ui=private))
+            self.assertEqual((root / "checkpoint.json").read_bytes(), before)
+            self.assertEqual(getattr(writer, "last_native_ui", None), first)
+            self.assertTrue(writer.failed)
+
+    def test_retained_scalar_mutation_cannot_publish_unknown_or_permission_data(self):
+        with self.world() as world:
+            if timeout_evidence_unavailable_fixture(self, world):
+                return
+            _, writer, root, _, _, _, _, _ = world
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=self.fact()))
+            before = (root / "checkpoint.json").read_bytes()
+            self.assertIsNotNone(getattr(writer, "last_native_ui", None))
+            writer.last_native_ui["api_osstatus"] = 0
+            self.assertFalse(writer.record("cleanup.closed", status="accepted", closed=True))
+            self.assertEqual((root / "checkpoint.json").read_bytes(), before)
+            self.assertFalse(writer.ownership_closed)
+
+
 if __name__ == "__main__":
     unittest.main()
