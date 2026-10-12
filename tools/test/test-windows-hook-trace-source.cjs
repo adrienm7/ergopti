@@ -455,3 +455,255 @@ console.log(
 	`Hook trace source bindings: 37 original + 3 diagnostic + 1 serializer exports and ${mutations.length} original + ${serializationMutations.length} additive negative controls passed.`
 );
 console.log('Source binding only; native Windows callback execution remains UNRUN.');
+
+/** Receives actual runner/compiler orchestration with recording ports, never a compiler or native child. */
+function checkPortableCompilerHostPreparation(
+	runnerRoot = __dirname,
+	helper = require('./lib/portable-c-compiler.cjs')
+) {
+	let controls = 0;
+	function control(name, callback) {
+		try {
+			callback();
+			controls += 1;
+		} catch (error) {
+			error.message = name + ': ' + error.message;
+			throw error;
+		}
+	}
+	const env = {
+		'ProgramFiles(x86)': 'C:\\Program Files (x86)',
+		ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+		PATH: 'old'
+	};
+	const install = 'C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools';
+	const tools = install + '\\VC\\Tools\\MSVC\\14.44.1\\';
+	const command = tools + 'bin\\Hostx64\\x64\\cl.exe';
+	function ports(platform = 'win32', environment = env) {
+		const calls = [];
+		return {
+			platform,
+			env: environment,
+			calls,
+			exists: () => true,
+			spawn(file, args, options) {
+				calls.push({ file, args, options });
+				if (file === 'cc')
+					return { error: Object.assign(new Error('spawnSync cc ENOENT'), { code: 'ENOENT' }) };
+				const stdout = file.endsWith('vswhere.exe')
+					? install + '\r\n'
+					: file === env.ComSpec
+						? `INCLUDE=owned-include\r\nLIB=owned-lib\r\nVCToolsInstallDir=${tools}\r\nPath=new\r\nOWNED_UNICODE=é🙂\r\n`
+						: '';
+				return { status: 0, signal: null, stdout };
+			}
+		};
+	}
+	const spec = {
+		sources: ['C:\\owned source\\subject.c', 'C:\\owned source\\subject_test.c'],
+		binary: 'C:\\owned temp\\subject.exe',
+		cwd: 'C:\\owned source',
+		sanitize: false
+	};
+	for (const [file, sources] of [
+		['run-windows-replay-route-core.cjs', ['replay_route_core.c', 'replay_route_core_test.c']],
+		[
+			'run-windows-terminal-output-plan.cjs',
+			['replay_route_core.c', 'terminal_output_plan.c', 'terminal_output_plan_test.c']
+		],
+		['run-windows-hook-trace-core.cjs', ['hook_trace.c', 'hook_trace_test.c']]
+	])
+		control(file + ' uses the real host compiler contract', () => {
+			const recording = ports();
+			let removed = 0;
+			const filename = path.join(runnerRoot, file);
+			const subject = { exports: {} };
+			const requirePort = (name) => {
+				if (name === 'node:fs')
+					return {
+						mkdtempSync: () => path.join(runnerRoot, 'owned temporary'),
+						rmSync: () => {
+							removed += 1;
+						}
+					};
+				if (name === 'node:os') return { tmpdir: () => runnerRoot };
+				if (name === 'node:child_process') return { spawnSync: recording.spawn };
+				if (name === './lib/portable-c-compiler.cjs')
+					return { compilePortable: (request) => helper.compilePortable(request, recording) };
+				return require(name);
+			};
+			new Function(
+				'require',
+				'module',
+				'exports',
+				'__dirname',
+				'process',
+				'console',
+				fs.readFileSync(filename, 'utf8')
+			)(
+				requirePort,
+				subject,
+				subject.exports,
+				runnerRoot,
+				{ platform: 'win32', arch: 'x64', env },
+				{ log() {} }
+			);
+			subject.exports.run([]);
+			const compilation = recording.calls.find((call) => call.file === command);
+			assert.ok(compilation, 'The Windows runner must invoke installed MSVC, not missing cc.');
+			assert.deepEqual(
+				compilation.args.filter((arg) => arg.endsWith('.c')).map((arg) => path.basename(arg)),
+				sources
+			);
+			for (const flag of ['/TC', '/std:c11', '/W4', '/WX', '/UNDEBUG'])
+				assert.ok(compilation.args.includes(flag));
+			assert.equal(compilation.options.stdio, 'inherit');
+			assert.equal(compilation.options.timeout, 30000);
+			assert.equal(
+				recording.calls.at(-1).args.length,
+				0,
+				'Original compiled executable must still run.'
+			);
+			assert.equal(recording.calls.at(-1).file.endsWith('.exe'), true);
+			assert.equal(removed, 1, 'Original owned cleanup remains exactly once.');
+		});
+	control('MSVC discovery preserves literal quoted setup and one PATH key', () => {
+		const recording = ports();
+		const result = helper.resolveCompiler(recording);
+		assert.equal(result.command, command);
+		assert.deepEqual(
+			Object.keys(result.env).filter((name) => name.toLowerCase() === 'path'),
+			['Path']
+		);
+		assert.equal(result.env.Path, 'new');
+		assert.equal(result.env.OWNED_UNICODE, 'é🙂');
+		assert.equal(recording.calls[0].args.includes('-utf8'), true);
+		assert.equal(recording.calls[1].options.windowsVerbatimArguments, true);
+		assert.equal(recording.calls[1].options.encoding, 'utf16le');
+		assert.deepEqual(recording.calls[1].args.slice(0, 4), ['/d', '/u', '/s', '/c']);
+		assert.equal(
+			recording.calls[1].args[4],
+			`""${install}\\VC\\Auxiliary\\Build\\vcvars64.bat" >nul && set"`
+		);
+		assert.equal(recording.calls[0].options.shell, undefined);
+	});
+	for (const platform of ['linux', 'darwin'])
+		control(platform + ' preserves GNU compiler flags and sanitizer request', () => {
+			const recording = ports(platform, { CC: '/literal compiler/cc' });
+			helper.compilePortable({ ...spec, sanitize: true }, recording);
+			assert.deepEqual(recording.calls[0].args, ['--version']);
+			assert.equal(recording.calls[0].file, '/literal compiler/cc');
+			assert.deepEqual(recording.calls[1].args, [
+				'-std=c11',
+				'-Wall',
+				'-Wextra',
+				'-Werror',
+				'-pedantic',
+				'-UNDEBUG',
+				'-fsanitize=address,undefined',
+				'-fno-omit-frame-pointer',
+				...spec.sources,
+				'-o',
+				spec.binary
+			]);
+			assert.equal(recording.calls[1].options.shell, undefined);
+		});
+	control('explicit Windows CC remains literal and never enters environment shell', () => {
+		const recording = ports('win32', { CC: 'C:\\literal compiler\\clang.exe & not a shell' });
+		helper.compilePortable(spec, recording);
+		assert.equal(recording.calls.length, 2);
+		assert.equal(recording.calls[0].file, recording.env.CC);
+		assert.equal(recording.calls[1].options.shell, undefined);
+	});
+	control('MSVC requested sanitizer refuses before compilation', () => {
+		const recording = ports();
+		assert.throws(
+			() => helper.compilePortable({ ...spec, sanitize: true }, recording),
+			/cannot provide.*sanitizer/
+		);
+		assert.equal(recording.calls.length, 2);
+	});
+	control('missing compiler discovery stays fatal', () => {
+		assert.throws(
+			() => helper.resolveCompiler({ ...ports(), exists: () => false }),
+			/requires.*vswhere/
+		);
+	});
+	control('failed compiler discovery stays fatal', () => {
+		assert.throws(
+			() => helper.resolveCompiler({ ...ports(), spawn: () => ({ status: 7, signal: null }) }),
+			/exited with 7/
+		);
+	});
+	control('ambiguous installation stays fatal', () => {
+		assert.throws(
+			() =>
+				helper.resolveCompiler({
+					...ports(),
+					spawn: () => ({ status: 0, signal: null, stdout: install + '\n' + install + '\n' })
+				}),
+			/exactly one/
+		);
+	});
+	control('partial MSVC environment stays fatal', () => {
+		const recording = ports();
+		const spawn = recording.spawn;
+		assert.throws(
+			() =>
+				helper.resolveCompiler({
+					...recording,
+					spawn: (file, args, options) =>
+						file === env.ComSpec
+							? { status: 0, signal: null, stdout: 'INCLUDE=only\n' }
+							: spawn(file, args, options)
+				}),
+			/did not publish/
+		);
+	});
+	for (const result of [
+		{ error: Object.assign(new Error('missing explicit CC'), { code: 'ENOENT' }) },
+		{ status: 9, signal: null },
+		{ status: null, signal: 'SIGTERM' }
+	])
+		control(
+			'compiler failure cannot become success ' +
+				(result.error?.code || result.signal || result.status),
+			() => {
+				assert.throws(() =>
+					helper.compilePortable(spec, {
+						...ports('linux', { CC: 'explicit-cc' }),
+						spawn: () => result
+					})
+				);
+			}
+		);
+	control('an explicit unprovisioned MSVC compiler refuses', () => {
+		assert.throws(
+			() => helper.resolveCompiler(ports('win32', { CC: 'cl.exe' })),
+			/provisioned environment/
+		);
+	});
+	control('implicit MSVC flags cannot silently disable the original C assertions', () => {
+		assert.throws(
+			() => helper.compilePortable(spec, ports('win32', { ...env, _CL_: '/DNDEBUG' })),
+			/implicit flags.*assertion contract/
+		);
+	});
+	control('unsafe environment shell path refuses', () => {
+		const recording = ports();
+		assert.throws(
+			() =>
+				helper.resolveCompiler({
+					...recording,
+					spawn: () => ({ status: 0, signal: null, stdout: 'C:\\bad%variable%\n' })
+				}),
+			/closed shell argument/
+		);
+	});
+	return { recording_controls: controls, real_compilers: 0, native_children: 0 };
+}
+
+console.log(
+	'Portable C host preparation recording controls:',
+	checkPortableCompilerHostPreparation()
+);
