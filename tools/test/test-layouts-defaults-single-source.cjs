@@ -160,6 +160,52 @@ check('no driver source spells the registry host or folder', () => {
 	assert.deepStrictEqual(offenders, [], 'these files retype the registry location');
 });
 
+/** Distinguishes a direct metadata lookup from a registry settings/client import. */
+function usesRegistrySettings(source) {
+	const tokens = scriptTokens(source, '.lua');
+	for (let at = 0; at < tokens.length; at++) {
+		if (tokens[at].kind !== 'identifier' || tokens[at].value !== 'require') continue;
+		const parenthesized = tokens[at + 1]?.value === '(';
+		const argument = tokens[at + (parenthesized ? 2 : 1)];
+		if (argument?.kind !== 'string' || argument.value !== 'layouts.registry') continue;
+		// Only the exact direct parenthesized metadata call is exempt; Lua import sugar stays a client.
+		if (!parenthesized || tokens[at + 3]?.value !== ')') return true;
+		const metadataOnly =
+			tokens[at + 4]?.value === '.' &&
+			tokens[at + 5]?.value === 'find_entry' &&
+			tokens[at + 6]?.value === '(';
+		if (!metadataOnly) return true;
+	}
+	return false;
+}
+
+check('registry metadata lookup does not become a URL settings client', () => {
+	for (const source of [
+		'local Registry = require("layouts.registry")',
+		"local Registry = require 'layouts.registry'",
+		'local Registry = require [[layouts.registry]]',
+		'return require("layouts.registry").unknown(index)',
+		'return (require("layouts.registry")).find_entry(index, id)',
+		'local find = require("layouts.registry").find_entry; return find(index, id)',
+		'local entry = require("layouts.registry").find_entry(index, id); return require("layouts.registry").unknown(entry)',
+		'return require("layouts.registry", extra).find_entry(index, id)',
+		"return require 'layouts.registry'",
+		'return require [[layouts.registry]]',
+		'return require("layouts.registry").resolve(layouts, updater)',
+		'return require("layouts.registry").url(settings, file)',
+		'return require("layouts.registry").find_entry',
+		'local entry = require("layouts.registry").find_entry(index, id); local Registry = require("layouts.registry")'
+	])
+		assert.equal(usesRegistrySettings(source), true, source);
+	for (const source of [
+		'return require("layouts.registry").find_entry(index, id)',
+		"return require ( 'layouts.registry' ) . find_entry ( index, id )",
+		'-- require("layouts.registry")\nreturn entry',
+		'return [[require("layouts.registry")]]'
+	])
+		assert.equal(usesRegistrySettings(source), false, source);
+});
+
 // The Lua drivers share one registry client, which receives the decoded
 // defaults; each driver settings constructor reads the two files itself.
 const SHARED_LUA_CLIENT = path.join(SP, '_shared', 'lua', 'layouts', 'registry.lua');
