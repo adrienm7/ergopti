@@ -10244,6 +10244,14 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   is not an installed feature or a native qualification; all thirteen items
   and the transversal validation requirements remain open.
 
+  The Snapshot source census now queries only its Windows/shared roots and four
+  authenticated helpers. Real Git receiving reproduces the original ENOBUFS
+  before native launch and preserves all 3,040 admitted source/blob pairs with
+  the finite query; removing any of its six path arguments loses required
+  inputs. All 22 controlled receiving cases, the independent 16-case oracle,
+  default capture limit and original deadlines remain unchanged. Actual native
+  Snapshot and full Windows qualification remain required after this correction.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
