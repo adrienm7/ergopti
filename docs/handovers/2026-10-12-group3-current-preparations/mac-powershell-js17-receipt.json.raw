@@ -1,0 +1,77 @@
+{
+  "contract": "exact17_frozen_new_guard_receiver_only",
+  "base_source_epoch": "e10136d3a60d01d5fd4a5c955b51a84f04544115",
+  "packet_receipt_sha256": "0469f0b459bfe468510032983b5b5615c371fba5f59765206ec1fd24e6d8579a",
+  "packet_all_pins_unchanged": true,
+  "runtime": "Node22.22.2 activated repository runtime",
+  "command": "node program-powershell-macos-workflow-private-v2-controls/js17/run17.cjs",
+  "result": {
+    "executed_mutation_guards": 17,
+    "detected": 17,
+    "failed": 0,
+    "positive_subject": 1,
+    "exit": 0,
+    "zero_match_refused": true
+  },
+  "source_receiver": "exact frozen new block + unchanged original mustCatch + byte-identical actual ci-pipeline parser",
+  "input_pins_pre_post_unchanged": true,
+  "full_wiring_suite": "UNRUN",
+  "full_default_tests": "UNRUN",
+  "native_Swift_capture": "UNRUN",
+  "official_runtime_acquisition": "UNRUN",
+  "SDK_G5_G6_source_authority": false,
+  "canonical_writes": false,
+  "changed_private_source_images": 0,
+  "artifacts": [
+    {
+      "path": "input-pins.json",
+      "sha256": "d8e8a1f5aa48de79acbfbd4e4443d9d2967b7c493109e98ba8539d9b7cd857e7",
+      "bytes": 1004
+    },
+    {
+      "path": "inputs/.github/workflows/ci-linux.yml",
+      "sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db",
+      "bytes": 242578
+    },
+    {
+      "path": "inputs/.github/workflows/ci-macos.yml",
+      "sha256": "803f432b4d0d7dd7a871574b14dcb857a9feb30f896c40e236d21e4d9bf2b946",
+      "bytes": 134887
+    },
+    {
+      "path": "inputs/.github/workflows/ci-windows.yml",
+      "sha256": "9fda9bad22d0eec1c4d5394f13f657e66c473aaf705ec1e963ad1f5f4c6cb3cc",
+      "bytes": 72291
+    },
+    {
+      "path": "inputs/.github/workflows/ci.yml",
+      "sha256": "826e8825083745bf92acc11802e410aad09487d4d60818d481f8d471e2369f35",
+      "bytes": 57054
+    },
+    {
+      "path": "inputs/tools/test/ci-pipeline.cjs",
+      "sha256": "218541aa704890e91df5fba31dff48456def4ed4e46e00a733f84b866d4b73f5",
+      "bytes": 20161
+    },
+    {
+      "path": "inputs/tools/test/test-ci-pipeline-wiring.cjs",
+      "sha256": "b8a92a921efe72cb1b00f8efc7edd8a72e5dac4cdf16f51f177e0a7b8c7cd3b1",
+      "bytes": 234973
+    },
+    {
+      "path": "result.json",
+      "sha256": "86e90c3de81427dbc826d147a0bc32fe74408fde7392b7b076aa481e67033859",
+      "bytes": 1930
+    },
+    {
+      "path": "run17.cjs",
+      "sha256": "2c7469d4696ca620be4805e6be05e002f9ff7709bc5ac23ac545ebd56f9ae0af",
+      "bytes": 2650
+    },
+    {
+      "path": "run17.log",
+      "sha256": "b6c928ac19aa54cf612cc7954c8d723a41708b0e67d752accfcd9ee72319851f",
+      "bytes": 91
+    }
+  ]
+}

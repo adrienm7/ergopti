@@ -1,0 +1,77 @@
+{
+  "passed": 17,
+  "failed": 0,
+  "positive": 1,
+  "receiver": "actual_frozen_guard_and_unchanged_mustCatch",
+  "rows": [
+    {
+      "label": "PowerShell: unknown allocation",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: capture ignores unknown",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: capture source admission omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: capture retained bytes replaced",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: source-host gate omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: source rejoin omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: cohort authority omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: original fourteen omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: guardian replaced with unowned launcher",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: capture controller raw status omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: closed capture group omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: subprocess status relation omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: raw preparation exit omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: late fatal receiving forgiven",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: artifact group receipt omitted",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: API credential alias into child env",
+      "mutation_detected": true
+    },
+    {
+      "label": "PowerShell: preparation token scrub omitted",
+      "mutation_detected": true
+    }
+  ],
+  "native": "UNRUN"
+}

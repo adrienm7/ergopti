@@ -1,0 +1,56 @@
+# V4 identity runtime evidence: independent receiving review
+
+RECEIVING_CLEAR within the recorded focused scopes. Source V4 was already
+independently SOURCE_CLEAR; this review executes no candidate, test, Lua/AHK
+import, native command, Git operation or full suite. Canonical source/index,
+refs and the parent40793 gate are untouched. Public source custody remains
+separate from evidence receiving.
+
+The exact runtime receipt81d82bd9 and source review4d7ea390 match. All31 runtime
+artifact hashes/sizes, all11 source artifacts, all12 child raw-output/status
+rows and41 recorded private source pins verify. Both before/after snapshots
+are byte-identical, including HEAD45b414, Git index,2331 tracked read sources,
+private sources and the shipped physical object. These are execution-epoch
+observations, not fresh qualification of the later merged canonical tree.
+
+On each LuaJIT/Lua5.4 ABI, unchanged controlled55/0 plus the separate independent
+safe-integer3/0 gives58 passing controls; genuine filesystem receiving is8/0.
+All positive runs exit0 with empty stderr and matching raw terminal markers.
+Original/V3 three-case receipts show LuaJIT1PASS/2FAIL/exit1, with both adjacent
+inode/device collision controls returningtrue incorrectly. Genuine integer
+Lua5.4 already passes3/0 on original/V3. V4 passes3/0 on both. This is an
+ABI-specific reproduced defect; prior Lua5.4 success is not hidden or counted
+as a regression. Fixed expected identities come from independently written
+9007199254740990/9007199254740991 literals; no producer output regenerates them.
+
+The actual native runner captures real luv fs_open/fs_close/fs_fstat functions
+before wrapping only acquisition/retirement accounting. Each captured close
+calls actual uv.fs_close, then actual fs_fstat on that exact retired descriptor
+must returnnil/EBADF immediately. No second native close is used as proof.
+Both ABI reports record72 acquired/72 close calls/72 physically closed,
+0 refused closes and8PASS/0FAIL. The unchanged original absolute/relative
+shipped-source cases execute alongside six real filesystem controls; modeled
+unknown-close/reentry/debt controls remain a distinct cohort.
+
+The separate Python os.stat oracle uses the kernel's exact integer metadata,
+not numeric conversion from the Lua producer. It witnesses the actual unsigned
+shipped inode beyond signed64, owned hardlink/relative aliases, a literal CRLF
+filename, non-executable mode0600 and a byte-identical physically distinct copy.
+After the native children return, all five metadata observations remain exact.
+Cleanup verifies only its four exact originally created objects before unlink,
+then retires its oracle/directory. Source/ctime/mode/bytes of the shipped object
+remain unchanged. The retained cleanup reports and actual current absence of
+that owned fixture directory agree; no global child/file census is claimed.
+
+V4's sole serializer replacement reconstructs the complete V3 loader when
+inverted. Its exact FD owner is wholly V3-byte-identical. The owning test keeps
+the whole separately frozen prior regression-test prefix and whole original
+owning-test prefix; only the new1677-byte three-case appendix is added. The
+original55 fixtures and independent expected identities are preserved.
+
+LIMITS: this is focused controlled plus real filesystem qualification. It is
+not a full Linux unit suite, input/keyboard/output/kernel delivery, physical
+hardware, X11/Wayland, package/install or cross-OS qualification. It does not
+grant an atomic pathname lease or prove unknown-close debt can be recovered.
+Future integration, actual enrollment, fresh selected/full source gates and
+owner-granted composition remain required. No case rerun was performed here.

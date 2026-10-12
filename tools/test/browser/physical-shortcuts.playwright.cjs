@@ -105,8 +105,13 @@ const assert = (condition, label) => {
 				'Manual W3C position and exact modifiers transported'
 			);
 			assert(
-				chosen.request.previous_slot === null && !('source' in chosen),
+				!Object.hasOwn(chosen.request, 'previous_slot') && !('source' in chosen),
 				'Page has no canonical source authority'
+			);
+			assert(
+				JSON.stringify(chosen) ===
+					'{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true,"alt":false,"shift":false,"super":false},"request_id":3}}',
+				'Add omits the optional old identity in the exact serialized native request'
 			);
 			const before = await page.evaluate(() => window.requests.length);
 			await page.keyboard.press('Control+KeyA');
@@ -175,6 +180,20 @@ const assert = (condition, label) => {
 				(await page.locator('#position').inputValue()) === 'KeyK' &&
 					(await page.locator('#mod-ctrl').isChecked()),
 				'Edit starts from exact native record'
+			);
+			await page.locator('#choose').click();
+			const editChoice = await page.evaluate(() => window.requests.at(-1));
+			assert(
+				Object.hasOwn(editChoice.request, 'previous_slot') &&
+					editChoice.request.previous_slot === 'physical_ctrl_KeyK' &&
+					!('source' in editChoice) &&
+					!('source' in editChoice.request),
+				'Edit retains only its exact displayed old identity and no source authority'
+			);
+			assert(
+				JSON.stringify(editChoice) ===
+					'{"action":"choose","request":{"code":"KeyK","mods":{"ctrl":true,"alt":false,"shift":false,"super":false},"previous_slot":"physical_ctrl_KeyK","request_id":8}}',
+				'Edit retains the old identity in the exact serialized native request'
 			);
 			await page.locator('#cancel').click();
 			await page.locator('.entry button').last().click();

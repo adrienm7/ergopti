@@ -1,0 +1,17 @@
+{
+  "actual_command": [
+    "python3",
+    "/workspace/.ergopti-cloud/reap_validation.py",
+    "node",
+    "tools/test/test-native-pac-source-contract.cjs"
+  ],
+  "cwd": "/workspace/ergopti",
+  "exit": 0,
+  "raw_sha256": "64d7ece7b1aeb1084f4752d4de42a176ab57e7dbe7bebde9a27bc5b5ef6cfac6",
+  "portable_CJS": 66,
+  "actual_peer_tests": 14,
+  "original_timeout_ms": 60000,
+  "native_Swift_SSPI": false,
+  "prior_full_414_ETIMEDOUT_retained": true,
+  "timeout_cause": "UNKNOWN"
+}

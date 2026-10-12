@@ -1,0 +1,52 @@
+{
+	"status": "PARTIAL_SOURCE_CHECKPOINT_NOT_NATIVE_QUALIFICATION",
+	"source_head": "0dcfe101ed06fd82994d728d70abf2b7cf69be05",
+	"incoming_dev": "ba41b79db7f9b3618ba3290cff1516a6a9d5e797",
+	"selected_gate": {
+		"selected_range": "ba41b79db7f9b3618ba3290cff1516a6a9d5e797",
+		"scope": "Actual delivery delta against fresh integration destination; full tracked source/index/HEAD bracket; all selected gates unchanged",
+		"exit": 1,
+		"seconds": 4016.4976221169927,
+		"source_index_head_exact": true,
+		"raw_sha256": "d3da5b48fb2749842824e49d802a2436cc8b0f6b6bf13766ee9b8e2f1c6aede7"
+	},
+	"passed": {
+		"format_files": 392,
+		"js_checks": 423,
+		"macos_simulated_unit_tests": 18991,
+		"linux_unit_tests": 13542,
+		"macos_standalone_e2e": 101,
+		"linux_e2e": 165,
+		"linux_http_streaming": 262,
+		"linux_local_api": 136,
+		"linux_retained_output": 18,
+		"linux_managed_transport": 30
+	},
+	"failed": {
+		"js_checks": 3,
+		"macos_simulated_unit_tests": 6,
+		"linux_e2e": 10
+	},
+	"skipped": [
+		"one original macOS rolling_buffer_cap scenario",
+		"native AHK execution and Windows-only parse unavailable on Linux"
+	],
+	"not_executed": [
+		"native macOS reception",
+		"integrated-SHA CI",
+		"physical input/display reception"
+	],
+	"paired_original_js_guards": {
+		"source_commits": [
+			"ba41b79db7f9b3618ba3290cff1516a6a9d5e797",
+			"50863919e29095c78a5b1a18b55aadbfee5b8c8f"
+		],
+		"exits": [
+			[1, 1],
+			[1, 1],
+			[1, 1]
+		],
+		"all_output_pairs_equal_after_literal_root_replacement": true
+	},
+	"items_removed": []
+}

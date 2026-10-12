@@ -620,3 +620,288 @@ helpers.describe("Offline shipped hotstring binding root", function()
 		end)
 	end
 end)
+
+
+--- Runs handwritten metadata through actual constructors and restores all ports.
+--- @param configure function Receives the recording native ports and actual owner list.
+--- @param body function Receives the fresh actual Loader.
+local function with_exact_loader_ports(configure, body)
+	local names = { "lfs", "luv", "modules.hotstrings.loader", "infra.curl_identity" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local Exact = require("infra.curl_identity")
+	local original_new = Exact.new
+	local Ports = require("tests.support.exact_identity_ports")
+	local native, state = Ports.new({ planned_inode = "9223372036855917341" })
+	local owners = {}
+	Exact.new = function(...)
+		local owner = original_new(...)
+		owners[#owners + 1] = owner
+		return owner
+	end
+	package.loaded.luv = native
+	package.loaded.lfs = { attributes = function() return { mode = "file", dev = 11, ino = 100 } end }
+	package.loaded["modules.hotstrings.loader"] = nil
+	local ok, err = pcall(function()
+		local Loader = require("modules.hotstrings.loader")
+		configure(Loader, native, state, owners, Exact)
+		body(Loader, native, state, owners)
+	end)
+	Exact.new = original_new
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("Closed exact identity joins for shipped hotstring selection", function()
+	for ordinal = 1, 4 do
+		for _, shape in ipairs({ "false", "nil", "throw" }) do
+			for _, close_ordinal in ipairs({ 1, 2 }) do
+				local fixed_ordinal, fixed_shape, fixed_close = ordinal, shape, close_ordinal
+				helpers.it("(exact-loader) refuses stat reentry debt at read " .. ordinal .. " close " .. close_ordinal .. " " .. shape, function()
+					local reads, nested = 0, nil
+					with_exact_loader_ports(function(Loader, native)
+						local close = native.fs_close
+						local closes = 0
+						native.fs_close = function(fd)
+							closes = closes + 1
+							local result = close(fd)
+							if closes == fixed_close then
+								if fixed_shape == "throw" then error("independent ambiguous close") end
+								if fixed_shape == "false" then return false end
+								return nil
+							end
+							return result
+						end
+						package.loaded.lfs.attributes = function(path)
+							if path == "/inner-left" or path == "/inner-right" then
+								return { mode = "file", dev = 11, ino = -1 }
+							end
+							reads = reads + 1
+							if reads == fixed_ordinal then nested = Loader.same_file("/inner-left", "/inner-right") end
+							return { mode = "file", dev = 11, ino = 100 }
+						end
+					end, function(Loader, _, state, owners)
+						helpers.assert_eq(Loader.same_file("outer-left", "outer-right"), false,
+							"an outer legacy ACK cannot bypass a nested uncertain native close")
+						helpers.assert_eq(nested, false)
+						helpers.assert_eq(reads, fixed_ordinal, "no later external stat follows retained debt")
+						helpers.assert_eq(#owners, 1)
+						helpers.assert_eq(owners[1]:is_settled(), false)
+						helpers.assert_eq(#state.opens, 2)
+						helpers.assert_eq(#state.closes, 2)
+						helpers.assert_true(state.closes[1] ~= state.closes[2], "the ambiguous descriptor is never closed twice")
+						helpers.assert_eq(Loader.same_file("outer-left", "outer-right"), false)
+						helpers.assert_eq(#state.opens, 2)
+						helpers.assert_eq(#state.closes, 2)
+						helpers.assert_eq(reads, fixed_ordinal)
+					end)
+				end)
+			end
+		end
+	end
+	for ordinal = 1, 4 do
+		local fixed_ordinal = ordinal
+		helpers.it("(exact-loader) permits a fully closed nested observation at original stat ordinal " .. ordinal .. " without losing the four reads", function()
+			local reads, nested = 0, nil
+			with_exact_loader_ports(function(Loader)
+				package.loaded.lfs.attributes = function(path)
+					if path == "/inner-left" or path == "/inner-right" then return { mode = "file", dev = 11, ino = -1 } end
+					reads = reads + 1
+					if reads == fixed_ordinal then nested = Loader.same_file("/inner-left", "/inner-right") end
+					return { mode = "file", dev = 11, ino = 100 }
+				end
+			end, function(Loader, _, state, owners)
+				helpers.assert_true(Loader.same_file("outer-left", "outer-right"))
+				helpers.assert_true(nested)
+				helpers.assert_eq(reads, 4)
+				helpers.assert_eq(#owners, 4)
+				helpers.assert_eq(#state.opens, 8)
+				helpers.assert_eq(#state.closes, 8)
+				for _, owner in ipairs(owners) do helpers.assert_true(owner:is_settled()) end
+			end)
+		end)
+	end
+	helpers.it("(exact-loader) rejoins debt after an original metadata scalar getter", function()
+		local reads, nested = 0, nil
+		with_exact_loader_ports(function(Loader, native)
+			local close = native.fs_close
+			native.fs_close = function(fd) close(fd); return false end
+			package.loaded.lfs.attributes = function(path)
+				if path == "/inner-left" or path == "/inner-right" then return { mode = "file", dev = 11, ino = -1 } end
+				reads = reads + 1
+				return setmetatable({ mode = "file", ino = 100 }, { __index = function(_, key)
+					if key == "dev" then nested = Loader.same_file("/inner-left", "/inner-right"); return 11 end
+				end })
+			end
+		end, function(Loader, _, state, owners)
+			helpers.assert_eq(Loader.same_file("outer-left", "outer-right"), false)
+			helpers.assert_eq(nested, false)
+			helpers.assert_eq(reads, 1)
+			helpers.assert_eq(owners[1]:is_settled(), false)
+			helpers.assert_eq(#state.opens, 2)
+		end)
+	end)
+	helpers.it("(exact-loader) keeps adjacent unsigned inode witnesses distinct despite one unsafe numeric stat", function()
+		with_exact_loader_ports(function(_, native, state)
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = -1 } end
+			local read = native.fs_read
+			native.fs_read = function(fd, bound, offset)
+				local bytes = read(fd, bound, offset)
+				local descriptor = state.descriptors[fd]
+				local subject = tonumber(descriptor.path:match("/fdinfo/(%d+)$"))
+				if offset == 0 and state.descriptors[subject].path == "/different" then
+					return "pos:\t0\nflags:\t0104000\nmnt_id:\t91\nino:\t9223372036855917342\n"
+				end
+				return bytes
+			end
+		end, function(Loader, _, state, owners)
+			helpers.assert_eq(Loader.same_file("/first", "/different"), false)
+			helpers.assert_eq(#owners, 2)
+			helpers.assert_eq(#state.opens, 4)
+			helpers.assert_eq(#state.closes, 4)
+			for _, owner in ipairs(owners) do helpers.assert_true(owner:is_settled()) end
+		end)
+	end)
+	helpers.it("(exact-loader) refuses replacement between independently repeated exact observations", function()
+		with_exact_loader_ports(function(_, native)
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = -1 } end
+			local fstat, calls = native.fs_fstat, 0
+			native.fs_fstat = function(fd)
+				local result = fstat(fd); calls = calls + 1
+				if calls >= 3 then result.size = 72 end
+				return result
+			end
+		end, function(Loader, _, state, owners)
+			helpers.assert_eq(Loader.same_file("/same-left", "/same-right"), false)
+			helpers.assert_eq(#owners, 3)
+			helpers.assert_eq(#state.opens, #state.closes)
+		end)
+	end)
+	helpers.it("(exact-loader) seals an empty old constructor without inventing debt", function()
+		with_exact_loader_ports(function(_, _, _, _, Exact)
+			local current_new = Exact.new
+			Exact.new = function(...)
+				local owner = current_new(...); owner.observe_regular = nil; return owner
+			end
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = -1 } end
+		end, function(Loader, _, state, owners)
+			helpers.assert_eq(Loader.same_file("/first", "/second"), false)
+			helpers.assert_true(owners[1]:is_settled())
+			helpers.assert_eq(#state.opens, 0)
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = 100 } end
+			helpers.assert_true(Loader.same_file("safe-left", "safe-right"))
+		end)
+	end)
+	helpers.it("(exact-loader) refuses a constructor throw without assuming an acquired descriptor", function()
+		with_exact_loader_ports(function(_, _, _, _, Exact)
+			Exact.new = function() error("independent pure constructor refusal") end
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = -1 } end
+		end, function(Loader, _, state, owners)
+			helpers.assert_eq(Loader.same_file("/first", "/second"), false)
+			helpers.assert_eq(#owners, 0)
+			helpers.assert_eq(#state.opens, 0)
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = 100 } end
+			helpers.assert_true(Loader.same_file("safe-left", "safe-right"))
+		end)
+	end)
+	for changed_at = 2, 4 do
+		local fixed = changed_at
+		helpers.it("(exact-loader) preserves original legacy short circuit at changed stat " .. changed_at, function()
+			local reads = 0
+			with_exact_loader_ports(function()
+				package.loaded.lfs.attributes = function()
+					reads = reads + 1
+					return { mode = "file", dev = 11, ino = reads >= fixed and 101 or 100 }
+				end
+			end, function(Loader, _, state, owners)
+				helpers.assert_eq(Loader.same_file("left", "right"), false)
+				helpers.assert_eq(reads, fixed)
+				helpers.assert_eq(#state.opens, 0)
+				helpers.assert_eq(#owners, 0)
+			end)
+		end)
+	end
+	helpers.it("(exact-loader) refuses an exact zero inode without retaining nonexistent close debt", function()
+		with_exact_loader_ports(function(_, native)
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = -1 } end
+			local read = native.fs_read
+			native.fs_read = function(fd, bound, offset)
+				local result = read(fd, bound, offset)
+				if offset == 0 then return "pos:\t0\nino:\t0\n" end
+				return result
+			end
+		end, function(Loader, _, state, owners)
+			helpers.assert_eq(Loader.same_file("/left", "/right"), false)
+			helpers.assert_true(owners[1]:is_settled())
+			helpers.assert_eq(#state.opens, 2)
+			helpers.assert_eq(#state.closes, 2)
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = 100 } end
+			helpers.assert_true(Loader.same_file("safe-left", "safe-right"))
+		end)
+	end)
+	helpers.it("(exact-loader) refuses unavailable native flags before descriptor acquisition", function()
+		with_exact_loader_ports(function(_, native)
+			native.constants = nil
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = -1 } end
+		end, function(Loader, _, state, owners)
+			helpers.assert_eq(Loader.same_file("/left", "/right"), false)
+			helpers.assert_true(owners[1]:is_settled())
+			helpers.assert_eq(#state.opens, 0)
+			package.loaded.lfs.attributes = function() return { mode = "file", dev = 11, ino = 100 } end
+			helpers.assert_true(Loader.same_file("safe-left", "safe-right"))
+		end)
+	end)
+	for _, vector in ipairs({ { mode = "file", dev = 11, ino = 0 / 0 }, { mode = "file", dev = 0 / 0, ino = 100 },
+		{ mode = "file", dev = math.huge, ino = 100 }, { mode = "file", dev = -1, ino = 100 },
+		{ mode = "file", dev = 11, ino = 0 }, { mode = "file", dev = 11, ino = -math.huge },
+		{ mode = "file", dev = 11, ino = 1.5 } }) do
+		local fixed = vector
+		helpers.it("(exact-loader) refuses a malformed legacy scalar without consulting an exact owner", function()
+			with_exact_loader_ports(function() package.loaded.lfs.attributes = function() return fixed end end,
+				function(Loader, _, state, owners)
+					helpers.assert_eq(Loader.same_file("left", "right"), false)
+					helpers.assert_eq(#owners, 0)
+					helpers.assert_eq(#state.opens, 0)
+				end)
+		end)
+	end
+end)
+
+
+helpers.describe("Exact safe-integer legacy filesystem serialization", function()
+	for _, field in ipairs({ "ino", "dev" }) do
+		local fixed = field
+		helpers.it("(exact-safe-integer) refuses independently distinct adjacent safe " .. field .. " values", function()
+			-- Both literals are representable on both ABIs; no expected key is
+			-- obtained from the producer or from a numeric-to-text conversion.
+			local left, right = 9007199254740990, 9007199254740991
+			helpers.assert_true(left ~= right, "the two independently written native numeric facts are distinct")
+			with_exact_loader_ports(function()
+				package.loaded.lfs.attributes = function(path)
+					local attrs = { mode = "file", dev = 11, ino = 100 }
+					attrs[fixed] = path == "left" and left or right
+					return attrs
+				end
+			end, function(Loader, _, state, owners)
+				helpers.assert_eq(Loader.same_file("left", "right"), false,
+					"distinct safe numeric identities must not collapse to the same legacy text key")
+				helpers.assert_eq(#owners, 0)
+				helpers.assert_eq(#state.opens, 0)
+			end)
+		end)
+	end
+	helpers.it("(exact-safe-integer) retains an independently equal high-safe source on both aliases", function()
+		local reads = 0
+		with_exact_loader_ports(function()
+			package.loaded.lfs.attributes = function()
+				reads = reads + 1
+				return { mode = "file", dev = 9007199254740990, ino = 9007199254740991 }
+			end
+		end, function(Loader, _, state, owners)
+			helpers.assert_true(Loader.same_file("left", "right"))
+			helpers.assert_eq(reads, 4, "all original stable-source readbacks still execute")
+			helpers.assert_eq(#owners, 0)
+			helpers.assert_eq(#state.opens, 0)
+		end)
+	end)
+end)

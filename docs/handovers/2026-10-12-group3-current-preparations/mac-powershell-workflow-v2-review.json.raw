@@ -1,0 +1,26 @@
+{
+	"decision": "SOURCE_CLEAR_PRIVATE_WORKFLOW_ROUTE_ONLY",
+	"packet_receipt_sha256": "0469f0b459bfe468510032983b5b5615c371fba5f59765206ec1fd24e6d8579a",
+	"source_patch_sha256": "726cf35cd05e85d5136fe3bf7f9316c31415206456804fcfa3873e8da4a362ff",
+	"whole_four_git_preimage_reconstructions_exact": true,
+	"v1_to_v2_changed_images_exact": 3,
+	"original_swift_prefix_bytes": 19188,
+	"origin_control_receipt_sha256": "67c04b2331968dfa89ba9fca8bc0d414b0cdc77214408eca38eaf54fc87ed221",
+	"actual_origin_receiving": {
+		"pass": 4,
+		"fail": 0,
+		"exit": 0,
+		"old_same_first_case_assertion_fail": 1,
+		"old_exit": 1
+	},
+	"capture_group_scope": "inherited_PGID_only_not_escaped_worker_sessions",
+	"native_final_admission": "READY_current_sources_raw_zero_all16_native_passed_with_original_payload_retirement_assertions",
+	"timeout_or_nonterminal_qualified": false,
+	"new_per_payload_machine_receipts_exported": false,
+	"native_capture_and_17_JS_controls": "UNRUN",
+	"timing_capacity": "UNPROVEN_BUDGETS_UNCHANGED",
+	"future_G5_G6_source_custody": "PENDING",
+	"reviewer_candidate_execution": false,
+	"report_sha256": "afecdeac3f6d034a36d4bb2ff4241c46d126479b455a47c96f7c1ec8fd3bf108",
+	"input_pins_sha256": "ab36dff378a7bc4b51c5973b377681aa83b4f78ca0f05f94b47ff9446a9809fd"
+}

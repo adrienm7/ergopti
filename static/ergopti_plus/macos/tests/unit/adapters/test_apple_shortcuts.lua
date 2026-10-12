@@ -473,3 +473,164 @@ H.describe("Apple Shortcut acquisition refusal settlement", function()
 		end
 	end)
 end)
+
+--- These are controlled transport owners, not native processes or permission receipts.
+local function invocation_start_fixture(configure)
+	local f = fixture(); local initial = f.discover()
+	local result = { calls = 0, admitted = true }
+	local original_invoke = f.ports.invoke
+	f.ports.invoke = function(...)
+		local task = original_invoke(...)
+		result.task = task
+		configure(task, f, result)
+		return task
+	end
+	function result.begin()
+		H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function()
+			if result.invalidate_admission then
+				result.invalidate_admission = false
+				result.invalidated = f.owner.invalidate()
+			end
+			return result.admitted
+		end, function(value, reason)
+			result.calls, result.value, result.reason = result.calls + 1, value, reason
+		end))
+		H.assert_eq(result.calls, 0)
+		f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire()
+		H.assert_eq(#f.invocations, 1); H.assert_true(f.tasks[2].physical)
+	end
+	return f, result
+end
+
+H.describe("Apple Shortcut invocation watcher and start refusals", function()
+	for _, phase in ipairs({ "watcher", "start" }) do
+		for _, refusal in ipairs({ "false", "throw", "nonliteral" }) do
+			H.it("current invocation " .. phase .. " " .. refusal .. " delivers refusal and retains debt", function()
+				local f, result = invocation_start_fixture(function(task)
+					local function refused()
+						if phase == "start" then task.starts = task.starts + 1 end
+						if refusal == "throw" then error("controlled invocation refusal") end
+						if refusal == "nonliteral" then return 1 end
+						return false
+					end
+					if phase == "watcher" then task.onSettled = refused else task.start = refused end
+				end)
+				result.begin(); local task = result.task
+				H.assert_eq(result.calls, 1); assert_false(result.value)
+				H.assert_eq(result.reason, phase == "watcher" and "transport_refused" or "start_refused")
+				H.assert_eq(task.starts, phase == "watcher" and 0 or 1); H.assert_eq(task.cancels, 1)
+				H.assert_true(f.owner.pending()); assert_false(f.owner.discover(function() end))
+				H.assert_eq(#f.tasks, 2)
+				-- Watcher refusal may leave no subscription. The original exact owner
+				-- is retried only by invalidate after both settlement facts exist.
+				task.finish(true); task.retire(false); H.assert_true(f.owner.pending())
+				H.assert_eq(result.calls, 1); task.retire(true)
+				H.assert_true(f.owner.invalidate()); assert_false(f.owner.pending())
+				H.assert_true(task.physical); H.assert_true(task.service); H.assert_eq(result.calls, 1)
+			end)
+		end
+		for _, port in ipairs({ "terminate", "isSettled", "automationSettled" }) do
+			H.it("invocation " .. phase .. " refusal " .. port .. " invalidation suppresses delivery", function()
+				local f, result = invocation_start_fixture(function(task, owner_fixture, observed)
+					if phase == "watcher" then task.onSettled = function() return false end
+					else task.start = function() task.starts = task.starts + 1; return false end end
+					if port == "automationSettled" then task.physical = true end
+					local original, invalidated_once = task[port], false
+					task[port] = function()
+						local value = original()
+						if not invalidated_once then
+							invalidated_once = true
+							observed.invalidated = owner_fixture.owner.invalidate()
+						end
+						return value
+					end
+				end)
+				result.begin(); local task = result.task
+				assert_false(result.invalidated); H.assert_eq(task.cancels, 2)
+				H.assert_eq(result.calls, 0); H.assert_nil(result.value); H.assert_nil(result.reason)
+				H.assert_true(f.owner.pending()); assert_false(f.owner.discover(function() end))
+				task.finish(true); task.retire(true); H.assert_true(f.owner.invalidate())
+				assert_false(f.owner.pending()); H.assert_eq(result.calls, 0)
+			end)
+		end
+		H.it("invocation " .. phase .. " refusal synchronously settles cancellation once", function()
+			local f, result = invocation_start_fixture(function(task, _, observed)
+				if phase == "watcher" then task.onSettled = function() return false end
+				else task.start = function() task.starts = task.starts + 1; return false end end
+				local terminate = task.terminate
+				task.terminate = function()
+					terminate(); task.finish(true); task.retire(true)
+					observed.calls_during_cancel = observed.calls
+					return true
+				end
+			end)
+			result.begin(); local task = result.task
+			H.assert_eq(result.calls_during_cancel, 0); H.assert_eq(result.calls, 1)
+			assert_false(result.value)
+			H.assert_eq(result.reason, phase == "watcher" and "transport_refused" or "start_refused")
+			H.assert_eq(task.cancels, 1); H.assert_true(task.physical); H.assert_true(task.service)
+			assert_false(f.owner.pending()); H.assert_eq(#f.discover().choices, 2)
+			H.assert_eq(result.calls, 1)
+		end)
+	end
+	for _, acknowledgement in ipairs({ false, true }) do
+		H.it("synchronous watcher completion with " .. tostring(acknowledgement) .. " ACK waits for start admission", function()
+			local f, result = invocation_start_fixture(function(task, _, observed)
+				local watch = task.onSettled
+				task.onSettled = function(callback)
+					watch(callback); task.finish(true); task.retire(true)
+					observed.calls_during_watch = observed.calls
+					return acknowledgement
+				end
+			end)
+			result.begin(); local task = result.task
+			H.assert_eq(result.calls_during_watch, 0); H.assert_eq(result.calls, 1)
+			H.assert_eq(result.value, acknowledgement)
+			H.assert_eq(result.reason, acknowledgement and "completed" or "transport_refused")
+			H.assert_eq(task.starts, acknowledgement and 1 or 0)
+			H.assert_eq(task.cancels, acknowledgement and 0 or 1)
+			H.assert_true(task.physical); H.assert_true(task.service); assert_false(f.owner.pending())
+		end)
+	end
+	for _, acknowledgement in ipairs({ "false", "throw", "true" }) do
+		H.it("synchronous start completion with " .. acknowledgement .. " ACK delivers once after acknowledgement", function()
+			local f, result = invocation_start_fixture(function(task, _, observed)
+				task.start = function()
+					task.starts = task.starts + 1; task.finish(true); task.retire(true)
+					observed.calls_before_ack = observed.calls
+					if acknowledgement == "throw" then error("controlled start acknowledgement") end
+					return acknowledgement == "true"
+				end
+			end)
+			result.begin(); local task = result.task
+			H.assert_eq(result.calls_before_ack, 0, "completion cannot precede start admission")
+			H.assert_eq(result.calls, 1); H.assert_eq(result.value, acknowledgement == "true")
+			H.assert_eq(result.reason, acknowledgement == "true" and "completed" or "start_refused")
+			H.assert_eq(task.starts, 1); H.assert_eq(task.cancels, acknowledgement == "true" and 0 or 1)
+			H.assert_true(task.physical); H.assert_true(task.service); assert_false(f.owner.pending())
+			H.assert_eq(#f.discover().choices, 2); H.assert_eq(result.calls, 1)
+		end)
+	end
+	H.it("current post-watcher admission refusal delivers without starting", function()
+		local f, result = invocation_start_fixture(function(task, _, observed)
+			local watch = task.onSettled
+			task.onSettled = function(callback) watch(callback); observed.admitted = false; return true end
+		end)
+		result.begin(); local task = result.task
+		H.assert_eq(result.calls, 1); assert_false(result.value); H.assert_eq(result.reason, "admission_refused")
+		H.assert_eq(task.starts, 0); H.assert_eq(task.cancels, 1); H.assert_true(f.owner.pending())
+		task.finish(true); task.retire(true); H.assert_true(f.owner.invalidate())
+		assert_false(f.owner.pending()); H.assert_eq(result.calls, 1)
+	end)
+	H.it("post-watcher admission invalidation refuses start without stale delivery", function()
+		local f, result = invocation_start_fixture(function(task, _, observed)
+			local watch = task.onSettled
+			task.onSettled = function(callback) watch(callback); observed.invalidate_admission = true; return true end
+		end)
+		result.begin(); local task = result.task
+		assert_false(result.invalidated); H.assert_eq(task.starts, 0); H.assert_eq(task.cancels, 2)
+		H.assert_eq(result.calls, 0); H.assert_nil(result.value); H.assert_nil(result.reason)
+		H.assert_true(f.owner.pending()); task.finish(true); task.retire(true)
+		H.assert_true(f.owner.invalidate()); assert_false(f.owner.pending()); H.assert_eq(result.calls, 0)
+	end)
+end)
