@@ -3955,5 +3955,392 @@ NATIVE_FIXTURE_CLOCK_CONTROLS = load(
 ) = NATIVE_FIXTURE_CLOCK_CONTROLS.enrolled_cases()
 
 
+class NativeTimedRemovalCaptureObservationTests(unittest.TestCase):
+    """Receive original software owner/captures; no native Security command runs."""
+
+    def receive_removal(
+        self,
+        raw=b"private native output",
+        *,
+        timeout=True,
+        exit_status=0,
+        acknowledgement=True,
+        expired=False,
+        close_refused=False,
+        actor=None,
+        observer_failure=None,
+    ):
+        fixture = object.__new__(WIRE.WireFixture)
+        fixture.native = True
+        fixture.command_file_debt = []
+        fixture.command_group_debt = []
+        fixture.native_groups = object()
+        child = SimpleNamespace(stdin=io.BytesIO(), returncode=None)
+        owner = SimpleNamespace(process=child, reaped=False)
+        primary = subprocess.TimeoutExpired("exact original native removal", 15)
+        close_primary = OSError("controlled original capture close refusal")
+        calls, captures = [], []
+        real_temporary = tempfile.TemporaryFile
+
+        class Capture:
+            def __init__(self):
+                self.original = real_temporary()
+                self.closed = False
+
+            def __getattr__(self, name):
+                return getattr(self.original, name)
+
+            def seek(self, *args):
+                if not owner.reaped:
+                    raise AssertionError("Unsettled writer retains the capture offset")
+                return self.original.seek(*args)
+
+            def read(self, *args):
+                if not owner.reaped:
+                    raise AssertionError("Unsettled writer retains capture bytes")
+                calls.append(("read", args))
+                return self.original.read(*args)
+
+            def close(self):
+                self.original.close()
+                self.closed = True
+                if close_refused and self is captures[1]:
+                    raise close_primary
+
+        def new_capture():
+            value = Capture()
+            captures.append(value)
+            return value
+
+        def acquire(arguments, native, register, **ports):
+            calls.append(("acquire", tuple(arguments)))
+            register(owner)
+            ports["stdout"].write(b"original removal output")
+            ports["stderr"].write(raw)
+
+        def wait(budget):
+            calls.append(("wait", budget))
+            if timeout:
+                raise primary
+            child.returncode = exit_status
+
+        def settle():
+            calls.append(("settle", owner))
+            owner.reaped = acknowledgement is True
+            if owner.reaped and child.returncode is None:
+                child.returncode = -15
+            return acknowledgement
+
+        owner.wait_for_exit, owner.settle = wait, settle
+        fixture.groups = SimpleNamespace(acquire_owned=acquire)
+        refusal = returned = None
+        out, err = io.StringIO(), io.StringIO()
+        original_print = print
+
+        def publish(value, **options):
+            if value.startswith("# native_http_trust_remove "):
+                calls.append(("publish", owner.reaped, tuple(v.closed for v in captures)))
+                if actor == "publication":
+                    raise observer_failure
+            original_print(value, **options)
+
+        capture_port = (
+            mock.patch.object(
+                WIRE.WireFixture, "_trust_install_stream", side_effect=observer_failure
+            )
+            if actor == "capture"
+            else contextlib.nullcontext()
+        )
+        arguments = [
+            "/usr/bin/sudo",
+            "-n",
+            "/usr/bin/security",
+            "remove-trusted-cert",
+            "-d",
+            "owned-ca.pem",
+        ]
+        with mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=new_capture):
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                with mock.patch("builtins.print", side_effect=publish), capture_port:
+                    with mock.patch.object(WIRE.time, "monotonic", return_value=10):
+                        try:
+                            returned = fixture._command(
+                                arguments,
+                                trust_operation="remove",
+                                deadline=9 if expired else None,
+                            )
+                        except BaseException as failure:
+                            refusal = failure
+        self.assertEqual(out.getvalue(), "")
+        return (
+            fixture,
+            owner,
+            child,
+            primary,
+            close_primary,
+            refusal,
+            returned,
+            calls,
+            captures,
+            err.getvalue(),
+        )
+
+    def removal_fact(self, output):
+        lines = [
+            line for line in output.splitlines() if line.startswith("# native_http_trust_remove ")
+        ]
+        self.assertEqual(len(lines), 1)
+        self.assertNotIn("# native_http_trust_install ", output)
+        return json.loads(lines[0].removeprefix("# native_http_trust_remove "))
+
+    def test76OriginalRemovalTimeoutProjectsSameSettledChildWithoutChangingPrimary(self):
+        fixture, owner, child, primary, _, refusal, returned, calls, captures, output = (
+            self.receive_removal()
+        )
+        self.assertIs(refusal, primary)
+        self.assertIsNone(returned)
+        self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+        self.assertEqual(fixture.command_group_debt, [])
+        self.assertEqual(fixture.command_file_debt, [])
+        self.assertEqual(child.returncode, -15)
+        self.assertTrue(owner.reaped)
+        self.assertTrue(all(value.closed for value in captures))
+        fact = self.removal_fact(output)
+        self.assertEqual(
+            fact,
+            {
+                "version": 1,
+                "action": "remove_trusted_cert",
+                "domain": "admin",
+                "keychain": None,
+                "phase": "deadline",
+                "child_settled": True,
+                "child_exit_status": -15,
+                "streams_closed": True,
+                "command_file_debt": False,
+                "stderr": {
+                    "observed": True,
+                    "captured_bytes": 21,
+                    "truncated": False,
+                    "callee": None,
+                    "category": "unknown",
+                },
+            },
+        )
+        self.assertEqual([v for v in calls if v[0] == "wait"], [("wait", 15)])
+        settlements = [v for v in calls if v[0] == "settle"]
+        self.assertEqual(len(settlements), 1)
+        self.assertIs(settlements[0][1], owner)
+        self.assertEqual([v for v in calls if v[0] == "read"], [("read", (1025,))])
+        self.assertEqual([v for v in calls if v[0] == "publish"], [("publish", True, (True, True))])
+        self.assertNotIn("private native output", output)
+        self.assertEqual(
+            vars(primary),
+            {"cmd": "exact original native removal", "timeout": 15, "output": None, "stderr": None},
+        )
+
+    def test77SuccessfulRemovalRetainsOriginalStdoutStatusAndAcquisition(self):
+        fixture, owner, _, _, _, refusal, returned, calls, _, output = self.receive_removal(
+            timeout=False
+        )
+        self.assertIsNone(refusal)
+        self.assertEqual(returned, (0, b"original removal output"))
+        self.assertEqual(fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertEqual(len([v for v in calls if v[0] == "acquire"]), 1)
+        self.assertEqual(len([v for v in calls if v[0] == "settle"]), 1)
+        self.assertEqual(
+            calls[0][1],
+            (
+                "/usr/bin/sudo",
+                "-n",
+                "/usr/bin/security",
+                "remove-trusted-cert",
+                "-d",
+                "owned-ca.pem",
+            ),
+        )
+        fact = self.removal_fact(output)
+        self.assertEqual(fact["child_exit_status"], 0)
+        self.assertTrue(fact["child_settled"])
+        self.assertTrue(owner.reaped)
+        self.assertIn('"operation": "remove"', output)
+        self.assertIn('"primary": "none"', output)
+
+    def test78FailedRemovalRetainsOriginalExitAndOnlyPublicCalleeCategory(self):
+        fixture, _, _, _, _, refusal, returned, calls, captures, output = self.receive_removal(
+            b"SecTrustSettingsRemoveTrustSettings: Access denied.\n",
+            timeout=False,
+            exit_status=1,
+        )
+        self.assertIs(type(refusal), WIRE.FixtureFailure)
+        self.assertEqual(refusal.args, ("Native fixture command refused",))
+        self.assertIsNone(returned)
+        self.assertEqual(fixture.command_fact, {"phase": "exit", "status": 1})
+        fact = self.removal_fact(output)
+        self.assertEqual(fact["child_exit_status"], 1)
+        self.assertEqual(fact["stderr"]["callee"], "SecTrustSettingsRemoveTrustSettings")
+        self.assertEqual(fact["stderr"]["category"], "access_denied")
+        self.assertNotIn("Access denied", output)
+        self.assertTrue(all(value.closed for value in captures))
+        self.assertEqual(len([v for v in calls if v[0] == "settle"]), 1)
+
+    def test79FalseOrTruthyACKCannotReadCaptureOrRetireSameOwnerDebt(self):
+        for acknowledgement in (False, None, 1, "settled"):
+            with self.subTest(acknowledgement=acknowledgement):
+                fixture, owner, _, primary, _, refusal, _, calls, _, output = self.receive_removal(
+                    acknowledgement=acknowledgement
+                )
+                self.assertIs(refusal, primary)
+                self.assertEqual(fixture.command_fact, {"phase": "settle", "status": None})
+                self.assertEqual(len(fixture.command_group_debt), 1)
+                self.assertIs(fixture.command_group_debt[0], owner)
+                self.assertEqual([v for v in calls if v[0] == "read"], [])
+                fact = self.removal_fact(output)
+                self.assertFalse(fact["child_settled"])
+                self.assertFalse(fact["streams_closed"])
+                self.assertIsNone(fact["child_exit_status"])
+                self.assertEqual(fact["stderr"], {"observed": False})
+
+    def test80ExpiredOriginalDeadlineFabricatesNoOwnerCaptureOrQuery(self):
+        fixture, owner, _, _, _, refusal, returned, calls, captures, output = self.receive_removal(
+            expired=True
+        )
+        self.assertIsInstance(refusal, subprocess.TimeoutExpired)
+        self.assertIsNone(returned)
+        self.assertEqual(calls, [("publish", False, ())])
+        self.assertEqual(
+            [value for value in calls if value[0] in ("acquire", "wait", "settle", "read")], []
+        )
+        self.assertEqual(captures, [])
+        self.assertFalse(owner.reaped)
+        self.assertEqual(fixture.command_group_debt, [])
+        self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+        fact = self.removal_fact(output)
+        self.assertFalse(fact["child_settled"])
+        self.assertIsNone(fact["child_exit_status"])
+        self.assertEqual(fact["stderr"], {"observed": False})
+
+    def test81TechnicalOptionalCaptureAndSinkRefusalPreserveExactOriginalOutcome(self):
+        for actor in ("capture", "publication"):
+            for timeout in (False, True):
+                with self.subTest(actor=actor, timeout=timeout):
+                    fixture, _, _, primary, _, refusal, returned, _, captures, output = (
+                        self.receive_removal(
+                            timeout=timeout,
+                            actor=actor,
+                            observer_failure=OSError("controlled optional refusal"),
+                        )
+                    )
+                    if timeout:
+                        self.assertIs(refusal, primary)
+                        self.assertIsNone(returned)
+                    else:
+                        self.assertIsNone(refusal)
+                        self.assertEqual(returned, (0, b"original removal output"))
+                    self.assertTrue(all(value.closed for value in captures))
+                    self.assertEqual(fixture.command_file_debt, [])
+                    self.assertEqual(fixture.command_group_debt, [])
+                    if actor == "capture":
+                        self.assertEqual(self.removal_fact(output)["stderr"], {"observed": False})
+
+    def test82ActualWorkerSignalCancellationPreservesSuccessOrOriginalTimeoutPrecedence(self):
+        handler = NativeTimedAddCancellationTests.actual_signal_handler()
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            for actor in ("capture", "publication"):
+                for timeout in (False, True):
+                    with self.subTest(signum=int(signum), actor=actor, timeout=timeout):
+                        interruptions = []
+                        prior = signal.getsignal(signum)
+                        signal.signal(signum, handler)
+
+                        class Dispatch:
+                            def __call__(self, *_args, **_keywords):
+                                try:
+                                    os.kill(os.getpid(), signum)
+                                except BaseException as failure:
+                                    interruptions.append(failure)
+                                    raise
+
+                        # A callable side effect receives the actual unmodified handler's exception.
+                        if actor == "capture":
+                            port = mock.patch.object(
+                                WIRE.WireFixture, "_trust_install_stream", side_effect=Dispatch()
+                            )
+                        else:
+                            original_print = print
+
+                            def publish(value, **options):
+                                if value.startswith("# native_http_trust_remove "):
+                                    Dispatch()()
+                                original_print(value, **options)
+
+                            port = mock.patch("builtins.print", side_effect=publish)
+                        try:
+                            with port:
+                                result = self.receive_removal(timeout=timeout)
+                        finally:
+                            signal.signal(signum, prior)
+                        fixture, _, _, primary, _, refusal, returned, _, captures, _ = result
+                        self.assertEqual(len(interruptions), 1)
+                        self.assertIs(type(interruptions[0]), WIRE.FixtureFailure)
+                        self.assertEqual(interruptions[0].args, ("Native fixture cancelled",))
+                        self.assertIs(refusal, primary if timeout else interruptions[0])
+                        self.assertIsNone(returned)
+                        self.assertTrue(all(value.closed for value in captures))
+                        self.assertEqual(fixture.command_file_debt, [])
+
+    def test83OriginalCaptureCloseRefusalCannotBePaidByRemovalProjection(self):
+        for timeout in (False, True):
+            with self.subTest(timeout=timeout):
+                fixture, _, _, primary, close_primary, refusal, returned, _, _, output = (
+                    self.receive_removal(timeout=timeout, close_refused=True)
+                )
+                self.assertIs(refusal, primary if timeout else close_primary)
+                self.assertIsNone(returned)
+                self.assertEqual(fixture.command_fact["phase"], "settle")
+                self.assertEqual(len(fixture.command_file_debt), 1)
+                self.assertTrue(fixture.command_file_debt[0]["uncertain"])
+                fact = self.removal_fact(output)
+                self.assertFalse(fact["streams_closed"])
+                self.assertTrue(fact["command_file_debt"])
+
+    def test84RemovalCategoriesRejectAddCalleesPrivateMessagesAndTruncation(self):
+        for raw, category, callee in [
+            (b"", "empty", None),
+            (
+                b"SecTrustSettingsRemoveTrustSettings: User interaction is not allowed.\n",
+                "user_interaction_required",
+                "SecTrustSettingsRemoveTrustSettings",
+            ),
+            (
+                b"security: SecTrustSettingsRemoveTrustSettings: The keychain is locked.\n",
+                "keychain_locked",
+                "SecTrustSettingsRemoveTrustSettings",
+            ),
+            (
+                b"SecTrustSettingsRemoveTrustSettings: private/path token@example.test\n",
+                "unknown",
+                "SecTrustSettingsRemoveTrustSettings",
+            ),
+            (b"SecTrustSettingsSetTrustSettings: Access denied.\n", "unknown", None),
+            (b"SecKeychainUnlock: The keychain is locked.\n", "unknown", None),
+            (
+                b"SecTrustSettingsRemoveTrustSettings: Access denied.\n" + b"x" * 1024,
+                "unknown",
+                None,
+            ),
+        ]:
+            with self.subTest(category=category, length=len(raw)):
+                _, _, _, primary, _, refusal, _, _, _, output = self.receive_removal(raw)
+                self.assertIs(refusal, primary)
+                fact = self.removal_fact(output)["stderr"]
+                self.assertEqual(fact["category"], category)
+                self.assertEqual(fact["callee"], callee)
+                self.assertEqual(fact["captured_bytes"], min(len(raw), 1024))
+                self.assertEqual(fact["truncated"], len(raw) > 1024)
+                self.assertNotIn("token@example.test", output)
+                self.assertNotIn("private/path", output)
+
+
 if __name__ == "__main__":
     unittest.main()
