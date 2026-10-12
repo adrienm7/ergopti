@@ -87,7 +87,7 @@ LLM_ManagedModelTag(Model) {
 class OllamaManagedBootstrap {
 	/** Captures every native source before admission; no installation occurs here. */
 	__New(Model, Epoch, OnReady, OnFailed, Port := 0) {
-		global _SharedDir, LLM_OLLAMA_BASE_URL, LLM_DEPS_POLL_TIMEOUT_MS, _LLM_Menu
+		global _SharedDir, _StaticDir, _VendorDir, LLM_OLLAMA_BASE_URL, LLM_DEPS_POLL_TIMEOUT_MS, _LLM_Menu
 		this.Port := Port
 		this.Model := Model
 		this.Epoch := Epoch
@@ -133,13 +133,13 @@ class OllamaManagedBootstrap {
 		NativeArchitecture := OllamaRuntime_HostArchitecture()
 		Asset := NativeArchitecture == "arm64" ? "windows-arm64" : "windows-amd64"
 		Root := EnvGet("LOCALAPPDATA") . "\" . AppDirsWindowsManagedOllamaFolderName()
-		Directory := A_ScriptDir . "\modules\llm"
+		Directory := _StaticDir . "\ergopti_plus\windows\modules\llm"
 		Catalogue := _SharedDir . "\modules\llm\ollama_release.json"
 		Updater := _SharedDir . "\modules\updater\defaults.json"
 		Policy := _SharedDir . "\modules\network\proxy_policy.json"
 		Helper := Directory . "\ollama_managed_files.ps1"
 		Acquisition := Directory . "\ollama_managed_acquisition.ps1"
-		Vendor := A_ScriptDir . "\vendor"
+		Vendor := _VendorDir
 		for Path in [Catalogue, Updater, Policy, Helper, Acquisition,
 			Directory . "\ollama_download_archive.ps1", Directory . "\ollama-runtime-launch.ps1",
 			Directory . "\ollama-model-pull.ps1"]
