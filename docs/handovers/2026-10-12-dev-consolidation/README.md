@@ -186,6 +186,52 @@ includes that correction. The earlier loaded Linux FIFO deadline failure passed
 in isolation and did not recur in the first whole-unit run above; no native
 budget was increased.
 
+## Subsequent issue 94 software corrections
+
+Separate atomic commits correct native scalar JSON delivery in typing metrics,
+the paths editor, the action picker and MLX downloader helper publication.
+The shared string quotation owner preserves exact UTF-8/control/injection bytes;
+invalid encoding and stale recipients refuse. The UI cohorts pass 16/16, 29/29
+and 42/42 on the composed source. All 19 new UI cases fail with original sources;
+actual Node evaluates 15 emitted callback scripts with 20/20 checks. MLX trust
+activation passes 20/20 and emitted Python trust receiving passes five independent
+vectors. A move-resilient unique original declaration locates the actual producer;
+the regression does not rely on a declaration introduced by the fix.
+
+Startup settlement now waits for the original physical requirement retirement
+and completes the retained failed cycle without requiring an unrelated Resume.
+Its seven lifecycle cohorts pass 167/167; original source fails all three new
+late-retirement cases. Prediction locks, refused cleanup debt, stale generations,
+pause and observer cancellation remain guarded.
+
+Replay from `static/ergopti_plus/macos` with pinned Lua 5.4.7:
+
+```sh
+lua tests/run.lua --only tests.unit.ui.test_metrics_typing_javascript_delivery
+lua tests/run.lua --only tests.unit.ui.test_menu_paths_javascript_delivery
+lua tests/run.lua --only tests.unit.ui.menu.test_program_provider_picker
+lua tests/run.lua --only tests.unit.ui.menu.menu_llm.test_mlx_download_trust_activation
+lua tests/run.lua --only tests.unit.ui.menu.menu_llm.test_startup_timer_scheduler_ownership
+lua tests/run.lua --only tests.unit.ui.menu.menu_llm.test_models_manager_requirement_capabilities
+```
+
+These Lua commands use native boundary doubles even when invoked on a Mac.
+Native receiving requires an active macOS GUI session, installed current driver
+and Hammerspoon 1.1.1. Verify the native contract independently:
+
+```sh
+hs -c 'assert(not pcall(require("hs.json").encode,"scalar")); local v="é漢😀\r\n\t\"\\"; assert(require("hs.json").decode(require("json").quote(v))==v); return "native JSON round-trip passed"'
+```
+
+Then use the statistics filters/reset, paths Browse/cancel/reopen and an
+unavailable action-picker provider. Expect exact delivery to the current page,
+visible localized refusal, no request-reset encoding errors and no stale-page
+delivery. Exercise MLX helper preparation and a failed requirements child that
+retires late: expect no scalar encoding refusal, retained cleanup until the
+child retires, then automatic failed-cycle finalization. These checks need a
+native VM and GUI session; no physical keyboard, display or trackpad is required.
+Native results remain NOT_RUN. Full integration suites are still pending.
+
 ## API addition and local receiving
 
 API Add uses the real private source and durable writer. macOS configuration
