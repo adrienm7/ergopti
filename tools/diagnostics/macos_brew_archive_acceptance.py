@@ -1135,7 +1135,7 @@ class PhaseEvidence:
             # closed UI observation independently through the terminal checkpoint.
             last_native_ui = getattr(self, "last_native_ui", None)
             if native_ui is not None:
-                last_native_ui = json.loads(json.dumps(packet["native_ui"]))
+                last_native_ui = json.loads(json.dumps(last_native_ui))
             if last_native_ui is not None:
                 packet["last_native_ui"] = _validate_owned_automation_ui_fact(last_native_ui)
             semantic = json.dumps(packet, sort_keys=True)
