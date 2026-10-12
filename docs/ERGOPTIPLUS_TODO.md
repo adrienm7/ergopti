@@ -243,6 +243,16 @@ an actual official MSVC rebuild must land together; the current E4133 DLL still
 matches the preceding live source and must not receive the changed consumer
 alone. Production observer conversion and emission remain software work.
 
+Item 49 also retains the [captured-clock boundary correction](handovers/2026-10-12-dev-consolidation/pending-capture-clock-half-range.patch)
+with [source hashes and native receiving instructions](handovers/2026-10-12-dev-consolidation/capture-clock-receiving.md).
+The exact half-DWORD ambiguity now refuses in both directions without losing
+raw edges or advancing the preceding anchor. All 1,352 original assertions remain,
+with 31 additions; 43/43 portable C cases and selected full sanitizers pass.
+The original producer and two independent mutations fail. This pending source
+patch is not applied to the live DLL; official Windows MSVC/SDK rebuild and
+matching provenance remain UNRUN. Observer conversion and output emission are
+still software work, and item 49 remains open.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)

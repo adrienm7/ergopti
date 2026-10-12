@@ -1,0 +1,71 @@
+{
+	"base_sha": "60001d60f99aaf30ed5e8a345972d671f47ea2f1",
+	"files": {
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c": "4432710663d7f61735d47ea84e559790edc02a1ba97be4d5c27352f4df383fb8",
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h": "330485f3a7fcacec44f4f70f007036a0b1ee380947666f189b1742b6514ce741",
+		"static/ergopti_plus/windows/native/nav_event_owner/hook_trace.c": "5dbfdf8d472a5a948bc6e3db5050e77ec022d22fce66d76c2f02747d5a458318",
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c": "14508fe4a4bde47f71ba5659121c87cad508de59df0f344b853b14affa27e4d8",
+		"static/ergopti_plus/windows/native/nav_event_owner/hook_trace.h": "148967c584af57fa02091c820a252a3ae2f1941cb4bfc12782a5200382e135b0",
+		"static/ergopti_plus/windows/native/nav_event_owner/editor_replace_test.c": "567830d9e4bcdd65a8669b8b6a65a47e03b8159013b377e0a0b4f6ad36730932",
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.def": "49fd8a83c14b93918f680d0584488027c08aadbbc30c931c454b91445dcf3db8",
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c": {
+			"before_sha256": "f95841224e04c1de6677159c27e78fbd859cc9074122493a84c7d40bb189f967",
+			"after_sha256": "d0ebc5b5adde5486eaf13a3ea501be2bd23442247fb3f6c56816e66116c77de2"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner_test.c": {
+			"before_sha256": "c5dc5e06f8a47b8f75dd5d5dc5204aacd64bd01e1b5a13f496a1dbfd25fefc75",
+			"after_sha256": "fc6bed064604b843e916f8ec8915469134e67b37ece49addf271431ef1927a25"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h": "6dc352785f5bfdede4ca7371fd0af34b43bda310cb3b2afbbc3a6d057853eda2",
+		"static/ergopti_plus/windows/native/nav_event_owner/hook_trace_test.c": "db0517a24ca3922eca40e6ee2aace3c4eb1fbdf023b12eb4c42b290b07f5103f",
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c": "931daec1ed74b9988a0ebe8fe0a6fa5822c6098764d72d014ebda902a7b42e6d",
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c": "ba651227681c94ac47b28c3c9a1bc0fb08eb26bf698038fe8e099272b1b4bf8a",
+		"static/ergopti_plus/windows/native/nav_event_owner/CMakeLists.txt": "58397ae399d900ca28cbd8874e0fb78d06ee0d08a77d91129a4259d607997770",
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h": "d358cddf27ab6993bdc2d71dc02b31f139f102b0d0ed8892a2b401a063623476",
+		"static/ergopti_plus/windows/native/nav_event_owner/editor_replace.h": "25eabd40b9f77034c6880223bb2fc8eea8fb3c43c433f0acd33cfe4e3e094017",
+		"static/ergopti_plus/windows/native/nav_event_owner/editor_replace.c": "813ebf14fa824feb51b3bc8cbfe12e7ceaaa1e56a32d2b227b59a40f421775dc",
+		"tools/test/run-nav-event-owner-portable.cjs": "b33763e6b827ca8726384ee533596f088a46654e56db12ca55a27af1aac32191",
+		"tools/test/test-windows-nav-portable-registration.cjs": "f4ba6a1e343898c747e2ff621bc64bae5a4f614559c7ad7fab1dc6e8a7494c4d",
+		"tools/test/support/nav_event_owner_portable/runtime.c": "d0c0bcf11e2f483f595bdd9df671f6d8ed000f60d90293d8b1851e287eecd0b1",
+		"tools/test/support/nav_event_owner_portable/runtime_test.c": "802835ac898f303757183fac48fd3ab28ffcd1a35499b87fc9996814252811ec",
+		"tools/test/support/nav_event_owner_portable/windows.h": "2b127b122f56306d2a82956572bcd821982dea4e907064b53bab3a36c5916f9a"
+	},
+	"preservation": {
+		"production": "Exactly one operator changed: > to >= at half-DWORD forward boundary.",
+		"test": "Original complete bytes preserved after removing the single additive clock block.",
+		"TEST_ASSERT_occurrences_before": 1353,
+		"TEST_ASSERT_occurrences_after": 1384,
+		"macro_definitions": 1,
+		"original_assertions_ordered_byte_identical": true,
+		"native_census": 44,
+		"portable_cases": 43
+	},
+	"negative_controls": [
+		{
+			"name": "clock-final-original-red",
+			"exit": 1,
+			"failure": "FAIL terminal route snapshots retain exact suffix (todo49-route-fifo):2879: peek.route.status == bounds[boundary].status\nNative navigation-owner tests stopped after 0/1 passes."
+		},
+		{
+			"name": "clock-mutant-advance-anchor-red",
+			"exit": 1,
+			"failure": "FAIL terminal route snapshots retain exact suffix (todo49-route-fifo):2884: peek.route.status == (bounds[boundary].status == ERGOPTI_REPLAY_STALE_EVENT ? ERGOPTI_REPLAY_OK : ERGOPTI_REPLAY_ORPHAN_EDGE)\nNative navigation-owner tests stopped after 0/1 passes."
+		},
+		{
+			"name": "clock-mutant-drop-edge-red",
+			"exit": 1,
+			"failure": "FAIL terminal route snapshots retain exact suffix (todo49-route-fifo):2876: result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS\nNative navigation-owner tests stopped after 0/1 passes."
+		}
+	],
+	"verification": {
+		"original_actual_producer_seam_exit": 1,
+		"corrected_seam_exit": 0,
+		"portable_all43_exit": 0,
+		"sanitizers_selected_exit": 0,
+		"qualification": "Actual portable production C; Windows MSVC/hooks/DLL/native qualification UNRUN."
+	},
+	"independent_of_modifier_patches": true,
+	"applied_pending_modifier_patches": false,
+	"native_vendor_modified": false,
+	"patch_sha256": "8ee073d062ac1cbee2b29b228d45ebc44d802603e5eec3ac69ccb393b2baea1c"
+}
