@@ -1005,6 +1005,134 @@ snapshot16Control('green bytes cannot revise native exit during receiving', (por
 });
 console.log(`Snapshot16 receiving: ${snapshot16Controls} controlled non-native cases passed.`);
 
+/** These facts observe closed bytes; they never normalize or admit a transcript. */
+function snapshot16CaptureFacts(bytes, mode) {
+	const crypto = require('node:crypto');
+	const expected = bytes.tap.subarray(3);
+	const limit = Math.min(expected.length, bytes.stdout.length);
+	let offset = 0;
+	while (offset < limit && expected[offset] === bytes.stdout[offset]) offset += 1;
+	const equal = offset === limit && expected.length === bytes.stdout.length;
+	const captures = {};
+	for (const key of ['tap', 'stdout', 'stderr']) {
+		const value = bytes[key];
+		captures[key] = {
+			bytes: value.length,
+			sha256: crypto.createHash('sha256').update(value).digest('hex'),
+			prefix_limit_bytes: 64,
+			prefix_hex: value.subarray(0, 64).toString('hex')
+		};
+	}
+	return {
+		schema: 1,
+		role: 'snapshot16-byte-observation',
+		mode,
+		expected_relation: 'stdout_equals_tap_without_utf8_BOM',
+		original_relation_observed: equal,
+		first_mismatch_offset: equal ? null : offset,
+		expected_byte: equal || offset >= expected.length ? null : expected[offset],
+		observed_byte: equal || offset >= bytes.stdout.length ? null : bytes.stdout[offset],
+		captures
+	};
+}
+
+/** The optional TAP descriptor cannot mask an already retained native refusal. */
+function snapshot16OptionalCapture(file, observe) {
+	try {
+		return observe(file);
+	} catch {
+		return { file, observation_error: 'optional TAP descriptor refused' };
+	}
+}
+
+/** An optional failure sink cannot replace the original strict refusal. */
+function snapshot16EmitCaptureFailure(receipt, write) {
+	try {
+		write(`SNAPSHOT16_CAPTURE_REFUSAL ${JSON.stringify(receipt)}\n`);
+	} catch {
+		// Keep the original admission error and all native retirement facts.
+	}
+}
+
+// These controls exercise only metadata. The original byte assertion stays decisive.
+{
+	const bytes = {
+		tap: Buffer.from([239, 187, 191, 97, 98, 99]),
+		stdout: Buffer.from('abc'),
+		stderr: Buffer.alloc(0)
+	};
+	const equal = snapshot16CaptureFacts(bytes, 'dry');
+	assert.equal(equal.mode, 'dry');
+	assert.equal(equal.original_relation_observed, true);
+	assert.equal(equal.first_mismatch_offset, null);
+	assert.equal(equal.captures.tap.bytes, 6);
+	assert.equal(equal.captures.stdout.bytes, 3);
+	assert.equal(equal.captures.stdout.prefix_hex, '616263');
+	assert.equal(
+		equal.captures.stdout.sha256,
+		'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+	);
+	for (const [stdout, offset, expected, observed] of [
+		[Buffer.from([239, 187, 191, 97, 98, 99]), 0, 97, 239],
+		[Buffer.from('Warning\r\nabc'), 0, 97, 87],
+		[Buffer.from('ab'), 2, 99, null]
+	]) {
+		const mismatch = { ...bytes, stdout };
+		const fact = snapshot16CaptureFacts(mismatch, 'run');
+		assert.equal(fact.mode, 'run');
+		assert.equal(fact.original_relation_observed, false);
+		assert.equal(fact.first_mismatch_offset, offset);
+		assert.equal(fact.expected_byte, expected);
+		assert.equal(fact.observed_byte, observed);
+		assert.throws(() => snapshot16Receive(mismatch, 'run'), /snapshot16 complete stdout differs/);
+	}
+	const long = snapshot16CaptureFacts({ ...bytes, stdout: Buffer.alloc(4200, 120) }, 'dry');
+	assert.equal(long.captures.stdout.bytes, 4200);
+	assert.equal(long.captures.stdout.prefix_hex, '78'.repeat(64));
+	assert.equal(long.captures.stdout.prefix_limit_bytes, 64);
+	const emitted = [];
+	snapshot16EmitCaptureFailure({ qualified: false, marker: 'unchanged' }, (line) =>
+		emitted.push(line)
+	);
+	assert.deepEqual(emitted, [
+		'SNAPSHOT16_CAPTURE_REFUSAL {"qualified":false,"marker":"unchanged"}\n'
+	]);
+	assert.doesNotThrow(() =>
+		snapshot16EmitCaptureFailure({ qualified: false }, () => {
+			throw new Error('optional sink refused');
+		})
+	);
+	const descriptor = { file: 'owned-results.txt', bytes: 6 };
+	assert.equal(
+		snapshot16OptionalCapture(descriptor.file, () => descriptor),
+		descriptor
+	);
+	const primary = new Error('snapshot16 complete stdout differs');
+	let caught;
+	let observed;
+	let calls = 0;
+	try {
+		try {
+			throw primary;
+		} finally {
+			observed = snapshot16OptionalCapture(descriptor.file, (file) => {
+				calls += 1;
+				assert.equal(file, descriptor.file);
+				throw new Error('descriptor close refused');
+			});
+		}
+	} catch (error) {
+		caught = error;
+	}
+	assert.equal(calls, 1, 'the optional descriptor failure is actually reached');
+	assert.equal(caught, primary, 'the original native refusal remains the exact error');
+	assert.deepEqual(observed, {
+		file: descriptor.file,
+		observation_error: 'optional TAP descriptor refused'
+	});
+	console.log('Snapshot16 capture diagnostics: 7 controlled metadata cases passed.');
+}
+
 if (ahkIndex !== -1) {
 	const crypto = require('node:crypto');
 	const { includeClosure } = require('./test-ahk-test-coverage.cjs');
@@ -1118,11 +1246,19 @@ if (ahkIndex !== -1) {
 				launches.push(packet);
 				return packet;
 			},
-			read: (packet) => ({
-				tap: fs.readFileSync(packet.tap),
-				stdout: fs.readFileSync(packet.captures.stdout),
-				stderr: fs.readFileSync(packet.captures.stderr)
-			})
+			read: (packet) => {
+				const bytes = {
+					tap: fs.readFileSync(packet.tap),
+					stdout: fs.readFileSync(packet.captures.stdout),
+					stderr: fs.readFileSync(packet.captures.stderr)
+				};
+				try {
+					packet.capture_observation = snapshot16CaptureFacts(bytes, packet.mode);
+				} catch (error) {
+					packet.capture_observation = { observation_error: String(error.message) };
+				}
+				return bytes;
+			}
 		});
 		receipt = {
 			schema: 1,
@@ -1152,12 +1288,16 @@ if (ahkIndex !== -1) {
 			signal: packet.result.signal,
 			error: packet.result.error && String(packet.result.error.code || packet.result.error.message),
 			tap: packet.tap,
+			tap_capture: snapshot16OptionalCapture(packet.tap, describeNativeCapture),
+			capture_observation: packet.capture_observation,
 			stdout: describeNativeCapture(packet.captures.stdout),
 			stderr: describeNativeCapture(packet.captures.stderr)
 		}));
 		fs.writeFileSync(path.join(evidence, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n', {
 			flag: 'wx'
 		});
+		if (receipt.qualified === false)
+			snapshot16EmitCaptureFailure(receipt, (line) => process.stderr.write(line));
 		console.log(`Snapshot16 closed supplemental evidence: ${evidence}`);
 	}
 }
