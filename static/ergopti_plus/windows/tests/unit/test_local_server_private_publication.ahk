@@ -1614,3 +1614,97 @@ class _LSP_PhysicalSourceFault extends _LMT_ApiPhysicalPublicationFault {
 		this.ObserveNativeRefusal()
 	}
 }
+
+_LSP_AffinitySource(World, Explicit := false) {
+	global _LLM_Menu
+	Entries := [Map("Id", "generic-first", "Name", "Private generic name", "Provider", "openai_compat",
+		"BaseUrl", "http://127.0.0.1:8000/v1", "Token", "generic-first-secret", "Model", "first-model"),
+		Map("Id", "generic-active", "Name", "Personal active name", "Provider", "openai",
+			"BaseUrl", "http://[::1]:8000/v1/", "Token", "generic-active-secret", "Model", "active-model"),
+		Map("Id", "foreign-cloud", "Name", "Cloud name", "Provider", "openai",
+			"BaseUrl", "https://cloud.invalid/v1", "Token", "foreign-credential-sentinel", "Model", "cloud-model")]
+	if Explicit
+		Entries.Push(Map("Id", "explicit-local", "Name", "Explicit custom", "Provider", "omlx",
+			"BaseUrl", "http://localhost:19423/custom/v1", "Token", "explicit-local-secret", "Model", "explicit-model"))
+	_LLM_Menu["api_entries"] := Entries
+	_LLM_Menu["api_entry_id"] := "generic-active"
+	World.ConfigImage := StrReplace(World.ConfigImage, 'api_entry_id = "native-active"', 'api_entry_id = "generic-active"')
+	World.ApiImage := _LLM_Menu_SerializeApiEntries(Map("api_entries", Entries))
+	AssertTrue(World.ApiImage is String)
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(FSWriteDurable(World.ApiPath, World.ApiImage))
+	return World.Capture()
+}
+
+_LSP_AffinityPublish(World) {
+	global _LLM_Menu
+	Receipt := _LSP_AffinitySource(World)
+	Entry := World.Owner.EntryBound("omlx", Receipt)
+	AssertEqual("generic-active", Entry["Id"], "active generic affinity follows explicit-provider precedence")
+	AssertEqual("openai", Entry["Provider"])
+	Fields := Map("base_url", Entry["BaseUrl"], "token", Entry["Token"], "model", "Qwen3-8B-4bit")
+	Saved := World.Owner.Apply("omlx", Fields, Receipt, ObjBindMethod(World, "Admission"), true)
+	AssertTrue(Saved is Map && Saved["saved"] == true)
+	AssertEqual("generic-active", Saved["entry_id"])
+	AssertEqual(3, _LLM_Menu["api_entries"].Length, "model selection must edit the original row rather than create a catalogue duplicate")
+	Actual := _LLM_Menu["api_entries"][2]
+	AssertEqual("openai", Actual["Provider"])
+	AssertEqual("Personal active name", Actual["Name"])
+	AssertEqual("generic-active-secret", Actual["Token"])
+	AssertEqual("Qwen3-8B-4bit", Actual["Model"])
+	AssertEqual("foreign-credential-sentinel", _LLM_Menu["api_entries"][3]["Token"])
+	Restart := _LLM_Menu_ParseAndValidateApiEntries(FSReadUtf8Exact(World.ApiPath))
+	AssertTrue(Restart["ok"])
+	AssertEqual("generic-active", Restart["entries"][2]["Id"])
+	AssertEqual("openai", Restart["entries"][2]["Provider"])
+	AssertEqual("Personal active name", Restart["entries"][2]["Name"])
+}
+Test("local-server-affinity: actual private publication preserves the original generic row", (*) => _LSP_WithWorld(_LSP_AffinityPublish))
+
+_LSP_AffinityPrecedence(World) {
+	Receipt := _LSP_AffinitySource(World, true)
+	Entry := World.Owner.EntryBound("omlx", Receipt)
+	AssertEqual("explicit-local", Entry["Id"], "an explicit provider outranks an active generic canonical alias")
+	AssertEqual("http://localhost:19423/custom/v1", Entry["BaseUrl"])
+	Projection := World.Owner.EntriesBound(["omlx"], Receipt)
+	AssertEqual("explicit-local", Projection["entries"]["omlx"]["Id"])
+}
+Test("local-server-affinity: actual private source keeps explicit provider precedence", (*) => _LSP_WithWorld(_LSP_AffinityPrecedence))
+
+_LSP_AffinityPrecommitRefusal(World) {
+	global _LLM_Menu
+	Receipt := _LSP_AffinitySource(World)
+	Entry := World.Owner.EntryBound("omlx", Receipt)
+	for Kind in ["address", "foreign"] {
+		Fields := Map("base_url", Entry["BaseUrl"], "token", Entry["Token"], "model", Entry["Model"])
+		if Kind == "address"
+			Fields["base_url"] := "http://localhost:19423/v1"
+		else
+			Fields["base_url"] := "http://external.invalid:8000/v1"
+		AssertFalse(World.Owner.Apply("omlx", Fields, Receipt, ObjBindMethod(World, "Admission"), false),
+			"generic edits outside canonical affinity must refuse before committing")
+		AssertEqual(World.ApiImage, FSReadUtf8Exact(World.ApiPath))
+		AssertEqual(World.ConfigImage, FSReadUtf8Exact(World.ConfigPath))
+		AssertEqual(0, World.ApplyCalls)
+		AssertFalse(_ConfigWriteTerminalIsActive())
+		AssertTrue(World.Owner.Current(Receipt))
+	}
+}
+Test("local-server-affinity: off-catalogue generic address edits refuse before native WAL", (*) => _LSP_WithWorld(_LSP_AffinityPrecommitRefusal))
+
+_LSP_AffinityKeyless(World) {
+	Receipt := _LSP_AffinitySource(World)
+	Entry := World.Owner.EntryBound("omlx", Receipt)
+	Fields := Map("base_url", Entry["BaseUrl"], "token", "", "model", Entry["Model"])
+	Saved := World.Owner.Apply("omlx", Fields, Receipt, ObjBindMethod(World, "Admission"), false)
+	AssertTrue(Saved is Map && Saved["saved"] == true, "a canonical generic loopback entry may explicitly store an empty key")
+	Restart := _LLM_Menu_ParseAndValidateApiEntries(FSReadUtf8Exact(World.ApiPath))
+	AssertTrue(Restart["ok"])
+	AssertEqual("generic-active", Restart["entries"][2]["Id"])
+	AssertEqual("openai", Restart["entries"][2]["Provider"])
+	AssertEqual("Personal active name", Restart["entries"][2]["Name"])
+	AssertEqual("", Restart["entries"][2]["Token"])
+	AssertEqual("active-model", Restart["entries"][2]["Model"])
+	AssertTrue(_LLMRemoteResolveEntry(Restart["entries"][2]) is Map, "the saved entry must remain usable by the real native resolver")
+}
+Test("local-server-affinity: actual generic private publication preserves keyless loopback identity", (*) => _LSP_WithWorld(_LSP_AffinityKeyless))

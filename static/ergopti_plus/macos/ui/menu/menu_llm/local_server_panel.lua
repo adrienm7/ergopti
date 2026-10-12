@@ -136,7 +136,7 @@ function M.select_model(ctx, id, model, on_selected)
 		if type(on_selected) == "function" then
 			local active = remote().get_active_entry()
 			local selected = committed == true and activated and ctx.state.llm_backend == "api"
-				and type(active) == "table" and active.provider == id and active.model == model
+				and type(active) == "table" and remote().local_server_entry(id) == active and active.model == model
 			if committed == true and not selected then
 				-- Leaving MLX waits for its server to stop: the switch lands later
 				Logger.warn(LOG, "Local server '%s' is stored; the API backend is not selected yet.", id)
@@ -315,6 +315,7 @@ function M.rows(ctx)
 		order = data.ORDER, servers = data.SERVERS, detected = data.detected(),
 		result = data.result, sweeping = data.is_sweeping(), paused = ctx.paused,
 		backend = ctx.state.llm_backend, active = remote().get_active_entry(),
+		entry_id = function(id) local entry = remote().local_server_entry(id); return entry and entry.id end,
 		tr = i18n.get, format = i18n.format,
 		actions = {
 			select = function(id, model) return M.select_model(ctx, id, model) end,

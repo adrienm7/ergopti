@@ -635,8 +635,8 @@ helpers.describe("API Add: retained native admission", function()
 			observed.prompts = observed.prompts + 1
 			if observed.on_prompt then observed.on_prompt(observed.prompts) end
 			if observed.cancel_at == observed.prompts then return "button.cancel", "" end
-			return affirmative, ({ provider_id and "http://127.0.0.1:8000/v1" or "https://example.invalid/v1",
-				"inert-new-secret", "new-model" })[observed.prompts]
+			return affirmative, ({ observed.endpoint or (provider_id and "http://127.0.0.1:8000/v1" or "https://example.invalid/v1"),
+				observed.token or "inert-new-secret", "new-model" })[observed.prompts]
 		end
 		remote.check_availability = function(_, callback)
 			observed.probes = observed.probes + 1
@@ -714,6 +714,43 @@ helpers.describe("API Add: retained native admission", function()
 			end)
 		end
 
+	end
+
+	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("accepts explicit keyless loopback through " .. provider_id .. " Add (api-add-local-keyless)", function()
+			helpers.with_fresh_modules(owned, function()
+				local action, _, remote, observed = install_add(provider_id)
+				observed.token = ""
+				action()
+				helpers.assert_eq(observed.prompts, 3, "an absent local key must still collect the user's model")
+				helpers.assert_eq(observed.probes, 1, "keyless local credentials still require a real availability verdict")
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(#remote.get_entries(), 2)
+				helpers.assert_eq(remote.get_entries()[2].token, "")
+				helpers.assert_eq(remote.get_entries()[2].base_url, "http://127.0.0.1:8000/v1")
+				helpers.assert_eq(remote.get_entries()[2].provider, provider_id)
+			end)
+		end)
+	end
+
+	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("reports a missing remote key through " .. provider_id .. " Add (api-add-local-keyless)", function()
+			helpers.with_fresh_modules(owned, function()
+				local action, ctx, remote, observed, entry, notices = install_add(provider_id)
+				observed.token = ""
+				observed.endpoint = "https://remote.example.invalid/v1"
+				helpers.assert_eq(action(), false)
+				helpers.assert_eq(observed.prompts, 2)
+				helpers.assert_eq(observed.probes, 0)
+				helpers.assert_eq(observed.writes, 0)
+				helpers.assert_eq(#remote.get_entries(), 1)
+				helpers.assert_eq(remote.get_entries()[1], entry)
+				helpers.assert_eq(remote.get_active_entry_id(), entry.id)
+				helpers.assert_eq(ctx.state.llm_model, "probe-model")
+				helpers.assert_eq(#notices, 1, "missing remote authentication must never silently disappear")
+				helpers.assert_eq(notices[1].level, "error")
+			end)
+		end)
 	end
 
 	local function assert_no_staging(ctx, remote, observed, entry)

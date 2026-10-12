@@ -963,3 +963,168 @@ helpers.describe("Atomic non-chat addition (ai-menu-nonchat-add)", function()
 		end)
 	end
 end)
+
+--- Runs actual menu/catalogue/private storage/request code over authored dialogs and HTTP.
+--- @param provider_id string
+--- @param scenario string
+--- @param body function
+local function with_real_api_add(provider_id, scenario, body)
+	local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows", "adapters.http_client" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local path, rename = assert(os.tmpname()), os.rename
+	local original = [[{"version":1,"entries":[{"id":"chosen","provider":"openai","label":"old","token":"inert-old","model":"old-model","base_url":"","future":{"kept":true}},{"id":"foreign","provider":"future-private-provider","label":"future","token":"inert-foreign","opaque":{"kept":17}}],"active_id":"chosen","foreign_personal":{"kept":"unchanged"}}]]
+	if scenario == "unknown-source" then original = original:gsub('"version":1', '"version":2', 1) end
+	local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
+	local state = { prompts = {}, errors = {}, infos = {}, requests = {}, changes = 0, backends = 0, stages = 0 }
+	local ok, failure = xpcall(function()
+		package.loaded["adapters.http_client"] = {
+			post = function(url, headers, payload, done)
+				state.requests[#state.requests + 1] = { url = url, headers = headers, payload = payload }
+				state.done = done
+				return true
+			end,
+			cancel = function() return true end,
+		}
+		local remote = helpers.load_module("modules.llm.api_remote")
+		local provider = assert(remote.provider(provider_id), "the actual shipped provider must exist")
+		local entries = helpers.load_module("modules.llm.api_entries"); entries._set_path_for_test(path)
+		os.rename = function(from, to)
+			if to == path then
+				state.stages = state.stages + 1
+				if scenario == "refused" then return nil, "authored publication refusal" end
+			end
+			return rename(from, to)
+		end
+		local answers = { "http://127.0.0.1:8000/v1", "  inert-private-key  ", "omlx-fixture-model" }
+		if scenario == "default-url" then answers[1] = provider.base_url end
+		if scenario == "no-auth-local" or scenario == "http-refused" then
+			answers[1], answers[2] = "http://127.0.0.1:8502/v1", ""
+		elseif scenario == "remote-empty-key" then
+			answers[1], answers[2] = "https://example.invalid/v1", ""
+		end
+		local cancel = { ["cancel-url"] = 1, ["cancel-key"] = 2, ["cancel-model"] = 3 }
+		local dialogs = {
+			prompt = function(title, text, initial, hidden)
+				local index = #state.prompts + 1
+				state.prompts[index] = { title = title, text = text, initial = initial, hidden = hidden }
+				if cancel[scenario] == index then return nil end
+				return answers[index]
+			end,
+			error = function(text) state.errors[#state.errors + 1] = text end,
+			info = function(_, text) state.infos[#state.infos + 1] = text end,
+		}
+		local llm = { get_backend = function() return "api" end,
+			set_backend = function(kind) state.backends = state.backends + 1; return kind == "api" end }
+		local Rows = helpers.load_module("ui.menu.llm_backend_rows")
+		local function changed() state.changes = state.changes + 1 end
+		local rows = Rows.rows(llm, dialogs, changed, function() return {} end)
+		assert(exact(rows, "➕ " .. provider.label), "the actual Add action must be present").action()
+		state.entry, state.list = entries.active(), entries.list()
+		local handle = assert(io.open(path, "rb")); state.bytes = handle:read("*a"); assert(handle:close())
+		state.image = require("json").decode(state.bytes)
+		if state.done then
+			if scenario == "http-refused" then
+				state.done({ ok = false, status = 401, error_body = '{"error":{"message":"inert key required"}}' })
+			else state.done({ ok = true, body = '{"choices":[{"message":{"content":"fixture answer"}}]}' }) end
+		end
+		state.rows = Rows.rows(llm, dialogs, changed, function() return {} end)
+		body(state, original, provider)
+	end, debug.traceback)
+	os.rename = rename
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	os.remove(path .. ".tmp"); os.remove(path)
+	if not ok then error(failure, 0) end
+end
+
+helpers.describe("Real API Add publication (api-add-real-publication)", function()
+	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("(api-add-real-publication) persists every supplied oMLX field and emits one actual request for " .. provider_id, function()
+			with_real_api_add(provider_id, "accepted", function(state, _, provider)
+				helpers.assert_eq(#state.prompts, 3)
+				helpers.assert_eq(state.prompts[1].initial, provider.base_url)
+				helpers.assert_eq(state.prompts[2].hidden, true)
+				helpers.assert_eq(state.prompts[3].initial, provider.default_model)
+				helpers.assert_eq(state.entry.provider, provider_id)
+				helpers.assert_eq(state.entry.base_url, "http://127.0.0.1:8000/v1")
+				helpers.assert_eq(state.entry.token, "  inert-private-key  ")
+				helpers.assert_eq(state.entry.model, "omlx-fixture-model")
+				helpers.assert_eq(state.image.active_id, state.entry.id)
+				helpers.assert_eq(state.image.entries[3].id, state.entry.id)
+				helpers.assert_eq(state.image.entries[1].future.kept, true)
+				helpers.assert_eq(state.image.entries[2].opaque.kept, 17)
+				helpers.assert_eq(state.image.foreign_personal.kept, "unchanged")
+				helpers.assert_eq(state.stages, 1)
+				helpers.assert_eq(state.changes, 1)
+				helpers.assert_eq(state.backends, 1)
+				helpers.assert_eq(#state.requests, 1)
+				helpers.assert_eq(state.requests[1].url, "http://127.0.0.1:8000/v1/chat/completions")
+				helpers.assert_eq(state.requests[1].headers.Authorization, "Bearer   inert-private-key  ")
+				helpers.assert_eq(require("json").decode(state.requests[1].payload).model, "omlx-fixture-model")
+				helpers.assert_eq(#state.errors, 0)
+				helpers.assert_eq(#state.infos, 1)
+				helpers.assert_contains(state.infos[1], "fixture answer")
+				helpers.assert_not_nil(find(state.rows, provider_id .. "/omlx-fixture-model"))
+			end)
+		end)
+		for _, scenario in ipairs({ "no-auth-local", "http-refused" }) do
+			helpers.it("(api-add-real-publication) preserves explicit local blank auth and truthful response " .. provider_id .. " " .. scenario, function()
+				with_real_api_add(provider_id, scenario, function(state)
+					helpers.assert_eq(state.entry.token, "")
+					helpers.assert_eq(state.image.entries[3].token, "")
+					helpers.assert_eq(state.entry.base_url, "http://127.0.0.1:8502/v1")
+					helpers.assert_eq(#state.requests, 1)
+					helpers.assert_eq(state.requests[1].url, "http://127.0.0.1:8502/v1/chat/completions")
+					helpers.assert_eq(state.requests[1].headers.Authorization, nil, "an optional blank key must not invent a secret")
+					helpers.assert_eq(#state.errors, scenario == "http-refused" and 1 or 0)
+					helpers.assert_eq(#state.infos, scenario == "http-refused" and 0 or 1)
+					if scenario == "http-refused" then
+						helpers.assert_contains(state.errors[1], "HTTP 401")
+						helpers.assert_contains(state.errors[1], "inert key required")
+					end
+				end)
+			end)
+		end
+		helpers.it("(api-add-real-publication) keeps nonlocal empty-key refusal " .. provider_id, function()
+			with_real_api_add(provider_id, "remote-empty-key", function(state, original)
+				helpers.assert_eq(state.bytes, original)
+				helpers.assert_eq(state.stages, 0)
+				helpers.assert_eq(#state.requests, 0)
+				helpers.assert_eq(state.changes, 0)
+			end)
+		end)
+
+		for _, scenario in ipairs({ "refused", "unknown-source" }) do
+			helpers.it("(api-add-real-publication) reports actual persistence refusal " .. provider_id .. " " .. scenario, function()
+				with_real_api_add(provider_id, scenario, function(state, original)
+					helpers.assert_eq(state.bytes, original, "a refused publication cannot rewrite personal data")
+					helpers.assert_eq(state.changes, 0)
+					helpers.assert_eq(state.backends, 0)
+					helpers.assert_eq(#state.requests, 0)
+					helpers.assert_eq(#state.errors, 1, "the actual failed persistence is visible to the user")
+					helpers.assert_contains(state.errors[1], "saved")
+					helpers.assert_eq(state.image.active_id, "chosen")
+				end)
+			end)
+		end
+		for _, scenario in ipairs({ "cancel-url", "cancel-key", "cancel-model" }) do
+			helpers.it("(api-add-real-publication) cancels without publication " .. provider_id .. " " .. scenario, function()
+				with_real_api_add(provider_id, scenario, function(state, original)
+					helpers.assert_eq(state.bytes, original)
+					helpers.assert_eq(state.stages, 0)
+					helpers.assert_eq(state.changes, 0)
+					helpers.assert_eq(state.backends, 0)
+					helpers.assert_eq(#state.requests, 0)
+					helpers.assert_eq(#state.errors, 0)
+				end)
+			end)
+		end
+	end
+	helpers.it("(api-add-real-publication) retains the official OpenAI URL when the prefilled field is accepted", function()
+		with_real_api_add("openai", "default-url", function(state, _, provider)
+			helpers.assert_eq(provider.base_url, "https://api.openai.com/v1")
+			helpers.assert_eq(state.entry.base_url, provider.base_url)
+			helpers.assert_eq(state.requests[1].url, "https://api.openai.com/v1/chat/completions")
+		end)
+	end)
+end)

@@ -14,6 +14,8 @@ local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
+local LocalAuth = require("llm.local_server_auth")
+local LocalServers = require("modules.llm.local_servers")
 local RuntimeChoice = require("core.llm.ollama_runtime_choice")
 local EnableAdmission = require("llm.enable_admission")
 local OllamaBinary = require("modules.llm.ollama_binary")
@@ -442,7 +444,7 @@ end
 --- Validates the canonical entry-array shape shared by legacy migration,
 --- combined-state load, and runtime publication. The legacy path alone may
 --- contain cleartext; every durable combined entry must carry an opaque ref,
---- except the empty token of a local server the user gave no key to.
+--- except explicit keyless local endpoints admitted by the shared auth policy.
 --- @param entries any Candidate dense array.
 --- @param allow_plaintext boolean Whether historical cleartext is accepted.
 --- @param active_id string Candidate active identity.
@@ -456,7 +458,8 @@ local function validate_api_entries(entries, allow_plaintext, active_id)
 			or type(entry.provider) ~= "string" or entry.provider == ""
 			or type(entry.model) ~= "string" or entry.model == ""
 			or type(entry.token) ~= "string"
-			or (entry.token == "" and not ApiRemote.is_local_server(entry.provider))
+			or not LocalAuth.entry_token_allowed(entry.provider, entry.token,
+				entry.base_url, LocalServers.SERVERS)
 			or (entry.base_url ~= nil and type(entry.base_url) ~= "string")
 			or (entry.label ~= nil and type(entry.label) ~= "string")
 			or ids[entry.id] == true then

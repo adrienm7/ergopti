@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Windows API form retains modal source authority and durable publication',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-api-add-production.cjs'],
+		repro: 'npm run test:windows-api-add-production'
+	},
+	{
 		name: 'Windows managed Ollama production uses owned per-user ports and separate consent',
 		cmd: process.execPath,
 		args: ['tools/test/test-windows-managed-bootstrap.cjs'],

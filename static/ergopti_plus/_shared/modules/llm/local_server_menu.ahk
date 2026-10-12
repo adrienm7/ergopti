@@ -43,7 +43,7 @@ LocalServerMenuRows(Options) {
 			Label := Fmt.Call("menu.llm.local_servers.needs_key", Label)
 		Active := Options["active"]
 		Rows.Push(Map("label", Label,
-			"checked", Options["backend"] == "api" && Active is Map && Active.Get("provider", "") == Id,
+			"checked", _LocalServerMenuActive(Options, Id),
 			"items", _LocalServerMenuItems(Options, Id, Verdict)))
 	}
 	if Options["detected"].Length == 0 {
@@ -79,8 +79,7 @@ _LocalServerMenuItems(Options, Id, Verdict) {
 	for Model in Verdict["models"] {
 		Active := Options["active"]
 		Row := _LocalServerMenuRow(Model, Paused, Actions["select"], Id, Model)
-		Row["checked"] := Options["backend"] == "api" && Active is Map
-			&& Active.Get("provider", "") == Id && Active.Get("model", "") == Model
+		Row["checked"] := _LocalServerMenuActive(Options, Id) && Active.Get("model", "") == Model
 		Items.Push(Row)
 	}
 	Items.Push(Map("separator", true))
@@ -103,4 +102,18 @@ _LocalServerMenuAction(Action, Id, Model?) {
 	if IsSet(Model)
 		return (*) => Action.Call(Id, Model)
 	return (*) => Action.Call(Id)
+}
+
+; Native checked state uses the exact configured target captured by its joined
+; source view. Historical callers without that port retain provider identity.
+_LocalServerMenuActive(Options, Id) {
+	Active := Options["active"]
+	if !(Options["backend"] == "api") || !(Active is Map)
+		return false
+	if !Options.Has("entry_id")
+		return Active.Get("provider", "") == Id
+	if !HasMethod(Options["entry_id"], "Call")
+		throw TypeError("Local server checked-state entry port must be callable.")
+	EntryId := Options["entry_id"].Call(Id)
+	return EntryId is String && EntryId != "" && Active.Get("id", "") == EntryId
 }

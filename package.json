@@ -183,6 +183,7 @@
 		"test:app-switch-labels": "node ./tools/test/test-app-switch-labels.cjs",
 		"test:automation-query-ci-publisher": "node ./tools/test/test-automation-query-ci-publisher.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
+		"test:windows-api-add-production": "node ./tools/test/test-windows-api-add-production.cjs",
 		"test:windows-managed-bootstrap": "node ./tools/test/test-windows-managed-bootstrap.cjs",
 		"test:windows-terminal-output-custody-adapter": "node ./tools/test/test-windows-terminal-output-custody-adapter.cjs",
 		"test:windows-nav-portable-registration": "node ./tools/test/test-windows-nav-portable-registration.cjs",

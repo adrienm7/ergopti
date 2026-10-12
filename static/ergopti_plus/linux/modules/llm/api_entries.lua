@@ -156,7 +156,7 @@ local function valid_entry(raw, stored)
 	-- Candidate admission keeps its existing strict authentication owner.
 	if identity ~= "unpublished" then
 		local _, servers = LocalCatalogue.load({})
-		if not AuthPolicy.token_allowed(raw.provider, raw.token, servers) then return nil end
+		if not AuthPolicy.entry_token_allowed(raw.provider, raw.token, raw.base_url, servers) then return nil end
 	end
 	return {
 		id = raw.id,
@@ -469,8 +469,17 @@ function M.upsert_local(provider, fields, source, admit, select)
 	if not accepted or allowed ~= true then return nil, "local API mutation is not admitted" end
 	if not M.source_is_current(source) then return nil, "local API source changed during admission" end
 	local current, index, previous_entry = state(), nil, nil
-	for position, entry in ipairs(current.entries) do
-		if entry.provider == provider then index, previous_entry = position, entry; break end
+	local active = M.active()
+	for _, exact in ipairs({ true, false }) do
+		for position, entry in ipairs(current.entries) do
+			if (entry.provider == provider) == exact
+				and AuthPolicy.entry_matches(entry.provider, entry.base_url, provider, servers) then
+				if not previous_entry or (active and active.id == entry.id) then
+					index, previous_entry = position, entry
+				end
+			end
+		end
+		if previous_entry then break end
 	end
 	local token = fields.token
 	if token == nil then token = previous_entry and previous_entry.token or "" end
@@ -480,7 +489,9 @@ function M.upsert_local(provider, fields, source, admit, select)
 	if base_url == nil then
 		base_url = previous_entry and previous_entry.base_url ~= "" and previous_entry.base_url or server.base_url
 	end
-	if model == "" or not AuthPolicy.token_allowed(provider, token, servers)
+	local entry_provider = previous_entry and previous_entry.provider or provider
+	if model == "" or not AuthPolicy.entry_token_allowed(entry_provider, token, base_url, servers)
+		or not AuthPolicy.entry_matches(entry_provider, base_url, provider, servers)
 		or not require("modules.llm.api_remote").normalize_base_url(base_url) then
 		return nil, "local API model, address or authentication is not supported"
 	end
@@ -496,7 +507,7 @@ function M.upsert_local(provider, fields, source, admit, select)
 			id = string.format("%s-%d-%d", provider, os.time(), _sequence)
 		until not used[id]
 	end
-	local entry = valid_entry({ id = id, provider = provider, label = previous_entry and previous_entry.label or (provider .. "/" .. model),
+	local entry = valid_entry({ id = id, provider = entry_provider, label = previous_entry and previous_entry.label or (provider .. "/" .. model),
 		model = model, token = token, base_url = base_url })
 	if not entry then return nil, "local API entry is not supported" end
 	local previous_active = current.active_id

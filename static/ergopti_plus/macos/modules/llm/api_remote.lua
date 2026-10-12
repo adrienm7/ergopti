@@ -336,7 +336,7 @@ end
 local function key_missing(entry)
 	if type(entry) ~= "table" then return true end
 	local servers = M.is_local_server(entry.provider) and LocalServers.SERVERS or {}
-	return not AuthPolicy.token_allowed(entry.provider, entry.token, servers)
+	return not AuthPolicy.entry_token_allowed(entry.provider, entry.token, entry.base_url, servers)
 end
 
 --- Lists the providers that serve one use (modules/llm/provider_uses.lua), in
@@ -2226,9 +2226,14 @@ end
 function M.local_server_entry(provider_id)
 	if not M.is_local_server(provider_id) then return nil end
 	local active = find_active_entry()
-	if active and active.provider == provider_id then return active end
-	for _, entry in ipairs(_entries) do
-		if entry.provider == provider_id then return entry end
+	-- A deliberate local-provider selection has priority over generic affinity.
+	for _, exact in ipairs({ true, false }) do
+		local function matches(entry)
+			return entry ~= nil and (entry.provider == provider_id) == exact
+				and AuthPolicy.entry_matches(entry.provider, entry.base_url or "", provider_id, LocalServers.SERVERS)
+		end
+		if matches(active) then return active end
+		for _, entry in ipairs(_entries) do if matches(entry) then return entry end end
 	end
 	return nil
 end
@@ -2850,7 +2855,7 @@ function M.local_server_target(provider_id)
 	local base_url = entry and entry.base_url or ""
 	if base_url == "" then base_url = pending.base_url or provider.base_url end
 	local token = entry and entry.token or pending.token or ""
-	return { id = provider_id, base_url = base_url, token = token }
+	return { id = provider_id, entry_id = entry and entry.id, provider = entry and entry.provider, base_url = base_url, token = token }
 end
 
 --- Sweeps every local server's models endpoint at once, with the rules of the
@@ -2882,7 +2887,8 @@ function M.detect_local_servers(on_done)
 		local function target_is_current()
 			if ticket.is_current() ~= true or not M.is_local_server(target.id) then return false end
 			local current = M.local_server_target(target.id)
-			return current.id == target.id and current.base_url == target.base_url and current.token == target.token
+			return current.id == target.id and current.entry_id == target.entry_id and current.provider == target.provider
+				and current.base_url == target.base_url and current.token == target.token
 		end
 		local function probe(token)
 			if not target_is_current() then return false end

@@ -704,3 +704,46 @@ _LSCJ_ActualManagedBranch(Mode) {
 }
 Test("local job managed: production routing and native admission path stay mandatory", _LSCJ_ActualManagedBranch.Bind("live"))
 Test("local job managed: replaced source refuses queued managed payload", _LSCJ_ActualManagedBranch.Bind("replaced"))
+
+_LSO_AffinityFixture() {
+	global LLM_LOCAL_API_SERVERS
+	LLM_Defaults_Load()
+	Fixture := _LSO_Fixture()
+	Fixture.Native.Cancel(true)
+	Fixture.Order := ["omlx"]
+	Fixture.Servers := Map("omlx", LLM_LOCAL_API_SERVERS["omlx"])
+	Fixture.Entries := Map("omlx", Map("Id", "generic-omlx", "Provider", "openai_compat",
+		"BaseUrl", "http://127.0.0.1:8000/v1/", "Token", "configured-loopback-token", "Model", "saved-model"))
+	Fixture.Transport.Options["servers"] := Fixture.Servers
+	Options := Fixture.Native.Options.Clone()
+	Options["order"] := Fixture.Order, Options["servers"] := Fixture.Servers
+	Fixture.Native := LocalServersOwner(Options)
+	return Fixture
+}
+
+_LSO_GenericAffinityOwnsTarget() {
+	global _SharedDir
+	Fixture := _LSO_AffinityFixture()
+	try {
+		Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
+		Target := Fixture.Native.Target("omlx")
+		AssertEqual("generic-omlx", Target["entry_id"])
+		AssertEqual("openai_compat", Target["provider"])
+		AssertEqual("http://127.0.0.1:8000/v1/", Target["base_url"])
+		AssertTrue(Fixture.Native.Rescan())
+		AssertContains(Fixture.Configs[1], "http://127.0.0.1:8000/v1/models")
+		AssertContains(Fixture.Configs[1], "configured-loopback-token")
+		Fixture.Complete(1, 200, Corpus["omlx_models_body"])
+		Verdict := Fixture.Native.Result("omlx")
+		AssertEqual("up", Verdict["status"])
+		AssertEqual(Corpus["omlx_model_ids"].Length, Verdict["models"].Length)
+		for Index, Id in Corpus["omlx_model_ids"]
+			AssertEqual(Id, Verdict["models"][Index])
+		Fixture.Native.BeginView()
+		Receipt := Fixture.Native.Capture("omlx")
+		AssertTrue(Fixture.Native.IsCurrent(Receipt, Corpus["omlx_model_ids"][1]), "a canonical generic target retains its real model provenance")
+		Fixture.Entries["omlx"]["Provider"] := "openai"
+		AssertFalse(Fixture.Native.IsCurrent(Receipt, Corpus["omlx_model_ids"][1]), "changing provider under equal ID, URL and token must revoke the old target")
+	} finally Fixture.Dispose()
+}
+Test("local-server-affinity: actual curl and discovery owners retain generic target identity", _LSO_GenericAffinityOwnsTarget)

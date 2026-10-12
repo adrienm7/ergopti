@@ -740,6 +740,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
 #Include unit/test_local_server_private_publication.ahk
+#Include unit/test_llm_api_add_production.ahk
 #Include unit/test_local_server_write_admission.ahk
 #Include unit/test_local_server_join.ahk
 #Include unit/test_local_server_scope_cohort.ahk

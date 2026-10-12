@@ -272,14 +272,14 @@ class LLM_LocalServerPanel {
 				"native_rescan", Projection["rescan"], "native_controller", Projection["controller"],
 				"authority", Entries["authority"])
 			Snapshot := Map("results", Projection["results"], "detected", Projection["detected"],
-				"active", 0, "backend", Entries["backend"], "sweeping", Projection["sweeping"],
+				"active", 0, "entry_ids", Map(), "backend", Entries["backend"], "sweeping", Projection["sweeping"],
 				"authority", Entries["authority"],
 				"menu_owner", Entries["menu_owner"], "active_id", Entries["active_id"])
 			for Id in this.Order {
 				Entry := Entries["entries"][Id]
+				Snapshot["entry_ids"][Id] := Entry is Map ? Entry["Id"] : ""
 				if Entry is Map && Entry["Id"] == Snapshot["active_id"] {
-					Snapshot["active"] := Map("provider", Id, "model", Entry["Model"])
-					break
+					Snapshot["active"] := Map("provider", Entry["Provider"], "id", Entry["Id"], "model", Entry["Model"])
 				}
 			}
 			ClaimCritical := Critical("On")
@@ -320,10 +320,12 @@ class LLM_LocalServerPanel {
 		Snapshot["menu_owner"] := Menu
 		EntryId := Menu.Get("api_entry_id", "")
 		Snapshot["active_id"] := EntryId
+		Snapshot["entry_ids"] := Map()
 		for Id in this.Order {
 			Entry := this.Source.Entry(Id)
+			Snapshot["entry_ids"][Id] := Entry is Map ? Entry["Id"] : ""
 			if Entry is Map && Entry["Id"] == EntryId {
-				Snapshot["active"] := Map("provider", Id, "model", Entry["Model"])
+				Snapshot["active"] := Map("provider", Entry["Provider"], "id", Entry["Id"], "model", Entry["Model"])
 				break
 			}
 		}
@@ -334,10 +336,16 @@ class LLM_LocalServerPanel {
 		return Snapshot["results"].Get(Id, 0)
 	}
 
+	_SnapshotEntryId(Snapshot, Id) {
+		Entries := Snapshot["entry_ids"]
+		return Entries.Get(Id, "")
+	}
+
 	_Render(Snapshot, Paused, Owner) {
 		return LocalServerMenuRows(Map("order", this.Order, "servers", this.Servers,
 			"detected", Snapshot["detected"], "result", ObjBindMethod(this, "_SnapshotResult", Snapshot),
 			"backend", Snapshot["backend"], "active", Snapshot["active"],
+			"entry_id", ObjBindMethod(this, "_SnapshotEntryId", Snapshot),
 			"sweeping", Snapshot["sweeping"], "paused", Paused, "tr", t,
 			"format", ObjBindMethod(this, "_Format"), "actions", Map(
 				"select", ObjBindMethod(this, "_Select", Owner),
