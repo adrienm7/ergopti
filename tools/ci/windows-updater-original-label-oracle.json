@@ -1,0 +1,117 @@
+{
+	"status": "FROZEN_ORIGINAL_LITERAL_REGISTRATION_LABEL_ORACLE_NO_RUNTIME_EXPECTATION_REGENERATION",
+	"origin_commit": "63d750fc0aa78eaa4ef6be9a5dccd37580209ffa",
+	"authentic_original_tree": {
+		"path": "/workspace/ergopti-delivery/group1-complete-resume-20261007/windows-authority-cost-38149575570-independent-receiving-20261011/SOURCE-TREE.json",
+		"sha256": "f9391e42c2b24aed10a1897fcbbd4a19c943ea1791d78a9e3d60c5a5bbbf6c4d",
+		"tree_sha": "e840f3c7fbf6c8e866e398b519c6c08eef45a29c"
+	},
+	"source_files": {
+		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": {
+			"sha256": "bd3fda3a199c2abd58ccca998ac481e5696a5094f763510c97a3e4c28336093a",
+			"git_blob_sha1": "28ca2ae95146e8f670cb2cb88a7b0ce3d1cd6be2",
+			"current_bytes_equal_authentic_original_blob": true
+		},
+		"static/ergopti_plus/windows/tests/unit/updater/test_global_config_admission.ahk": {
+			"sha256": "e58469018e045b7ddfc147d5898f0a5559dcbb498cbdd18bb1cff6f8da9d9a89",
+			"git_blob_sha1": "8d983d0b8cbe5fc3ab89a1b8b487ff887a3d8f34",
+			"current_bytes_equal_authentic_original_blob": true
+		}
+	},
+	"cohorts": [
+		{
+			"id": "channel-replacement",
+			"filter": "(updater-channel-replacement-transaction)",
+			"expected_names": [
+				"Updater AHK-31: channel admission precedes persistence and releases on failure (updater-channel-replacement-transaction)",
+				"Updater AHK-31: action leases serialize channel, cadence and install ingress (updater-channel-replacement-transaction)",
+				"Updater AHK-31: real async wrappers stop at admission refusal (updater-channel-replacement-transaction)",
+				"Updater AHK-31: interval action lease spans post-commit cancellation (updater-channel-replacement-transaction)",
+				"Updater AHK-31: failed channel persistence restores the exact retired cadence (updater-channel-replacement-transaction)",
+				"Updater AHK-31: failed cadence retirement aborts before persistence (updater-channel-replacement-transaction)",
+				"Updater AHK-31: registry swap preserves reentrant replacement (updater-channel-replacement-transaction)",
+				"Updater AHK-31: non-leased terminal blocks Reload until callback return (updater-channel-replacement-transaction)",
+				"Updater AHK-31: simultaneous terminal claims balance independently (updater-channel-replacement-transaction)",
+				"Updater AHK-31: deferred Reload timeout crosses a DWORD boundary and is exact-once (updater-channel-replacement-transaction)",
+				"Updater AHK-31: deferred Reload arm failure owns one recovery (updater-channel-replacement-transaction)",
+				"Updater AHK-31: Setter initial arm failure has one owned terminal (updater-channel-replacement-transaction)",
+				"Updater AHK-31: active COM lease blocks deferred Reload (updater-channel-replacement-transaction)",
+				"Updater AHK-31: Reload and recovery false/throw paths are exact (updater-channel-replacement-transaction)",
+				"Updater AHK-31: default recovery types cadence, scheduler and menu effect (updater-channel-replacement-transaction)",
+				"Updater AHK-31: stale timed-out continuation cannot retire successor (updater-channel-replacement-transaction)",
+				"Updater AHK-31: channel epoch rejects ABA publication (updater-channel-replacement-transaction)",
+				"Updater AHK-31: background arm cannot cross channel admission (updater-channel-replacement-transaction)"
+			]
+		},
+		{
+			"id": "global-config-barrier",
+			"filter": "(updater-global-config-barrier)",
+			"expected_names": [
+				"Updater AHK-34: global terminal collision precedes all preference effects (updater-global-config-barrier)",
+				"Updater AHK-34: channel Reload retains global config ownership through recovery (updater-global-config-barrier)",
+				"Updater AHK-34: interval writer owns config before failure publication (updater-global-config-barrier)",
+				"Updater AHK-34: interval publication replaces stale reentrant live state (updater-global-config-barrier)"
+			]
+		},
+		{
+			"id": "inherited-critical",
+			"filter": "(updater-channel-inherited-critical)",
+			"expected_names": [
+				"Updater AHK-31: channel action never inherits caller Critical (updater-channel-inherited-critical)"
+			]
+		}
+	],
+	"prospective_subjects": 23,
+	"original_monolithic_failure_evidence": {
+		"run_id": 38149575570,
+		"ci_sha": "470f24ed63be0cb63bcc6163c34bd1332c0bd8ae",
+		"runtime_source_sha": "63d750fc0aa78eaa4ef6be9a5dccd37580209ffa",
+		"review_sha256": "298ca428c4e37d572449dbb06f43e68ae101497e5ed112dd658fe1b3ab4697c1",
+		"failed_counts": {
+			"channel_replacement": 5,
+			"global_barrier": 3,
+			"critical": 1
+		},
+		"raw_terminal_rows": [
+			{
+				"index": 2489,
+				"raw_detail": "Updater AHK-31: channel admission precedes persistence and releases on failure (updater-channel-replacement-transaction) \u2014 HTTP admission must close before the first yielding TOML effect - expected: <1>, actual: <0> [test_updater.ahk:1712]"
+			},
+			{
+				"index": 2490,
+				"raw_detail": "Updater AHK-31: action leases serialize channel, cadence and install ingress (updater-channel-replacement-transaction) \u2014 the interval action must enter its yielding persistence seam once - expected: <1>, actual: <0> [test_updater.ahk:1876]"
+			},
+			{
+				"index": 2492,
+				"raw_detail": "Updater AHK-31: interval action lease spans post-commit cancellation (updater-channel-replacement-transaction) \u2014 a typed durable interval write must complete - expected: <1>, actual: <0> [test_updater.ahk:2003]"
+			},
+			{
+				"index": 2493,
+				"raw_detail": "Updater AHK-31: failed channel persistence restores the exact retired cadence (updater-channel-replacement-transaction) \u2014 the tick captured before persistence must already be retired - expected: <0>, actual: <1> [test_updater.ahk:2107]"
+			},
+			{
+				"index": 2496,
+				"raw_detail": "Updater AHK-31: channel action never inherits caller Critical (updater-channel-inherited-critical) \u2014 expected true - actual: <0> [test_updater.ahk:2407]"
+			},
+			{
+				"index": 2501,
+				"raw_detail": "Updater AHK-31: Setter initial arm failure has one owned terminal (updater-channel-replacement-transaction) \u2014 the channel must reach its durable commit exactly once - expected: <1>, actual: <0> [test_updater.ahk:2715]"
+			},
+			{
+				"index": 2521,
+				"raw_detail": "Updater AHK-34: channel Reload retains global config ownership through recovery (updater-global-config-barrier) \u2014 a durable channel change must transfer its exact bundle to Reload - expected: <1>, actual: <0> [test_global_config_admission.ahk:199]"
+			},
+			{
+				"index": 2522,
+				"raw_detail": "Updater AHK-34: interval writer owns config before failure publication (updater-global-config-barrier) \u2014 the strict writer seam must run exactly once - expected: <1>, actual: <0> [test_global_config_admission.ahk:287]"
+			},
+			{
+				"index": 2523,
+				"raw_detail": "Updater AHK-34: interval publication replaces stale reentrant live state (updater-global-config-barrier) \u2014 an acknowledged native handoff must commit the interval transaction - expected: <1>, actual: <0> [test_global_config_admission.ahk:338]"
+			}
+		]
+	},
+	"selection_and_order": "Exact original existing single-substring filters; original registration order within each selected group. Three fresh native actual processes deliberately isolate groups; no claim of reproducing monolithic process state/order.",
+	"excludes": "All private cost probe labels/includes/bodies. Original run_all Source hash and two original fixture hashes fence against that private mutation.",
+	"native_status": "UNRUN; original nine monolithic failures do not imply any prospective isolated-cohort status"
+}
