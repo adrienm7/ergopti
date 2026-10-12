@@ -779,4 +779,96 @@ return function(helpers, Editor, Window, Model)
 			eq(s.window.close(), false, "external page revocation is not a close-request capability")
 		end)
 	end)
+	helpers.describe("Physical editor serialized optional old identity", function()
+		local Json = require("json")
+		-- These literals are fixed independently of the browser implementation.
+		-- The browser controls require its actual serialized packets to match them.
+		local add_wire = '{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true,"alt":false,"shift":false,"super":false},"request_id":3}}'
+		local edit_wire = '{"action":"choose","request":{"code":"KeyK","mods":{"ctrl":true,"alt":false,"shift":false,"super":false},"previous_slot":"physical_ctrl_KeyK","request_id":8}}'
+		local function clone(value)
+			if type(value) ~= "table" then return value end
+			local result = {}; for key, item in pairs(value) do result[key] = clone(item) end
+			return result
+		end
+		local function fixture(previous)
+			local state = { receipt = {}, assignments = { other_owner = "copy" },
+				parameters = { unknown_owner = "retain" }, picks = 0, writes = 0, messages = {}, page = true }
+			if previous then state.assignments.physical_ctrl_KeyK = "none" end
+			local actions = { is_assignable = function(action) return action == "none" or action == "copy" end,
+				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+				split_action_parameter_key = function(key) return key:match("^(keyboard__.+)__(.+)$") end }
+			state.window = Window.new({ model = Model, catalogue = actions, parameter_section = "gesture_parameters",
+				positions = {}, label = function(action) return action end, translate = function(key) return key end,
+				capture = function() return { assignments = clone(state.assignments), parameters = clone(state.parameters) }, state.receipt end,
+				current = function(receipt) return rawequal(receipt, state.receipt) end,
+				page_current = function() return state.page end,
+				picker = function(binding, action, callback)
+					state.picks = state.picks + 1; state.binding, state.action, state.confirm = binding, action, callback
+					return true
+				end,
+				emit = function() return true end,
+				send = function(name, data) state.messages[name] = data; return true end,
+				commit = function(rows, receipt)
+					eq(rawequal(receipt, state.receipt), true, "wire selection retains original canonical receipt")
+					state.writes = state.writes + 1; state.rows = clone(rows)
+					for _, row in ipairs(rows) do
+						local map = row.section == "shortcuts.keyboard" and state.assignments or state.parameters
+						if row.delete then map[row.key] = nil else map[row.key] = row.value end
+					end
+					state.receipt = {}; return true
+				end,
+				close = function() state.page = false; return true end })
+			eq(state.window.receive({ action = "ready" }), true, "actual shared intake opens from owned fixture source")
+			return state
+		end
+		helpers.it("(physical-editor-wire) Add omission survives actual JSON decode and exact publication", function()
+			local state = fixture(); local message = Json.decode(add_wire)
+			eq(message.request.previous_slot, nil, "omission is actual absence after unchanged native JSON decode")
+			eq(state.window.receive(message), true, "actual intake and Editor admit serialized Add")
+			eq(state.picks, 1); eq(state.binding, "keyboard__physical_ctrl_KeyJ"); eq(state.writes, 0)
+			eq(state.confirm("none"), true, "exact picker creates only a draft")
+			eq(state.window.receive({ action = "save", token = state.messages.selected.token }), true)
+			eq(state.messages.result.committed, true); eq(state.writes, 1)
+			eq(state.rows, { { section = "shortcuts.keyboard", key = "physical_ctrl_KeyJ", value = "none", intent = "keyboard_assignment" } })
+			eq(state.assignments.other_owner, "copy"); eq(state.parameters.unknown_owner, "retain")
+			eq(state.window.close(), true)
+		end)
+		helpers.it("(physical-editor-wire) Edit retains exact prior identity through actual JSON and Editor", function()
+			local state = fixture(true); local message = Json.decode(edit_wire)
+			eq(message.request.previous_slot, "physical_ctrl_KeyK")
+			eq(state.window.receive(message), true); eq(state.picks, 1)
+			eq(state.binding, "keyboard__physical_ctrl_KeyK"); eq(state.action, "none"); eq(state.writes, 0)
+			eq(state.confirm("copy"), true)
+			eq(state.window.receive({ action = "save", token = state.messages.selected.token }), true)
+			eq(state.messages.result.committed, true); eq(state.writes, 1)
+			eq(state.rows, { { section = "shortcuts.keyboard", key = "physical_ctrl_KeyK", value = "copy", intent = "keyboard_assignment" } })
+			eq(state.assignments.other_owner, "copy"); eq(state.parameters.unknown_owner, "retain")
+			eq(state.window.close(), true)
+		end)
+		local refusals = {
+			{ "original-null", '{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true},"previous_slot":null,"request_id":3}}' },
+			{ "empty-object", '{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true},"previous_slot":{},"request_id":3}}' },
+			{ "wrong-scope", '{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true},"previous_slot":"foreign_owner","request_id":3}}' },
+			{ "absent-old-entry", edit_wire },
+			{ "outer-authority", '{"action":"choose","source":"foreign","request":{"code":"KeyJ","mods":{"ctrl":true},"request_id":3}}' },
+			{ "request-authority", '{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true},"source":"foreign","request_id":3}}' },
+		}
+		for _, refusal in ipairs(refusals) do
+			helpers.it("(physical-editor-wire) serialized " .. refusal[1] .. " remains refused without picker or write", function()
+				local state = fixture(); local message = Json.decode(refusal[2])
+				if refusal[1] == "original-null" or refusal[1] == "empty-object" then
+					eq(type(message.request.previous_slot), "table", "legacy null cannot be authenticated as absence")
+				end
+				eq(state.window.receive(message), false); eq(state.picks, 0); eq(state.writes, 0)
+				eq(state.assignments, { other_owner = "copy" }); eq(state.parameters, { unknown_owner = "retain" })
+				eq(state.window.close(), true)
+			end)
+		end
+		helpers.it("(physical-editor-wire) inherited request fields remain refused without picker or write", function()
+			local state = fixture(); local message = Json.decode(add_wire)
+			setmetatable(message.request, { __index = { source = "foreign" } })
+			eq(state.window.receive(message), false); eq(state.picks, 0); eq(state.writes, 0)
+			eq(state.window.close(), true)
+		end)
+	end)
 end

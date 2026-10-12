@@ -10603,6 +10603,17 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   omissions fail. Native GUI, capture and output qualification remain open;
   this optional session contract does not enable physical delivery.
 
+  The shared browser now omits the optional previous-slot field for Add;
+  Edit preserves its exact displayed prior identity. The real legacy JSON
+  decoder turns null into an object, so the old Add packet was refused before
+  the picker. Actual Chromium packets joined to the unchanged JSON, Window and
+  Editor reproduce 8 passes / 1 failure originally and 9 passes / 0 failures
+  with the correction on both Lua ABIs. Edit and seven malformed/foreign
+  requests retain their original refusals. The registered browser scenario adds
+  independent exact Add/Edit wire checks, and the shared contract preserves
+  all 51 prior cases with nine appended controls. Native GUI, capture, assignment
+  and output qualification remain required; physical delivery stays unavailable.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
