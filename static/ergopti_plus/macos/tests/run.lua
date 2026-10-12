@@ -65,6 +65,7 @@ package.path = table.concat({
 }, ";")
 
 local helpers = require("tests.helpers")
+local shell_quote = require("text_utils").shell_quote
 helpers.initialize_timing()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
@@ -247,8 +248,8 @@ if r.failed > 0 then
 	for i, f in ipairs(r.failures) do
 		if f.kind ~= "case" then print("  FAIL " .. f.name .. " — " .. f.err) end
 		print(string.format(
-				"[%d] %s\n    Error: %s\n    replay: lua tests/run.lua --only %q\n",
-				i, f.name, f.err, f.kind == "case" and f.name or f.module or f.name
+				"[%d] %s\n    Error: %s\n    replay: lua tests/run.lua --only %s\n",
+				i, f.name, f.err, shell_quote(f.kind == "case" and f.name or f.module or f.name)
 			))
 	end
 	os.exit(1)

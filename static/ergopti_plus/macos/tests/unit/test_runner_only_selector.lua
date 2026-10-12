@@ -336,3 +336,5 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 end)
 
 require("test.runner_timing_contract").run(helpers)
+
+require("test.runner_replay_contract").run(helpers, "macos")

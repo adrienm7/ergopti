@@ -79,6 +79,7 @@ local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")
 if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() end
 
 local helpers = require("tests.helpers")
+local shell_quote = require("text_utils").shell_quote
 helpers.initialize_timing()
 local RunnerContract = require("tests.runner_contract")
 local TEST_MANIFEST = require("tests.test_manifest")
@@ -247,7 +248,7 @@ end
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
 		local replay = "luajit tests/run.lua"
-		if f.kind == "case" then replay = replay .. string.format(" --only %q", f.name) end
+		if f.kind == "case" then replay = replay .. " --only " .. shell_quote(f.name) end
 		if f.kind ~= "case" then print("  FAIL " .. f.name .. " — " .. f.err) end
 		print(string.format("  - %s : %s\n    replay: %s", f.name, f.err, replay))
 	end
