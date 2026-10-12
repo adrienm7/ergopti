@@ -379,15 +379,20 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 			helpers.assert_true(f.open())
 			local old, Json = f.pages[1], require("json")
 			local old_scripts = #old.scripts
-			_G.hs.json.encode = function(value)
-				if value == UNAVAILABLE then helpers.assert_true(f.open()) end
-				return Json.encode(value)
-			end
-			f.message(old, { action = "confirm", id = "run_program", parameter = RESERVED })
-			helpers.assert_eq(#f.calls, 0)
-			helpers.assert_eq(#old.scripts, old_scripts)
-			f.message(f.pages[2], { action = "confirm", id = "run_program", parameter = SCALAR })
-			helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+			local original = Json.quote
+			local ok, err = xpcall(function()
+				Json.quote = function(value)
+					if value == UNAVAILABLE then helpers.assert_true(f.open()) end
+					return original(value)
+				end
+				f.message(old, { action = "confirm", id = "run_program", parameter = RESERVED })
+				helpers.assert_eq(#f.calls, 0)
+				helpers.assert_eq(#old.scripts, old_scripts)
+				f.message(f.pages[2], { action = "confirm", id = "run_program", parameter = SCALAR })
+				helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+			end, debug.traceback)
+			Json.quote = original
+			if not ok then error(err, 0) end
 		end)
 	end)
 	helpers.it("native prompt refuses a reserved value and still accepts an ordinary replacement", function()
@@ -452,5 +457,103 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 			helpers.assert_eq(reason, "invalid_parameter")
 			helpers.assert_eq(f.native_tasks, 0)
 		end)
+	end)
+end)
+
+
+helpers.describe("action picker scalar native JSON boundary", function()
+	helpers.it("(hs-scalar-json-picker) actual unavailable reason reaches the retained picker with native table-only JSON", function()
+		fixture(function(f)
+			local Json = require("json")
+			local reason = 'Unavailable é漢😀\r\n\t"\\");globalThis.__injected=true;//'
+			f.locale.get = function(key) return key == UNAVAILABLE and reason or key end
+			local native_tables = 0
+			-- This is a native-contract double, not the actual Hammerspoon encoder.
+			_G.hs.json.encode = function(value)
+				helpers.assert_eq(type(value), "table", "Hammerspoon 1.1.1 JSON requires a table")
+				native_tables = native_tables + 1
+				return Json.encode(value)
+			end
+			helpers.assert_true(f.open())
+			local page = f.pages[1]
+			local initial_scripts, initial_native_tables = #page.scripts, native_tables
+			f.message(page, { action = "confirm", id = "run_program", parameter = RESERVED })
+			helpers.assert_eq(#page.scripts, initial_scripts + 1, "an unavailable native action must explain its refusal")
+			local quoted = assert(page.scripts[#page.scripts]:match('^programProviderRefused%((.*)%)$'))
+			helpers.assert_eq(Json.decode(quoted), reason)
+			helpers.assert_eq(quoted:find("[%z\1-\31]"), nil)
+			helpers.assert_eq(native_tables, initial_native_tables)
+			helpers.assert_eq(#f.calls, 0)
+			helpers.assert_eq(page.deletes, 0)
+			f.message(page, { action = "confirm", id = "run_program", parameter = SCALAR })
+			helpers.assert_eq(f.calls, { { "run_program", SCALAR } }, "ordinary repair remains available")
+		end)
+	end)
+	for _, mode in ipairs({ "nil", "false", "throw" }) do
+		helpers.it("(hs-scalar-json-picker) unavailable reason quotation " .. mode .. " cannot confirm", function()
+			fixture(function(f)
+				local Json = require("json")
+				local original = Json.quote
+				local ok, err = xpcall(function()
+					helpers.assert_true(f.open())
+					local initial_scripts = #f.pages[1].scripts
+					Json.quote = function(value)
+						if value ~= UNAVAILABLE then return original(value) end
+						if mode == "throw" then error("PRIVATE_REFUSAL_REASON") end
+						if mode == "false" then return false end
+					end
+					f.message(f.pages[1], { action = "confirm", id = "run_program", parameter = RESERVED })
+					helpers.assert_eq(#f.pages[1].scripts, initial_scripts)
+					helpers.assert_eq(#f.calls, 0)
+					helpers.assert_eq(f.pages[1].deletes, 0)
+				end, debug.traceback)
+				Json.quote = original
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+	helpers.it("(hs-scalar-json-picker) reason encoding reentry cannot target a replacement picker", function()
+		fixture(function(f)
+			local Json = require("json")
+			local original = Json.quote
+			local ok, err = xpcall(function()
+				helpers.assert_true(f.open())
+				local old = f.pages[1]
+				local initial_scripts = #old.scripts
+				Json.quote = function(value)
+					if value == UNAVAILABLE then helpers.assert_true(f.open()) end
+					return original(value)
+				end
+				f.message(old, { action = "confirm", id = "run_program", parameter = RESERVED })
+				helpers.assert_eq(#f.pages, 2)
+				helpers.assert_eq(#old.scripts, initial_scripts)
+				helpers.assert_true(#f.pages[2].scripts > 0, "the replacement retains its own startup scripts")
+				for _, code in ipairs(f.pages[2].scripts) do
+					helpers.assert_nil(code:find("programProviderRefused", 1, true))
+				end
+				helpers.assert_eq(#f.calls, 0)
+			end, debug.traceback)
+			Json.quote = original
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)
+
+helpers.it("(hs-scalar-json-picker) invalid UTF-8 reason neither dispatches nor confirms", function()
+	fixture(function(f)
+		f.locale.get = function(key) return key == UNAVAILABLE and ("PRIVATE" .. string.char(0xC0, 0xAF)) or key end
+		helpers.assert_true(f.open())
+		local page = f.pages[1]
+		local initial_scripts = #page.scripts
+		local errors = {}
+		package.loaded["infra.logger"].error = function(_, template, ...)
+			errors[#errors + 1] = string.format(template, ...)
+		end
+		f.message(page, { action = "confirm", id = "run_program", parameter = RESERVED })
+		helpers.assert_eq(#page.scripts, initial_scripts)
+		helpers.assert_eq(#f.calls, 0)
+		helpers.assert_eq(page.deletes, 0)
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_nil(errors[1]:find("PRIVATE", 1, true))
 	end)
 end)
