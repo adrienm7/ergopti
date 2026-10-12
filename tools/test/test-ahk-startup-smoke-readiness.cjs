@@ -219,7 +219,129 @@ async function observe(source, root, scenario) {
 	}
 }
 
+/** Exercises the actual fresh-clone reporter and verdict flow without a child. */
+function checkObserverStageRetention(root = ROOT) {
+	const freshOwner = 'tools/test/test-ahk-fresh-clone-startup.cjs';
+	const source = fs.readFileSync(path.join(root, freshOwner), 'utf8');
+	const tree = require('acorn').parse(source, { ecmaVersion: 'latest' });
+	const functions = ['run', 'reportSourceObserverStages'].map((name) => {
+		const matches = tree.body.filter(
+			(node) => node.type === 'FunctionDeclaration' && node.id.name === name
+		);
+		assert.equal(matches.length, 1, 'the actual fresh-clone owner must have exactly one ' + name);
+		return source.slice(matches[0].start, matches[0].end);
+	});
+	const observer = fs.readFileSync(
+		path.join(root, 'tools/test/fixtures/observe_ahk_source_boot.ps1'),
+		'utf8'
+	);
+	assert.match(
+		observer,
+		/nonce_sha256\s*=\s*\[Convert\]::ToHexString\(\[Security.Cryptography.SHA256\]::HashData\(\s*\[Text.Encoding\]::UTF8.GetBytes\(\$Nonce\)\)\)/
+	);
+	assert.match(observer, /\$script:observerStageRecordingFailed\s*=\s*\$true/);
+	assert.match(observer, /recording_failed\s*=\s*\[bool\]\$observerStageRecordingFailed/);
+	const retained = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-source-stage-controls-'));
+	const nonce = 'a'.repeat(32);
+	try {
+		for (const scenario of [
+			'success',
+			'failure',
+			'stale',
+			'parse-failure-stale',
+			'read-failure',
+			'unrelated',
+			'malformed',
+			'recording-failed'
+		]) {
+			const record = {
+				schema_version: 1,
+				diagnostic_only: true,
+				clock: 'stopwatch-monotonic',
+				nonce_sha256: require('node:crypto')
+					.createHash('sha256')
+					.update(scenario.includes('stale') ? 'b'.repeat(32) : nonce)
+					.digest('hex'),
+				recording_failed: scenario === 'recording-failed',
+				stages: [{ stage: 'ack-published', elapsed_ms: 12, result: -1 }]
+			};
+			const file = path.join(retained, 'observer-stages.json');
+			fs.writeFileSync(file, scenario === 'malformed' ? '{' : JSON.stringify(record));
+			const logs = [],
+				errors = [];
+			let launches = 0;
+			const context = vm.createContext({
+				root,
+				probe: retained,
+				path,
+				assert,
+				crypto: require('node:crypto'),
+				fs: {
+					...fs,
+					readFileSync(fileName, ...args) {
+						if (scenario === 'read-failure' && fileName === file)
+							throw new Error('private-path-must-not-be-printed');
+						return fs.readFileSync(fileName, ...args);
+					}
+				},
+				console: { log: (line) => logs.push(line), error: (line) => errors.push(line) },
+				spawnSync() {
+					launches++;
+					return {
+						status: ['failure', 'parse-failure-stale'].includes(scenario) ? 1 : 0,
+						stdout: '',
+						stderr: ''
+					};
+				}
+			});
+			vm.runInContext(functions.join('\n') + '\nglobalThis.actualRun = run;', context, {
+				filename: freshOwner
+			});
+			const args = [
+				'-File',
+				path.join(
+					root,
+					scenario === 'unrelated'
+						? 'unrelated.ps1'
+						: 'tools/test/fixtures/observe_ahk_source_boot.ps1'
+				),
+				'-Nonce',
+				nonce
+			];
+			let caught;
+			try {
+				context.actualRun('inert-recording-port', args);
+			} catch (error) {
+				caught = error;
+			}
+			assert.equal(launches, 1, 'the exact owner verdict flow must execute once');
+			assert.equal(
+				Boolean(caught),
+				['failure', 'parse-failure-stale'].includes(scenario),
+				scenario + ': diagnostics cannot alter the original status verdict'
+			);
+			const accepted = ['success', 'failure', 'recording-failed'].includes(scenario);
+			assert.equal(
+				logs.length,
+				accepted ? 1 : 0,
+				scenario + ': only the current bound record is retained'
+			);
+			if (accepted)
+				assert.deepEqual(JSON.parse(logs[0].slice('source-observer-stages: '.length)), record);
+			else if (scenario !== 'unrelated')
+				assert.ok(errors.includes('Current passive source observer stages are unavailable.'));
+			assert.ok(
+				!errors.join('\n').includes('private-path-must-not-be-printed'),
+				'observer read failures never expose private paths'
+			);
+		}
+	} finally {
+		fs.rmSync(retained, { recursive: true });
+	}
+}
+
 async function check(source, root = ROOT) {
+	checkObserverStageRetention(root);
 	const observations = [];
 	for (const scenario of [
 		'early-exit',
@@ -299,4 +421,4 @@ if (require.main === module)
 		}
 	);
 
-module.exports = { check, observe };
+module.exports = { check, observe, checkObserverStageRetention };
