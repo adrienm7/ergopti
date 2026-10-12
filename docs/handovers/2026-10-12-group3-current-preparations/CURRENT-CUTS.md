@@ -7,16 +7,16 @@ receipts are unchanged. All thirteen Group 3 TODO items remain partial. Use
 [NEXT-STEPS.md](NEXT-STEPS.md) for the specific software, custody, native and
 device continuations. Items 16 and 38 remain required; item 22 stays excluded.
 
-The authenticated two-parent source snapshot is `50863919e29095c78a5b1a18b55aadbfee5b8c8f`.
-Earlier snapshot `b10fb252b8bc9ca90b8ea003e14de141bc23dfd8` is retained in ordinary
-published feature ancestry. The current composition includes latest Dev
-`ba41b79db7f9b3618ba3290cff1516a6a9d5e797`. Its sources
-include current Dev and the owner-published Group 6 tranche, preserving the
-Group 1 TOML correction and Group 6 diagnostics. The source-pin generator runs
-against that remotely recoverable Git object, with the fixed 21 source roster,
-original protected fields, 18/4/1/UNRUN and independent oracle unchanged.
-Its source-identical normal feature ancestry join must be received before
-qualification. Source authority does not grant any unexecuted native behavior.
+The current source seal is generated from published feature commit
+`0ec756d467fbf81b501baebb2aed1737b7aa609d`, which preserves the latest Dev
+`728aadc1c722c2e7af2511b3797844c20e4b325c` and all owned action cuts.
+The unchanged generator joins all twenty-one current source images to this
+ordinary recoverable Git ancestor and preserves the independent 23-case oracle.
+Source admission does not qualify native updater or Snapshot execution.
+
+The prior authenticated snapshots `50863919e29095c78a5b1a18b55aadbfee5b8c8f`
+and `b10fb252b8bc9ca90b8ea003e14de141bc23dfd8` remain actual feature ancestors.
+Their original raw receipts are retained unchanged as historical evidence.
 
 ## Published fixes and component receiving
 
@@ -75,3 +75,13 @@ cases fail. This source checkpoint preserves the original assertions and does
 not qualify native execution. Full Git-archive receiving reproduces the same
 three JS failures on BA41 and the composed Source snapshot, with equal output.
 Subsequent Dev fixes are adopted separately; no TODO item is removed.
+
+## Current composition receiving
+
+[The current composition receipt](latest-dev-composition-receiving.json) records
+18,998 simulated macOS unit successes, 101 standalone macOS E2E successes,
+13,544 Linux unit successes and 193 Linux E2E successes. Actual Linux HTTP
+checks pass. Source/index/HEAD remain exact. The two inherited JS source guards
+remain red (424/426); Root owns their pending corrections. Native Windows,
+Darwin, package/install and device reception are separate open requirements.
+No original assertion, warning policy or deadline was relaxed.

@@ -1,0 +1,45 @@
+{
+	"status": "PARTIAL_COMPOSITION_RECEIVING",
+	"source_head": "0ec756d467fbf81b501baebb2aed1737b7aa609d",
+	"dev_basis": "728aadc1c722c2e7af2511b3797844c20e4b325c",
+	"selected_gate": {
+		"selected_range": "728aadc1c722c2e7af2511b3797844c20e4b325c",
+		"scope": "Actual delivery delta against fresh integration destination; full tracked source/index/HEAD bracket; all selected gates unchanged",
+		"exit": 1,
+		"seconds": 3659.8986173959856,
+		"source_index_head_exact": true,
+		"raw_sha256": "b2f3c3a938bad2727f72d28cc6c3c6a3c956bed81e362676f719d4b88281c964"
+	},
+	"passed": {
+		"js_checks": 424,
+		"macos_simulated_units": 18998,
+		"macos_simulated_e2e": 101,
+		"linux_units": 13544,
+		"linux_e2e": 193,
+		"linux_streaming_http": 262,
+		"linux_local_api": 136,
+		"linux_retained_output": 18,
+		"linux_managed_http": 30
+	},
+	"failed": {
+		"js_checks": 2
+	},
+	"inherited_failures": [
+		"test-lua-gsub-single-return.cjs",
+		"test-layouts-defaults-single-source.cjs"
+	],
+	"skipped": ["one original macOS rolling_buffer_cap scenario"],
+	"not_executed": [
+		"native AHK unit/E2E/parse",
+		"native Darwin reception",
+		"integrated-source packaging and installation",
+		"physical keyboard/brightness/two-screen effects"
+	],
+	"source_controls": {
+		"passed": 22,
+		"native": false,
+		"oracle_labels": 23,
+		"oracle_unchanged": true
+	},
+	"items_removed": []
+}
