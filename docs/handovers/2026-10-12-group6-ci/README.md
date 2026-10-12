@@ -431,3 +431,35 @@ interpreter and kernel execution identity for changed Dev. Passive evidence
 completion is prepared outside the checkout for ownership review. It grants no
 clock, factory, TLS, model or corporate-network acceptance; no trust or deadline
 is changed. Root retains workflow, runner, inventory and source-guard ownership.
+
+## Source receiving and descriptor-close refusal
+
+Fresh Dev `6def133426bd33863242426ceaeac30ab659fa69` is received before this
+reader-only correction. `readSourceFile` formerly allowed an unconditional
+finally-close error to replace the original receiving refusal. The reviewed
+reader retains both exact failures in ordered AggregateError.errors and keeps
+the receiving value as cause; a separate Boolean preserves even thrown
+undefined/null/false. Single refusal objects and all successful bytes, digests,
+size/alias/device/inode/timestamp checks stay unchanged.
+
+The existing22-control source owner adds six real-file/descriptor vectors:
+paired errors with four original receiving values, receiving-only and
+closure-only. The original reader fails the new paired-error assertion, rather
+than a setup condition; the candidate passes all22 controls. Each close is
+attempted once, with exact error identities asserted. The fault boundary closes
+the real FD before throwing, so actual Windows close semantics or uncertain
+closure are not qualified by these portable results. No acknowledgment, retry
+or receipt of physical retirement is invented.
+
+All previous test assertions, literal control names/order, independent oracle
+and21 runtime pins remain. Root's original23 enrollment, CI/clock/graph paths
+and inactive staged-byte candidate are untouched. No Windows or stopped
+CA/PAC/curl/account experiment is launched. Original23 and complete native
+Unit/E2E/package/install remain unqualified. Only item62 changes in TODO.
+
+Sibling audit finds the same masking mechanism in the shared sealing
+generator's separate output-write finally block; it is unmodified here and
+requires coordinated follow-up. Its source reads already use the common reader.
+The original native diagnostic child separately retains its cleanup errors.
+This slice does not repair or attribute prior native failures. Items36/62 and
+transversal16/38 stay open;22 remains excluded.

@@ -10213,6 +10213,23 @@ completion is prepared separately for ownership review; it changes no trust,
 clock, acceptance or factory admission. Native managed-network delivery and
 trust restoration remain required.
 
+The common Windows updater source reader now preserves acquisition/validation
+refusal and a simultaneous descriptor-close refusal as two exact error values,
+with the original receiving value retained as cause. Single refusals and
+successful bytes/digests/identity guards remain unchanged. Cleanup is attempted
+once; uncertain closure is not retried or acknowledged. Six additive portable
+vectors in the existing22-control owner use real temporary files/descriptors
+with modeled read and close failures, including undefined/null/false. The
+original reader fails the paired-refusal assertion; the candidate passes22
+without native or official acceptance. No21-pin input, original23 label oracle,
+child command, timeout or native assertion is changed. Root retains CI enrollment
+and clock/graph ownership.
+
+The shared sealing generator's separate write/validation-plus-close masking
+path remains unmodified and requires a coordinated follow-up. Generator reads
+use the corrected common reader. This does not qualify original23 Windows,
+managed-network receiving or complete item62;16/38 stay open and22 excluded.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
