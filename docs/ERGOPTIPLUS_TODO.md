@@ -5373,6 +5373,27 @@ ACK/refusal subjects, all gesture-marker modes, Tap-Hold negative backup and
 external-edit cases, and the complete unchanged native suite. Source review
 and Linux-host encoding/JS checks do not complete that Windows validation.
 
+The Windows TOML tokenizer uses native forward LF search for positive integer
+cursors in unquoted comments, retaining its original character loop for an
+absent LF, a search stopped by NUL or other cursor types. All original 37
+fixture registrations and 280 assertions remain unchanged; 38 independently
+frozen UTF-16 controls cover cursor domains, quoting, separators, NUL,
+surrogates and exception outcomes. No corpus expectation is generated from
+the candidate. The launcher passes its eleven local checks, including the
+original 66 controls, 20 additive controls and both workflow guards. Manual
+Windows CI 38204598996 completed on exact private source 2abf20a709 with
+SDK 2.0.26. The original/candidate/inverse Native38 gate and strict candidate
+restoration gate passed; the raw artifact download remains refused by GitHub,
+so its individual raw records have not been independently received. The
+unchanged thirteen temporal subjects remain incomplete: four terminal passes,
+one started subject killed at the original shared 600,000 ms budget and eight
+subjects never started. Core JavaScript passed 412 of 413 checks; managed
+Ollama's Swift dependency control failed. Full Windows units, E2E, packaging
+and installation were skipped after the temporal failure. Phase measurement
+and complete native qualification remain required; no performance improvement
+or complete writer qualification is inferred. Installed-device acceptance and
+items 42 and 16/38 remain partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
