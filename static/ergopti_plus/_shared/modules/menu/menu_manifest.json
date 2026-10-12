@@ -7050,5 +7050,21 @@
 			],
 			"unavailable": "hide"
 		}
-	]
+	],
+	"shortcut_extension_construction_ahk": {
+		"kind": "owned_native_menu",
+		"platform": "ahk",
+		"program": [
+			"admit_markers",
+			"allocate_owned_menu",
+			"observe_native_builder",
+			"place_observed_result"
+		],
+		"result_frame": "shortcut_extension_result_frame",
+		"append_outcomes": [
+			"failed",
+			"empty",
+			"missing"
+		]
+	}
 }
