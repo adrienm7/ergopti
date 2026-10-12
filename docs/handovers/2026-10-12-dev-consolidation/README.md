@@ -345,6 +345,30 @@ Zenity/GTK and real devices remain unrun here.
 
 ### Terminal Mac receiving and preserved next native patch
 
+The complete successor on `0fc80d950a5a8bebe946481c25036059d09cc243` now passes
+18,952/18,952 in 1,576 modules, subprocess status 0, signal null and elapsed time
+1,450,143 ms. It receives the six failures below together, including the real
+runner's mandatory E2E corpus. This is portable Hammerspoon-double execution on
+Linux, not native macOS acceptance. Private terminal receipt:
+`/tmp/ergopti247-composed-hs-successor-receipt.json`; log:
+`/tmp/ergopti247-composed-hs-successor.log`. The preceding red and targeted
+successors remain recorded below; the new full receipt supersedes their
+previously pending composition check.
+
+The complete JS gate on `728aadc1c722c2e7af2511b3797844c20e4b325c` completed
+423/426, status 1, signal null, in 1,711,556 ms. The receipt is
+`/tmp/ergopti247-composed-js-full-receipt.json`. The gsub guard rejects the already
+parenthesized concatenation in `_shared/lua/llm/local_server_auth.lua`; the layout
+location guard treats the pure `find_entry` ISO lookup as a download client.
+Actual download settings remain owned by `modules/keymap/layout_registry.lua`.
+Both guarded-source observations existed on `ba41`; no new runtime defect is
+claimed. Root owns their source-policy corrections. Convention P instead scans
+ignored Python bytecode directories produced by its preceding tests. All four
+compared tracked trees retain only network/remap/tray, with vendor count 1/1.
+After terminal removal of the five exact owned cache files, the unchanged guard
+passes at 1/1. Its initial full-run failure remains failed. Future test shells
+set `PYTHONDONTWRITEBYTECODE=1`; no source assertion or threshold is waived.
+
 The full portable Mac suite on `0cd3c15aa86bf116c87a3db2bc5660205b61ec11`
 finished with 18,945 passes, six failures and 1,576 modules, exit 1. Three of
 those failures are corrected by `dcf146842` and `b046f00ff`: the unchanged closure
@@ -358,8 +382,8 @@ all six original scenarios and adds held-cancellation, stale/duplicate reply and
 carried-caller custody. Its actual canonical cohort passes 7/0 after the original
 3/3 failure. The fixture now models get/cancel/isSettled/onSettled; production
 correctly refuses missing native infrastructure. All six full-run failures now
-have targeted passing successors. The full suite has not been rerun after these
-three corrections. An incorrect
+have targeted passing successors. Before the complete successor above, the full
+suite had not been rerun after these three corrections. An incorrect
 module filter was rejected with zero cases; that invocation is not evidence.
 Fresh dev `2bfcf853c` was integrated at this terminal checkpoint, preserving G6.
 
@@ -382,14 +406,39 @@ and missing-right-Ctrl mutations fail. The independent review confirms exact
 original-edge consumption and retained partial ACK debt. Remapped modifiers
 still need their own qualified delivery/cleanup before production activation.
 
-On the fresh Windows checkout, coordinate these three C paths and vendor with
-Root, apply the patch and rebuild before committing changed live source:
+The [paired consumer correction](pending-modifier-consumer.patch) has SHA256
+`eedef72cfd2e1fee4d605f195b1a4a6e890a7807e15c2ca34733865a9a17085d` and base
+`0fc80d950a5a8bebe946481c25036059d09cc243`. The old guarded AHK consumer always
+expects one natural modifier unit; the pending C planner may correctly expect
+zero when another source retains its effective bit. The two executable lines
+inserted after natural-route validation use the retained before/after LR mask,
+without changing owner/key/sequence checks, unknown debt, emitter refusal or
+production admission. Exact three preimages and patch application are verified.
+
+The complete original AHK test file remains an exact byte prefix: all 184 Assert
+occurrences and registrations survive; 39 additional occurrences cover 96
+family/axis/origin/unchanged-edge cases and two unknown zero-unit retirements.
+The existing source guard retains thirteen controls and adds five inverse
+controls. Independent source receiving reproduces original RED 1, corrected
+GREEN 0. Syntax, loop-capture and encoding controls pass. These are source
+controls, not AHK execution: all 98 new AHK cases remain UNRUN, and their test
+ports do not qualify the actual DLL, hooks or physical output even on Windows.
+No new CHECKS entry, include, runner, workflow or active native source changes.
+
+On the fresh Windows checkout, coordinate the three C paths, paired adapter/test
+paths and vendor with Root. Apply both patches and rebuild before committing
+changed live source; current E4133 must not receive the new consumer alone:
 
 ```powershell
 git apply --check docs/handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch
+git apply --check docs/handovers/2026-10-12-dev-consolidation/pending-modifier-consumer.patch
 git apply docs/handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch
+git apply docs/handovers/2026-10-12-dev-consolidation/pending-modifier-consumer.patch
 powershell -NoProfile -File tools/build/build_windows_nav_owner.ps1 -UpdateTracked
 powershell -NoProfile -File tools/build/build_windows_nav_owner.ps1
+node tools/test/test-windows-terminal-output-custody-adapter.cjs
+& $env:ERGOPTI_AHK_RUNTIME /ErrorStdOut=UTF-8 static/ergopti_plus/windows/tests/run_all.ahk --only todo49-output
+& $env:ERGOPTI_AHK_RUNTIME /ErrorStdOut=UTF-8 static/ergopti_plus/windows/tests/run_all.ahk --only todo49-natural-custody
 node tools/test/test-ahk-full-startup-smoke.cjs
 ```
 
@@ -397,7 +446,10 @@ Require canonical MSVC/SDK prerequisites, the new output matrix census of eight,
 all original C/route/trace cases and exact new DLL/source fingerprints. The
 preceding E4133 DLL cannot qualify these changed inputs. No backend selection,
 hook-order assumption, production-cohort activation or physical proof is added.
-Remove this pending patch only when its exact changes and matching native
+Expect 98 cases in the new natural-custody selection, the original output
+cohort and eighteen source controls. Preserve actual status and runtime census;
+authored expectations are not executions. Remove both pending patches only
+when their exact changes and matching native
 artifact are durably integrated. Both transfer refs remain preserved until
 fresh integration/PR/CI checks authorize their cleanup.
 
@@ -511,5 +563,5 @@ Root owns inventory/runner/workflow reorganization and the Windows
 `unit/test_hotstrings_config.ahk` fixture isolation correction. This checkpoint
 preserves the historical registrations in `run_all.ahk`, `test_framework.ahk`
 and the legacy JS runner; it introduces no concurrent semantic migration.
-The ongoing discovery, startup-settlement and scalar JSON fixes will be
-published separately with their existing-path tests after this checkpoint.
+The discovery, startup-settlement and scalar JSON fixes were subsequently
+published with their existing-path tests in the checkpoints recorded above.

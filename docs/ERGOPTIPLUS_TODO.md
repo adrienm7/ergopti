@@ -43,8 +43,8 @@ results and native commands are in the
 [dev consolidation handover](handovers/2026-10-12-dev-consolidation/README.md).
 The existing groups 2/4/7 native checklists remain actionable; their TODO items
 stay open. Item 49 additionally retains unfinished production cohort migration,
-not merely native validation; its disabled cohort and stale native DLL are not
-presented as complete.
+not merely native validation; its disabled cohort and pending native receiving
+are not presented as complete.
 
 #### First verified dev consolidation checkpoint
 
@@ -193,7 +193,7 @@ The subsequent unreachable-server fixture correction preserves all six original
 scenarios and adds held-cancellation/late-receipt custody: 3/3 becomes 7/0.
 Its four HTTP doubles now model the required native settlement interface instead
 of manufacturing unavailable acquisition. All six observed failures have targeted
-passing successors; no complete Mac rerun is claimed after these changes.
+passing successors; at that checkpoint no complete Mac rerun was claimed.
 The complete Linux suite on `08c7886ba6f48d272cfd2768e5750c3282add211`
 passes 13,452/13,452 in 521 modules, actual subprocess exit 0 in 572,293 ms.
 
@@ -213,6 +213,35 @@ remain unfinished. Native or physical acceptance is not inferred from C tests.
 The [Windows continuation prompt](handovers/2026-10-12-dev-consolidation/windows-receiving-prompt.md)
 includes the release/one-click receiving route and native prerequisites. Root
 continues to own publication and CI; no release or direct main push is made.
+
+#### Composed terminal receiving and modifier consumer coupling
+
+The full portable Mac successor on `0fc80d950a5a8bebe946481c25036059d09cc243`
+passes 18,952/18,952 in 1,576 modules, actual subprocess status 0, signal null,
+in 1,450,143 ms. This receives all six preceding failures together, including
+the mandatory E2E corpus. It remains Linux-host execution with Hammerspoon
+doubles, not native macOS qualification. The full JS source run on `728aadc1c`
+passes 423/426, status 1, in 1,711,556 ms. Its three failures are retained:
+the gsub guard misclassifies an already-parenthesized concatenation, the registry
+guard classifies a pure ISO metadata lookup as a download client, and Convention
+P enumerates five test-generated ignored Python cache files. After those exact
+owned cache files are removed at the terminal checkpoint, the unchanged
+Convention P guard passes at its unchanged 1/1 threshold. Root owns the remaining
+source-guard corrections; no assertion, threshold or runner is weakened here.
+
+Item 49 additionally retains the
+[pending consumer correction](handovers/2026-10-12-dev-consolidation/pending-modifier-consumer.patch).
+Its SHA256 is `eedef72cfd2e1fee4d605f195b1a4a6e890a7807e15c2ca34733865a9a17085d`.
+The guarded AHK consumer must match the pending C planner's zero-unit natural
+modifier plans when another source retains the effective bit. Thirteen original
+and five new inverse source controls pass; the original consumer fails and the
+corrected consumer passes, independently reproduced. The complete original AHK
+test file remains an exact byte prefix, preserving all 184 Assert occurrences;
+39 are appended for 96 matrix cases and two uncertain-retirement cases.
+All 98 new AHK cases are authored but Windows UNRUN. Both pending patches and
+an actual official MSVC rebuild must land together; the current E4133 DLL still
+matches the preceding live source and must not receive the changed consumer
+alone. Production observer conversion and emission remain software work.
 
 ### Historical v1.0.0 publication checkpoint
 
@@ -5311,6 +5340,19 @@ once into an explicit String initializer before the switch and matches that
 local without a cast-pattern. All25 native cases, original permission/consent
 laws and archive/package/install requirements remain unchanged and unqualified.
 
+Group6 regular delivery integrates atomic `2688661e837d069056df17c2101330c892108f4d`
+through no-ff Dev `d91baccc8eaac1577827c47d0bc6b646e925efc0`; received Dev
+`08c7886ba6f48d272cfd2768e5750c3282add211` retains it. The feature is preserved.
+Portable projection controls pass, but no new macOS native acceptance is claimed.
+Read-only analysis of the authentic94fe archive receipt proves that the27.64ms
+observer budget belongs to the final polling child: the first observer starts
+285.296ms after the permission request. Three existing deadline/readiness
+controls pass. Seventy-three retained UI observations have no matching prompt;
+278 omitted phases prevent a whole-period absence claim. Permission API return,
+worker closure, no-prompt requery, both positive deliveries, policy denial and
+all six Brew operations still require native receiving. No initial-budget, TCC
+or main-thread cause is proved, and no timeout or assertion is changed.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -10149,6 +10191,27 @@ Its successor moves conversion into an explicit String initializer outside the
 case pattern. All63 portable method bodies, all14 native PAC cases, the exact
 five-span inverse and historical whole-source pin remain unchanged. Corrected
 native compilation/receiving remains required; items62,16 and38 stay open.
+
+Group6 next receiving is based on fresh Dev
+`08c7886ba6f48d272cfd2768e5750c3282add211`. Root receives the exact original
+Windows updater launcher blob `82b6946fd66e94ecd0e8893c1fe4df73eab2b4a1`
+(SHA256 `e7572508bc7bacc8d0db3afe2c8693aa2b6cc4458c9ae2af5ca39e95fa979541`)
+and its frozen23-label inventory:18 channel-replacement,4 global-config-barrier,
+1 inherited-critical. All21 current pins match; runtime remains UNRUN. The
+existing collector is absent from workflows and needs Root-owned enrollment on
+a fresh clean Windows checkout or before tracked PAC publication. Its original
+300000ms selection/execution and30000ms disposal clocks, immutable oracle and
+full Unit/E2E/build/install obligations remain. Source22 is not native23. No
+stopped CA/PAC/curl/account experiment is retried, and no dirty-source exception
+is introduced.
+
+The current Swift wire fixture still lacks same-call post-add trust facts. Its
+held native factory cannot be activated from historical94fe clock numbers:
+16 staged-source hashes have no retained original payloads, and compiler,
+interpreter and kernel execution identity remain unqualified. A passive evidence
+completion is prepared separately for ownership review; it changes no trust,
+clock, acceptance or factory admission. Native managed-network delivery and
+trust restoration remain required.
 
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
