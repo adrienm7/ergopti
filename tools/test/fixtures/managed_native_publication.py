@@ -35,6 +35,7 @@ SOURCE_FILES = (
     "static/ergopti_plus/_shared/go/native_http/listener_event_linux.go",
     "static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go",
     "static/ergopti_plus/_shared/go/native_http/listener_event_test.go",
+    "static/ergopti_plus/_shared/go/native_http/failure_stage_test.go",
 )
 VERSION = "0.24.0"
 CAPABILITY = "ERGOPTI_OLLAMA_NATIVE_HTTP_V1"

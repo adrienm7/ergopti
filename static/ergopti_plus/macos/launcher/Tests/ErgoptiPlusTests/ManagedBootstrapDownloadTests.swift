@@ -24,6 +24,29 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 			bytes: JSONSerialization.data(withJSONObject: fields)))
 	}
 
+	private func assertUnambiguousFailedStageMetadata() throws {
+		let valid = #"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":"native_policy_load"}"#
+		let collector = ManagedBootstrapCollector(maximumBytes: nil, remaining: { 10 }, writeBody: { _ in true })
+		XCTAssertTrue(collector.consume(try XCTUnwrap(ManagedHTTPFrame.encode(tag: 67, bytes: Data(valid.utf8)))))
+		XCTAssertTrue(collector.terminal)
+		XCTAssertFalse(collector.successfulTerminal)
+		XCTAssertEqual(collector.terminalReason, "unavailable")
+		XCTAssertNil(collector.failure)
+		let rejected = [
+			#"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":null}"#,
+			#"{"version":1,"success":true,"reason":"complete","native_refusal_stage":"native_session_terminal"}"#,
+			#"{"version":1,"success":false,"reason":"certificate","native_refusal_stage":"native_policy_load"}"#,
+			#"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":"native_policy_load","native_refusal_stage":"native_proxy_lookup"}"#,
+			#"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":"native_policy_load","native_refusal_st\u0061ge":"native_proxy_lookup"}"#
+		]
+		for text in rejected {
+			let refused = ManagedBootstrapCollector(maximumBytes: nil, remaining: { 10 }, writeBody: { _ in true })
+			XCTAssertFalse(refused.consume(try XCTUnwrap(ManagedHTTPFrame.encode(tag: 67, bytes: Data(text.utf8)))))
+			XCTAssertEqual(refused.failure, "protocol")
+			XCTAssertFalse(refused.terminal)
+		}
+	}
+
 	func testPrivateAdmissionKeepsExactPublicPinAndRefusesOtherJSONKinds() throws {
 		let parsed = try XCTUnwrap(ManagedBootstrapRequest.parse(JSONSerialization.data(withJSONObject: input)))
 		XCTAssertEqual(parsed.url.absoluteString, "https://release.example/exact/archive?q=pin")
@@ -97,6 +120,7 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 		XCTAssertTrue(collector.verified(digest: digest, size: 3))
 		XCTAssertEqual(written, Data("abc".utf8))
 		XCTAssertFalse(collector.consume(try frame(67, ["version": 1, "success": true, "reason": "complete"])))
+		try assertUnambiguousFailedStageMetadata()
 	}
 
 	func testRedirectHeaderCancelsBeforeAnyBodyAndStillRequiresClosure() throws {

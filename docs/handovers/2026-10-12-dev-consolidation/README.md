@@ -565,3 +565,114 @@ preserves the historical registrations in `run_all.ahk`, `test_framework.ahk`
 and the legacy JS runner; it introduces no concurrent semantic migration.
 The discovery, startup-settlement and scalar JSON fixes were subsequently
 published with their existing-path tests in the checkpoints recorded above.
+
+### Issue94 native HTTP refusal stages
+
+The diagnostic correction composes on dev60001d60f after receiving the complete
+incoming Group3 checkpoint. It adds nine fixed stage/reason pairs to the native
+generic HTTP worker's failed completion frame and validates them in the Python,
+Go and Python-free artifact receivers. No private exception, URL, credential or
+path enters this field. The existing success frame and legacy failed frame stay
+valid; malformed, duplicate, null, mismatched or successful stage-bearing frames
+refuse. The Python-free artifact result retains its original three-field final
+envelope; the new diagnostic is exposed through the existing Python bootstrap
+failure fact after confirmed child retirement. Public Go `Do` also preserves it.
+
+The one authority is `_shared/modules/network/native_http_failure_stages.json`.
+Its generator owns bounded spans in three existing source files. The generator
+registry gains only those outputs. Existing registered
+`tools/test/test-macos-managed-bootstrap-http.cjs` receives18 portable authority
+checks on all three hosts and six extra Python cases on POSIX after the unchanged
+25+12+35+4 cohorts. No CHECKS, runner, workflow or job-address guard was changed.
+Three Go regression names and their source enter the existing producer contract.
+The receiving-only Go module pins the exact upstream x/sys dependency without
+altering the production standalone module or source injector.
+
+Actual Python3.13.5 receiving:6 tests,35 independent subprocess/projection
+vectors, exit0; genuine predecessor21 assertion failures. Node22.22.2 authority
+checks:18/0, including duplicate/escaped fields, strict UTF-8 and bounded span
+repair. The existing composed Node entry receives all82 Python tests plus18
+authority checks with actual status0, signalnull in3,014ms. Its earlier shell
+invocation returned1 despite the same successful footer and remains failed with
+an unattributed exit discrepancy. The structured receipt supersedes that
+invocation for current receiving without rewriting the old result.
+
+Frozen delivery Go1.26.8 receiving:70 passing test events, zero failing events,
+zero skips and a terminal package PASS, actual status0, signalnull,1,905ms
+with admitted real Unix/loopback sockets. Genuine predecessor:59 passes,
+10 failures across69 events. The intermediate public-Do propagation omission
+also failed its regression before correction. The earlier restricted-sandbox
+socket refusals remain distinct failures. Exact receipts and sanitized issue94
+logs remain private outside Git.
+
+The complete portable Hammerspoon gate on this source composition finished
+18,998/18,998 in 1,576 modules: actual subprocess status0, signalnull,
+1,368,730ms. These are Linux executions with Hammerspoon doubles, not native
+macOS receiving. The full JS gate remains a recorded failure:416 passes,
+10 failures across426 checks, actual status1, signalnull,1,383,861ms. Follow-up
+composition corrections preserve the original Swift XCTest method census
+(12 worker and10 bootstrap methods), invoking the new assertions from existing
+cases. The existing Python receiving corpus preserves all172 tests and both
+historical source pins;49 additional closed-inverse refusal controls exercise
+the new producer projection. Node authority controls are inlined once into the
+existing registered bootstrap entry; no standalone gate or inventory exemption
+was added. Three mistakenly selected nonexistent check names were recorded as
+invocation failures and rerun using their actual registered paths.
+
+All eight affected JS composition checks have now passed targeted receiving
+with actual status0 and signalnull: native PAC qualification, item36 qualification,
+Swift XCTest evidence, pipeline wiring, release reruns, Windows bundle manifest,
+managed Ollama protocol and gate registration. Additional bootstrap HTTP,
+generator ownership and the unchanged Lua pinned-read ratchet also pass. The
+release fixture and its copy inventory each receive one literal source dependency
+addition; all prior assertions remain. Its existing Python publication owner
+passes24 cases with new actual admission, stale/missing-source refusal and
+synthetic-authority controls. Original declaration and missing-file refusals
+remain recorded failures. The final release-rerun successor exits0 in23,859ms.
+No workflow, runner, inventory exemption or publication rule changed.
+
+The two previously reproduced source-policy failures remain owned by Root:
+`test-lua-gsub-single-return.cjs` and `test-layouts-defaults-single-source.cjs`.
+The targeted successes do not rewrite the failed full JS receipt into a full
+suite pass. Format checking passes393 files; strict conventions report no
+violations. Receiving requires the native Mac commands below before qualification.
+
+Native Swift/XCTest, Darwin CFNetwork/session behavior and installed diagnostic
+collection are **UNRUN**. On a macOS14+ VM with the canonical Xcode toolchain:
+
+```sh
+node tools/codegen/codegen-native-http-failure-stages.cjs --check
+node tools/test/test-macos-managed-bootstrap-http.cjs
+swift test --package-path static/ergopti_plus/macos/launcher --filter 'ManagedHTTPWorkerTests|ManagedBootstrapDownloadTests'
+```
+
+Require the new emitter stage/reason/status and strict collector cases plus all
+existing assertions to pass. Rebuild and install the complete signed bundle
+from matching source before retrying MLX bootstrap. Expect one allowlisted stage
+in its existing failure fact, the original child status/reason and confirmed
+cleanup. Old strict three-field receivers reject enriched failures, so ship and
+rebuild producer and receivers atomically; a cached old Go binary's V1
+capability alone does not establish compatibility. Preserve qualification flags,
+consent and deadlines. These checks need native software; no physical keyboard,
+screen or trackpad is required for this diagnostic lot. The installation cause
+in the historical report remains unresolved until native receiving.
+
+### Published diagnostic checkpoint and preserved native output candidates
+
+Native HTTP diagnostic correction `e94153e87b698b24de86133239319bde4be12a90`
+is verified published on dev after receiving G6 source-reader checkpoint
+`80d4588f8eb6fbd66f2f420c843faa395a466620`. Post-rebase source-reader,
+bootstrap HTTP and release-rerun checks have actual status0/signalnull;
+the last takes27,301ms. No workflow or runner was modified. The shared
+publication fixture and its release-test copy inventory each gained one literal
+source dependency; Root should preserve both during CI composition.
+
+The [native continuation](pending-native-output-receiving.md) preserves the
+additional captured-clock and retained-output serializer corrections, their
+regressions and source inventories. Both were implemented and executed in
+Linux C projections, remain unapplied to the live DLL, and need a coordinated
+real MSVC/SDK rebuild before receiving their source union. The expected combined
+eleven output matrices are not an executed result. The bridge, emitter and
+remaining cohort conversion are still software work; native and physical
+acceptance remain separate. No compiled private artifact, full log or diagnostic
+archive is included in Git. Item49 remains open.

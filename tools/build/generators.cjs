@@ -54,6 +54,14 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-native-http-failure-stages.cjs',
+		outputs: [
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift',
+			'static/ergopti_plus/macos/platform/network/native_http.py',
+			'static/ergopti_plus/_shared/go/native_http/transport.go'
+		]
+	},
+	{
 		script: 'codegen/codegen-managed-bootstrap.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift',

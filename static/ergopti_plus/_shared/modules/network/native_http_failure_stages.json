@@ -1,0 +1,60 @@
+{
+	"schema_version": 1,
+	"stages": [
+		{
+			"symbol": "policyLoad",
+			"code": "native_policy_load",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "selectionBound",
+			"code": "native_selection_bound",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "proxyLookup",
+			"code": "native_proxy_lookup",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "proxyDictionary",
+			"code": "native_proxy_dictionary",
+			"reasons": ["proxy"]
+		},
+		{
+			"symbol": "routeEmpty",
+			"code": "native_route_empty",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "certificateLoad",
+			"code": "native_certificate_load",
+			"reasons": ["certificate"]
+		},
+		{
+			"symbol": "lookupDeadline",
+			"code": "native_lookup_deadline",
+			"reasons": ["deadline"]
+		},
+		{
+			"symbol": "dispatchDeadline",
+			"code": "native_dispatch_deadline",
+			"reasons": ["deadline"]
+		},
+		{
+			"symbol": "sessionTerminal",
+			"code": "native_session_terminal",
+			"reasons": [
+				"deadline",
+				"cancelled",
+				"offline",
+				"certificate",
+				"proxy",
+				"connect",
+				"unavailable",
+				"protocol",
+				"content_encoding"
+			]
+		}
+	]
+}

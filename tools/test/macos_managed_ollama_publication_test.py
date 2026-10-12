@@ -15,6 +15,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 import zipfile
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,6 +30,12 @@ def module(name, path):
 STAGE = module("managed_inputs", ROOT / "tools/build/stage-macos-managed-ollama-inputs.py")
 PUBLICATION = module(
     "managed_publication", ROOT / "tools/build/verify-macos-managed-ollama-publication.py"
+)
+
+
+FIXTURE = module(
+    "independent_managed_publication_fixture",
+    ROOT / "tools/test/fixtures/managed_native_publication.py",
 )
 
 
@@ -252,8 +259,85 @@ class PublicationAdmission(unittest.TestCase):
             info.size = len(encoded)
             archive.addfile(info, io.BytesIO(encoded))
 
+    def _assert_independent_publication_fixture_fingerprint_admission(self):
+        # The reviewed handwritten fixture is the oracle; the live producer
+        # contract is the input checked against it, never a generated inventory.
+        added = "static/ergopti_plus/_shared/go/native_http/failure_stage_test.go"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository, assets = root / "repository", root / "assets"
+            repository.mkdir()
+            assets.mkdir()
+            for relative in dict.fromkeys(
+                (
+                    *FIXTURE.SOURCE_FILES,
+                    added,
+                    PUBLICATION.OWNER.CONTRACT,
+                    PUBLICATION.OWNER.DEFAULTS,
+                )
+            ):
+                destination = repository / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes((self.repository / relative).read_bytes())
+            subprocess.run(["git", "init", "--quiet", str(repository)], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repository),
+                    "-c",
+                    "user.name=Publication Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "commit",
+                    "--quiet",
+                    "--allow-empty",
+                    "-m",
+                    "Bind independent synthetic publication receiving",
+                ],
+                check=True,
+            )
+            FIXTURE.fixture(repository, assets, self.options.tag, self.options.channel)
+            catalogue = json.loads((assets / FIXTURE.CATALOGUE).read_bytes())
+            self.assertEqual(set(catalogue["repository_source_sha256"]), set(FIXTURE.SOURCE_FILES))
+            self.assertEqual(
+                catalogue["repository_source_sha256"][added],
+                hashlib.sha256((repository / added).read_bytes()).hexdigest(),
+            )
+            receipts = repository / "managed-publication-fixture-receipts"
+            self.assertEqual(len(tuple(receipts.iterdir())), 2)
+            for receipt in receipts.iterdir():
+                facts = json.loads(receipt.read_bytes())
+                self.assertIs(facts["native_execution"], False)
+                self.assertEqual(facts["fixture_role"], "synthetic publication admission only")
+            refused_assets = root / "refused-assets"
+            refused_assets.mkdir()
+            stale = tuple(name for name in FIXTURE.SOURCE_FILES if name != added)
+            with mock.patch.object(FIXTURE, "SOURCE_FILES", stale):
+                with self.assertRaisesRegex(
+                    ValueError, "independently reviewed publication fixture"
+                ):
+                    FIXTURE.fixture(
+                        repository, refused_assets, self.options.tag, self.options.channel
+                    )
+            self.assertEqual(tuple(refused_assets.iterdir()), ())
+            path = repository / PUBLICATION.OWNER.CONTRACT
+            original = path.read_bytes()
+            contract = json.loads(original)
+            contract["source_fingerprint_paths"].remove(added)
+            path.write_bytes(json.dumps(contract).encode())
+            with self.assertRaisesRegex(ValueError, "independently reviewed publication fixture"):
+                FIXTURE.fixture(repository, refused_assets, self.options.tag, self.options.channel)
+            self.assertEqual(tuple(refused_assets.iterdir()), ())
+            path.write_bytes(original)
+            (repository / added).unlink()
+            with self.assertRaises(FileNotFoundError):
+                FIXTURE.fixture(repository, refused_assets, self.options.tag, self.options.channel)
+            self.assertEqual(tuple(refused_assets.iterdir()), ())
+
     def test_exact_both_assets_and_sealed_catalogues_pass(self):
         self.assertEqual(PUBLICATION.verify(self.options), 2)
+        self._assert_independent_publication_fixture_fingerprint_admission()
 
     def test_missing_native_asset_refuses(self):
         (self.assets / self.contract["assets"]["macos-arm64"]["filename"]).unlink()
