@@ -37,6 +37,7 @@ local function fresh_fixture()
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	local fixture = {
+		clock_ns = 0,
 		native_timers = {},
 		next_native_options = {},
 		posted_triggers = {},
@@ -59,6 +60,7 @@ local function fresh_fixture()
 
 	local timer_contract = {}
 	for key, value in pairs(hs_stub.timer) do timer_contract[key] = value end
+	timer_contract.absoluteTime = function() return fixture.clock_ns end
 	timer_contract.new = function(delay, callback)
 		local options = table.remove(fixture.next_native_options, 1) or {}
 		local native = {
@@ -100,7 +102,10 @@ local function fresh_fixture()
 		end
 		function native:running() return self.running_state end
 		function native:fire()
-			if self.running_state then self.callback() end
+			if self.running_state then
+				fixture.clock_ns = fixture.clock_ns + math.ceil(self.delay * 1e9)
+				self.callback()
+			end
 		end
 		function native:deliver()
 			self.callback()
@@ -213,7 +218,13 @@ local function start_slot(fixture, slot)
 	end
 	helpers.assert_true(#fixture.native_timers > before,
 		"the real TimerScheduler must acquire a native owner for " .. slot)
-	return fixture.native_timers[before + 1]
+	local target = fixture.native_timers[before + 1]
+	if slot == "wrap" then
+		-- These controls isolate timer identity and restore refusal after the
+		-- native paste grace. Broker tests separately hold PAUSE inside that grace.
+		fixture.clock_ns = fixture.clock_ns + math.ceil(target.delay * 1e9)
+	end
+	return target
 end
 
 
