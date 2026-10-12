@@ -87,7 +87,13 @@ local RuntimeGuard = require("infra.runtime_guard")
 -- the first Logger.* call. Without this every log line on Linux — including the
 -- two fatal errors below — went to a ring buffer and nowhere else.
 local LoggerSink = require("infra.logger_sink")
-LoggerSink.install(Logger)
+-- A privacy admission failure must not let Lua print the unredacted exception.
+-- A false durability result remains a successfully admitted stdout-only sink.
+local privacy_admitted, _, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
+if not privacy_admitted or privacy_refusal then
+	io.stderr:write("[logger_sink] Privacy initialization refused; daemon not started.\n")
+	os.exit(1)
+end
 
 -- Single source of the driver version (never a re-typed literal).
 local Version = require("infra.version")

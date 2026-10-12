@@ -7,7 +7,10 @@ receipts are unchanged. All thirteen Group 3 TODO items remain partial. Use
 [NEXT-STEPS.md](NEXT-STEPS.md) for the specific software, custody, native and
 device continuations. Items 16 and 38 remain required; item 22 stays excluded.
 
-The authenticated two-parent source snapshot is `b10fb252b8bc9ca90b8ea003e14de141bc23dfd8`. Its sources
+The authenticated two-parent source snapshot is `50863919e29095c78a5b1a18b55aadbfee5b8c8f`.
+Earlier snapshot `b10fb252b8bc9ca90b8ea003e14de141bc23dfd8` is retained in ordinary
+published feature ancestry. The current composition includes latest Dev
+`ba41b79db7f9b3618ba3290cff1516a6a9d5e797`. Its sources
 include current Dev and the owner-published Group 6 tranche, preserving the
 Group 1 TOML correction and Group 6 diagnostics. The source-pin generator runs
 against that remotely recoverable Git object, with the fixed 21 source roster,
@@ -61,3 +64,14 @@ reader of the eight generic bindings. Its unresolved, generated and dynamic
 edges remain unproved; this is not exhaustive semantic or native qualification.
 No Windows-local test was launched during the maintainer's offline period.
 No peer runner, workflow, inventory or fixture is taken over by this handover.
+
+## October 12 resolved Dev checkpoint
+
+The resolved BA41 source composition completed its unchanged selected gates
+with exit 1. [The exact partial receipt](ba41-terminal-partial-receiving.json)
+records passed, failed, skipped and unexecuted outcomes. Linux unit and actual
+HTTP checks pass; three JS checks, six simulated macOS cases and ten Linux E2E
+cases fail. This source checkpoint preserves the original assertions and does
+not qualify native execution. Full Git-archive receiving reproduces the same
+three JS failures on BA41 and the composed Source snapshot, with equal output.
+Subsequent Dev fixes are adopted separately; no TODO item is removed.

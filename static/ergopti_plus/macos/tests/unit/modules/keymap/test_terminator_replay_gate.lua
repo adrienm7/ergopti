@@ -178,6 +178,7 @@ end
 
 local function capture_replay_errors(callback)
 	local Logger = require("infra.logger")
+	helpers.admit_logger_privacy(Logger)
 	local original_error = Logger.error
 	local errors = {}
 	Logger.error = function(log, format_string, ...)

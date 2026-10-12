@@ -29,7 +29,10 @@ function M.run(helpers, manifest, Logger)
 				return true
 			end,
 			changed = function() f.calls.changed = f.calls.changed + 1 end,
-			prompt = function() return f.selected end,
+			prompt = function()
+				if f.on_prompt then f.on_prompt() end
+				return f.selected
+			end,
 			error = function(open) f.calls.error = f.calls.error + 1; f.offered = open end }
 		for _, kind in ipairs({ "open", "reload", "create" }) do
 			ports[kind] = function() f.calls[kind] = f.calls[kind] + 1; return not f.refuse end
@@ -141,6 +144,21 @@ function M.run(helpers, manifest, Logger)
 			helpers.assert_eq(f.calls.changed, 0)
 			helpers.assert_type(f.offered, "function", "every refusal offers the source opener")
 		end)
+		for _, changed in ipairs({ "enabled", "seconds" }) do
+			helpers.it("(user-hotstrings-menu-held-prompt) refuses changed " .. changed .. " preference without overwriting it", function()
+				local f = fixture()
+				f.selected = "125"
+				f.on_prompt = function()
+					if changed == "enabled" then f.enabled = true else f.seconds = 0.75 end
+				end
+				helpers.assert_eq(f.rows[1].menu[2].fn(), false)
+				helpers.assert_eq(f.enabled, changed == "enabled")
+				helpers.assert_eq(f.seconds, changed == "seconds" and 0.75 or 0.5)
+				helpers.assert_eq(f.calls.set, 0)
+				helpers.assert_eq(f.calls.changed, 0)
+				helpers.assert_eq(f.calls.error, 1)
+			end)
+		end
 		helpers.it("(user-hotstrings-menu) refused native publication surfaces a source-open action", function()
 			local f = fixture()
 			f.refuse = true

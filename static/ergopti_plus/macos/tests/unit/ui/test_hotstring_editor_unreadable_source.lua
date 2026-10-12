@@ -486,6 +486,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 			error("injected deferred menu refresh failure", 0)
 		end, 50)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
@@ -522,6 +523,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		editor.open("menu")
 
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)

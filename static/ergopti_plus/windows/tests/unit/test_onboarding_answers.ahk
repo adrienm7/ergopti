@@ -554,8 +554,8 @@ _TOAN_FullSemanticCommit() {
 	Folder := SubStr(_TOAN_NewPath(), 1, -5), Path := Folder . "\config.toml"
 	AssertTrue(DllCall("CreateDirectoryW", "Str", Folder, "Ptr", 0, "Int"),
 		"the wizard transaction fixture must exclusively own its directory")
-	Source := 'script = {locale = "en", future = "retain"}`n[future]`nold = "retain" # user data`n'
-	Expected := Chr(0xFEFF) . 'script = {locale = "fr", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Source := _CMJFixtureCurrentSource('script = {locale = "en", future = "retain"}`n[future]`nold = "retain" # user data`n')
+	Expected := Chr(0xFEFF) . _CMJFixtureCurrentSource('script = {locale = "fr", future = "retain"}`n[future]`nold = "retain" # user data`n')
 	Seen := Map("calls", 0)
 	Observe() {
 		Seen["calls"] += 1
@@ -581,10 +581,10 @@ _TOAN_FullSemanticCommit() {
 		_AhkSubDir := ""
 		_PathsFile := Folder . "\paths.toml"
 		_Stub_SentText := []
-		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CFGFS_Prepare(Path)
 		Plan := _OnbWeb_FinishPlan(_TOAN_Answers([], "fr", Folder))
 		AssertTrue(Plan is Map)
 		Result := _Onboarding_Commit(Plan["locale"], Plan["config_dir"],
@@ -610,6 +610,18 @@ _TOAN_FullSemanticCommit() {
 		AssertEqual("reload_preserving_suspend", _Stub_SentText[1].kind)
 		AssertFalse(_ConfigWriteTerminalIsActive())
 		AssertFalse(ConfigWriteLeaseBusy())
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "returning reload stub does not confer next-process READY")
+		Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
+		Receipt := Folder . "\cold-reload-receipt.txt"
+		AssertFalse(FSStrictExists(Receipt))
+		Command := '"' . A_AhkPath . '" /ErrorStdOut "' . Harness . '" onboarding_recovery "' . Path . '" "' . _PathsFile . '" "' . Receipt . '"'
+		AssertEqual(0, RunWait(Command, A_ScriptDir, "Hide"), "the actual cold replacement recovers and reads the wizard publication")
+		AssertEqual("recovered_new`nfr`nretain`n", FSReadUtf8Exact(Receipt), "the cold child confirms only its closed recovered semantic facts")
+		AssertTrue(FSDeleteStrict(Receipt))
+		AssertFalse(FSStrictExists(Receipt), "the exact owned cold-child receipt is retired")
+		AssertFalse(FSStrictExists(ConfigTransitionWalPath(_PathsFile)), "cold recovery retires the retained committed journal")
+		AssertEqual(Expected, FSReadUtf8Exact(Path), "cold recovery preserves the exact published semantic image")
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"], "the retained test process reaches its genuine later Boot before reading")
 		Cache := ParseConfigTomlFile(Path)
 		AssertEqual("fr", IniCacheGet(Cache, "script", "locale"))
 		AssertEqual("retain", IniCacheGet(Cache, "script", "future"))

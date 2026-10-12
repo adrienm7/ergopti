@@ -31,10 +31,82 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Windows API form retains modal source authority and durable publication',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-api-add-production.cjs'],
+		repro: 'npm run test:windows-api-add-production'
+	},
+	{
+		name: 'Windows managed Ollama production uses owned per-user ports and separate consent',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-managed-bootstrap.cjs'],
+		repro: 'node tools/test/test-windows-managed-bootstrap.cjs'
+	},
+	{
+		name: 'Windows navigation portable census retains every native and portable case',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-nav-portable-registration.cjs'],
+		repro: 'node tools/test/test-windows-nav-portable-registration.cjs'
+	},
+	{
+		name: 'Windows navigation executes every portable production C case',
+		cmd: process.execPath,
+		args: ['tools/test/run-nav-event-owner-portable.cjs'],
+		repro: 'node tools/test/run-nav-event-owner-portable.cjs'
+	},
+	{
+		name: 'Windows captured-event route core executes independent event vectors',
+		cmd: process.execPath,
+		args: ['tools/test/run-windows-replay-route-core.cjs'],
+		repro: 'node tools/test/run-windows-replay-route-core.cjs'
+	},
+	{
+		name: 'Windows canonical output planner executes independent custody matrices',
+		cmd: process.execPath,
+		args: ['tools/test/run-windows-terminal-output-plan.cjs'],
+		repro: 'node tools/test/run-windows-terminal-output-plan.cjs'
+	},
+	{
+		name: 'Windows terminal output custody adapter preserves exact native bindings and closed admission',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-terminal-output-custody-adapter.cjs'],
+		repro: 'npm run test:windows-terminal-output-custody-adapter'
+	},
+	{
+		name: 'Windows Group 7 receipt parser refuses incomplete and malformed native evidence',
+		cmd: process.execPath,
+		args: ['tools/diagnostics/test_windows_group7_receipt.cjs'],
+		repro: 'node tools/diagnostics/test_windows_group7_receipt.cjs'
+	},
+	{
+		name: 'Windows bounded hook trace core retains exact ownership and loss receipts',
+		cmd: process.execPath,
+		args: ['tools/test/run-windows-hook-trace-core.cjs'],
+		repro: 'npm run test:windows-hook-trace-core'
+	},
+	{
+		name: 'Windows native callback trace reader refuses missing or malformed observations',
+		cmd: process.execPath,
+		args: ['tools/diagnostics/test_windows_group7_trace.cjs'],
+		repro: 'npm run test:windows-hook-trace-protocol'
+	},
+	{
+		name: 'Windows hook tracing remains opt-in, isolated and bound to native source inputs',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-hook-trace-source.cjs'],
+		repro: 'npm run test:windows-hook-trace-source'
+	},
+	{
 		name: 'Windows ordered-pair cohort receiving retains original publisher and retirement',
 		cmd: process.execPath,
 		args: ['tools/test/test-windows-key-combination-cohorts.cjs'],
 		repro: 'node tools/test/test-windows-key-combination-cohorts.cjs'
+	},
+	{
+		name: 'web text decoding and icon demo preserve literal input with bounded parsing',
+		cmd: process.execPath,
+		args: ['tools/test/test-web-text-admission.cjs'],
+		repro: 'npm run test:web-text-admission'
 	},
 	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',

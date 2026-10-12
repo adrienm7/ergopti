@@ -1212,6 +1212,7 @@ function M.new(deps, presets, ram_getter)
 	schedule_initial_refresh()
 
 	local function check_model_loadable(target_model, on_success, on_fail, opts)
+		local origin = OllamaEndpoint.get_base_url()
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
 		local requirement_lifecycle = type(opts) == "table"
 			and opts._requirement_lifecycle or nil
@@ -1232,7 +1233,7 @@ function M.new(deps, presets, ram_getter)
 			return ok == true and current == true
 		end
 		local function current_or_cancel()
-			if still_current() then return true end
+			if still_current() and origin == OllamaEndpoint.get_base_url() then return true end
 			settle_failure("stale", false)
 			return false
 		end
@@ -1292,7 +1293,7 @@ function M.new(deps, presets, ram_getter)
 			end
 			requirement_registered = true
 		end
-		local accepted = client.post("http://127.0.0.1:11434/api/chat",
+		local accepted = client.post(origin .. "/api/chat",
 			{ ["Content-Type"] = "application/json" }, body, function(result)
 				if not current_or_cancel() then return end
 				if type(result) == "table" and result.status == 200 then
@@ -1656,14 +1657,14 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not current_or_cancel() then return finish_result(false) end
 			if code == 0 then
-				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(owner, true, target_model)
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
+					pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 					settle_success()
-				end, function()
-					settle_success()
+				end, function(reason)
+					settle_cancel(reason == "stale" and "stale" or "model_load_failed")
 				end, opts)
 			elseif code == 15 then
 				pcall(notifications.notify, i18n.get("ollama.cancelled_title"), i18n.get("ollama.download_cancelled"), "warning")

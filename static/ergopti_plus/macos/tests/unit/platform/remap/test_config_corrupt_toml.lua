@@ -22,6 +22,7 @@ package.loaded["infra.toml.codec"] = _toml_stub
 
 -- Capture Logger calls via the runtime capture helper.
 local Logger = require("infra.logger")
+helpers.admit_logger_privacy(Logger)
 local captured = {}
 local original_fn = {}
 for _, level in ipairs({"debug", "info", "warn", "error"}) do

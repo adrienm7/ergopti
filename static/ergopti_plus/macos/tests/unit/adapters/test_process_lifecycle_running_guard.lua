@@ -41,6 +41,7 @@ local function load_adapter(options)
 
 	package.loaded["infra.logger"] = nil
 	local real_logger = require("infra.logger")
+	helpers.admit_logger_privacy(real_logger)
 	local logger = setmetatable({}, { __index = real_logger })
 	logger.error = function(_module, fmt, ...)
 		local ok, rendered = pcall(string.format, fmt, ...)

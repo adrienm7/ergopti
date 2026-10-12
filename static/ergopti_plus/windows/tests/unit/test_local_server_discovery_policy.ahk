@@ -356,3 +356,81 @@ _LSD_CallerCriticalCase(InitialCritical) {
 }
 Test("local discovery: callbacks run outside Critical and restore a non-Critical caller", _LSD_CallerCriticalCase.Bind("Off"))
 Test("local discovery: callbacks run outside Critical and restore the exact Critical interval", _LSD_CallerCriticalCase.Bind(37))
+
+_LSD_DynamicOrderOwnsOnlyTickets() {
+	Fixture := _LSD_Fixture(["old"], 1000)
+	Old := Map("name", "old", "targets", [Map("id", "old", "base_url", "http://localhost:19273/v1")])
+	AssertTrue(Fixture.Sweep(Old))
+	Ticket := Fixture.Calls["old"]["old"]["ticket"]
+	AssertTrue(Ticket["is_current"].Call())
+	Order := ["configured:new"]
+	AssertTrue(Fixture.Controller.SetOrder(Order))
+	Order.Push("caller-mutation")
+	AssertEqual(1, Fixture.Controller.Order.Length, "logical order retains its own copied array")
+	AssertFalse(Ticket["is_current"].Call())
+	AssertFalse(Fixture.Controller.IsSweeping())
+	AssertFalse(Fixture.Controller.HasCheckedAt)
+	AssertEqual(0, Fixture.Controller.Results.Count)
+	AssertEqual(1, Fixture.Controller.Waiters.Length, "membership invalidation retains observers for the next completed sweep")
+	Generation := Fixture.Controller.Generation
+	AssertFalse(Fixture.Controller.SetOrder(["configured:new"]))
+	AssertEqual(Generation, Fixture.Controller.Generation)
+	Thrown := false
+	try Fixture.Controller.SetOrder(["configured:new", "configured:new"])
+	catch ValueError
+		Thrown := true
+	AssertTrue(Thrown, "duplicate identities cannot partially change membership")
+	AssertEqual(Generation, Fixture.Controller.Generation)
+	Fresh := Map("name", "fresh", "targets", [Map("id", "configured:new", "base_url", "http://localhost:19274/v1")],
+		"sync", Map("configured:new", Map("ok", true, "status", 200, "body", '{"data":[{"id":"fresh-model"}]}')))
+	AssertTrue(Fixture.Sweep(Fresh))
+	AssertEqual(2, Fixture.Done.Length, "both observers settle only against the newer completed logical result")
+	Fixture.Calls["old"]["old"]["settle"].Call(Map("ok", true, "status", 200, "body", '{"data":[{"id":"late-old"}]}'))
+	AssertEqual("fresh-model", Fixture.Controller.Result("configured:new")["models"][1])
+	AssertEqual(1, Fixture.Published)
+}
+Test("configured-local-view: logical order revokes old tickets and retains waiters", _LSD_DynamicOrderOwnsOnlyTickets)
+
+
+_LSCI_ForcedOrderRefresh() {
+	Fixture := _LSD_Fixture(["same"], 1000)
+	Old := Map("name", "old", "targets", [Map("id", "same", "base_url", "http://localhost:19423/v1")])
+	AssertTrue(Fixture.Sweep(Old))
+	Ticket := Fixture.Calls["old"]["same"]["ticket"]
+	Generation := Fixture.Controller.Generation
+	AssertTrue(Fixture.Controller.SetOrder(["same"], true))
+	AssertEqual(Generation + 1, Fixture.Controller.Generation)
+	AssertFalse(Ticket["is_current"].Call())
+	AssertFalse(Fixture.Controller.IsSweeping())
+	AssertTrue(Fixture.Controller.IsStale())
+	AssertEqual(0, Fixture.Controller.Results.Count)
+	AssertEqual(1, Fixture.Controller.Waiters.Length)
+	Fresh := Map("name", "fresh", "targets", [Map("id", "same", "base_url", "http://localhost:19424/v1")],
+		"sync", Map("same", Map("ok", true, "status", 200, "body", '{"data":[{"id":"fresh-owned"}]}')))
+	AssertTrue(Fixture.Sweep(Fresh))
+	AssertEqual(2, Fixture.Done.Length)
+	Fixture.Calls["old"]["same"]["settle"].Call(Map("ok", true, "status", 200, "body", '{"data":[{"id":"late-old"}]}'))
+	AssertEqual("fresh-owned", Fixture.Controller.Result("same")["models"][1])
+	Generation := Fixture.Controller.Generation
+	AssertTrue(Fixture.Controller.SetOrder(["same"], true))
+	AssertEqual(Generation + 1, Fixture.Controller.Generation)
+	AssertEqual(0, Fixture.Controller.Results.Count, "forced refresh also clears a completed result before its age expires")
+	AssertFalse(Fixture.Controller.HasCheckedAt)
+}
+Test("local-server-cache-identity: forced equal membership revokes tickets, results and age while retaining waiters", _LSCI_ForcedOrderRefresh)
+
+_LSCI_ForcedOrderRequiresTypedFlag() {
+	Fixture := _LSD_Fixture(["same"], 1000)
+	for Flag in ["1", "true", 2, -1, {}] {
+		Generation := Fixture.Controller.Generation
+		Thrown := false
+		try Fixture.Controller.SetOrder(["new"], Flag)
+		catch TypeError
+			Thrown := true
+		AssertTrue(Thrown)
+		AssertEqual(Generation, Fixture.Controller.Generation)
+		AssertEqual("same", Fixture.Controller.Order[1], "invalid flags cannot partially replace membership")
+	}
+	AssertFalse(Fixture.Controller.SetOrder(["same"], false))
+}
+Test("local-server-cache-identity: refresh requires an actual Boolean without partial mutation", _LSCI_ForcedOrderRequiresTypedFlag)

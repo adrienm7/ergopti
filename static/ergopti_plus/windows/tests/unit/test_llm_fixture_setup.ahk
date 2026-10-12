@@ -15,7 +15,7 @@ _LMFS_Write(State, FailAt, Throws, Path, Content) {
 	State["dir"] := Dir
 	if State["paths"].Length == FailAt {
 		if FailAt == 2
-			AssertEqual('[llm]`nenabled = false`napi_entry_id = "api_old"`n',
+			AssertEqual(_CMJFixtureCurrentSource('[llm]`nenabled = false`napi_entry_id = "api_old"`n'),
 				FSReadUtf8Exact(State["paths"][1]))
 		if Throws
 			throw Error("Injected fixture write exception")

@@ -9,6 +9,7 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
 	OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
+	OldConfigurationFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
 	; Supply queued intent before the real current-schema cohort boots.
 	QueuedGestureSource := '[gestures]`nenabled = true`ntap_4 = "open_url"`nauto_configure_on_next_start = true`nunknown_user = "keep"`n'
 	Fixture := _HotstringsScopeFixture(1, QueuedGestureSource)
@@ -97,6 +98,7 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 			ConfigurationFile := IsSet(PreviousConfigurationFile) ? PreviousConfigurationFile : unset
 		}
 	} finally {
+		ConfigurationFile := IsSet(OldConfigurationFile) ? OldConfigurationFile : unset
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
 		_PersonalShortcutsRegistry := IsSet(OldRegistry) ? OldRegistry : unset

@@ -1843,11 +1843,62 @@ function M.wrap_selection(sel, left, right, parent)
 			_wrap_generation = _wrap_generation + 1
 		end
 	end
+	owner.on_quiesce = function()
+		local snapshot = {}
+		local cleanup_pending = false
+		for _, entry in pairs(owner.timers) do
+			if entry.completion == true then cleanup_pending = true
+			else snapshot[#snapshot + 1] = entry end
+		end
+		local timers_settled = true
+		owner.mutations = owner.mutations + 1
+		for _, entry in ipairs(snapshot) do
+			if cancel_text_timer(owner, entry) ~= true then timers_settled = false end
+		end
+		if owner.synthetic_pending == true then
+			pcall(SyntheticInput.cancel, owner.synthetic_tx)
+		end
+		owner.mutations = owner.mutations - 1
+		if owner.synthetic_pending == true then
+			-- Accepted cancellation does not retract a native handoff. Keep the
+			-- pasteboard until the exact producer reports its terminal receipt.
+			return true, false
+		end
+		local remaining = transaction.restore_after ~= nil
+			and transaction.restore_after - TimerScheduler.awake_time() or 0
+		if remaining > 0 and owner.clipboard_owned == true then
+			-- PAUSE revokes document work, but cannot revoke a paste that Quartz
+			-- already returned. One cleanup-only timer retains its fixed grace
+			-- deadline; repeated PAUSE/RESUME never restarts that interval.
+			owner.completion_only = true
+			if not cleanup_pending and timers_settled then
+				local armed, cleanup_error = schedule_text_timer(owner, remaining,
+					"Wrap paste grace cleanup", function() settle_text_owner(owner) end, true)
+				if armed ~= true then
+					defer_wrap_diagnostic("error", "Paste grace cleanup timer was refused: %s.",
+						tostring(cleanup_error))
+				end
+			end
+			return true, false
+		end
+		if cleanup_pending then return true, false end
+		local restored, restore_error = restore_text_clipboard(owner)
+		if restored ~= true then
+			defer_wrap_diagnostic("error", "Paused wrap clipboard restore remains pending: %s.",
+				tostring(restore_error))
+		end
+		local released = maybe_release_text_owner(owner)
+		return true, timers_settled == true and restored == true and released == true
+	end
 	owner.on_timer_settled = function(_, entry)
 		if transaction.timer_entry == entry then
 			transaction.timer_entry = nil
 			transaction.timer = nil
 			if _wrap_restore_timer == entry.handle then _wrap_restore_timer = nil end
+		end
+		if owner.business_open ~= true then
+			settle_text_owner(owner)
+			return
 		end
 		if transaction.restore_waiting == true
 			and transaction.restore_scheduling ~= true
@@ -1866,6 +1917,23 @@ function M.wrap_selection(sel, left, right, parent)
 	end
 
 	local function rollback(reason, detail)
+		transaction.aborting = true
+		if owner.synthetic_pending == true then
+			local cancelled_ok, cancelled = pcall(SyntheticInput.cancel, owner.synthetic_tx)
+			if cancelled_ok and cancelled == true
+				and owner.synthetic_completion_registered ~= true then
+				owner.synthetic_pending = false
+			end
+		end
+		if owner.synthetic_pending == true or transaction.paste_accepted == true
+			or transaction.restore_after ~= nil then
+			-- Refused admission cannot retract accepted native output. Reuse the
+			-- fenced owner to join its exact producer and retain host paste grace.
+			defer_wrap_diagnostic("error", "Wrap transaction aborted at %s: %s.",
+				reason, tostring(detail or "operation failed"))
+			settle_text_owner(owner)
+			return false
+		end
 		detach_timer(true)
 		local restored, restore_error = true, nil
 		if transaction.mutated then
@@ -1931,6 +1999,25 @@ function M.wrap_selection(sel, left, right, parent)
 			or transaction.generation ~= _wrap_generation then
 			return false
 		end
+		if owner.synthetic_pending == true then
+			transaction.restore_waiting = true
+			return false
+		end
+		if transaction.restore_after ~= nil then
+			local remaining = transaction.restore_after - TimerScheduler.awake_time()
+			if remaining > 0 then
+				local scheduled, settling_error = schedule_restore(remaining)
+				if scheduled ~= true then
+					defer_wrap_diagnostic("error", "Paste settling timer was refused: %s.",
+						tostring(settling_error))
+				end
+				if scheduled ~= true and allow_lifecycle_fallback then
+					pcall(SyntheticInput.defer_after_callback,
+						"wrap post-paste settling retry", function() attempt_restore(false) end)
+				end
+				return false
+			end
+		end
 		local restored, restore_error = restore_prior()
 		if restored then
 			finish_restore()
@@ -1990,10 +2077,59 @@ function M.wrap_selection(sel, left, right, parent)
 		return rollback("restore timer", timer_error)
 	end
 
+	local producer_ok, producer_or_error = call_text_boundary(owner,
+		SyntheticInput.begin, "shortcuts.text.wrap", "action")
+	if not producer_ok then return rollback("paste producer", producer_or_error) end
+	owner.synthetic_tx = producer_or_error
+	owner.synthetic_pending = true
+	local dispatch_observe_ok, dispatch_observe_error = call_text_boundary(owner,
+		SyntheticInput.on_dispatched, owner.synthetic_tx, function(_, _, status)
+			if status == "dispatched" then transaction.paste_accepted = true end
+		end)
+	if not dispatch_observe_ok then
+		return rollback("paste dispatch observer", dispatch_observe_error)
+	end
+	local observe_ok, observe_error = call_text_boundary(owner,
+		SyntheticInput.on_complete, owner.synthetic_tx, function(_, status)
+			owner.synthetic_pending = false
+			if status == "complete" or transaction.paste_accepted == true then
+				-- Queue admission is not native delivery. The full clipboard grace
+				-- interval starts only after the exact paste producer completes.
+				transaction.restore_after = TimerScheduler.awake_time() + RESTORE_DELAY_SEC
+			end
+			if transaction.aborting == true then
+				settle_text_owner(owner)
+			elseif owner.business_open ~= true or scope.paused == true then
+				settle_text_owner(owner)
+			elseif status ~= "complete" then
+				if transaction.paste_accepted == true then settle_text_owner(owner)
+				else rollback("paste completion", status) end
+			elseif transaction.restore_waiting == true and transaction.timer_entry == nil then
+				-- A broker can remain queued longer than the original restore timer.
+				-- Start a fresh paste-settling delay after its actual completion.
+				transaction.restore_waiting = false
+				local restored_timer, restore_error = schedule_restore(RESTORE_DELAY_SEC)
+				if restored_timer ~= true then
+					defer_wrap_diagnostic("error", "Post-paste restore timer was refused: %s.",
+						tostring(restore_error))
+					attempt_restore(true)
+				end
+			end
+			maybe_release_text_owner(owner)
+		end)
+	if not observe_ok then return rollback("paste completion observer", observe_error) end
+	owner.synthetic_completion_registered = true
 	local emit_ok, emitted_or_error = call_text_boundary(owner,
-		SyntheticInput.emit_key_stroke, { "cmd" }, "v", KEYSTROKE_NO_DELAY_US)
+		SyntheticInput.emit_key_stroke, { "cmd" }, "v", KEYSTROKE_NO_DELAY_US,
+		owner.synthetic_tx)
 	if not emit_ok or emitted_or_error ~= true then
+		pcall(SyntheticInput.cancel, owner.synthetic_tx)
 		return rollback("paste dispatch", emitted_or_error)
+	end
+	local seal_ok, sealed = call_text_boundary(owner, SyntheticInput.seal, owner.synthetic_tx)
+	if not seal_ok or sealed ~= true then
+		pcall(SyntheticInput.cancel, owner.synthetic_tx)
+		return rollback("paste seal", sealed)
 	end
 
 	transaction.paste_dispatched = true

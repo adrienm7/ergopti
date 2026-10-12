@@ -25,7 +25,6 @@ _L4M_MenuDesired() {
 		State := MasterGateState(), SavedState := State.Clone()
 		Fixture := _ScopeOwnerFixture(), Bundle := 0, Refusal := 0, FileMenu := 0
 		Fixture.source .= '[hotstrings.groups]`n"ext:sample:words" = true`n'
-		Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 		Assert(FSWriteDurable(Fixture.path, Fixture.source))
 		Launch(_Success, Borrowed, Refused) {
 			Bundle := Borrowed

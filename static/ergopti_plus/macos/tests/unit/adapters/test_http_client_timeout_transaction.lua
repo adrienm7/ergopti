@@ -781,3 +781,23 @@ helpers.describe("HTTP physical settlement migration admission", function()
 		helpers.assert_true(client.isSettled())
 	end)
 end)
+
+helpers.describe("Native HTTP infrastructure receipts (local-configured-native-owner)", function()
+	for _, kind in ipairs({ "false", "throw" }) do
+		helpers.it("marks native dispatch " .. kind .. " without classifying ordinary network failure (local-configured-native-owner)", function()
+			local timers = make_single_timer("success")
+			local client = load_client(timers, { doAsyncRequest = function()
+				if kind == "throw" then error("native fixture dispatch refusal") end
+				return false
+			end }, { follow_redirects = false })
+			local receipt, deliveries = nil, 0
+			helpers.assert_eq(client.get("http://127.0.0.1:19423/v1/models", {}, function(response)
+				receipt = response; deliveries = deliveries + 1
+			end), false)
+			helpers.assert_eq(deliveries, 1)
+			helpers.assert_eq(receipt.ok, false); helpers.assert_eq(receipt.status, 0)
+			helpers.assert_eq(receipt.error_kind, "native_dispatch")
+			helpers.assert_eq(client.isSettled(), true, "typed failure retains the exact existing timeout retirement")
+		end)
+	end
+end)

@@ -17,6 +17,12 @@
 
 
 
+#Include personal_toml_preservation.ahk
+
+
+
+
+
 ; ===============================
 ; ===============================
 ; ======= 1/ Path helpers =======
@@ -276,9 +282,9 @@ _PersonalTomlOpeningImageMatches(Source, FilePath, OwnerToken) {
 		&& (Observed["content"] == Expected)
 }
 
-ReadPersonalToml(Refresh := false, OpeningSource := 0) {
+ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
 	global _ReadPersonalTomlCache
-	if (!Refresh && !(OpeningSource is Map) && _ReadPersonalTomlCache != false)
+	if (!IsSet(ExactContent) && !Refresh && !(OpeningSource is Map) && _ReadPersonalTomlCache != false)
 		return _ReadPersonalTomlCache
 
 	FilePath := PersonalTomlPath()
@@ -287,7 +293,7 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 		"sections", Map(),
 		"meta_description", t("editor.hotstrings.meta_desc"),
 	)
-	Capturing := OpeningSource is Map
+	Capturing := !IsSet(ExactContent) && OpeningSource is Map
 	Image := Capturing ? _PersonalTomlReadOpeningImage(FilePath) : 0
 	global _TomlUnreadableFiles
 	if Capturing {
@@ -299,7 +305,7 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 			return Result
 		}
 	}
-	if (Capturing ? !Image["present"] : !FileExist(FilePath)) {
+	if !IsSet(ExactContent) && (Capturing ? !Image["present"] : !FileExist(FilePath)) {
 		if Capturing && _TomlUnreadableFiles.Has(FilePath)
 			_TomlUnreadableFiles.Delete(FilePath)
 		_ReadPersonalTomlCache := Result
@@ -327,9 +333,9 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 	Raw := ""
 	global _TomlUnreadableFiles
 	try {
-		Raw := Capturing ? Image["content"] : FileRead(FilePath, "UTF-8")
+		Raw := IsSet(ExactContent) ? ExactContent : Capturing ? Image["content"] : FileRead(FilePath, "UTF-8")
 		; Preserve BOM bytes in consent; ordinary FileRead omitted it for parsing.
-		if Capturing && SubStr(Raw, 1, 1) == Chr(0xFEFF)
+		if (Capturing || IsSet(ExactContent)) && SubStr(Raw, 1, 1) == Chr(0xFEFF)
 			Raw := SubStr(Raw, 2)
 	} catch as Err {
 		_TomlUnreadableFiles[FilePath] := true
@@ -343,7 +349,7 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 	; for the rest of the session, even though this very reader had since
 	; succeeded and _ReadPersonalTomlCache held the user's real model. The reader
 	; that raises the latch has to be the reader that lowers it.
-	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+	if (!IsSet(ExactContent) && IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
 		_TomlUnreadableFiles.Delete(FilePath)
 	; Normalise to LF so every line ends cleanly — eliminates CRLF anchor bugs
 	FileContent := StrReplace(Raw, "`r`n", "`n")
@@ -378,6 +384,39 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 		}
 	}
 
+	; The semantic metadata owner also carries nested section descriptions and
+	; quoted keys. Reading only the legacy flat block would display a fallback
+	; and overwrite the untouched description on the next editor save.
+	try {
+		TypedDocument := TOML_ParseDocument(FileContent)
+		TypedMeta := TypedDocument.Get("_meta", 0)
+		if TypedMeta is Map {
+			TypedOrder := TypedMeta.Get("sections_order", 0)
+			if TypedOrder is Array {
+				MetaOrder := []
+				for Name in TypedOrder {
+					if Name is String
+						MetaOrder.Push(StrLower(Name))
+				}
+			}
+			if TypedMeta.Get("description", 0) is String
+				Result["meta_description"] := TypedMeta["description"]
+			TypedDescriptions := TypedMeta.Get("sections", 0)
+			if TypedDescriptions is Map {
+				for Name, Description in TypedDescriptions {
+					if Description is String
+						MetaDescriptions[StrLower(Name)] := Description
+					else if Description is Map && Description.Get("description", 0) is String
+						MetaDescriptions[StrLower(Name)] := Description["description"]
+				}
+			}
+		}
+	} catch as Err {
+		if !IsSet(ExactContent)
+			try LoggerWarn("PersonalToml", "Metadata source in '{1}' is not admitted: {2}. Editor publication will refuse malformed source.",
+				FilePath, Err.Message)
+	}
+
 	; ── Single pass: collect [[section]] entries ──
 	CurrentSection := ""
 	LineIndex := 0
@@ -389,9 +428,10 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
-		; [[section]] header
-		if (SubStr(Line, 1, 2) == "[[" and SubStr(Line, -1) == "]") {
-			CurrentSection := StrLower(SubStr(Line, 3, StrLen(Line) - 4))
+		; [[section]] header: inline comments are outside the displayed name.
+		HeaderLine := TOML_StripInlineComment(Line)
+		if (SubStr(HeaderLine, 1, 2) == "[[" and SubStr(HeaderLine, -2) == "]]") {
+			CurrentSection := StrLower(SubStr(HeaderLine, 3, StrLen(HeaderLine) - 4))
 			if !Result["sections"].Has(CurrentSection) {
 				FileSectionOrder.Push(CurrentSection)
 				Result["sections"][CurrentSection] := Map(
@@ -413,6 +453,9 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 			continue
 		}
 		if !RegExMatch(Line, EntryPattern, &EM) {
+			TypedEntry := _PersonalTomlTypedEntry(Line, LineIndex)
+			if TypedEntry is Map
+				Result["sections"][CurrentSection]["entries"].Push(TypedEntry)
 			continue
 		}
 		Entry := Map(
@@ -444,7 +487,8 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 			Seen[SecName] := true
 		}
 	}
-	_ReadPersonalTomlCache := Result
+	if !IsSet(ExactContent)
+		_ReadPersonalTomlCache := Result
 	return Result
 }
 
@@ -608,7 +652,7 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 ; durable target: even a partial stage write is isolated under a unique name.
 _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		DeleteFn := 0, AuthorizeFn := 0, PublishFn := 0,
-		OpeningSource := 0, OwnerToken := 0) {
+		OpeningSource := 0, OwnerToken := 0, PreservationSource := 0) {
 	static STALE_TEMP_MS := 60000
 	static WriteSeq := 0
 	InheritedCritical := A_IsCritical
@@ -617,7 +661,7 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		; Critical state into stale-temp cleanup, staging or atomic replacement.
 		Critical("Off")
 		try return _PersonalTomlWriteAtomic(FilePath, Content, WriterFn,
-			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn, OpeningSource, OwnerToken)
+			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn, OpeningSource, OwnerToken, PreservationSource)
 		finally Critical(InheritedCritical)
 	}
 	HasPublisher := !((PublishFn is Integer) && PublishFn == 0)
@@ -687,6 +731,20 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		PreviousCritical := Critical("On")
 		try SourceMatches := SourceMatches
 			&& _PersonalTomlOpeningAuthority(OpeningSource, FilePath, OwnerToken)
+		finally Critical(PreviousCritical)
+		if !SourceMatches {
+			_PersonalTomlCleanupStage(StagePath, DeleteFn)
+			return false
+		}
+	}
+
+	if PreservationSource is Map {
+		Observed := _PersonalTomlReadOpeningImage(FilePath)
+		SourceMatches := Observed["admitted"] && Observed["present"] == PreservationSource["present"]
+			&& (Observed["content"] == PreservationSource["content"])
+		PreviousCritical := Critical("On")
+		try SourceMatches := SourceMatches && _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
+			&& !A_IsSuspended && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
 		finally Critical(PreviousCritical)
 		if !SourceMatches {
 			_PersonalTomlCleanupStage(StagePath, DeleteFn)
@@ -981,6 +1039,9 @@ WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		if !_PersonalTomlOpeningImageMatches(OpeningSource, FilePath, OwnerToken)
 			return false
 	}
+	PreservationSource := OpeningSource is Map ? OpeningSource : _PersonalTomlReadOpeningImage(FilePath)
+	if !PreservationSource.Get("admitted", false)
+		return false
 	PreservedOverrides := _PersonalTomlCaptureOverrides(FilePath, OpeningSource)
 	if !PreservedOverrides["ok"] {
 		try LoggerError("PersonalToml",
@@ -996,80 +1057,17 @@ WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 	; re-reads the STALE boot-time file content and silently reverts the edit just
 	; saved to disk. Drop the reader-shared caches (raw content, group config, section
 	; counts, resolve memo) too so the on-disk truth wins on the next read.
-	Q := Chr(34)
-	Lines := []
-
-	MetaDesc := Data.Has("meta_description") ? Data["meta_description"] : t("editor.hotstrings.meta_desc")
-	Lines.Push("[_meta]")
-	Lines.Push("description = " . Q . EscapeTomlValue(MetaDesc) . Q)
-
-	; Build sections_order as a TOML inline array
-	OrderParts := []
-	for SecName in CanonicalOrder {
-		OrderParts.Push(Q . EscapeTomlValue(SecName) . Q)
-	}
-	Lines.Push("sections_order = [" . ArrayJoin(OrderParts, ", ") . "]")
-	_PersonalTomlAppendOverrides(Lines, PreservedOverrides["file"])
-
-	Lines.Push("[_meta.sections]")
-	for SecName in CanonicalOrder {
-		if Data["sections"].Has(SecName) {
-			Desc := Data["sections"][SecName]["description"]
-			Lines.Push(EscapeTomlValue(SecName) . " = " . Q . EscapeTomlValue(Desc) . Q)
-		}
-	}
-	for SecName in CanonicalOrder {
-		if !Data["sections"].Has(SecName)
-			continue
-		SecKey := StrLower(SecName)
-		if !PreservedOverrides["sections"].Has(SecKey)
-			continue
-		SectionOverrides := PreservedOverrides["sections"][SecKey]
-		if !(SectionOverrides is Map) || SectionOverrides.Count == 0
-			continue
-		Lines.Push("[_meta.sections." . SecName . "]")
-		_PersonalTomlAppendOverrides(Lines, SectionOverrides)
-	}
-
-	for SecName in CanonicalOrder {
-		if !Data["sections"].Has(SecName) {
-			continue
-		}
-		Sec := Data["sections"][SecName]
-		Lines.Push("[[" . SecName . "]]")
-		for E in Sec["entries"] {
-			IsWord := E["is_word"] ? "true" : "false"
-			AutoExp := E["auto_expand"] ? "true" : "false"
-			IsCaseSens := E["is_case_sensitive"] ? "true" : "false"
-			Final := E["final_result"] ? "true" : "false"
-			Line := Q . EscapeTomlValue(E["trigger"]) . Q
-			. " = { output = " . Q . EscapeTomlValue(E["output"]) . Q
-			. ", is_word = " . IsWord
-			. ", auto_expand = " . AutoExp
-			. ", is_case_sensitive = " . IsCaseSens
-			. ", final_result = " . Final
-			if E.Has("strict_case") and E["strict_case"] {
-				Line .= ", is_case_sensitive_strict = true"
-			}
-			; Individual collision-priority override — written only when set so
-			; entries that inherit the source default stay free of the key
-			if E.Has("priority") and E["priority"] != "" {
-				Line .= ", priority = " . E["priority"]
-			}
-			Line .= " }"
-			Lines.Push(Line)
-		}
-	}
-
-	Content := ""
-	for i, L in Lines {
-		Content .= L . "`r`n"
+	try Content := _PersonalTomlPreserveModel(PreservationSource["content"], Data, CanonicalOrder)
+	catch as Err {
+		try LoggerError("PersonalToml", "Refusing to replace '{1}': {2}. Foreign source data remain intact.",
+			FilePath, Err.Message)
+		return false
 	}
 
 	return _PersonalTomlWriteAtomic(FilePath, Content,
 		WriterFn, ReplaceFn, DeleteFn,
 		_PersonalTomlAuthorizeOwnedWrite.Bind(
-			OwnerToken, FilePath, AuthorizeFn), 0, OpeningSource, OwnerToken)
+			OwnerToken, FilePath, AuthorizeFn), 0, OpeningSource, OwnerToken, PreservationSource)
 	} finally {
 		; A read can interrupt the O(entries) serialization/staging window and
 		; repopulate every cache from the OLD durable target. Evict again after

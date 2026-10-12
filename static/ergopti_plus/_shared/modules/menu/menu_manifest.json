@@ -438,6 +438,7 @@
 			"disabled_when": [
 				"llm_toggle_ready"
 			],
+			"disabled_reason_key": "menu.llm.save_unavailable",
 			"category": "LLM"
 		},
 		{

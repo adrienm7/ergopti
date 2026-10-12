@@ -72,7 +72,7 @@ _KSWS_EditorSlotAssignmentsRemainUserOwned() {
 	OldCache := _IniCache, OldParameters := GestureActionParameters
 	OldPath := ConfigurationFile, OldActions := GESTURE_ACTIONS, OldSent := _Stub_SentText
 	Path := A_Temp . "\ergopti_editor_slot_" . A_TickCount . ".toml"
-	Source := '[shortcuts.keyboard]`nwin_d = "copy"`nwin_b = "open_hotstrings_editor"`nfuture_pair = "keep"`n[unowned]`ntext = "preserve"`n'
+	Source := _CMJFixtureCurrentSource('[shortcuts.keyboard]`nwin_d = "copy"`nwin_b = "open_hotstrings_editor"`nfuture_pair = "keep"`n[unowned]`ntext = "preserve"`n')
 	EditorCalls := 0, CopyCalls := 0, WriteFailures := 0
 	EditorAction(*) {
 		EditorCalls += 1
@@ -89,6 +89,12 @@ _KSWS_EditorSlotAssignmentsRemainUserOwned() {
 	try {
 		Assert(FSWriteDurable(Path, Source), "the private configuration must be durable")
 		ConfigurationFile := Path
+		; Authored metadata alone cannot replace the native startup owner.
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"])
+		AssertEqual(0, Boot["read_only"])
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "ordinary assignments consume genuine current-source authority")
 		_Stub_SentText := []
 		GESTURE_ACTIONS := OldActions.Clone()
 		GESTURE_ACTIONS["open_hotstrings_editor"] := { Fn: EditorAction }

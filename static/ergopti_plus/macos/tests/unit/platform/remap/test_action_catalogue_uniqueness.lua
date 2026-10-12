@@ -63,6 +63,7 @@ local function with_config_fixture(callback)
 				combo_symmetric = false,
 			}
 			package.loaded["modules.keymap.layout"] = {
+				keyboard_form = function() return "ansi" end,
 				key_code_for_char = function(char) return char end,
 			}
 			package.loaded["modules.gestures.actions"] = {

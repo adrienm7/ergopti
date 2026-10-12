@@ -87,6 +87,7 @@ local _ollama_start_pause_fenced = false
 -- exact slots are not terminal until the outer start frame returns and is
 -- revalidated, so PAUSE/RESUME must refuse cleanup while this depth is non-zero.
 local _ollama_start_acquisition_depth = 0
+local _ollama_server_retirement_depth = 0
 local _ollama_launch_cleanup_observers = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
@@ -106,6 +107,7 @@ local _active_stream_task = nil
 local _stream_generation  = 0
 -- Readiness flag: true once warmup has confirmed the model is loaded
 local _is_ready           = false
+local _ready_origin       = nil
 -- Bumped by reset_ready(); a warmup callback that captured an older value describes
 -- a server/model that is no longer current and must discard itself. Mirrors the
 -- api_mlx _warmup_gen invariant (F-L4).
@@ -403,6 +405,7 @@ end
 --- Returns true when the backend has confirmed it can answer inference requests.
 --- @return boolean
 function M.is_ready()
+	if _is_ready == true and _ready_origin ~= M.get_base_url() then M.reset_ready() end
 	if has_ollama_resume_intent() and _warmup_client_recovery_token == nil then
 		local paused, epoch, state_ok = read_script_pause_state()
 		if state_ok == true and paused ~= true then
@@ -424,6 +427,7 @@ end
 --- reset_endpoints() invariant: a fresh server/model deserves a fresh verdict (F-M8).
 function M.reset_ready()
 	_is_ready = false
+	_ready_origin = nil
 	-- Clearing the flag alone is racy: an Ollama warmup POST triggers the actual
 	-- model load and can stay in flight for tens of seconds, so a response issued
 	-- against the PREVIOUS server can still land after this reset and flip
@@ -609,6 +613,31 @@ function M.stop_warmup()
 	return quiesce_warmup()
 end
 
+--- Retires only this module's original foreground daemon, including a published
+--- READY owner. External servers never acquire a handle here. EOF is a request;
+--- the exact RETIRED receipt and native completion remain required for release.
+--- @return boolean settled True only when the retained daemon owners are joined.
+function M.stop_owned_server()
+	if _ollama_server_retirement_depth > 0 then return false end
+	_ollama_server_retirement_depth = _ollama_server_retirement_depth + 1
+	local ok, settled = xpcall(function()
+		local generation = _ollama_start_generation
+		_ollama_start_generation = generation + 1
+		_ollama_start_resume_pending = false
+		_ollama_starting = false
+		_ollama_started = false
+		_ollama_start_cleanup_pending = true
+		M.reset_ready()
+		settle_ollama_start_transaction(generation, false, "owned server retirement")
+		local warmup_settled = M.stop_warmup()
+		local daemon_settled = settle_ollama_start_cleanup()
+		return warmup_settled == true and daemon_settled == true
+	end, debug.traceback)
+	_ollama_server_retirement_depth = _ollama_server_retirement_depth - 1
+	if not ok then Logger.error(LOG, "Owned Ollama server retirement failed: %s.", tostring(settled)) end
+	return ok == true and settled == true
+end
+
 --- Quiesces one in-flight warmup while retaining its exact pre-pause intent.
 --- @return boolean settled
 function M.pause_warmup()
@@ -650,6 +679,7 @@ local STREAM_TMPFILE_CLEANUP_SEC = 70
 -- @return boolean accepted True when a daemon is running or one launch attempt
 -- was committed to native async ownership.
 local function ensure_ollama_running(options)
+	if _ollama_server_retirement_depth > 0 then return false end
 	if _ollama_ambiguous_task ~= nil then _ollama_start_cleanup_pending = true end
 	if _ollama_start_cleanup_pending == true
 		and settle_ollama_start_cleanup() ~= true then
@@ -858,7 +888,8 @@ end
 --- An acknowledged published daemon is stable ownership, not cleanup debt.
 --- @return boolean idle
 function M.startup_idle()
-	return _ollama_start_acquisition_depth == 0 and _ollama_starting ~= true
+	return _ollama_start_acquisition_depth == 0 and _ollama_server_retirement_depth == 0
+		and _ollama_starting ~= true
 		and _ollama_start_transaction == nil and _ollama_start_cleanup_pending ~= true
 		and _ollama_start_resume_pending ~= true and not has_pending_ollama_start_owner()
 end
@@ -939,12 +970,13 @@ function M.warmup(model_name, on_acquired)
 	-- in flight, the response describes a now-stale server/model and its callback
 	-- must not touch _is_ready (see reset_ready for the self-termination scenario).
 	local my_warmup_gen = _warmup_gen
+	local origin = M.get_base_url()
 	_warmup_active = true
 	local dispatch_committed = false
 	local pending_response = nil
 	local dispatch_ok, accepted_or_err = xpcall(function()
 		return _warmup_client.post(
-		M.get_base_url() .. "/api/chat",
+		origin .. "/api/chat",
 		{ ["Content-Type"] = "application/json" },
 		encoded,
 		function(r)
@@ -955,9 +987,14 @@ function M.warmup(model_name, on_acquired)
 				return
 			end
 			_warmup_active = false
+			if origin ~= M.get_base_url() then
+				Logger.debug(LOG, "Discarding Ollama warmup response from a superseded endpoint.")
+				return
+			end
 			if r.status == 200 then
 				local became_ready = (_is_ready ~= true)
 				_is_ready = true
+				_ready_origin = origin
 				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
 				if became_ready then
 					Notifications.notify(i18n.get("llm.server_ready_title"), i18n.get("llm.server_ollama_ready_body"), "success")

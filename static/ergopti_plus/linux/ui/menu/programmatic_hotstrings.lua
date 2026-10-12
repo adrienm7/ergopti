@@ -19,6 +19,7 @@ local WindowTitles = require("window_titles")
 local Logger = require("logger.shim")
 local ENABLED = "hotstrings.dynamic.user_code.enabled"
 local TIME = "hotstrings.dynamic.user_code.time_activation_seconds"
+local Publication = require("dynamic_hotstrings.menu_publication").new()
 
 --- Builds declared controls for the daemon's exact programmable runtime.
 --- @param ctx table Menu context with dynamic owner and refresh callback.
@@ -27,10 +28,6 @@ function M.build(ctx)
 	local native = ctx.dyn_hotstrings
 	local function current() return ctx.dyn_hotstrings == native end
 	local function get() return Preferences.get(ENABLED), Preferences.get(TIME) end
-	local function apply(enabled, seconds)
-		return current() and native.set_user_code_time_activation(seconds) == true
-			and native.set_user_code_enabled(enabled) == true
-	end
 	local function open()
 		if not current() then return false end
 		return Shell.run("xdg-open " .. Shell.quote(native.user_code_source_path()) .. " >/dev/null 2>&1 &") == true
@@ -41,13 +38,14 @@ function M.build(ctx)
 			return ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() ~= false
 		end,
 		set = function(enabled, seconds)
-			local old_enabled, old_seconds = get()
-			if apply(enabled, seconds) ~= true then return false end
-			if Preferences.set_many({ [ENABLED] = enabled, [TIME] = seconds }) == true then return true end
-			if apply(old_enabled, old_seconds) ~= true then
+			if not current() then return false end
+			local committed = Publication.commit(native, enabled, seconds, function()
+				return current() and Preferences.set_many({ [ENABLED] = enabled, [TIME] = seconds }) == true
+			end)
+			if Publication.pending() then
 				Logger.error("programmable_hotstrings", "Native preferences retain failed compensation ownership.")
 			end
-			return false
+			return committed
 		end,
 		changed = function() if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end,
 		open = open,

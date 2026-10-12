@@ -46,16 +46,22 @@ def _remaining(deadline):
 
 
 def _native_request(*args, **kwargs):
-    if "_ergopti_native_http" not in sys.modules:
-        specification = importlib.util.spec_from_file_location(
-            "_ergopti_native_http", NATIVE_ENGINE
-        )
-        if specification is None or specification.loader is None:
-            raise BootstrapFailure("unavailable")
-        module = importlib.util.module_from_spec(specification)
-        sys.modules[specification.name] = module
-        specification.loader.exec_module(module)
-    return sys.modules["_ergopti_native_http"].open_request(*args, **kwargs)
+    stage = "native_import"
+    try:
+        if "_ergopti_native_http" not in sys.modules:
+            specification = importlib.util.spec_from_file_location(
+                "_ergopti_native_http", NATIVE_ENGINE
+            )
+            if specification is None or specification.loader is None:
+                raise BootstrapFailure("unavailable")
+            module = importlib.util.module_from_spec(specification)
+            sys.modules[specification.name] = module
+            specification.loader.exec_module(module)
+        stage = "native_request"
+        return sys.modules["_ergopti_native_http"].open_request(*args, **kwargs)
+    except Exception as failure:
+        failure.bootstrap_stage = stage
+        raise
 
 
 def _url(value, maximum):
@@ -494,6 +500,92 @@ def main(argv=None):
         )
 
 
+def _report_failure(failure, reason):
+    """Publish closed passive provenance, retaining the original failure message."""
+    stages = {
+        "bootstrap",
+        "native_import",
+        "native_request",
+        "native_identity",
+        "native_spawn",
+        "native_pipe_setup",
+        "native_write",
+        "native_first_frame",
+        "native_head",
+        "native_terminal",
+        "native_body",
+        "native_cleanup",
+    }
+    kinds = {
+        "NativeHTTPError",
+        "BootstrapFailure",
+        "TimeoutExpired",
+        "OSError",
+        "ImportError",
+        "ValueError",
+        "TypeError",
+        "AttributeError",
+        "other",
+    }
+    kind = type(failure).__name__ if type(failure).__name__ in kinds else "other"
+    for cls in (
+        subprocess.TimeoutExpired,
+        OSError,
+        ImportError,
+        ValueError,
+        TypeError,
+        AttributeError,
+    ):
+        if isinstance(failure, cls):
+            kind = cls.__name__
+            break
+    stage = getattr(failure, "bootstrap_stage", "bootstrap")
+    fact = {
+        "version": 1,
+        "stage": stage if type(stage) is str and stage in stages else "bootstrap",
+        "exception_class": kind,
+        "native_child_pid": None,
+        "native_child_status": None,
+        "native_receipt_reason": None,
+        "cleanup": "unconfirmed",
+    }
+    native = getattr(failure, "native_diagnostic", None)
+    if type(native) is dict and set(native) == set(fact) - {"version"}:
+        if (
+            all(type(native[key]) is str for key in ("stage", "exception_class", "cleanup"))
+            and native["stage"] in stages
+            and native["exception_class"] in kinds
+            and native["cleanup"] in {"confirmed", "unconfirmed"}
+        ):
+            fact["stage"] = native["stage"]
+            fact["exception_class"] = native["exception_class"]
+            fact["cleanup"] = native["cleanup"]
+            if native["cleanup"] == "confirmed":
+                pid, status, terminal = (
+                    native[key]
+                    for key in ("native_child_pid", "native_child_status", "native_receipt_reason")
+                )
+                if type(pid) is int and pid > 0:
+                    fact["native_child_pid"] = pid
+                if type(status) is int and -65535 <= status <= 65535:
+                    fact["native_child_status"] = status
+                if type(terminal) is str and terminal in {
+                    "complete",
+                    "deadline",
+                    "cancelled",
+                    "offline",
+                    "certificate",
+                    "proxy",
+                    "connect",
+                    "unavailable",
+                    "protocol",
+                    "content_encoding",
+                }:
+                    fact["native_receipt_reason"] = terminal
+    print("# managed_bootstrap_failure " + json.dumps(fact, sort_keys=True), file=sys.stderr)
+    print("Managed bootstrap request failed: " + reason + ".", file=sys.stderr)
+
+
 if __name__ == "__main__":
     try:
         main()
@@ -516,5 +608,5 @@ if __name__ == "__main__":
             "content_encoding",
         }:
             reason = "unavailable"
-        print("Managed bootstrap request failed: " + reason + ".", file=sys.stderr)
+        _report_failure(failure, reason)
         sys.exit(74)

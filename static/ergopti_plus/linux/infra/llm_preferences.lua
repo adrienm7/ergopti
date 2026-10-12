@@ -14,9 +14,11 @@ local _detached = nil
 local _generation = 0
 local _observed_source = nil
 
---- Admits ordinary writes only outside the retained terminal transaction.
+--- Admits ordinary actions only outside a retained scope and source write refusal.
 --- @return boolean admitted
-function M.admit() return _scope_owner == nil end
+function M.admit()
+	return _scope_owner == nil and Writer.write_refusal(Paths.config("config.toml")) == nil
+end
 
 --- Rechecks only the originating acknowledged revision and ordinary owner.
 --- No IO or user callback occurs after this check in final write admission.

@@ -754,6 +754,65 @@ helpers.describe("programmable native macOS hotstrings", function()
 			helpers.assert_eq(f.outputs, { "0" })
 		end)
 	end)
+	for _, refusal in ipairs({ "time-port", "save-throw", "save-refuse" }) do
+		helpers.it("(user-menu-publication-inverse) restores exact native timing after " .. refusal, function()
+			with_native(function(f)
+				package.loaded["infra.dialog_util"] = {
+					text_prompt = function() return require("infra.i18n").get("common.ok"), "125" end,
+					block_alert = function() return require("infra.i18n").get("common.close") end,
+				}
+				local set_time = f.Keymap.set_user_hotstring_time_activation
+				if refusal == "time-port" then
+					local first = true
+					f.Keymap.set_user_hotstring_time_activation = function(seconds)
+						local committed = set_time(seconds)
+						if first then first = false; return false end
+						return committed
+					end
+				end
+				local saves, updates = 0, 0
+				local state = { dynamichotstrings_user_code_enabled = true,
+					dynamichotstrings_user_code_time_activation_seconds = 0.5 }
+				local rows = require("ui.menu.programmatic_hotstrings").build({ state = state, keymap = f.Keymap,
+					script_control = { is_paused = function() return false end },
+					updateMenu = function() updates = updates + 1 end,
+					save_prefs = function()
+						saves = saves + 1
+						if refusal == "save-throw" then error("controlled preferences publication refusal") end
+						return false
+					end })
+				helpers.assert_eq(rows[1].menu[2].fn(), false)
+				helpers.assert_eq(saves, refusal == "time-port" and 0 or 1); helpers.assert_eq(updates, 0)
+				helpers.assert_eq(state.dynamichotstrings_user_code_enabled, true)
+				helpers.assert_eq(state.dynamichotstrings_user_code_time_activation_seconds, 0.5)
+				helpers.assert_true(f.User.is_enabled())
+				helpers.assert_eq(f.User.time_activation(), 0.5)
+				helpers.assert_eq(f.state.SECTION_DELAYS.dynamichotstrings.user_code, 0.5,
+					"the actual native timing projection is restored even after a partial setter refusal")
+				f.type_suffix(); helpers.assert_eq(f.tap.fn(physical("★")), true); drain(f.hs)
+				helpers.assert_eq(f.calls, 1); helpers.assert_eq(f.outputs, { "0" })
+				f.Keymap.set_user_hotstring_time_activation = set_time
+			end)
+		end)
+	end
+	helpers.it("(user-menu-live-pause) fences retained controls after the real pause owner closes", function()
+		with_native(function(f)
+			package.loaded["infra.dialog_util"] = {
+				block_alert = function() return require("infra.i18n").get("common.close") end,
+			}
+			local paused, saves, updates = false, 0, 0
+			local rows = require("ui.menu.programmatic_hotstrings").build({
+				state = { dynamichotstrings_user_code_enabled = true,
+					dynamichotstrings_user_code_time_activation_seconds = 0.5 }, keymap = f.Keymap,
+				paused = false, script_control = { is_paused = function() return paused end },
+				updateMenu = function() updates = updates + 1 end,
+				save_prefs = function() saves = saves + 1; return true end })
+			paused = true
+			helpers.assert_eq(rows[1].menu[1].fn(), false)
+			helpers.assert_true(f.User.is_enabled())
+			helpers.assert_eq(saves, 0); helpers.assert_eq(updates, 0)
+		end)
+	end)
 	helpers.it("opens source through the actual menu adapter without loading or creating it", function()
 		with_native(function(f)
 			local admitted
