@@ -105,6 +105,7 @@ class OllamaManagedBootstrap {
 		this.EnableHandoff := 0
 		this.CleanupRunning := false
 		this.PullTask := 0
+		this.MenuPull := 0
 		this.RuntimeRetired := false
 		this.RuntimeRetiring := false
 		this.Target := 0
@@ -407,6 +408,8 @@ class OllamaManagedBootstrap {
 	_Tick() {
 		if this.Cancelled || this.Failed
 			return this.Cancel()
+		if this.MenuPull is Map && !this._MenuPullCurrent(this.MenuPull)
+			return this.Cancel()
 		if !this.Ready && (this._Now() < this.StartedTick || this._Now() - this.StartedTick >= this.Plan["deadline_ms"])
 			return this._Fail("bootstrap_timeout")
 		if !this._Current()
@@ -474,39 +477,95 @@ class OllamaManagedBootstrap {
 
 	/** An explicit menu download borrows this exact ready runtime, never PATH. */
 	PullModel(Model, OnDone := 0) {
-		if !this.Ready || !this._Current() || !this.RuntimeIdentityReady() || IsObject(this.PullTask)
+		if !this.Ready || !this._Current() || !this.RuntimeIdentityReady() || IsObject(this.PullTask) || this.MenuPull is Map
 			return false
 		try Tag := LLM_ManagedModelTag(Model)
 		catch
 			return false
-		if Tag == "" || !this._Consent("model", Tag)
+		if Tag == ""
 			return false
-		Done := ObjBindMethod(this, "_MenuPulled", Tag, OnDone)
-		if this.Port is Map
-			return this.Port["pull"].Call(this.Target.Clone(), Tag, Done)
-		return this._NativePull(Tag, Done)
+		; A READY flow can outlive its bootstrap clock. The new request owns one
+		; captured budget through consent, native retirement and fresh model tags.
+		Operation := Map("tag", Tag, "callback", OnDone, "started_tick", this._Now(),
+			"deadline_ms", this.Plan["deadline_ms"], "failed", false)
+		this.MenuPull := Operation
+		LoggerTrace("LLM.managed", "Starting bounded managed menu model download.")
+		try {
+			if !this._Consent("model", Tag) {
+				this._MenuPullRetire(Operation)
+				return false
+			}
+			if !this._MenuPullCurrent(Operation)
+				return false
+			Done := ObjBindMethod(this, "_MenuPulled", Operation)
+			Accepted := this.Port is Map
+				? this.Port["pull"].Call(this.Target.Clone(), Tag, Done) : this._NativePull(Tag, Done)
+			if !this._True(Accepted) && this.MenuPull == Operation
+				return this._MenuPullFail(Operation)
+			return this._True(Accepted)
+		} catch as Err {
+			this._MenuPullFail(Operation)
+			throw Err
+		}
 	}
 
-	_MenuPulled(Tag, OnDone, ExitCode, *) {
-		if !this._Current() || !(ExitCode is Integer) || ExitCode != 0
+	/** A menu operation cannot borrow another request or reset its deadline. */
+	_MenuPullCurrent(Operation) {
+		if !(Operation is Map) || this.MenuPull != Operation || Operation["failed"]
 			return false
-		Done := ObjBindMethod(this, "_MenuPullModels", Tag, OnDone)
+		Now := this._Now()
+		if Now < Operation["started_tick"] || Now - Operation["started_tick"] >= Operation["deadline_ms"]
+			return this._MenuPullFail(Operation)
+		return this.Ready && this._Current() && this.RuntimeIdentityReady()
+	}
+
+	_MenuPullRetire(Operation) {
+		if this.MenuPull != Operation
+			return false
+		this.MenuPull := 0
+		LoggerDone("LLM.managed", "Managed menu model download settled logically; native task custody remains independent.")
+		return true
+	}
+
+	_MenuPullFail(Operation) {
+		if !(Operation is Map) || this.MenuPull != Operation || Operation["failed"]
+			return false
+		Operation["failed"] := true
+		LoggerError("LLM.managed", "Managed menu model download failed; cancelling its retained owners.")
+		try {
+			this._Ui("ollama.runtime_repair_failed")
+			if !(this.Port is Map) && this.UiShown && !A_IsSuspended
+				OllamaWV_SetError(t("ollama.runtime_repair_failed"))
+		} finally this.Cancel()
+		return false
+	}
+
+	_MenuPulled(Operation, ExitCode, *) {
+		if !this._MenuPullCurrent(Operation)
+			return false
+		if !(ExitCode is Integer) || ExitCode != 0
+			return this._MenuPullFail(Operation)
+		Done := ObjBindMethod(this, "_MenuPullModels", Operation)
 		if this.Port is Map
 			return this.Port["models"].Call(Done)
 		Owner := LLM_AuxBegin(this.AuxPrefix . "models", Map("backend", "ollama",
-			"endpoint", this.Target["origin"], "identity", Tag))
+			"endpoint", this.Target["origin"], "identity", Operation["tag"]))
 		return LLM_OllamaListModels_Async(Done, Owner, true)
 	}
 
-	_MenuPullModels(Tag, OnDone, Receipt) {
-		if !this._Current() || !(Receipt is Map) || !this._True(Receipt.Get("ok", false)) || !(Receipt.Get("names", 0) is Map)
+	_MenuPullModels(Operation, Receipt) {
+		if !this._MenuPullCurrent(Operation)
 			return false
-		if Receipt["names"].Has(LLM_LocalModelNormalize(Tag)) {
+		if !(Receipt is Map) || !this._True(Receipt.Get("ok", false)) || !(Receipt.Get("names", 0) is Map)
+			return this._MenuPullFail(Operation)
+		if Receipt["names"].Has(LLM_LocalModelNormalize(Operation["tag"])) {
+			OnDone := Operation["callback"]
+			this._MenuPullRetire(Operation)
 			if HasMethod(OnDone, "Call")
 				OnDone.Call()
 			return true
 		}
-		return false
+		return this._MenuPullFail(Operation)
 	}
 
 	_NativePull(Model := unset, OnDone := 0) {
@@ -670,6 +729,8 @@ class OllamaManagedBootstrap {
 	Cancel(*) {
 		global _LLM_ManagedBootstrap, _LLM_Deps_State
 		this.Cancelled := true
+		if this.MenuPull is Map
+			this._MenuPullRetire(this.MenuPull)
 		if this.Ready && IsObject(_LLM_ManagedBootstrap) && _LLM_ManagedBootstrap == this
 				&& _LLM_Deps_State == "ready"
 			_LLM_Deps_State := "pending"

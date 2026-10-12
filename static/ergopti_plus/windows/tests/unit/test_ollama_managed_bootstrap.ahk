@@ -28,6 +28,99 @@ Test("managed bootstrap: exact committed enable hands off READY source (groups24
 Test("managed bootstrap: unauthorized source cannot borrow enable handoff (groups247-managed)", _G4B_EnableHandoffForeign)
 Test("managed bootstrap: enable handoff cannot bless another model (groups247-managed)", _G4B_EnableHandoffModel)
 
+_G4B_ReadyMenuPullDeadline() {
+	F := _G4B_Fixture()
+	Done := 0, Published := 0
+	Pull(Target, Model, Callback) {
+		Done := Callback
+		return true
+	}
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready)
+		F.Now += F.Flow.Plan["deadline_ms"] * 2
+		F.Flow.Port["pull"] := Pull
+		AssertTrue(F.Flow.PullModel("qwen3:0.6b", (*) => Published += 1))
+		AssertTrue(HasMethod(Done, "Call"))
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Ready, "a new consented pull does not inherit an expired bootstrap clock")
+		F.Now += F.Flow.Plan["deadline_ms"]
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Cancelled, "a READY menu pull reaches the original configured operation deadline")
+		AssertFalse(F.Flow.Ready, "expired model work cannot retain READY admission")
+		Done.Call(0)
+		AssertEqual(0, Published, "late model completion cannot publish after the operation deadline")
+		AssertEqual(1, F.ReadyCalls, "the original bootstrap success remains a single terminal callback")
+		AssertEqual(0, F.FailedCalls, "a later menu operation does not replay the completed bootstrap failure callback")
+	} finally F.Close()
+}
+Test("managed bootstrap: READY menu pull has a separate captured deadline (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullDeadline)
+
+_G4B_ReadyMenuPullSuccessor() {
+	F := _G4B_Fixture()
+	Callbacks := [], Published := 0
+	Pull(Target, Model, Callback) {
+		F.Pulls += 1
+		Callbacks.Push(Callback)
+		return true
+	}
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		F.Model := "qwen3:0.6b"
+		F.Flow.Port["pull"] := Pull
+		ConsentCount := F.Consents.Length
+		AssertTrue(F.Flow.PullModel(F.Model, (*) => Published += 1))
+		AssertFalse(F.Flow.PullModel(F.Model), "an unfinished request refuses another consent and dispatch")
+		AssertEqual(ConsentCount + 1, F.Consents.Length)
+		AssertEqual(1, Callbacks.Length)
+		Callbacks[1].Call(0)
+		AssertEqual(1, Published)
+		AssertTrue(F.Flow.Ready)
+		AssertEqual(0, F.Runtime.Stops)
+		AssertTrue(F.Flow.PullModel(F.Model, (*) => Published += 1))
+		Successor := F.Flow.MenuPull
+		Callbacks[1].Call(0)
+		AssertTrue(F.Flow.MenuPull == Successor, "the retired callback cannot settle its replacement")
+		AssertEqual(1, Published)
+		F.Flow.Cancel()
+		Callbacks[2].Call(0)
+		AssertEqual(1, Published, "cancelled requests cannot publish a late fresh-tags response")
+	} finally F.Close()
+}
+Test("managed bootstrap: READY menu callbacks retain exact request custody (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullSuccessor)
+
+_G4B_ReadyMenuPullDebt() {
+	F := _G4B_Fixture()
+	Done := 0
+	Pull(Target, Model, Callback) {
+		Done := Callback
+		return true
+	}
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		F.Flow.Port["pull"] := Pull
+		AssertTrue(F.Flow.PullModel("qwen3:0.6b"))
+		CapturedBudget := F.Flow.Plan["deadline_ms"]
+		F.Flow.Plan["deadline_ms"] := CapturedBudget * 10
+		Owner := Map("task", {requestTerminate: (*) => "true"}, "building", false,
+			"accepted", true, "terminal", 0, "callback", Done)
+		F.Flow.PullTask := Owner
+		F.Now += CapturedBudget
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Cancelled, "changing later policy cannot extend the captured request budget")
+		AssertTrue(F.Flow.PullTask == Owner, "a string ACK cannot release native task ownership")
+		AssertFalse(F.Flow.CanReplace(), "unknown physical retirement blocks a new bootstrap")
+		F.Flow._Pulled(Owner, 0)
+		AssertTrue(F.Flow.CanReplace(), "only exact task completion releases the retained request")
+		AssertEqual(1, F.ReadyCalls)
+		AssertEqual(0, F.FailedCalls)
+	} finally F.Close()
+}
+Test("managed bootstrap: READY menu deadline preserves unknown native retirement (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullDebt)
+
 class _G4B_Fixture {
 	__New() {
 		global _LLM_Deps_Epoch, LLM_OLLAMA_BASE_URL, _LLM_Deps_State, _LLM_Deps_Checking
