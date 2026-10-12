@@ -25,12 +25,68 @@ import (
 	"time"
 )
 
+// BEGIN GENERATED NATIVE HTTP FAILURE STAGES
+// Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.
+func validNativeFailureStage(stage, reason string) bool {
+	switch stage {
+	case "native_policy_load":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_selection_bound":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_lookup":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_dictionary":
+		switch reason {
+		case "proxy":
+			return true
+		}
+	case "native_route_empty":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_certificate_load":
+		switch reason {
+		case "certificate":
+			return true
+		}
+	case "native_lookup_deadline":
+		switch reason {
+		case "deadline":
+			return true
+		}
+	case "native_dispatch_deadline":
+		switch reason {
+		case "deadline":
+			return true
+		}
+	case "native_session_terminal":
+		switch reason {
+		case "deadline", "cancelled", "offline", "certificate", "proxy", "connect", "unavailable", "protocol", "content_encoding":
+			return true
+		}
+	}
+	return false
+}
+
+// END GENERATED NATIVE HTTP FAILURE STAGES
+
 const maximumFrame = 65536
 
 // Error reports fixed transport evidence without a URL or authentication data.
 type Error struct {
-	Reason string
-	cause  error
+	Reason             string
+	NativeFailureStage string
+	cause              error
 }
 
 func (e *Error) Error() string { return "Native HTTP request failed: " + e.Reason }
@@ -98,7 +154,7 @@ func Do(client *http.Client, request *http.Request) (*http.Response, error) {
 	}
 	var native *Error
 	if errors.As(err, &native) {
-		return response, &Error{Reason: native.Reason, cause: err}
+		return response, &Error{Reason: native.Reason, NativeFailureStage: native.NativeFailureStage, cause: err}
 	}
 	if errors.Is(err, context.Canceled) {
 		return response, &Error{Reason: "cancelled", cause: err}
@@ -619,8 +675,16 @@ func (b *nativeBody) terminal(payload []byte) error {
 		Version int    `json:"version"`
 		Success bool   `json:"success"`
 		Reason  string `json:"reason"`
+		Stage   string `json:"native_refusal_stage"`
 	}
-	if decodeObject(payload, &terminal, "version", "success", "reason") != nil || terminal.Version != 1 {
+	decoded := decodeObject(payload, &terminal, "version", "success", "reason")
+	if decoded != nil {
+		if decodeObject(payload, &terminal, "version", "success", "reason", "native_refusal_stage") != nil ||
+			terminal.Success || !validNativeFailureStage(terminal.Stage, terminal.Reason) {
+			return fail("protocol")
+		}
+	}
+	if terminal.Version != 1 {
 		return fail("protocol")
 	}
 	valid := map[string]bool{"complete": true, "deadline": true, "cancelled": true, "offline": true, "certificate": true, "proxy": true, "connect": true, "unavailable": true, "protocol": true, "content_encoding": true}
@@ -634,7 +698,7 @@ func (b *nativeBody) terminal(payload []byte) error {
 		return b.failure("protocol")
 	}
 	if !terminal.Success {
-		return fail(terminal.Reason)
+		return &Error{Reason: terminal.Reason, NativeFailureStage: terminal.Stage}
 	}
 	if b.context.Err() != nil || b.timedOut.Load() {
 		return b.failure("deadline")

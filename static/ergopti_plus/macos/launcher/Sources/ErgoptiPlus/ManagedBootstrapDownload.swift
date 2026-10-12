@@ -231,13 +231,24 @@ final class ManagedBootstrapCollector {
 
 	private func consumeTerminal(_ payload: Data) -> Bool {
 		guard let fields = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
-			Set(fields.keys) == Set(["version", "success", "reason"]),
+			(Set(fields.keys) == Set(["version", "success", "reason"])
+				|| Set(fields.keys) == Set(["version", "success", "reason", "native_refusal_stage"])),
 			ManagedBootstrapRequest.integer(fields["version"]) == 1,
 			let success = fields["success"] as? NSNumber, CFGetTypeID(success) == CFBooleanGetTypeID(),
 			let reason = fields["reason"] as? String,
 			["complete", "protocol", "deadline", "cancelled", "offline", "certificate", "connect",
 				"unavailable", "proxy", "content_encoding"].contains(reason)
 		else { failure = "protocol"; return false }
+		if fields.keys.contains("native_refusal_stage") {
+			guard !success.boolValue, let code = fields["native_refusal_stage"] as? String,
+				let stage = ManagedHTTPFailureStage(rawValue: code), stage.permits(reason: reason),
+				let raw = String(data: payload, encoding: .utf8),
+				!raw.contains("\\"),
+				["version", "success", "reason", "native_refusal_stage"].allSatisfy({
+					raw.components(separatedBy: "\"\($0)\"").count == 2
+				})
+			else { failure = "protocol"; return false }
+		}
 		terminal = true
 		successfulTerminal = success.boolValue
 		terminalReason = reason

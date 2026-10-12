@@ -104,7 +104,8 @@ const MANAGED_PUBLICATION_SOURCES = [
 	'static/ergopti_plus/_shared/go/native_http/listener_event_darwin.go',
 	'static/ergopti_plus/_shared/go/native_http/listener_event_linux.go',
 	'static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go',
-	'static/ergopti_plus/_shared/go/native_http/listener_event_test.go'
+	'static/ergopti_plus/_shared/go/native_http/listener_event_test.go',
+	'static/ergopti_plus/_shared/go/native_http/failure_stage_test.go'
 ];
 function copyManagedPublicationSources(work) {
 	for (const relative of MANAGED_PUBLICATION_SOURCES) {
