@@ -419,7 +419,10 @@ _TestHC_StructuredNativeFallback() {
 		_HC_OnSize(Tree, Window, 0, 720, 520)
 		Tree.GetPos(, , &Width, &Height)
 		AssertEqual(720, Width, "the native view must resize with the host")
-		AssertEqual(520, Height)
+		AssertEqual(520 - HC_NATIVE_EXPORT_ROW, Height, "the native toolbar remains outside the resized tree")
+		AssertTrue(Window.NativeCollection["start"].Enabled, "Native Diagnostics retains the one-click collection action.")
+		Window.NativeCollection["progress"].GetPos(, &ProgressY)
+		AssertTrue(ProgressY + 24 <= 520, "the actual native progress control remains within the host")
 	} finally {
 		Window.Destroy()
 	}
@@ -588,3 +591,113 @@ _TestHC_CancelRefreshExportHistory(Refresh := true) {
 }
 Test("HealthCheck cleanup-history: cancel then refresh then export preserves unknown cleanup", _TestHC_CancelRefreshExportHistory)
 Test("HealthCheck cleanup-history: immediate cancel export retains existing truthful metadata", _TestHC_CancelRefreshExportHistory.Bind(false))
+
+/** Runs collection state regressions in an owned synthetic directory without launching a worker. */
+_TestHC_CollectionState(TestCase) {
+	D := DiagnosticCollectionWindows()
+	Root := A_Temp . "\ergopti-hc-collection-" . D.Id
+	D.Directory := Root . "\" . D.Id
+	D.Archive := D.Directory . ".zip"
+	DirCreate(Root)
+	try {
+		if TestCase == "launch-failure" {
+			FileAppend("synthetic blocker", D.Directory, "UTF-8-RAW")
+			AssertEqual(false, D.Start(), "A pre-spawn filesystem failure must be contained.")
+			AssertTrue(D.Terminal, "No native task exists; the failed session must allow retry.")
+			AssertEqual("failed", D.Result["phase"])
+			AssertEqual("synthetic blocker", FileRead(D.Directory, "UTF-8"), "The preexisting file is not owned output.")
+		} else {
+			DirCreate(D.Directory)
+			if TestCase == "cancel" {
+				AssertTrue(D.Cancel())
+				First := D.CancelTick
+				AssertTrue(D.Cancel())
+				AssertEqual(First, D.CancelTick, "Repeated cancellation must not postpone retirement.")
+				AssertEqual(false, D.SkipGuided(), "Cancelled observations cannot be acknowledged.")
+				AssertTrue(FileExist(D.Directory . "\cancel"))
+				AssertEqual(false, D.Terminal, "A request is not a native retirement acknowledgement.")
+			} else if TestCase == "skip" {
+				AssertTrue(D.SkipGuided())
+				Receipt := JsonParse(FileRead(D.Directory . "\physical.json", "UTF-8"))
+				AssertEqual("SKIP", Receipt["physical_text"])
+				AssertEqual("SKIP", Receipt["physical_display"])
+				AssertEqual(D.Id, Receipt["session_id"])
+				D.Completed(1, "", "")
+				AssertTrue(D.Terminal)
+				AssertEqual("failed", D.Result["phase"])
+				AssertEqual(false, D.Result["archive_created"])
+			} else if TestCase == "progress" {
+				Value := Map("schema_version", 1, "session_id", D.Id, "phase", "guided", "completed", 0,
+					"total", D.Contract["checks"].Length, "results", [])
+				AssertTrue(D.AcceptProgress(Value))
+				Bad := Value.Clone(), Bad["session_id"] := "foreign"
+				AssertThrows(() => D.AcceptProgress(Bad))
+				Bad := Value.Clone(), Bad["completed"] := 1
+				AssertThrows(() => D.AcceptProgress(Bad))
+				Bad := Value.Clone(), Bad["completed"] := 1
+				Bad["results"] := [Map("id", "callbacks", "status", "PASS", "evidence_class", "unexecuted")]
+				AssertThrows(() => D.AcceptProgress(Bad), "An unexecuted check must never become PASS.")
+				Bad["results"][1]["status"] := "UNRUN"
+				AssertTrue(D.AcceptProgress(Bad))
+				D.Completed(1, "", "")
+				AssertFalse(D.AcceptProgress(Value), "Stale progress cannot resurrect a retired session.")
+				AssertEqual("failed", D.Result["phase"])
+			} else if TestCase == "terminate-reentry" {
+				D.Task := {requestTerminate: Retire}
+				Retire(This) {
+					D.Completed(1, "", "")
+					return true
+				}
+				D.Write("progress.json", Map("schema_version", 1, "session_id", D.Id, "phase", "guided", "completed", 0,
+					"total", D.Contract["checks"].Length, "results", []))
+				D.Cancel()
+				D.CancelTick := A_TickCount - D.Contract["retirement_grace_ms"] - 1
+				D.Tick()
+				AssertTrue(D.Terminal)
+				AssertEqual("failed", D.Result["phase"], "Synchronous retirement cannot be overwritten by stale guided progress.")
+			} else if TestCase == "exit-refusal" {
+				D.Task := {requestTerminate: (*) => false}
+				AssertEqual(1, D.Exit("Exit", 0), "Unacknowledged worker retirement must veto application exit.")
+				AssertFalse(D.Terminal)
+				AssertFalse(FileExist(D.Directory . "\host-exit.json"), "A refused exit cannot write a cleanup acknowledgement.")
+			} else if TestCase == "cancel-write-failure" {
+				D.DefineProp("Write", {Call: RefuseWrite})
+				RefuseWrite(This, Name, Value) {
+					throw Error("Injected cancellation filesystem failure.")
+				}
+				AssertTrue(D.Cancel(), "A failed control write cannot crash the cancellation action.")
+				AssertTrue(D.Result["cancel_control_failed"])
+				AssertEqual("cleanup_pending", D.Result["phase"])
+				AssertFalse(D.Terminal, "Control write failure cannot invent worker retirement.")
+			} else if TestCase == "archive-ack" || TestCase == "archive-good" {
+				FileAppend("synthetic archive bytes", D.Archive, "UTF-8-RAW")
+				Ack := Map("schema_version", 1, "session_id", D.Id, "archive_committed", true,
+					"bytes", FileGetSize(D.Archive), "sha256", CryptoSha256Bytes(FileRead(D.Archive, "RAW")))
+				if TestCase == "archive-ack" {
+					Bad := Ack.Clone(), Bad["sha256"] := StrReplace(Ack["sha256"], SubStr(Ack["sha256"], 1, 1), "z")
+					AssertTrue(D.Completed(0, _HC_ValueToJson(Bad), ""))
+					AssertFalse(D.Result["archive_created"], "Existence and size alone cannot acknowledge an archive.")
+					AssertFalse(D.Completed(0, _HC_ValueToJson(Ack), ""), "A duplicate completion cannot replace a failed terminal receipt.")
+					AssertFalse(D.Result["archive_created"])
+				} else {
+					AssertTrue(D.Completed(0, _HC_ValueToJson(Ack), ""))
+					AssertTrue(D.Result["archive_created"])
+					FileAppend("replacement", D.Archive, "UTF-8-RAW")
+					AssertFalse(D.OpenFolder(), "A changed archive must be refused before opening Explorer.")
+				}
+			}
+		}
+	} finally {
+		SetTimer(D.CollectionTimer, 0)
+		DirDelete(Root, true)
+	}
+}
+Test("Diagnostics collection contains pre-spawn failure (groups247-collection)", (*) => _TestHC_CollectionState("launch-failure"))
+Test("Diagnostics collection cancellation retains acknowledgement ownership (groups247-collection)", (*) => _TestHC_CollectionState("cancel"))
+Test("Diagnostics collection skipped physical checks never pass (groups247-collection)", (*) => _TestHC_CollectionState("skip"))
+Test("Diagnostics collection validates progress and refuses resurrection (groups247-collection)", (*) => _TestHC_CollectionState("progress"))
+Test("Diagnostics collection synchronous retirement keeps terminal state (groups247-collection)", (*) => _TestHC_CollectionState("terminate-reentry"))
+Test("Diagnostics collection exit refusal keeps cleanup custody (groups247-collection)", (*) => _TestHC_CollectionState("exit-refusal"))
+Test("Diagnostics collection archive acknowledgement binds exact bytes (groups247-collection)", (*) => _TestHC_CollectionState("archive-ack"))
+Test("Diagnostics collection rejects replaced acknowledged archives (groups247-collection)", (*) => _TestHC_CollectionState("archive-good"))
+Test("Diagnostics collection failed cancel write retains cleanup custody (groups247-collection)", (*) => _TestHC_CollectionState("cancel-write-failure"))

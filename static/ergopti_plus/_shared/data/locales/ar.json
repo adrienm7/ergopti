@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "أمر بدء آخر: تم إعداد بدء التشغيل لأمر أو تثبيت آخر. يبقى الإعداد الحالي محفوظًا.",
 	"menu.llm.model_parent_with_health": "%sالنموذج المحدد: %s",
 	"config.read_only.newer_schema": "حُفظ هذا الإعداد بإصدار أحدث من ErgoptiPlus. تم الاحتفاظ بإعداداتك. حدّث ErgoptiPlus ثم أعد تحميله قبل تغيير الإعدادات.",
-	"menu.llm.save_unavailable": "غير متاح: استأنف ErgoptiPlus إذا كان متوقفًا مؤقتًا، أو افتح التشخيص لمعرفة سبب تعذّر حفظ الإعدادات."
+	"menu.llm.save_unavailable": "غير متاح: استأنف ErgoptiPlus إذا كان متوقفًا مؤقتًا، أو افتح التشخيص لمعرفة سبب تعذّر حفظ الإعدادات.",
+	"healthcheck.collection.start": "جمع تشخيص Windows",
+	"healthcheck.collection.guided": "خطوات موجهة للوحة المفاتيح والشاشة",
+	"healthcheck.collection.skip": "تخطي الخطوات الفعلية",
+	"healthcheck.collection.open": "فتح المجلد",
+	"healthcheck.collection.complete": "تم إنشاء الأرشيف. أرفق ملف ZIP بالمحادثة يدويًا.",
+	"healthcheck.collection.unavailable": "جامع تشخيص Windows غير متاح على macOS وLinux.",
+	"healthcheck.collection.guide": "اكتب النص التجريبي أدناه. اضغط Ctrl ثم حرره، ثم اضغط Shift وحرره بشكل منفصل، مع التركيز على حقل النص.",
+	"healthcheck.collection.visual": "يمكنني قراءة النص التجريبي بوضوح.",
+	"healthcheck.collection.failed": "فشل الجمع. راجع المجلد المحلي للتحقق من العمليات غير المكتملة."
 }

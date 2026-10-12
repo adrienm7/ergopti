@@ -1,0 +1,108 @@
+# tests/fixtures/diagnostic_collection_controls.ps1
+#Requires -Version 5.1
+param([Parameter(Mandatory=$true)][string]$Checkout, [Parameter(Mandatory=$true)][string]$Runtime)
+$ErrorActionPreference='Stop'
+$taskRoot=(Join-Path ([IO.Path]::GetTempPath()) 'ergopti-collector-controls-')+[Guid]::NewGuid().ToString('N')
+[IO.Directory]::CreateDirectory($taskRoot)|Out-Null
+$taskWorker=Join-Path $Checkout 'static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1'
+$taskContract=Join-Path $Checkout 'static/ergopti_plus/_shared/modules/diagnostics/collection.json'
+$taskPowerShell=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+$taskProofs=New-Object Collections.Generic.List[object]
+$taskSentinel='sk-'+('A'*32)
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$env:PSModulePath="$env:SystemRoot/System32/WindowsPowerShell/v1.0/Modules;"+$env:PSModulePath
+foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','existing-partial','archive-limit','owner-observed','query-timeout')){
+ $taskId='ergopti-diagnostic-'+[Guid]::NewGuid().ToString('N');$taskDirectory=Join-Path $taskRoot $taskId
+ [IO.Directory]::CreateDirectory($taskDirectory)|Out-Null
+ $taskRunWorker=$taskWorker;$taskRunContract=$taskContract
+ if(@('deadline','archive-limit') -contains $taskCase){
+  $taskObject=Get-Content -LiteralPath $taskContract -Raw -Encoding UTF8|ConvertFrom-Json
+  if($taskCase -eq 'deadline'){$taskObject.deadline_ms=1}else{$taskObject.max_archive_bytes=1}
+  $taskRunContract=Join-Path $taskRoot ($taskCase+'-contract.json')
+  [IO.File]::WriteAllText($taskRunContract,($taskObject|ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))
+ }
+ if($taskCase -eq 'query-timeout'){
+  $taskRunWorker=Join-Path $taskRoot 'bounded-query-control.ps1'
+  $taskSource=[IO.File]::ReadAllText($taskWorker).Replace('if ($UiaChild) {',"if (`$UiaChild) {`n`tStart-Sleep -Milliseconds 20000")
+  [IO.File]::WriteAllText($taskRunWorker,$taskSource,[Text.UTF8Encoding]::new($false))
+ }
+ $taskComponents=@(
+  @{id='driver';path=(Join-Path $Checkout 'static/ergopti_plus/windows/ErgoptiPlus.ahk')},
+  @{id='runtime';path=$Runtime},
+  @{id='native_owner';path=(Join-Path $Checkout 'static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll')},
+  @{id='native_manifest';path=(Join-Path $Checkout 'static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json')},
+  @{id='collector';path=$taskRunWorker},@{id='contract';path=$taskRunContract})
+ $taskRequest=@{schema_version=1;redaction_verified=$true;compiled=0;version='local';source_sha='97f4e08fff32c43933c09e3d0a7b83abde8b4c9e';architecture='x64';runtime='2.0.26';contract_path=$taskRunContract;components=$taskComponents}
+ if($taskCase -eq 'missing-component'){$taskRequest.components[0].path=Join-Path $taskDirectory 'missing.ahk'}
+ if($taskCase -eq 'redaction-refusal'){$taskRequest.version='token='+$taskSentinel}
+ if($taskCase -eq 'owner-observed'){
+  $taskRequest.input_owner=@{pid=$PID;created_filetime=[Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToFileTimeUtc();mutex='exempt';mutex_handle_retained=0;dispatcher_started=0;native_started=0;native_quarantined=0}
+ }
+ [IO.File]::WriteAllText((Join-Path $taskDirectory 'request.json'),($taskRequest|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
+ [IO.File]::WriteAllText((Join-Path $taskDirectory 'request.json.tmp'),$taskSentinel,[Text.UTF8Encoding]::new($false))
+ [IO.File]::WriteAllText((Join-Path $taskDirectory 'unexpected-private.txt'),$taskSentinel,[Text.UTF8Encoding]::new($false))
+ $taskAck=@{session_id=$taskId;physical_text='SKIP';physical_display='SKIP'}
+ if($taskCase -eq 'foreign-physical'){$taskAck.session_id='foreign-session'}
+ [IO.File]::WriteAllText((Join-Path $taskDirectory 'physical.json'),($taskAck|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+ if($taskCase -eq 'cancel'){[IO.File]::WriteAllText((Join-Path $taskDirectory 'cancel'),'cancel',[Text.UTF8Encoding]::new($false))}
+ if($taskCase -eq 'existing-partial'){[IO.File]::WriteAllText(($taskDirectory+'.zip.partial'),'owned existing partial',[Text.UTF8Encoding]::new($false))}
+ $taskInfo=New-Object Diagnostics.ProcessStartInfo
+ $taskInfo.FileName=$taskPowerShell;$taskInfo.Arguments='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$taskRunWorker+'" -SessionDirectory "'+$taskDirectory+'"'
+ $taskInfo.UseShellExecute=$false;$taskInfo.CreateNoWindow=$true;$taskInfo.RedirectStandardOutput=$true;$taskInfo.RedirectStandardError=$true
+ $taskProcess=[Diagnostics.Process]::Start($taskInfo);$taskRetainedHandle=$taskProcess.Handle
+ $taskOutput=$taskProcess.StandardOutput.ReadToEndAsync();$taskErrors=$taskProcess.StandardError.ReadToEndAsync()
+ $taskExited=$taskProcess.WaitForExit(20000)
+ if(!$taskExited){throw ('Collector control retained PID '+$taskProcess.Id+'; no competitor was launched.')}
+ $taskRow=[ordered]@{case=$taskCase;scope=$(if($taskCase -eq 'query-timeout'){'injected_query_delay'}else{'actual_worker_control'});worker_sha256=(Get-FileHash -LiteralPath $taskRunWorker -Algorithm SHA256).Hash;exit_code=$taskProcess.ExitCode;stderr_bytes=$taskErrors.Result.Length;archive_created=(Test-Path -LiteralPath ($taskDirectory+'.zip'));path=$taskDirectory;results=@();checks=@()}
+ if($taskRow.archive_created){
+  $taskCommitted=$taskOutput.Result|ConvertFrom-Json
+  if($taskCommitted.schema_version -ne 1 -or $taskCommitted.session_id -cne $taskId -or $taskCommitted.archive_committed -ne $true -or
+   $taskCommitted.bytes -ne (Get-Item -LiteralPath ($taskDirectory+'.zip')).Length -or
+   $taskCommitted.sha256 -cne (Get-FileHash -LiteralPath ($taskDirectory+'.zip') -Algorithm SHA256).Hash.ToLowerInvariant()){throw 'Actual worker acknowledgement did not bind the exact committed archive.'}
+ }
+ $taskProcess.Dispose()
+ if(Test-Path -LiteralPath (Join-Path $taskDirectory 'results.json')){$taskResults=Get-Content -LiteralPath (Join-Path $taskDirectory 'results.json') -Raw -Encoding UTF8|ConvertFrom-Json;$taskRow.results=$taskResults.results}
+ if($taskRow.archive_created){
+  $taskZip=[IO.Compression.ZipFile]::OpenRead($taskDirectory+'.zip')
+  try{
+   $taskNames=@($taskZip.Entries|ForEach-Object FullName);$taskRow.checks+=@{id='evidence_allowlist';ok=(@($taskNames|Where-Object{$_ -cnotin @('manifest.json','results.json','summary.md','failure.json','synthetic-window.png')}).Count -eq 0)}
+   $taskRow.checks+=@{id='manifest_present';ok=($taskNames -contains 'manifest.json')}
+   $taskSafe=$true
+   foreach($taskEntry in $taskZip.Entries){if($taskEntry.Name -eq 'synthetic-window.png'){continue};$taskReader=New-Object IO.StreamReader($taskEntry.Open());try{if($taskReader.ReadToEnd().Contains($taskSentinel)){$taskSafe=$false}}finally{$taskReader.Dispose()}}
+   $taskRow.checks+=@{id='synthetic_secret_not_exported';ok=$taskSafe}
+  }finally{$taskZip.Dispose()}
+ }
+ $taskProofs.Add($taskRow)
+ [IO.File]::WriteAllText((Join-Path $taskRoot 'controls.json'),($taskProofs.ToArray()|ConvertTo-Json -Depth 12),[Text.UTF8Encoding]::new($false))
+ Write-Host ($taskCase+' exit='+$taskRow.exit_code+' archive='+$taskRow.archive_created)
+}
+$taskExpectedChecks=Get-Content -LiteralPath $taskContract -Raw -Encoding UTF8|ConvertFrom-Json
+foreach($taskProof in $taskProofs){
+ if(@('existing-partial','archive-limit') -contains $taskProof.case){
+  if($taskProof.exit_code -ne 1 -or $taskProof.archive_created){throw 'Existing partial archive control failed.'}
+  if($taskProof.case -eq 'existing-partial' -and [IO.File]::ReadAllText($taskProof.path+'.zip.partial') -cne 'owned existing partial'){throw 'Existing partial archive was modified.'}
+  $taskArchiveError=Get-Content -LiteralPath (Join-Path $taskProof.path 'archive-error.json') -Raw -Encoding UTF8|ConvertFrom-Json
+  if(!$taskArchiveError.partial_retained -or $taskArchiveError.reason -cne 'archive_creation_failed'){throw 'Partial archive cleanup debt disappeared.'}
+  continue
+ }
+ if($taskProof.exit_code -ne 0 -or !$taskProof.archive_created -or $taskProof.stderr_bytes -ne 0){throw ('Worker archive acknowledgement failed: '+$taskProof.case)}
+ foreach($taskCheck in $taskProof.checks){if(!$taskCheck.ok){throw ('Archive control failed: '+$taskProof.case+'/'+$taskCheck.id)}}
+ if($taskProof.results.Count -ne $taskExpectedChecks.checks.Count){throw ('Result census failed: '+$taskProof.case)}
+ foreach($taskId in $taskExpectedChecks.checks){if(@($taskProof.results|Where-Object {$_.id -ceq $taskId}).Count -ne 1){throw 'Missing or duplicate result.'}}
+ $taskById=@{};foreach($taskRow in $taskProof.results){$taskById[$taskRow.id]=$taskRow}
+ foreach($taskResult in $taskProof.results){
+  if($taskExpectedChecks.statuses -cnotcontains $taskResult.status -or $taskExpectedChecks.evidence_classes -cnotcontains $taskResult.evidence_class -or
+   $taskResult.duration_ms -lt 0 -or !$taskResult.preconditions.Count -or $taskResult.reason -cnotmatch '^[a-z0-9_]+$'){throw 'Structured result contract failed.'}
+  if($taskResult.status -ceq 'PASS' -and $taskResult.evidence_class -ceq 'unexecuted'){throw 'Unexecuted evidence became PASS.'}
+ }
+ if($taskById.cleanup.status -cne 'PASS'){throw 'Native child or control cleanup failed.'}
+ if($taskById.physical_text.status -ceq 'PASS' -or $taskById.physical_display.status -ceq 'PASS'){throw 'Automated controls invented physical qualification.'}
+ if($taskProof.case -eq 'native' -and ($taskById.native_uia.status -cne 'PASS' -or $taskById.native_render.status -cne 'PASS')){throw 'Actual native synthetic collection failed.'}
+ if(@('cancel','deadline') -contains $taskProof.case -and $taskById.physical_text.status -cne 'SKIP'){throw 'Cancellation promoted physical evidence.'}
+ if($taskProof.case -eq 'missing-component' -and $taskById.components.status -cne 'FAIL'){throw 'Missing component admitted.'}
+ if($taskProof.case -eq 'redaction-refusal' -and $taskById.redaction.status -cne 'FAIL'){throw 'Private identity admitted.'}
+ if($taskProof.case -eq 'query-timeout' -and $taskById.native_uia.status -cne 'FAIL'){throw 'Timed-out query admitted.'}
+ if($taskProof.case -eq 'owner-observed' -and ($taskById.callbacks.status -cne 'UNRUN' -or $taskById.callbacks.receipt.observation -cne 'PASS' -or
+  $taskById.callbacks.receipt.reason -cne 'exclusive_input_session_not_admitted' -or $taskById.callbacks.receipt.isolated_input_allowed)){throw 'Observed host ownership granted an isolated native input session.'}
+}
+Write-Host ('PASS: '+$taskProofs.Count+' actual Windows collection controls. Proof: '+$taskRoot)

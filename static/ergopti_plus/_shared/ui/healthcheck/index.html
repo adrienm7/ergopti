@@ -23,6 +23,39 @@
 						data-i18n="healthcheck.toolbar.open_logs"
 					></button>
 				</div>
+				<div id="collection-controls">
+					<button
+						type="button"
+						id="btn-collect-windows"
+						data-i18n="healthcheck.collection.start"
+						disabled
+					></button>
+					<button
+						type="button"
+						id="btn-collection-cancel"
+						data-i18n="common.cancel"
+						hidden
+					></button>
+					<button
+						type="button"
+						id="btn-collection-guided"
+						data-i18n="healthcheck.collection.guided"
+						hidden
+					></button>
+					<button
+						type="button"
+						id="btn-collection-skip"
+						data-i18n="healthcheck.collection.skip"
+						hidden
+					></button>
+					<button
+						type="button"
+						id="btn-collection-open"
+						data-i18n="healthcheck.collection.open"
+						hidden
+					></button>
+					<p id="collection-progress" role="status" aria-live="polite"></p>
+				</div>
 				<div class="toolbar-center">
 					<button
 						type="button"

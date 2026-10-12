@@ -1,0 +1,37 @@
+{
+	"schema_version": 1,
+	"platforms": ["windows"],
+	"unavailable_reason_key": "healthcheck.collection.unavailable",
+	"deadline_ms": 120000,
+	"retirement_grace_ms": 5000,
+	"max_output_bytes": 262144,
+	"fixture": "Ergopti 247 abc XYZ 123",
+	"statuses": ["PASS", "FAIL", "SKIP", "UNRUN"],
+	"evidence_classes": ["automatic", "native_synthetic", "physical", "unexecuted"],
+	"checks": [
+		"components",
+		"component_stability",
+		"redaction",
+		"native_uia",
+		"native_render",
+		"hotstrings",
+		"ai",
+		"capture_replay",
+		"callbacks",
+		"fifo",
+		"modifiers",
+		"physical_text",
+		"physical_display",
+		"cleanup"
+	],
+	"component_ids": [
+		"driver",
+		"runtime",
+		"native_owner",
+		"native_manifest",
+		"collector",
+		"contract"
+	],
+	"max_archive_bytes": 8388608,
+	"max_evidence_file_bytes": 4194304
+}
