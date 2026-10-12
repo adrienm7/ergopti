@@ -2675,7 +2675,7 @@ const results = [];
 for (const check of checks) {
 	const ordinal = results.length + 1;
 	recordTiming({ type: 'start', ordinal, name: check.name });
-	process.stdout.write(`  • ${check.name} … `);
+	console.log(`  RUNNING ${ordinal}/${checks.length} — ${check.name}`);
 	const checkStartedAt = performance.now();
 	let r;
 	try {
@@ -2696,7 +2696,7 @@ for (const check of checks) {
 		error_code: r.error?.code ?? null,
 		duration_ms: durationMs
 	});
-	console.log(ok ? 'OK' : 'FAIL');
+	console.log(`  ${ok ? 'PASS' : 'FAIL'} ${ordinal}/${checks.length} — ${check.name}`);
 	console.log(`    duration: ${durationMs.toFixed(3)} ms (${ordinal}/${checks.length})`);
 	const result = {
 		...check,
