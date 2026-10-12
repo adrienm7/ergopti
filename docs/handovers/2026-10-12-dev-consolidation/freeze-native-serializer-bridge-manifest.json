@@ -1,0 +1,114 @@
+{
+	"canonical_base": "702db4560bcf9b974dcc5302213beffb7b83b104",
+	"dependency": "pending-owned-win32-payload-serialization.patch",
+	"dependency_sha256": "c34435adcce905b74019fad3792f8b4a8ef6cdbda94ec8c1a78d640d808ee7ff",
+	"clock_applied": false,
+	"modifier_patches_applied": false,
+	"paths": {
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c": {
+			"before_sha256": "0806f6cc1bd4ac64675d2ed439307f7a75e3d421b588728ec404f90a18711bbd",
+			"after_sha256": "f38290a72df7b86137eba5ceba22633871d8946903714494fa60476b9755722d"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h": {
+			"before_sha256": "08acd0b8a5109ce1520ab7134375b025ec8296f02747b8a45c36d58b8f6a4487",
+			"after_sha256": "85a98b0f2657c4bf7b1c6652ea85ee1d4c10329b171a50c4aecffb9b47720223"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.def": {
+			"before_sha256": "49fd8a83c14b93918f680d0584488027c08aadbbc30c931c454b91445dcf3db8",
+			"after_sha256": "ca61491d30692f2c7d30ff7e4b54f478b3c5ae3f2f5c16dcf0082d2e46aa5a6a"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner_test.c": {
+			"before_sha256": "c5dc5e06f8a47b8f75dd5d5dc5204aacd64bd01e1b5a13f496a1dbfd25fefc75",
+			"after_sha256": "be9379d756e3c64c3b94a2a89865a358584e43811c1b3b0a646911f558dcdae9"
+		}
+	},
+	"preservation": {
+		"original_native_test_complete_bytes_recovered_by_removing_additions": true,
+		"TEST_ASSERT_occurrences_before": 1353,
+		"TEST_ASSERT_occurrences_after": 1455,
+		"macro_definitions": 1,
+		"original_case_census": 44,
+		"portable_case_census": 43
+	},
+	"exports": {
+		"before": 40,
+		"after": 41,
+		"added": "ErgoptiNav_SerializeTerminalOutputAttempt",
+		"existing_order_exact": true,
+		"abi_version_changed": false,
+		"native_artifact_rebuild_required": true
+	},
+	"actual_results": {
+		"registered_selected": {
+			"exit": 0,
+			"count": 1
+		},
+		"registered_full": {
+			"exit": 0,
+			"count": 43
+		},
+		"pure_serializer": {
+			"exit": 0,
+			"matrices": 10
+		},
+		"registered_sanitizers": {
+			"exit": 0,
+			"separate_cases": 2,
+			"checks": "Address/Undefined/Leak; no disabling"
+		},
+		"supplemental_private_fault_harness": {
+			"exit": 0,
+			"sanitizers_exit": 0,
+			"shipping_registration": false,
+			"evidence": "Actual producer inclusion, controlled FIFO faults, whole-state aliases and second pthread EBUSY at pure dispatch"
+		},
+		"windows_sdk_msvc_dll": "UNRUN",
+		"ahk_native": "UNRUN",
+		"actual_emission": "UNRUN",
+		"production_admission": false
+	},
+	"negative_controls": {
+		"bypass-current-head": {
+			"compile_exit": 0,
+			"execution_exit": 1,
+			"failure": "FAIL supplemental native serializer custody fault boundaries:89: status == (fault == 2 ? ERGOPTI_NAV_STATUS_BUSY : ERGOPTI_NAV_STATUS_INVALID_STATE)",
+			"supplemental_fault_harness": true
+		},
+		"ignore-attempt-identity": {
+			"compile_exit": 0,
+			"execution_exit": 1,
+			"failure": "FAIL terminal output custody settles exact FIFO head (todo49-output-custody):3066: ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, old_attempt, inputs, 6, &count) == ERGOPTI_NAV_STATUS_INVALID_STATE\nFAIL terminal output custody settles exact FIFO head (todo49-output-custody):3358: TestTerminalSerializedOutputUnicode(name)\nNative navigation-owner tests stopped after 0/1 passes.",
+			"supplemental_fault_harness": false
+		},
+		"early-output-write": {
+			"compile_exit": 0,
+			"execution_exit": 1,
+			"failure": "FAIL terminal output custody settles exact FIFO head (todo49-output-custody):3036: count == 99 && inputs[0].type == 0xA5A5A5A5u\nFAIL terminal output custody settles exact FIFO head (todo49-output-custody):3358: TestTerminalSerializedOutputUnicode(name)\nNative navigation-owner tests stopped after 0/1 passes.",
+			"supplemental_fault_harness": false
+		},
+		"omit-bridge-lock-pair": {
+			"compile_exit": 0,
+			"execution_exit": 1,
+			"failure": "FAIL supplemental native serializer custody fault boundaries:121: bridge_probe_calls != 0 && bridge_probe_lock_held",
+			"supplemental_fault_harness": true
+		},
+		"release-before-pure-dispatch": {
+			"compile_exit": 0,
+			"execution_exit": 1,
+			"failure": "FAIL supplemental native serializer custody fault boundaries:121: bridge_probe_calls != 0 && bridge_probe_lock_held",
+			"supplemental_fault_harness": true
+		},
+		"old-missing-export": {
+			"compile_link_exit": 1,
+			"execution_exit": null,
+			"meaning": "Actual old producer lacks API implementation; absence only."
+		}
+	},
+	"supplemental_source_sha256": "6b561e30e6d84929ea8b0200f3ef4ecaefd0338eb97666d3c3052bfb69954f57",
+	"patch_sha256": "2ff7f370089dec54ec58b6521af63c0f8dd347bf8317b252ded08a713da5ca10",
+	"unchanged_serializer_dependency_inputs": {
+		"terminal_output_plan.c": "1018442271bd9445f3436b81c98890e5705bb9ecd461efa31c01320ae0e69544",
+		"terminal_output_plan.h": "e2cec5b79af346baa245a4be06fd3c903ef90384ef0f76ba46bf98d6bb656404"
+	},
+	"native_signature": "int32_t __cdecl ErgoptiNav_SerializeTerminalOutputAttempt(uint64_t owner, const ErgoptiOutput_Key *key, uint64_t attempt, ErgoptiOutput_Win32Input *out_inputs, uint32_t capacity, uint32_t *out_count)"
+}

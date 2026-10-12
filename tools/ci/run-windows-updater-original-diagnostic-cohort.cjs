@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const { spawn, execFileSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('../test/validate-ahk-suite-manifest.cjs');
 const inputs = require('./windows-updater-original-diagnostic-cohort-inputs.json');
+const { receiveSdk, requireSameSdk } = require('./windows-updater-sdk-auth.cjs');
 const {
 	readSourceFile,
 	candidateSourceReceipt,
@@ -215,6 +216,8 @@ async function main() {
 		receipt.ahk = {
 			path: ahk,
 			file_version: selected.arguments[1],
+			file_version_qualified: false,
+			file_version_source: 'caller_provided_metadata',
 			sha256: readSourceFile(ahk, 134217728).sha256
 		};
 		receipt.node = {
@@ -239,8 +242,10 @@ async function main() {
 			JSON.stringify(receipt.source_before) === JSON.stringify(inputs.source_sha256),
 			'Original source pins changed.'
 		);
+		receipt.sdk_before = receiveSdk(ahk, selected.arguments[1]);
 		const runner = path.join(root, 'static/ergopti_plus/windows/tests/run_all.ahk');
 		const deadline = Date.now() + budgetMs;
+		requireSameSdk(receipt.sdk_before, receiveSdk(ahk, selected.arguments[1]));
 		for (const [cohortIndex, cohort] of inputs.cohorts.entries()) {
 			const current = receipt.cohorts[cohortIndex];
 			current.status = 'ATTEMPTED';
@@ -358,6 +363,8 @@ async function main() {
 				JSON.stringify(receipt.source_after) === JSON.stringify(inputs.source_sha256),
 				'Final source pins changed.'
 			);
+			receipt.sdk_after = receiveSdk(receipt.ahk.path, receipt.ahk.file_version);
+			requireSameSdk(receipt.sdk_before, receipt.sdk_after);
 		} catch (error) {
 			receipt.cleanup_errors.push(String(error));
 		}
