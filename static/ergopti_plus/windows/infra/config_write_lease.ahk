@@ -339,6 +339,50 @@ _ConfigWriteTerminalRelease(Bundle) {
 }
 
 _ConfigWriteLeaseSelectOwner(OwnerOrBundle, Path) {
+	static OwnsOwner := _ConfigWriteLeaseOwns, IssuerOwner := _ConfigWriteTerminalTryAcquire
+	static TargetOwner := _ConfigWriteLeaseTryAcquire, StateOwner := _ConfigWriteLeaseState
+	static DataOwner := _ConfigWriteLeaseDataObject, ContainerOwner := _ConfigWriteLeasePlainContainer
+	static StateDataOwner := _ConfigWriteLeaseStateIsData
+	static KeyOwner := _ConfigWriteLeaseKey, ReadKeyOwner := FileReadActivityKey
+	FastOwnersLive() {
+		return OwnsOwner == _ConfigWriteLeaseOwns && IssuerOwner == _ConfigWriteTerminalTryAcquire
+			&& TargetOwner == _ConfigWriteLeaseTryAcquire && StateOwner == _ConfigWriteLeaseState
+			&& DataOwner == _ConfigWriteLeaseDataObject && ContainerOwner == _ConfigWriteLeasePlainContainer
+			&& StateDataOwner == _ConfigWriteLeaseStateIsData
+			&& KeyOwner == _ConfigWriteLeaseKey && ReadKeyOwner == FileReadActivityKey
+			&& !Object.Prototype.HasOwnProp.Call(OwnsOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(IssuerOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(TargetOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(StateOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(DataOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(ContainerOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(StateDataOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(KeyOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(ReadKeyOwner, "Call")
+	}
+	; One admitted string key avoids repeating a complete sibling-receipt walk
+	; for every nonmatching token. Object conversion retains the original path.
+	if IsObject(OwnerOrBundle) && (Path is String) && FastOwnersLive()
+			&& DataOwner.Call(OwnerOrBundle, ["id", "kind", "tokens", "authorized", "shutdown_claimed"]) {
+		Key := KeyOwner.Call(Path)
+		PreviousCritical := Critical("On")
+		try {
+			; Normalization precedes this pure-RAM span. The native issuer proves
+			; all siblings again before any admitted token field is selected.
+			if !FastOwnersLive() || !IssuerOwner.Call([], OwnerOrBundle)
+					|| !DataOwner.Call(OwnerOrBundle, ["id", "kind", "tokens", "authorized", "shutdown_claimed"])
+				return false
+			for Token in OwnerOrBundle.tokens {
+				if !(Token.key == Key)
+					continue
+				; Owns repeats the full native sibling receipt proof, not only this token.
+				if !OwnsOwner.Call(Token)
+					return false
+				return FastOwnersLive() ? Token : false
+			}
+			return false
+		} finally Critical(PreviousCritical)
+	}
 	if !IsObject(OwnerOrBundle)
 		return false
 	if _ConfigWriteTerminalTryAcquire([], OwnerOrBundle)
