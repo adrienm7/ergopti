@@ -260,7 +260,7 @@ function assertSelectors(text) {
 	assert.equal(blocks.length, 1, 'Fixed POSIX owning selector must exist exactly once.');
 	const statements = blocks[0].consequent.body;
 	for (const template of [
-		"cases.push(['tools/test/macos_native_http_receiving_facts_test.py',165]);",
+		"cases.push(['tools/test/macos_native_http_receiving_facts_test.py',172]);",
 		"cases.push(['tools/test/macos_native_http_clock_passive_receiving_controls.py',21]);"
 	]) {
 		const expectedStatement = selectorShape(
@@ -829,8 +829,16 @@ try {
 		assertSelectors(original);
 		for (const [from, to] of [
 			[
-				"cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 165]);",
+				"cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 172]);",
 				"cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 156]);"
+			],
+			[
+				"cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 172]);",
+				"cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 163]);"
+			],
+			[
+				"cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 172]);",
+				"cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 165]);"
 			],
 			["cases.push(['tools/test/macos_native_http_clock_passive_receiving_controls.py', 21]);", ''],
 			[

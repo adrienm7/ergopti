@@ -80,7 +80,7 @@ end
 local function with_editor(scenario)
 	local names = { "infra.logger", "infra.i18n", "infra.paths", "infra.config_paths", "adapters.file_system",
 		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes",
-		"modules.shortcuts.bindings" }
+		"modules.shortcuts.bindings", "modules.keymap.layout_registry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local prior_hs = _G.hs
@@ -101,6 +101,7 @@ local function with_editor(scenario)
 			shared = function(rel) return helpers.shared(rel) end,
 		}
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return world.dir end }
+		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 		-- The owner of the layer's wheel bindings, which Hammerspoon runs.
 		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
 			world.wheel_reconciles = world.wheel_reconciles + 1

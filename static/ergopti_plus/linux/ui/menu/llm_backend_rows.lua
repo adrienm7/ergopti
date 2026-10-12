@@ -114,22 +114,23 @@ end
 local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
-	-- Only the generic OpenAI-compatible entry has no URL of its own.
-	if provider.base_url == "" then
-		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), "")
+	-- OpenAI selects the wire schema, not a fixed host. Keep its declared
+	-- default visible while allowing the same custom endpoint as the generic form.
+	if provider.base_url == "" or provider.id == "openai" then
+		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), provider.base_url)
 		if not base_url or base_url == "" then return end
 		if not remote.normalize_base_url(base_url) then
 			dialogs.error(tr("menu.llm.api_prompt_url") .. " " .. base_url, heading)
 			return
 		end
 	end
-	local prompt = type(remote.token_allowed) == "function" and remote.token_allowed(provider.id, "") == true
+	local prompt = type(remote.token_allowed) == "function" and remote.token_allowed(provider.id, "", base_url) == true
 		and fill(tr("dialog.local_servers.key_prompt"), { provider.label }) or tr("menu.llm.api_prompt_token")
 	local token = dialogs.prompt(heading, prompt, "", true)
 	if not token then return end
 	-- The actual provider owns optional authentication; never trim secret bytes.
 	if token == "" and (type(remote.token_allowed) ~= "function"
-		or remote.token_allowed(provider.id, token) ~= true) then return end
+		or remote.token_allowed(provider.id, token, base_url) ~= true) then return end
 	local model = dialogs.prompt(heading, tr("menu.llm.api_prompt_model"), provider.default_model)
 	if not model then return end
 	model = model:match("^%s*(.-)%s*$")
@@ -137,7 +138,6 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	if model == "" then return end
 
 	local chat = remote.serves(provider.id, "chat")
-	local previous = entries.active()
 	-- The label is required by the builds before 2026-10 that read this file;
 	-- it holds the automatic name and no tray reads it.
 	local entry, err = entries.add({
@@ -146,7 +146,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		label = provider.id .. "/" .. model,
 		model = model ~= provider.default_model and model or "",
 		base_url = base_url,
-	})
+	}, chat)
 	if not entry then
 		dialogs.error(tostring(err), heading)
 		return
@@ -157,9 +157,6 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		-- Only the agent's System 1 reads this key: predictions keep their entry.
 		Logger.info(LOG, "API entry '%s' serves the agent's System 1 only; predictions keep their entry.",
 			entry.id)
-		if previous and entries.set_active(previous.id) ~= true then
-			Logger.error(LOG, "The predictions' API entry '%s' could not be selected again.", previous.id)
-		end
 	end
 	if type(on_changed) == "function" then on_changed() end
 	run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id])
@@ -195,6 +192,11 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
 	local backend = llm.get_backend()
 	local function changed() if type(on_changed) == "function" then on_changed() end end
+	local function select_backend(kind)
+		if llm.set_backend(kind) ~= true then return false end
+		changed()
+		return true
+	end
 
 	-- The selected model heads the list under the key macOS and Windows give
 	-- their model row, so the three trays name it with one wording.
@@ -207,12 +209,12 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 		{
 			label = "Ollama 🦙 — " .. tr("menu.llm.backend_ollama_suffix"),
 			checked = backend == "ollama",
-			action = function() llm.set_backend("ollama"); changed() end,
+			action = function() return select_backend("ollama") end,
 		},
 		{
 			label = "API 🌐 — " .. tr("menu.llm.backend_api_suffix"),
 			checked = backend == "api",
-			action = function() llm.set_backend("api"); changed() end,
+			action = function() return select_backend("api") end,
 		},
 	}
 	local boundary = ManifestMenu.template_rows("llm_backend_choice_boundary", {}, {}, {})
@@ -248,7 +250,11 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 			rows[#rows + 1] = {
 				label = label,
 				checked = active ~= nil and entry.id == active.id,
-				action = function() entries.set_active(entry.id); changed() end,
+				action = function()
+					if entries.set_active(entry.id) ~= true then return false end
+					changed()
+					return true
+				end,
 			}
 		else
 			-- Never the predictions' entry: its own test and removal instead.
@@ -256,9 +262,10 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 				{ label = tr("menu.llm.api_test_entry"), action = function() run_test(remote, dialogs, entry, label) end },
 				{ label = "🗑️ " .. tr("menu.llm.api_remove_entry"), action = function()
 					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
-					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return end
-					entries.remove(entry.id)
+					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+					if entries.remove(entry.id) ~= true then return false end
 					changed()
+					return true
 				end },
 			} }
 		end

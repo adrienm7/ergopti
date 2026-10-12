@@ -69,6 +69,7 @@ function M.rows(llm, dialogs, changed, context)
 	end
 	return Menu.rows({ order = Servers.order(), servers = Servers.servers(), detected = Servers.detected(),
 		result = Servers.result, sweeping = Servers.is_sweeping(), paused = not admit(),
+		entry_id = function(id) local target = Servers.target(id); return target and target.entry_id end,
 		backend = llm.get_backend(), active = Entries.active(), tr = I18n.get, format = format,
 		actions = { select = function(id, model) return apply(id, { model = model }) end,
 			address = function(id) return prompt(id, "base_url") end,

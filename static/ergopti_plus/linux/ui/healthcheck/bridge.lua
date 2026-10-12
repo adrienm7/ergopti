@@ -612,6 +612,7 @@ end
 --- @return table
 local function init_message(session)
 	local documents = M.config()
+	session.snapshot.export_revision = session.snapshot.export_revision or 1
 	return {
 		type = "init",
 		config = {
@@ -644,6 +645,9 @@ local function perform(session, action, state, context)
 	local Report = require("ui.healthcheck.report")
 	local documents = M.config()
 	if action.action == "export_snapshot" then
+		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
+			return { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence }
+		end
 		return { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
@@ -660,7 +664,9 @@ local function perform(session, action, state, context)
 		cancel_probes(session)
 		archive_cleanup_metadata(session)
 		session.detailed = action.detailed
+		local revision = (session.snapshot.export_revision or 1) + 1
 		session.snapshot = M.build_snapshot(state, action.detailed, action.extensive)
+		session.snapshot.export_revision = revision
 		session.snapshot.retired_probes = session.cleanup_history
 		start_probes(session, state)
 		return { type = "snapshot", snapshot = session.snapshot }

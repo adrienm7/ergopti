@@ -317,6 +317,37 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		end)
 	end
 
+	helpers.it("(ollama-owned-retirement) closes only its published daemon and retains receipt debt", function()
+		with_startup({}, function(api, fixture)
+			helpers.assert_true(api.ensure_running())
+			local original = fixture.tasks[1]
+			original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+			helpers.assert_true(api.is_ready() == false, "daemon readiness is independent of model warmup")
+			helpers.assert_eq(api.stop_owned_server(), false,
+				"stdin EOF cannot acknowledge a daemon's native retirement")
+			helpers.assert_eq(original.input_closes, 1)
+			helpers.assert_eq(api.ensure_running(), false, "the exact daemon debt blocks a successor")
+			helpers.assert_eq(#fixture.tasks, 1)
+			original.emit(original.frame("RETIRED 0"))
+			helpers.assert_eq(api.stop_owned_server(), false, "the receipt cannot substitute for physical exit")
+			original.complete(0)
+			helpers.assert_true(api.stop_owned_server())
+			helpers.assert_eq(original.input_closes, 1, "the original EOF remains a once-only request")
+			helpers.assert_true(api.migration_idle())
+		end)
+	end)
+
+	helpers.it("(ollama-owned-retirement) never acquires authority over an external server", function()
+		with_startup({}, function(api, fixture)
+			package.loaded["modules.llm.ollama_binary"].resolve = function()
+				return "/Applications/Ollama.app/Contents/Resources/ollama", nil, "app"
+			end
+			helpers.assert_eq(api.ensure_running(), false)
+			helpers.assert_true(api.stop_owned_server())
+			helpers.assert_eq(#fixture.tasks, 0, "an external executable does not grant service ownership")
+		end)
+	end)
+
 	for _, case in ipairs({
 		{ name = "false", start = function() return false end },
 		{ name = "nil", start = function() return nil end },
@@ -450,6 +481,8 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		with_startup({}, function(api, fixture)
 			helpers.assert_true(set_upvalue(api.is_ready, "_is_ready", true),
 				"the daemon-exit regression must seed the real readiness owner")
+			helpers.assert_true(set_upvalue(api.is_ready, "_ready_origin", api.get_base_url()),
+				"the ready model belongs to the currently configured endpoint")
 			helpers.assert_true(set_upvalue(api.reset_ready, "_warmup_gen", 41),
 				"the daemon-exit regression must seed the real warmup generation")
 			helpers.assert_true(set_upvalue(api.warmup, "_warmup_active", true),
@@ -473,6 +506,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				"daemon death must release the stale warmup intent")
 			helpers.assert_eq(recovery_calls, 1, "the current daemon must delegate exactly one recovery attempt")
 			helpers.assert_true(set_upvalue(api.is_ready, "_is_ready", true))
+			helpers.assert_true(set_upvalue(api.is_ready, "_ready_origin", api.get_base_url()))
 			original.complete(0)
 			helpers.assert_eq(api.is_ready(), true, "a duplicate stale completion must not demote a successor readiness verdict")
 			helpers.assert_eq(recovery_calls, 1, "a duplicate stale completion must not request sibling recovery")

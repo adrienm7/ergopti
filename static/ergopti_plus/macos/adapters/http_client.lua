@@ -650,6 +650,7 @@ local function new(options)
 				status = 0,
 				body = "",
 				error = tostring(task_or_err),
+				error_kind = "native_dispatch",
 			})
 			_notify_settlement_observers()
 			return false

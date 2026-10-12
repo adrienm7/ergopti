@@ -47,6 +47,11 @@ const FAST_MS = 1000;
  * The interval is read from the source, not repeated here — one source of truth.
  */
 const INVENTORY = {
+	'modules/llm/ollama_managed_bootstrap.ahk:this':
+		'Armed only while a managed Ollama session owns installation, startup, model work or ' +
+		'READY service custody. 150 ms bounds cancellation, stale configuration and pause ' +
+		'observation; READY retains the ownership watch after the progress window closes. ' +
+		'Cancel stops the exact callback, and no unowned or external server arms this timer.',
 	'modules/dynamic_hotstrings/user_code.ahk:_UserHotstringsPoll':
 		'Armed only while a programmable worker or exact Job/stage retirement debt is owned. ' +
 		'25 ms bounds cooperative cancellation and stale source/focus/input publication; ' +

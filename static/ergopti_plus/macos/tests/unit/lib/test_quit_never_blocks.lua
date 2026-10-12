@@ -78,7 +78,7 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 			helpers.assert_eq(blocked, {}, "no synchronous process primitive may run at Quit")
 			helpers.assert_eq(helper_result, true)
 			helpers.assert_eq(orphan_result, true)
-			helpers.assert_eq(#spawns, 5, "three helper sweeps plus two orphan MLX sweeps")
+			helpers.assert_eq(#spawns, 4, "two helper sweeps plus two orphan MLX sweeps; Ollama uses its exact owner")
 			for _, record in ipairs(spawns) do
 				helpers.assert_true(record.executable:sub(1, 1) == "/",
 					"sweeps must use absolute binaries: " .. tostring(record.executable))
@@ -86,17 +86,43 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 				helpers.assert_eq(record.on_done, nil,
 					"a completion callback could log after the exit-time sink was finalized")
 				for _, argument in ipairs(record.arguments) do
+					helpers.assert_true(argument:find("ollama serve", 1, true) == nil,
+						"a Quit sweep cannot acquire authority over a personal Ollama service")
 					helpers.assert_true(argument ~= "-l" and argument ~= "-i"
 						and argument ~= "-li" and argument ~= "-il",
 						"no login or interactive shell may run at Quit")
 				end
 			end
-			local listener = spawns[5]
+			local listener = spawns[4]
 			helpers.assert_eq(listener.executable, "/bin/sh")
 			helpers.assert_true(listener.arguments[2]:find("/usr/sbin/lsof -nP -tiTCP:3460", 1, true) ~= nil,
 				"the listener sweep must skip DNS/port-name resolution")
 			-- with_stub_scope restores the cache too; explicit for the suite ratchet
 			package.loaded["adapters.shell_runner"] = nil
+		end)
+	end)
+
+	helpers.it("(ollama-owned-retirement) Quit reports retained daemon debt without a global kill", function()
+		helpers.with_stub_scope({ "adapters.shell_runner", "ui.menu.menu_llm", "modules.llm.api_ollama" }, function()
+			local spawns, retirements = {}, 0
+			package.loaded["adapters.shell_runner"] = {
+				_active_tasks = {},
+				spawn = function(executable, arguments)
+					spawns[#spawns + 1] = { executable = executable, arguments = arguments }
+					return { start = function() return true end }
+				end,
+			}
+			local MenuLLM = helpers.load_with_stubs("ui.menu.menu_llm")
+			local Api = require("modules.llm.api_ollama")
+			Api.stop_owned_server = function() retirements = retirements + 1; return false end
+			local result
+			local blocked = with_blocking_primitives_forbidden(function()
+				result = MenuLLM.terminate_helper_processes()
+			end)
+			helpers.assert_eq(result, false, "accepted retirement requests cannot acknowledge native closure")
+			helpers.assert_eq(retirements, 1, "the original daemon capability must own Quit retirement")
+			helpers.assert_eq(#spawns, 2, "daemon debt cannot launch a global Ollama killer")
+			helpers.assert_eq(blocked, {})
 		end)
 	end)
 

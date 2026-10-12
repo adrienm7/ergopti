@@ -54,9 +54,10 @@
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases and one final verdict. Windows/Linux keep one entry; macOS has
- *    exactly three entries for unit tests and independent mandatory managed
- *    Ollama/cold bootstrap jobs, and observes its native tooltip canvas after E2E.
+ *    phases and one final verdict. Linux and Windows start their
+ *    two suites independently. macOS has five entries: the scoped native
+ *    archive, independent unit/E2E tests, managed Ollama and cold bootstrap.
+ *    Its native tooltip canvas still waits for both suites.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
@@ -343,8 +344,20 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		'Retain actual native producer, catalogue and receiving evidence',
 		'always()'
 	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain passive security service logs after native receiving failure',
+		"${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}"
+	],
 	[MACOS_BOX, 'package-macos', 'Retain launcher build diagnostics', 'always()'],
 	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Retain source-bound package native qualification receipt',
+		'always()'
+	],
 	[
 		MACOS_BOX,
 		'cold-bootstrap-native',
@@ -504,6 +517,12 @@ const STEP_CONDITIONS = [
 	[MACOS_BOX, 'launch', 'Retain launch evidence', 'always()'],
 	[
 		MACOS_BOX,
+		'launch',
+		'Retain source-bound AppleEvent launch qualification receipt',
+		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+	],
+	[
+		MACOS_BOX,
 		'tooltip-canvas',
 		'Retain native captures, source, provisioning and retirement receipts',
 		'always()'
@@ -518,6 +537,7 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[WINDOWS_BOX, 'e2e-ahk', 'Retain E2E native streams', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish native desktop AHK evidence', 'always()'],
 	[
 		WINDOWS_BOX,
@@ -1219,9 +1239,19 @@ function graphProblems(files) {
 						? rel === MACOS_BOX
 							? MACOS_VERDICT_NEEDS
 							: sequence.slice(0, 4)
-						: rel === MACOS_BOX && id === 'package-macos'
-							? ['e2e-hs', 'managed-ollama-native']
-							: [sequence[index - 1]];
+						: rel === WINDOWS_BOX && id === 'e2e-ahk'
+							? []
+							: rel === WINDOWS_BOX && id === 'package-windows'
+								? ['test-ahk', 'e2e-ahk']
+								: rel === MACOS_BOX && id === 'e2e-hs'
+									? []
+									: rel === MACOS_BOX && id === 'package-macos'
+										? ['test-hs', 'e2e-hs', 'managed-ollama-native']
+										: rel === LINUX_BOX && id === 'e2e-linux'
+											? []
+											: rel === LINUX_BOX && id === 'package-linux'
+												? ['test-linux', 'e2e-linux']
+												: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
@@ -1229,7 +1259,7 @@ function graphProblems(files) {
 				index === 4
 					? 'always()'
 					: rel === LINUX_BOX && id === 'package-linux'
-						? "${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+						? "${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 						: null;
 			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
 				problems.push(
@@ -1268,8 +1298,11 @@ function graphProblems(files) {
 				}
 			}
 			const canvas = jobs.find((candidate) => candidate.id === 'tooltip-canvas');
-			if (!canvas || JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['e2e-hs'])) {
-				problems.push(`${rel} tooltip-canvas must need exactly e2e-hs`);
+			if (
+				!canvas ||
+				JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['test-hs', 'e2e-hs'])
+			) {
+				problems.push(`${rel} tooltip-canvas must need exactly test-hs and e2e-hs`);
 			}
 			if (canvas && pipeline.field(canvas.body, 'if') !== null) {
 				problems.push(`${rel} tooltip-canvas must run on every profile without a job condition`);
@@ -1291,6 +1324,7 @@ function graphProblems(files) {
 				'lease-silence-native',
 				'managed-ollama-native',
 				'test-hs',
+				'e2e-hs',
 				'cold-bootstrap-native'
 			];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
@@ -1298,10 +1332,11 @@ function graphProblems(files) {
 					`${rel} must have exactly the five declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
-		} else if (entries.length !== 1) {
-			problems.push(
-				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
-			);
+		} else {
+			const expectedEntries =
+				rel === WINDOWS_BOX ? ['test-ahk', 'e2e-ahk'] : ['test-linux', 'e2e-linux'];
+			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries))
+				problems.push(`${rel} must retain exactly the independent unit and E2E entries`);
 		}
 		const expectedExits =
 			rel === MACOS_BOX ? ['item36-native', 'lease-silence-native', 'macos-ok'] : [sequence[4]];
@@ -1329,7 +1364,7 @@ for (const [what, from, to] of [
 	['canvas bypassed by the macOS verdict', '      - tooltip-canvas\n', ''],
 	[
 		'canvas depends on packaging instead of native E2E',
-		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: e2e-hs\n",
+		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: [test-hs, e2e-hs]\n",
 		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: package-macos\n"
 	],
 	['conditional native canvas job', '  tooltip-canvas:\n', '  tooltip-canvas:\n    if: false\n']
@@ -1340,8 +1375,8 @@ for (const [what, from, to] of [
 mustCatch(
 	'native producer omitted from application packaging',
 	MACOS_BOX,
-	'    needs: [e2e-hs, managed-ollama-native]\n',
-	'    needs: e2e-hs\n',
+	'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
+	'    needs: [test-hs, e2e-hs]\n',
 	graphProblems
 );
 
@@ -1440,6 +1475,31 @@ for (const [label, before, after] of [
 	const changed = whole.replace(before, () => after);
 	mustCatch('lease silence: ' + label, MACOS_BOX, whole, changed, graphProblems);
 }
+
+// Independent Linux suites still gate packaging and the mandatory verdict.
+for (const [what, from, to] of [
+	[
+		'Linux E2E is coupled to units again',
+		"  e2e-linux:\n    name: 'E2E tests'\n",
+		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n"
+	],
+	['Linux package omits units', '    needs: [test-linux, e2e-linux]\n', '    needs: [e2e-linux]\n'],
+	['Linux package omits E2E', '    needs: [test-linux, e2e-linux]\n', '    needs: [test-linux]\n'],
+	['Linux package forgives failed units', "needs.test-linux.result == 'success' && ", ''],
+	[
+		'Linux package drops manual failed-E2E diagnostics',
+		" || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
+		''
+	],
+	[
+		'Linux package admits failed E2E automatically',
+		"(github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
+		"(needs.e2e-linux.result == 'failure')"
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, graphProblems);
+}
+
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
@@ -1472,14 +1532,62 @@ for (const [what, rel, from, to] of [
 		'    needs: [validate, core, macos, windows, linux]\n',
 		'    needs: [macos, windows, linux]\n'
 	],
-	['a second entry in the macOS lane', MACOS_BOX, '    needs: test-hs\n', ''],
+	['a sixth entry in the macOS lane', MACOS_BOX, '    needs: [test-hs, e2e-hs]\n', ''],
 	[
-		'a second entry in the Linux lane',
+		'macOS packaging stops waiting for units',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
+		'    needs: [e2e-hs, managed-ollama-native]\n'
+	],
+	[
+		'macOS packaging stops waiting for E2E',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
+		'    needs: [test-hs, managed-ollama-native]\n'
+	],
+	[
+		'native canvas stops waiting for units',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs]\n',
+		'    needs: e2e-hs\n'
+	],
+	[
+		'native canvas stops waiting for E2E',
+		MACOS_BOX,
+		'    needs: [test-hs, e2e-hs]\n',
+		'    needs: test-hs\n'
+	],
+	[
+		'macOS E2E is coupled to units again',
+		MACOS_BOX,
+		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n",
+		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n    needs: test-hs\n"
+	],
+	[
+		'a third entry in the Linux lane',
 		LINUX_BOX,
 		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
 		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"
 	],
-	['a second entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk]\n', ''],
+	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk, e2e-ahk]\n', ''],
+	[
+		'Windows packaging stops waiting for unit tests',
+		WINDOWS_BOX,
+		'    needs: [test-ahk, e2e-ahk]\n',
+		'    needs: [e2e-ahk]\n'
+	],
+	[
+		'Windows packaging stops waiting for E2E tests',
+		WINDOWS_BOX,
+		'    needs: [test-ahk, e2e-ahk]\n',
+		'    needs: [test-ahk]\n'
+	],
+	[
+		'Windows E2E is coupled to unit tests again',
+		WINDOWS_BOX,
+		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n",
+		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n"
+	],
 	[
 		'a second exit in the macOS lane',
 		MACOS_BOX,
@@ -1581,7 +1689,16 @@ function permissionProblems(files) {
 	return problems;
 }
 
-errors.push(...topJobProblems(pipeline.files()), ...permissionProblems(pipeline.files()));
+// The independent benchmark also receives a repository token on every main push.
+// Include it here even though it is not called by the release workflow.
+const benchmarkWorkflow = {
+	rel: '.github/workflows/bench.yml',
+	text: fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/bench.yml'), 'utf8')
+};
+errors.push(
+	...topJobProblems(pipeline.files()),
+	...permissionProblems([...pipeline.files(), benchmarkWorkflow])
+);
 for (const [what, from, to] of [
 	['if: false on the Windows caller', '  windows:\n', '  windows:\n    if: false\n'],
 	[
@@ -1607,6 +1724,7 @@ for (const [what, from, to] of [
 	mustCatch(what, ENTRY, from, to, topJobProblems);
 }
 for (const [what, rel, from, to] of [
+	['missing token permissions', ENTRY, 'permissions:\n  contents: read\n', ''],
 	[
 		'write-all at the top of ci.yml',
 		ENTRY,
@@ -2014,6 +2132,55 @@ mustCatch(
 	'      - name: Omitted Configuration assertion diagnostic\n',
 	stepProblems
 );
+// Passive diagnostics never authorize a receiving gate or forgive its failure.
+{
+	const name = 'Retain passive security service logs after native receiving failure';
+	const condition =
+		"${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}";
+	assert.equal(CONDITIONS.get(conditionKey(MACOS_BOX, 'managed-ollama-native', name)), condition);
+	const head = `      - name: ${name}\n`;
+	const changedConditions = [
+		'',
+		'always()',
+		'failure()',
+		'success()',
+		'false',
+		condition.replace('!cancelled() && ', ''),
+		condition.replace('failure() && ', '')
+	];
+	for (const identifier of [
+		'managed-ollama-pac-receiving',
+		'native_http_clock',
+		'managed-ollama-model-receiving'
+	]) {
+		const clause = `steps.${identifier}.outcome == 'failure'`;
+		changedConditions.push(condition.replace(clause, clause.replace("'failure'", "'success'")));
+		changedConditions.push(condition.replace(clause, 'false'));
+	}
+	for (const changed of changedConditions)
+		mustCatch(
+			'passive Security observation condition ' + (changed || '(none)'),
+			MACOS_BOX,
+			head + `        if: ${condition}\n`,
+			head + (changed ? `        if: ${changed}\n` : ''),
+			stepProblems
+		);
+	mustCatch(
+		'passive Security observation missing exact step',
+		MACOS_BOX,
+		head,
+		'      - name: Unknown passive Security observation\n',
+		stepProblems
+	);
+	for (const [rel, job] of [
+		[MACOS_BOX, 'package-macos'],
+		[MACOS_BOX, 'test-hs'],
+		[WINDOWS_BOX, 'test-ahk'],
+		[LINUX_BOX, 'test-linux']
+	])
+		assert.equal(CONDITIONS.has(conditionKey(rel, job, name)), false);
+}
+
 // Each new native evidence condition is exact, scoped to its job and source-owned step.
 for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 	const head = `      - name: ${name}\n`;
@@ -4967,10 +5134,12 @@ for (const name of [
 		build.replace(buildName, 'Omitted native source build'),
 		/no step named/
 	);
+	const modelId = '        id: managed-ollama-model-receiving\n';
+	assert.equal(model.split(modelId).length - 1, 1, 'one actual model receiver id');
 	refuses(
 		'producer id stolen by model receiver',
 		model,
-		model.replace(`      - name: ${modelName}\n`, `      - name: ${modelName}\n${id}`),
+		model.replace(modelId, id),
 		/native producer unique build id/
 	);
 	const together = build + '\n' + model;

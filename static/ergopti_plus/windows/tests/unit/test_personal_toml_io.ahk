@@ -124,3 +124,5 @@ Test("personal-toml-cache-race: writer evicts every derived reader cache",
 #Include test_personal_toml_roundtrip.ahk
 #Include test_personal_toml_metadata_transactions.ahk
 #Include test_personal_toml_live_transactions.ahk
+
+#Include test_personal_toml_preservation.ahk

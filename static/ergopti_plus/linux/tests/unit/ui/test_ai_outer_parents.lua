@@ -148,21 +148,35 @@ helpers.describe("Linux shared AI outer parents with published available compone
 				ctx.on_menu_changed = function() refreshes = refreshes + 1 end
 				engine[method] = nil
 				local ok, err = xpcall(function()
-					local row = parent(ctx, kind)
+					local direct, render = nil, require("infra.manifest_menu").build
+					require("infra.manifest_menu").build = function(key, path, handlers, groups, context, providers)
+						if key == "llm_menu" then direct = context.commands.llm_toggle end
+						return render(key, path, handlers, groups, context, providers)
+					end
+					local built, row = pcall(parent, ctx, kind)
+					require("infra.manifest_menu").build = render
+					if not built then error(row, 0) end
 					helpers.assert_type(row, "table", "a present engine retains its real submenu")
 					helpers.assert_true(row.disabled ~= true, "opening a submenu does not require unrelated action capability")
 					helpers.assert_type(row.menu, "table", "the complete native child stays navigable")
 					local command
 					if kind == "agent" then command = row.menu[1].menu[2]
 					else
-						local title = require("infra.i18n").get("menu.llm.enable")
+						local title = require("infra.i18n").get("menu.llm.enable") .. " — "
+							.. require("infra.i18n").get("menu.llm.save_unavailable"):match("^([^:]+)"):gsub("%s+$", "")
 						for _, child in ipairs(row.menu) do if child.title == title then command = child end end
 					end
 					helpers.assert_type(command, "table", "the genuine action row remains visible")
 					local disabled = kind == "agent" and row.menu[1].disabled or command.disabled
 					helpers.assert_eq(disabled, true, "the unavailable child action must refuse")
-					helpers.assert_type(command.fn, "function", "the original guarded native callback stays owned")
-					command.fn()
+					if kind == "llm" then
+						helpers.assert_nil(command.fn, "the unavailable native toggle cannot retain an action")
+						helpers.assert_type(direct, "function", "the actual guarded command stays owned")
+						helpers.assert_eq(direct(), false, "retained direct invocation must refuse")
+					else
+						helpers.assert_type(command.fn, "function", "the original guarded native callback stays owned")
+						command.fn()
+					end
 					helpers.assert_eq(engine.is_enabled(), enabled, "missing toggle cannot change native activation")
 					helpers.assert_eq(settings.get_mode(), mode, "missing mode capability cannot commit")
 					helpers.assert_eq(refreshes, 0, "a refused native command never rebuilds")

@@ -51,4 +51,71 @@ assert.equal(
 	0,
 	'an assertion on the returned value remains a positive control'
 );
-console.log('false-green pcall rejection: 10 scenarios passed');
+const ahkFixture = path.join(__dirname, 'synthetic-mixed-quotes.ahk');
+for (const literal of [
+	"{Source: ' # fake } ] \"', Expected: 1}",
+	'{Source: " # fake } ] \'", Expected: 1}',
+	"{Source: ' # fake `' } ] \"', Expected: 1}",
+	'{Source: " # fake `" } ] \'", Expected: 1}',
+	"{Source: '; fake } \"', Expected: 1}"
+]) {
+	const live = [
+		'Live() {',
+		`    Vector := ${literal} ; ignored trailing }`,
+		'    AssertEqual(Vector.Expected, 1)',
+		'}',
+		'Test("live", Live)'
+	].join('\n');
+	const blocks = context.ahkFunctionBlocks(live);
+	assert.equal(blocks.length, 1);
+	assert.equal(
+		blocks[0].end,
+		4,
+		'mixed literals cannot truncate a real function before its assertion'
+	);
+	assert.ok(blocks[0].text.includes('AssertEqual(Vector.Expected, 1)'));
+	assert.ok(
+		context.ahkAllFunctionBlocks(live).get('Live').text.includes('AssertEqual(Vector.Expected, 1)')
+	);
+	assert.equal(context.ahkEnclosingFunction(live)[2], 'Live');
+	assert.equal(context.ahkEnclosingFunction(live)[4], null);
+	assert.equal(context.findDeadTests(ahkFixture, live, '.ahk').length, 0);
+	const dead = ['Empty() {', `    Vector := ${literal}`, '}', 'Test("empty", Empty)'].join('\n');
+	assert.equal(
+		context.findDeadTests(ahkFixture, dead, '.ahk').length,
+		1,
+		'real non-asserting tests remain dead'
+	);
+	const nested = [
+		'Register() {',
+		`    Vector := ${literal}`,
+		'    Nested() {',
+		`        Vector := ${literal}`,
+		'        AssertEqual(Vector.Expected, 1)',
+		'    }',
+		'    Test("nested", Nested)',
+		'}',
+		'Register()'
+	].join('\n');
+	assert.ok(
+		context
+			.ahkAllFunctionBlocks(nested)
+			.get('Nested')
+			.text.includes('AssertEqual(Vector.Expected, 1)')
+	);
+	assert.equal(context.ahkEnclosingFunction(nested)[4], 'Nested');
+	assert.equal(context.ahkEnclosingFunction(nested)[6], 'Register');
+	assert.equal(
+		context.findDeadTests(ahkFixture, nested, '.ahk').length,
+		0,
+		'a genuinely reached nested registration stays live'
+	);
+	assert.equal(
+		context.findDeadTests(ahkFixture, nested.replace('\nRegister()', ''), '.ahk').length,
+		1,
+		'an unreached nested registration remains dead'
+	);
+}
+console.log(
+	'false-green pcall rejection: 10 scenarios; AHK mixed quotes: 5 live/dead/nested vectors passed'
+);

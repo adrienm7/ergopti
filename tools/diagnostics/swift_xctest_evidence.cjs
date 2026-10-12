@@ -11,6 +11,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const pacAdmissions = new WeakSet();
+const brewAdmissions = new WeakSet();
+
+function capturedMethods(methods) {
+	return Object.freeze(
+		Object.fromEntries(
+			Object.entries(methods).map(([suite, names]) => [suite, Object.freeze([...names])])
+		)
+	);
+}
 
 /** The bootstrap transfer invokes the same native TLS/full-URL PAC fixture. */
 const pacMethods = Object.freeze({
@@ -37,7 +46,10 @@ function pacQualification(receipt, env = process.env, now = new Date()) {
 	const admission = Object.freeze({
 		mode,
 		source_sha: env.GITHUB_SHA,
-		profile_id: receipt.profile_id
+		profile_id: receipt.profile_id,
+		...(receipt.profile_id === q.STABLE_V101_PROFILE_ID
+			? { expires_at: receipt.expires_at, methods: capturedMethods(receipt.artifact.methods) }
+			: {})
 	});
 	pacAdmissions.add(admission);
 	return admission;
@@ -48,42 +60,138 @@ function readPacQualification(file) {
 	return pacQualification(q.parseClosedJson(fs.readFileSync(file, 'utf8')));
 }
 
-function rootPattern(admission) {
-	if (admission === null) return 'All tests';
-	if (!pacAdmissions.has(admission)) throw new TypeError('Unadmitted PAC qualification.');
-	return admission.mode === 'deferred' ? 'Selected tests' : 'All tests';
+/** The Brew omission needs its own exact current scope receipt. */
+function brewQualification(receipt, env = process.env, now = new Date()) {
+	const q = require('../ci/dev-release-qualification.cjs');
+	const mode = q.scopeDisposition(
+		receipt,
+		'macos-brew-archive',
+		env.GITHUB_SHA,
+		q.environmentContext(env),
+		now
+	);
+	if (mode === 'deferred' && receipt.profile_id !== q.STABLE_V101_PROFILE_ID)
+		throw new TypeError('Only the current three-scope profile admits this Brew routing.');
+	const admission = Object.freeze({
+		mode,
+		source_sha: env.GITHUB_SHA,
+		profile_id: receipt.profile_id,
+		expires_at: receipt.expires_at,
+		...(mode === 'deferred'
+			? {
+					methods: capturedMethods({
+						[path.basename(receipt.artifact.path, '.swift')]: [receipt.artifact.name]
+					})
+				}
+			: {})
+	});
+	brewAdmissions.add(admission);
+	return admission;
 }
 
-function pacSkipPattern(admission) {
+function readBrewQualification(file) {
+	const q = require('../ci/dev-release-qualification.cjs');
+	return brewQualification(q.parseClosedJson(fs.readFileSync(file, 'utf8')));
+}
+
+function narrowPac(admission) {
+	return (
+		admission !== null &&
+		admission.profile_id === require('../ci/dev-release-qualification.cjs').STABLE_V101_PROFILE_ID
+	);
+}
+
+function rootPattern(admission, brewAdmission = null) {
+	if (admission !== null && !pacAdmissions.has(admission))
+		throw new TypeError('Unadmitted PAC qualification.');
+	if (brewAdmission !== null && !brewAdmissions.has(brewAdmission))
+		throw new TypeError('Unadmitted Brew qualification.');
+	if (
+		brewAdmission !== null &&
+		brewAdmission.mode === 'deferred' &&
+		(!narrowPac(admission) ||
+			admission.mode !== 'deferred' ||
+			admission.source_sha !== brewAdmission.source_sha ||
+			admission.profile_id !== brewAdmission.profile_id ||
+			admission.expires_at !== brewAdmission.expires_at)
+	)
+		throw new TypeError('The package scope receipts do not own the same publication.');
+	return admission !== null && admission.mode === 'deferred' ? 'Selected tests' : 'All tests';
+}
+
+/** Closed provenance is available only from an authenticated collector admission. */
+function pacQualificationDetails(admission) {
 	rootPattern(admission);
+	if (admission === null || admission.mode !== 'deferred') return null;
+	const q = require('../ci/dev-release-qualification.cjs');
+	return {
+		scope: 'macos-native-pac',
+		status: 'deferred',
+		qualified: false,
+		classes: narrowPac(admission) ? [] : pacClasses(),
+		methods: narrowPac(admission) ? admission.methods : pacMethods,
+		source_sha: admission.source_sha,
+		profile_id: admission.profile_id,
+		...(narrowPac(admission) ? { expires_at: admission.expires_at } : {})
+	};
+}
+
+function brewQualificationDetails(admission, brewAdmission) {
+	rootPattern(admission, brewAdmission);
+	if (brewAdmission === null || brewAdmission.mode !== 'deferred') return null;
+	return {
+		scope: 'macos-brew-archive',
+		status: 'deferred',
+		qualified: false,
+		methods: brewAdmission.methods,
+		source_sha: brewAdmission.source_sha,
+		profile_id: brewAdmission.profile_id,
+		expires_at: brewAdmission.expires_at
+	};
+}
+
+function pacSkipPattern(admission, brewAdmission = null) {
+	rootPattern(admission, brewAdmission);
 	if (admission === null || admission.mode !== 'deferred')
 		throw new Error('PAC execution may only be omitted under its active scope.');
-	const methods = Object.entries(pacMethods).flatMap(([suite, names]) =>
+	const info = pacQualificationDetails(admission);
+	const brew = brewQualificationDetails(admission, brewAdmission);
+	const selectedMethods = { ...info.methods, ...(brew ? brew.methods : {}) };
+	const methods = Object.entries(selectedMethods).flatMap(([suite, names]) =>
 		names.map((name) => suite + '/' + name + '$')
 	);
+	if (narrowPac(admission)) return '^ErgoptiPlusTests[.](?:' + methods.join('|') + ')';
 	return '^ErgoptiPlusTests[.](?:(?:' + pacClasses().join('|') + ')/|' + methods.join('|') + ')';
 }
 
+function methodMatches(name, methods) {
+	return Object.entries(methods).some(([suite, names]) =>
+		names.some((method) =>
+			[
+				'-[ErgoptiPlusTests.' + suite + ' ' + method + ']',
+				'ErgoptiPlusTests.' + suite + '.' + method,
+				'ErgoptiPlusTests.' + suite + '/' + method
+			].includes(name)
+		)
+	);
+}
+
 function isDeferredPacCase(name, admission) {
+	if (admission === null || admission.mode !== 'deferred') return false;
+	const info = pacQualificationDetails(admission);
 	return (
-		admission !== null &&
-		admission.mode === 'deferred' &&
-		(pacClasses().some(
+		info.classes.some(
 			(suite) =>
 				name.startsWith('-[ErgoptiPlusTests.' + suite + ' ') ||
 				name.startsWith('ErgoptiPlusTests.' + suite + '.') ||
 				name.startsWith('ErgoptiPlusTests.' + suite + '/')
-		) ||
-			Object.entries(pacMethods).some(([suite, methods]) =>
-				methods.some((method) =>
-					[
-						'-[ErgoptiPlusTests.' + suite + ' ' + method + ']',
-						'ErgoptiPlusTests.' + suite + '.' + method,
-						'ErgoptiPlusTests.' + suite + '/' + method
-					].includes(name)
-				)
-			))
+		) || methodMatches(name, info.methods)
 	);
+}
+
+function isDeferredBrewCase(name, admission, brewAdmission) {
+	const info = brewQualificationDetails(admission, brewAdmission);
+	return info !== null && methodMatches(name, info.methods);
 }
 
 /** Removes PTY styling and normalizes line endings without changing Unicode. */
@@ -121,14 +229,17 @@ function evaluate(
 	scriptStatus,
 	teeStatus,
 	repository = path.resolve(__dirname, '../..'),
-	admission = null
+	admission = null,
+	brewAdmission = null
 ) {
-	const root = rootPattern(admission);
+	const root = rootPattern(admission, brewAdmission);
 	const rootStart = new RegExp("^Test Suite '" + root + "' started at ");
 	const rootFinish = new RegExp("^Test Suite '" + root + "' (passed|failed) at ");
 	const rootPass = new RegExp("^Test Suite '" + root + "' passed at ");
 	const script = exitStatus(scriptStatus);
 	const tee = exitStatus(teeStatus);
+	const pacInfo = pacQualificationDetails(admission);
+	const brewInfo = brewQualificationDetails(admission, brewAdmission);
 	const lines = cleanTranscript(text).split('\n');
 	const failures = [];
 	const completed = [];
@@ -185,9 +296,28 @@ function evaluate(
 		if (!completed.some((test) => test.name === name))
 			failures.push({ message: 'XCTest case did not complete: ' + name });
 	for (const name of started)
-		if (isDeferredPacCase(name, admission))
-			failures.push({ message: 'A deferred PAC case was unexpectedly executed.' });
+		if (isDeferredPacCase(name, admission) || isDeferredBrewCase(name, admission, brewAdmission))
+			failures.push({
+				message: isDeferredPacCase(name, admission)
+					? 'A deferred PAC case was unexpectedly executed.'
+					: 'A deferred Brew case was unexpectedly executed.'
+			});
+	const workers = require('./managed_http_pac_xctest_evidence.cjs').METHODS.ManagedHTTPWorkerTests;
+	const workersComplete =
+		!narrowPac(admission) ||
+		admission.mode !== 'deferred' ||
+		workers.every(
+			(method) =>
+				completed.filter(
+					(test) =>
+						methodMatches(test.name, { ManagedHTTPWorkerTests: [method] }) &&
+						test.result === 'passed'
+				).length === 1
+		);
+	if (!workersComplete)
+		failures.push({ message: 'The twelve mandatory HTTP Worker cases did not complete.' });
 	const complete =
+		workersComplete &&
 		rootStarts === 1 &&
 		rootFinishes === 1 &&
 		rootPassed &&
@@ -208,19 +338,8 @@ function evaluate(
 		failures.push({ message: `The native Swift/PTY command exited with status ${script}.` });
 	if (tee !== 0) failures.push({ message: `XCTest transcript capture exited with status ${tee}.` });
 	return {
-		...(admission !== null && admission.mode === 'deferred'
-			? {
-					qualification: {
-						scope: 'macos-native-pac',
-						status: 'deferred',
-						qualified: false,
-						classes: pacClasses(),
-						methods: pacMethods,
-						source_sha: admission.source_sha,
-						profile_id: admission.profile_id
-					}
-				}
-			: {}),
+		...(pacInfo !== null ? { qualification: pacInfo } : {}),
+		...(brewInfo !== null ? { brew_qualification: brewInfo } : {}),
 		schema_version: 1,
 		script_status: script,
 		tee_status: tee,
@@ -245,8 +364,9 @@ const archiveCases = Object.freeze([
 ]);
 
 /** Projects authentic case completion independently of another case's failure. */
-function archiveOutcomes(text, scriptStatus, teeStatus, admission = null) {
-	const root = rootPattern(admission);
+function archiveOutcomes(text, scriptStatus, teeStatus, admission = null, brewAdmission = null) {
+	const root = rootPattern(admission, brewAdmission);
+	const brewInfo = brewQualificationDetails(admission, brewAdmission);
 	const rootStart = new RegExp("^Test Suite '" + root + "' started at ");
 	const rootFinish = new RegExp("^Test Suite '" + root + "' (passed|failed) at ");
 	const script = exitStatus(scriptStatus);
@@ -306,7 +426,11 @@ function archiveOutcomes(text, scriptStatus, teeStatus, admission = null) {
 			line
 		);
 		if (start) {
-			if (isDeferredPacCase(start[1], admission)) invalid = true;
+			if (
+				isDeferredPacCase(start[1], admission) ||
+				isDeferredBrewCase(start[1], admission, brewAdmission)
+			)
+				invalid = true;
 			if (state !== 'running' || active !== null || starts.has(start[1])) invalid = true;
 			starts.add(start[1]);
 			active = start[1];
@@ -339,8 +463,15 @@ function archiveOutcomes(text, scriptStatus, teeStatus, admission = null) {
 	return archiveCases.map(([label, name]) => ({
 		schema: 1,
 		case: label,
-		outcome: outcomes[terminals.get(name)] || 'UNAVAILABLE',
-		basis: terminals.has(name) ? 'exact-xctest-completion' : 'unavailable',
+		outcome:
+			label === 'brew' && brewInfo ? 'DEFERRED' : outcomes[terminals.get(name)] || 'UNAVAILABLE',
+		basis:
+			label === 'brew' && brewInfo
+				? 'scoped-qualification'
+				: terminals.has(name)
+					? 'exact-xctest-completion'
+					: 'unavailable',
+		...(label === 'brew' && brewInfo ? { qualification: brewInfo } : {}),
 		script_status: script,
 		capture_status: tee
 	}));
@@ -351,11 +482,38 @@ function archiveAnnotation(receipt) {
 	if (
 		receipt.schema !== 1 ||
 		!archiveCases.some(([label]) => label === receipt.case) ||
-		!['PASS', 'FAIL', 'SKIP', 'UNAVAILABLE'].includes(receipt.outcome) ||
+		!['PASS', 'FAIL', 'SKIP', 'UNAVAILABLE', 'DEFERRED'].includes(receipt.outcome) ||
 		receipt.basis !==
-			(receipt.outcome === 'UNAVAILABLE' ? 'unavailable' : 'exact-xctest-completion')
+			(receipt.outcome === 'UNAVAILABLE'
+				? 'unavailable'
+				: receipt.outcome === 'DEFERRED'
+					? 'scoped-qualification'
+					: 'exact-xctest-completion')
 	)
 		throw new TypeError('Invalid native archive XCTest receipt.');
+	if (receipt.outcome === 'DEFERRED') {
+		const q = require('../ci/dev-release-qualification.cjs');
+		const fact = receipt.qualification;
+		const policy = q.validatePolicy(
+			q.parseClosedJson(fs.readFileSync(q.STABLE_V101_POLICY_PATH, 'utf8'))
+		);
+		const row = policy.scopes['macos-brew-archive'];
+		const approvedMethods = { [path.basename(row.path, '.swift')]: [row.name] };
+		if (
+			!fact ||
+			receipt.case !== 'brew' ||
+			Object.keys(fact).sort().join(',') !==
+				'expires_at,methods,profile_id,qualified,scope,source_sha,status' ||
+			fact.scope !== 'macos-brew-archive' ||
+			fact.status !== 'deferred' ||
+			fact.qualified !== false ||
+			fact.profile_id !== q.STABLE_V101_PROFILE_ID ||
+			!/^[0-9a-f]{40}$/.test(fact.source_sha) ||
+			fact.expires_at !== policy.expires_at ||
+			JSON.stringify(fact.methods) !== JSON.stringify(approvedMethods)
+		)
+			throw new TypeError('Unbound deferred native archive receipt.');
+	}
 	return (
 		'::notice title=Native archive XCTest outcome::' +
 		JSON.stringify({
@@ -363,6 +521,7 @@ function archiveAnnotation(receipt) {
 			case: receipt.case,
 			outcome: receipt.outcome,
 			basis: receipt.basis,
+			...(receipt.outcome === 'DEFERRED' ? { qualification: receipt.qualification } : {}),
 			script_status: exitStatus(receipt.script_status),
 			capture_status: exitStatus(receipt.capture_status)
 		})
@@ -374,14 +533,22 @@ function main(args = process.argv.slice(2), log = console.log) {
 	let script = 0;
 	let tee = 0;
 	try {
-		if (args.length !== 4 && !(args.length === 6 && args[4] === '--pac-qualification-receipt'))
+		if (
+			args.length !== 4 &&
+			!(
+				[6, 8].includes(args.length) &&
+				args[4] === '--pac-qualification-receipt' &&
+				(args.length === 6 || args[6] === '--brew-qualification-receipt')
+			)
+		)
 			throw new Error('Expected transcript path, script status, tee status and verdict path.');
 		script = exitStatus(args[1]);
 		tee = exitStatus(args[2]);
 		const transcript = fs.readFileSync(args[0], 'utf8');
-		const admission = args.length === 6 ? readPacQualification(args[5]) : null;
-		const result = evaluate(transcript, script, tee, undefined, admission);
-		result.archive_outcomes = archiveOutcomes(transcript, script, tee, admission);
+		const admission = args.length >= 6 ? readPacQualification(args[5]) : null;
+		const brewAdmission = args.length === 8 ? readBrewQualification(args[7]) : null;
+		const result = evaluate(transcript, script, tee, undefined, admission, brewAdmission);
+		result.archive_outcomes = archiveOutcomes(transcript, script, tee, admission, brewAdmission);
 		fs.writeFileSync(args[3], JSON.stringify(result, null, '\t') + '\n');
 		for (const receipt of result.archive_outcomes) log(archiveAnnotation(receipt));
 		for (const failure of result.failures) log(annotation(failure));
@@ -398,6 +565,9 @@ function main(args = process.argv.slice(2), log = console.log) {
 
 module.exports = {
 	pacQualification,
+	pacQualificationDetails,
+	brewQualification,
+	readBrewQualification,
 	readPacQualification,
 	pacSkipPattern,
 	annotation,
@@ -409,7 +579,15 @@ module.exports = {
 };
 if (require.main === module) {
 	const args = process.argv.slice(2);
-	if (args.length === 2 && args[0] === '--pac-skip-pattern') {
-		process.stdout.write(pacSkipPattern(readPacQualification(args[1])));
+	if (
+		(args.length === 2 || (args.length === 4 && args[2] === '--brew-qualification-receipt')) &&
+		args[0] === '--pac-skip-pattern'
+	) {
+		process.stdout.write(
+			pacSkipPattern(
+				readPacQualification(args[1]),
+				args.length === 4 ? readBrewQualification(args[3]) : null
+			)
+		);
 	} else process.exitCode = main();
 }

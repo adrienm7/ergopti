@@ -57,7 +57,6 @@ _CTT_RealCollector(OnboardingSeen) {
 	OldLoaded := HadLoaded ? _LLM_Menu_Loaded : false
 	Path := _CTU_NewPath()
 	try {
-		_CFGFS_Prepare(Path)
 		Features := ManifestBuildFeaturesMap()
 		_LLM_Menu := _HSDeepCloneMap(OldMenu)
 		_LLM_Menu["onboarding_seen"] := OnboardingSeen
@@ -67,7 +66,9 @@ _CTT_RealCollector(OnboardingSeen) {
 		Legacy := '# unowned dashboard shortcuts`n[metrics]`nmetrics_shortcut_typing = "ctrl+alt+m" # keep typing`nmetrics_shortcut_apps = { future = "keep" } # keep apps`n'
 		Legacy := _CMJFixtureCurrentSource(Legacy)
 		AssertTrue(FSWrite(Path, Legacy))
-		ConfigMigrateBoot(Path)
+		; The actual subject exists before the fixture completes its one native Boot.
+		_CFGFS_Prepare(Path)
+		AssertTrue(FSUtf8ExactMatches(Path, Legacy))
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true),
 			"the real full-save collector must produce valid typed updates")
 		for Line in StrSplit(Legacy, "`n") {
@@ -109,7 +110,7 @@ _CTT_DetachedLlm(Injected) {
 	global ConfigurationFile
 	Previous := _LMT_InstallApiFixture()
 	Seen := []
-	Build := (Path, Updates) => (Seen.Push(Updates), TOML_BuildUpdatedContent(Path, Updates))
+	Build := (Path, Updates) => (Seen.Push(Updates), TOML_BuildConfigUpdatedContent(Path, Updates))
 	Collect := (CandidateFeatures, CandidateMenu) => [
 		{ Section: "llm", Key: "enabled", Value: CandidateMenu["enabled"] },
 		{ Section: "llm", Key: "api_entry_id", Value: CandidateMenu["api_entry_id"] }

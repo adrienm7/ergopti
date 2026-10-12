@@ -646,7 +646,9 @@ helpers.describe("programmable native Linux runtime", function()
 				local facade = { is_enabled = function() return f.enabled end,
 					set_user_code_time_activation = f.User.set_time_activation,
 					set_user_code_enabled = f.User.set_enabled, reload_user_code = f.User.reload,
-					user_code_source_path = f.User.source_path, create_user_code_example = f.User.create_example }
+					user_code_source_path = f.User.source_path, create_user_code_example = f.User.create_example,
+					user_code_scope_snapshot = f.User.scope_snapshot, user_code_scope_adopt = f.User.scope_adopt,
+					user_code_scope_restore = f.User.scope_restore }
 				package.loaded["ui.menu.programmatic_hotstrings"] = nil
 				local rows = require("ui.menu.programmatic_hotstrings").build({ dyn_hotstrings = facade,
 					is_paused = function() return false end, on_menu_changed = function() end })
@@ -673,6 +675,47 @@ helpers.describe("programmable native Linux runtime", function()
 			if not ok then error(problem, 0) end
 		end)
 	end)
+	for _, failure in ipairs({ "false", "throw" }) do
+		helpers.it("(user-menu-publication-inverse) restores actual Linux source timing after " .. failure .. " publication", function()
+			with_runtime(function(f)
+				local names = { "infra.hotstring_preferences", "ui.menu.programmatic_hotstrings", "ui.text_prompt", "ui.modal" }
+				local previous = {}
+				for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+				local writes, updates = 0, 0
+				local ok, problem = xpcall(function()
+					package.loaded["infra.hotstring_preferences"] = {
+						get = function(key) return key:match("enabled$") and true or 0.5 end,
+						set_many = function()
+							writes = writes + 1
+							if failure == "throw" then error("controlled Linux preferences publication refusal") end
+							return false
+						end,
+					}
+					package.loaded["ui.text_prompt"] = { ask = function() return "125" end }
+					package.loaded["ui.modal"] = { run = function() return false end }
+					local facade = {
+						is_enabled = function() return f.enabled end,
+						set_user_code_time_activation = f.User.set_time_activation,
+						set_user_code_enabled = f.User.set_enabled,
+						user_code_source_path = f.User.source_path,
+						user_code_scope_snapshot = f.User.scope_snapshot, user_code_scope_adopt = f.User.scope_adopt,
+						user_code_scope_restore = f.User.scope_restore,
+					}
+					local rows = require("ui.menu.programmatic_hotstrings").build({ dyn_hotstrings = facade,
+						is_paused = function() return false end,
+						on_menu_changed = function() updates = updates + 1 end })
+					helpers.assert_eq(rows[1].menu[2].fn(), false)
+					helpers.assert_eq(writes, 1); helpers.assert_eq(updates, 0)
+					helpers.assert_true(f.User.is_enabled()); helpers.assert_eq(f.User.time_activation(), 0.5)
+					f.type_suffix(); helpers.assert_true(f.User.request("@é")); drain()
+					helpers.assert_eq(f.calls, 1)
+					helpers.assert_eq(f.outputs, { { deletes = 3, text = "0", private = true } })
+				end, debug.traceback)
+				for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+				if not ok then error(problem, 0) end
+			end)
+		end)
+	end
 	helpers.it("(user-hotstrings-native) uses retained physical timestamps and does not expire an admitted slow callback", function()
 		with_runtime(function(f)
 			f.type_suffix(501); helpers.assert_eq(f.User.request("@é"), false)

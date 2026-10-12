@@ -88,3 +88,49 @@ _LSMR_PausedActionsAndSearching() {
 	AssertEqual("menu.llm.local_servers.none|LM Studio, llama.cpp", Rows[3]["label"])
 }
 Test("local server menu: pause suppresses actions and retains honest search status", _LSMR_PausedActionsAndSearching)
+
+_LSMR_GenericCheckedIdentity() {
+	Options := _LSMR_Options()
+	Options["active"] := Map("id", "generic-selected", "provider", "openai_compat", "model", "first")
+	Options["entry_id"] := (Id) => Id == "lmstudio" ? "generic-selected" : ""
+	Rows := LocalServerMenuRows(Options)
+	AssertTrue(Rows[3]["checked"], "the exact source-owned generic entry checks its catalogue row")
+	AssertTrue(Rows[3]["items"][2]["checked"])
+	Options["entry_id"] := (Id) => Id == "lmstudio" ? "explicit-precedence" : ""
+	Rows := LocalServerMenuRows(Options)
+	AssertFalse(Rows[3]["checked"], "an explicit selected target cannot borrow a generic active ID")
+	AssertFalse(Rows[3]["items"][2]["checked"])
+	Options["active"] := Map("id", "foreign-active", "provider", "lmstudio", "model", "first")
+	Rows := LocalServerMenuRows(Options)
+	AssertFalse(Rows[3]["checked"], "provider and model equality cannot substitute for the exact target ID")
+}
+Test("local-server-affinity: checked rows use source-owned entry IDs", _LSMR_GenericCheckedIdentity)
+
+
+_LSI_MenuUnavailableIsHonest() {
+	Options := _LSMR_Options()
+	Options["detected"] := []
+	Options["result"] := (Id) => Map("status", "unavailable", "models", [])
+	for Sweeping in [false, true] {
+		Options["sweeping"] := Sweeping
+		Rows := LocalServerMenuRows(Options)
+		AssertEqual("healthcheck.status.failed", Rows[3]["label"])
+		AssertTrue(Rows[3]["disabled"])
+		AssertFalse(Rows[3].Has("action"))
+		for Row in Rows
+			if Row.Has("label") {
+				AssertFalse(InStr(Row["label"], "menu.llm.local_servers.none"))
+				AssertFalse(InStr(Row["label"], "menu.llm.local_servers.searching"))
+			}
+	}
+	Options["detected"] := ["lmstudio"]
+	Options["result"] := (Id) => Id == "lmstudio"
+		? Map("status", "up", "models", [], "base_url", "http://127.0.0.1:1234/v1")
+		: Map("status", "unavailable", "models", [])
+	Rows := LocalServerMenuRows(Options)
+	AssertEqual("healthcheck.status.failed", Rows[3]["label"])
+	AssertEqual("LM Studio 🖥️ — 127.0.0.1:1234", Rows[4]["label"], "an unavailable peer does not hide a proven available server")
+	AssertEqual("menu.llm.local_servers.no_models", Rows[4]["items"][1]["label"])
+	AssertTrue(Rows[4]["items"][1]["disabled"])
+}
+Test("local-server-unavailable: unavailable infrastructure renders a disabled failure instead of no servers", _LSI_MenuUnavailableIsHonest)

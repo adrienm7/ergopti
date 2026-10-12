@@ -195,6 +195,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		}
 
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		local port = 49152
 		local token = string.rep("a", 32)

@@ -72,8 +72,16 @@ _LSA_ResolverAndPrivateRestart() {
 		AssertEqual(Entry["BaseUrl"], Restarted[1]["BaseUrl"])
 		AssertTrue(_LLMRemoteResolveEntry(Restarted[1]) is Map)
 	}
-	for Id in ["openai", "openai_compat", "unknown-provider"]
-		AssertEqual("", _LLMRemoteResolveEntry(Map("Provider", Id, "BaseUrl", "http://127.0.0.1:19273/v1", "Token", "", "Model", "fixture-model")), "empty cloud, generic and unknown credentials remain refused")
+	for Id in ["openai", "openai_compat"] {
+		Resolved := _LLMRemoteResolveEntry(Map("Provider", Id, "BaseUrl", "http://127.0.0.1:19273/v1", "Token", "", "Model", "fixture-model"))
+		AssertTrue(Resolved is Map, "an explicitly configured generic loopback endpoint accepts a keyless policy")
+		AssertEqual(Id, Resolved["Provider"], "contextual authentication does not rewrite generic provider identity")
+		AssertEqual("", Resolved["Token"])
+		AssertEqual("", _LLMRemoteResolveEntry(Map("Provider", Id, "BaseUrl", "https://remote.invalid/v1", "Token", "", "Model", "fixture-model")),
+			"keyless generic remote credentials remain refused")
+	}
+	AssertEqual("", _LLMRemoteResolveEntry(Map("Provider", "unknown-provider", "BaseUrl", "http://127.0.0.1:19273/v1", "Token", "", "Model", "fixture-model")),
+		"an unknown provider cannot borrow loopback optional authentication")
 	Secret := " leading-and-trailing "
 	Resolved := _LLMRemoteResolveEntry(Map("Provider", "lmstudio", "BaseUrl", "http://127.0.0.1:19273/v1", "Token", Secret, "Model", "fixture-model"))
 	AssertEqual(Secret, Resolved["Token"], "provided credentials retain their exact bytes")
@@ -114,3 +122,46 @@ _LSA_DurableForeignRefusal() {
 	} finally _LMT_RestoreApiFixture(Previous)
 }
 Test("local API authentication: actual transaction preserves unsupported source bytes", _LSA_DurableForeignRefusal)
+
+_LSA_AffinityCorpus() {
+	global _SharedDir, LLM_LOCAL_API_SERVERS
+	LLM_Defaults_Load()
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
+	AssertEqual(24, Corpus["affinity_cases"].Length, "the independent endpoint affinity inventory must be complete")
+	for Vector in Corpus["affinity_cases"]
+		AssertEqual(Vector["matches"], LocalServerAuthEntryMatches(Vector["provider"], Vector["base_url"], Vector["server"], LLM_LOCAL_API_SERVERS), Vector["name"])
+	AssertEqual(13, Corpus["entry_auth_cases"].Length, "the contextual authentication inventory must remain independent")
+	for Vector in Corpus["entry_auth_cases"]
+		AssertEqual(Vector["allowed"], LocalServerAuthEntryTokenAllowed(Vector["provider"], Vector["token"], Vector["base_url"], LLM_LOCAL_API_SERVERS), Vector["name"])
+	Ids := LocalServerAuthModelsReceipt(Map("ok", true, "status", 200, "body", Corpus["omlx_models_body"]))
+	Assert(Ids is Array, "the independent literal oMLX response must be parsed by the production receipt owner")
+	AssertEqual(Corpus["omlx_model_ids"].Length, Ids.Length)
+	for Index, Id in Corpus["omlx_model_ids"]
+		AssertEqual(Id, Ids[Index], "model IDs remain opaque and retain the response order")
+}
+Test("local-server-affinity: independent endpoint and literal oMLX receipt corpus", _LSA_AffinityCorpus)
+
+_LSA_ConfiguredViewsCorpus() {
+	global _SharedDir, LLM_LOCAL_API_SERVERS, LLM_API_PROVIDERS
+	LLM_Defaults_Load()
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
+	AssertEqual(6, Corpus["configured_view_cases"].Length)
+	for Vector in Corpus["configured_view_cases"] {
+		Entries := []
+		for Row in Vector["entries"] {
+			Entries.Push(Row is Map ? Map("Id", Row.Get("id", 0), "Provider", Row.Get("provider", 0),
+				"BaseUrl", Row.Get("base_url", 0), "Token", Row.Get("token", 0)) : Row)
+		}
+		Before := KL_JsonEncode(Entries)
+		Projection := LocalServerAuthConfiguredViews(Entries, LLM_LOCAL_API_SERVERS, LLM_API_PROVIDERS)
+		AssertTrue(TOML_SameValue(Vector["expected_order"], Projection["order"]), Vector["name"])
+		AssertTrue(TOML_SameValue(Vector["expected_views"], Projection["views"]), Vector["name"])
+		AssertEqual(Before, KL_JsonEncode(Entries), "public projection cannot mutate native credential ownership")
+		for Id, Descriptor in Projection["views"] {
+			AssertEqual(5, Descriptor.Count, "only public identity, provider, label and endpoint may leave the private owner")
+			AssertFalse(Descriptor.Has("token"))
+			AssertFalse(Descriptor.Has("model"))
+		}
+	}
+}
+Test("configured-local-view: independent credential-free native projection corpus", _LSA_ConfiguredViewsCorpus)

@@ -38,8 +38,11 @@ _CRG_GatewayOwnsEveryRecoveryStage() {
 		"forward and reverse writes must share the strict writer gateway")
 	Assert(NativeWriter != "", "the actual configuration gateway must retain its shared writer")
 	Assert(InStr(NativeWriter,
-		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true, NativeAdmission)') > 0,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write",') > 0
+		&& InStr(NativeWriter, "ProvidedContent?, ProvidedPresence?, true, NativeAdmission)") > 0,
 		"the forward and reverse default writer must reach the same canonical implementation with source admission")
+	Assert(InStr(NativeWriter, "ProvidedContent := unset, ProvidedPresence := unset") > 0,
+		"default forward/reverse writes keep fresh reads while captured callers retain exact presence and content")
 	Assert(InStr(NativeWriter, "_ConfigWriteLeaseOwns(Owner, Path)") > 0
 		&& InStr(NativeWriter, "_FSNativeAdmissionAccepted(AdmissionFn)") > 0,
 		"the strict shared writer must retain exact path ownership and supplied native admission")

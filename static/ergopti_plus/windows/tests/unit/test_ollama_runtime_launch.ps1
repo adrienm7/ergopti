@@ -17,6 +17,7 @@ namespace Ergopti.Ollama {
   public static ulong Tick=1010;
   public static uint Active=1;
   public static ulong GetTickCount64() { return Tick; }
+  public static long CreationTime(IntPtr handle) { if(handle.ToInt64()!=123) throw new Exception("Unexpected process handle."); return 133700000000000000L; }
   public static Queue<uint> Sequence=new Queue<uint>();
   public static uint ActiveProcesses() { uint count=Sequence.Count>0 ? Sequence.Dequeue() : Active; ManagedNative.Events.Add("account:"+count); return count; }
  }
@@ -135,6 +136,7 @@ $cases = @(
 		Must ($script:LastStart.EnvironmentVariables['OLLAMA_MODELS'] -ceq (Join-Path $script:ManagedRoot 'models')) 'Models directory must be the same admitted root child.'
 		$receipt = $global:CapturedReadyText | ConvertFrom-Json
 		Must ($receipt.launcher_pid -eq $PID -and $receipt.child_pid -eq 5002 -and $receipt.manifest_sha256 -ceq $script:ManifestSha256) 'Fresh receipt must bind current launcher, retained child and exact manifest.'
+		Must ($receipt.child_created_filetime -eq 133700000000000000L) 'Receipt must retain exact child creation identity from its held HANDLE.'
 		Must (-not [IO.File]::Exists($global:CapturedReadyPath)) 'Normal exact receipt retirement must leave no file.'
 		$events = [Ergopti.Ollama.ManagedNative]::Events
 		Must ($events.IndexOf('child-dispose') -lt $events.IndexOf('prepared-close')) 'Native child tree must be ended before releasing image leases.'

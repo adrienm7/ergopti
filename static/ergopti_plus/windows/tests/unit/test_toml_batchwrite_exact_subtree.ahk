@@ -249,8 +249,11 @@ _TBES_ConfigDeletionAncestorVectors() {
 _TBES_ConfigDeletionAncestorVector(Vector) {
 	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
 	Expected := Chr(0xFEFF) . Vector.Expected
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		_TBUI_AdmitCurrentFixture(Path, Source)
 		FileSetTime("20000101000000", Path, "M")
 		BeforeTime := FileGetTime(Path, "M")
 		Cached := ParseTomlFile(Path)

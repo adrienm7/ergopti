@@ -72,6 +72,59 @@ local function project(value, rule)
 	return nil
 end
 
+--- Classifies only known technical failure shapes; all raw text remains local.
+--- These are log observations, never native state, revocation or incident-cause proof.
+--- @param entries table|string Host-retained recent errors, without page authority.
+--- @param source string Existing collector source.
+--- @param schema table Canonical closed rules.
+--- @return table
+function M.error_facts(entries, source, schema)
+	local observed = type(entries) == "table"
+	if observed then
+		local length = #entries
+		for key in pairs(entries) do
+			if type(key) ~= "number" or key < 1 or key % 1 ~= 0 or key > length then observed = false; break end
+		end
+	end
+	local events, count = {}, 0
+	local specs = schema.recent_error_facts
+	for index, entry in ipairs(observed and entries or {}) do
+		count = count + 1
+		local first = type(entry) == "string" and entry:match("^[^\r\n]*") or ""
+		local start = first:find(specs.owner_prefix, 1, true)
+		local marker = start and first:find(specs.failure_marker, start + #specs.owner_prefix, true)
+		local reason = marker and first:sub(marker + #specs.failure_marker) or ""
+		for _, rule in ipairs(specs.rules) do
+			local event, candidate = nil, reason
+			if rule.message_prefix then
+				local position = first:find(rule.message_prefix, 1, true)
+				candidate = position and first:sub(position) or ""
+				if rule.number_marker then
+					local number_at = candidate:find(rule.number_marker, #rule.message_prefix + 1, true)
+					candidate = number_at and candidate:sub(number_at) or ""
+				end
+			end
+			if rule.literal and candidate == rule.literal then
+				event = { entry_index = index, code = rule.code }
+			elseif rule.prefix and candidate:sub(1, #rule.prefix) == rule.prefix then
+				local value = candidate:sub(#rule.prefix + 1)
+				if rule.suffix ~= "" then
+					local finish = value:find(rule.suffix, 1, true)
+					value = finish and value:sub(1, finish - 1) or ""
+				end
+				if value:match("^%-?%d+$") then
+					local number = project(tonumber(value), { kind = "integer", minimum = rule.minimum, maximum = rule.maximum })
+					if number and tostring(number) == value then event = { entry_index = index, code = rule.code, [rule.field] = number } end
+				end
+			end
+			if event then events[#events + 1] = event; break end
+		end
+	end
+	return { observed = observed, source = (source == "errors_file" or source == "ring") and source or "unavailable",
+		qualification = "log_observation_only", examined_entries = count, excluded_entries = count - #events,
+		events = Json.array(events) }
+end
+
 --- Returns a detached technical projection; no callback or native authority is exported.
 --- @param snapshot table Host-retained snapshot.
 --- @param schema table Canonical diagnostics schema.
@@ -81,9 +134,55 @@ function M.snapshot(snapshot, schema)
 		"Diagnostic sharing policy unavailable")
 	assert(type(snapshot) == "table" and (snapshot.driver == "macos" or snapshot.driver == "linux"
 		or snapshot.driver == "windows"), "Diagnostic sharing identity unavailable")
-	return project(snapshot, schema.share_policy.projection)
+	local safe = project(snapshot, schema.share_policy.projection)
+	local sections = type(snapshot.sections) == "table" and snapshot.sections or {}
+	local issues = sections.issues
+	if type(issues) == "table" then
+		safe.sections.issues.recent_error_facts = M.error_facts(issues.recent, issues.recent_source, schema)
+	end
+	return safe
 end
 
+
+--- Rebuilds only schema-owned installed-page observations, without native authority.
+--- @param results table Untrusted page records.
+--- @param schema table Canonical diagnostic checks.
+--- @return table|nil observations
+function M.page_checks(results, schema)
+	if type(results) ~= "table" or type(schema.diagnostic_checks) ~= "table" then return nil end
+	local accepted, expected = {}, {}
+	for _, spec in ipairs(schema.diagnostic_checks.items) do
+		expected[spec.id] = true
+		local row = results[spec.id]
+		if type(row) ~= "table" or row.scope ~= spec.scope then return nil end
+		for key in pairs(row) do
+			if key ~= "state" and key ~= "scope" and key ~= "reason" and key ~= "ms" then return nil end
+		end
+		local rule = schema.share_policy.projection.fields.page_check_observations.fields.results.fields[spec.id]
+		local clean = project(row, rule)
+		if clean.state == nil or clean.state ~= row.state or clean.scope ~= row.scope or clean.reason ~= row.reason or clean.ms ~= row.ms then return nil end
+		if spec.reason then
+			if row.state ~= "not_run" or row.reason ~= spec.reason or row.ms ~= nil then return nil end
+		elseif row.state == "ok" or row.state == "error" then
+			if row.ms == nil or (row.reason ~= nil and row.reason ~= "invalid_diagnostic_model") then return nil end
+		elseif row.ms ~= nil or (row.state == "cancelled" and row.reason ~= nil)
+			or (row.state ~= "cancelled" and row.reason ~= "opt_in_required") then return nil end
+		accepted[spec.id] = clean
+	end
+	for id in pairs(results) do if not expected[id] then return nil end end
+	return { source = "installed_page_reported", qualification = "unqualified", results = accepted }
+end
+
+--- Admits page records only into the exact current host snapshot generation.
+--- @param snapshot table Host-retained report.
+--- @param action table Validated export action.
+--- @return boolean accepted
+function M.capture_page_checks(snapshot, action)
+	if action.page_check_observations == nil then return true end
+	if action.generated_at ~= snapshot.generated_at or action.snapshot_revision ~= snapshot.export_revision then return false end
+	snapshot.page_check_observations = action.page_check_observations
+	return true
+end
 
 local function cell(value)
 	return (tostring(value):gsub("[\r\n]+", " "):gsub("|", "\\|"))
@@ -108,7 +207,11 @@ end
 
 --- Formats only detached approved leaves, using the driver's existing catalogue.
 local function readable(safe, schema)
-	local translate = require("infra.i18n").get
+	local function translate(key)
+		local value = schema.export_strings and schema.export_strings[key]
+		assert(type(value) == "string" and value ~= "", "English export label unavailable: " .. key)
+		return value
+	end
 	local policy, lines, rows = schema.share_policy.projection.fields, {}, {}
 	local keys = {}
 	for key in pairs(safe) do
@@ -155,12 +258,17 @@ end
 --- @return table { text, fields, name, snapshot }
 function M.document(snapshot, schema, notice)
 	local safe = M.snapshot(snapshot, schema)
+	notice = schema.export_strings and schema.export_strings[schema.share_policy.notice_key]
+	assert(type(notice) == "string" and notice ~= "", "English export notice unavailable")
 	local versions = safe.sections and safe.sections.versions or {}
 	local stamp = safe.generated_at or "unknown"
 	return {
 		snapshot = safe,
+		summary = "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.\n"
+			.. "Driver: " .. safe.driver .. "\nVersion: " .. (versions.ergopti_version or "unknown")
+			.. "\nCommit: " .. (versions.commit or "unknown") .. "\nDriver suites: NOT_RUN",
 		text = "# ErgoptiPlus diagnostics\n\n" .. notice
-			.. "\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n" .. readable(safe, schema)
+			.. "\n\ndriver-suites: not_run\npage-model-checks: " .. (safe.page_check_observations and "installed_page_reported (unqualified)" or "not_collected") .. "\n\n" .. readable(safe, schema)
 			.. "\n```json\n" .. Json.encode(safe) .. "\n```\n",
 		fields = { driver = safe.driver, version = versions.ergopti_version or "unknown", os = safe.driver },
 		name = schema.report.name_prefix .. safe.driver .. "-" .. stamp:gsub("[^%w.-]", "_") .. schema.report.name_suffix,

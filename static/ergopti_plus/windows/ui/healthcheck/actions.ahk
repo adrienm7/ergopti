@@ -170,7 +170,20 @@ HealthCheck_ValidateAction(Message, Context) {
 			ExportSequence := Message.Get("export_sequence", 0)
 			if !(ExportSequence is Integer) || ExportSequence <= 0 || ExportSequence > Schema["report"]["export_sequence_max"]
 				return _HCActions_Refuse("bad_export_sequence")
-			return Map("action", Map("action", "export_snapshot", "export_sequence", ExportSequence))
+			Normalized := Map("action", "export_snapshot", "export_sequence", ExportSequence)
+			if Message.Has("page_checks") {
+				Observations := HealthCheck_PageChecks(Message["page_checks"], Schema)
+				if !(Observations is Map)
+					return _HCActions_Refuse("bad_page_checks")
+				Revision := Message.Get("snapshot_revision", 0)
+				if !_HCActions_BoundedText(Message.Get("generated_at", ""), 40) || !(Revision is Integer)
+					|| Revision <= 0 || Revision > Schema["report"]["export_sequence_max"]
+					return _HCActions_Refuse("bad_snapshot_identity")
+				Normalized["generated_at"] := Message["generated_at"]
+				Normalized["snapshot_revision"] := Revision
+				Normalized["page_check_observations"] := Observations
+			}
+			return Map("action", Normalized)
 		case "cancel":
 			return Map("action", Map("action", "cancel"))
 		case "close":

@@ -45,6 +45,45 @@ function assertPostExitTranscript(script, name) {
 	);
 }
 
+// Native console output must not retain the hosted runner's undrained pipe.
+function assertOwnedFileOutput(script, name, prefix) {
+	const code = script.replace(/^\s*#.*$/gm, '');
+	const launch = /\$proc = Start-Process[^\n]+/.exec(code);
+	assert.ok(launch, `${name}: the exact asynchronous launch remains owned`);
+	assert.match(
+		launch[0],
+		/-RedirectStandardOutput \$stdoutFile(?:\s|$)/,
+		`${name}: stdout owns its capture`
+	);
+	assert.match(
+		launch[0],
+		/-RedirectStandardError \$stderrFile(?:\s|$)/,
+		`${name}: stderr owns its capture`
+	);
+	for (const [variable, extension] of [
+		['stdoutFile', 'stdout'],
+		['stderrFile', 'stderr']
+	]) {
+		const assignment = `$${variable} = Join-Path $env:RUNNER_TEMP '${prefix}.${extension}.log'`;
+		assert.ok(code.includes(assignment), `${name}: distinct private ${extension} capture path`);
+		assert.ok(
+			code.indexOf(assignment) < launch.index,
+			`${name}: capture is assigned before launch`
+		);
+		assert.equal(
+			[...code.matchAll(new RegExp('\\$' + variable + '\\s*=', 'g'))].length,
+			1,
+			`${name}: the capture owner is not rebound`
+		);
+	}
+	assertPostExitTranscript(script, name);
+	const joined = code.indexOf('$proc.WaitForExit()');
+	assert.ok(
+		code.indexOf('Get-Content -LiteralPath $stderrFile -Encoding utf8') > joined,
+		`${name}: diagnostics are replayed only after native exit`
+	);
+}
+
 const processReceipts = [];
 for (const [job, name] of [
 	['test-ahk', 'Run AHK test suite'],
@@ -61,6 +100,21 @@ for (const [job, name] of [
 	);
 	const finish = /\$proc\.WaitForExit\(\)\s*\n\s*\$exit = \$proc\.ExitCode/.exec(script);
 	assert.ok(finish, `${name}: join the process before reading its exit receipt`);
+	const prefix = job === 'test-ahk' ? 'windows-ahk-suite' : 'windows-ahk-e2e';
+	assertOwnedFileOutput(script, name, prefix);
+	const artifact = pipeline.step(
+		pipeline.job(job),
+		job === 'test-ahk' ? 'Publish AHK execution manifest' : 'Retain E2E native streams'
+	);
+	assert.equal(pipeline.stepField(artifact, 'if'), 'always()', `${name}: retain failed captures`);
+	for (const extension of ['stdout', 'stderr'])
+		assert.ok(
+			artifact
+				.replace(/^\s*#.*$/gm, '')
+				.split('\n')
+				.some((line) => line.trim() === '${{ runner.temp }}/' + prefix + '.' + extension + '.log'),
+			`${name}: retain the complete ${extension} capture`
+		);
 	assertPostExitTranscript(script, name);
 	processReceipts.push({ name, start: start[0], finish: finish[0] });
 }
@@ -114,6 +168,50 @@ for (const [job, name] of [
 	);
 }
 
+for (const [job, name] of [
+	['test-ahk', 'Run AHK test suite'],
+	['e2e-ahk', 'Run E2E suite (Strategy A — pure engine injection)']
+]) {
+	const script = pipeline.runOf(pipeline.step(pipeline.job(job), name)).join('\n');
+	const prefix = job === 'test-ahk' ? 'windows-ahk-suite' : 'windows-ahk-e2e';
+	for (const flag of ['-RedirectStandardOutput $stdoutFile', '-RedirectStandardError $stderrFile'])
+		assert.throws(
+			() => assertOwnedFileOutput(script.replace(flag, ''), name, prefix),
+			/owns its capture/
+		);
+	assert.throws(
+		() =>
+			assertOwnedFileOutput(
+				script.replace(`'${prefix}.stderr.log'`, `'${prefix}.stdout.log'`),
+				name,
+				prefix
+			),
+		/distinct private stderr/
+	);
+	assert.throws(
+		() =>
+			assertOwnedFileOutput(
+				script.replace('-RedirectStandardError $stderrFile', '-RedirectStandardError $stdoutFile'),
+				name,
+				prefix
+			),
+		/stderr owns/
+	);
+	for (const variable of ['stdoutFile', 'stderrFile'])
+		assert.throws(
+			() =>
+				assertOwnedFileOutput(
+					script.replace(
+						'$proc.WaitForExit()',
+						`Get-Content -LiteralPath $${variable}\n$proc.WaitForExit()`
+					),
+					name,
+					prefix
+				),
+			/no transcript reader/
+		);
+}
+
 const ahkIndex = process.argv.indexOf('--ahk');
 if (ahkIndex >= 0) {
 	assert.equal(process.platform, 'win32', 'native exit receipt probes require Windows');
@@ -121,6 +219,8 @@ if (ahkIndex >= 0) {
 	assert.ok(ahk && fs.existsSync(ahk), 'native exit receipt probes require the actual AHK binary');
 	const probeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-exit-'));
 	const quote = (value) => `'${value.replaceAll("'", "''")}'`;
+	const captureSetup = (runner) =>
+		`$stdoutFile = ${quote(runner + '.stdout.log')}; $stderrFile = ${quote(runner + '.stderr.log')}`;
 	try {
 		// The real exclusive FileAppend must refuse the former held reader and
 		// succeed once the workflow waits for native exit before reading.
@@ -157,6 +257,7 @@ if (ahkIndex >= 0) {
 								'$reader = [IO.FileStream]::new($resultsFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)'
 							]
 						: []),
+					captureSetup(runner),
 					receipt.start,
 					'$clock = [Diagnostics.Stopwatch]::StartNew()',
 					'while (-not $proc.HasExited) { if ($clock.ElapsedMilliseconds -ge 5000) { throw "Owned append child did not retire" }; Start-Sleep -Milliseconds 10 }',
@@ -200,6 +301,7 @@ if (ahkIndex >= 0) {
 				const command = [
 					"$ErrorActionPreference = 'Stop'",
 					`$ahk = ${quote(ahk)}; $runner = ${quote(runner)}`,
+					captureSetup(runner),
 					receipt.start,
 					'while (-not $proc.HasExited) { Start-Sleep -Milliseconds 10 }',
 					receipt.finish,
@@ -647,6 +749,116 @@ try {
 } finally {
 	fs.rmSync(transportRoot, { recursive: true, force: true });
 }
+
+/** Parses active runner declarations and the actual CI owner before budget models. */
+function assertCompleteAhkWatchdogBudget() {
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const yaml = require('yaml');
+	const root = path.resolve(__dirname, '../..');
+	const runner = fs.readFileSync(
+		path.join(root, 'static/ergopti_plus/windows/tests/run_all.ahk'),
+		'utf8'
+	);
+	const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci-windows.yml'), 'utf8');
+	function checkBudget(source, yamlSource) {
+		const active = source.replace(/[^\n]/g, ' ').split('');
+		for (const token of scriptTokens(source, '.ahk')) {
+			if (token.kind === 'string') continue;
+			for (let at = token.start; at < token.end; at++) active[at] = source[at];
+		}
+		const code = active.join('');
+		const values = {};
+		for (const name of ['STARTUP_BUDGET', 'PER_TEST_BUDGET', 'MAX_TIMEOUT']) {
+			const declarations = [
+				...code.matchAll(new RegExp('^global _SUITE_' + name + '_MS := (\\d+)\\s*$', 'gm'))
+			];
+			assert.equal(declarations.length, 1, 'one active finite budget declaration');
+			values[name] = Number(declarations[0][1]);
+			assert.ok(Number.isSafeInteger(values[name]) && values[name] > 0);
+		}
+		const bodies = [...code.matchAll(/^_SuiteTimeoutForCount\(PlannedCount\) \{([\s\S]*?)^\}/gm)];
+		assert.equal(bodies.length, 1, 'one genuine timeout calculation');
+		assert.equal(
+			bodies[0][1].replace(/\s+/g, ' ').trim(),
+			'global _SUITE_MAX_TIMEOUT_MS, _SUITE_STARTUP_BUDGET_MS, _SUITE_PER_TEST_BUDGET_MS return Min(_SUITE_MAX_TIMEOUT_MS, _SUITE_STARTUP_BUDGET_MS + PlannedCount * _SUITE_PER_TEST_BUDGET_MS)'
+		);
+		assert.equal(
+			(
+				code.match(
+					/^global _SUITE_TIMEOUT_MS := _SuiteTimeoutForCount\(TEST_REGISTRY.Length\)\s*$/gm
+				) || []
+			).length,
+			1
+		);
+		assert.equal(
+			(code.match(/^SetTimer\(_WatchdogFire, -_SUITE_TIMEOUT_MS\)\s*$/gm) || []).length,
+			1
+		);
+		const parsed = yaml.parse(yamlSource, { uniqueKeys: true });
+		const steps = parsed.jobs['test-ahk'].steps.filter(
+			(step) => step.name === 'Run AHK test suite'
+		);
+		assert.equal(steps.length, 1, 'one actual complete-suite CI owner');
+		const minutes = steps[0]['timeout-minutes'];
+		assert.equal(minutes, 125);
+		assert.ok(steps[0].run.includes('validate-ahk-suite-manifest.cjs'));
+		const startup = values.STARTUP_BUDGET,
+			perTest = values.PER_TEST_BUDGET,
+			cap = values.MAX_TIMEOUT;
+		assert.equal(startup, 120000);
+		assert.equal(cap, 120 * 60 * 1000);
+		assert.equal(minutes * 60 * 1000 - cap, 5 * 60 * 1000);
+		const budget = (count) => Math.min(cap, startup + count * perTest);
+		assert.equal(budget(0), startup);
+		assert.equal(budget(1), startup + perTest);
+		assert.ok(budget(11197) >= 45 * 60 * 1000 && budget(11197) <= cap);
+		// The raw 11229 registrations include nine interactive callbacks.
+		assert.equal(budget(11229), cap, 'the measured raw registry receives the declared cap');
+		assert.equal(budget(11220), cap, 'the measured full cohort receives the declared cap');
+		assert.equal(budget(11197), cap);
+		const saturation = Math.ceil((cap - startup) / perTest);
+		assert.ok(saturation > 1);
+		assert.ok(budget(saturation - 1) < cap);
+		assert.equal(budget(saturation), cap);
+		assert.equal(budget(saturation + 1000), cap);
+		assert.equal(budget(1000000), cap);
+		return budget(11197);
+	}
+	assert.equal(checkBudget(runner, workflow), 7200000);
+	for (const [before, after] of [
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', 'global _SUITE_MAX_TIMEOUT_MS := 1320000'],
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', 'global _SUITE_MAX_TIMEOUT_MS := 3300000'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 200'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 300'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 250'],
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', 'global _SUITE_MAX_TIMEOUT_MS := 4500000'],
+		['global _SUITE_PER_TEST_BUDGET_MS := 650', 'global _SUITE_PER_TEST_BUDGET_MS := 400'],
+		['global _SUITE_MAX_TIMEOUT_MS := 7200000', '; global _SUITE_MAX_TIMEOUT_MS := 7200000'],
+		['return Min(_SUITE_MAX_TIMEOUT_MS,', 'return Max(_SUITE_MAX_TIMEOUT_MS,'],
+		['SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)', '; SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)']
+	]) {
+		assert.ok(runner.includes(before));
+		assert.throws(() => checkBudget(runner.replace(before, after), workflow));
+	}
+	const step =
+		'      - name: Run AHK test suite\n        shell: pwsh\n        timeout-minutes: 125\n';
+	assert.equal(workflow.split(step).length - 1, 1);
+	for (const after of [
+		step.replace(': 125', ': 25'),
+		step.replace(': 125', ': 0'),
+		step.replace(': 125', ': 55'),
+		step.replace(': 125', ': 60'),
+		step.replace(': 125', ': 75'),
+		step.replace(': 125', ': 80'),
+		step.replace(': 125', ': 120')
+	])
+		assert.throws(() => checkBudget(runner, workflow.replace(step, after)));
+	console.log(
+		'PASS: complete AHK budget source/CI parsing, growth, saturation and seventeen refusal controls; native/full suite NOT_RUN.'
+	);
+}
+
+assertCompleteAhkWatchdogBudget();
 
 // This supplemental route follows every original contract assertion. It loads
 // the authentic whole runner; the fixed data-only selection never grants a

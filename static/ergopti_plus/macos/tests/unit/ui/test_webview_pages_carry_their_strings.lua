@@ -99,6 +99,7 @@ local function build(locale, catalogue)
 	package.loaded["infra.i18n"] = { get_locale = function() return locale end }
 	local builder = require("ui.ui_builder")
 	local logger = require("infra.logger")
+	helpers.admit_logger_privacy(logger)
 	local original = logger.error
 	local errors = {}
 	logger.error = function(_tag, fmt, ...)

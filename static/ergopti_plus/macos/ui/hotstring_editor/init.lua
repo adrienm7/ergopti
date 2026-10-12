@@ -486,8 +486,8 @@ local function handle_message(msg, owner)
 				end
 			end
 		else
-			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"),
-				tostring(ok_write and write_err or written), "error")
+			Logger.error(LOG, "Personal hotstring publication was refused: %s.", tostring(ok_write and write_err or written))
+			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
 		end
 		return
 	end

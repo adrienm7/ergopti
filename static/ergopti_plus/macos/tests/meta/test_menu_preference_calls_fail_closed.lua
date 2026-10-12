@@ -40,7 +40,8 @@ local function executable(source)
 				else last = last + 1 end
 			end
 			local literal = source:sub(at + 1, last - 1)
-			mask(math.min(last, #source), literal == "menu.wrap_mutation" and "__WRAP_MUTATION_MODULE__" or nil)
+			mask(math.min(last, #source), literal == "menu.wrap_mutation" and "__WRAP_MUTATION_MODULE__"
+				or literal == "dynamic_hotstrings.menu_publication" and "__PROGRAMMABLE_PUBLICATION_MODULE__" or nil)
 		else
 			output[#output + 1] = source:sub(at, at)
 			at = at + 1
@@ -124,9 +125,51 @@ local function delegated_guards(source, helper_source, native_source)
 	return callbacks, valid and callbacks or 0
 end
 
+local publication_file = assert(io.open(helpers.shared("lua/dynamic_hotstrings/menu_publication.lua"), "rb"))
+local publication_source = assert(publication_file:read("*a")); assert(publication_file:close())
+
+-- The actual helper must consume the genuine publisher's protected status and
+-- exact receipt. Simulated scalar ports only prove this software owner contract.
+local function assert_programmable_guards(helper_source, native_source)
+	local native = executable(native_source)
+	helpers.assert_true(has_tokens(native, "local Publication = require(__PROGRAMMABLE_PUBLICATION_MODULE__).new()"),
+		"every menu preference writer: programmable native import must retain its actual binding")
+	helpers.assert_true(has_tokens(native, "local committed = Publication.commit(User, enabled, seconds, function()"),
+		"every menu preference writer: programmable native setter must invoke that bound helper")
+	local helper = assert(load(helper_source, "@programmable-publication-control", "t", { type = type, pcall = pcall }))()
+	for _, mode in ipairs({ "false", "nil", "truthy", "throw", "throw-true" }) do
+		local seconds, enabled, writes, inverses = 0.5, true, 0, 0
+		local receipt = { seconds = seconds, enabled = enabled }
+		local ports = {
+			user_code_scope_snapshot = function() return receipt end,
+			user_code_scope_adopt = function(snapshot, interval, active)
+				helpers.assert_eq(snapshot, receipt); seconds, enabled = interval, active; return true
+			end,
+			user_code_scope_restore = function(snapshot)
+				helpers.assert_eq(snapshot, receipt); seconds, enabled = receipt.seconds, receipt.enabled
+				inverses = inverses + 1; return true
+			end,
+		}
+		local owner = helper.new()
+		local committed = owner.commit(ports, false, 0.125, function()
+			writes = writes + 1
+			if mode == "throw" then error("controlled preferences refusal") end
+			if mode == "throw-true" then error(true) end
+			if mode == "truthy" then return "true" end
+			if mode == "false" then return false end
+			return nil
+		end)
+		helpers.assert_eq(committed, false, "every menu preference writer: programmable helper must refuse " .. mode)
+		helpers.assert_eq(writes, 1, "every menu preference writer: actual publisher must execute once")
+		helpers.assert_eq(inverses, 1, "every menu preference writer: refusal must attempt the captured native inverse")
+		helpers.assert_eq(seconds, 0.5); helpers.assert_eq(enabled, true)
+		helpers.assert_eq(owner.pending(), false)
+	end
+end
+
 --- Checks every remaining persistence call and its exact refusal predicate.
 --- @param source string Complete driver source containing save_prefs.
-local function assert_guards(source, helper_source, native_source)
+local function assert_guards(source, helper_source, native_source, programmable_source, programmable_native)
 	helpers.assert_type(source, "string")
 	if not native_source then
 		local owner, owner_error = helpers.read_driver_unit("local function build_wrap_symbols_submenu")
@@ -201,6 +244,12 @@ local function assert_guards(source, helper_source, native_source)
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
 			.. table.concat(unguarded, " | "))
+	local owner, detail = programmable_native, nil
+	if not owner then owner, detail = helpers.read_driver_unit("MODULE: Programmable Hotstring Menu (macOS Native Ports)") end
+	helpers.assert_not_nil(owner, detail)
+	helpers.assert_not_nil(source:find(executable(owner), 1, true),
+		"every menu preference writer: full census must contain the current programmable owner")
+	assert_programmable_guards(programmable_source or publication_source, owner)
 end
 
 helpers.describe("menu preference call sites fail closed", function()
@@ -252,7 +301,7 @@ helpers.describe("menu preference call sites fail closed", function()
 		end)
 	end
 
-	for _, owner_symbol in ipairs({ "set personal file gate", "MODULE: Programmable Hotstring Menu (macOS Native Ports)" }) do
+	for _, owner_symbol in ipairs({ "set personal file gate" }) do
 		for _, mutation in ipairs({
 			{ name = "removing", after = "return true", reason = "reviewed post-retirement census" },
 			{ name = "weakening", after = "if ctx.save_prefs() then return true end", reason = "every menu preference writer" },
@@ -277,6 +326,43 @@ helpers.describe("menu preference call sites fail closed", function()
 				helpers.assert_true(tostring(err):find(mutation.reason, 1, true) ~= nil)
 			end)
 		end
+	end
+
+	for _, mutation in ipairs({
+		{ name = "removing", before = "local called, saved = pcall(ctx.save_prefs)",
+			after = "local called, saved = true, true", reason = "reviewed post-retirement census" },
+		{ name = "weakening", before = "if called and saved == true then return true end",
+			after = "if called and saved then return true end", reason = "every menu preference writer" },
+		{ name = "appending a truthy fallback to", before = "if called and saved == true then return true end",
+			after = "if called and (saved == true or true) then return true end", reason = "every menu preference writer" },
+	}) do
+		helpers.it("rejects " .. mutation.name .. " the programmable protected publisher acknowledgement", function()
+			local owner, detail = helpers.read_driver_unit("MODULE: Programmable Hotstring Menu (macOS Native Ports)")
+			helpers.assert_not_nil(owner, detail)
+			local first = owner:find(mutation.before, 1, true)
+			helpers.assert_not_nil(first, "the mutation must reach the actual protected publisher")
+			helpers.assert_nil(owner:find(mutation.before, first + 1, true))
+			local altered = owner:sub(1, first - 1) .. mutation.after .. owner:sub(first + #mutation.before)
+			local source = helpers.read_driver_source("save_prefs")
+			local start = assert(source:find(owner, 1, true))
+			local changed = source:sub(1, start - 1) .. altered .. source:sub(start + #owner)
+			local ok, err = pcall(assert_guards, changed, nil, nil, nil, altered)
+			helpers.assert_eq(ok, false); helpers.assert_contains(tostring(err), mutation.reason)
+		end)
+	end
+
+	for _, mutation in ipairs({
+		{ name = "removing the real programmable publisher", before = "local written, committed = pcall(persist)", after = "local written, committed = true, true" },
+		{ name = "accepting a truthy programmable receipt", before = "if written and committed == true then", after = "if written and committed then" },
+		{ name = "discarding the programmable protected-call status", before = "if written and committed == true then", after = "if committed == true then" },
+	}) do
+		helpers.it("rejects " .. mutation.name .. " in the actual shared owner", function()
+			local first = assert(publication_source:find(mutation.before, 1, true))
+			helpers.assert_nil(publication_source:find(mutation.before, first + 1, true))
+			local altered = publication_source:sub(1, first - 1) .. mutation.after .. publication_source:sub(first + #mutation.before)
+			local ok = pcall(assert_guards, helpers.read_driver_source("save_prefs"), nil, nil, altered)
+			helpers.assert_eq(ok, false, "actual shared-owner mutations must fail the complete census contract")
+		end)
 	end
 
 	for _, mutation in ipairs({
