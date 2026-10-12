@@ -454,6 +454,7 @@ helpers.describe("llm.init — auto-detect callback failures are visible (HS-016
 			404, ""
 		)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.ring_buffer_clear()
 		local calls = 0
 		LLM.auto_detect_backend(function()

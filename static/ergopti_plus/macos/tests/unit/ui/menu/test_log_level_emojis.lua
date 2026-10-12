@@ -10,6 +10,7 @@ helpers.describe("Menu — log level emojis", function()
 	local i18n    = require("infra.i18n")
 	local Logger  = require("infra.logger")
 
+	helpers.admit_logger_privacy(Logger)
 	helpers.it("includes correct emojis in log level selection labels", function()
 		local old_level = Logger.current_level
 		Logger.set_level("INFO")
@@ -110,6 +111,7 @@ end
 --- @return table row
 local function log_row(value, setter)
 	local logger = require("infra.logger")
+	helpers.admit_logger_privacy(logger)
 	logger.set_level(value)
 	local rows = helpers.load_with_stubs("ui.menu.builder").generate({}, {}, { set_log_level = setter })
 	local label = require("infra.i18n").get("menu.debug.log_level")
@@ -248,6 +250,7 @@ local function debug_parent_fixture(body)
 	local callbacks = {}
 	local function setter(value) callbacks[#callbacks + 1] = value; return false end
 	local logger = require("infra.logger")
+	helpers.admit_logger_privacy(logger)
 	local threshold = logger.current_level
 	logger.set_level("INFO")
 	local actions = { set_log_level = setter }

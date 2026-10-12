@@ -80,8 +80,8 @@ DisableCapsWord() {
 ; evaluation saw the toggle it had just set, concluded the user wanted CapsLock,
 ; and re-asserted it — so CapsLock survived CapsWord and everything kept typing
 ; in uppercase until the user toggled it by hand. Seeded from the real toggle
-; once, at load, so a CapsLock already on when the driver starts is respected.
-global _HardwareCapsLockOn := GetKeyState("CapsLock", "T") ? true : false
+; once by the entry pre-pump owner, before a parse-time callback can run.
+; This module must not re-seed it after an early user toggle.
 
 ; The CapsLock toggle changes native character case as well as its LED. Only
 ; CapsWord and the user's genuine CapsLock intent may drive it. Navigation has

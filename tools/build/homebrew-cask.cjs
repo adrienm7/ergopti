@@ -139,7 +139,7 @@ function renderCask(tag, sha256, assetName = ASSET_NAME) {
 		'  end',
 		'',
 		...others.map((other) => `  conflicts_with cask: "${other.token}"`),
-		`  depends_on macos: ">= ${MINIMUM_MACOS}"`,
+		`  depends_on macos: ${MINIMUM_MACOS}`,
 		'',
 		`  app "${APP_NAME}"`,
 		'',

@@ -338,6 +338,7 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 
 	helpers.it("resolves every placeholder and warns on degraded fallback", function()
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local original_warn = Logger.warn
 		local warnings = {}
 		local ok, detail = xpcall(function()

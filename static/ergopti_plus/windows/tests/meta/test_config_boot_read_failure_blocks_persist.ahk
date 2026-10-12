@@ -100,31 +100,54 @@ _CBRF_UnreadableExistingFileIsFlagged() {
 ; The destructive step needs TWO things to be true: the tree in memory is
 ; defaults, and something later serializes it. This asserts the first — the
 ; apply must neither claim success nor leave the caller unable to tell.
+; Construct the exact current source before provoking a native read refusal.
+; This does not publish a snapshot that could hide the subsequent real lock.
+_CBRF_PrepareCurrentSource(Path) {
+	Before := FSReadUtf8Exact(Path)
+	Boot := ConfigMigrateBoot(Path)
+	AssertEqual("current", Boot["status"], "the independent versioned fixture reaches genuine native Boot")
+	AssertEqual(0, Boot["read_only"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	AssertEqual("", TOML_WriteRefusal(Path))
+	AssertEqual(Before, FSReadUtf8Exact(Path), "fixture admission does not normalize its source")
+}
+
 _CBRF_ApplyRefusesUnreadableConfig() {
 	global _ConfigBootReadFailed
 	Path := A_Temp . "\ergopti_test_cbrf_apply_" . A_TickCount . ".toml"
 	try FileDelete(Path)
 	; A real override: if the apply ever ran, this key would flip in the fixture.
-	FileAppend("[layout]`nenabled = false`n", Path, "UTF-8")
 
 	Fixture := Map("layout", Map("enabled", true))
 	PrevFlag := _ConfigBootReadFailed
-	_ConfigBootReadFailed := false
+	Lock := 0
+	try {
+		FileAppend(_CMJFixtureCurrentSource("[layout]`nenabled = false`n"), Path, "UTF-8")
+		_CBRF_PrepareCurrentSource(Path)
+		_ConfigBootReadFailed := false
 
-	Lock := FileOpen(Path, _CBRF_EXCLUSIVE_LOCK_FLAGS)
-	Assert(Lock != "" and IsObject(Lock), "the test could not take an exclusive lock — it would otherwise assert nothing")
-	Result := ApplyConfigToml(Fixture, Path)
-	Flag := _ConfigBootReadFailed
-	Lock.Close()
-	try FileDelete(Path)
-	_ConfigBootReadFailed := PrevFlag
+		Lock := FileOpen(Path, _CBRF_EXCLUSIVE_LOCK_FLAGS)
+		Assert(Lock != "" and IsObject(Lock), "the test could not take an exclusive lock — it would otherwise assert nothing")
+		Result := ApplyConfigToml(Fixture, Path)
+		Flag := _ConfigBootReadFailed
+		Lock.Close()
+		Lock := 0
 
-	Assert(Result == -1,
-		"ApplyConfigToml must return a FAILURE signal (-1) for an existing-but-unreadable config — returning 0 is indistinguishable from a config that legitimately carried no overrides")
-	Assert(Flag,
-		"ApplyConfigToml must latch _ConfigBootReadFailed so the deferred boot save knows the feature tree in memory is defaults rather than the user's settings")
-	Assert(Fixture["layout"]["enabled"] == true,
-		"nothing may be applied from a file that could not be read")
+		Assert(Result == -1,
+			"ApplyConfigToml must return a FAILURE signal (-1) for an existing-but-unreadable config — returning 0 is indistinguishable from a config that legitimately carried no overrides")
+		Assert(Flag,
+			"ApplyConfigToml must latch _ConfigBootReadFailed so the deferred boot save knows the feature tree in memory is defaults rather than the user's settings")
+		Assert(Fixture["layout"]["enabled"] == true,
+			"nothing may be applied from a file that could not be read")
+	} finally {
+		try {
+			if IsObject(Lock)
+				Lock.Close()
+		} finally {
+			_ConfigBootReadFailed := PrevFlag
+			try FileDelete(Path)
+		}
+	}
 }
 
 ; The success path must keep working unchanged, or the guard would be a
@@ -133,19 +156,29 @@ _CBRF_ApplyStillWorksWhenReadable() {
 	global _ConfigBootReadFailed
 	Path := A_Temp . "\ergopti_test_cbrf_ok_" . A_TickCount . ".toml"
 	try FileDelete(Path)
-	FileAppend("[layout]`nenabled = false`n", Path, "UTF-8")
 
 	Fixture := Map("layout", Map("enabled", true))
 	PrevFlag := _ConfigBootReadFailed
-	_ConfigBootReadFailed := false
-	Result := ApplyConfigToml(Fixture, Path)
-	Flag := _ConfigBootReadFailed
-	_ConfigBootReadFailed := PrevFlag
-	try FileDelete(Path)
+	Lock := 0
+	try {
+		FileAppend(_CMJFixtureCurrentSource("[layout]`nenabled = false`n"), Path, "UTF-8")
+		_CBRF_PrepareCurrentSource(Path)
+		_ConfigBootReadFailed := false
+		Result := ApplyConfigToml(Fixture, Path)
+		Flag := _ConfigBootReadFailed
 
-	Assert(Result >= 1, "a readable config must still apply its overrides")
-	Assert(Fixture["layout"]["enabled"] == false, "the override must reach the Features tree")
-	Assert(!Flag, "a readable config must not latch the failure flag")
+		Assert(Result >= 1, "a readable config must still apply its overrides")
+		Assert(Fixture["layout"]["enabled"] == false, "the override must reach the Features tree")
+		Assert(!Flag, "a readable config must not latch the failure flag")
+	} finally {
+		try {
+			if IsObject(Lock)
+				Lock.Close()
+		} finally {
+			_ConfigBootReadFailed := PrevFlag
+			try FileDelete(Path)
+		}
+	}
 }
 
 
@@ -161,27 +194,23 @@ _CBRF_ApplyStillWorksWhenReadable() {
 ; The last link: even with the file readable again and the driver fully ready,
 ; SaveFullConfig must refuse, because what it would serialize is the default
 ; tree that step 2 proved was never overridden.
-; The last link: even with the file readable again and the driver fully ready,
-; SaveFullConfig must refuse, because what it would serialize is the default
-; tree that step 2 proved was never overridden.
 ;
-; The unguarded write is deliberately NOT driven here as a control: a completed
-; SaveFullConfig pulls in the whole tray/menu/metrics surface and blocks the
-; headless runner on a dialog. The false-green risk that control would have
-; covered ("it bailed for some unrelated reason") is closed instead by asserting
-; the refusal's own distinct return value — the only other early exit,
-; !_DriverReady, returns nothing — and by the positional assertion below.
+; The ordinary refusal retains its exact mandatory intent. A separate control
+; opens only the latch and observes the same request's real native publication;
+; fixture cleanup settles its own obligation without touching the caller's.
 _CBRF_CaptureSaveRuntime() {
-	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
 	return Map("path_set", IsSet(ConfigurationFile),
 		"path", IsSet(ConfigurationFile) ? ConfigurationFile : "",
 		"ready_set", IsSet(_DriverReady), "ready", IsSet(_DriverReady) ? _DriverReady : false,
 		"flag_set", IsSet(_ConfigBootReadFailed),
-		"flag", IsSet(_ConfigBootReadFailed) ? _ConfigBootReadFailed : false)
+		"flag", IsSet(_ConfigBootReadFailed) ? _ConfigBootReadFailed : false,
+		"rejected_set", IsSet(_ConfigBootRejectedOverrides),
+		"rejected", IsSet(_ConfigBootRejectedOverrides) ? _ConfigBootRejectedOverrides : 0)
 }
 
 _CBRF_RestoreSaveRuntime(Runtime) {
-	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
 	if Runtime["path_set"]
 		ConfigurationFile := Runtime["path"]
 	else
@@ -194,20 +223,48 @@ _CBRF_RestoreSaveRuntime(Runtime) {
 		_ConfigBootReadFailed := Runtime["flag"]
 	else
 		_ConfigBootReadFailed := unset
+	if Runtime["rejected_set"]
+		_ConfigBootRejectedOverrides := Runtime["rejected"]
+	else
+		_ConfigBootRejectedOverrides := unset
+}
+
+; Settle only this fixture's accepted intent with the actual native publisher.
+; The caller's coordinator remains detached and is restored by the outer finally.
+_CBRF_DrainFixtureIntent(State, Target) {
+	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides, CONFIG_SAVE_OK
+	AssertTrue(_ConfigFullSaveCoordinator() == State)
+	AssertFalse(_ConfigWriteTerminalIsActive(), "cleanup never releases a foreign terminal owner")
+	if State.requested_generation <= State.settled_generation
+		return
+	AssertEqual(Target, State.bound_path, "cleanup drains only the fixture's captured source")
+	AssertEqual(_ConfigWriteLeaseKey(Target), State.bound_path_key)
+	Before := FSReadUtf8Exact(Target)
+	_ConfigBootReadFailed := false
+	_ConfigBootRejectedOverrides := 0
+	AssertTrue(ConfigFullStateCanPersist(), "only the fixture's read latch is withdrawn for its native cleanup")
+	AssertEqual(CONFIG_SAVE_OK, _ConfigDrainFullSave(0, (*) => true, 0, () => []),
+		"a genuine native no-change ACK settles the fixture's original request")
+	AssertEqual(Before, FSReadUtf8Exact(Target))
+	AssertFalse(_ConfigFullSaveHasPending())
+	AssertEqual(State.requested_generation, State.committed_generation)
+	AssertEqual(State.requested_generation, State.settled_generation)
 }
 
 _CBRF_SaveDeclinesWhileFlagged(FailAfterRefusal := false) {
-	global _ConfigBootReadFailed, ConfigurationFile, _DriverReady
+	global _ConfigBootReadFailed, ConfigurationFile, _DriverReady, _ConfigBootRejectedOverrides
 	Target := A_Temp . "\ergopti_test_cbrf_save_" . A_TickCount . ".toml"
 	Runtime := _CBRF_CaptureSaveRuntime()
 	Coordinator := _ConfigFullSaveCoordinator()
+	FixtureState := 0
 	BeforeProperties := Map()
 	for Name, Value in ObjOwnProps(Coordinator)
 		BeforeProperties[Name] := Value
 	try {
 		try FileDelete(Target)
 		; Content that is unmistakably the user's, so any rewrite is visible.
-		FileAppend("[layout]`nenabled = false`n", Target, "UTF-8")
+		FileAppend(_CMJFixtureCurrentSource("[layout]`nenabled = false`n"), Target, "UTF-8")
+		_CBRF_PrepareCurrentSource(Target)
 		Before := FileRead(Target, "UTF-8")
 		; The explicit refusal records intent in this fixture's own coordinator.
 		; Restore the caller's exact obligation instead of draining or clearing it.
@@ -216,8 +273,15 @@ _CBRF_SaveDeclinesWhileFlagged(FailAfterRefusal := false) {
 			terminal_required_generation: 0, bound_path: "", bound_path_key: "",
 			reload_required: false, timer_armed: false, reported_failure_generation: 0
 		})
+		FixtureState := _ConfigFullSaveCoordinator()
+		AssertFalse(_ConfigWriteTerminalIsActive(), "the fresh fixture does not inherit a terminal barrier")
 		ConfigurationFile     := Target
 		_DriverReady          := true
+		_ConfigBootReadFailed := false
+		_ConfigBootRejectedOverrides := 0
+		AssertTrue(ConfigFullStateCanPersist(), "genuine current source and all other admission gates are open before the unreadable-boot latch")
+		AssertEqual(0, _ConfigFullSaveCoordinator().requested_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
 		_ConfigBootReadFailed := true
 		Threw   := ""
 		Refused := ""
@@ -246,9 +310,14 @@ _CBRF_SaveDeclinesWhileFlagged(FailAfterRefusal := false) {
 		if FailAfterRefusal
 			throw Error("CBRF fixture cleanup control after genuine refusal")
 	} finally {
-		_ConfigFullSaveCoordinator(Coordinator)
-		_CBRF_RestoreSaveRuntime(Runtime)
-		try FileDelete(Target)
+		try {
+			if IsObject(FixtureState)
+				_CBRF_DrainFixtureIntent(FixtureState, Target)
+			try FileDelete(Target)
+		} finally {
+			try _ConfigFullSaveCoordinator(Coordinator)
+			finally _CBRF_RestoreSaveRuntime(Runtime)
+		}
 	}
 	AssertTrue(_ConfigFullSaveCoordinator() == Coordinator, "normal cleanup restores the exact caller coordinator")
 	AfterProperties := Map()
@@ -284,8 +353,12 @@ _CBRF_GuardPrecedesTheWrite() {
 	Assert(_CBRF_SemanticGuardAndStrictAck(Body),
 		"the current publisher remains after admission and before its strict Integer-1 ACK")
 	Publisher := _StripFullLineComments(_DriverFuncBody("TOML_ConfigBatchWrite"))
-	Assert(InStr(Publisher, 'return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)') > 0,
+	Assert(_CBRF_SourceStatementPosition(Publisher,
+		'm)^[ \t]*try return _TOML_BatchWriteImpl\(Path, Updates, ExactSectionPrefixes, "write",[ \t]*\n[ \t]*ProvidedContent\?, ProvidedPresence\?, true, NativeAdmission\)[ \t]*$', "try") > 0,
 		"the current gateway returns the semantic native writer result unchanged")
+	Assert(_CBRF_SourceStatementPosition(Publisher,
+		'm)^[ \t]*NativeAdmission := \(\) => _ConfigWriteLeaseOwns\(Owner, Path\) && _FSNativeAdmissionAccepted\(AdmissionFn\)[ \t]*$', "NativeAdmission") > 0,
+		"optional captured images retain the exact native lease and original caller admission")
 	NativePublisher := _StripFullLineComments(_DriverFuncBody("_TOML_BatchWriteImpl"))
 	SourceBuilder := _StripFullLineComments(_DriverFuncBody("TOML_BuildConfigUpdatedContent"))
 	SourceReceipt := _StripFullLineComments(_DriverFuncBody("_TOML_FinalizeBuildResult"))
@@ -323,7 +396,7 @@ _CBRF_CapturedPublisherPosition(Body) {
 }
 
 _CBRF_SemanticGuardAndStrictAck(Body) {
-	GuardPos := RegExMatch(Body, "m)^[ `t]*if !ConfigFullStateCanPersist\(\) \{[ `t]*$")
+	GuardPos := RegExMatch(Body, "m)^[ `t]*if !PublicationDebt && !ConfigFullStateCanPersist\(\) \{[ `t]*$")
 	CapturePos := RegExMatch(Body, 'm)^[ \t]*SourceImage := TOML_BuildConfigUpdatedContent\(BoundPath, \[\]\)')
 	ClassifyPos := RegExMatch(Body, 'm)^[ \t]*ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource\(SourceImage\["source_content"\]\)')
 	CollectPos := RegExMatch(Body, 'm)^[ \t]*Updates := HasMethod\(CollectFn, "Call"\)')
@@ -354,7 +427,7 @@ _CBRF_CurrentPublisherGuardMutations() {
 		Call, StrReplace(Call, "Written :=", "UnrelatedWritten :=", true))),
 		"a suffix-sharing assignment cannot lend an unresolved Written result binding")
 	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
-		"if !ConfigFullStateCanPersist()", "if true")), "removing boot admission cannot pass")
+		"if !PublicationDebt && !ConfigFullStateCanPersist()", "if true")), "removing boot admission cannot pass")
 	AssertFalse(_CBRF_SemanticGuardAndStrictAck(Call . "`n" . Body),
 		"publishing before boot admission cannot pass")
 	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
@@ -399,7 +472,7 @@ _CBRF_SourceReceiptOwnersAreExecutable(Builder, Receipt, Publisher) {
 	Finalize := _CBRF_SourceStatementPosition(Builder, 'm)^[ \t]*return _TOML_FinalizeBuildResult\(Result, SourcePresent, SourceBytes\)[ \t]*$', "return")
 	PresenceField := _CBRF_SourceStatementPosition(Receipt, 'm)^[ \t]*Result\["source_present"\] := SourcePresent[ \t]*$', "Result")
 	ContentField := _CBRF_SourceStatementPosition(Receipt, 'm)^[ \t]*Result\["source_content"\] := SourceBytes[ \t]*$', "Result")
-	Typed := _CBRF_SourceStatementPosition(Publisher, 'm)^[ \t]*try Admitted := TOML_BuildConfigDocumentCandidate\(SourceBytes, Updates, ExactSectionPrefixes\)[ \t]*$', "try")
+	Typed := _CBRF_SourceStatementPosition(Publisher, 'm)^[ \t]*try Admitted := TOML_BuildConfigDocumentCandidate\(SourceBytes, CandidateUpdates, ExactSectionPrefixes\)[ \t]*$', "try")
 	return Presence > 0 && Content > Presence && Finalize > Content
 		&& PresenceField > 0 && ContentField > PresenceField && Typed > 0
 }
@@ -430,7 +503,7 @@ _CBRF_CurrentSourceReceiptGuardMutations() {
 		{ owner: "builder", statement: 'return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)' },
 		{ owner: "receipt", statement: 'Result["source_present"] := SourcePresent' },
 		{ owner: "receipt", statement: 'Result["source_content"] := SourceBytes' },
-		{ owner: "publisher", statement: 'try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, Updates, ExactSectionPrefixes)' }
+		{ owner: "publisher", statement: 'try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, CandidateUpdates, ExactSectionPrefixes)' }
 	]
 		_CBRF_SourceReceiptMutation(Builder, Receipt, Publisher, Spec.owner, Spec.statement)
 }
@@ -474,9 +547,69 @@ _CBRF_SaveFixtureRestoresPendingCaller() {
 				AssertEqual(Value, RestoredRuntime[Name], "cleanup restores runtime values and definedness after either exit")
 		}
 	} finally {
-		_ConfigFullSaveCoordinator(Coordinator)
-		_CBRF_RestoreSaveRuntime(Runtime)
+		try _ConfigFullSaveCoordinator(Coordinator)
+		finally _CBRF_RestoreSaveRuntime(Runtime)
 	}
 }
 Test("meta config-boot-read-failed: refused save fixture preserves caller intent on normal and throwing exits",
 	_CBRF_SaveFixtureRestoresPendingCaller)
+
+; A refusal alone could also be an unrelated collector error. This control opens
+; every other gate and proves the same native request reaches collection only
+; after its unreadable-boot latch is removed, then retires by real disk ACK.
+_CBRF_LatchBlocksOnlyCollection() {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	global CONFIG_SAVE_FAILED, CONFIG_SAVE_OK
+	Target := A_Temp . "\ergopti_test_cbrf_reachable_" . A_TickCount . ".toml"
+	Runtime := _CBRF_CaptureSaveRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	FixtureState := 0
+	Calls := Map("collector", 0, "timer", 0)
+	Collect := () => (Calls["collector"] += 1, [])
+	Timer := (*) => (Calls["timer"] += 1, true)
+	try {
+		FileAppend(_CMJFixtureCurrentSource("[layout]`nenabled = false`n"), Target, "UTF-8")
+		_CBRF_PrepareCurrentSource(Target)
+		Before := FSReadUtf8Exact(Target)
+		_ConfigFullSaveCoordinator({
+			requested_generation: 0, committed_generation: 0, settled_generation: 0,
+			terminal_required_generation: 0, bound_path: "", bound_path_key: "",
+			reload_required: false, timer_armed: false, reported_failure_generation: 0
+		})
+		FixtureState := _ConfigFullSaveCoordinator()
+		AssertFalse(_ConfigWriteTerminalIsActive())
+		ConfigurationFile := Target
+		_DriverReady := true
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootReadFailed := false
+		AssertTrue(ConfigFullStateCanPersist())
+		_ConfigBootReadFailed := true
+		AssertEqual(CONFIG_SAVE_FAILED, SaveFullConfig(0, Timer, true, 0, Collect))
+		AssertEqual(0, Calls["collector"], "the actual latch refuses before the controlled collector")
+		AssertEqual(0, Calls["timer"])
+		AssertEqual(1, FixtureState.requested_generation)
+		AssertEqual(0, FixtureState.committed_generation)
+		AssertEqual(Before, FSReadUtf8Exact(Target))
+		_ConfigBootReadFailed := false
+		AssertEqual(CONFIG_SAVE_OK, _ConfigDrainFullSave(0, Timer, 0, Collect),
+			"the real publisher drains the same request after only the latch changes")
+		AssertEqual(1, Calls["collector"])
+		AssertEqual(0, Calls["timer"])
+		AssertEqual(1, FixtureState.requested_generation, "draining never creates a second obligation")
+		AssertEqual(1, FixtureState.committed_generation)
+		AssertEqual(1, FixtureState.settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual(Before, FSReadUtf8Exact(Target))
+	} finally {
+		try {
+			if IsObject(FixtureState)
+				_CBRF_DrainFixtureIntent(FixtureState, Target)
+			try FileDelete(Target)
+		} finally {
+			try _ConfigFullSaveCoordinator(Coordinator)
+			finally _CBRF_RestoreSaveRuntime(Runtime)
+		}
+	}
+}
+Test("meta config-boot-read-failed: the actual latch blocks collection before a native same-request repair",
+	_CBRF_LatchBlocksOnlyCollection)

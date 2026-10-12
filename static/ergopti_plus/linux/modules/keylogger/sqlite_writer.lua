@@ -384,7 +384,7 @@ COMMIT;
 	-- registration in one explicit transaction; -bail closes and rolls it back
 	-- after a refused statement or COMMIT, before the terminal receipt returns.
 	local accepted = _exec(sql)
-	if accepted then Logger.debug(LOG, "Device '%s' registered.", device_id) end
+	if accepted then Logger.debug(LOG, "Device registered.") end
 	return accepted
 end
 

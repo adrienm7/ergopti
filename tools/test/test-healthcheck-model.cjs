@@ -720,6 +720,28 @@ for (const vector of vectors.file_name_vectors || []) {
 // =========================
 // =========================
 
+// Exported table values must survive the same DOM-only Markdown consumer.
+{
+	const { runPage, byTag } = require('./support/changelog-page-dom.cjs');
+	const page = runPage();
+	const body = page.document.getElementById('release-body');
+	for (const driver of DRIVERS) {
+		for (const value of ['literal\\|value', 'two\\\\|pipes', 'ending\\']) {
+			const snapshot = fixture(driver);
+			snapshot.sections.versions.ergopti_version = value;
+			const original = JSON.stringify(snapshot);
+			const markdown = Model.formatMarkdown(snapshot, schema, t);
+			page.sandbox.renderMarkdownInto(body, markdown, {});
+			const row = byTag(body, 'tr').find((node) =>
+				node.children.some((child) => child.textContent === t('healthcheck.export.version'))
+			);
+			if (!row || row.children.length !== 2 || row.children[1].textContent !== value)
+				fail(`${driver}: Markdown report table lost a literal backslash or pipe`);
+			if (JSON.stringify(snapshot) !== original) fail(`${driver}: escaping changed the snapshot`);
+		}
+	}
+}
+
 require('./fixtures/healthcheck-sharing-controls.cjs').run(ROOT);
 require('./fixtures/diagnostic-checks-controls.cjs').run(ROOT);
 require('./fixtures/diagnostic-summary-controls.cjs').run(ROOT);

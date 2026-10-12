@@ -97,6 +97,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-windows-key-combination-cohorts.cjs'
 	},
 	{
+		name: 'web text decoding and icon demo preserve literal input with bounded parsing',
+		cmd: process.execPath,
+		args: ['tools/test/test-web-text-admission.cjs'],
+		repro: 'npm run test:web-text-admission'
+	},
+	{
 		name: 'native XI2 three-cookie CI preserves original family and source receipts',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs'],

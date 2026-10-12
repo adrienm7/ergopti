@@ -8,6 +8,7 @@ The portable role exercises real peers without claiming native Apple acceptance.
 """
 
 import http.server
+import hashlib
 import importlib.util
 import json
 import os
@@ -154,8 +155,57 @@ class WireFixture:
         security_failure_observation=False,
         trust_operation=None,
         passive_receiving=None,
+        trust_install_observation=False,
     ):
         phase = "setup"
+        milestones = {
+            "acquisition_entered": False,
+            "child_acquired": False,
+            "wait_entered": False,
+            "wait_returned": False,
+            "retirement_attempted": False,
+            "retirement_result": "not_acquired",
+            "failure_phase": None,
+        }
+        # This observer never consumes the deadline clock or acquires authority.
+        timing = {
+            "observed": True,
+            "acquisition_elapsed_ms": None,
+            "input_close_elapsed_ms": None,
+            "wait_budget_ms": None,
+            "wait_elapsed_ms": None,
+            "retirement_elapsed_ms": None,
+        }
+        timing_starts = {}
+
+        def observe_timing(stage, finished=False):
+            if not security_failure_observation or not timing["observed"]:
+                return
+            try:
+                if finished and stage not in timing_starts:
+                    return
+                now = time.perf_counter_ns()
+                if type(now) is not int or now < 0:
+                    raise ValueError("Cleanup observation clock refused")
+                if finished:
+                    started = timing_starts.pop(stage)
+                    if now < started:
+                        raise ValueError("Cleanup observation clock regressed")
+                    timing[stage + "_elapsed_ms"] = round((now - started) / 1_000_000, 3)
+                else:
+                    timing_starts[stage] = now
+                    if stage == "wait":
+                        if type(wait_timeout) not in (int, float) or not (
+                            0 <= wait_timeout < float("inf")
+                        ):
+                            raise ValueError("Cleanup observation budget refused")
+                        timing["wait_budget_ms"] = round(wait_timeout * 1000, 3)
+            except Exception:
+                # Closed unavailability is diagnostic only, including clock refusal.
+                for key in timing:
+                    timing[key] = False if key == "observed" else None
+
+        self.command_milestone_fact = None
         status = None
         self.command_fact = None
         output = errors = owned = child = input_owner = input_observer = None
@@ -166,6 +216,9 @@ class WireFixture:
         security_failure = None
         trust_callee = None
         trust_install_stream = {"observed": False}
+        observation_started = time.monotonic() if trust_install_observation else None
+        captured_streams = {}
+        captured_output = {}
         try:
             if self.command_file_debt:
                 phase = "settle"
@@ -184,9 +237,12 @@ class WireFixture:
                     nonlocal owned
                     owned = value
                     self.command_group_debt.append(value)
+                    milestones["child_acquired"] = True
 
                 try:
                     phase = "acquire"
+                    milestones["acquisition_entered"] = True
+                    observe_timing("acquisition")
                     self.groups.acquire_owned(
                         arguments,
                         self.native_groups,
@@ -195,10 +251,13 @@ class WireFixture:
                         stdout=output,
                         stderr=output if merge_errors else errors,
                     )
+                    observe_timing("acquisition", finished=True)
                     phase = "input"
                     owned.process.stdin.write(input_bytes)
                     try:
+                        observe_timing("input_close")
                         owned.process.stdin.close()
+                        observe_timing("input_close", finished=True)
                     except BaseException:
                         closure_refused = True
                         if owned.process.stdin.closed:
@@ -210,11 +269,25 @@ class WireFixture:
                             )
                         raise
                     phase = "wait"
-                    owned.wait_for_exit(
+                    milestones["wait_entered"] = True
+                    wait_timeout = (
                         timeout if deadline is None else max(0, deadline - time.monotonic())
                     )
+                    observe_timing("wait")
+                    owned.wait_for_exit(wait_timeout)
+                    observe_timing("wait", finished=True)
+                    milestones["wait_returned"] = True
                 except BaseException as primary:
+                    observe_timing(
+                        "acquisition"
+                        if phase == "acquire"
+                        else "input_close"
+                        if phase == "input"
+                        else "wait",
+                        finished=True,
+                    )
                     failure = primary
+                    milestones["failure_phase"] = phase
                 finally:
                     try:
                         if owned is not None:
@@ -223,52 +296,85 @@ class WireFixture:
                             # original settlement attempt.
                             if not any(value is owned for value in self.command_group_debt):
                                 self.command_group_debt.append(owned)
+                            milestones["retirement_attempted"] = True
+                            observe_timing("retirement")
                             group_settled = owned.settle()
+                            observe_timing("retirement", finished=True)
+                            milestones["retirement_result"] = (
+                                "acknowledged" if group_settled is True else "not_confirmed"
+                            )
                             if group_settled is not True:
                                 raise FixtureFailure("Native fixture child closure refused")
                     except BaseException as refused:
+                        observe_timing("retirement", finished=True)
+                        if milestones["retirement_attempted"]:
+                            milestones["retirement_result"] = "refused"
                         phase = "settle"
                         closure_refused = True
                         if failure is None:
                             failure = refused
+                            milestones["failure_phase"] = phase
                 if failure is not None:
                     raise failure
                 status = owned.process.returncode
             else:
                 phase = "acquire"
+                milestones["acquisition_entered"] = True
+                observe_timing("acquisition")
                 child = subprocess.Popen(
                     arguments,
                     stdin=subprocess.PIPE,
                     stdout=output,
                     stderr=output if merge_errors else errors,
                 )
+                observe_timing("acquisition", finished=True)
+                milestones["child_acquired"] = True
                 input_owner = child.stdin
                 input_observer = CommandInputOwner(input_owner)
                 child.stdin = input_observer
                 try:
                     phase = "wait"
-                    child.communicate(
-                        input_bytes,
-                        timeout=timeout
-                        if deadline is None
-                        else max(0, deadline - time.monotonic()),
+                    milestones["wait_entered"] = True
+                    wait_timeout = (
+                        timeout if deadline is None else max(0, deadline - time.monotonic())
                     )
+                    observe_timing("wait")
+                    child.communicate(input_bytes, timeout=wait_timeout)
+                    observe_timing("wait", finished=True)
+                    milestones["wait_returned"] = True
                 except BaseException as primary:
+                    observe_timing(
+                        "acquisition"
+                        if phase == "acquire"
+                        else "input_close"
+                        if phase == "input"
+                        else "wait",
+                        finished=True,
+                    )
                     failure = primary
+                    milestones["failure_phase"] = phase
                 finally:
                     if input_observer.close_failure is not None:
                         closure_refused = True
                         if failure is None:
                             failure = input_observer.close_failure
                     try:
+                        milestones["retirement_attempted"] = True
+                        observe_timing("retirement")
                         if child.poll() is None:
                             child.kill()
                         child.wait()
+                        observe_timing("retirement", finished=True)
+                        milestones["retirement_result"] = "acknowledged"
                     except BaseException as refused:
+                        observe_timing("retirement", finished=True)
+                        if milestones["retirement_attempted"]:
+                            milestones["retirement_result"] = "refused"
                         phase = "settle"
                         closure_refused = True
                         if failure is None:
                             failure = refused
+                            milestones["failure_phase"] = phase
                 if failure is not None:
                     raise failure
                 status = child.returncode
@@ -296,8 +402,10 @@ class WireFixture:
             output.seek(0)
             result = status, output.read(65536)
         except BaseException as refused:
+            observe_timing("acquisition", finished=True)
             if failure is None:
                 failure = refused
+                milestones["failure_phase"] = phase
         finally:
             process = owned.process if owned is not None else child
             if input_observer is not None and input_observer.close_uncertain:
@@ -328,6 +436,24 @@ class WireFixture:
                         )
                     ):
                         failure = observation_failure
+            if (
+                trust_install_observation
+                and owned is not None
+                and getattr(owned, "reaped", False) is True
+            ):
+                # Only exact retirement releases the shared writable file offset.
+                # A still-owned child keeps its capture unobserved and untouched.
+                # Preserve bounded bytes before closing the existing captures.
+                # Public facts contain no native message, argument or path.
+                for name, stream in (("stdout", output), ("stderr", errors)):
+                    try:
+                        fact, raw = self._trust_install_private_stream(stream)
+                        captured_streams[name] = fact
+                        captured_output[name] = raw
+                    except BaseException as observation_failure:
+                        captured_streams[name] = {"observed": False}
+                        if failure is None:
+                            failure = observation_failure
             for stream in streams:
                 if stream is None or any(
                     debt["stream"] is stream and debt["uncertain"]
@@ -367,6 +493,25 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        if security_failure_observation:
+            self.command_milestone_fact = {
+                "version": 1,
+                "action": "security_cleanup",
+                "phase": self.command_fact["phase"],
+                "status": self.command_fact["status"],
+                **milestones,
+                "timing": timing,
+            }
+            # Passive closed milestones cannot replace a command verdict or primary error.
+            try:
+                print(
+                    "# native_http_security_milestones "
+                    + json.dumps(self.command_milestone_fact, sort_keys=True),
+                    flush=True,
+                    file=sys.stderr,
+                )
+            except BaseException:
+                pass
         # Optional receiving observes this same local owner only after its
         # original literalTrue ACK and original three capture closures. It has
         # no retirement authority and cannot pay debt or change a primary.
@@ -521,6 +666,38 @@ class WireFixture:
                     )
                 ):
                     failure = publication_failure
+        if trust_install_observation:
+            pid = getattr(process, "pid", None)
+            exit_status = getattr(process, "returncode", None)
+            observation = {
+                "version": 1,
+                "action": "add_trusted_cert",
+                "domain": "admin",
+                "keychain": "owned_private",
+                "pid": pid if type(pid) is int and pid > 0 else None,
+                "exit_status": exit_status if type(exit_status) is int else None,
+                "elapsed_ms": max(0, round((time.monotonic() - observation_started) * 1000)),
+                "phase": self.command_fact["phase"],
+                "child_settled": owned is not None and getattr(owned, "reaped", False) is True,
+                "streams_closed": not closure_refused
+                and all(stream is None or stream.closed for stream in streams),
+                "stdout": captured_streams.get("stdout", {"observed": False}),
+                "stderr": captured_streams.get("stderr", {"observed": False}),
+            }
+            # Exact bounded bytes remain private exception evidence in memory;
+            # neither traceback formatting nor the public JSON emits them.
+            if failure is not None:
+                failure.trust_install_output = captured_output
+            try:
+                print(
+                    "# native_http_trust_install " + json.dumps(observation, sort_keys=True),
+                    flush=True,
+                    file=sys.stderr,
+                )
+            except BaseException as observation_failure:
+                if failure is not None:
+                    raise failure from observation_failure
+                raise
         if security_failure is not None:
             # Closed categories are observations, never a command success or an
             # API OSStatus. Publication follows exact child and file retirement.
@@ -590,6 +767,43 @@ class WireFixture:
         ):
             return "trust_settings_remove"
         return None
+
+    @staticmethod
+    def _trust_install_private_stream(stream):
+        """Project bounded private native output into path-free public facts."""
+        if stream is None:
+            return {"observed": False}, None
+        stream.seek(0)
+        raw = stream.read(1025)
+        prefix = raw[:1024]
+        function = None
+        for name in (
+            b"SecTrustSettingsSetTrustSettings",
+            b"SecKeychainItemImport",
+            b"SecKeychainUnlock",
+        ):
+            if raw.startswith(name + b": ") or raw.startswith(b"security: " + name + b": "):
+                function = name.decode("ascii")
+                break
+        category = "empty" if not raw else "unknown"
+        if function is not None and len(raw) <= 1024:
+            # Literal stderr evidence only; interaction refusal never implies
+            # that the keychain was locked. Localized/unknown messages stay unknown.
+            message = raw.removeprefix(b"security: ").split(b": ", 1)[1]
+            category = {
+                b"User interaction is not allowed.\n": "user_interaction_required",
+                b"The keychain is locked.\n": "keychain_locked",
+                b"Access denied.\n": "access_denied",
+                b"Authorization denied.\n": "access_denied",
+            }.get(message, "unknown")
+        return {
+            "observed": True,
+            "category": category,
+            "captured_bytes": len(prefix),
+            "truncated": len(raw) > 1024,
+            "bounded_sha256": hashlib.sha256(prefix).hexdigest(),
+            "security_function": function,
+        }, prefix
 
     @staticmethod
     def _security_failure_fact(raw):
@@ -714,7 +928,11 @@ class WireFixture:
                     str(self.keychain),
                     str(self.ca),
                 ],
-                trust_operation="add",
+                **(
+                    {"trust_install_observation": True}
+                    if getattr(self, "trust_install_observation", False)
+                    else {"trust_operation": "add"}
+                ),
                 deadline=deadline,
             )
             if deadline is not None:

@@ -42,7 +42,40 @@ assert.match(flow, /LLM_OllamaListModels_Async/);
 assert.match(flow, /this\.Runtime\.ObserveReady\(\)/);
 assert.match(flow, /CryptoSha256Bytes\(FileRead\(Path, "RAW"\)\)/);
 const admission = fs.readFileSync(path.join(root, 'ui/menu/menu_llm/enable_admission.ahk'), 'utf8');
-assert.match(admission, /TOML_BuildUpdatedContent\(Path, Updates\)/);
+// The production resolver preserves the injected writer's refusal contract.
+// The config renderer already returns the complete canonical UTF-8/BOM image;
+// copy exactly that image, excluding only StrPut's terminating NUL.
+function assertEnableWriterSource(source) {
+	assert.match(source, /TOML_BuildConfigUpdatedContent\(Path, Updates\)/);
+	assert.match(
+		source,
+		/Writer := _LLM_Menu_EnablePort\(Request\["port"\], "writer", TOML_ConfigBatchWrite\)/
+	);
+	assert.match(source, /Written := Writer\.Call\(Path, Updates\)/);
+	assert.match(source, /Content := Built\["content"\]\s+Size := StrPut\(Content, "UTF-8"\) - 1/);
+	assert.match(source, /Bytes := Buffer\(Size, 0\)/);
+	assert.match(
+		source,
+		/Encoded := Buffer\(Size \+ 1, 0\)\s+StrPut\(Content, Encoded, "UTF-8"\)\s+DllCall\("RtlMoveMemory", "Ptr", Bytes\.Ptr, "Ptr", Encoded\.Ptr, "UPtr", Size\)/
+	);
+	assert.match(
+		source,
+		/PrepareEnableHandoff\(Request\["source"\], Map\("path", Path, "bytes", Bytes\)\)/
+	);
+	assert.doesNotMatch(source, /StrPut\(Chr\(0xFEFF\) \. (?:Built\["content"\]|Content)/);
+	assert.doesNotMatch(source, /NumPut\("UChar", 0xEF|Bytes\.Ptr \+ 3|Buffer\(Size \+ 3/);
+}
+assertEnableWriterSource(admission);
+const originalEncoding = 'StrPut(Content, Encoded, "UTF-8")';
+const doubledEncoding = 'StrPut(Chr(0xFEFF) . Content, Encoded, "UTF-8")';
+const doubledBom = admission.replace(originalEncoding, doubledEncoding);
+assert.notEqual(doubledBom, admission, 'The counterfactual must change the actual encoding call.');
+assert.throws(
+	() => assertEnableWriterSource(doubledBom),
+	{ code: 'ERR_ASSERTION' },
+	'A prepended second BOM cannot satisfy the complete source/image contract.'
+);
+assertEnableWriterSource(doubledBom.replace(doubledEncoding, originalEncoding));
 assert.match(admission, /PrepareEnableHandoff/);
 assert.match(admission, /FinishEnableHandoff/);
 for (const file of [

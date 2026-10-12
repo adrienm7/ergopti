@@ -62,6 +62,7 @@ helpers.describe("notifications.notify", function()
 	helpers.it("returns false and never claims dispatch if hs.notify.new throws", function()
 		local lines = {}
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
 		_G.hs.notify.new = function() error("boom") end
@@ -78,6 +79,7 @@ helpers.describe("notifications.notify", function()
 	helpers.it("returns false and never claims dispatch if native send refuses", function()
 		local lines = {}
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
 		_G.hs.notify.new = function()
@@ -111,6 +113,7 @@ helpers.describe("notifications.notify", function()
 		end
 		local lines = {}
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
 		local dispatched = notifications.notify("click me")
@@ -188,6 +191,7 @@ helpers.describe("notifications.debugLog", function()
 		_G.hs.console.printStyledtext = function() error("nope") end
 		local lines = {}
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
 		notifications.debugLog("hello")

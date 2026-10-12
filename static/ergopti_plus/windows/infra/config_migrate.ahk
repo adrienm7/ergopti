@@ -894,13 +894,13 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		try {
 			VersionSource := FSReadStrict(FilePath)
 			VersionScan := _ConfigMigrateRecordScan(VersionSource)
-			_ConfigMigrateRecordValidateModel(VersionScan, Before)
 			VersionDocument := TOML_ParseDocument(VersionSource)
+			Outcome := _ConfigMigrateClassifyDocument(VersionDocument, Registry, &Version)
+			_ConfigMigrateRecordValidateModel(VersionScan, Before, Outcome == "current", VersionDocument)
 			if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(VersionSource, "the version snapshot"))
 				return Refuse("failed", "the file changed while its physical version ownership was checked")
 		} catch as Err
 			return Refuse("failed", "the physical version owner refused: " . Err.Message)
-		Outcome := _ConfigMigrateClassifyDocument(VersionDocument, Registry, &Version)
 		Result["from"] := Version
 		switch Outcome {
 			case "current":
@@ -970,7 +970,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		migrate: ConfigMigrateRun, key: FileReadActivityKey,
 		clone: ManifestCloneValue, same: ConfigMigrateSameValue,
 		terminal_owns: _ConfigWriteTerminalOwnsExact, variant_refusal: _ConfigMigrateVariantBootRefusal,
-		move: FSConfigAtomicMoveReplace, generic_move: FSAtomicMoveReplace, noop: FSNativeAcknowledge, config_write: TOML_ConfigBatchWrite, generic_write: TOML_BatchWrite, recovery_images: _ConfigTransitionNativeRecoveryImages
+		move: FSConfigAtomicMoveReplace, generic_move: FSAtomicMoveReplace, noop: FSNativeAcknowledge, settlement_port: ConfigTransitionProductionPort, settlement_inspect: ConfigTransitionInspect, settlement_result: ConfigTransitionResultIs, settlement_matches: FSUtf8ExactMatches, settlement_debt: _ConfigPublicationHasRecoveryDebt, settlement_refusal: TOML_WriteRefusal, settlement_bounds: _ConfigTransitionPresenceHashIsValid, config_write: TOML_ConfigBatchWrite, generic_write: TOML_BatchWrite, recovery_images: _ConfigTransitionNativeRecoveryImages
 	}
 
 	NativeLive() {
@@ -982,6 +982,10 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			&& Native.registry_path == ConfigMigrateRegistryPath
 			&& Native.registry == ConfigMigrateShippedRegistry
 			&& Native.decode == TOML_ParseDocument && Native.classify == _ConfigMigrateClassifyDocument
+			&& Native.settlement_port == ConfigTransitionProductionPort && Native.settlement_inspect == ConfigTransitionInspect
+			&& Native.settlement_result == ConfigTransitionResultIs && Native.settlement_matches == FSUtf8ExactMatches
+			&& Native.settlement_debt == _ConfigPublicationHasRecoveryDebt && Native.settlement_refusal == TOML_WriteRefusal
+			&& Native.settlement_bounds == _ConfigTransitionPresenceHashIsValid
 			&& Native.migrate == ConfigMigrateRun && Native.key == FileReadActivityKey
 			&& Native.clone == ManifestCloneValue && Native.same == ConfigMigrateSameValue
 			&& Native.terminal_owns == _ConfigWriteTerminalOwnsExact
@@ -1000,14 +1004,22 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	}
 
 	SameRegistry(Left, Right) {
+		; NativeLive still binds the canonical scalar owner before comparison.
+		if Left is String
+			return (Right is String) && StrCompare(Left, Right, true) == 0
+		if Left is Integer || Left is Float
+			return (Right is Integer || Right is Float) && Left = Right
 		if Left is Map {
 			if !PlainContainer(Left, Map.Prototype) || !PlainContainer(Right, Map.Prototype)
 					|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
 				return false
-			ExactRight := Map()
-			ExactRight.CaseSense := "On"
-			for Key, Value in Right
-				ExactRight[Key] := Value
+			ExactRight := Right
+			if Right.CaseSense != "On" {
+				ExactRight := Map()
+				ExactRight.CaseSense := "On"
+				for Key, Value in Right
+					ExactRight[Key] := Value
+			}
 			for Key, Value in Left {
 				if !ExactRight.Has(Key) || !SameRegistry(Value, ExactRight[Key])
 					return false
@@ -1104,15 +1116,24 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			return "failed"
 		if !Image.present
 			return "fresh-missing"
+		; Only deterministic parsing/classification is reused. Every caller still
+		; reads its genuine source and rechecks live registry/owner admission.
+		if Row.HasOwnProp("classification_image")
+				&& StrCompare(Image.source, Row.classification_image.source, true) == 0
+			return Row.classification_image.classification
 		try {
-			return Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
+			Classification := Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
 		} catch {
 			return "failed"
 		}
+		if Classification == "current" || Classification == "migrate" || Classification == "newer"
+				|| Classification == "invalid" || Classification == "unsupported"
+			Row.classification_image := { source: Image.source, classification: Classification }
+		return Classification
 	}
 
-	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned"
-			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure")
+	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned" || Request == "settle_owned"
+			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure" || Request == "read_only_status")
 		throw ValueError("Unknown configuration journal request")
 	if !(FilePath is String) || FilePath == "" || !NativeLive()
 		return false
@@ -1126,6 +1147,20 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	Key := Native.key.Call(FilePath)
 	if Request == "known"
 		return Destinations.Has(Key)
+	if Request == "read_only_status" {
+		; Observation returns only the retained boot classification, never source
+		; bytes, a mutable journal row or preparation/write permission.
+		if !Destinations.Has(Key)
+			return ""
+		ObservedRow := Destinations[Key]
+		if !RegistryLive(ObservedRow) || ObservedRow.phase == "ready"
+				|| !ObservedRow.HasOwnProp("classification")
+			return ""
+		for Status in ["newer", "invalid", "unsupported"]
+			if ObservedRow.classification == Status
+				return Status
+		return ""
+	}
 	if Request == "consume_read_failure" {
 		if !Destinations.Has(Key)
 			return 0
@@ -1140,6 +1175,114 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 					&& Native.terminal_owns.Call(Failure.owner, FilePath)))
 		ObservedRow.DeleteProp("read_failure")
 		return Valid ? (Failure.present == 1 ? 2 : 1) : 0
+	}
+	if Request == "settle_owned" {
+		if !IsSet(OwnerBundle) || !IsSet(Candidate)
+				|| !PlainContainer(Candidate, Map.Prototype) || !(Candidate.Count == 2 || Candidate.Count == 4)
+				|| !Candidate.Has("locator") || !Candidate.Has("side")
+				|| !(Candidate["locator"] is String) || Candidate["locator"] == ""
+				|| !(Candidate["side"] is String)
+				|| !(Candidate["side"] == "old" || Candidate["side"] == "new")
+			return false
+		Locator := Candidate["locator"], Side := Candidate["side"]
+		Bounded := Candidate.Count == 4
+		if Bounded {
+			if !Candidate.Has("expected_present") || !Candidate.Has("expected_hash")
+				return false
+			BoundPresent := Candidate["expected_present"], BoundHash := Candidate["expected_hash"]
+			if !Native.settlement_bounds.Call(BoundPresent, BoundHash)
+				return false
+		}
+		if !Native.terminal_owns.Call(OwnerBundle, FilePath)
+				|| !Native.terminal_owns.Call(OwnerBundle, Locator)
+			return false
+		if Native.settlement_debt.Call(FilePath)
+			return false
+		Port := Native.settlement_port.Call()
+		WalAbsent() {
+			return NativeLive() && Native.settlement_port.Call(Port)
+				&& Native.settlement_result.Call(Native.settlement_inspect.Call(Locator, Port), "absent")
+		}
+		if !WalAbsent()
+			return false
+		; An unmanaged target is a verified no-op, never a new schema destination.
+		if !Destinations.Has(Key)
+			return NativeLive() && Native.settlement_refusal.Call(FilePath) == ""
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, Locator)
+		Row := Destinations[Key]
+		if !RegistryLive(Row)
+			return false
+		; An absent unbounded recovery has no acquired source phase to settle.
+		; Keep its existing refusal and readonly/ready row unchanged; this result
+		; grants neither source admission nor a pending recovered-image receipt.
+		if !Bounded && (Row.phase == "prepared" || Row.phase == "ready") {
+			UnchangedPhase := Row.phase
+			return WalAbsent() && RegistryLive(Row) && Destinations[Key] == Row
+				&& Row.phase == UnchangedPhase && NativeLive()
+				&& !Native.settlement_debt.Call(FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, Locator)
+				&& NativeLive() && Destinations[Key] == Row && Row.phase == UnchangedPhase
+		}
+		; Actual owned settlement and bounded retry observations keep the strict
+		; refusal fence before reading or acknowledging any recovered image.
+		if Native.settlement_refusal.Call(FilePath) != ""
+			return false
+		Image := false
+		if Bounded {
+			Image := ReadImage()
+			if !Native.settlement_port.Call(Port) || !NativeLive()
+				return false
+			if !(Image is Object) || Image.present != BoundPresent
+					|| (Image.present && Port["hash"].Call(Image.source) != BoundHash)
+					|| !Native.settlement_port.Call(Port) || !NativeLive()
+				return false
+		}
+		; No owned phase was acquired by cold recovery. Its legacy readonly source
+		; still needs ordinary later migration; settlement cannot grant READY.
+		if Row.phase == "prepared" || Row.phase == "ready"
+			return true
+		if !(Image is Object)
+			Image := ReadImage()
+		if !(Image is Object)
+			return false
+		Classification := ClassifyImage(Image, Row)
+		if !(Classification == "current" || Classification == "fresh-missing")
+			return false
+		if Row.phase != "owned" || Row.owned_bundle != OwnerBundle
+				|| !Row.HasOwnProp("owned_return_phase")
+				|| !(Row.owned_return_phase == "prepared" || Row.owned_return_phase == "ready")
+			return false
+		Expected := Side == "old" ? Row.owned_old_image
+			: (Row.HasOwnProp("owned_new_image") ? Row.owned_new_image : false)
+		if !(Expected is Object) || Image.present != Expected.present
+				|| StrCompare(Image.source, Expected.source, true) != 0
+			return false
+		ReturnPhase := Row.owned_return_phase
+		FinalAdmission() {
+			if !RegistryLive(Row) || Destinations[Key] != Row || Row.phase != "owned"
+					|| Row.owned_bundle != OwnerBundle || Row.owned_return_phase != ReturnPhase
+					|| !Native.terminal_owns.Call(OwnerBundle, FilePath)
+					|| !Native.terminal_owns.Call(OwnerBundle, Locator)
+					|| Native.settlement_debt.Call(FilePath) || Native.settlement_refusal.Call(FilePath) != "" || !WalAbsent()
+				return false
+			Matched := Image.present ? Native.settlement_matches.Call(FilePath, Image.source)
+				: !Native.exists.Call(FilePath)
+			return Matched && NativeLive() && RegistryLive(Row) && Native.settlement_refusal.Call(FilePath) == ""
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, Locator) && Row.phase == "owned"
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if !Native.noop.Call(FinalAdmission) || !NativeLive()
+				return false
+			Row.image := Image, Row.classification := Classification, Row.phase := ReturnPhase
+			Row.DeleteProp("owned_bundle"), Row.DeleteProp("owned_return_phase"), Row.DeleteProp("owned_old_image")
+			if Row.HasOwnProp("owned_new_image")
+				Row.DeleteProp("owned_new_image")
+			return true
+		} finally Critical(PreviousCritical)
 	}
 	if !Destinations.Has(Key) {
 		; Public/custom migration results cannot construct a row. Only genuine
@@ -1214,12 +1357,15 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 				|| StrCompare(Image.source, Row.image.source, true) != 0)
 			return false
 		if Row.phase == "owned" && Row.owned_bundle != OwnerBundle
-				&& Native.terminal_owns.Call(Row.owned_bundle, FilePath)
 			return false
 		PreviousCritical := Critical("On")
 		try {
 			if !RegistryLive(Row) || !Native.terminal_owns.Call(OwnerBundle, FilePath)
 				return false
+			if Row.phase != "owned" {
+				Row.owned_return_phase := Row.phase
+				Row.owned_old_image := Image
+			}
 			Row.image := Image
 			Row.classification := Classification
 			Row.owned_bundle := OwnerBundle
@@ -1378,6 +1524,13 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		NewPresent := Candidate["present"], NewContent := Candidate["content"]
 		if NewPresent && ClassifyImage({ present: 1, source: NewContent }, Row) != "current"
 			return false
+		PreviousCritical := Critical("On")
+		try {
+			if !RegistryLive(Row) || Row.phase != "owned" || Row.owned_bundle != OwnerBundle
+					|| !Native.terminal_owns.Call(OwnerBundle, FilePath)
+				return false
+			Row.owned_new_image := { present: NewPresent, source: NewContent }
+		} finally Critical(PreviousCritical)
 		OldPresent := Image.present, OldContent := Image.source, ExactBundle := OwnerBundle
 		Matches(Source, Present, ExpectedSource, ExpectedPresent) {
 			return (Present is Integer) && Present == ExpectedPresent && (Source is String)
@@ -1432,6 +1585,18 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 /** Read-only constructor handoff; actual migration keeps its later boot timing. */
 ConfigSchemaPrepareSource(Path) {
 	return ConfigMigrateBoot(Path, "prepare")
+}
+
+/**
+ * Observes a retained incompatible boot schema without opening or changing it.
+ * @param {String} Path Exact boot configuration destination.
+ * @returns {String} newer/invalid/unsupported, or empty when no such state exists.
+ */
+ConfigSchemaReadOnlyStatus(Path) {
+	try Status := ConfigMigrateBoot(Path, "read_only_status")
+	catch
+		return ""
+	return Status is String ? Status : ""
 }
 
 /** Captures only genuinely initialized fresh source permission before effects. */
@@ -1607,4 +1772,23 @@ _ConfigMigrateVariantBootRefusal(Result, FilePath) {
 			return Prefix . " an independent layer gate is not an exact TOML boolean"
 	}
 	return ""
+}
+
+/** Restores only the source phase retained before this exact terminal owner. */
+ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, Side, Bounds := 0) {
+	try {
+		Candidate := Map("locator", Locator, "side", Side)
+		if !((Bounds is Integer) && Bounds == 0) {
+			if !(Bounds is Map) || ObjGetBase(Bounds) != Map.Prototype
+				return false
+			for Name in ObjOwnProps(Bounds)
+				return false
+			if Bounds.Count != 2 || !Bounds.Has("present") || !Bounds.Has("hash")
+				return false
+			Candidate["expected_present"] := Bounds["present"]
+			Candidate["expected_hash"] := Bounds["hash"]
+		}
+		return ConfigMigrateBoot(Path, "settle_owned", Candidate, Bundle)
+	} catch
+		return false
 }

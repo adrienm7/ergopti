@@ -66,6 +66,7 @@ end
 --- @return table Ordered lifecycle observations.
 local function capture_replacement_logs(callback)
 	local logger = require("infra.logger")
+	helpers.admit_logger_privacy(logger)
 	local original, records = {}, {}
 	for _, level in ipairs({ "trace", "done", "error" }) do
 		original[level] = logger[level]

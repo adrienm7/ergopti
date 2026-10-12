@@ -302,6 +302,9 @@ end
 -- Forward-declared here so the closure handed to KcBridge.init below captures
 -- the real upvalue rather than a nil global.
 local _is_paused
+-- A refused auth-policy cancellation cannot be bypassed by restoring permission.
+-- Only this public setter's exact pure-settlement receipt clears the debt.
+local _system_auth_modifier_settlement_pending = false
 
 --- Settles held modifiers without I/O or external callbacks during publication.
 --- Prepare both new tables before the one owned in-memory swap. Suppression
@@ -562,6 +565,7 @@ end
 --- second copy is how these four answers drift apart again.
 --- @return boolean True when the context is loggable.
 function M.context_allows_logging()
+	if _system_auth_modifier_settlement_pending then return false end
 	return PrivacyContext.allows_logging(CoreState)
 end
 
@@ -1123,7 +1127,19 @@ end
 --- When disabled, keystrokes typed into macOS admin/sudo prompts are recorded.
 --- @param v boolean
 function M.set_system_auth_filter_enabled(v)
+	local allowed_before = PrivacyContext.allows_logging(CoreState)
 	CoreState.system_auth_filter_enabled = (v ~= false)
+	local allowed_after = PrivacyContext.allows_logging(CoreState)
+	-- Preserve fully included holds, including the disabled-filter and ordinary
+	-- context cases. Crossing an excluded interval cancels its entire duration.
+	if _system_auth_modifier_settlement_pending
+		or allowed_before ~= true or allowed_after ~= true then
+		_system_auth_modifier_settlement_pending = true
+		local settled_ok, settled = pcall(settle_physical_modifiers)
+		assert(settled_ok and settled == true,
+			"System auth filter modifier settlement remains pending")
+		_system_auth_modifier_settlement_pending = false
+	end
 	Logger.debug(LOG, "System auth filter: %s.", CoreState.system_auth_filter_enabled and "on" or "off")
 end
 
