@@ -1120,3 +1120,94 @@ _TBUI_CanonicalSpansAndContainerBoundary() {
 }
 Test("toml canonical lexer: merged spans and balanced-container stopping preserve the same source owner",
 	_TBUI_CanonicalSpansAndContainerBoundary)
+
+; Frozen handwritten UTF-16 lexer vectors predate the native-search candidate.
+; No file, cache, port, or publication state is mutated by these direct calls.
+_TBUI_CommentTokenUnits(Units, Label) {
+	Text := ""
+	for Unit in Units
+		Text .= Chr(Unit)
+	_TBUI_CommentTokenAssertUnits(Units, Text, Label)
+	return Text
+}
+
+_TBUI_CommentTokenAssertUnits(Units, Text, Label) {
+	AssertEqual(Units.Length, StrLen(Text), Label . " exact UTF-16 length")
+	for Index, Unit in Units
+		AssertEqual(Unit, Ord(SubStr(Text, Index, 1)), Label . " UTF-16 unit " . Index)
+}
+
+_TBUI_CommentTokenVector(Vector) {
+	Source := _TBUI_CommentTokenUnits(Vector.Source, "source")
+	Separator := _TBUI_CommentTokenUnits(Vector.Separator, "separator")
+	Expected := _TBUI_CommentTokenUnits(Vector.Token, "expected token")
+	Position := Vector.Initial, Separated := -1, SpanStart := -1, SpanEnd := -1
+	Caught := false, Token := ""
+	try Token := _TOML_DocumentToken(Source, &Position, Separator, &Separated,
+		&SpanStart, &SpanEnd, Vector.Stop)
+	catch Error as Failure
+		Caught := Failure
+	if Vector.ErrorType != "" {
+		AssertTrue(IsObject(Caught), "the original error must remain observable")
+		AssertEqual(Vector.ErrorType, Type(Caught), "original error class")
+		if Vector.Error != ""
+			AssertEqual(Vector.Error, Caught.Message, "original document error")
+	} else {
+		if IsObject(Caught)
+			throw Caught
+		AssertEqual(Expected, Token, "handwritten token")
+		_TBUI_CommentTokenAssertUnits(Vector.Token, Token, "actual token")
+	}
+	AssertEqual(Vector.Position, Position, "exact cursor")
+	AssertEqual(Vector.PositionType, Type(Position), "cursor value type")
+	AssertEqual(Vector.Separated, Separated, "original separator admission")
+	AssertEqual(Vector.Start, SpanStart, "original first owned unit")
+	AssertEqual(Vector.End, SpanEnd, "original final owned unit")
+}
+
+_TBUI_CommentTokenVectors() {
+	return [
+		{ Id: "line-feed-is-processed-by-original-separator", Source: [35, 120, 10, 55], Separator: [10], Initial: 1, Stop: false, Token: [], Position: 4, PositionType: "Integer", Separated: true, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "comment-at-end-retains-original-eof-cursor", Source: [35, 120], Separator: [10], Initial: 1, Stop: false, Token: [], Position: 3, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "one-unit-comment-at-end", Source: [35], Separator: [10], Initial: 1, Stop: false, Token: [], Position: 2, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "scalar-comment-span", Source: [97, 32, 35, 120, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 6, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "crlf-comment-span", Source: [97, 32, 35, 120, 13, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 7, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "carriage-return-at-eof-is-comment-data", Source: [97, 35, 120, 13], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 5, PositionType: "Integer", Separated: false, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "separator-inside-comment-is-not-owned", Source: [97, 35, 61, 10, 61, 98], Separator: [61], Initial: 1, Stop: false, Token: [97], Position: 6, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "nested-array-comment-keeps-newline", Source: [91, 49, 44, 35, 44, 10, 50, 93, 44, 51], Separator: [44], Initial: 1, Stop: false, Token: [91, 49, 44, 10, 50, 93], Position: 10, PositionType: "Integer", Separated: true, Start: 1, End: 8, ErrorType: "", Error: "" },
+		{ Id: "comment-hides-quotes-and-closers", Source: [97, 35, 93, 125, 34, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 7, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "basic-quoted-hash-is-data", Source: [34, 35, 34, 44, 120], Separator: [44], Initial: 1, Stop: false, Token: [34, 35, 34], Position: 5, PositionType: "Integer", Separated: true, Start: 1, End: 3, ErrorType: "", Error: "" },
+		{ Id: "literal-quoted-hash-is-data", Source: [39, 35, 39, 44, 120], Separator: [44], Initial: 1, Stop: false, Token: [39, 35, 39], Position: 5, PositionType: "Integer", Separated: true, Start: 1, End: 3, ErrorType: "", Error: "" },
+		{ Id: "triple-basic-hashes-are-data", Source: [34, 34, 34, 35, 10, 35, 34, 34, 34, 44, 120], Separator: [44], Initial: 1, Stop: false, Token: [34, 34, 34, 35, 10, 35, 34, 34, 34], Position: 11, PositionType: "Integer", Separated: true, Start: 1, End: 9, ErrorType: "", Error: "" },
+		{ Id: "triple-literal-hashes-are-data", Source: [39, 39, 39, 35, 10, 35, 39, 39, 39, 44, 120], Separator: [44], Initial: 1, Stop: false, Token: [39, 39, 39, 35, 10, 35, 39, 39, 39], Position: 11, PositionType: "Integer", Separated: true, Start: 1, End: 9, ErrorType: "", Error: "" },
+		{ Id: "supplementary-comment-units-do-not-own-span", Source: [97, 35, 55357, 56832, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 6, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "supplementary-token-keeps-two-unit-span", Source: [55357, 56832, 35, 120, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [55357, 56832], Position: 6, PositionType: "Integer", Separated: true, Start: 1, End: 2, ErrorType: "", Error: "" },
+		{ Id: "accent-and-surrogate-comment-units", Source: [97, 35, 233, 55357, 56832, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 7, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "isolated-high-surrogate-comment-unit", Source: [97, 35, 55296, 113, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 6, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "nul-before-line-feed-retains-character-fallback", Source: [97, 35, 0, 113, 10, 98], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 6, PositionType: "Integer", Separated: true, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "nul-comment-at-eof-retains-original-cursor", Source: [97, 35, 0, 113], Separator: [10], Initial: 1, Stop: false, Token: [97], Position: 5, PositionType: "Integer", Separated: false, Start: 1, End: 1, ErrorType: "", Error: "" },
+		{ Id: "nul-comment-hidden-closer-still-unterminated", Source: [91, 49, 35, 0, 93, 10, 50], Separator: [44], Initial: 1, Stop: false, Token: [], Position: 8, PositionType: "Integer", Separated: false, Start: 1, End: 7, ErrorType: "ValueError", Error: "Unterminated TOML document record" },
+		{ Id: "balanced-container-stops-before-trailing-comment", Source: [91, 35, 120, 10, 49, 93, 32, 35, 122, 10, 113], Separator: [0], Initial: 1, Stop: true, Token: [91, 10, 49, 93], Position: 7, PositionType: "Integer", Separated: false, Start: 1, End: 6, ErrorType: "", Error: "" },
+		{ Id: "hash-separator-still-starts-comment", Source: [97, 35, 120, 10, 98], Separator: [35], Initial: 1, Stop: false, Token: [97, 10, 98], Position: 6, PositionType: "Integer", Separated: false, Start: 1, End: 5, ErrorType: "", Error: "" },
+		{ Id: "later-start-keeps-absolute-span", Source: [120, 120, 97, 35, 121, 10, 98], Separator: [10], Initial: 3, Stop: false, Token: [97], Position: 7, PositionType: "Integer", Separated: true, Start: 3, End: 3, ErrorType: "", Error: "" },
+		{ Id: "comment-hidden-closer-keeps-unterminated-error", Source: [91, 49, 44, 35, 93, 10, 50], Separator: [44], Initial: 1, Stop: false, Token: [], Position: 8, PositionType: "Integer", Separated: false, Start: 1, End: 7, ErrorType: "ValueError", Error: "Unterminated TOML document record" },
+		{ Id: "quoted-newline-keeps-original-error", Source: [34, 97, 35, 10, 120, 34], Separator: [10], Initial: 1, Stop: false, Token: [], Position: 4, PositionType: "Integer", Separated: false, Start: 1, End: 4, ErrorType: "ValueError", Error: "A single-line TOML string contains a newline" },
+		{ Id: "wrong-closer-after-comment-keeps-original-error", Source: [91, 49, 32, 35, 120, 10, 125], Separator: [44], Initial: 1, Stop: false, Token: [], Position: 7, PositionType: "Integer", Separated: false, Start: 1, End: 7, ErrorType: "ValueError", Error: "Unbalanced TOML document container" },
+		{ Id: "unterminated-triple-keeps-original-error", Source: [39, 39, 39, 35, 10], Separator: [44], Initial: 1, Stop: false, Token: [], Position: 6, PositionType: "Integer", Separated: false, Start: 1, End: 5, ErrorType: "ValueError", Error: "Unterminated TOML document record" },
+		{ Id: "negative-cursor-uses-old-forward-comment-loop", Source: [35, 120, 35], Separator: [10], Initial: -1, Stop: false, Token: [], Position: 4, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "negative-range-clamp-keeps-old-loop", Source: [35, 120, 35], Separator: [10], Initial: -5, Stop: false, Token: [], Position: 4, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "negative-cursor-line-feed-separator", Source: [35, 120, 10], Separator: [10], Initial: -1, Stop: false, Token: [], Position: 0, PositionType: "Integer", Separated: true, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "fractional-comment-cursor-retains-fraction", Source: [35, 120, 10, 98], Separator: [10], Initial: 1.5, Stop: false, Token: [], Position: 4.5, PositionType: "Float", Separated: true, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "integral-float-cursor-keeps-old-addition", Source: [35, 120, 10, 98], Separator: [10], Initial: 1.0, Stop: false, Token: [], Position: 4.0, PositionType: "Float", Separated: true, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "numeric-string-cursor-keeps-original-coercion", Source: [35, 120, 10, 98], Separator: [10], Initial: "1", Stop: false, Token: [], Position: 4, PositionType: "Integer", Separated: true, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "zero-cursor-keeps-empty-needle-value-error", Source: [35, 120, 35], Separator: [10], Initial: 0, Stop: false, Token: [], Position: 0, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "ValueError", Error: "" },
+		{ Id: "fraction-under-one-keeps-empty-needle-value-error", Source: [35, 120, 35], Separator: [10], Initial: 0.5, Stop: false, Token: [], Position: 0.5, PositionType: "Float", Separated: false, Start: 0, End: 0, ErrorType: "ValueError", Error: "" },
+		{ Id: "past-end-cursor-is-unchanged", Source: [35, 120, 35], Separator: [10], Initial: 4, Stop: false, Token: [], Position: 4, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "far-past-end-cursor-is-unchanged", Source: [35, 120, 35], Separator: [10], Initial: 100, Stop: false, Token: [], Position: 100, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "", Error: "" },
+		{ Id: "empty-source-with-ordinary-cursor", Source: [], Separator: [10], Initial: 1, Stop: false, Token: [], Position: 1, PositionType: "Integer", Separated: false, Start: 0, End: 0, ErrorType: "", Error: "" }
+	]
+}
+
+for _TBUI_CommentTokenCase in _TBUI_CommentTokenVectors()
+	Test("toml-comment-newline-native: " . _TBUI_CommentTokenCase.Id,
+		_TBUI_CommentTokenVector.Bind(_TBUI_CommentTokenCase))
