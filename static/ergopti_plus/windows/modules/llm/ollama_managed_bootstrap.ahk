@@ -568,7 +568,9 @@ class OllamaManagedBootstrap {
 		return this._MenuPullFail(Operation)
 	}
 
-	_NativePull(Model := unset, OnDone := 0) {
+	_NativePull(Model := unset, OnDone := 0, SpawnFn := 0) {
+		; Capture logical custody before a native boundary can cancel or retire it.
+		MenuOperation := HasMethod(OnDone, "Call") && this.MenuPull is Map ? this.MenuPull : 0
 		if !IsSet(Model)
 			Model := this.Model
 		Target := this.Target
@@ -586,7 +588,8 @@ class OllamaManagedBootstrap {
 		this.PullTask := Owner
 		Accepted := false
 		try {
-			Task := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+			Factory := HasMethod(SpawnFn, "Call") ? SpawnFn : ShellRunner_SpawnTreeOwned
+			Task := Factory.Call(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 				Args, ObjBindMethod(this, "_Pulled", Owner), , , 65536, true, true)
 			Owner["task"] := Task
 			Accepted := this._Current() && this._True(Task.start()) && this._Current()
@@ -598,7 +601,15 @@ class OllamaManagedBootstrap {
 			if Owner["terminal"] is Map
 				this._Pulled(Owner, Owner["terminal"]["exit"])
 		}
-		return Accepted ? true : this._Fail("model_dispatch")
+		if Accepted
+			return true
+		; A post-READY menu dispatch cannot re-notify the completed bootstrap.
+		; Retain the captured operation even when native completion retired it.
+		if MenuOperation is Map {
+			try return this._MenuPullFail(MenuOperation)
+			finally this.Cancel()
+		}
+		return this._Fail("model_dispatch")
 	}
 
 	_Pulled(Owner, ExitCode, Stdout := "", Stderr := "") {
