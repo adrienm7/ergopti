@@ -4076,6 +4076,12 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-12 resumed exact `dbfdcaa652` native receiving confirms 24/25 archive
+controls pass, one owned Automation deadline fails and all six Brew scenarios
+remain unexecuted. Original logs, archive digest, 348 safe members and 407 source
+pins are retained in the [current receiving capsule](handovers/2026-10-11-group6-cloud/native-dbfd-core-archive-receiving.tar.gz).
+Package and installation were skipped; item36 and transversal16/38 remain open.
+
 2026-10-12 the original Windows updater23 diagnostic is now callable from the
 reviewed checkout with an explicit local mode before PAC -Publish. It retains
 original18/4/1 names, the2307-byte child and300000/30000/1320000 clocks, plus
@@ -7050,6 +7056,16 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-12 the authenticated `dbfdcaa652` Core result is 413/414, with all 165
+earlier receiving controls admitted. The remaining failure is the unchanged
+compiler include-directory assertion: observed0755, required0700. The G6-owned
+builder now creates that directory explicitly at0700 before staging its original
+headers. The same independent ten tests fail on old source under022/000 and pass
+on the correction under022/000/077; no assertion, command, source recipe or clock
+changes. This portable proof does not replace selected or native validation.
+Both native PAC cohorts have12 passed methods/two failed methods; trust, HTTP,
+model, package and enterprise acceptance remain incomplete. Item62 stays open.
 
 2026-10-12 the settled removal diagnostic is now composed with the G6 polling
 fix. It records only the original retired child/status and bounded existing stderr;
