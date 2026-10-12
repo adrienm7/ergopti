@@ -7722,6 +7722,23 @@ executes exactly12 CLI cases and six identity vectors in about3.34s; the wider
 research matrices remain separately retained. No rollback, transactionality,
 Windows/process closure or native updater acceptance is claimed.
 
+2026-10-12 the original Windows updater collector now authenticates the fixed
+canonical SDK archive before parsing, binds its exact unique interpreter bytes
+and AMD64/PE32+ executable headers, and compares original/final file identities.
+An explicit absolute ERGOPTI_WINDOWS_AHK_ARCHIVE is mandatory; no cache fallback
+or public contract override exists. FileVersion remains reported, unqualified
+metadata; header checks do not establish native loader behavior.
+
+SDK admission occurs before the entire cohort loop. An intermediate per-cohort
+catch could allow two later mocked launches after an identity refusal; the
+corrected transition refuses all launches and leaves all cohorts UNRUN. All33
+original predicates,88 prior assertions,2307-byte child,22 registrations,21 pins
+and independent23-label oracle remain intact. The final helper passes52 portable
+controls, registered22 controls and genuine pinned2.0.26 inert archive/image
+receiving. No SDK executable was installed or run in this container. Root-owned
+cache authentication, held-image/whole-tree owner enrollment and actual original23
+Windows/complete build-install receiving remain open. Items62 and16/38 stay open.
+
 The sibling writer limitation recorded by the earlier reader-only slice is
 therefore repaired at source level. Original23, SDK/cache authentication,
 whole-tree owner enrollment and all native/package/enterprise requirements
