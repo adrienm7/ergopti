@@ -13,6 +13,7 @@ const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { resolveArchives } = require('./macos-release-archives.cjs');
 const { shared } = require('../lib/paths.cjs');
+const { readOwnedDescriptor } = require('../lib/owned-descriptor-read.cjs');
 
 const RECEIPT = 'macos-publication.json';
 const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -28,19 +29,24 @@ function bindings(defaults) {
 function bytes(filename, allowAbsent = false) {
 	let fd;
 	try {
-		fd = fs.openSync(filename, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+		fd = fs.openSync(
+			filename,
+			fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0)
+		);
 	} catch (error) {
 		if (allowAbsent && error.code === 'ENOENT') return null;
 		throw error;
 	}
-	try {
-		const stat = fs.fstatSync(fd);
-		if (!stat.isFile() || stat.size <= 0 || fs.lstatSync(filename).isSymbolicLink())
-			throw new Error('A public archive input is not a nonempty regular file.');
-		return fs.readFileSync(fd);
-	} finally {
-		fs.closeSync(fd);
-	}
+	return readOwnedDescriptor(
+		fd,
+		() => {
+			const stat = fs.fstatSync(fd);
+			if (!stat.isFile() || stat.size <= 0 || fs.lstatSync(filename).isSymbolicLink())
+				throw new Error('A public archive input is not a nonempty regular file.');
+			return fs.readFileSync(fd);
+		},
+		(owned) => fs.closeSync(owned)
+	);
 }
 
 /** Keep native failure output private; the caller receives only closed refusal. */

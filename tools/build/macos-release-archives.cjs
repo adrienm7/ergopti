@@ -21,6 +21,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { shared } = require('../lib/paths.cjs');
+const { readOwnedDescriptor } = require('../lib/owned-descriptor-read.cjs');
 
 const FORMATS = new Map([
 	['zip', '.zip'],
@@ -258,19 +259,24 @@ function ciBindings(options) {
 function archiveBytes(filename, allowAbsent = false) {
 	let descriptor;
 	try {
-		descriptor = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+		descriptor = fs.openSync(
+			filename,
+			fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK
+		);
 	} catch (error) {
 		if (allowAbsent && error.code === 'ENOENT') return null;
 		throw error;
 	}
-	try {
-		const stat = fs.fstatSync(descriptor);
-		if (!stat.isFile() || stat.size === 0)
-			throw new Error('A CI archive must be a nonempty physical regular file.');
-		return fs.readFileSync(descriptor);
-	} finally {
-		fs.closeSync(descriptor);
-	}
+	return readOwnedDescriptor(
+		descriptor,
+		() => {
+			const stat = fs.fstatSync(descriptor);
+			if (!stat.isFile() || stat.size === 0)
+				throw new Error('A CI archive must be a nonempty physical regular file.');
+			return fs.readFileSync(descriptor);
+		},
+		(owned) => fs.closeSync(owned)
+	);
 }
 
 function digest(bytes) {

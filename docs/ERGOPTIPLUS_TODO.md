@@ -4493,6 +4493,18 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-12 producer and publication archive readers share one-close receiving
+that preserves exact read/validation and secondary close failures, including
+thrown falsy values. Nonblocking open precedes the original regular-file checks;
+real POSIX FIFO readers now refuse instead of blocking. ENOENT historical
+fallback, selection, signing and installation policies remain unchanged.
+All103 old assertions remain; the registered callback passes246 POSIX subcases
+with two actual FIFO readers and244 privately modeled Windows subcases without
+FIFO. The missing Windows constant has a causal original refusal and corrected
+normalized expectation; POSIX still requires a nonzero flag. Physical macOS
+signature/archive/Brew6 and complete package/install receiving remain open.
+Item36 and transversal16/38 stay open.
+
 2026-10-12 the Dev 2203 timestamp addition overwrote the Brew diagnostic's
 validated last-census projection with the full UI observation. The corrective
 copy retains the timestamp while excluding optional button/identity fields
@@ -7759,6 +7771,16 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-12 the archive helper is explicitly enrolled in original Windows
+SourceRoots and the finite Source22 seed through two literal path additions.
+Every other SDK callback, predicate, assertion and registration remains exact.
+Actual Source receiving binds the helper and refuses its absence; the old roster
+incorrectly admitted that missing dependency. Composed registered22 controls
+pass. No pins, oracle, workflow, runtime ownership or native qualification is
+regenerated. Root host/held bridge acquisition, process-adapter enrollment, cache
+authentication and complete native/enterprise receiving remain required.
+Item62 and transversal16/38 stay open.
 
 2026-10-12 the source sealer now preserves exact write/validation and descriptor
 closure failures together, including thrown falsy values, with one close
