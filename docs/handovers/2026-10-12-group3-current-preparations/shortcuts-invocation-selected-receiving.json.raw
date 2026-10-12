@@ -1,0 +1,39 @@
+{
+  "publication": {
+    "sha": "3fdfa8600b8574d5ce24a43683df31dbfeefb5ee",
+    "parent": "60adb7e83d504b04ca807bfda8657254cccae306",
+    "tree": "065326906cf8cd4acb19865d83fd7d92c02e1490",
+    "owned": [
+      "docs/ERGOPTIPLUS_TODO.md",
+      "static/ergopti_plus/macos/adapters/apple_shortcuts.lua",
+      "static/ergopti_plus/macos/tests/unit/adapters/test_apple_shortcuts.lua"
+    ],
+    "selected_exit": 0,
+    "selected_seconds": 3209.4234135129955,
+    "native": "Separate receiving required; no native success inferred.",
+    "dev_ci_lock_changed": false
+  },
+  "gate": {
+    "exit": 0,
+    "seconds": 3209.4234135129955,
+    "source_index_head_exact": true,
+    "raw_sha256": "e99bf6577533b4771e72341dda3935157bc709e2fb423ef380450c320b8a1ba4"
+  },
+  "mac_e2e": {
+    "passed_e2e_case_lines": 55,
+    "passed_hardening_lines": 34,
+    "explicit_skip_lines": [
+      "e2e[buffer_cap_trigger_longer_than_window]  (driver-specific: rolling_buffer_cap)"
+    ],
+    "final": "# All E2E scenarios passed."
+  },
+  "mac_unit": {
+    "modules": 1571,
+    "passed": 18653,
+    "failed": 0
+  },
+  "raw_receiving": "Original bytes retained; ASCII counters parsed directly, not UTF-8-normalized.",
+  "native": "UNQUALIFIED",
+  "original_catalogue_probe_deadline_seconds": 20,
+  "todo_removed": []
+}
