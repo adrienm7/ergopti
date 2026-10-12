@@ -724,11 +724,18 @@ function publishesSelectedMenuGroup(source, extension, section, definition, proo
 	);
 	const executable = (text) => {
 		const lines = codeLines(text);
+		let line = 0,
+			lineStart = 0,
+			nextLine = text.indexOf('\n');
 		return scriptTokens(text, '.ahk').filter((token) => {
 			if (token.kind === 'string')
 				return text.slice(token.start, token.end) === JSON.stringify(token.value);
-			const line = text.slice(0, token.start).split('\n').length - 1;
-			const column = token.start - text.lastIndexOf('\n', token.start - 1) - 1;
+			while (nextLine >= 0 && nextLine < token.start) {
+				line += 1;
+				lineStart = nextLine + 1;
+				nextLine = text.indexOf('\n', lineStart);
+			}
+			const column = token.start - lineStart;
 			return lines[line]?.slice(column, column + token.value.length) === token.value;
 		});
 	};
