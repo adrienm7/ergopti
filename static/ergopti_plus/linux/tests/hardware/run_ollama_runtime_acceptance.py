@@ -71,6 +71,70 @@ EXCEPTION_TYPES = frozenset(
 )
 
 
+BOUNDARY_STEPS = (
+    "guardian-enter",
+    "build-admission",
+    "build-command",
+    "build-complete",
+    "lua-launch",
+    "lua-complete",
+)
+BOUNDARY_REFUSAL = "guardian-deadline-exception"
+
+
+def _boundary_marker(kind):
+    """Emit an optional closed milestone, never private text or native authority."""
+    if type(kind) is not str or kind not in (*BOUNDARY_STEPS, BOUNDARY_REFUSAL):
+        return
+    try:
+        print("ACCEPTANCE_BOUNDARY " + kind, flush=True)
+    except Exception:
+        # Diagnostics must not replace work failures; fresh control exceptions propagate.
+        pass
+
+
+def _boundary_observation(text):
+    """Select an ordered literal observation only; it cannot qualify acceptance."""
+    if type(text) is not str:
+        return {}
+    observed = []
+    reason = None
+    for line in text.splitlines():
+        if not line.startswith("ACCEPTANCE_BOUNDARY "):
+            continue
+        token = line[len("ACCEPTANCE_BOUNDARY ") :]
+        if token == BOUNDARY_REFUSAL and observed and reason is None:
+            reason = token
+        elif (
+            reason is None
+            and len(observed) < len(BOUNDARY_STEPS)
+            and token == BOUNDARY_STEPS[len(observed)]
+        ):
+            observed.append(token)
+        else:
+            return {}
+    if not observed:
+        return {}
+    return {"boundary_stage_observed": observed[-1], "boundary_reason_observed": reason}
+
+
+def _guardian_call(owner, args):
+    """Observe only the original guardian call and its exact known refusal."""
+    _boundary_marker("guardian-enter")
+    try:
+        return owner.main(args.child_command, deadline_seconds=930)
+    except RuntimeError as original:
+        if (
+            type(original) is RuntimeError
+            and type(original.args) is tuple
+            and len(original.args) == 1
+            and type(original.args[0]) is str
+            and original.args[0] == "native owned-process probe exceeded its deadline"
+        ):
+            _boundary_marker(BOUNDARY_REFUSAL)
+        raise
+
+
 def acceptance_phases(text):
     """Retain literal work markers separately from the terminal cleanup marker.
 
@@ -228,6 +292,7 @@ def build_and_run(repository, hardware, command):
     assert len(command) == 4 and command[0] in ("luajit", "lua5.4")
     assert command[1] == str(hardware / "run_ollama_runtime_acceptance.lua")
     assert command[2] == str(repository) and 0 < int(command[3]) < 65536
+    _boundary_marker("build-admission")
     driver = repository / "static/ergopti_plus/linux"
     source_directory = driver / "native/archive_output"
     script = repository / "tools/build/build-linux-native-output.sh"
@@ -265,6 +330,7 @@ def build_and_run(repository, hardware, command):
     directory_identity = (identity.st_dev, identity.st_ino, identity.st_uid, identity.st_mode)
     # Own fresh output on the publication filesystem, including separate HOME mounts.
     output = Path(tempfile.mkdtemp(prefix=".runtime-acceptance-native-", dir=binary_directory))
+    _boundary_marker("build-command")
     subprocess.run(
         [
             str(tools[0]),
@@ -277,6 +343,7 @@ def build_and_run(repository, hardware, command):
         env=dict(os.environ, CC=str(tools[1])),
         check=True,
     )
+    _boundary_marker("build-complete")
     generated = output / "libergopti_archive_publication.so"
 
     def native_identity(path):
@@ -303,7 +370,9 @@ def build_and_run(repository, hardware, command):
     assert installed_identity[-1] == generated_identity[-1], (
         "existing native helper differs from fresh producer"
     )
+    _boundary_marker("lua-launch")
     result = subprocess.run(command, cwd=repository)
+    _boundary_marker("lua-complete")
     assert native_identity(generated) == generated_identity
     assert native_identity(installed) == installed_identity
     identity = binary_directory.lstat()
@@ -346,7 +415,7 @@ def main():
         )
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
-        return owner.main(args.child_command, deadline_seconds=930)
+        return _guardian_call(owner, args)
 
     if args.build_and_run is not None:
         return build_and_run(repository, hardware, args.build_and_run)
@@ -482,6 +551,7 @@ def main():
             )
         text = (root / "native.private.log").read_text(errors="replace")
         document.update(acceptance_phases(text))
+        document.update(_boundary_observation(text))
         after = sources()
         receipts = []
         for line in text.splitlines():
