@@ -60,9 +60,13 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		"tail_text", tail_text,
 		"payload", payload
 	)
-	if payload != "" {
+	try {
 		job["presence_generation"] := LLM_AuxGeneration()
-		job["base_url"] := LLM_OLLAMA_BASE_URL
+		job["base_url"] := LLM_OllamaRequestOrigin()
+		job["origin_owned"] := LLM_OllamaManagedOriginRequired()
+	} catch {
+		_LLM_InvokeCallback(on_fail, "on_fail")
+		return req_id
 	}
 	global _LLM_Ollama_Async
 	if (_LLM_Ollama_Async.Count > 0) {
@@ -141,7 +145,8 @@ _LLM_Ollama_DispatchAsync(job) {
 		"cancelled", false, "start_tick", A_TickCount,
 		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "",
 		"redact", job.Get("payload", "") != "",
-		"base_url", job.Get("base_url", LLM_OLLAMA_BASE_URL),
+		"base_url", job.Get("base_url", LLM_OllamaRequestOrigin()),
+		"origin_owned", job.Get("origin_owned", false),
 		"presence_generation", job.Get("presence_generation", LLM_AuxGeneration()))
 	if job.Get("payload", "") != "" {
 		Port := _LLM_Ollama_PreflightPort
@@ -184,7 +189,7 @@ _LLM_Ollama_Preflight(req_id, payload, job, Port := 0) {
 		return
 	}
 	if Entry.Get("presence_generation", 0) != LLM_AuxGeneration()
-			|| Entry.Get("base_url", "") != LLM_OLLAMA_BASE_URL {
+			|| Entry.Get("base_url", "") != LLM_OllamaRequestOrigin() {
 		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
 		return
 	}
@@ -227,7 +232,7 @@ _LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt)
 		return
 	if Entry["cancelled"] || A_IsSuspended || !LLM_AuxIsCurrent(Owner)
 			|| Entry["presence_generation"] != LLM_AuxGeneration()
-			|| Entry["base_url"] != LLM_OLLAMA_BASE_URL {
+			|| Entry["base_url"] != LLM_OllamaRequestOrigin() {
 		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
 		return
 	}
@@ -249,9 +254,10 @@ _LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt)
 
 _LLM_Ollama_PresenceStillCurrent(Entry) {
 	global LLM_OLLAMA_BASE_URL
-	return !Entry.Get("presence_admitted", false)
-		|| (Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
-			&& Entry.Get("base_url", "") == LLM_OLLAMA_BASE_URL)
+	if !Entry.Get("presence_admitted", false) && !Entry.Get("origin_owned", false) && !LLM_OllamaManagedOriginRequired()
+		return true
+	return Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
+		&& LLM_OllamaOriginMatches(Entry.Get("base_url", ""))
 }
 
 ; Deferred spawn: writes the payload file and launches curl outside the
@@ -323,7 +329,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 						. _LLM_CurlMaxFileSizeArg() . '-X POST '
 						. '-H "Content-Type: application/json" '
 						. '--data-binary @' . _Q(tmp_payload) . ' '
-						. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
+						. _Q(LLM_OllamaRequestOrigin() . "/api/chat") . ' '
 						. '-o ' . _Q(tmp_stdout)
 					cmdLine := _LLM_CurlOwnedCommand(cmdLine,
 						entry["tmp_status"], entry["tmp_exit"])
@@ -724,7 +730,8 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; this reservation a later keystroke can cancel the current generation, then
 	; this stack resumes and launches its stale POST after the cancellation.
 	handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: "", TmpStdout: "" }
+		TmpPayload: "", TmpStdout: "", Origin: LLM_OllamaRequestOrigin(),
+		OriginGeneration: LLM_AuxGeneration(), OriginOwned: LLM_OllamaManagedOriginRequired() }
 	global _LLM_Ollama_ActiveStreams
 	_LLM_Ollama_ActiveStreams.Push(handle)
 
@@ -741,7 +748,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		return handle
 	}
-	if (A_IsSuspended or handle.Cancelled) {
+	if (A_IsSuspended or handle.Cancelled or !_LLM_Ollama_StreamOriginCurrent(handle)) {
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		return handle
@@ -765,7 +772,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 		. _LLM_CurlMaxFileSizeArg() . '-X POST '
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
-		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
+		. _Q(handle.Origin . "/api/chat") . ' '
 		. '-o ' . _Q(tmp_stdout)
 
 	launch_blocked := false
@@ -773,7 +780,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	try {
 		PreviousCritical := Critical("On")
 		try {
-			if (A_IsSuspended or handle.Cancelled) {
+			if (A_IsSuspended or handle.Cancelled or !_LLM_Ollama_StreamOriginCurrent(handle)) {
 				launch_blocked := true
 			} else {
 				ProcessOwner := _LLM_CurlRunOwned(RunFn,
@@ -804,6 +811,14 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000)
 	_LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail)
 	return handle
+}
+
+_LLM_Ollama_StreamOriginCurrent(Handle) {
+	if !Handle.HasOwnProp("Origin")
+		return !LLM_OllamaManagedOriginRequired()
+	if !Handle.OriginOwned && !LLM_OllamaManagedOriginRequired()
+		return true
+	return Handle.OriginGeneration == LLM_AuxGeneration() && LLM_OllamaOriginMatches(Handle.Origin)
 }
 
 ; Read a growing JSONL file without asking the UTF-8 decoder to cross a
@@ -876,7 +891,7 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
  */
 _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	global LLM_OLLAMA_POLL_MS
-	if handle.Cancelled {
+	if handle.Cancelled || !_LLM_Ollama_StreamOriginCurrent(handle) {
 		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		_LLM_Ollama_RemoveStreamHandle(handle)

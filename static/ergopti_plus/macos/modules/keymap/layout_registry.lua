@@ -343,11 +343,37 @@ function M.picker(deps)
 	return picker
 end
 
+--- Registers an exact declared input-source name, retaining collision evidence.
+--- @param names table
+--- @param name string|nil
+--- @param id string
+local function add_source_name(names, name, id)
+	if type(name) ~= "string" or name == "" then return end
+	if names[name] == nil then names[name] = id
+	elseif names[name] ~= id then names[name] = false end
+end
+
+--- Finds an active owner without choosing an arbitrary display-name collision.
+--- Raw identifiers have precedence over localized aliases. The latter come
+--- only from declared catalogue names and the existing input-source formatter.
+--- @param source table
+--- @param names table Exact internal identifiers.
+--- @param aliases table Declared localized names.
+--- @return string|boolean|nil owner False means ambiguous ownership.
+local function active_source_owner(source, names, aliases)
+	if names[source.id] ~= nil then return names[source.id] end
+	if names[source.name] ~= nil then return names[source.name] end
+	local id_owner, name_owner = aliases[source.id], aliases[source.name]
+	if id_owner ~= nil and name_owner ~= nil and id_owner ~= name_owner then return false end
+	if id_owner ~= nil then return id_owner end
+	return name_owner
+end
+
 --- What the layout manager shows: the last catalogue, the installed layouts,
 --- the ones an Ergopti bundle provides, the operation in flight and the
 --- layout of the current input source.
 --- @param deps table|nil
---- @return table { index, source, error, installed, provided, busy, active, record_error }
+--- @return table { index, source, error, installed, provided, busy, active, active_error, record_error }
 function M.snapshot(deps)
 	local resolved = resolve_deps(deps)
 	local snapshot = {
@@ -380,20 +406,30 @@ function M.snapshot(deps)
 		end
 	end
 	local provided = bundle_names(deps)
-	local names = {}
+	local names, aliases = {}, {}
+	local InputSources = require("modules.keymap.input_sources")
+	--- Registers metadata aliases before the nonblocking TIS cache is populated.
+	--- @param entry table
+	local function register_source(entry)
+		add_source_name(names, entry.keyboard_name, entry.id)
+		add_source_name(aliases, entry.name, entry.id)
+		add_source_name(aliases, InputSources.format_ergopti_display(entry.keyboard_name), entry.id)
+	end
 	for _, entry in ipairs(type(snapshot.index) == "table" and snapshot.index.layouts or {}) do
-		if type(entry.keyboard_name) == "string" then
-			names[entry.keyboard_name] = entry.id
-			if provided[entry.keyboard_name] then snapshot.provided[entry.id] = "bundle" end
-		end
+		register_source(entry)
+		if provided[entry.keyboard_name] then snapshot.provided[entry.id] = "bundle" end
 	end
-	for _, entry in pairs(snapshot.installed) do
-		if type(entry.keyboard_name) == "string" then names[entry.keyboard_name] = entry.id end
-	end
+	for _, entry in pairs(snapshot.installed) do register_source(entry) end
 	local ok, records = pcall(deps.active_sources)
 	for _, source in ipairs(ok and type(records) == "table" and records or {}) do
-		if source.selected and names[source.id] then snapshot.active = names[source.id] end
+		if source.selected then
+			local owner = active_source_owner(source, names, aliases)
+			if owner == false or (owner ~= nil and snapshot.active ~= "" and snapshot.active ~= owner) then
+				snapshot.active_error = "ambiguous_input_source"
+			elseif owner ~= nil then snapshot.active = owner end
+		end
 	end
+	if snapshot.active_error then snapshot.active = "" end
 	return snapshot
 end
 

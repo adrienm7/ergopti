@@ -1,0 +1,572 @@
+{
+	"vectors": [
+		{
+			"name": "retained rows preserve foreign metadata and comments",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"future_flag = true",
+				"future = \"section-owned\"",
+				"# Keep this standalone comment.",
+				"description = \"Personal owned by user\"",
+				"delay = 0.75"
+			],
+			"decoded": {
+				"_meta.future_flag": true,
+				"_meta.sections.words.future": "section-owned",
+				"words.1.hello.output": "Salut"
+			}
+		},
+		{
+			"name": "unchanged rows keep original spelling and comments",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false } # Keep this rule comment.\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Bonjour",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false } # Keep this rule comment."
+			]
+		},
+		{
+			"name": "edited row keeps unknown inline fields",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false, future = \"row-owned\" }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["future = \"row-owned\""],
+			"decoded": {
+				"words.1.hello.future": "row-owned",
+				"words.1.hello.output": "Salut"
+			}
+		},
+		{
+			"name": "explicit row deletion remains authoritative",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": []
+					}
+				}
+			},
+			"absent": ["\"hello\" ="],
+			"contains": ["future_flag = true", "future = \"section-owned\""]
+		},
+		{
+			"name": "explicit section deletion preserves foreign metadata",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": [],
+				"sections": {}
+			},
+			"absent": ["[[words]]", "\"hello\" ="],
+			"contains": ["future = \"section-owned\"", "# Keep this standalone comment."]
+		},
+		{
+			"name": "hidden nonrow assignments survive visible row edits",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\nfuture_flag = true\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["future_flag = true"],
+			"decoded": {
+				"words.1.future_flag": true,
+				"words.1.hello.output": "Salut"
+			}
+		},
+		{
+			"name": "section deletion cannot discard hidden assignments",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\nfuture_flag = true\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": [],
+				"sections": {}
+			},
+			"refusal": "unowned-personal-section"
+		},
+		{
+			"name": "reorder cannot cross hidden assignments",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\nfuture_flag = true\n\"other\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "other",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							},
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"refusal": "unowned-personal-order"
+		},
+		{
+			"name": "new row preserves hidden section assignments",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\nfuture_flag = true\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							},
+							{
+								"trigger": "new",
+								"output": "Added",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["future_flag = true"],
+			"decoded": {
+				"words.1.new.output": "Added"
+			}
+		},
+		{
+			"name": "new file retains requested projection",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"decoded": {
+				"words.1.hello.output": "Salut"
+			}
+		},
+		{
+			"name": "changed row retains trailing comment and literal hash",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bon#jour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false } # Keep changed-row comment.\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["# Keep changed-row comment."]
+		},
+		{
+			"name": "CRLF edits retain unowned physical lines",
+			"source": "[_meta]\r\ndescription = \"Personal owned by user\"\r\nfuture_flag = true\r\nsections_order = [\"words\"]\r\n[_meta.sections.words]\r\ndescription = \"Words\"\r\ndelay = 0.75\r\nfuture = \"section-owned\"\r\n# Keep this standalone comment.\r\n[[words]]\r\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\r\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["future_flag = true\r\n", "# Keep this standalone comment.\r\n"]
+		},
+		{
+			"name": "EOF without newline retains terminal comment",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false } # Keep EOF comment.",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["# Keep EOF comment."],
+			"ends_with_newline": false
+		},
+		{
+			"name": "deleted row retains its unowned trailing comment",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false } # Keep deleted-row comment.\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": []
+					}
+				}
+			},
+			"absent": ["\"hello\" ="],
+			"contains": ["# Keep deleted-row comment.", "future_flag = true"]
+		},
+		{
+			"name": "descendant metadata keeps latest array ownership",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n[\"words\".future]\nmarker = \"first-owner\"\n[[words]]\n\"other\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							},
+							{
+								"trigger": "other",
+								"output": "Second",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"future_flag = true",
+				"future = \"section-owned\"",
+				"# Keep this standalone comment.",
+				"description = \"Personal owned by user\"",
+				"delay = 0.75"
+			],
+			"decoded": {
+				"words.1.future.marker": "first-owner",
+				"words.1.hello.output": "Salut",
+				"words.2.other.output": "Second"
+			}
+		},
+		{
+			"name": "reorder cannot reattach descendant array metadata",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n[\"words\".future]\nmarker = \"first-owner\"\n[[words]]\n\"other\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "other",
+								"output": "Second",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							},
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"future_flag = true",
+				"future = \"section-owned\"",
+				"# Keep this standalone comment.",
+				"description = \"Personal owned by user\"",
+				"delay = 0.75"
+			],
+			"refusal": "unowned-personal-order"
+		},
+		{
+			"name": "deleted section cannot discard hidden descendants",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n[\"words\".future]\nmarker = \"first-owner\"\n",
+			"model": {
+				"sections_order": [],
+				"sections": {}
+			},
+			"refusal": "unowned-personal-section"
+		},
+		{
+			"name": "deleted section retains its unowned header comment",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]] # Keep deleted-header comment.\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": [],
+				"sections": {}
+			},
+			"absent": ["[[words]]", "\"hello\" ="],
+			"contains": ["# Keep deleted-header comment.", "future = \"section-owned\""]
+		},
+		{
+			"name": "changed output retains native token normalization",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "First\r\nSecond\t{Esc}{return}",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"future_flag = true",
+				"future = \"section-owned\"",
+				"# Keep this standalone comment.",
+				"description = \"Personal owned by user\"",
+				"delay = 0.75"
+			],
+			"decoded": {
+				"words.1.hello.output": "First{Enter}Second{Tab}{Escape}{Enter}"
+			}
+		},
+		{
+			"name": "retained inline fields keep array and numeric source kinds",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false, future_empty = [], future_float = 1.0, future_nested = { array = [], numeric = 1.0 } }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["future_float = 1.0", "numeric = 1.0"],
+			"arrays": ["words.1.hello.future_empty", "words.1.hello.future_nested.array"]
+		},
+		{
+			"name": "unprojected multilingual description survives unrelated edits",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = { en = \"Words\", fr = \"Mots\" }\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"future_flag = true",
+				"future = \"section-owned\"",
+				"# Keep this standalone comment.",
+				"description = \"Personal owned by user\"",
+				"delay = 0.75"
+			],
+			"decoded": {
+				"_meta.sections.words.description.fr": "Mots"
+			}
+		},
+		{
+			"name": "unprojected description cannot be silently replaced",
+			"source": "[_meta]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = { en = \"Words\", fr = \"Mots\" }\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Edited words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"future_flag = true",
+				"future = \"section-owned\"",
+				"# Keep this standalone comment.",
+				"description = \"Personal owned by user\"",
+				"delay = 0.75"
+			],
+			"refusal": "unowned-personal-description"
+		},
+		{
+			"name": "metadata ancestor aliases cannot grant source ownership",
+			"source": "[_META]\ndescription = \"Personal owned by user\"\nfuture_flag = true\nsections_order = [\"words\"]\n[_meta.sections.words]\ndescription = \"Words\"\ndelay = 0.75\nfuture = \"section-owned\"\n# Keep this standalone comment.\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"description": "Words",
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Salut",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": [
+				"future_flag = true",
+				"future = \"section-owned\"",
+				"# Keep this standalone comment.",
+				"description = \"Personal owned by user\"",
+				"delay = 0.75"
+			],
+			"refusal": "ambiguous-personal-metadata"
+		}
+	]
+}

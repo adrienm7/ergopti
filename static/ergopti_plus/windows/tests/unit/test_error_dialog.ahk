@@ -120,11 +120,17 @@ _TED_UntickedKeepsQuiet() {
 Test("error window: nothing opens while the setting is unticked (error-dialog-windows)", _TED_UntickedKeepsQuiet)
 
 _TED_DisablingCancelsPending() {
-	global _TED_Timers, _ED_Busy, _DriverBootPhase, _DriverStartupSmokeDir
+	global _TED_Timers, _ED_Busy, _DriverBootPhase, _DriverStartupSmokeDir, ConfigurationFile
 	HadPhase := IsSet(_DriverBootPhase), SavedPhase := HadPhase ? _DriverBootPhase : ""
 	HadSmoke := IsSet(_DriverStartupSmokeDir), SavedSmoke := HadSmoke ? _DriverStartupSmokeDir : ""
+	HadPath := IsSet(ConfigurationFile), SavedPath := HadPath ? ConfigurationFile : ""
+	Fixture := 0
 	_TED_Reset()
 	try {
+		; Recording writers do not mint the native source authority they consume.
+		Fixture := _ScopeOwnerFixture("[script]`nshow_error_dialog = true`n")
+		ConfigurationFile := Fixture.path
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile), "cancellation starts from the genuine current source before its writer port")
 		_DriverBootPhase := "ready"
 		_DriverStartupSmokeDir := "error-dialog-cancellation-test"
 		ErrorDialog_OnError("old", "Old failure", "Old failure", "t")
@@ -141,9 +147,15 @@ _TED_DisablingCancelsPending() {
 		_TED_Timers[2]["fn"].Call()
 		AssertEqual(false, _ED_Busy, "the current callback reaches the headless presentation guard")
 	} finally {
-		_DriverBootPhase := HadPhase ? SavedPhase : unset
-		_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
-		_TED_Restore()
+		try {
+			_DriverBootPhase := HadPhase ? SavedPhase : unset
+			_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
+			ConfigurationFile := HadPath ? SavedPath : unset
+			_TED_Restore()
+		} finally {
+			if IsObject(Fixture)
+				_ScopeOwnerCleanup(Fixture)
+		}
 	}
 }
 Test("error window: disabling invalidates queued windows across reactivation (error-dialog-cancel)",
@@ -163,10 +175,14 @@ Test("error window: nothing before initialisation (error-dialog-windows)", _TED_
 
 _TED_SettingPersists() {
 	global _ED_Enabled, ConfigurationFile
-	SavedPath := ConfigurationFile
+	HadPath := IsSet(ConfigurationFile), SavedPath := HadPath ? ConfigurationFile : ""
+	Fixture := 0
 	_TED_Reset()
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_error_dialog_setting.toml"
+		; Preserve the existing ACK ports beneath the actual selected source owner.
+		Fixture := _ScopeOwnerFixture("[script]`nshow_error_dialog = true`n")
+		ConfigurationFile := Fixture.path
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile), "the setting writer receives genuine source/schema admission")
 		Seen := []
 		Quiet := (*) => 0
 		Refused := (Path, Updates) => false
@@ -179,8 +195,13 @@ _TED_SettingPersists() {
 		AssertEqual("script", Seen[1][1].Section)
 		AssertEqual("show_error_dialog", Seen[1][1].Key)
 	} finally {
-		ConfigurationFile := SavedPath
-		_TED_Restore()
+		try {
+			ConfigurationFile := HadPath ? SavedPath : unset
+			_TED_Restore()
+		} finally {
+			if IsObject(Fixture)
+				_ScopeOwnerCleanup(Fixture)
+		}
 	}
 }
 Test("error window: the setting is saved to config.toml (error-dialog-windows)", _TED_SettingPersists)
@@ -259,13 +280,17 @@ _TED_RealSharingSink() {
 	SavedSession := _ED_Session, SavedReset := _ED_ResetDone, SavedEpoch := _ED_WindowEpoch
 	try {
 		Snapshot := _TED_SharingSnapshot()
+		Snapshot["sections"]["paths"]["diagnostics_dir"] := "C:\synthetic-owner\diagnostics"
 		Fields := _ErrorDialog_BuildReport(Map("kind", "error", "module", "synthetic",
 			"message", "CANARY-private.invalid/notes", "time", "local"), (*) => Snapshot)
 		Assert(Fields["snapshot"] == Snapshot, "the builder retains the exact captured host snapshot")
 		AssertContains(Fields["report"]["text"], "CANARY", "local detailed report remains available")
-		Copied := [], Opened := []
+		Copied := [], Opened := [], Saved := [], Revealed := [], Order := []
 		Overrides := Map("identity", (*) => Map("home", "C:\synthetic-owner", "user", "synthetic"),
-			"copy", (Text) => (Copied.Push(Text), true), "open_url", (Url) => (Opened.Push(Url), true))
+			"copy", (Text) => (Order.Push("copy"), Copied.Push(Text), true),
+			"save", (Dir, Name, Text) => (Order.Push("save"), Saved.Push(Map("dir", Dir, "name", Name, "text", Text)), Dir . "\" . Name),
+			"reveal", (Path) => (Order.Push("reveal"), Revealed.Push(Path), true),
+			"open_url", (Url) => (Order.Push("browser"), Opened.Push(Url), true))
 		Perform := (Action, Paths, Config, Unused := 0, Retained := 0) => HealthCheck_PerformAction(Action, Paths, Config, Overrides, Retained)
 		_ED_Session := Fields
 		_ED_ResetDone := true ; The response port refuses before any WebView use.
@@ -273,6 +298,14 @@ _TED_RealSharingSink() {
 		_ErrorDialog_Perform(_ED_WindowEpoch, "report", Perform)
 		AssertEqual(2, Copied.Length, "both callers reach the actual approved copy sink")
 		AssertEqual(1, Opened.Length, "the actual issue builder opens after copying")
+		AssertEqual(1, Saved.Length, "the complete reviewed report has one attachment before browser launch")
+		AssertEqual("C:\synthetic-owner\diagnostics", Saved[1]["dir"], "the host owns the synthetic attachment destination")
+		AssertEqual(Copied[2], Saved[1]["text"], "the attachment contains the same approved complete report")
+		AssertEqual(1, Revealed.Length, "the saved attachment is revealed exactly once")
+		AssertEqual(Saved[1]["dir"] . "\" . Saved[1]["name"], Revealed[1], "only the returned owned attachment is revealed")
+		AssertEqual(5, Order.Length, "copy action and complete report action reach only their admitted ports")
+		for Index, Expected in ["copy", "copy", "save", "reveal", "browser"]
+			AssertEqual(Expected, Order[Index], "browser admission follows attachment save and reveal")
 		AssertEqual(Copied[1], Copied[2], "both actions use the same retained projection")
 		AssertFalse(InStr(Copied[1], "CANARY"), "private error details never leave")
 		AssertContains(Copied[1], "-1744", "admitted technical status remains useful")
@@ -280,6 +313,9 @@ _TED_RealSharingSink() {
 		Overrides["copy"] := (*) => false
 		_ErrorDialog_Perform(_ED_WindowEpoch, "report", Perform)
 		AssertEqual(1, Opened.Length, "copy refusal prevents another browser action")
+		AssertEqual(1, Saved.Length, "copy refusal reaches no new attachment writer")
+		AssertEqual(1, Revealed.Length, "copy refusal reaches no new reveal port")
+		AssertEqual(5, Order.Length, "copy refusal leaves the complete port ordering unchanged")
 	} finally {
 		_ED_Session := SavedSession, _ED_ResetDone := SavedReset, _ED_WindowEpoch := SavedEpoch
 	}

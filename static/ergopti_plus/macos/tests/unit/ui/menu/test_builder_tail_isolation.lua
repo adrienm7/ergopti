@@ -37,6 +37,7 @@ local function make_error_capturing_logger()
 	-- previous test file may have left in package.loaded.
 	package.loaded["infra.logger"] = nil
 	local real_logger = require("infra.logger")
+	helpers.admit_logger_privacy(real_logger)
 	local logger_spy = setmetatable({}, { __index = real_logger })
 	logger_spy.error = function(module_name, fmt, ...)
 		local ok, formatted = pcall(string.format, fmt, ...)

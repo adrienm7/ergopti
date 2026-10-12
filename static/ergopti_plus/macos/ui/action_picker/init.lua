@@ -26,6 +26,7 @@ local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
+local Json       = require("json")
 local ProgramProviderPicker = require("program_provider_picker")
 local PresentationPrepareOwner = rawget(ui_builder, "prepare_app_presentation")
 local PresentationContextPrepareOwner = rawget(ui_builder, "prepare_app_contextual_title")
@@ -296,10 +297,17 @@ function M.open(opts, on_confirm)
 			end
 			if reason then
 				session.settling = false
-				local encoded, argument = pcall(hs.json.encode, reason)
-				if encoded and type(argument) == "string" and _active_session == session and session.webview then
-					pcall(function() session.webview:evaluateJavaScript("programProviderRefused(" .. argument .. ")") end)
+				-- Refusal reasons are strings; native hs.json.encode accepts tables only.
+				local encoded, argument = pcall(function()
+					if type(reason) ~= "string" or not utf8.len(reason) then return nil end
+					return Json.quote(reason)
+				end)
+				if _active_session ~= session or not session.webview then return end
+				if not encoded or type(argument) ~= "string" or argument == "" then
+					Logger.error(LOG, "Action picker refusal could not be encoded (content withheld).")
+					return
 				end
+				pcall(function() session.webview:evaluateJavaScript("programProviderRefused(" .. argument .. ")") end)
 				return
 			end
 			local callback = session.on_confirm

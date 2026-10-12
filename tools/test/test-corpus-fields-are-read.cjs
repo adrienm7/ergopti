@@ -98,7 +98,14 @@ for (const base of readerRoots) {
 				if (path.resolve(p) === path.resolve(__filename)) continue;
 				readerFiles.push({
 					rel: path.relative(SP, p).split(path.sep).join('/'),
-					src: fs.readFileSync(p, 'utf8')
+					// This invocation owns an immutable source snapshot; classify its lines once.
+					lines: fs
+						.readFileSync(p, 'utf8')
+						.split(/\r?\n/)
+						.filter((line) => {
+							const t = line.trimStart();
+							return !t.startsWith('--') && !t.startsWith(';') && !t.startsWith('//');
+						})
 				});
 			}
 		}
@@ -121,13 +128,7 @@ function isRead(field) {
 		new RegExp(`\\['${f}'\\]`),
 		new RegExp(`Has\\("${f}"\\)`)
 	];
-	return readerFiles.some(({ src }) =>
-		src.split(/\r?\n/).some((line) => {
-			const t = line.trimStart();
-			if (t.startsWith('--') || t.startsWith(';') || t.startsWith('//')) return false;
-			return patterns.some((p) => p.test(line));
-		})
-	);
+	return readerFiles.some(({ lines }) => lines.some((line) => patterns.some((p) => p.test(line))));
 }
 
 let scanned = 0;

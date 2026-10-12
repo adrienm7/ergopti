@@ -16,6 +16,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "replay_route_core.h"
+#include "terminal_output_plan.h"
+#include "hook_trace.h"
+
 #if !defined(_WIN32)
 #error "The Ergopti navigation event owner requires Win32."
 #endif
@@ -46,6 +50,7 @@ extern "C" {
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_MAX 100u
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_BASE 0xFFC3D44Du
 #define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY 8192u
+#define ERGOPTI_NAV_TERMINAL_ROUTE_BUSY (-11)
 #define ERGOPTI_NAV_TERMINAL_REPLAY_MARKER 0x4552475054524D31ull
 
 /** Return codes shared by every fallible API entry point. */
@@ -60,7 +65,8 @@ typedef enum ErgoptiNav_Status {
 	ERGOPTI_NAV_STATUS_TIMEOUT = 7,
 	ERGOPTI_NAV_STATUS_OWNER_MISMATCH = 8,
 	ERGOPTI_NAV_STATUS_STOP_PENDING = 9,
-	ERGOPTI_NAV_STATUS_STOPPED_WITH_ERROR = 10
+	ERGOPTI_NAV_STATUS_STOPPED_WITH_ERROR = 10,
+	ERGOPTI_NAV_STATUS_TRACE_INCOMPLETE = 11
 } ErgoptiNav_Status;
 
 /** Descriptor axis values copied from the AHK-027 native descriptor. */
@@ -248,6 +254,26 @@ typedef struct ErgoptiNav_TerminalCaptureSnapshot {
 	uint32_t release_kind;
 } ErgoptiNav_TerminalCaptureSnapshot;
 
+/** Immutable queued event metadata; reading never acknowledges keyboard output. */
+typedef struct ErgoptiNav_TerminalRouteSnapshot {
+	uint64_t token;
+	uint64_t sequence;
+	ErgoptiReplay_Snapshot route;
+} ErgoptiNav_TerminalRouteSnapshot;
+
+/** A non-delivering authenticated output preview; all reserved fields are zero. */
+typedef struct ErgoptiNav_TerminalOutputPreview {
+	uint64_t owner;
+	uint64_t token;
+	uint64_t sequence;
+	uint64_t plan_id;
+	uint32_t unit_count;
+	uint32_t reserved;
+	int32_t planner_status;
+	uint8_t dispatchable;
+	uint8_t reserved_tail[3];
+} ErgoptiNav_TerminalOutputPreview;
+
 #pragma pack(pop)
 
 #if defined(__cplusplus)
@@ -293,6 +319,10 @@ ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TestEvent) == 16, "Test event ABI si
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TestEvent, extra_info) == 8, "Test event marker offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_DispatchResult) == 12, "Dispatch result ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_DispatchResult, receipt_sequence) == 4, "Dispatch sequence offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalOutputPreview) == 48, "Output preview ABI size changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalOutputPreview, planner_status) == 40, "Output preview status offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalRouteSnapshot) == 184, "Terminal route snapshot ABI size changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalRouteSnapshot, route) == 16, "Terminal route offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalCaptureSnapshot) == 28, "Terminal snapshot ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, token) == 0, "Terminal token offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, phase) == 8, "Terminal phase offset changed.");
@@ -367,6 +397,70 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitPlan(
  */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SetSuspended(
 	uint8_t suspended);
+
+/**
+ * Publishes authoritative event-time recipes without enabling transformed replay.
+ * Returns ErgoptiReplay_Status, or ERGOPTI_NAV_TERMINAL_ROUTE_BUSY while capture
+ * owns debt. The caller supplies a neutral Caps baseline and declares only
+ * routes whose handler cohort it owns. Unknown startup modifiers, Caps toggles
+ * and unconverted edges veto later text recipes rather than inventing state.
+ * Rejected registration preserves the owner, registry and held recipes.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_RegisterTerminalRoutes(
+	uint64_t owner, uint64_t generation, uint64_t layout_id,
+	const ErgoptiReplay_Route *routes, uint32_t route_count);
+
+/**
+ * Lists retained held recipe IDs only while the native capture FIFO is debt-free.
+ * A caller may retire its older model recipes after a successful registration
+ * only when this query succeeds; BUSY/error must preserve all retained recipes.
+ * Capacity is at most ERGOPTI_REPLAY_MAX_HELD_KEYS; no partial list is written.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ListTerminalHeldRecipes(
+	uint64_t owner, uint64_t *out_recipes, uint32_t capacity, uint32_t *out_count);
+
+/** Copies one queued immutable recipe; never consumes or acknowledges its edge. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
+	uint64_t token, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot);
+
+/**
+ * Plans canonical supplied UTF16 against the authenticated immutable FIFO edge.
+ * This diagnostic call hardcodes cohort completeness to false, never sends input
+ * and never acknowledges an original edge or transformed unit. A NULL units
+ * pointer with capacity zero queries the required count; no partial copy occurs.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PreviewTerminalOutput(
+	uint64_t owner, uint64_t token, uint64_t sequence, uint32_t index,
+	const uint16_t *text, uint32_t text_length,
+	ErgoptiNav_TerminalOutputPreview *out_preview,
+	ErgoptiOutput_Unit *out_units, uint32_t capacity);
+
+/**
+ * Retains one canonical plan for the authenticated FIFO head. Admission remains
+ * disabled in production until the complete nonhook handler/observer cohort
+ * qualifies natively. No public parameter or setter bypasses that guard.
+ * Successful plans exclude raw commit/abort and shutdown until settled/cancelled.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
+	uint64_t owner, uint64_t token, uint64_t sequence,
+	const uint16_t *text, uint32_t length, ErgoptiOutput_Key *out_key);
+
+/** Copies an immutable unsent suffix and acquires one exact attempt identity. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalOutputAttempt(
+	uint64_t owner, const ErgoptiOutput_Key *key, ErgoptiOutput_Unit *units,
+	uint32_t capacity, uint32_t *out_count, uint64_t *out_attempt);
+
+/** Reports the exact accepted prefix; zero leaves every output unit retryable. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AcknowledgeTerminalOutput(
+	uint64_t owner, const ErgoptiOutput_Key *key, uint64_t attempt, uint32_t accepted);
+
+/** Removes one original FIFO edge only after every output unit is settled. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ConsumeTerminalOutput(
+	uint64_t owner, const ErgoptiOutput_Key *key);
+
+/** Cancels only a plan with no accepted output and no outstanding attempt. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CancelTerminalOutput(
+	uint64_t owner, const ErgoptiOutput_Key *key);
 
 /** Starts one bounded physical-keyboard capture for terminal paced output. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
@@ -560,6 +654,22 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestDispatch(
 	const ErgoptiNav_TestEvent *event,
 	ErgoptiNav_DispatchResult *out_result);
 
+/**
+ * Explicit isolated diagnostic session; owner must be this process's foreground
+ * receiver HWND. Default disabled. No input policy or production grant changes.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_StartHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation);
+
+/** Read-only bounded page; incomplete evidence returns TRACE_INCOMPLETE (11). */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ReadHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation, uint32_t offset,
+	ErgoptiTrace_Entry *entries, uint32_t capacity, ErgoptiTrace_Receipt *receipt);
+
+/** Freeze exact session; refusal or in-flight callback never erases evidence. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_StopHookTrace(
+	uint64_t owner, uint64_t token, uint64_t generation);
+
 #if defined(ERGOPTI_NAV_TESTING)
 /** Applies one provenance-free startup modifier through the production helper. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSeedInitialModifier(
@@ -607,8 +717,14 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetOsModifierKeys(
 	const uint16_t *down_vks,
 	uint32_t count);
 
+/** Supplies the native raw-event DWORD clock to hook-free capture regressions. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetHookTime(uint32_t time);
+
 /** Enables public terminal-capture APIs without installing a hook. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetRunning(uint8_t running);
+
+/** Testing-only cohort grant; not compiled or exported by the shipped DLL. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestAdmitTerminalOutput(uint8_t admitted);
 
 /** Callback invoked by the deterministic replay sink before accepting input. */
 typedef void (*ErgoptiNav_TerminalReplayObserver)(void *context);

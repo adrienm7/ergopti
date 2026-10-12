@@ -89,3 +89,37 @@ helpers.describe("Actual local catalogue publication acknowledgement", function(
 		end)
 	end
 end)
+
+helpers.describe("Configured endpoint affinity (local-configured-affinity)", function()
+	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), {})
+	local corpus = read("tests/corpus/llm/local_server_affinity.json")
+	for _, vector in ipairs(corpus.affinity_cases) do
+		helpers.it(vector.name .. " (local-configured-affinity)", function()
+			helpers.assert_eq(Policy.entry_matches(vector.provider, vector.base_url, vector.server, servers), vector.matches)
+		end)
+	end
+	helpers.it("accepts literal oMLX model identifiers without using them as endpoint identity (local-configured-affinity)", function()
+		helpers.assert_eq(Policy.models_receipt({ ok = true, status = 200, body = corpus.omlx_models_body }), corpus.omlx_model_ids)
+	end)
+end)
+
+helpers.describe("Configured loopback optional credentials (local-configured-affinity)", function()
+	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), {})
+	for _, vector in ipairs(read("tests/corpus/llm/local_server_affinity.json").entry_auth_cases) do
+		helpers.it(vector.name .. " (local-configured-affinity)", function()
+			helpers.assert_eq(Policy.entry_token_allowed(vector.provider, vector.token, vector.base_url, servers), vector.allowed)
+		end)
+	end
+end)
+
+helpers.describe("Configured generic endpoint view projection (local-configured-views)", function()
+	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), {})
+	local providers = read("modules/llm/api_providers.json").providers
+	for _, vector in ipairs(read("tests/corpus/llm/local_server_affinity.json").configured_view_cases) do
+		helpers.it(vector.name .. " (local-configured-views)", function()
+			local order, views = Policy.configured_views(vector.entries, servers, providers)
+			helpers.assert_eq(order, vector.expected_order); helpers.assert_eq(views, vector.expected_views)
+			for _, view in pairs(views) do helpers.assert_eq(view.token, nil); helpers.assert_eq(view.model, nil) end
+		end)
+	end
+end)

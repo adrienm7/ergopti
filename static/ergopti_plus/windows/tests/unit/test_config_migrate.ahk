@@ -662,6 +662,8 @@ _CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
 	}
 	try {
 		AssertTrue(FSWriteDurable(Path, Source))
+		; Custom migration ports exercise the algorithm, not native read authority.
+		AssertEqual(ExpectedStatus, ConfigMigrateBoot(Path)["status"])
 		Result := ConfigMigrateRun(Path, 0, "semantic-snapshot", Backup, Publish)
 		AssertEqual(ExpectedStatus, Result["status"])
 		AssertEqual(0, Calls.Backup)
@@ -671,7 +673,7 @@ _CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
 			"the reader consumes the admitted setting without inventing stamp authority")
 		if ExpectedStatus == "current" {
 			AssertEqual("", TOML_WriteRefusal(Path))
-			AssertTrue(TOML_BatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "@" }]))
+			AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "@" }]))
 		} else {
 			AssertEqual(1, Result["read_only"])
 			Reason := TOML_WriteRefusal(Path)
@@ -683,7 +685,7 @@ _CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
 			AssertEqual("error", Built["status"])
 		}
 		AssertTrue(FSUtf8ExactMatches(Path, Source), "boot consumption must not rewrite any source bytes")
-	} finally DirDelete(Dir, true)
+	} finally _CMJ_Cleanup(Dir, Path)
 }
 _CMG_SemanticCurrentSourceConsumesRootSettings() {
 	_CMG_SemanticSnapshotKeepsStampAuthority(String(ConfigMigrateCurrentVersion()), "current")
@@ -1052,10 +1054,19 @@ _CMJ_VersionRefusalReadsOnlyCapturedImage() {
 	try {
 		AssertTrue(FSWriteDurable(Path, Original))
 		AssertEqual("invalid", ConfigMigrateBoot(Path)["status"])
+		CapturedRead := ConfigMigrateBoot(Path, "capture_read")
+		AssertTrue(HasMethod(CapturedRead, "Call"))
+		AssertTrue(CapturedRead.Call(Original, 1))
 		AssertEqual("!", ConfigTomlReadSnapshot(Path).Cache["hotstrings"]["trigger_char"], "the exact captured initial image stays readable only")
+		Reason := TOML_WriteRefusal(Path)
+		Assert(Reason != "", "invalid boot owns its persistence refusal")
 		Repair := _CMJ_CurrentSource()
 		AssertTrue(FSWriteDurable(Path, Repair))
-		AssertThrows(ConfigTomlReadSnapshot.Bind(Path), "a readable external repair cannot borrow the initial source permission")
+		AssertFalse(CapturedRead.Call(Repair, 1), "a readable external repair cannot borrow the initial source permission")
+		Fresh := ConfigTomlReadSnapshot(Path)
+		AssertEqual(Repair, Fresh.Source, "a fresh read observes actual repaired bytes without granting write readiness")
+		AssertEqual("@", Fresh.Cache["hotstrings"]["trigger_char"])
+		AssertEqual(Reason, TOML_WriteRefusal(Path), "read availability never clears the invalid boot persistence refusal")
 		AssertFalse(_CMJ_BuiltGateway(Path, &Calls))
 		AssertEqual(0, Calls.build)
 		AssertEqual(0, Calls.write)
@@ -1350,6 +1361,7 @@ _CMJ_SnapshotObserver(Kind) {
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Source))
 		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		ParseConfigTomlFile(Path)
 		Snapshot := ConfigTomlReadSnapshot(Path)
 		switch Kind {
 			case "snapshot-cache-getter":
@@ -1359,7 +1371,9 @@ _CMJ_SnapshotObserver(Kind) {
 				Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
 			case "snapshot-own-count":
 				Owner := Snapshot, Name := "OwnPropCount"
-				Original := Object.Prototype.OwnPropCount.Call(Owner)
+				Original := 0
+				for Field in ObjOwnProps(Owner)
+					Original += 1
 				Owner.DefineProp(Name, { Call: (*) => (Hits.count += 1, Original) })
 			case "cache-map-enumerator":
 				Owner := Snapshot.Cache, Name := "__Enum"
@@ -1372,6 +1386,8 @@ _CMJ_SnapshotObserver(Kind) {
 				Original := Descriptor.Value
 				Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
 		}
+		; Only the genuine parser publishes the replacement generation.
+		ParseConfigTomlFile(Path)
 		Fresh := ConfigTomlReadSnapshot(Path)
 		AssertEqual(0, Hits.count, "read generation comparison rejects genuine exported observers before any invocation")
 		AssertFalse(Fresh == Snapshot, "only a genuine fresh native reread replaces the altered published generation")
@@ -1591,6 +1607,589 @@ Test("config journal: post-boot direct scalar metadata no-op and writer refuse w
 	_CMJ_PostBootDirectPublication.Bind('_meta = true', true))
 
 
+
+
+
+; ==============================================
+; ==============================================
+; ======= 4/ Read-Only AI Menu Admission =======
+; ==============================================
+; ==============================================
+
+_CMJ_WithAiPersistenceState(Body) {
+	global ConfigurationFile, _LLM_Menu, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	Prior := Map("path", IsSet(ConfigurationFile), "menu", IsSet(_LLM_Menu),
+		"read", IsSet(_ConfigBootReadFailed), "rejected", IsSet(_ConfigBootRejectedOverrides))
+	if Prior["path"]
+		Prior["path_value"] := ConfigurationFile
+	if Prior["menu"]
+		Prior["menu_value"] := _LLM_Menu
+	if Prior["read"]
+		Prior["read_value"] := _ConfigBootReadFailed
+	if Prior["rejected"]
+		Prior["rejected_value"] := _ConfigBootRejectedOverrides
+	PriorSuspend := A_IsSuspended
+	Dir := _CMG_NewDir()
+	try {
+		Suspend(false)
+		ConfigurationFile := Dir . "\config.toml"
+		_LLM_Menu := Map("enabled", false)
+		_ConfigBootReadFailed := false
+		_ConfigBootRejectedOverrides := 0
+		return Body.Call(ConfigurationFile)
+	} finally {
+		try _CMJ_Cleanup(Dir, Dir . "\config.toml")
+		finally {
+			ConfigurationFile := Prior["path"] ? Prior["path_value"] : unset
+			_LLM_Menu := Prior["menu"] ? Prior["menu_value"] : unset
+			_ConfigBootReadFailed := Prior["read"] ? Prior["read_value"] : unset
+			_ConfigBootRejectedOverrides := Prior["rejected"] ? Prior["rejected_value"] : unset
+			Suspend(PriorSuspend)
+		}
+	}
+}
+
+_CMJ_NewerSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)
+		. '`n[layout]`nfuture_layout_owner = "retain exactly"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path), "observing an unknown destination does not construct it")
+	AssertFalse(ConfigMigrateBoot(Path, "known"))
+	Prepared := ConfigSchemaPrepareSource(Path)
+	AssertEqual("newer", Prepared["status"])
+	Result := ConfigMigrateBoot(Path)
+	AssertEqual("newer", Result["status"])
+	AssertEqual(1, Result["read_only"])
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertFalse(Getters["llm_enabled"].Call())
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "a paused-independent future-schema toggle is not clickable")
+	AssertEqual("newer", ConfigSchemaReadOnlyStatus(Path), "the actual retained classification remains observable without write permission")
+	AssertTrue(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters),
+		"the actual declaration renders protected AI activation disabled")
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the AI toggle", (Message, Options) => Messages.Push([Message, Options]),
+		"the boot configuration was not completely loaded"))
+	AssertEqual(1, Messages.Length)
+	AssertEqual(t("config.read_only.newer_schema"), Messages[1][1], "stale callers explain the actual retained newer schema")
+	AssertFalse(Messages[1][1] == "config.read_only.newer_schema", "the user sees localized guidance, not a raw key")
+	AssertEqual("error", Messages[1][2]["level"])
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "observation, menu rendering and failure reporting preserve every source byte")
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path), "diagnostic status and notification never grant permission")
+}
+Test("config journal: newer schema disables AI activation and explains update without changing settings (newer-schema-ai)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_NewerSchemaAiAdmission))
+
+_CMJ_CurrentSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("current", ConfigSchemaPrepareSource(Path)["status"])
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path))
+	AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertTrue(Getters["llm_toggle_ready"].Call(), "an admitted ordinary current configuration remains available")
+	AssertFalse(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters))
+	Suspend(true)
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "configuration readiness does not override suspension")
+	Suspend(false)
+	AssertTrue(Getters["llm_toggle_ready"].Call())
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the ordinary failure", (Message, Options) => Messages.Push(Message), "controlled write refusal"))
+	AssertEqual(t("dialog.bulk_toggle.save_failed"), Messages[1], "ordinary failure localization is unchanged")
+	AssertTrue(FSUtf8ExactMatches(Path, Source))
+}
+Test("config journal: current schema and pause retain ordinary AI menu and failure semantics (newer-schema-ai-current)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_CurrentSchemaAiAdmission))
+
+
+; Repeated classification may reuse only exact source bytes; source reads and
+; registry/owner admission remain genuine on every request.
+_CMJ_MemoSyntheticSource(VersionText) {
+	Source := '[_meta]`nschema_version = ' . VersionText . '`n[llm]`n'
+	loop 135
+		Source .= Format('memo_field_{1:03} = "value{1:03}"`n', A_Index)
+	Padding := 5000 - StrLen(Source)
+	AssertTrue(Padding >= 2, "the controlled classification workload has bounded padding")
+	Source .= "#"
+	loop Padding - 2
+		Source .= "x"
+	return Source . "`n"
+}
+
+_CMJ_MemoFileTimestamp(Path, Stamp := unset) {
+	if IsSet(Stamp)
+		FileSetTime(Stamp, Path, "M")
+	return FileGetTime(Path, "M")
+}
+
+_CMJ_ClassificationMemoFreshSource() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion()))
+	try {
+		AssertEqual(5000, StrLen(Source), "the workload contains 136 scalar keys in exactly 5000 ASCII bytes")
+		AssertTrue(FSWriteDurable(Path, Source))
+		Stamp := _CMJ_MemoFileTimestamp(Path)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		loop 3
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Captured := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(HasMethod(Captured, "Call"))
+		ChangedCase := StrReplace(Source, "schema_version", "SCHEMA_VERSION")
+		AssertEqual(StrLen(Source), StrLen(ChangedCase))
+		AssertTrue(FSWriteDurable(Path, ChangedCase))
+		AssertEqual(Stamp, _CMJ_MemoFileTimestamp(Path, Stamp), "the same-length successor retains the old modification timestamp")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a same-length case change cannot reuse current metadata classification")
+		AssertFalse(Captured.Call(ChangedCase, 1), "a cached classification never becomes stale source authority")
+		Future := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion() + 1))
+		AssertTrue(FSWriteDurable(Path, Future))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "fresh newer metadata remains read-only after a warm hit")
+		Invalid := _CMJ_MemoSyntheticSource('"invalid"')
+		AssertTrue(FSWriteDurable(Path, Invalid))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "typed invalid metadata cannot borrow the prior current decision")
+		Malformed := StrReplace(Source, "schema_version = " . ConfigMigrateCurrentVersion(),
+			"schema_version = " . ConfigMigrateCurrentVersion() . "`nschema_version = " . ConfigMigrateCurrentVersion())
+		AssertTrue(FSWriteDurable(Path, Malformed))
+		loop 2
+			AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a parse refusal never grants cached readiness")
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact current source repair restores original admission")
+		AssertTrue(Captured.Call(Source, 1), "the original source guard remains authoritative after exact repair")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: classification memo preserves fresh source and case-sensitive authority (classification-memo-source)",
+	_CMJ_ClassificationMemoFreshSource)
+
+_CMJ_ClassificationMemoRegistry() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion()))
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	Step := Registry["steps"][1], Reason := Step["reason"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Captured := ConfigMigrateBoot(Path, "capture_noop")
+		Registry["current"] := Current + 1
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a warm source memo cannot hide in-place registry mutation")
+		AssertFalse(Captured.Call(Source, 1))
+		Registry["current"] := Current
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Step["reason"] := Reason . " altered"
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "nested registry data is still compared against the private shadow on a hit")
+		AssertFalse(Captured.Call(Source, 1))
+		Step["reason"] := Reason
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact nested registry repair restores admission")
+		AssertTrue(Captured.Call(Source, 1))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		Step["reason"] := Reason
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: classification memo rechecks genuine registry and exact repair (classification-memo-registry)",
+	_CMJ_ClassificationMemoRegistry)
+
+_CMJ_ClassificationMemoPresence() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	try {
+		AssertEqual("absent", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSWriteDurable(Path, ""))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a present empty file cannot borrow absent-source default permission")
+		AssertTrue(FSDelete(Path))
+		AssertFalse(FSStrictExists(Path))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "the genuine absent-image branch still uses its original readiness rules")
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: classification memo does not alias missing and present empty source (classification-memo-presence)",
+	_CMJ_ClassificationMemoPresence)
+
+
+_CMJ_RegistryLeafScalarTypes() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	Step := Registry["steps"][1], Reason := Step["reason"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Registry["current"] := Current + 0.0
+		AssertTrue(Registry["current"] is Float, "the numeric parity vector must be a real Float")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "native integer and equal Float retain canonical numeric equality")
+		AssertTrue(Guard.Call(Source, 1))
+		Registry["current"] := String(Current)
+		AssertTrue(Registry["current"] is String, "the numeric-looking refusal vector must remain a String")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "numeric-looking strings cannot borrow native numeric registry authority")
+		AssertFalse(Guard.Call(Source, 1))
+		Registry["current"] := Current
+		Step["reason"] := StrUpper(Reason)
+		AssertTrue(StrCompare(Step["reason"], Reason, true) != 0, "the actual reason must have a distinct case mutation")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "registry strings remain exactly case-sensitive")
+		AssertFalse(Guard.Call(Source, 1))
+		Step["reason"] := Reason
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact scalar repair restores observed native registry authority")
+		AssertTrue(Guard.Call(Source, 1))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		Step["reason"] := Reason
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves preserve typed numeric and exact string semantics (registry-leaf-safety)",
+	_CMJ_RegistryLeafScalarTypes)
+
+_CMJ_RegistryLeafNativeOwner() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call"))
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(Guard.Call(Source, 1))
+		ConfigMigrateSameValue.DefineProp("Call", {Call: (*) => (Invocations.count += 1, true)})
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "direct scalar comparisons cannot skip the exact canonical native owner fence")
+		AssertFalse(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count, "foreign native scalar callbacks are refused before invocation")
+		ConfigMigrateSameValue.DeleteProp("Call")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call")
+			ConfigMigrateSameValue.DeleteProp("Call")
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves retain canonical native owner admission (registry-leaf-safety)",
+	_CMJ_RegistryLeafNativeOwner)
+
+
+; Native journal recovery returns only the phase acquired before its terminal span.
+_CMJ_OwnedReadyLifecycle(Mode) {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n[private]`nkeep = "retained"`n')
+	Path := Fixture.path, Locator := Fixture.options["locator"], ApiPath := Fixture.directory . "\api_entries.json"
+	Initial := Fixture.source, ApiInitial := '{"generation":0}', Bundle := 0
+	Assert(FSWriteDurable(ApiPath, ApiInitial))
+	try {
+		Loops := Mode == "success" ? 2 : 1
+		Loop Loops {
+			NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = ' . (A_Index == 1 ? "false" : "true") . '`n[private]`nkeep = "retained"`n')
+			ApiNew := '{"generation":' . A_Index . '}'
+			Bundle := _ConfigWriteTerminalTryAcquire([Path, ApiPath, Locator])
+			Assert(Bundle is Object)
+			Specs := [ConfigTransitionPresentTarget(Path, NewSource), ConfigTransitionPresentTarget(ApiPath, ApiNew)]
+			Committed := ConfigTransitionCommitOwned(Locator, Specs, Bundle)
+			Assert(ConfigTransitionResultIs(Committed, "committed_new"), "the real two-file native publisher must commit before readiness is examined")
+			Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle), "same-bundle repeated preparation remains admitted")
+			Resolved := Mode == "rollback" ? ConfigTransitionRollbackOwned(Locator, Bundle)
+				: ConfigTransitionRecoverOwned(Locator, Bundle)
+			Assert(ConfigTransitionResultIs(Resolved, Mode == "rollback" ? "recovered_old" : "recovered_new"))
+			Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+			Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+			Assert(ConfigSchemaCanPrepareWrite(Path), "a completed native transition cannot retire a genuinely booted source forever")
+			AssertTrue(FSUtf8ExactMatches(Path, Mode == "rollback" ? Initial : NewSource))
+			AssertTrue(FSUtf8ExactMatches(ApiPath, Mode == "rollback" ? ApiInitial : ApiNew))
+		}
+		Assert(TOML_ConfigBatchWrite(Path, [{ Section: "llm", Key: "enabled", Value: TOML_Bool(true) }]), "an independent later native writer must remain admitted")
+	} finally {
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: two native publications retain booted readiness", _CMJ_OwnedReadyLifecycle.Bind("success"))
+Test("config journal owned settlement: native rollback retains booted readiness", _CMJ_OwnedReadyLifecycle.Bind("rollback"))
+
+_CMJ_OwnedPreparedLifecycle() {
+	Fixture := _ScopeOwnerFixture(), Path := Fixture.directory . "\preboot.toml", Locator := Fixture.options["locator"], Bundle := 0
+	Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n')
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	try {
+		Assert(FSWriteDurable(Path, Initial))
+		AssertEqual("current", ConfigSchemaPrepareSource(Path)["status"])
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "recovered_new"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "owned wizard publication must not manufacture completed startup")
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Assert(ConfigSchemaCanPrepareWrite(Path), "only the genuine later boot may acquire readiness")
+	} finally {
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: preboot remains readonly until genuine boot", _CMJ_OwnedPreparedLifecycle)
+
+_CMJ_OwnedColdLegacyRecovery() {
+	Fixture := _ScopeOwnerFixture(), Path := Fixture.directory . "\cold.toml", Locator := Fixture.options["locator"], Bundle := 0
+	Legacy := '[llm]`nenabled = true`n', NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	try {
+		Assert(FSWriteDurable(Path, Legacy))
+		Port := ConfigTransitionProductionPort()
+		Assert(ConfigTransitionResultIs(ConfigTransitionPrepare(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Port), "prepared"))
+		AssertEqual("migrate", ConfigSchemaPrepareSource(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "recovered_old"), "real cold all-old recovery keeps its legacy source")
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertTrue(FSUtf8ExactMatches(Path, Legacy))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "recovery alone does not complete legacy migration")
+		AssertEqual("migrated", ConfigMigrateBoot(Path)["status"])
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: cold legacy WAL recovery preserves later migration", _CMJ_OwnedColdLegacyRecovery)
+
+_CMJ_OwnedSettlementRefusals() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, {}, "old"), "a foreign bundle cannot settle the source")
+		Assert(FSWriteDurable(Path, Fixture.source . "# foreign current bytes`n"))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "current classification cannot replace exact settled byte identity")
+		Assert(FSWriteDurable(Path, Fixture.source))
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "new"), "discoverable WAL debt must remain owned")
+		Assert(ConfigTransitionResultIs(ConfigTransitionRollbackOwned(Locator, Bundle), "recovered_old"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		TOML_RefuseWrites(Path, "owned fixture refusal")
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "an explicit real refusal cannot be promoted to READY")
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: foreign bytes bundle debt and refusal stay fail closed", _CMJ_OwnedSettlementRefusals)
+
+_CMJ_OwnedNativeWithdrawal() {
+	Fixture := _ScopeOwnerFixture(), Path := Fixture.directory . "\withdraw.toml", Locator := Fixture.options["locator"], Bundle := 0
+	Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n')
+	Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call"))
+	try {
+		Assert(FSWriteDurable(Path, Initial))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		ConfigMigrateSameValue.DefineProp("Call", {Call: (*) => (Invocations.count += 1, true)})
+		AssertFalse(ConfigMigrateBoot(Path, "known"), "withdrawn native authority must not be mistaken for an unknown destination")
+		Recovered := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", Recovered["status"], "recovery cannot report clean settlement after its native issuer was withdrawn")
+		AssertEqual("source_schema_settlement_refused", Recovered["kind"])
+		AssertEqual(0, Invocations.count, "the foreign native callback must never be invoked")
+		ConfigMigrateSameValue.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		AssertTrue(FSUtf8ExactMatches(Path, Initial))
+		Assert(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "exact issuer repair can acknowledge the already observed settled image")
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call")
+			ConfigMigrateSameValue.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: withdrawn native issuer cannot look like unknown destination", _CMJ_OwnedNativeWithdrawal)
+
+_CMJ_OwnedRecoveredNewRetry() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	Fault := { calls: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call"))
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		; This named boundary fault refuses only schema settlement. The genuine
+		; native recovery still verifies new bytes and physically retires its WAL.
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: (*) => (Fault.calls += 1, false)})
+		First := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", First["status"])
+		AssertEqual("source_schema_settlement_refused", First["kind"])
+		AssertEqual(1, Fault.calls, "the injected refusal must occur at the actual post-recovery settlement boundary")
+		ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		AssertTrue(FSUtf8ExactMatches(Path, NewSource))
+		Retry := ConfigTransitionRecoverOwned(Locator, Bundle)
+		Assert(ConfigTransitionResultIs(Retry, "absent"), "retry must retain the genuinely recovered-new side: " . Retry["status"] . "/" . Retry["kind"])
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, NewSource))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call")
+			ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: recovered-new cleanup refusal retries its exact side", _CMJ_OwnedRecoveredNewRetry)
+
+_CMJ_OwnedRebindFault(Fault, Owner, Path, Locator, Bundle, Side, Bounds := 0) {
+	Fault.calls += 1
+	ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+	Guard := ConfigMigrateBoot(Path, "capture_transition", Map("present", 1, "content", Fault.source), Bundle)
+	Assert(HasMethod(Guard, "Call"))
+	AssertTrue(Guard.Call(Fault.original, 1, Fault.source, 1), "the successor candidate must genuinely reach the original source owner")
+	Assert(FSWriteDurable(Path, Fault.source))
+	return ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, Side, Bounds)
+}
+
+_CMJ_OwnedRecoveredImageBound() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n[private]`nmarker = 1`n')
+	Fault := { calls: 0, original: NewSource, source: _CMJFixtureCurrentSource('[llm]`nenabled = false`n[private]`nmarker = 2`n') }
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: (*) => false})
+		First := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", First["status"])
+		ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: _CMJ_OwnedRebindFault.Bind(Fault)})
+		Retry := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual(1, Fault.calls, "the candidate replacement must occur after native record snapshot verification")
+		AssertEqual("retry", Retry["status"])
+		AssertEqual("source_schema_settlement_refused", Retry["kind"])
+		AssertTrue(FSUtf8ExactMatches(Path, Fault.source))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "the recovered image cannot promote a later same-bundle candidate to READY")
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call")
+			ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: recovered record cannot lend READY to a later candidate", _CMJ_OwnedRecoveredImageBound)
+
+_CMJ_OwnedPartialFault(Fault, Owner, Path, Locator, Bundle, Side, Bounds := 0) {
+	if Path == Fault.second {
+		Fault.refused += 1
+		return false
+	}
+	ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+	try {
+		Result := ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, Side, Bounds)
+		if (Result is Integer) && Result == 1
+			Fault.confirmed += 1
+		return Result
+	} finally ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: _CMJ_OwnedPartialFault.Bind(Fault)})
+}
+
+_CMJ_OwnedPartialRetry() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	Second := Fixture.directory . "\second.toml", Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n')
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	Fault := { second: Second, confirmed: 0, refused: 0 }
+	try {
+		Assert(FSWriteDurable(Second, Initial))
+		AssertEqual("current", ConfigMigrateBoot(Second)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Second, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator,
+			[ConfigTransitionPresentTarget(Path, NewSource), ConfigTransitionPresentTarget(Second, NewSource)], Bundle), "committed_new"))
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: _CMJ_OwnedPartialFault.Bind(Fault)})
+		First := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", First["status"])
+		AssertEqual(1, Fault.confirmed, "the first real native target must already be settled")
+		AssertEqual(1, Fault.refused, "the second target must actually refuse after partial settlement")
+		ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		Foreign := { kind: Bundle.kind, id: Bundle.id, tokens: Bundle.tokens, authorized: Bundle.authorized, shutdown_claimed: Bundle.shutdown_claimed }
+		AssertEqual("fatal", ConfigTransitionRecoverOwned(Locator, Foreign)["status"], "a lookalike bundle cannot consume the observation")
+		AssertEqual("fatal", ConfigTransitionRecoverOwned(Fixture.directory . "\foreign-paths.toml", Bundle)["status"], "a foreign locator cannot consume the observation")
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "absent"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+		Assert(ConfigSchemaCanPrepareWrite(Second))
+		AssertTrue(FSUtf8ExactMatches(Path, NewSource))
+		AssertTrue(FSUtf8ExactMatches(Second, NewSource))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call")
+			ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: partial native settlement retries all original targets", _CMJ_OwnedPartialRetry)
+
+_CMJ_OwnedRecoveryProducer() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n'), Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigTransitionRecover, "Call"))
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		ConfigTransitionRecover.DefineProp("Call", {Call: (*) => (Invocations.count += 1, Map("status", "ok", "kind", "recovered_new"))})
+		Refused := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", Refused["status"])
+		AssertEqual("recovery_native_owner_refused", Refused["kind"])
+		AssertEqual(0, Invocations.count, "a foreign recovery callback cannot mint an actual-native observation")
+		ConfigTransitionRecover.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "ready"))
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "recovered_new"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigTransitionRecover, "Call")
+			ConfigTransitionRecover.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: only the original recovery producer can mint its outcome", _CMJ_OwnedRecoveryProducer)
 ; Caller-held predicates must reject additional source units after a literal NUL.
 ; The native reader is never asked to decode NUL-bearing bytes in this subject.
 _CMJ_CapturedTransitionRejectsCallerNulSuffix(Side) {

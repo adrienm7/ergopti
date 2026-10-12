@@ -35,7 +35,14 @@ LocalServerMenuRows(Options) {
 	Tr := Options["tr"], Fmt := Options["format"]
 	Paused := Options["paused"], Actions := Options["actions"]
 	Rows := [Map("separator", true), Map("label", Tr.Call("menu.llm.local_servers.header"), "disabled", true)]
-	Result := Options["result"]
+	Result := Options["result"], Unavailable := false
+	for Id in Options["order"] {
+		Verdict := Result.Call(Id)
+		if Verdict is Map && Verdict.Get("status", "") == "unavailable"
+			Unavailable := true
+	}
+	if Unavailable
+		Rows.Push(Map("label", Tr.Call("healthcheck.status.failed"), "disabled", true))
 	for Id in Options["detected"] {
 		Verdict := Result.Call(Id)
 		Label := Options["servers"][Id]["label"] . " 🖥️ — " . LocalServerMenuHost(Verdict["base_url"])
@@ -43,10 +50,10 @@ LocalServerMenuRows(Options) {
 			Label := Fmt.Call("menu.llm.local_servers.needs_key", Label)
 		Active := Options["active"]
 		Rows.Push(Map("label", Label,
-			"checked", Options["backend"] == "api" && Active is Map && Active.Get("provider", "") == Id,
+			"checked", _LocalServerMenuActive(Options, Id),
 			"items", _LocalServerMenuItems(Options, Id, Verdict)))
 	}
-	if Options["detected"].Length == 0 {
+	if Options["detected"].Length == 0 && !Unavailable {
 		Labels := ""
 		for Id in Options["order"]
 			Labels .= (Labels == "" ? "" : ", ") . Options["servers"][Id]["label"]
@@ -79,8 +86,7 @@ _LocalServerMenuItems(Options, Id, Verdict) {
 	for Model in Verdict["models"] {
 		Active := Options["active"]
 		Row := _LocalServerMenuRow(Model, Paused, Actions["select"], Id, Model)
-		Row["checked"] := Options["backend"] == "api" && Active is Map
-			&& Active.Get("provider", "") == Id && Active.Get("model", "") == Model
+		Row["checked"] := _LocalServerMenuActive(Options, Id) && Active.Get("model", "") == Model
 		Items.Push(Row)
 	}
 	Items.Push(Map("separator", true))
@@ -103,4 +109,18 @@ _LocalServerMenuAction(Action, Id, Model?) {
 	if IsSet(Model)
 		return (*) => Action.Call(Id, Model)
 	return (*) => Action.Call(Id)
+}
+
+; Native checked state uses the exact configured target captured by its joined
+; source view. Historical callers without that port retain provider identity.
+_LocalServerMenuActive(Options, Id) {
+	Active := Options["active"]
+	if !(Options["backend"] == "api") || !(Active is Map)
+		return false
+	if !Options.Has("entry_id")
+		return Active.Get("provider", "") == Id
+	if !HasMethod(Options["entry_id"], "Call")
+		throw TypeError("Local server checked-state entry port must be callable.")
+	EntryId := Options["entry_id"].Call(Id)
+	return EntryId is String && EntryId != "" && Active.Get("id", "") == EntryId
 }

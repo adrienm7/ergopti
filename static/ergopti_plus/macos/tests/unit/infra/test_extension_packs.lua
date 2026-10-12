@@ -14,6 +14,7 @@
 
 local helpers = require("tests.helpers")
 local Logger = require("infra.logger")
+helpers.admit_logger_privacy(Logger)
 local Packs = require("infra.extension_packs")
 
 --- Runs a callback while capturing the extension packs' error log lines.

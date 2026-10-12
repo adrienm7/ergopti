@@ -30,6 +30,7 @@ local function with_world(body)
 		local Storage = require("adapters.storage")
 		local Json = require("json")
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local world = { api = Api, gets = {}, posts = {}, failures = {}, successes = {} }
 		world.client = upvalue(Api.request_chat, "_vision_client")
 		world.listing = upvalue(Api.refresh_local_models, "_listing_client")
@@ -177,6 +178,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("rechecks endpoint identity after the last logging boundary before private POST", function(world)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local info = Logger.info
 		Logger.info = function(topic, template, ...)
 			if template == "%s request to the local server (model %s, %d byte(s))." then world.port(11471) end
@@ -199,6 +201,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	for _, installed in ipairs({ false, true }) do
 		test("refuses a verify result invalidated at the final inventory publication: installed=" .. tostring(installed), function(world)
 			local Logger = require("infra.logger")
+			helpers.admit_logger_privacy(Logger)
 			local debug_log = Logger.debug
 			Logger.debug = function(topic, template, ...)
 				if template == "The local server returned a readable model list." then world.port(11471) end
@@ -217,6 +220,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("does not offer a missing model after the final list consumer loses its endpoint", function(world)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local debug_log = Logger.debug
 		Logger.debug = function(topic, template, ...)
 			if template == "The local server returned a readable model list." then world.port(11471) end
@@ -230,6 +234,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("rechecks an empty inventory after the last missing-model logging boundary", function(world)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local warn = Logger.warn
 		Logger.warn = function(topic, template, ...)
 			if template == "%s request not sent: the local server does not hold model %s." then world.port(11471) end
@@ -243,6 +248,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("refuses stale text after the final successful response logging boundary", function(world)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local info = Logger.info
 		Logger.info = function(topic, template, ...)
 			if template == "%s answer of the local server received in %dms (%d char(s))." then world.port(11471) end
@@ -255,6 +261,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("keeps an old endpoint's missing response from forgetting the newly acknowledged inventory", function(world)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local error_log = Logger.error
 		Logger.error = function(topic, template, ...)
 			if template == "%s request to the local server failed in %dms: HTTP %s (%s)." then
@@ -274,6 +281,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("refuses stale empty-answer publication after its last logging boundary", function(world)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local warn = Logger.warn
 		Logger.warn = function(topic, template, ...)
 			if template == "%s answer of the local server holds no text (%dms)." then world.port(11471) end
@@ -287,6 +295,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("preserves an admitted response across an independent refresh of the same endpoint", function(world)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local info = Logger.info
 		Logger.info = function(topic, template, ...)
 			if template == "%s answer of the local server received in %dms (%d char(s))." then

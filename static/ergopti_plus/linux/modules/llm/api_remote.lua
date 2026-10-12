@@ -236,9 +236,9 @@ end
 --- @param provider_id any
 --- @param token any
 --- @return boolean
-function M.token_allowed(provider_id, token)
+function M.token_allowed(provider_id, token, base_url)
 	return M.provider(provider_id) ~= nil
-		and AuthPolicy.token_allowed(provider_id, token, catalogue().local_servers)
+		and AuthPolicy.entry_token_allowed(provider_id, token, base_url, catalogue().local_servers)
 end
 
 --- The shared connectivity probe, or nil when the catalogue section is invalid.
@@ -359,7 +359,7 @@ function M.endpoint(entry, model)
 	local base, reason = M.normalize_base_url(base_raw)
 	if not base then return nil, reason end
 	local token = entry.token
-	if not M.token_allowed(entry.provider, token) then return nil, "the API key is missing or invalid" end
+	if not M.token_allowed(entry.provider, token, entry.base_url) then return nil, "the API key is missing or invalid" end
 	if type(model) ~= "string" or model == "" then return nil, "no model is configured" end
 
 	local headers = { ["Content-Type"] = "application/json" }

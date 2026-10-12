@@ -24,8 +24,10 @@ _MGP_DesiredBatchPreservesUnknown() {
 	global ConfigurationFile, Features
 	Original := "[unknown.nested]" . Chr(10) . 'token = "retain"' . Chr(10)
 	Original .= "[layout]" . Chr(10) . "ergopti_alt_gr = true" . Chr(10)
-	FileAppend(Original, ConfigurationFile, "UTF-8-RAW")
+	SavedPath := ConfigurationFile
+	Fixture := _ScopeOwnerFixture(Original)
 	try {
+		ConfigurationFile := Fixture.path
 		Updates := _ConfigCollectFullSaveUpdates()
 		AssertTrue(ConfigCommitUpdates(ConfigurationFile, Updates, "desired fixture"),
 			"the full-save batch must cross the durable transaction gateway")
@@ -39,7 +41,8 @@ _MGP_DesiredBatchPreservesUnknown() {
 			"disabled hotstring subcategories retain their desired section choices")
 		AssertFalse(Features["layout"]["ergopti_base"], "saving cannot activate runtime")
 	} finally {
-		FileDelete(ConfigurationFile)
+		ConfigurationFile := SavedPath
+		_ScopeOwnerCleanup(Fixture)
 	}
 }
 Test("config_io: sparse desired save preserves disabled children and unknown TOML (a1-sparse)",

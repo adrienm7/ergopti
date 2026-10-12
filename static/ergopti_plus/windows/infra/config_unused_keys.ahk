@@ -116,6 +116,10 @@ _ConfigUnusedKeysNeedsRetiredRoot(Document, Records, Physical, Sections := unset
 ; boot/session persistence authority.
 ConfigUnusedKeysFind(FilePath, SchemaTree := unset) {
 	Keys := []
+	; A protected source belongs to a schema or boot owner this build cannot edit.
+	; Do not offer its unrecognized keys as disposable cleanup candidates.
+	if TOML_WriteRefusal(FilePath) != ""
+		return Map("status", "unsupported", "keys", Keys)
 	Tree := IsSet(SchemaTree) ? SchemaTree : ManifestBuildFeaturesMap()
 	if !FileExist(FilePath)
 		return Map("status", "ok", "keys", Keys)

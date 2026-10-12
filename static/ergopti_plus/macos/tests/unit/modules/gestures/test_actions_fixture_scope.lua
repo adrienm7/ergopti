@@ -39,7 +39,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
 						"_generated.action_catalogue", "config_binding_identity", "tap_hold.key_combinations", "config_binding_publication", "config_keyboard_publication", "hs", "hs.timer",
-						"llm.translate", "ui.menu.gesture_fixture_unrelated" }) do
+						"llm.translate", "toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
 					_G.hs = sentinel
@@ -49,6 +49,14 @@ helpers.describe("Gesture actions fixture ownership", function()
 					local constructions = 0
 					helpers.load_with_stubs = function(...)
 						local result = loader(...)
+						local scanner = package.loaded["toml_codec.record_scanner"]
+						helpers.assert_type(scanner, "table", "construction loads the real reader's scanner child")
+						helpers.assert_type(scanner.advance, "function")
+						local header = '[["owned#literal"]] # outside'
+						local depth, quote, comment = scanner.advance(header, 0, nil)
+						helpers.assert_eq(depth, 0)
+						helpers.assert_nil(quote)
+						helpers.assert_eq(comment, header:find("# outside", 1, true))
 						local translation = package.loaded["llm.translate"]
 						helpers.assert_type(translation, "table", "construction loads the real transitive translation owner")
 						helpers.assert_type(translation.is_language_text, "function")

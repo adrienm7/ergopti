@@ -38,7 +38,7 @@ _LMBC_BuildIsStaged() {
 	Assert(InStr(Body, "_LLM_Menu_Handle.Delete()") == 0,
 		"LLM_Menu_Build must not delete the live submenu before the staged replacement is complete")
 	Assert(InStr(Body,
-		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot, true, true)") > 0,
+		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)") > 0,
 		"LLM_Menu_Build must submit the detached submenu to the root coordinator")
 	Assert(InStr(Body, "A_TrayMenu.Add") == 0,
 		"LLM_Menu_Build must not mutate the live root independently")

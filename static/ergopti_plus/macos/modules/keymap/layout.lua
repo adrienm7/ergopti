@@ -9,11 +9,11 @@
 --- FEATURES & RATIONALE:
 --- 1. Layout-aware: uses hs.keycodes.map to resolve which physical key produces
 ---    a given character on the current input source.
---- 2. Fixed QWERTY translation: keycode → Karabiner key_code is a layout-
----    independent constant (USB HID / Carbon virtual key mapping), so it is
----    stored inline and NOT read from hs.keycodes.map — otherwise the map's
----    remapped string keys would loop back to the layout character instead of
----    the physical QWERTY position.
+--- 2. HID translation: ordinary Carbon positions are fixed; the ISO pair
+---    follows the active registry layout's declared keycode convention. Never
+---    infer that convention from a variant's name or a different keyboard.
+---    Character legends cannot translate HID names: they would loop back to
+---    the layout character instead of the physical position.
 --- 3. Shared: avoids duplicating the same lookup logic in every module that
 ---    needs to map a logical char to a physical key position.
 --- 4. Graceful fallback: returns the char itself when hs.keycodes.map is
@@ -161,6 +161,41 @@ local KEYCODE_TO_QWERTY_NAME = {
 -- ===============================
 -- ===============================
 
+--- Reads the active registry layout's declared virtual-keyboard convention.
+--- An unregistered source keeps the existing ANSI policy; a known registry
+--- layout without its declaration refuses rather than swapping physical keys.
+--- @param snapshot table|nil LayoutRegistry snapshot, injectable for pure checks.
+--- @return string form ansi | iso.
+function M.keyboard_form(snapshot)
+	if snapshot == nil then snapshot = require("modules.keymap.layout_registry").snapshot() end
+	assert(type(snapshot) == "table" and type(snapshot.active) == "string",
+		"the active layout registry snapshot is unavailable")
+	assert(snapshot.active_error == nil, "the active registry input-source ownership is ambiguous")
+	if snapshot.active == "" then return "ansi" end
+	local entry = type(snapshot.installed) == "table" and snapshot.installed[snapshot.active] or nil
+	if entry == nil then entry = require("layouts.registry").find_entry(snapshot.index, snapshot.active) end
+	assert(type(entry) == "table" and entry.id == snapshot.active,
+		"the active registry layout metadata is unavailable")
+	local form = entry.keycode_convention
+	assert(form == "ansi" or form == "iso", "the active registry layout keycode convention is invalid")
+	return form
+end
+
+--- Translates Carbon codes to HID names for the selected virtual keyboard.
+--- The fixed table describes ANSI; ISO swaps only the two Carbon positions.
+--- @param keycode integer Carbon virtual code.
+--- @param form string Virtual keyboard form.
+--- @return string|nil name Karabiner HID key name.
+local function virtual_name(keycode, form)
+	assert(form == "ansi" or form == "iso", "virtual keyboard form must be ansi or iso")
+	local name = KEYCODE_TO_QWERTY_NAME[keycode]
+	if form == "iso" then
+		if name == "non_us_backslash" then return "grave_accent_and_tilde" end
+		if name == "grave_accent_and_tilde" then return "non_us_backslash" end
+	end
+	return name
+end
+
 --- Returns the current hs.keycodes.map snapshot, or nil on failure.
 --- hs.keycodes.map is a bidirectional table:
 ---   map[keycode_number] → character produced on the CURRENT layout
@@ -187,8 +222,9 @@ end
 --- direct lookups but does NOT enumerate via pairs(), which caused earlier
 --- revisions to silently fall through to the char fallback.
 --- @param char string Single character to resolve (e.g. "c").
+--- @param form string|nil Captured virtual keyboard convention.
 --- @return string QWERTY key_code name (e.g. "o").
-function M.key_code_for_char(char)
+function M.key_code_for_char(char, form)
 	local map = get_map()
 	if not map then
 		Logger.warn(LOG, "hs.keycodes.map unavailable — falling back to '%s'.", tostring(char))
@@ -217,7 +253,7 @@ function M.key_code_for_char(char)
 
 	-- Resolve keycode → QWERTY name via the fixed table
 	-- (NOT via hs.keycodes.map, which would loop back to the layout character)
-	local qwerty_name = KEYCODE_TO_QWERTY_NAME[target_keycode]
+	local qwerty_name = virtual_name(target_keycode, form or M.keyboard_form())
 	if not qwerty_name then
 		Logger.warn(LOG, "Keycode %d has no QWERTY name — falling back to char '%s'.",
 			target_keycode, tostring(char))
@@ -233,15 +269,17 @@ end
 --- returns "c".
 --- Falls back to qwerty_name itself on error.
 --- @param qwerty_name string QWERTY key name (e.g. "o").
+--- @param form string|nil Captured virtual keyboard convention.
 --- @return string Character on current layout (e.g. "c").
-function M.char_for_key_code(qwerty_name)
+function M.char_for_key_code(qwerty_name, form)
 	local map = get_map()
 	if not map then return qwerty_name end
 
 	-- Find the keycode number whose QWERTY name matches the input
 	local target_keycode = nil
-	for kc, name in pairs(KEYCODE_TO_QWERTY_NAME) do
-		if name == qwerty_name then
+	form = form or M.keyboard_form()
+	for kc in pairs(KEYCODE_TO_QWERTY_NAME) do
+		if virtual_name(kc, form) == qwerty_name then
 			target_keycode = kc
 			break
 		end
