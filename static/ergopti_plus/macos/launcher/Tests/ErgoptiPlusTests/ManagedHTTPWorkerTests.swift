@@ -19,6 +19,33 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			"idle_timeout": 10, "direct": false]
 	}
 
+	private func assertNativeFailureStagesBeforeNetworkDispatch() throws {
+		let parsed = try XCTUnwrap(ManagedHTTPRequest.parse(JSONSerialization.data(withJSONObject: request)))
+		let cases: [(Int, TimeInterval, String, String, Int32)] = [
+			(0, ProcessInfo.processInfo.systemUptime, "native_selection_bound", "unavailable", 78),
+			(1, ProcessInfo.processInfo.systemUptime - 31, "native_lookup_deadline", "deadline", 75),
+			(1, ProcessInfo.processInfo.systemUptime, "native_proxy_lookup", "unavailable", 78)
+		]
+		for (selections, started, stage, reason, expectedStatus) in cases {
+			var wire = Data()
+			let status = ManagedHTTPWorker.execute(parsed, maximumSelections: selections,
+				started: started, settingsProvider: { nil }, environment: [:],
+				output: { wire.append($0); return true })
+			XCTAssertEqual(status, expectedStatus)
+			XCTAssertGreaterThan(wire.count, 5)
+			let count = wire.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+			XCTAssertEqual(Int(count), wire.count - 4)
+			XCTAssertEqual(wire[4], 67)
+			let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: wire.dropFirst(5)) as? [String: Any])
+			XCTAssertEqual(Set(fields.keys), Set(["version", "success", "reason", "native_refusal_stage"]))
+			XCTAssertEqual(fields["version"] as? Int, 1)
+			XCTAssertEqual(fields["success"] as? Bool, false)
+			XCTAssertEqual(fields["reason"] as? String, reason)
+			XCTAssertEqual(fields["native_refusal_stage"] as? String, stage)
+			XCTAssertFalse(String(decoding: wire, as: UTF8.self).contains("origin.example"))
+		}
+	}
+
 	func testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout() throws {
 		let parsed = try XCTUnwrap(ManagedHTTPRequest.parse(JSONSerialization.data(withJSONObject: request)))
 		XCTAssertEqual(parsed.url.absoluteString, "https://origin.example/path?case=one")
@@ -184,6 +211,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			XCTAssertLessThan(bytes.count, 4096)
 			XCTAssertFalse(String(decoding: bytes, as: UTF8.self).contains("reserved"))
 		}
+		try assertNativeFailureStagesBeforeNetworkDispatch()
 	}
 
 	func testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries() throws {

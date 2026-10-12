@@ -39,6 +39,79 @@ WIRE = load("receiving_fact_wire", SUPPORT / "native_http_wire_fixture.py")
 CLIENT = load("receiving_fact_client", SUPPORT / "native_http_wire_client_receiving.py")
 
 
+# Closed inverse for the complete reviewed failed-C-frame diagnostic overlay.
+# Every span is literal and unique. Existing PAC/diagnostic inverses and their
+# historical whole-source oracles remain unchanged after this first projection.
+NATIVE_FAILURE_STAGE_INVERSE = (
+    (
+        '// BEGIN GENERATED NATIVE HTTP FAILURE STAGES\n// Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.\nenum ManagedHTTPFailureStage: String, CaseIterable {\n\tcase policyLoad = "native_policy_load"\n\tcase selectionBound = "native_selection_bound"\n\tcase proxyLookup = "native_proxy_lookup"\n\tcase proxyDictionary = "native_proxy_dictionary"\n\tcase routeEmpty = "native_route_empty"\n\tcase certificateLoad = "native_certificate_load"\n\tcase lookupDeadline = "native_lookup_deadline"\n\tcase dispatchDeadline = "native_dispatch_deadline"\n\tcase sessionTerminal = "native_session_terminal"\n\n\tfunc permits(reason: String) -> Bool {\n\t\tswitch self {\n\t\tcase .policyLoad: return ["unavailable"].contains(reason)\n\t\tcase .selectionBound: return ["unavailable"].contains(reason)\n\t\tcase .proxyLookup: return ["unavailable"].contains(reason)\n\t\tcase .proxyDictionary: return ["proxy"].contains(reason)\n\t\tcase .routeEmpty: return ["unavailable"].contains(reason)\n\t\tcase .certificateLoad: return ["certificate"].contains(reason)\n\t\tcase .lookupDeadline: return ["deadline"].contains(reason)\n\t\tcase .dispatchDeadline: return ["deadline"].contains(reason)\n\t\tcase .sessionTerminal: return ["deadline", "cancelled", "offline", "certificate", "proxy", "connect", "unavailable", "protocol", "content_encoding"].contains(reason)\n\t\t}\n\t}\n}\n// END GENERATED NATIVE HTTP FAILURE STAGES\n\n',
+        "",
+    ),
+    (
+        '\t\tvar terminal: [String: Any] = ["version": 1, "success": success, "reason": failure ?? "complete"]\n\t\tif !success, let failure, ManagedHTTPFailureStage.sessionTerminal.permits(reason: failure) {\n\t\t\tterminal["native_refusal_stage"] = ManagedHTTPFailureStage.sessionTerminal.rawValue\n\t\t}\n\t\tlet sent = json(tag: 67, object: terminal)\n',
+        '\t\tlet sent = json(tag: 67, object: ["version": 1, "success": success, "reason": failure ?? "complete"])\n',
+    ),
+    (
+        '\tprivate static func refuse(reason: String, status: Int32, stage: ManagedHTTPFailureStage, output: (Data) -> Bool) -> Int32 {\n\t\tguard stage.permits(reason: reason) else { return 74 }\n\t\tguard let json = try? JSONSerialization.data(withJSONObject: ["version": 1, "success": false, "reason": reason,\n\t\t\t"native_refusal_stage": stage.rawValue]),\n\t\t\tlet frame = ManagedHTTPFrame.encode(tag: 67, bytes: json) else { return 74 }\n\t\treturn output(frame) ? status : 74\n\t}\n\n\tprivate static func stdout(',
+        '\tprivate static func refuse(reason: String, status: Int32, output: (Data) -> Bool) -> Int32 {\n\t\tguard let json = try? JSONSerialization.data(withJSONObject: ["version": 1, "success": false, "reason": reason]),\n\t\t\tlet frame = ManagedHTTPFrame.encode(tag: 67, bytes: json) else { return 74 }\n\t\treturn output(frame) ? status : 74\n\t}\n\n\tprivate static func stdout(',
+    ),
+    (
+        '\t\telse { return refuse(reason: "unavailable", status: 78, stage: .policyLoad, output: stdout) }\n',
+        '\t\telse { return refuse(reason: "unavailable", status: 78, output: stdout) }\n',
+    ),
+    (
+        '\t\tcatch { return refuse(reason: "certificate", status: 74, stage: .certificateLoad, output: output) }\n',
+        '\t\tcatch { return refuse(reason: "certificate", status: 74, output: output) }\n',
+    ),
+    (
+        '\t\tguard maximumSelections > 0 else { return refuse(reason: "unavailable", status: 78, stage: .selectionBound, output: output) }\n',
+        '\t\tguard maximumSelections > 0 else { return refuse(reason: "unavailable", status: 78, output: output) }\n',
+    ),
+    (
+        '\t\t\tif let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .lookupDeadline, output: output) }\n',
+        '\t\t\tif let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }\n',
+    ),
+    (
+        '\t\t\telse { return refuse(reason: "unavailable", status: 78, stage: .proxyLookup, output: output) }\n',
+        '\t\t\telse { return refuse(reason: "unavailable", status: 78, output: output) }\n',
+    ),
+    (
+        '\t\t\tguard let proxy = ManagedProxyLookup.dictionary(route: route) else { return refuse(reason: "proxy", status: 78, stage: .proxyDictionary, output: output) }\n',
+        '\t\t\tguard let proxy = ManagedProxyLookup.dictionary(route: route) else { return refuse(reason: "proxy", status: 78, output: output) }\n',
+    ),
+    (
+        '\t\t\tif let remaining, remaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .dispatchDeadline, output: output) }\n',
+        '\t\t\tif let remaining, remaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }\n',
+    ),
+    (
+        '\t\treturn refuse(reason: "unavailable", status: 78, stage: .routeEmpty, output: output)\n',
+        '\t\treturn refuse(reason: "unavailable", status: 78, output: output)\n',
+    ),
+)
+NATIVE_FAILURE_STAGE_MARKERS = (
+    "GENERATED NATIVE HTTP FAILURE STAGES",
+    "ManagedHTTPFailureStage",
+    "native_refusal_stage",
+)
+
+
+def native_failure_stage_projection(source):
+    """Invert one complete closed overlay, preserving unrelated source bytes."""
+    if not any(marker in source for marker in NATIVE_FAILURE_STAGE_MARKERS):
+        return source
+    if any(
+        source.count(new) != 1 or (legacy and legacy in source)
+        for new, legacy in NATIVE_FAILURE_STAGE_INVERSE
+    ):
+        raise ValueError("Native failure-stage enrollment refused")
+    projected = source
+    for new, legacy in NATIVE_FAILURE_STAGE_INVERSE:
+        projected = projected.replace(new, legacy, 1)
+    if any(marker in projected for marker in NATIVE_FAILURE_STAGE_MARKERS):
+        raise ValueError("Native failure-stage projection refused")
+    return projected
+
+
 # Finite approved source-acquisition hunks compose before the independent
 # ownership repair. These spans never replace the historical whole-source pin.
 PAC_SOURCE_ACQUISITION_INVERSE = (
@@ -71,6 +144,7 @@ PAC_SOURCE_ACQUISITION_INVERSE = (
 
 def pac_source_acquisition_projection(source):
     """Invert only one complete enrolled request-owned PAC source repair."""
+    source = native_failure_stage_projection(source)
     if "ManagedPACSource." not in source:
         return source
     if any(source.count(new) != 1 for new, old in PAC_SOURCE_ACQUISITION_INVERSE):
@@ -121,6 +195,7 @@ DEBUG_CERTIFICATE_FAILURE_INVERSE = (
 
 def debug_certificate_failure_projection(source):
     """Invert one exact diagnostic function or preserve one exact original."""
+    source = native_failure_stage_projection(source)
     diagnostic, original = DEBUG_CERTIFICATE_FAILURE_INVERSE
     if source.count("func managedHTTPFailure(") != 1:
         raise ValueError("Certificate diagnostic function identity refused")
@@ -151,6 +226,7 @@ TRUST_CAUSE_DIAGNOSTIC_MARKERS = (
 
 def trust_cause_diagnostic_projection(source):
     """Invert all five exact observation spans together, or retain legacy bytes."""
+    source = native_failure_stage_projection(source)
     if not any(marker in source for marker in TRUST_CAUSE_DIAGNOSTIC_MARKERS):
         return source
     if any(source.count(span) != 1 for span in TRUST_CAUSE_DIAGNOSTIC_INVERSE):
@@ -165,6 +241,7 @@ def trust_cause_diagnostic_projection(source):
 
 def historical_pac_ownership_projection(source):
     """Accept the exact legacy source or the complete approved ownership repair."""
+    source = native_failure_stage_projection(source)
     source = trust_cause_diagnostic_projection(source)
     source = tls_failure_diagnostic_projection(source)
     source = debug_certificate_failure_projection(source)
@@ -195,6 +272,7 @@ TLS_FAILURE_DIAGNOSTIC_INVERSE = (
 
 def tls_failure_diagnostic_projection(source):
     """Accept an absent observation or its two exact complete reviewed spans."""
+    source = native_failure_stage_projection(source)
     marker = "func managedHTTPTLSDiagnostic("
     if marker not in source and "# native_http_tls_failure " not in source:
         return source
@@ -2053,9 +2131,61 @@ class PACSourceAcquisitionProjectionTests(unittest.TestCase):
         return re.sub(
             r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
             "",
-            source,
+            native_failure_stage_projection(source),
             flags=re.MULTILINE | re.DOTALL,
         )
+
+    def _assert_closed_failure_stage_overlay(self):
+        # Read the actual staged producer. No historical source file replaces
+        # this input: only the complete, closed literal overlay may disappear.
+        source = (
+            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+        ).read_text()
+        projected = native_failure_stage_projection(source)
+        self.assertEqual(len(NATIVE_FAILURE_STAGE_INVERSE), 11)
+        self.assertEqual(
+            hashlib.sha256(projected.encode()).hexdigest(),
+            "621bead52172608f1ae40cb57713c718734f3c2c43f063485932ac9e560cc647",
+        )
+        self.assertEqual(native_failure_stage_projection(projected), projected)
+        for new, legacy in NATIVE_FAILURE_STAGE_INVERSE:
+            with self.subTest(overlay=new):
+                self.assertEqual(source.count(new), 1)
+                for replacement in (legacy, new[:-1], new + new):
+                    with self.subTest(replacement=replacement):
+                        with self.assertRaises(ValueError):
+                            native_failure_stage_projection(source.replace(new, replacement, 1))
+                if legacy:
+                    with self.assertRaises(ValueError):
+                        native_failure_stage_projection(source.replace(new, new + legacy, 1))
+        for before, after in (
+            ("stage: .selectionBound", "stage: .policyLoad"),
+            (
+                "if !success, let failure, ManagedHTTPFailureStage",
+                "if success, let failure, ManagedHTTPFailureStage",
+            ),
+            ("guard stage.permits(reason: reason) else", "guard true else"),
+            ('"native_refusal_stage": stage.rawValue', '"native_refusal_stage": reason'),
+        ):
+            with self.subTest(mismatch=before):
+                self.assertEqual(source.count(before), 1)
+                with self.assertRaises(ValueError):
+                    native_failure_stage_projection(source.replace(before, after, 1))
+        with self.assertRaises(ValueError):
+            native_failure_stage_projection(
+                source + "\n// native_refusal_stage unenrolled sibling\n"
+            )
+        # Bytes outside the exact overlay remain owned by the unchanged whole
+        # historical oracle, even after a complete valid inverse.
+        candidate = source + "\n// unrelated unapproved bytes\n"
+        release = re.sub(
+            r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
+            "",
+            candidate,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+        with self.assertRaises(ValueError):
+            historical_pac_ownership_projection(release)
 
     def test45CompleteSourceOwnerKeepsImmutableHistoricalPin(self):
         source = self.raw_source()
@@ -2064,6 +2194,7 @@ class PACSourceAcquisitionProjectionTests(unittest.TestCase):
             hashlib.sha256(legacy.encode()).hexdigest(), HISTORICAL_HTTP_RELEASE_SHA256
         )
         self.assertNotIn("ManagedPACSource.", legacy)
+        self._assert_closed_failure_stage_overlay()
 
     def test46EveryPartialSourceOwnerSpanRefuses(self):
         source = self.raw_source()

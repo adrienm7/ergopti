@@ -16,6 +16,7 @@ const seed = path.join(temporary, 'immutable-seed');
 fs.mkdirSync(seed);
 const collectorPath = 'tools/ci/run-windows-updater-original-diagnostic-cohort.cjs';
 const modulePath = 'tools/ci/windows-updater-original-source.cjs';
+const sealerPath = 'tools/ci/seal-windows-updater-original-source.cjs';
 const inputPath = 'tools/ci/windows-updater-original-diagnostic-cohort-inputs.json';
 const oraclePath = 'tools/ci/windows-updater-original-label-oracle.json';
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
@@ -28,6 +29,7 @@ const templateFiles = new Set([
 	...Object.keys(selectedInputs.source_sha256),
 	collectorPath,
 	modulePath,
+	sealerPath,
 	inputPath,
 	oraclePath,
 	'tools/ci/manual-ci-lanes.cjs',
@@ -170,6 +172,210 @@ function architectureModel(f, architecture, overrides = {}) {
 	}
 	api = load(modulePath);
 	return { api, cli: load(collectorPath), context, required };
+}
+// Test-only realm calls the actual generator main against the owning private Git fixture.
+function sealWriteFault(f, vector) {
+	const before = fs.readFileSync(path.join(f.directory, inputPath));
+	const context = vm.createContext({
+		Buffer,
+		AggregateError,
+		process: { env, stdout: { write() {} } }
+	});
+	let refused = false,
+		failure,
+		closeAttempts = 0;
+	const filePort = {
+		...fs,
+		fstatSync: (...args) => {
+			if (vector.phase === 'validation') throw vector.value;
+			return fs.fstatSync(...args);
+		},
+		writeSync: (...args) => {
+			if (vector.phase === 'write') throw vector.value;
+			return fs.writeSync(...args);
+		},
+		closeSync: (descriptor) => {
+			closeAttempts += 1;
+			fs.closeSync(descriptor);
+			if (vector.close) throw vector.closure;
+		}
+	};
+	const required = (name) => (name === 'node:fs' ? filePort : f.required(name));
+	const ownedModule = { exports: {} };
+	const code = fs.readFileSync(path.join(f.directory, sealerPath), 'utf8');
+	const loaded = vm.runInContext(
+		'(function(require,module,__dirname){\n' + code + '\nmodule.exports.testOnlyMain=main;\n})',
+		context,
+		{ filename: path.join(f.directory, sealerPath) }
+	);
+	loaded(required, ownedModule, path.dirname(path.join(f.directory, sealerPath)));
+	try {
+		ownedModule.exports.testOnlyMain(['--ref', f.head, '--write']);
+	} catch (error) {
+		refused = true;
+		failure = error;
+	} finally {
+		fs.writeFileSync(path.join(f.directory, inputPath), before);
+	}
+	assert.equal(closeAttempts, 1, 'Source seal closure is attempted once without uncertain retry');
+	return { refused, failure };
+}
+// Actual CLI children use only an owned private preloader; production has no test flag/export.
+function sourceSealCLIVectors(f) {
+	const generic = 'SOURCE_SEAL_REFUSAL stage=unclassified error_count=unknown\n';
+	const paired = 'SOURCE_SEAL_REFUSAL stage=write_and_close error_count=2\n';
+	return [
+		{
+			label: 'error/paired',
+			phase: 'write',
+			value: 'error',
+			close: true,
+			closure: 'error',
+			expected: paired
+		},
+		{
+			label: 'undefined/single',
+			phase: 'write',
+			value: 'undefined',
+			close: false,
+			expected: generic
+		},
+		{
+			label: 'native_getter/single',
+			phase: 'write',
+			value: 'native_getter',
+			close: false,
+			expected: generic
+		},
+		{
+			label: 'object_getter/single',
+			phase: 'write',
+			value: 'object_getter',
+			close: false,
+			expected: generic
+		},
+		{ label: 'proxy/single', phase: 'write', value: 'proxy', close: false, expected: generic },
+		{
+			label: 'native_object_message/single',
+			phase: 'write',
+			value: 'native_object_message',
+			close: false,
+			expected: generic
+		},
+		{
+			label: 'lookalike_pair/single',
+			phase: 'write',
+			value: 'lookalike_pair',
+			close: false,
+			expected: generic
+		},
+		{
+			label: 'ownership/single',
+			phase: 'ownership',
+			value: 'error',
+			close: false,
+			closure: 'error',
+			expected: 'Source output ownership changed.\n'
+		},
+		{
+			label: 'partial_write/paired',
+			phase: 'partial_write',
+			value: 'error',
+			close: true,
+			closure: 'error',
+			expected: paired
+		},
+		{
+			label: 'final_predicate/single',
+			phase: 'final_predicate',
+			value: 'error',
+			close: false,
+			closure: 'error',
+			expected: 'Published source seal differs.\n'
+		},
+		{
+			label: 'normal_stale',
+			args: ['--ref', f.head, '--check'],
+			expected: 'Source seal is stale; review the commit and run --write.\n'
+		},
+		{ label: 'normal_success', success: true, expected: '' }
+	];
+}
+function sourceSealCLIChild(f, vector) {
+	const preload = path.join(f.directory, 'source-seal-private-preload.cjs');
+	fs.writeFileSync(
+		preload,
+		"'use strict';\n// Private fault injection only; no production option or export authorizes this hook.\nconst fs = require('node:fs'), path = require('node:path');\nconst vectorPath = process.env.ERGOPTI_SOURCE_SEAL_TEST_VECTOR;\nconst vector = JSON.parse(fs.readFileSync(vectorPath, 'utf8'));\nconst source = path.resolve(path.dirname(process.argv[1]), 'windows-updater-original-diagnostic-cohort-inputs.json');\nconst state = { writer_close_attempts: 0, write_calls: 0, truncate_calls: 0, message_gets: 0, coercions: 0, proxy_traps: 0 };\nconst token = 'EXPLICIT_SYNTHETIC_PRIVATE_SOURCE_SEAL_TOKEN';\nconst actual = Object.fromEntries(['openSync', 'fstatSync', 'writeSync', 'readSync', 'ftruncateSync', 'closeSync'].map(name => [name, fs[name]]));\nlet writer, reserved = false, truncated = false;\nconst inputDescriptors = new Set();\nfunction value(kind) {\n switch (kind) {\n  case 'undefined': return undefined;\n  case 'null': return null;\n  case 'false': return false;\n  case 'zero': return 0;\n  case 'negative_zero': return -0;\n  case 'nan': return NaN;\n  case 'empty_string': return '';\n  case 'bigint_zero': return 0n;\n  case 'private_string': return token;\n  case 'symbol': return Symbol(token);\n  case 'error': return new Error(token);\n  case 'native_getter': {\n   const error = new Error();\n   Object.defineProperty(error, 'message', { get() { state.message_gets++; throw new Error(token); } });\n   return error;\n  }\n  case 'object_getter': return { get message() { state.message_gets++; throw new Error(token); }, toString() { state.coercions++; return token; }, [Symbol.toPrimitive]() { state.coercions++; return token; } };\n  case 'proxy': return new Proxy({}, { get() { state.proxy_traps++; throw new Error(token); }, getOwnPropertyDescriptor() { state.proxy_traps++; throw new Error(token); } });\n  case 'native_object_message': {\n   const error = new Error();\n   error.message = { [Symbol.toPrimitive]() { state.coercions++; return token; } };\n   return error;\n  }\n  case 'lookalike_pair': {\n   const error = new AggregateError([new Error(token), new Error(token)], 'Source seal write and closure refused.');\n   Object.defineProperty(error, 'cause', { get() { state.message_gets++; throw new Error(token); } });\n   return error;\n  }\n  default: throw new Error('Unadmitted private test vector');\n }\n}\nfs.openSync = (file, flags, ...rest) => {\n const descriptor = actual.openSync(file, flags, ...rest);\n if (path.resolve(String(file)) === source) {\n  inputDescriptors.add(descriptor);\n  if (typeof flags === 'number' && (flags & fs.constants.O_RDWR)) { writer = descriptor; reserved = true; }\n }\n return descriptor;\n};\nfs.fstatSync = (descriptor, ...rest) => {\n const received = actual.fstatSync(descriptor, ...rest);\n if (reserved && descriptor === writer && vector.phase === 'validation') throw value(vector.value);\n if (reserved && descriptor === writer && vector.phase === 'ownership') return { ...received, isFile: () => received.isFile(), nlink: 2n };\n return received;\n};\nfs.writeSync = (descriptor, buffer, offset, length, position) => {\n if (reserved && descriptor === writer) {\n  state.write_calls++;\n  if (vector.phase === 'write') throw value(vector.value);\n  if (vector.phase === 'partial_write') {\n   actual.writeSync(descriptor, buffer, offset, length - 1, position);\n   throw value(vector.value);\n  }\n }\n return actual.writeSync(descriptor, buffer, offset, length, position);\n};\nfs.ftruncateSync = (descriptor, length) => {\n if (reserved && descriptor === writer) {\n  state.truncate_calls++;\n  if (vector.phase === 'truncate') { actual.ftruncateSync(descriptor, 2); throw value(vector.value); }\n  const received = actual.ftruncateSync(descriptor, length); truncated = true;\n  if (vector.phase === 'final_predicate') actual.writeSync(descriptor, Buffer.from(token), 0, token.length, 0);\n  return received;\n }\n return actual.ftruncateSync(descriptor, length);\n};\nfs.readSync = (descriptor, ...rest) => {\n if (truncated && inputDescriptors.has(descriptor) && vector.phase === 'final_read') throw value(vector.value);\n return actual.readSync(descriptor, ...rest);\n};\nfs.closeSync = (descriptor) => {\n inputDescriptors.delete(descriptor);\n if (reserved && descriptor === writer) {\n  reserved = false; state.writer_close_attempts++;\n  const received = actual.closeSync(descriptor);\n  if (vector.close) throw value(vector.closure);\n  return received;\n }\n return actual.closeSync(descriptor);\n};\nprocess.on('exit', () => fs.writeFileSync(vector.trace, JSON.stringify(state)));\n"
+	);
+	const vectorPath = path.join(f.directory, 'source-seal-private-vector.json');
+	const trace = path.join(f.directory, 'source-seal-private-trace.json');
+	const input = path.join(f.directory, inputPath);
+	const before = fs.readFileSync(input);
+	const oracleBefore = fs.readFileSync(path.join(f.directory, oraclePath));
+	fs.writeFileSync(vectorPath, JSON.stringify({ ...vector, trace }));
+	try {
+		const result = cp.spawnSync(
+			process.execPath,
+			[
+				'--require',
+				preload,
+				path.join(f.directory, sealerPath),
+				...(vector.args || ['--ref', f.head, '--write'])
+			],
+			{
+				cwd: f.directory,
+				env: { ...env, ERGOPTI_SOURCE_SEAL_TEST_VECTOR: vectorPath },
+				encoding: 'utf8',
+				timeout: 30000,
+				maxBuffer: 33554432
+			}
+		);
+		return {
+			result,
+			state: JSON.parse(fs.readFileSync(trace, 'utf8')),
+			inputChanged: !fs.readFileSync(input).equals(before),
+			oracleUnchanged: fs.readFileSync(path.join(f.directory, oraclePath)).equals(oracleBefore)
+		};
+	} finally {
+		// Restore only the test-owned seed after the actual CLI child has returned.
+		fs.writeFileSync(input, before);
+	}
+}
+function assertSourceSealCLI(f, vector, outcome) {
+	const { result, state } = outcome;
+	assert.equal(result.error, undefined, vector.label);
+	assert.equal(result.signal, null, vector.label);
+	assert.equal(result.status, vector.success ? 0 : 1, vector.label);
+	assert.equal(result.stderr, vector.expected, vector.label);
+	assert.equal(
+		result.stdout,
+		vector.success
+			? `WINDOWS_UPDATER_SOURCE_SEAL ref=${f.head} inputs=21 mode=write native=false official=false\n`
+			: '',
+		vector.label
+	);
+	assert.equal(state.writer_close_attempts, vector.args ? 0 : 1, vector.label);
+	assert.equal(state.message_gets, 0, vector.label);
+	assert.equal(state.coercions, 0, vector.label);
+	assert.equal(state.proxy_traps, 0, vector.label);
+	assert.equal(outcome.oracleUnchanged, true, vector.label);
+	if (['partial_write', 'truncate', 'final_predicate', 'final_read'].includes(vector.phase))
+		assert.equal(outcome.inputChanged, true, 'The refusal does not promise rollback');
+}
+function sourceSealCLIControls(f) {
+	const vectors = sourceSealCLIVectors(f);
+	assert.equal(vectors.length, 12, 'Every normal actual CLI vector is enrolled');
+	assert.equal(
+		new Set(vectors.map((row) => row.label)).size,
+		12,
+		'Every actual CLI vector is unique'
+	);
+	const started = process.hrtime.bigint();
+	for (const vector of vectors) assertSourceSealCLI(f, vector, sourceSealCLIChild(f, vector));
+	const elapsed = Number(process.hrtime.bigint() - started) / 1000000;
+	process.stdout.write(
+		`SOURCE_SEAL_CLI controls=12 elapsed_ms=${elapsed.toFixed(3)} native=false official=false\n`
+	);
 }
 const passiveCopy = (value) => JSON.parse(JSON.stringify(value));
 async function modelMain(f, code) {
@@ -444,6 +650,82 @@ async function modelMain(f, code) {
 		assert.equal(v.sha256, sha(bytes));
 		assert.equal(v.identity.size, String(bytes.length));
 		refuses(() => f.api.readSourceFile(file, bytes.length - 1), /acquisition/);
+		// Faults exercise the actual reader and descriptor; none is native acceptance.
+		const originalRead = new Error('Independent source receiving refusal');
+		const originalClose = new Error('Independent closure acknowledgment refusal');
+		for (const vector of [
+			{ read: true, value: originalRead, close: true },
+			{ read: true, value: undefined, close: true },
+			{ read: true, value: null, close: true },
+			{ read: true, value: false, close: true },
+			{ read: true, value: originalRead, close: false },
+			{ read: false, close: true }
+		]) {
+			const actualOpen = fs.openSync,
+				actualStat = fs.fstatSync,
+				actualClose = fs.closeSync;
+			let descriptor,
+				closeAttempts = 0,
+				refused = false,
+				failure;
+			try {
+				fs.openSync = (...args) => (descriptor = actualOpen(...args));
+				fs.fstatSync = (...args) => {
+					if (vector.read) throw vector.value;
+					return actualStat(...args);
+				};
+				fs.closeSync = (fd) => {
+					closeAttempts += 1;
+					actualClose(fd);
+					if (vector.close) throw originalClose;
+				};
+				try {
+					f.api.readSourceFile(file);
+				} catch (error) {
+					refused = true;
+					failure = error;
+				}
+			} finally {
+				fs.openSync = actualOpen;
+				fs.fstatSync = actualStat;
+				fs.closeSync = actualClose;
+			}
+			assert.equal(refused, true, 'Both single and paired refusals deny receiving');
+			assert.equal(closeAttempts, 1, 'Uncertain close is not retried');
+			assert.throws(
+				() => actualStat(descriptor),
+				(error) => error.code === 'EBADF'
+			);
+			if (vector.read && vector.close) {
+				assert.ok(failure instanceof AggregateError, 'Both original failures survive');
+				assert.equal(failure.cause, vector.value);
+				assert.deepEqual(failure.errors, [vector.value, originalClose]);
+				assert.equal(failure.errors[0], vector.value);
+				assert.equal(failure.errors[1], originalClose);
+			} else assert.equal(failure, vector.read ? vector.value : originalClose);
+		}
+		// These selected identity controls share the original finite fixture.
+		const closure = new Error('Independent source seal closure refusal');
+		const sealingVectors = [
+			{ phase: 'write', value: originalRead, close: true, closure },
+			{ phase: 'write', value: undefined, close: true, closure },
+			{ phase: 'write', value: false, close: true, closure: false },
+			{ phase: 'validation', value: null, close: false },
+			{ close: true, closure: 0 },
+			{ close: false }
+		];
+		for (const vector of sealingVectors) {
+			const outcome = sealWriteFault(f, vector);
+			assert.equal(outcome.refused, Boolean(vector.phase || vector.close));
+			if (vector.phase && vector.close) {
+				assert.ok(outcome.failure instanceof AggregateError);
+				assert.equal(outcome.failure.cause, vector.value);
+				assert.deepEqual(outcome.failure.errors, [vector.value, vector.closure]);
+				assert.equal(outcome.failure.errors[0], vector.value);
+				assert.equal(outcome.failure.errors[1], vector.closure);
+			} else assert.equal(outcome.failure, vector.phase ? vector.value : vector.closure);
+		}
+		sourceSealCLIControls(f);
 	});
 	control('real hardlink and symlink reader aliases refuse', () => {
 		const f = fixture(),

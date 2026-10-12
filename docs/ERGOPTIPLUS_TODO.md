@@ -243,6 +243,29 @@ an actual official MSVC rebuild must land together; the current E4133 DLL still
 matches the preceding live source and must not receive the changed consumer
 alone. Production observer conversion and emission remain software work.
 
+Item 49 also retains the [captured-clock boundary correction](handovers/2026-10-12-dev-consolidation/pending-capture-clock-half-range.patch)
+with [source hashes and native receiving instructions](handovers/2026-10-12-dev-consolidation/capture-clock-receiving.md).
+The exact half-DWORD ambiguity now refuses in both directions without losing
+raw edges or advancing the preceding anchor. All 1,352 original assertions remain,
+with 31 additions; 43/43 portable C cases and selected full sanitizers pass.
+The original producer and two independent mutations fail. This pending source
+patch is not applied to the live DLL; official Windows MSVC/SDK rebuild and
+matching provenance remain UNRUN. Observer conversion and output emission are
+still software work, and item 49 remains open.
+
+Item 49 additionally retains the [owned Win32 serialization correction](handovers/2026-10-12-dev-consolidation/pending-owned-win32-payload-serialization.patch)
+and [combined native receiving instructions](handovers/2026-10-12-dev-consolidation/pending-native-output-receiving.md).
+The pure serializer validates the retained attempt before copying its exact
+Unicode/VK/scan suffix into fixed owned Win32 packets. It changes no send,
+acknowledgement, export or cohort admission. All 124 original assertions remain,
+with 66 additions; ten matrices pass with full sanitizers and six compiled
+mutations fail. Native SDK, DLL and AHK receiving remain UNRUN. The union with
+the paired modifier corrections expects eleven matrices, not executed together;
+preserve both additive test bodies when composing the shared footer. The
+lock-held DLL/consumer bridge, emitter orchestration and full nonhook
+handler/observer conversion remain software work. No SendEvent/SendInput choice
+or physical acceptance is inferred.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
@@ -7686,6 +7709,26 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-12 the source sealer now preserves exact write/validation and descriptor
+closure failures together, including thrown falsy values, with one close
+attempt and no uncertain retry. Its actual CLI emits only owned fixed refusal
+diagnostics, never private exception getters, coercions or assertion diff
+payloads. Genuine assertion labels and Git operation refusals remain useful.
+All30 original predicate calls stay exact; the Node assertion singleton and
+prototypes remain unchanged. Actual CLI56 and writer57 portable controls pass;
+the original has53 CLI counterexamples and28 paired writer counterexamples.
+The unchanged historical15 and registered22 controls pass. Normal enrollment
+executes exactly12 CLI cases and six identity vectors in about3.34s; the wider
+research matrices remain separately retained. No rollback, transactionality,
+Windows/process closure or native updater acceptance is claimed.
+
+The sibling writer limitation recorded by the earlier reader-only slice is
+therefore repaired at source level. Original23, SDK/cache authentication,
+whole-tree owner enrollment and all native/package/enterprise requirements
+remain independent. The SDK pure-helper and Root-owned process adapter are
+being reviewed separately; no stopped CA/PAC/account/curl experiment or
+new native receipt is inferred. Items62 and transversal16/38 remain open.
+
 The ba41 successor's Linux unit composition passes13450/0, while its full JS and
 simulated Hammerspoon checks retain the documented three/six upstream failures.
 Fresh Dev is checked independently through Git and API before delivery. Root
@@ -10212,6 +10255,23 @@ interpreter and kernel execution identity remain unqualified. A passive evidence
 completion is prepared separately for ownership review; it changes no trust,
 clock, acceptance or factory admission. Native managed-network delivery and
 trust restoration remain required.
+
+The common Windows updater source reader now preserves acquisition/validation
+refusal and a simultaneous descriptor-close refusal as two exact error values,
+with the original receiving value retained as cause. Single refusals and
+successful bytes/digests/identity guards remain unchanged. Cleanup is attempted
+once; uncertain closure is not retried or acknowledged. Six additive portable
+vectors in the existing22-control owner use real temporary files/descriptors
+with modeled read and close failures, including undefined/null/false. The
+original reader fails the paired-refusal assertion; the candidate passes22
+without native or official acceptance. No21-pin input, original23 label oracle,
+child command, timeout or native assertion is changed. Root retains CI enrollment
+and clock/graph ownership.
+
+The shared sealing generator's separate write/validation-plus-close masking
+path remains unmodified and requires a coordinated follow-up. Generator reads
+use the corrected common reader. This does not qualify original23 Windows,
+managed-network receiving or complete item62;16/38 stay open and22 excluded.
 
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
@@ -13126,6 +13186,25 @@ test precondition failure, not a Lua defect or a successful permission grant.
   original failure exit and excludes addresses, environment values and private
   error text. Receive a new real Apple Silicon attempt before marking the
   installation defect fixed.
+
+  Issue94 follow-up: the native generic HTTP worker and its Python/Go
+  receivers now preserve nine closed refusal stages and their exact permitted
+  reasons. The Python bootstrap fact retains the stage only after actual child
+  retirement; public Go `Do` preserves it as well as `RoundTrip`. Success and
+  legacy failure frames keep their original contract. Unknown, duplicated,
+  null, mismatched and successful stage-bearing frames refuse. Generator
+  controls pass18/0; actual Python receiving passes6 tests with35 independent
+  vectors, with21 genuine predecessor assertion failures. Actual Go receiving
+  passes70 test events with zero skips and terminal package PASS, exit0. The
+  complete portable Mac composition passes18,998/18,998, actual exit0;
+  Hammerspoon doubles under Linux do not qualify a native Mac. The full JS run
+  remains416/426, exit1; all eight affected composition checks now pass
+  targeted successors, while two known source-policy failures remain with Root.
+  The publication fixture preserves its24 cases with added admission/refusal
+  controls. No full-green result is inferred. Native Swift/XCTest,
+  Darwin networking and installed MLX receiving remain unrun. Ship the signed
+  producer and strict receivers together; do not enable production qualification
+  or infer a historical failure's stage from its old `unavailable` reason.
 
 - [ ] **137.** Publish the selected AI provider before model loading completes.
 
