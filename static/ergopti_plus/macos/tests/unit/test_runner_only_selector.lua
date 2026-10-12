@@ -183,7 +183,7 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		local source = handle:read("*a")
 		handle:close()
 		local select_index = source:find("OnlySelector.select_modules", 1, true)
-		local require_index = source:find("pcall(require, mod_name)", 1, true)
+		local require_index = source:find("helpers.measure_module(mod_name,", 1, true)
 		helpers.assert_true(select_index ~= nil, "runner must invoke the focused module selector")
 		helpers.assert_true(require_index ~= nil, "runner must retain protected module loading")
 		helpers.assert_true(select_index < require_index,
@@ -203,6 +203,92 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 			and summary_index ~= nil
 			and match_guard_index < summary_index,
 			"only a classified case-name filter may guard zero-test replays")
+	end)
+
+	helpers.it("retains isolated measurement and the actual module load failure in the runner loop", function()
+		local function compile(text, name, environment)
+			if type(loadstring) == "function" then
+				local chunk = assert(loadstring(text, name))
+				return setfenv(chunk, environment)
+			end
+			return assert(load(text, name, "t", environment))
+		end
+		local root = helpers.driver_root()
+		local handle = assert(io.open(root .. "tests/run.lua", "rb"))
+		local source = handle:read("*a")
+		assert(handle:close())
+		local first = assert(source:find("for _, mod_name in ipairs(modules_to_load) do\n", 1, true))
+		local last = assert(source:find("\nlocal r = helpers.get_results()", first, true))
+		local helper_path = root .. "tests/helpers/init.lua"
+		local helper_file = assert(io.open(helper_path, "rb"))
+		local helper_source = helper_file:read("*a")
+		assert(helper_file:close())
+		local Timing = require("test.runner_timing")
+		local rows, ticks, printed, captures = {}, 0, 0, 0
+		-- A separate real helper instance keeps the deliberately failed module out
+		-- of the outer test reporter. Only the fixture clock and sink are recorded.
+		local helper_environment = setmetatable({
+			require = function(name)
+				if name ~= "test.runner_timing" then return require(name) end
+				return { capture = function(driver)
+					helpers.assert_eq(driver, "macos")
+					captures = captures + 1
+					return Timing.new(driver, function()
+						ticks = ticks + 1000000
+						return ticks
+					end, function(row) rows[#rows + 1] = row end)
+				end }
+			end,
+			print = function() printed = printed + 1 end,
+		}, { __index = _G })
+		local isolated = compile(helper_source, "@" .. helper_path, helper_environment)()
+		helpers.assert_true(not rawequal(isolated, helpers))
+		isolated.initialize_timing()
+		local sentinel, calls, result = {}, {}, { failed = 0, failures = {} }
+		local measured_error
+		local environment = {
+			modules_to_load = { "tests.unit.recorded_load_failure" },
+			total_modules = 0,
+			driver_root = "recording-driver",
+			shared_lua = "recording-shared",
+			ipairs = ipairs,
+			pcall = pcall,
+			string = string,
+			tostring = tostring,
+			print = function() end,
+			ModuleIsolation = { purge = function() calls[#calls + 1] = "purge" end },
+			require = function(name)
+				helpers.assert_eq(name, "tests.unit.recorded_load_failure")
+				calls[#calls + 1] = "require"
+				error(sentinel, 0)
+			end,
+			helpers = {
+				get_results = function() return result end,
+				measure_module = function(name, callback)
+					calls[#calls + 1] = "measure"
+					local ok, err = isolated.measure_module(name, callback)
+					measured_error = err
+					return ok, err
+				end,
+			},
+		}
+		compile(source:sub(first, last - 1), "@actual-runner-module-loop", environment)()
+		helpers.assert_eq(environment.total_modules, 1)
+		helpers.assert_eq(result.failed, 1)
+		helpers.assert_eq(#result.failures, 1)
+		helpers.assert_eq(result.failures[1].kind, "module")
+		helpers.assert_eq(result.failures[1].module, "tests.unit.recorded_load_failure")
+		helpers.assert_eq(result.failures[1].err, tostring(sentinel))
+		helpers.assert_true(rawequal(measured_error, sentinel), "the actual protected helper must retain error identity")
+		helpers.assert_eq(calls, { "purge", "measure", "require" })
+		helpers.assert_eq(captures, 1)
+		helpers.assert_eq(printed, 0, "the isolated helper must not emit a failed outer timing row")
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].kind, "module")
+		helpers.assert_eq(rows[1].module, "tests.unit.recorded_load_failure")
+		helpers.assert_eq(rows[1].status, "fail")
+		helpers.assert_eq(rows[1].elapsed_ms, 1)
+		helpers.assert_true(not isolated.timing_failed())
 	end)
 
 	helpers.it("accepts an exact source-only module with zero registered cases", function()
@@ -248,3 +334,5 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		helpers.assert_eq(#failed_load.failures, 1)
 	end)
 end)
+
+require("test.runner_timing_contract").run(helpers)

@@ -26,6 +26,7 @@
 
 const { spawn } = require('child_process');
 const fs = require('fs');
+const { StringDecoder } = require('node:string_decoder');
 
 // =====================================
 // ======= 1/ Argument parsing =========
@@ -54,13 +55,42 @@ function parseArgs(argv) {
  * @param {string} out The runner's full stdout/stderr.
  * @returns {{failures: string[], passed: number, failed: number, format: string}}
  */
-function parseResults(out) {
+function parseResults(out, timingOutput = out) {
 	const lines = out.split(/\r?\n/);
 	const failures = [];
+	const timings = [];
+	const timing_errors = [];
 	let passed = 0,
 		failed = 0,
 		format = 'unknown';
 
+	for (const line of timingOutput.split(/\r?\n/)) {
+		if (line.startsWith('# lua_timing ')) {
+			try {
+				const row = JSON.parse(line.slice('# lua_timing '.length));
+				if (
+					row.schema !== 1 ||
+					!Number.isSafeInteger(row.id) ||
+					row.id < 1 ||
+					!['case', 'module'].includes(row.kind) ||
+					!['pass', 'fail'].includes(row.status) ||
+					!['driver', 'module', 'name', 'timing_error'].every(
+						(key) => typeof row[key] === 'string'
+					) ||
+					!(
+						(row.elapsed_ms === null && row.timing_error !== '') ||
+						(Number.isFinite(row.elapsed_ms) && row.elapsed_ms >= 0 && row.timing_error === '')
+					)
+				)
+					throw new Error('invalid timing record');
+				timings.push(row);
+				if (row.timing_error) timing_errors.push(`${row.module}: ${row.name}: ${row.timing_error}`);
+			} catch {
+				timing_errors.push('Malformed Lua timing record');
+			}
+			continue;
+		}
+	}
 	for (const line of lines) {
 		// TAP: "not ok 12 - some test - diag"
 		const tap = line.match(/^not ok\s+\d+\s+-\s+(.+)$/);
@@ -100,7 +130,7 @@ function parseResults(out) {
 	const seen = new Set();
 	const uniqueFailures = failures.filter((f) => (seen.has(f) ? false : (seen.add(f), true)));
 
-	return { failures: uniqueFailures, passed, failed, format };
+	return { failures: uniqueFailures, passed, failed, format, timings, timing_errors };
 }
 
 // =====================================
@@ -187,7 +217,10 @@ function emit(opts, res, code) {
 			passed: res.passed,
 			failed: res.failed,
 			exit_code: code,
-			failures: res.failures
+			failures: res.failures,
+			...(res.timings.length || res.timing_errors.length
+				? { timings: res.timings, timing_errors: res.timing_errors }
+				: {})
 		};
 		try {
 			fs.writeFileSync(opts.json, JSON.stringify(payload, null, 2));
@@ -221,29 +254,38 @@ function main() {
 	if (opts.cmd[0] === 'PARSE_FILE') {
 		const out = fs.readFileSync(opts.cmd[1], 'utf8');
 		const res = parseResults(out);
-		emit(opts, res, res.failed > 0 ? 1 : 0);
-		process.exitCode = res.failed > 0 ? 1 : 0;
+		emit(opts, res, res.failed > 0 || res.timing_errors.length ? 1 : 0);
+		process.exitCode = res.failed > 0 || res.timing_errors.length ? 1 : 0;
 		return;
 	}
 
 	const child = spawn(opts.cmd[0], opts.cmd.slice(1), { shell: false });
 	let buf = '';
+	let timingOutput = '';
+	const stdoutDecoder = new StringDecoder('utf8');
+	const stderrDecoder = new StringDecoder('utf8');
 	let spawnFailed = false;
 	child.stdout.on('data', (d) => {
-		buf += d;
+		const text = stdoutDecoder.write(d);
+		buf += text;
+		timingOutput += text;
 		process.stdout.write(d);
 	});
 	child.stderr.on('data', (d) => {
-		buf += d;
+		buf += stderrDecoder.write(d);
 		process.stderr.write(d);
 	});
 	child.on('close', (code) => {
 		if (spawnFailed) return;
-		const res = parseResults(buf);
-		emit(opts, res, code ?? 0);
+		const stdoutEnd = stdoutDecoder.end();
+		buf += stdoutEnd + stderrDecoder.end();
+		timingOutput += stdoutEnd;
+		const res = parseResults(buf, timingOutput);
+		const finalCode = code || (res.timing_errors.length ? 1 : 0);
+		emit(opts, res, finalCode);
 		// Natural shutdown drains both forwarded streams and final annotations.
 		// An immediate exit discards pending pipe writes despite a valid JSON file.
-		process.exitCode = code ?? 0;
+		process.exitCode = finalCode;
 	});
 	child.on('error', (err) => {
 		spawnFailed = true;

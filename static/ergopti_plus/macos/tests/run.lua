@@ -65,6 +65,7 @@ package.path = table.concat({
 }, ";")
 
 local helpers = require("tests.helpers")
+helpers.initialize_timing()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
 
@@ -223,10 +224,14 @@ for _, mod_name in ipairs(modules_to_load) do
 	total_modules = total_modules + 1
 	ModuleIsolation.purge(driver_root, shared_lua)
 	print(string.format("\n>>> Loading %s", mod_name))
-	local ok, err = pcall(require, mod_name)
+	local ok, err = helpers.measure_module(mod_name, function() return require(mod_name) end)
 	if not ok then
 		print(string.format("  ! LOAD FAILURE in %s: %s", mod_name, tostring(err)))
 		helpers.get_results().failed = helpers.get_results().failed + 1
+		local failures = helpers.get_results().failures
+		failures[#failures + 1] = {
+			name = mod_name, err = tostring(err), kind = "module", module = mod_name,
+		}
 	end
 end
 
@@ -240,11 +245,16 @@ print(string.format(
 if r.failed > 0 then
 	print("\n--- DETAILED FAILURES ---")
 	for i, f in ipairs(r.failures) do
+		if f.kind ~= "case" then print("  FAIL " .. f.name .. " — " .. f.err) end
 		print(string.format(
 				"[%d] %s\n    Error: %s\n    replay: lua tests/run.lua --only %q\n",
-				i, f.name, f.err, f.name
+				i, f.name, f.err, f.kind == "case" and f.name or f.module or f.name
 			))
 	end
+	os.exit(1)
+end
+if helpers.timing_failed() then
+	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)
 end
 print("\n[OK] All Lua unit tests passed.")

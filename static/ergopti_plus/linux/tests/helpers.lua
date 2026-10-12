@@ -5,10 +5,10 @@
 --- DESCRIPTION:
 --- Shared utilities for the Linux driver test suite — path resolution,
 --- lightweight assertions, and a minimal describe/it layer usable under plain
---- LuaJIT with no external dependencies.
+--- LuaJIT with the native luv wall-clock provider.
 ---
 --- FEATURES & RATIONALE:
---- 1. Zero-dependency runner: works under LuaJIT 2.x with no external libs;
+--- 1. Timed runner: works under LuaJIT 2.x with native luv.hrtime;
 ---    the describe/it API mirrors the Hammerspoon helpers so test files are
 ---    easy to port between drivers.
 --- 2. Per-test isolation: load_module() wipes the package cache before
@@ -24,6 +24,8 @@ local M = {}
 
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")
+local _timing = nil
+local _current_module = nil
 M.inspect = fmt.inspect
 M.deep_equal = fmt.deep_equal
 
@@ -171,6 +173,9 @@ function M.describe(name, fn)
 	if not ok then
 		print(string.format("  ! suite error: %s", tostring(err)))
 		_suite_results.failed = _suite_results.failed + 1
+		_suite_results.failures[#_suite_results.failures + 1] = {
+			name = name, err = tostring(err), kind = "suite", module = _current_module,
+		}
 	end
 end
 
@@ -187,17 +192,23 @@ end
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring) so one behaviour can be re-run in isolation.
-	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
-	local ok, err = pcall(function()
-		if _before_each_fn then _before_each_fn() end
-		fn()
-	end)
+	local ok, err
+	if _timing then
+		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
+		if ok == nil then return end
+	else
+		if _only_filter and not string.find(name, _only_filter, 1, true) then return end
+		ok, err = pcall(function()
+			if _before_each_fn then _before_each_fn() end
+			fn()
+		end)
+	end
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
 	else
 		_suite_results.failed = _suite_results.failed + 1
-		_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = tostring(err) }
+		_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = tostring(err), kind = "case", module = _current_module }
 		print("  FAIL " .. name .. " — " .. tostring(err))
 	end
 end
@@ -230,5 +241,31 @@ end
 --- Restricts M.it execution to tests whose name contains `substr` (the --only filter).
 --- @param substr string|nil Substring to match; nil clears the filter (run all).
 function M.set_only_filter(substr) _only_filter = substr end
+
+
+--- Initializes the unit runner clock before test modules can replace stubs.
+--- Support imports by E2E do not acquire a clock or claim unit timing coverage.
+function M.initialize_timing()
+	assert(_timing == nil, "Lua unit timing is already initialized")
+	_timing = require("test.runner_timing").capture("linux")
+end
+
+--- Measures one module load while retaining its current case ownership.
+--- @param name string Exact test module identity.
+--- @param callback function Original require operation.
+--- @return boolean ok Original protected-call verdict.
+--- @return any result Original protected-call result or error.
+function M.measure_module(name, callback)
+	assert(_timing ~= nil, "Lua unit timing is not initialized")
+	local previous = _current_module
+	_current_module = name
+	local ok, result = _timing.measure("module", name, callback, name)
+	_current_module = previous
+	return ok, result
+end
+
+--- Reports timing admission failure without changing assertion counters.
+--- @return boolean failed True if clock or output diagnostics were incomplete.
+function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
 
 return M
