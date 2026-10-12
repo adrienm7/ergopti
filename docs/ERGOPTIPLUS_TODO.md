@@ -5422,6 +5422,45 @@ ACK/refusal subjects, all gesture-marker modes, Tap-Hold negative backup and
 external-edit cases, and the complete unchanged native suite. Source review
 and Linux-host encoding/JS checks do not complete that Windows validation.
 
+The Windows TOML tokenizer uses native forward LF search for positive integer
+cursors in unquoted comments, retaining its original character loop for an
+absent LF, a search stopped by NUL or other cursor types. All original 37
+fixture registrations and 280 assertions remain unchanged; 38 independently
+frozen UTF-16 controls cover cursor domains, quoting, separators, NUL,
+surrogates and exception outcomes. No corpus expectation is generated from
+the candidate. The launcher passes its eleven local checks, including the
+original 66 controls, 20 additive controls and both workflow guards. Manual
+Windows CI 38204598996 completed on exact private source 2abf20a709 with
+SDK 2.0.26. The original/candidate/inverse Native38 gate and strict candidate
+restoration gate passed; the raw artifact download remains refused by GitHub,
+so its individual raw records have not been independently received. The
+unchanged thirteen temporal subjects remain incomplete: four terminal passes,
+one started subject killed at the original shared 600,000 ms budget and eight
+subjects never started. Core JavaScript passed 412 of 413 checks; managed
+Ollama's Swift dependency control failed. Full Windows units, E2E, packaging
+and installation were skipped after the temporal failure. Phase measurement
+and complete native qualification remain required; no performance improvement
+or complete writer qualification is inferred. Installed-device acceptance and
+items 42 and 16/38 remain partial.
+
+Actual bounded Windows receiving on manual run 38209311346, exact private SHA
+5ec8e90b94886c20b01e7a75a0712e5122dfc684, independently reconstructs all
+45 complete host-log streams with exact byte counts and SHA-256 values.
+SDK 2.0.26 runs all 38 unchanged independent controls against the original,
+candidate and inverse sources successfully, then acknowledges the final
+candidate restoration. The unchanged thirteen temporal subjects remain
+incomplete: six pass, the seventh is interrupted by the original 600,000 ms
+shared budget, and six are never started. Commit costs 33.7–37.1 seconds and
+rollback 49.8–54.4 seconds in the six settled cases; WAL hex conversion is
+about 1 ms and their single observed recovery-image attempts cost 0.37–1.65
+seconds. Eight attempts remain the original maximum, not an observed count.
+These phase measurements identify further investigation, not a qualified
+production optimization. Full Windows units, E2E, packaging and installation
+remain skipped. Local selected checks passed 412/413; the unchanged Linux
+uninstall control separately passes when its fixture is outside the managed
+Git ancestors. This is mixed-environment evidence, not one green full run.
+Item 42 and transversal items 16/38 remain partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -5692,8 +5731,13 @@ allocation, native builder observation and result placement. The unchanged
 census owner measures Windows 17 to 16, with macOS 2 and Linux 1 unchanged.
 Actual private Node22 menu guards, reader and inert-publication controls, syntax,
 owning formatting and genuine generation pass. The original ten and four new
-Windows subjects remain native UNRUN; Windows qualification is pending.
-This item remains partial.
+Windows subjects now pass in actual bounded run 38209311346 on exact
+private SHA 5ec8e90b94886c20b01e7a75a0712e5122dfc684 with SDK 2.0.26.
+All six native children exit and dispose; all seventeen cleanup reports retain
+the original construction-refusal then repair sequences and zero secondary
+errors. The unchanged fixture and all 3273 source pins are verified before and
+after. This qualifies the targeted cohort; full-suite, E2E, packaging,
+installation and device acceptance remain pending. This item remains partial.
 
 Current Windows receiving38173146839 on committed9c9d now passes all twelve
 personal-file caption subjects (eight new and four original late controls).
@@ -7108,6 +7152,16 @@ Each macOS native PAC cohort has12 passes/two failures and independent HTTP
 retains two method errors plus a teardown error and trust-restoration debt.
 See the [official runner checkpoint](handovers/2026-10-12-group6-ci/README.md).
 Root owns supplemental enrollment; full enterprise acceptance remains open.
+
+2026-10-12 Devd98e4f1 changes one of the21 Windows updater source inputs.
+The source-only sealer refreshes those hashes from an explicit reviewed commit;
+the23 independent labels,18/4/1 cohorts, UNRUN dispositions and frozen oracle
+remain byte-equivalent. The original22 source controls pass after refusing the
+stale TOML hash;15 independent generator controls pass. Existing Group1 manual
+38218957837 tested identical Windows/shared/build sources and failed; its1976
+terminal annotations do not supply updater outcomes. Detailed receiving is
+blocked at productionresultssa14; no duplicate native run or success is inferred.
+Root still owns clean original23 enrollment; item62 remains open.
 
 2026-10-12 the Linux acceptance collector now projects ordered, closed build and
 guardian milestones separately from acceptance and physical-closure evidence.
@@ -9634,8 +9688,13 @@ is committed; one request is one commit with its regression test.
 On 2026-10-12, one genuine Windows shortcut-extension construction and
 placement site moves to the shared recipe: Windows 17 to 16, macOS 2, Linux 1.
 Actual private Node22 owning guards and genuine generation pass with all original
-corpora and assertions retained. The fourteen Windows subjects remain native
-UNRUN; Windows qualification is pending. Items 54 and 81 remain partial.
+corpora and assertions retained. Actual bounded run 38209311346 on exact
+private SHA 5ec8e90b94886c20b01e7a75a0712e5122dfc684 passes all fourteen
+unchanged subjects, six genuine SDK 2.0.26 children and seventeen exact cleanup
+reports, including the intentional refusal/repair sequences. All source pins,
+original corpus, names and order are independently received. Full-suite, E2E,
+packaging, installation and device acceptance remain pending. Items 54 and 81
+remain partial.
 
 Current Windows receiving38173146839 on committed9c9d now passes all twelve
 personal-file caption subjects (eight new and four original late controls).

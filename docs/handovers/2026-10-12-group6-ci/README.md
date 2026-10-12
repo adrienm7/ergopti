@@ -109,6 +109,44 @@ the coordination issue after the atomic commit. Root's offline period is not a
 custody handoff. See the existing [native procedure](../2026-10-11-group6-cloud/LOCAL-VALIDATION.md)
 for unresolved original entrypoints; no new Windows local test is requested.
 
+## Fresh Dev and source-only updater resealing
+
+The subsequent synchronization preserves Dev commit
+`d98e4f1fe83bec44dd60756c38868c073752ac9a`, including Group1's TOML source and
+its registered test. Only that TOML source changes among the21 frozen updater
+inputs. The existing22-control source test correctly refuses the stale hash
+before the generator repair; all22 controls pass after resealing.
+
+Run the generator with the full reviewed commit, then verify its output:
+
+```bash
+node tools/ci/seal-windows-updater-original-source.cjs --ref d98e4f1fe83bec44dd60756c38868c073752ac9a --write
+node tools/ci/seal-windows-updater-original-source.cjs --ref d98e4f1fe83bec44dd60756c38868c073752ac9a --check
+```
+
+The immutable current-HEAD template and original label oracle remain the
+independent authority. Only `source_sha256` and `source_pin_base` may change.
+The actual21 files must equal the selected Git commit. Changed protected data,
+aliases and hardlinks are refused; the existing output descriptor is acquired
+before writing. Publication is not crash-atomic. Fifteen portable controls
+execute18 actual CLI children and verify refusal, idempotence and whole-template
+inverse restoration with exactly two substitutions. They are source-only,
+not Windows acceptance or normal-suite enrollment. Oracle SHA256 remains
+`2b00c32567273c9e671b3460fe54b52059032b0188f10103076523d58b59eb01`.
+
+Group1 manual38218957837 on6b85331f5c6a31d516c2e9f0824bd1073e622b0c already
+tested identical Windows,shared,build/native and Windows workflow inputs.
+It failed: annotations report1976 terminal records of11211 planned, with missing
+footer. Actual pass count, last case, timing and all23 updater dispositions are
+unknown. The official129250-byte manifest artifact11734552827 has SHA256
+`c09794f9b2f058dd06c88d2334be3d6d62cfc895bda34dc8a7104537744578de`,
+but its payload and raw job log were refused at
+`productionresultssa14.blob.core.windows.net`. The additive network requirement
+is saved in the environment draft; runtime activation and publication are not
+proved. Prior211e results cannot fill these missing outcomes. No duplicate
+Windows replay is justified by this source-data-only repair. Group1's shared
+CI lease remains owned by Group1 even after its run terminates.
+
 ## Verified obsolete branch cleanup
 
 The following3 remote refs had no open PR or active CI, were integrated in
