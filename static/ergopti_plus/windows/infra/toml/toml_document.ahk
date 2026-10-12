@@ -59,8 +59,16 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 			else if StrLen(Quote) == 1 && (Char == Chr(10) || Char == Chr(13))
 				throw ValueError("A single-line TOML string contains a newline")
 		} else if Char == "#" {
-			while Position <= Length && SubStr(Text, Position, 1) != Chr(10)
-				Position += 1
+			; Leave the LF to the original separator/container processing. Native
+			; search is forward only for an integer cursor and stops at NUL, so
+			; keep the original loop when there is no match or another cursor type.
+			if Type(Position) == "Integer" && Position > 0
+					&& (CommentNewline := InStr(Text, Chr(10), true, Position))
+				Position := CommentNewline
+			else {
+				while Position <= Length && SubStr(Text, Position, 1) != Chr(10)
+					Position += 1
+			}
 			continue
 		} else if (Triple == Chr(34) . Chr(34) . Chr(34))
 				|| (Triple == Chr(39) . Chr(39) . Chr(39)) {
