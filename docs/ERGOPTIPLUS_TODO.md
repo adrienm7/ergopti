@@ -4076,6 +4076,12 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-12 resumed exact `dbfdcaa652` native receiving confirms 24/25 archive
+controls pass, one owned Automation deadline fails and all six Brew scenarios
+remain unexecuted. Original logs, archive digest, 348 safe members and 407 source
+pins are retained in the [current receiving capsule](handovers/2026-10-11-group6-cloud/native-dbfd-core-archive-receiving.tar.gz).
+Package and installation were skipped; item36 and transversal16/38 remain open.
+
 2026-10-12 the original Windows updater23 diagnostic is now callable from the
 reviewed checkout with an explicit local mode before PAC -Publish. It retains
 original18/4/1 names, the2307-byte child and300000/30000/1320000 clocks, plus
@@ -7050,6 +7056,31 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-12 the authenticated `dbfdcaa652` Core result is 413/414, with all 165
+earlier receiving controls admitted. The remaining failure is the unchanged
+compiler include-directory assertion: observed0755, required0700. The G6-owned
+builder now creates that directory explicitly at0700 before staging its original
+headers. The same independent ten tests fail on old source under022/000 and pass
+on the correction under022/000/077; no assertion, command, source recipe or clock
+changes. This portable proof does not replace selected or native validation.
+Both native PAC cohorts have12 passed methods/two failed methods; trust, HTTP,
+model, package and enterprise acceptance remain incomplete. Item62 stays open.
+
+2026-10-12 the settled removal diagnostic is now composed with the G6 polling
+fix. It records only the original retired child/status and bounded existing stderr;
+original ADD ABI, trust commands,15s deadlines, primary/cancellation and closure/debt
+remain. All156 original tests and250 helpers/providers/assertions are unchanged;
+the nine reviewed regressions raise the strict count to165. The clock selector
+guard requires the same exact165 and rejects obsolete156. Current165 portable
+controls pass in13.192s; native Darwin receiving of this successor remains unrun.
+The authentic predecessor a18 manual has23jobs:8success/8failure/7skipped,
+Release skipped. Its Core413/414 times out the original156 child; bothPAC14
+have12passes/2failures, HTTP trust/restoration refuse, archive24/25 lacks consent,
+and Windows1983/11165 passes before the unchanged watchdog. No updater23,
+full-unit/package/install or enterprise qualification is granted. Root finite
+custody/history and actual own-span continuation are preserved in the
+[checkpoint](handovers/2026-10-11-group6-cloud/README.md); item62 stays open.
 
 2026-10-12 the G6-owned network fixture now uses an explicit50ms serving poll
 instead of the implicit500ms default, reducing idle shutdown cost without changing
@@ -10142,6 +10173,11 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   source image. The other twenty source pins, historical provenance and
   independent twenty-three-label oracle remain unchanged; source declarations
   do not qualify native updater or Snapshot execution.
+
+  Reviewed inactive source preparations and the remaining software, native-CI
+  and device checks are preserved in the 2026-10-12 Group3 handover. Its archive
+  is not an installed feature or a native qualification; all thirteen items
+  and the transversal validation requirements remain open.
 
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery

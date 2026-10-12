@@ -1,0 +1,913 @@
+{
+  "schema": 1,
+  "status": "INACTIVE_EXACT_SELECTED_SOURCE_AND_RECEIPT_CAPSULE",
+  "source_fence": "No canonical source/index/HEAD/ref writes, tests, native processes or network during parent gate40793",
+  "all_group3_items": "13 PARTIAL, 0 REMOVED",
+  "code_adoption_from_archive": false,
+  "runtime_binaries_caches_API_private_headers_signed_URLs_credentials": "EXCLUDED",
+  "selection_complete_original_packets": false,
+  "pending": {
+    "final_V4_runtime_independent_review": "PENDING; source review CLEAR is separate",
+    "Mac_PS_workflow_V2_independent_review": "PENDING; source freeze and four real POSIX controls do not qualify Mac native",
+    "Root_SourceB_workflow_grant_carry": "PENDING",
+    "Loader_unit_final_handback": "PENDING"
+  },
+  "members": [
+    {
+      "member": "README.md",
+      "source_origin": "New proposed private capsule README, not a repository change",
+      "bytes": 7653,
+      "sha256": "0513342924c16d223ee7d3aa9f03567eb8769efe2d95ba972c5d7ba9018b6a47",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/prior-append-review/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/linux-shipped-identity-regression-independent-v1/REPORT.md",
+      "bytes": 4697,
+      "sha256": "62949a8702f6fdf24e94eb8b09c15cc8fc1fbfa236a2a03f3470702e37e58f69",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/prior-append-review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/linux-shipped-identity-regression-independent-v1/review.json",
+      "bytes": 1211,
+      "sha256": "d6c09f44004ff1aa910f2983c54e72b99265942195bac03ba6652a4d5d74329d",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/prior-control-source/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-regression-preparation-private-v1/receipt.json",
+      "bytes": 4512,
+      "sha256": "ff86cb2d2ee73ef764a3b37e5d40c44af030aa32fcbd040c8c97a88eeaf9c7f8",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/prior-control-source/test-append.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-regression-preparation-private-v1/test-append.patch",
+      "bytes": 14634,
+      "sha256": "21fa39535b341b24d116944c09a9c4db50b86bae198009674fa9ea1ae169e029",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/after-native.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/after-native.stdout.raw",
+      "bytes": 27,
+      "sha256": "d1681bda44345ae42728c9cad1f3c5bacaff5406a4dd72c1889a6809f04075da",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/cleanup.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/cleanup.json",
+      "bytes": 969,
+      "sha256": "be3cec0809b6a532e9231d6d7262aa6eaf27261007278f5190bebc8d04ecf499",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/native-lua5.4.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/native-lua5.4.json",
+      "bytes": 130,
+      "sha256": "e4593724108e472fa737d083ec8da4fd05250522bb6777b34dfb0840377f1b94",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/native-luajit.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/native-luajit.json",
+      "bytes": 130,
+      "sha256": "e4593724108e472fa737d083ec8da4fd05250522bb6777b34dfb0840377f1b94",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/oracle.retained.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/oracle.retained.json",
+      "bytes": 3339,
+      "sha256": "121ad8d51326ed67a1170369358637ca90c30c6ff5a40881be5df5f25d6bca49",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/original-safe-lua5.4.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/original-safe-lua5.4.stdout.raw",
+      "bytes": 946,
+      "sha256": "12a2731042ee0d8ed97888d8cdd542effd480157688fb958c103bc30ed0e2b39",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/original-safe-luajit.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/original-safe-luajit.stdout.raw",
+      "bytes": 1768,
+      "sha256": "fe5823bee05e25458bfff2f15797ea5b02ab02909912d59f0f72a4a6c9e34ccc",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/receipt.json",
+      "bytes": 17571,
+      "sha256": "81d82bd9ce7a27ad8a6834936ea870fcf6e700a6d16ee580ed5dfc1d015721d1",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v3-safe-lua5.4.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v3-safe-lua5.4.stdout.raw",
+      "bytes": 946,
+      "sha256": "12a2731042ee0d8ed97888d8cdd542effd480157688fb958c103bc30ed0e2b39",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v3-safe-luajit.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v3-safe-luajit.stdout.raw",
+      "bytes": 1768,
+      "sha256": "fe5823bee05e25458bfff2f15797ea5b02ab02909912d59f0f72a4a6c9e34ccc",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v4-controlled55-lua5.4.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v4-controlled55-lua5.4.stdout.raw",
+      "bytes": 5291,
+      "sha256": "bb2fb4de355b56d9095ac4d4a766c85ef4733e166477d9b1716edb34d18df5f2",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v4-controlled55-luajit.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v4-controlled55-luajit.stdout.raw",
+      "bytes": 5291,
+      "sha256": "bb2fb4de355b56d9095ac4d4a766c85ef4733e166477d9b1716edb34d18df5f2",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v4-native-lua5.4.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v4-native-lua5.4.stdout.raw",
+      "bytes": 1304,
+      "sha256": "0193fd31b9afe1ae8c50f0ac22fff23943afe12eb86db50d6321912930c38244",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v4-native-luajit.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v4-native-luajit.stdout.raw",
+      "bytes": 1304,
+      "sha256": "0193fd31b9afe1ae8c50f0ac22fff23943afe12eb86db50d6321912930c38244",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v4-safe-lua5.4.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v4-safe-lua5.4.stdout.raw",
+      "bytes": 946,
+      "sha256": "12a2731042ee0d8ed97888d8cdd542effd480157688fb958c103bc30ed0e2b39",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/runtime/v4-safe-luajit.stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/v4-safe-luajit.stdout.raw",
+      "bytes": 946,
+      "sha256": "12a2731042ee0d8ed97888d8cdd542effd480157688fb958c103bc30ed0e2b39",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/safe-source/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-exact-owner-proposal-private-v4-safe-integer/receipt.json",
+      "bytes": 3567,
+      "sha256": "3b8b45a8f68dc538f026d2da01625f8b78d42891ce1a98b184e35bea6fbaa7c8",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/safe-source/v3-to-v4.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-exact-owner-proposal-private-v4-safe-integer/v3-to-v4.patch",
+      "bytes": 2454,
+      "sha256": "e0c0ec683e3b0a7866b2648965fd87b76ff1ea02fce6d2b14c99018d0f3527ba",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/source-review/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/linux-shipped-identity-safe-integer-independent-v4/REPORT.md",
+      "bytes": 3305,
+      "sha256": "e5624f98b5ffc5cf31281c60f80b5bd12e7459d3db6f4c7040a3fc1ff2eb0e51",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/source-review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/linux-shipped-identity-safe-integer-independent-v4/review.json",
+      "bytes": 1425,
+      "sha256": "4d7ea3906acb5c969fa15f76b962dfb7b6052162a521b7f94ad6c185037378ce",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/source/README.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-five-path-future-adoption-private-v1/README.md",
+      "bytes": 1022,
+      "sha256": "bbe3596c3cc0ee53b7d127449b70a23debb9de15ccd04f8b73a0c48f5712cb5c",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/source/adoption.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-five-path-future-adoption-private-v1/adoption.patch",
+      "bytes": 24731,
+      "sha256": "e07839938760d0b03f4dce78cab807a6f5999ee60d7ff11ae2234b9edfee2963",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/source/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-five-path-future-adoption-private-v1/receipt.json",
+      "bytes": 6381,
+      "sha256": "e3788afc776aa08be7af79f327ee70e7f19c79eb35b12a1f69f73fe82c3c4173",
+      "ordinary_file": true
+    },
+    {
+      "member": "linux-v4/source/todo-source-inverse.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-five-path-future-adoption-private-v1/todo-source-inverse.json",
+      "bytes": 393,
+      "sha256": "8500624fd1332e0814ea5fa01deb5fee8103fc474c818d6a7b1e68820a92f58f",
+      "ordinary_file": true
+    },
+    {
+      "member": "main71-96/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/main63cf-group3-71-96-qualification-transfer-v1/REPORT.md",
+      "bytes": 4323,
+      "sha256": "0c608824de89427a54b067f70baa908a346286b5795ad55b57be070a4a51ba63",
+      "ordinary_file": true
+    },
+    {
+      "member": "main71-96/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/main63cf-group3-71-96-qualification-transfer-v1/review.json",
+      "bytes": 751,
+      "sha256": "b1482c83edb6f22a1394dae62f868d6df3f40e2baa9a24632939154bdebc1534",
+      "ordinary_file": true
+    },
+    {
+      "member": "main71-96/source-census.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/main63cf-group3-71-96-qualification-transfer-v1/source-census.json",
+      "bytes": 21824,
+      "sha256": "cab053827039bb22b3306d0bf8018d4e13af3cf6cb493a8b858c2dfb16f033b0",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/helper-review/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/program-powershell-macos-helper-v2-independent/REPORT.md",
+      "bytes": 2295,
+      "sha256": "0767c45dcc9f0cde1f70d16dda3d3443e88abe00cc97e67f5123da730e235ddd",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/helper-review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/program-powershell-macos-helper-v2-independent/review.json",
+      "bytes": 694,
+      "sha256": "386e11d7989c0e7e0a411afd86adf918b035d9756104b43164fa5e0e979fa8e0",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/helper/README.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-helper-private-v2/README.md",
+      "bytes": 527,
+      "sha256": "c4cb677f482faedbbbc1251782c14f498e81cefe6c3e8087a8dc1b8ac5912f07",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/helper/closed-source-before.log",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-helper-private-v2/closed-source-before.log",
+      "bytes": 5544,
+      "sha256": "c9026aea68b1d62627637aab157456a241892bbb57d96f1adbb779bb356a2be2",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/helper/final-controlled.log",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-helper-private-v2/final-controlled.log",
+      "bytes": 4712,
+      "sha256": "49b945bb5d4fe449ea596c7c685a6e0abf8db983f2e3642dc2d100a7e8edf12c",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/helper/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-helper-private-v2/receipt.json",
+      "bytes": 2329,
+      "sha256": "39194637582bf9a4e76558f0711c3ae38cda364d5434304fb5345d947fa809de",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/helper/source.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-helper-private-v2/source.patch",
+      "bytes": 74828,
+      "sha256": "d7c3b0772c38eb014280e969c822713e5fbccdec6b6931efce3f1c59c7975bf9",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/origin-controls/cached-origin-old.log",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-workflow-private-v2-controls/cached-origin-old.log",
+      "bytes": 992,
+      "sha256": "8f17784cdb39601c1dd78438236494c1b4967501836e4870324fa15a1e23b673",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/origin-controls/qualification.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-workflow-private-v2-controls/qualification.json",
+      "bytes": 2083,
+      "sha256": "67c04b2331968dfa89ba9fca8bc0d414b0cdc77214408eca38eaf54fc87ed221",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/origin-controls/retained-origin.log",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-workflow-private-v2-controls/retained-origin.log",
+      "bytes": 800,
+      "sha256": "30c434778ff5e2e8a14510c8dbd39dd9fe2775bfc0a62a38b06a9a69087209bd",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/swift-review/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/program-powershell-macos-native-source-v2-independent/REPORT.md",
+      "bytes": 4639,
+      "sha256": "ad67fc958ffd69026110b1cfdaac5272bba2feb58bcd54ae7e6f98badc030be7",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/swift-review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/program-powershell-macos-native-source-v2-independent/review.json",
+      "bytes": 1024,
+      "sha256": "9d3da709692faf390c5d9cfffebc3196494327c121d1b1b3e0357d103beeb091",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/swift/V2-DESIGN.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-native-source-private-v2/V2-DESIGN.md",
+      "bytes": 9632,
+      "sha256": "18652b9c85f138dd3a7956848bd64452f55e092201acad923feb3b3f03590bc1",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/swift/preservation.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-native-source-private-v2/preservation.json",
+      "bytes": 1536,
+      "sha256": "70ddc1f1cdad26cd42f347e6331874630ab328b4b81fc4928bc19e6e2308a89e",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/swift/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-native-source-private-v2/receipt.json",
+      "bytes": 2493,
+      "sha256": "a9e54afa9cc857f0f407c424cc7e30105348cbb99e67abc4a48f4f21627797b8",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/swift/source-only.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-native-source-private-v2/source-only.patch",
+      "bytes": 12082,
+      "sha256": "7274ab17387b45d18e67b43b78b8fc1863fc223d9fb1320ddae02bdfcd345c14",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/workflow/DESIGN.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-workflow-private-v2/DESIGN.md",
+      "bytes": 4033,
+      "sha256": "1d40ad3fb3641e1c127232e351da03760cad04c3321ce941613d6a3ec782266a",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/workflow/preservation.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-workflow-private-v2/preservation.json",
+      "bytes": 644,
+      "sha256": "64651e04d9ace32b95fcc8a90f72a35de2f7b0a71df9d1cf38796f575b3949f6",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/workflow/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-workflow-private-v2/receipt.json",
+      "bytes": 5061,
+      "sha256": "0469f0b459bfe468510032983b5b5615c371fba5f59765206ec1fd24e6d8579a",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-macos/workflow/source.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-macos-workflow-private-v2/source.patch",
+      "bytes": 36187,
+      "sha256": "726cf35cd05e85d5136fe3bf7f9316c31415206456804fcfa3873e8da4a362ff",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/prior-driver/hs-terminal.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-d316-final-driver-receiving-v1/hs-terminal.json",
+      "bytes": 191,
+      "sha256": "bd363d284cf4496460d3f19552a9a5a4b7a9e67e2948f8b42276fa101c9f773f",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/prior-driver/linux-terminal.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-d316-final-driver-receiving-v1/linux-terminal.json",
+      "bytes": 194,
+      "sha256": "ce03e46b52fdefe6a9f9aeedfa3416837e2a79f519c144d883537e9c1932e540",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/prior-driver/terminal.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-d316-final-driver-receiving-v1/terminal.json",
+      "bytes": 611,
+      "sha256": "b8a30cf2e53edecb92820b2a5b2dc5d5496dd6e129ff5d59110900721ce87094",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/actual-runtime.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/actual-runtime.json",
+      "bytes": 840,
+      "sha256": "47f09ddd5208830d1a972f8cba7ef7b74a531ee79cabd04cdf1af7bd9dd156e2",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/final-controlled-execution.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/final-controlled-execution.json",
+      "bytes": 2727,
+      "sha256": "41d181a4660bd692e9e6362d2be9c6b00d54c87f24d0a8b2af2b79d7cf7a2597",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/final-native-execution.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/final-native-execution.json",
+      "bytes": 852,
+      "sha256": "f89b6952f1b53e0b46f34bc436367223a069661f633d1a5455a397135c50f3b7",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/mac-final-execution.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/mac-final-execution.json",
+      "bytes": 417,
+      "sha256": "b1874af960a5cb9c50de53f10eff0e71eaf353a4caaeab7faa4df07cf109e201",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/native-causal-execution.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/native-causal-execution.json",
+      "bytes": 1928,
+      "sha256": "89cb59037cf9c39d28d70f5fc23178662772d7c9e68d43e4efcdc4c4539d74ed",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/receipt.json",
+      "bytes": 14791,
+      "sha256": "d6f8f33fe8fabc8e55714e3dde9f1ddd0b6caebdd81d3ace3fc95cfc8d62f88b",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/results/final-lua5.4-linux-tests-unit-adapters-test_program_providers.stdout",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/results/final-lua5.4-linux-tests-unit-adapters-test_program_providers.stdout",
+      "bytes": 860,
+      "sha256": "9f8a47f18feb4e43e7b9d6d697dfcd236871af5102f98a4a37c248d4b81d5f1e",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/results/final-lua5.4-linux-tests-unit-modules-test_program_providers.stdout",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/results/final-lua5.4-linux-tests-unit-modules-test_program_providers.stdout",
+      "bytes": 1763,
+      "sha256": "4ebf19b7ba15c02f4f53ff7294abde5c5c8330487516c7351256b58508dd7f96",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/results/final-luajit-linux-tests-unit-adapters-test_program_providers.stdout",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/results/final-luajit-linux-tests-unit-adapters-test_program_providers.stdout",
+      "bytes": 860,
+      "sha256": "9f8a47f18feb4e43e7b9d6d697dfcd236871af5102f98a4a37c248d4b81d5f1e",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/results/final-luajit-linux-tests-unit-modules-test_program_providers.stdout",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/results/final-luajit-linux-tests-unit-modules-test_program_providers.stdout",
+      "bytes": 1763,
+      "sha256": "4ebf19b7ba15c02f4f53ff7294abde5c5c8330487516c7351256b58508dd7f96",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/results/final-native-pinned.stdout",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/results/final-native-pinned.stdout",
+      "bytes": 195,
+      "sha256": "019f49491ef657881e464d16c73e253d23f903601432ee513d0344ba43e484ea",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/results/mac-final.stdout",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/results/mac-final.stdout",
+      "bytes": 2195,
+      "sha256": "0728b21debc4b343a6b210b178383b19d2f5f3543554386d86ce3403a35e7e0b",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/runtime/results/old-actual-native-absence.stdout",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-posix-private-v1/results/old-actual-native-absence.stdout",
+      "bytes": 99,
+      "sha256": "56a87374e3927acc0925565693ffbfa4984e3ea458eea7a4f73ca3426d742cab",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/source-review/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/program-powershell-posix-private-v1-independent/REPORT.md",
+      "bytes": 3102,
+      "sha256": "63f9afd3bfc1b2ad1914fdc81483095f9ccf63bbf47e4b5e0dbfa40a946cd937",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/source-review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/program-powershell-posix-private-v1-independent/review.json",
+      "bytes": 990,
+      "sha256": "f56db6bc74d2a383e77e594bb1075547867ae9e306648409f517a1cc302d55ee",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/source/ADOPTION.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-prospective8261-source-receiving-private-v2/ADOPTION.md",
+      "bytes": 3012,
+      "sha256": "b20486dc522d1cc64a96a35af4a1639a81517dd10d00763b617b0f371e86b2e2",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/source/forward-five.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-prospective8261-source-receiving-private-v2/forward-five.patch",
+      "bytes": 11923,
+      "sha256": "579ce230df7d2e206906e6222c3d04af625401ed89460aeb3246e2fe8064f87a",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/source/prior-evidence-pins.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-prospective8261-source-receiving-private-v2/prior-evidence-pins.json",
+      "bytes": 3415,
+      "sha256": "6dce87646313c357a6592268829d37889463c6f7e34ae6277f673f4231c3e9eb",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/source/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-prospective8261-source-receiving-private-v2/receipt.json",
+      "bytes": 8583,
+      "sha256": "e94e300dadcd420b808b4b96edecf0b2ed69e9aeebf737622cb1935b28f6e52e",
+      "ordinary_file": true
+    },
+    {
+      "member": "powershell-posix/source/roundtrip.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/program-powershell-prospective8261-source-receiving-private-v2/roundtrip.json",
+      "bytes": 2126,
+      "sha256": "fb24817044cc00543a88929895550616dc728ff185a9fd302d0dd6f78d02f7a9",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/REPORT.md",
+      "bytes": 1825,
+      "sha256": "b57bc1d2ed3375f3de6df0c688edff6fccff3d0de5d1cc5000a724f0b3322965",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/controls18.stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/controls18.stderr.raw",
+      "bytes": 2252,
+      "sha256": "c7ec7b325d70d275c6a0d16f74196b8b52df2d85d501bd22ba180c33042ec18f",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/original51.stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/original51.stderr.raw",
+      "bytes": 6332,
+      "sha256": "dd22a69d5243ddf026c3034e21143d39b51008dcd6cb22d15b5d41441d72ba01",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/original53.stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/original53.stderr.raw",
+      "bytes": 5567,
+      "sha256": "09a7fdb88c4782762cf724a9ab3b00e49282f6defa943dd1ffb892de276d6342",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/process-closure.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/process-closure.json",
+      "bytes": 623,
+      "sha256": "8a7e70a86e0b09cddb983a905f52346f8ce2f57b3440d0cf64e2a953bfd954ed",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/raw-result.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/raw-result.json",
+      "bytes": 560,
+      "sha256": "de8180062617e8407f4dcfeaaabaf95f38e8645a30b906710970cb831cce057e",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/receipt.json",
+      "bytes": 17380,
+      "sha256": "6ff89af29416648c0dcb19e89684a81b01afdefa1ebe06f9e13baec7d249ab50",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/sdkCLI8.stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/sdkCLI8.stderr.raw",
+      "bytes": 1296,
+      "sha256": "a4b4ec6d62551125d445e2aca2a89cedd4b0a7ecac4ddba98a87a1458f0400cd",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/sdkContract16.stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/sdkContract16.stderr.raw",
+      "bytes": 2299,
+      "sha256": "b762ae28ed1f7d77f390b52dc4695093b48a78ddaa8ce455d8aae44c783d3844",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/stderr.raw",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/final-serial/stdout.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-2/stdout.raw",
+      "bytes": 288,
+      "sha256": "50fdac5e5f42fae8306896e171776732de722d839c9000fb591fc6caf57fd275",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/fixtures/g5-clock-component-additional-approval.3d.json.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/postimages/tools/diagnostics/fixtures/number-row-native-causal/g5-clock-component-additional-approval.3d.json.raw",
+      "bytes": 540,
+      "sha256": "9730a63c05ce45f1665072a1f0863ba81a3d4d293d53c3651c212e13ececbb3e",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/fixtures/g5-clock-component-composition.3d.json.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/postimages/tools/diagnostics/fixtures/number-row-native-causal/g5-clock-component-composition.3d.json.raw",
+      "bytes": 26516,
+      "sha256": "370ed15b13004184e6c142e05006a5280968fa37749efee3a6991f62bedb3750",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/fixtures/g5-clock-component-source-approvals.3d.json.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/postimages/tools/diagnostics/fixtures/number-row-native-causal/g5-clock-component-source-approvals.3d.json.raw",
+      "bytes": 1455,
+      "sha256": "e7f5c01ddc8c41898d6feb5ba6f0cc5d1287b6e1c8b86f72cc6d4cbf51d77f34",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/fixtures/original783-source-closure.json.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/postimages/tools/diagnostics/fixtures/number-row-native-causal/original783-source-closure.json.raw",
+      "bytes": 38177,
+      "sha256": "d20c39c8c35b59d23153f2f97298743060997537d6cc62bafde7e21975264c9e",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/fixtures/portable-source-control-names.json.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/postimages/tools/diagnostics/fixtures/number-row-native-causal/portable-source-control-names.json.raw",
+      "bytes": 8760,
+      "sha256": "428f4a5edb7e2391a7e7ceed82ba9f036f97c0a9697f2c55d61730ece77d8100",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/fixtures/sdk112-portable-control-names.json.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/postimages/tools/diagnostics/fixtures/number-row-native-causal/sdk112-portable-control-names.json.raw",
+      "bytes": 2262,
+      "sha256": "02605c6e97468aa60dcf910cdba74eb03641efba6f2da722c28ef10af055d1cd",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/prior-refusal/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-1/REPORT.md",
+      "bytes": 1566,
+      "sha256": "515c12030021045e0d81fd6211d7016744acb788291411acb4a234945a3fd0ff",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/prior-refusal/original51.stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-1/original51.stderr.raw",
+      "bytes": 4543,
+      "sha256": "afbf599c7e6bf718f08f564f60b75bc892318724be159e911a1ba64b494f2439",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/prior-refusal/raw-result.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-1/raw-result.json",
+      "bytes": 454,
+      "sha256": "6a9093bc6626052fa776ba696c65611f4d2d23d2aa551b93c55db7df8a8e988c",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/prior-refusal/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-1/receipt.json",
+      "bytes": 14358,
+      "sha256": "00e153cb2e7b3a4ef7c7878cfa0ab65cd0b01bdcbfce3d52e4c159342eeefea3",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/prior-refusal/stderr.raw",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-private-execution-v3-1/stderr.raw",
+      "bytes": 4525,
+      "sha256": "c9dfc1bc52b201b797868766d063e4361e60a05aea814fbd1fe1cf30f21e95f2",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/review/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-sdk112-regular146-formatted-v3-independent/REPORT.md",
+      "bytes": 1783,
+      "sha256": "714baa046bb2466c9097ab46d2d976182e470bf105e752989b06f32e4cd5d5af",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-sdk112-regular146-formatted-v3-independent/review.json",
+      "bytes": 940,
+      "sha256": "f2bb7a9f92017e4ec768a42efb36d735b31cd96f057eb966c8f5dfbfe53bdd36",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/source/README.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/README.md",
+      "bytes": 1967,
+      "sha256": "554af55d92707203cc764e5ebd00cdac23414e4b2eefa6222585e93b6a9d4824",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/source/combined15.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/combined15.patch",
+      "bytes": 169972,
+      "sha256": "1e3afc91040473a365114fb087ee5cf2ae7ebd58c66f0af452566407ab2580a5",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/source/js-semantics.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/js-semantics.json",
+      "bytes": 552,
+      "sha256": "0c39d004f114cda2438814a6ac24ddfff430f3e8838443972cd072cccf3f156a",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/source/python-AST-equivalence.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/python-AST-equivalence.json",
+      "bytes": 1177,
+      "sha256": "9a9ee63f6a9af131f3da097290fc59333f090b02d7faaaddfd4e744a14b4410e",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/source/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/receipt.json",
+      "bytes": 3811,
+      "sha256": "de244753e325c06964a033fbe5c04fb48ecdf73c92ca56cf7e186ec22b9f4ff5",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/source/roundtrip-results.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/roundtrip-results.json",
+      "bytes": 1258,
+      "sha256": "b36ad727b0f7d4352913b1e59d771ab531c9f6cd00f17b2622ab2ddfd5fce8f5",
+      "ordinary_file": true
+    },
+    {
+      "member": "regular146/source/source-pairs.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-sdk112-regular146-formatted-private-v3/source-pairs.json",
+      "bytes": 3381,
+      "sha256": "1d3c1d1284a7b3b94b557e2a8d5df222494367ad25b406b2be937b506d2c6d87",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/committed/committed.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-snapshot16-staged-selected-preparation-v2/committed.json",
+      "bytes": 461,
+      "sha256": "3bea06046e8df3d05d03f0cf049b6f55b66a6e4fb879619fca7f78337784b193",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/committed/published.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-snapshot16-staged-selected-preparation-v2/published.json",
+      "bytes": 145,
+      "sha256": "7870374a30a5ab94b6a534cabd10dee61b54cef68a3e09f164d5f7a419e5f6b9",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/committed/selected-gates/selected.raw.log",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-snapshot16-staged-selected-preparation-v2/selected-gates/selected.raw.log",
+      "bytes": 41165,
+      "sha256": "2d795d135719fbf7b18ac29026b43aaaab7f426becc9fd4e7f93e5db6153b3b3",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/committed/selected-gates/terminal.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-snapshot16-staged-selected-preparation-v2/selected-gates/terminal.json",
+      "bytes": 264,
+      "sha256": "15534e7c578379d9d2a32977e102a813ae665c7b41a668af25476f0ebc37d345",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/pure-controls/actual-full-cjs.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-snapshot16-canonical-qualified-preparation-v1/actual-full-cjs.json",
+      "bytes": 432,
+      "sha256": "a1bdde06f875a6914a8cc69c0182b9a921c1a184b1a6bd23bdbf865e2864a2d2",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/pure-controls/actual-full-cjs.raw.log",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-snapshot16-canonical-qualified-preparation-v1/actual-full-cjs.raw.log",
+      "bytes": 248,
+      "sha256": "f80838eaba27825a7a55d8bed7e5019706157e3798e2f8d41f5077a3b2190256",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/receiving-review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows91-snapshot16-controlled-receiving-independent-v1/review.json",
+      "bytes": 2145,
+      "sha256": "78593447207bfb0b590286a594a8e67539e8880c56d2a70c4fff5eb74ed0524e",
+      "ordinary_file": true
+    },
+    {
+      "member": "snapshot-e101/source-review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-snapshot16-authentic-runner-independent-review-v19/review.json",
+      "bytes": 8638,
+      "sha256": "27ac66cc6ed3d9a81dcef2926464c9eb906b9e4b2ecd16dffabdadc40d94562d",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/review/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows91-source-b-native28-enrollment-f7-v2-independent/REPORT.md",
+      "bytes": 1760,
+      "sha256": "1519bd9638b5cb9547a9061497b9e5fc498c13840e09e7deeb5204554b41a957",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/review/review.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows91-source-b-native28-enrollment-f7-v2-independent/review.json",
+      "bytes": 3394,
+      "sha256": "62286cd4db4fbe5410d2558350ffcce75191bd800fe709cd8ac385a35816539b",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/source/README.md",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-sourceb-45b-snapshot-forward-private-v1/README.md",
+      "bytes": 2227,
+      "sha256": "88360988bc3927f3a9d06475eabb0b406e1bbe4d1d222da374bd09c85bc671ee",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/source/candidate.patch",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-sourceb-45b-snapshot-forward-private-v1/candidate.patch",
+      "bytes": 30080,
+      "sha256": "90c713cd936883eed09788dee3e908b7eb190107e985f8beac1eb697e090110e",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/source/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-sourceb-45b-snapshot-forward-private-v1/receipt.json",
+      "bytes": 2141,
+      "sha256": "1e0dff1194f6632bc46db4f5456793da3c62c57e3fd6730fb0e0acb55daf31ee",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/source/snapshot-context-pins.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-sourceb-45b-snapshot-forward-private-v1/snapshot-context-pins.json",
+      "bytes": 668,
+      "sha256": "300e899ba234c07072a38d3d7149401971adedc698500b576f0f301285615786",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/source/source-checks.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-sourceb-45b-snapshot-forward-private-v1/source-checks.json",
+      "bytes": 775,
+      "sha256": "4d8204c52913d960654fbd2f0f1bd564939573b5556c9b684502ec1e0a6ff36f",
+      "ordinary_file": true
+    },
+    {
+      "member": "source-b/source/source-pairs.json",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-11/windows91-sourceb-45b-snapshot-forward-private-v1/source-pairs.json",
+      "bytes": 1396,
+      "sha256": "64ae9357ba36d47e4a4aa099e89c08e064d73c821500d04fe807e39edb117d4c",
+      "ordinary_file": true
+    },
+    {
+      "member": "windows381887/REPORT.md",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows38188708204-finite-native-receiving-v1/REPORT.md",
+      "bytes": 5428,
+      "sha256": "5162aa527782723dfd9384f0783664575dd0cb92d2eadf5c801feec2159f396e",
+      "ordinary_file": true
+    },
+    {
+      "member": "windows381887/case-body-comparison.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows38188708204-finite-native-receiving-v1/case-body-comparison.json",
+      "bytes": 233,
+      "sha256": "18630d19295cd6fc74854a5fc3b9a0815cf82f2886da06b7cb9b4136b6db89e4",
+      "ordinary_file": true
+    },
+    {
+      "member": "windows381887/findings.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows38188708204-finite-native-receiving-v1/findings.json",
+      "bytes": 7194,
+      "sha256": "aaff6102e6f132bbe5ea8520dacaeceda66a5a162b396ebf88fbb7f9b34c0b91",
+      "ordinary_file": true
+    },
+    {
+      "member": "windows381887/receipt.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows38188708204-finite-native-receiving-v1/receipt.json",
+      "bytes": 3926,
+      "sha256": "0cf6fea8cc84d8d3dd502891ae1fe0dd541b1f4d7b1550ef6f9276cdaa0d6538",
+      "ordinary_file": true
+    },
+    {
+      "member": "windows381887/relevant-native-progress.raw.log",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows38188708204-finite-native-receiving-v1/relevant-native-progress.raw.log",
+      "bytes": 3520,
+      "sha256": "66aafdcf4930ca26b7d0e9d00c9d32d2ccfec10baec619dc2518c741dd74a72f",
+      "ordinary_file": true
+    },
+    {
+      "member": "windows381887/source-comparison.json",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/windows38188708204-finite-native-receiving-v1/source-comparison.json",
+      "bytes": 2370,
+      "sha256": "3adb7cc6861b18b2f9491fb83608d84b16712fb6839c7752d2de6fe12dec7002",
+      "ordinary_file": true
+    }
+  ]
+}
