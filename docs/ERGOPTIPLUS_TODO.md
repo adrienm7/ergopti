@@ -7092,6 +7092,18 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-12 the separate Linux cursor-window fixture now retains only closed
+metadata from the last already-produced visible-window search at its original
+five-second refusal boundary. Thirteen pure controls preserve original exception
+identity, cancellation, query counts and window-ID semantics; older observer
+behavior reproduces three failures and the first proposal one additional failure.
+The production worker, all original commands/deadlines/assertions and cleanup
+remain unchanged under the Group3 bounded fixture handback. This is diagnostic
+receiving, not a window-readiness fix or native qualification. The current host
+refuses native admission before allocation because its exact kernel child census
+is unavailable. Root owns normal-suite enrollment and targeted native receiving;
+item62 and transversal16/38 remain open. No Ollama experiment was relaunched.
+
 2026-10-12 the Linux native-acceptance checkpoint now explicitly flushes its
 phase before continuing, with a fixed refusal if flushing fails. A terminal
 marker refusal is deferred until unchanged cleanup finishes; original work
