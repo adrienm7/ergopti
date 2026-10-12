@@ -1143,6 +1143,13 @@
 		{
 			"file": ".github/workflows/ci.yml",
 			"job": "core",
+			"name": "Retain shared validation timings, including interrupted runs",
+			"condition": "always() && matrix.suite == 'js'",
+			"body": "      - name: Retain shared validation timings, including interrupted runs\n        if: always() && matrix.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: core-js-timings\n          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson\n          if-no-files-found: warn"
+		},
+		{
+			"file": ".github/workflows/ci.yml",
+			"job": "core",
 			"name": "Retain the source-bound Core JavaScript qualification",
 			"condition": "always() && matrix.suite == 'js'",
 			"body": "      - name: Retain the source-bound Core JavaScript qualification\n        if: always() && matrix.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-core-js\n          path: ${{ runner.temp }}/stable-core-js-suite.json\n          if-no-files-found: warn"

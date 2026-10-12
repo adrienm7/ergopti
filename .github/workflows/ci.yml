@@ -413,6 +413,14 @@ jobs:
           path: ${{ runner.temp }}/stable-core-js-suite.json
           if-no-files-found: warn
 
+      - name: Retain shared validation timings, including interrupted runs
+        if: always() && matrix.suite == 'js'
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-js-timings
+          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson
+          if-no-files-found: warn
+
   macos:
     name: 'macOS'
     needs: [validate]
