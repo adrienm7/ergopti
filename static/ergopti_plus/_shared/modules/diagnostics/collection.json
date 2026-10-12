@@ -33,5 +33,51 @@
 		"contract"
 	],
 	"max_archive_bytes": 8388608,
-	"max_evidence_file_bytes": 4194304
+	"max_evidence_file_bytes": 4194304,
+	"resident_observation_schema_version": 1,
+	"resident_observation_preconditions": [
+		"same_resident_process_creation",
+		"existing_owner_only",
+		"no_input_or_network_acquisition"
+	],
+	"resident_observation_reasons": [
+		"resident_owner_unavailable",
+		"resident_generations_observed",
+		"native_managed_listener_identity_observed",
+		"native_managed_listener_identity_refused",
+		"native_identity_cleanup_pending",
+		"resident_observation_error",
+		"native_aggregate_drain_observed",
+		"native_query_refused",
+		"native_capture_state_observed",
+		"native_capture_not_present",
+		"native_observation_error"
+	],
+	"resident_native_abi": {
+		"statuses": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+		"capture_phases": [0, 1, 2, 3, 4],
+		"release_kinds": [0, 1, 2],
+		"capture_capacity": 8192
+	},
+	"resident_observation_fields": {
+		"hotstrings": [
+			"registry_generation",
+			"runtime_generation",
+			"transition_depth",
+			"suppression_depth",
+			"prefix_generation",
+			"prefix_suppression_depth"
+		],
+		"ai": ["managed_owner_present", "live_identity", "identity_handle_debt"],
+		"capture_replay": [
+			"native_status",
+			"token",
+			"phase",
+			"queued",
+			"replayed",
+			"last_os_error",
+			"release_kind"
+		],
+		"fifo": ["native_status", "can_stop", "record_count", "pending_count", "unknown_count"]
+	}
 }

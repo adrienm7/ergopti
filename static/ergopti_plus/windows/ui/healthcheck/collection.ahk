@@ -74,6 +74,7 @@ class DiagnosticCollectionWindows {
 			this.ExitArmed := true
 			DirCreate(this.Directory)
 			Identity := DiagSnapshot_CollectionIdentity()
+			Identity["resident_observations"] := DiagSnapshot_ResidentObservations(this.Contract)
 			Identity["schema_version"] := 1
 			Identity["contract_path"] := this.ContractPath
 			Identity["components"] := [Map("id", "driver", "path", A_ScriptFullPath), Map("id", "runtime", "path", A_AhkPath),

@@ -710,3 +710,52 @@ Test("Diagnostics collection exit refusal keeps cleanup custody (groups247-colle
 Test("Diagnostics collection archive acknowledgement binds exact bytes (groups247-collection)", (*) => _TestHC_CollectionState("archive-ack"))
 Test("Diagnostics collection rejects replaced acknowledged archives (groups247-collection)", (*) => _TestHC_CollectionState("archive-good"))
 Test("Diagnostics collection failed cancel write retains cleanup custody (groups247-collection)", (*) => _TestHC_CollectionState("cancel-write-failure"))
+
+_TestHC_ResidentObservationProjection() {
+	Assert(IsSet(DiagSnapshot_ResidentObservations), "the collecting resident must produce its own closed observations")
+	global HSE_Buffer, HSE_LastMatch, _PrefixBuffer
+	Saved := [HSE_Buffer, HSE_LastMatch, _PrefixBuffer]
+	Sentinel := "private synthetic corpus token sk-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	try {
+		HSE_Buffer := Sentinel, HSE_LastMatch := Sentinel, _PrefixBuffer := Sentinel
+		Receipt := DiagSnapshot_ResidentObservations()
+		AssertEqual(1, Receipt["schema_version"])
+		Assert(Receipt["captured_at_filetime"] is Integer && Receipt["captured_at_filetime"] > 0)
+		AssertEqual(4, Receipt["rows"].Length)
+		AssertFalse(InStr(_HC_ValueToJson(Receipt), Sentinel), "private input and corpus values cannot enter technical observations")
+		for Row in Receipt["rows"] {
+			AssertFalse(Row["scenario_qualified"], "a state read cannot qualify the unexecuted functional scenario")
+			AssertTrue(Row["values"] is Map)
+		}
+		AssertEqual("runtime_state", Receipt["rows"][1]["scope"])
+		AssertEqual("UNRUN", Receipt["rows"][2]["status"], "an absent production runtime cannot become native identity evidence")
+		AssertEqual("UNRUN", Receipt["rows"][3]["status"], "headless execution cannot start a native capture owner")
+		AssertEqual("UNRUN", Receipt["rows"][4]["status"], "headless execution cannot load or initialize a native DLL")
+	} finally {
+		HSE_Buffer := Saved[1], HSE_LastMatch := Saved[2], _PrefixBuffer := Saved[3]
+	}
+}
+Test("Diagnostics collection projects resident observations without private content (groups247-resident-observations)", _TestHC_ResidentObservationProjection)
+
+_TestHC_ResidentIdentityDebt() {
+	global _OllamaIdentityPendingHandles, _LLM_ManagedBootstrap
+	SavedHandles := _OllamaIdentityPendingHandles, SavedFlow := _LLM_ManagedBootstrap
+	try {
+		; Zero is an invalid recording handle, never an acquired process resource.
+		Debt := Map(0, true)
+		_OllamaIdentityPendingHandles := Debt
+		_LLM_ManagedBootstrap := {Port: 0, Ready: true, Runtime: {Record: Map("target", Map())}}
+		Receipt := DiagSnapshot_ResidentObservations()
+		Row := Receipt["rows"][2]
+		AssertEqual("UNRUN", Row["status"], "an existing probe-handle debt refuses another identity query")
+		AssertEqual("native_identity_cleanup_pending", Row["reason"])
+		AssertEqual(1, Row["values"]["identity_handle_debt"])
+		AssertTrue(_OllamaIdentityPendingHandles == Debt)
+		AssertTrue(Debt.Has(0), "collection cannot retire another operation's retained handle")
+		AssertFalse(Row["scenario_qualified"])
+	} finally {
+		_OllamaIdentityPendingHandles := SavedHandles
+		_LLM_ManagedBootstrap := SavedFlow
+	}
+}
+Test("Diagnostics collection preserves existing identity handle debt (groups247-resident-observations)", _TestHC_ResidentIdentityDebt)

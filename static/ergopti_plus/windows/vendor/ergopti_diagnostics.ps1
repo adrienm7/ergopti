@@ -50,6 +50,7 @@ $taskUnfinished = New-Object Collections.Generic.List[object]
 $taskPhase = 'collecting'
 $taskActiveCheck = 'redaction'
 $taskFailure = $null
+$taskResidentReceipt = $null
 $taskIdentity = [ordered]@{
 	schema_version=1; session_id=$taskId; started_at=$taskStarted.ToString('o'); ended_at=$null
 	build_kind='unverified_input'; identity_status='FAIL'; version=$null; source_sha=$null
@@ -60,6 +61,90 @@ $taskArchive = [IO.Path]::Combine([IO.Path]::GetDirectoryName($taskRoot), $taskI
 $taskRequest = Read-CollectionJson (Join-Path $taskRoot 'request.json') 262144
 $taskContract = Read-CollectionJson $taskRequest.contract_path 262144
 if ($taskContract.schema_version -ne 1 -or $taskRequest.schema_version -ne 1) { throw 'Unsupported collection contract.' }
+
+function Receive-CollectionResidentObservations($Value, $Owner) {
+	if ($Owner.observation -cne 'PASS' -or $Value.schema_version -ne $taskContract.resident_observation_schema_version -or
+		@($Value.PSObject.Properties.Name).Count -ne 3 -or
+		@($Value.PSObject.Properties.Name | Where-Object { @('schema_version','captured_at_filetime','rows') -cnotcontains $_ }).Count -or
+		$Value.captured_at_filetime -isnot [long] -or $Value.captured_at_filetime -lt $Owner.created_filetime -or
+		$Value.captured_at_filetime -gt $taskStarted.ToFileTimeUtc()) { throw 'Resident observation identity refused.' }
+	$taskObservationIds = @($taskContract.resident_observation_fields.PSObject.Properties.Name)
+	if (@($Value.rows).Count -ne $taskObservationIds.Count) { throw 'Resident observation census refused.' }
+	$taskObserved = @{}
+	$taskClosedRows = New-Object Collections.Generic.List[object]
+	foreach ($taskRow in $Value.rows) {
+		$taskRowKeys = @('id','status','scope','reason','duration_ms','scenario_qualified','values','evidence_class','preconditions','errors')
+		if (@($taskRow.PSObject.Properties.Name).Count -ne $taskRowKeys.Count -or
+			@($taskRow.PSObject.Properties.Name | Where-Object {$taskRowKeys -cnotcontains $_}).Count -or
+			$taskObservationIds -cnotcontains $taskRow.id -or $taskObserved.ContainsKey($taskRow.id) -or
+			@('PASS','FAIL','UNRUN') -cnotcontains $taskRow.status -or
+			@('runtime_state','native_readonly','unexecuted') -cnotcontains $taskRow.scope -or
+			$taskRow.evidence_class -cne 'automatic' -or $taskContract.resident_observation_reasons -cnotcontains $taskRow.reason -or
+			$taskRow.scenario_qualified -isnot [int] -or $taskRow.scenario_qualified -ne 0 -or
+			($taskRow.duration_ms -isnot [int] -and $taskRow.duration_ms -isnot [long]) -or
+			$taskRow.duration_ms -lt 0 -or $taskRow.duration_ms -gt $taskContract.deadline_ms) { throw 'Resident observation projection refused.' }
+		if ($taskRow.status -ceq 'PASS' -and ($taskRow.scope -ceq 'unexecuted' -or
+			($taskRow.scope -ceq 'native_readonly' -and $taskRequest.evidence_origin -cne 'resident_driver'))) { throw 'Unexecuted resident evidence cannot pass.' }
+		if (@($taskRow.preconditions).Count -ne $taskContract.resident_observation_preconditions.Count -or
+			@($taskRow.preconditions | Where-Object {$taskContract.resident_observation_preconditions -cnotcontains $_}).Count -or
+			@($taskRow.preconditions | Select-Object -Unique).Count -ne $taskContract.resident_observation_preconditions.Count) { throw 'Resident observation preconditions refused.' }
+		$taskFields = @($taskContract.resident_observation_fields.($taskRow.id))
+		if (@($taskRow.values.PSObject.Properties.Name).Count -ne $taskFields.Count -or
+			@($taskRow.values.PSObject.Properties.Name | Where-Object {$taskFields -cnotcontains $_}).Count) { throw 'Private resident observation fields refused.' }
+		$taskValues = [ordered]@{}
+		foreach ($taskField in $taskFields) {
+			$taskNumber = $taskRow.values.$taskField
+			if (($taskNumber -isnot [int] -and $taskNumber -isnot [long]) -or $taskNumber -lt -1) { throw 'Nontechnical resident observation value refused.' }
+			$taskValues[$taskField] = $taskNumber
+		}
+		if ($taskRow.id -ceq 'ai' -and (@(-1,0,1) -notcontains $taskValues.managed_owner_present -or
+			@(-1,0,1) -notcontains $taskValues.live_identity)) { throw 'Invalid managed observation flag.' }
+		if (@('capture_replay','fifo') -ccontains $taskRow.id -and $taskValues.native_status -ne -1 -and
+			$taskContract.resident_native_abi.statuses -notcontains $taskValues.native_status) { throw 'Invalid native observation status.' }
+		if ($taskRow.id -ceq 'capture_replay' -and (
+			($taskValues.phase -ne -1 -and $taskContract.resident_native_abi.capture_phases -notcontains $taskValues.phase) -or
+			($taskValues.release_kind -ne -1 -and $taskContract.resident_native_abi.release_kinds -notcontains $taskValues.release_kind) -or
+			$taskValues.queued -gt $taskContract.resident_native_abi.capture_capacity -or
+			$taskValues.replayed -gt [uint32]::MaxValue -or $taskValues.last_os_error -gt [uint32]::MaxValue)) { throw 'Invalid native capture domain.' }
+		if ($taskRow.id -ceq 'fifo' -and (@(-1,0,1) -notcontains $taskValues.can_stop -or
+			($taskValues.record_count -ge 0 -and ($taskValues.pending_count -gt $taskValues.record_count -or
+			$taskValues.unknown_count -gt $taskValues.record_count + 1)))) { throw 'Invalid native drain census.' }
+		$taskPassReasons = @{hotstrings='resident_generations_observed';ai='native_managed_listener_identity_observed'
+			capture_replay='native_capture_state_observed';fifo='native_aggregate_drain_observed'}
+		if ($taskRow.status -ceq 'PASS' -and ($taskRow.reason -cne $taskPassReasons[$taskRow.id] -or
+			@($taskRow.errors).Count)) { throw 'Contradictory passing resident observation refused.' }
+		if ($taskRow.status -ceq 'PASS' -and $taskRow.id -ceq 'hotstrings' -and
+			($taskRow.scope -cne 'runtime_state' -or @($taskValues.Values | Where-Object {$_ -lt 0}).Count)) { throw 'Unobserved resident generations cannot pass.' }
+		if ($taskRow.status -ceq 'PASS' -and $taskRow.id -ceq 'ai' -and
+			($taskRow.scope -cne 'native_readonly' -or $taskValues.managed_owner_present -ne 1 -or $taskValues.live_identity -ne 1 -or
+			$taskValues.identity_handle_debt -ne 0)) { throw 'Unobserved managed identity cannot pass.' }
+		if ($taskRow.status -ceq 'PASS' -and @('capture_replay','fifo') -ccontains $taskRow.id -and
+			($taskRow.scope -cne 'native_readonly' -or $Owner.native_started -ne $true -or $Owner.native_quarantined -ne $false -or $taskValues.native_status -ne 0)) { throw 'Inactive native owner cannot supply passing receipts.' }
+		if ($taskRow.status -ceq 'PASS' -and $taskRow.id -ceq 'capture_replay' -and
+			($taskValues.token -le 0 -or @($taskValues.Values | Where-Object {$_ -lt 0}).Count)) { throw 'Incomplete native capture cannot pass.' }
+		if ($taskRow.status -ceq 'PASS' -and $taskRow.id -ceq 'fifo' -and
+			(@(0,1) -notcontains $taskValues.can_stop -or @($taskValues.Values | Where-Object {$_ -lt 0}).Count)) { throw 'Incomplete native drain observation cannot pass.' }
+		$taskClosedErrors = @()
+		if (@($taskRow.errors).Count -gt 1) { throw 'Resident observation errors exceeded their bound.' }
+		foreach ($taskError in $taskRow.errors) {
+			$taskErrorKeys = @($taskError.PSObject.Properties.Name)
+			if ($taskErrorKeys.Count -ne 1) { throw 'Private resident error payload refused.' }
+			if ($taskErrorKeys[0] -ceq 'native_status' -and $taskError.native_status -is [int]) {
+				$taskClosedErrors += [ordered]@{native_status=$taskError.native_status}
+			} elseif ($taskErrorKeys[0] -ceq 'reason' -and $taskContract.resident_observation_reasons -ccontains $taskError.reason) {
+				$taskClosedErrors += [ordered]@{reason=$taskError.reason}
+			} else { throw 'Resident observation error refused.' }
+		}
+		$taskObserved[$taskRow.id] = $true
+		$taskClosedRows.Add([ordered]@{id=$taskRow.id;status=$taskRow.status;scope=$taskRow.scope;reason=$taskRow.reason
+			duration_ms=$taskRow.duration_ms;scenario_qualified=$false;evidence_class='automatic'
+			preconditions=@($taskRow.preconditions);errors=@($taskClosedErrors);values=$taskValues})
+	}
+	return [ordered]@{schema_version=$taskContract.resident_observation_schema_version;session_id=$taskId
+		captured_at_filetime=$Value.captured_at_filetime;producer=$taskRequest.evidence_origin
+		pid=$Owner.pid;created_filetime=$Owner.created_filetime;source_sha=$taskIdentity.source_sha
+		build_kind=$taskIdentity.build_kind;scenario_qualified=$false;rows=@($taskClosedRows.ToArray())}
+}
 
 if ($UiaChild) {
 	$taskChildStage = 'assemblies'
@@ -291,9 +376,19 @@ try {
 				reason=$(if($taskOwner.mutex -ceq 'acquired' -and $taskOwner.dispatcher_started -eq 1){'resident_input_owner_observed'}else{'exclusive_input_session_not_admitted'})}
 		} finally { $taskHost.Dispose() }
 	}
+	if ($taskRequest.PSObject.Properties.Name -contains 'resident_observations') {
+		$taskResidentReceipt = Receive-CollectionResidentObservations $taskRequest.resident_observations $taskOwnerReceipt
+		Write-CollectionJson 'resident-observations.json' $taskResidentReceipt
+	}
 	foreach ($taskNativeId in @('hotstrings','ai','capture_replay','callbacks','fifo','modifiers')) {
 		# No isolated input owner is launched beside the collecting resident driver.
-		Add-CollectionResult $taskNativeId 'UNRUN' 'unexecuted' $(if($taskNativeId -eq 'ai'){'dedicated_install_start_model_consent_required'}else{'native_collector_not_implemented'}) 0 $taskOwnerReceipt
+		$taskResultReceipt = [ordered]@{}
+		foreach ($taskField in $taskOwnerReceipt.Keys) { $taskResultReceipt[$taskField] = $taskOwnerReceipt[$taskField] }
+		if ($taskResidentReceipt -ne $null) {
+			$taskObservation = @($taskResidentReceipt.rows | Where-Object {$_.id -ceq $taskNativeId})
+			if ($taskObservation.Count -eq 1) { $taskResultReceipt.state_observation = $taskObservation[0] }
+		}
+		Add-CollectionResult $taskNativeId 'UNRUN' 'unexecuted' $(if($taskNativeId -eq 'ai'){'dedicated_install_start_model_consent_required'}elseif($taskResultReceipt.Contains('state_observation')){'resident_state_observed_scenario_unexecuted'}else{'native_collector_not_implemented'}) 0 $taskResultReceipt
 	}
 	$taskPhase = 'guided'
 	Write-CollectionJson 'progress.json' ([ordered]@{schema_version=1; session_id=$taskId; phase=$taskPhase; completed=$taskRows.Count; total=$taskContract.checks.Count; results=@($taskRows.ToArray())})
@@ -362,6 +457,10 @@ try {
 	$taskSummary = "# Ergopti Windows diagnostic`n`nSession: $taskId`nEvidence origin: $($taskIdentity.build_kind)`nInstalled binary evidence: $($taskIdentity.build_kind -ceq 'installed_binary')`nNo production or physical cohort qualification is granted by collection.`n`n"
 	if ($null -ne $taskFailure) { $taskSummary += "Collection failed: $($taskFailure.reason) (HRESULT $($taskFailure.error_code)). Review failure.json before using any partial evidence.`n`n" }
 	foreach($taskRow in $taskRows){$taskSummary += "$($taskRow.id): $($taskRow.status) [$($taskRow.evidence_class)] $($taskRow.reason)`n"}
+	if ($null -ne $taskResidentReceipt) {
+		$taskSummary += "`nResident state observations ($($taskResidentReceipt.producer)); these do not qualify the UNRUN functional scenarios:`n"
+		foreach ($taskObservation in $taskResidentReceipt.rows) { $taskSummary += "$($taskObservation.id): $($taskObservation.status) [$($taskObservation.scope)] $($taskObservation.reason)`n" }
+	}
 	$taskSummary += "`nNext action: attach this local ZIP manually. Review FAIL, SKIP and UNRUN with the maintainer. Isolated native input needs an exclusive owner; AI installation and model download require separate consent. macOS and Linux were not executed here.`n"
 	[IO.File]::WriteAllText((Join-Path $taskRoot 'summary.md'), $taskSummary, $taskEncoding)
 	Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
@@ -373,7 +472,9 @@ try {
 		try {
 			$taskZip = New-Object IO.Compression.ZipArchive($taskStream, [IO.Compression.ZipArchiveMode]::Create, $true)
 			try {
-				foreach ($taskEvidence in @('manifest.json','results.json','summary.md','failure.json','synthetic-window.png')) {
+				$taskEvidenceNames = @('manifest.json','results.json','summary.md','failure.json','synthetic-window.png')
+				if ($null -ne $taskResidentReceipt) { $taskEvidenceNames += 'resident-observations.json' }
+				foreach ($taskEvidence in $taskEvidenceNames) {
 					$taskEvidencePath = Join-Path $taskRoot $taskEvidence
 					if (!(Test-Path -LiteralPath $taskEvidencePath -PathType Leaf)) { continue }
 					$taskFile = Get-Item -LiteralPath $taskEvidencePath

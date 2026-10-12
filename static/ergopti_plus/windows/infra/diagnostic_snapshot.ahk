@@ -79,6 +79,133 @@ DiagSnapshot_CollectionIdentity() {
 	return Identity
 }
 
+/** Reads closed resident state without acquiring an input, model or capture owner. */
+DiagSnapshot_ResidentObservations(Contract := 0) {
+	global _SharedDir, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration, HSE_RegistryTransitionDepth, HSE_Suppressed
+	global _PrefixContentGeneration, _PrefixWatcherSuppressed, _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
+	global _OllamaIdentityPendingHandles
+	if !(Contract is Map)
+		Contract := JsonParse(FileRead(_SharedDir . "\modules\diagnostics\collection.json", "UTF-8"))
+	Fields := Contract["resident_observation_fields"]
+	Rows := []
+	for Id in ["hotstrings", "ai", "capture_replay", "fifo"]
+		Rows.Push(_DiagSnapshot_ResidentRow(Id, Fields[Id], Contract["resident_observation_preconditions"]))
+	PreviousCritical := Critical("On")
+	try {
+		Row := Rows[1]
+		Row["status"] := "PASS", Row["scope"] := "runtime_state", Row["reason"] := "resident_generations_observed"
+		Row["values"] := Map("registry_generation", HSE_RegistryGeneration, "runtime_generation", HSE_RuntimeDecisionGeneration,
+			"transition_depth", HSE_RegistryTransitionDepth, "suppression_depth", HSE_Suppressed,
+			"prefix_generation", _PrefixContentGeneration, "prefix_suppression_depth", _PrefixWatcherSuppressed)
+		try _DiagSnapshot_ResidentNativeReads(Rows)
+		catch as Err {
+			LoggerWarn("DiagnosticsCollection", "Resident native state queries failed; their observations remain incomplete.")
+			for Index in [3, 4]
+				Rows[Index]["status"] := "FAIL", Rows[Index]["reason"] := "native_observation_error",
+					Rows[Index]["errors"] := [Map("reason", "native_observation_error")]
+		}
+		Flow := IsSet(_LLM_ManagedBootstrap) ? _LLM_ManagedBootstrap : 0
+		Row := Rows[2]
+		Row["values"]["managed_owner_present"] := IsObject(Flow) ? 1 : 0
+		Row["values"]["identity_handle_debt"] := _OllamaIdentityPendingHandles.Count
+		if IsObject(Flow) && !(Flow.Port is Map) && Flow.Ready && IsObject(Flow.Runtime) && Flow.Runtime.Record is Map {
+			Record := Flow.Runtime.Record
+			Target := Record.Get("target", 0)
+			if _OllamaIdentityPendingHandles.Count {
+				; A diagnostic read cannot perform another operation's debt retirement.
+				Row["reason"] := "native_identity_cleanup_pending"
+			} else if Target is Map && Record.Get("ready", false) && !Record.Get("cancelled", true)
+					&& !Record.Get("terminal", true) && Flow.Runtime.HasOwner() && Flow.Endpoint == LLM_OLLAMA_BASE_URL {
+				Started := A_TickCount
+				Ready := OllamaNativeIdentityReady(Record.Get("process_receipt", 0), Target.Clone())
+				Ready := Ready && _LLM_ManagedBootstrap == Flow && Flow.Runtime.Record == Record
+					&& Flow.Ready && !Flow.Cancelled && Flow.Endpoint == LLM_OLLAMA_BASE_URL
+				Row["status"] := Ready ? "PASS" : "FAIL", Row["scope"] := "native_readonly"
+				Row["reason"] := Ready ? "native_managed_listener_identity_observed" : "native_managed_listener_identity_refused"
+				Row["duration_ms"] := TickElapsed(Started), Row["values"]["live_identity"] := Ready ? 1 : 0
+			}
+		}
+	} catch as Err {
+		; The archive exports only a closed failure, never exception text or user paths.
+		LoggerWarn("DiagnosticsCollection", "Resident state observation failed; functional qualification remains unavailable.")
+		Row["status"] := "FAIL", Row["reason"] := "resident_observation_error"
+		Row["errors"] := [Map("reason", "resident_observation_error")]
+		Rows[2]["values"]["identity_handle_debt"] := _OllamaIdentityPendingHandles.Count
+	} finally Critical(PreviousCritical)
+	Time := Buffer(8, 0)
+	DllCall("GetSystemTimeAsFileTime", "Ptr", Time)
+	return Map("schema_version", Contract["resident_observation_schema_version"],
+		"captured_at_filetime", NumGet(Time, 0, "Int64"), "rows", Rows)
+}
+
+_DiagSnapshot_ResidentRow(Id, Fields, Preconditions) {
+	Values := Map()
+	for Field in Fields
+		Values[Field] := -1
+	return Map("id", Id, "status", "UNRUN", "scope", "unexecuted", "reason", "resident_owner_unavailable",
+		"duration_ms", 0, "scenario_qualified", false, "values", Values,
+		"evidence_class", "automatic", "preconditions", Preconditions.Clone(), "errors", [])
+}
+
+/** Queries only an already-loaded, started native module; never lazy-loads it. */
+_DiagSnapshot_ResidentNativeReads(Rows) {
+	global _VendorDir, _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerModule, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerQuarantined
+	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputUnknown, _HSE_TerminalOwner, _HSE_TerminalReplayPending
+	global _LLM_NavEventOwnerStopPending, _LLM_NavEventOwnerStartRollbackPending, _LLM_NavEventOwnerStartCancelled
+	global _LLM_NavEventOwnerLifecycleQuiesced, _LLM_NavEventOwnerShutdownFenced, _LLM_NavEventOwnerDrainActive
+	if !_LLM_NavEventOwnerStarted || !_LLM_NavEventOwnerModule || _LLM_NavEventOwnerStarting
+			|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerQuarantined || _LLM_NavEventOwnerPort is Map
+			|| _LLM_NavEventOwnerStopPending || _LLM_NavEventOwnerStartRollbackPending || _LLM_NavEventOwnerStartCancelled
+			|| _LLM_NavEventOwnerLifecycleQuiesced || _LLM_NavEventOwnerShutdownFenced || _LLM_NavEventOwnerDrainActive
+		return
+	Module := _LLM_NavEventOwnerModule
+	Path := Buffer(65536, 0)
+	Length := DllCall("GetModuleFileNameW", "Ptr", Module, "Ptr", Path, "UInt", 32768, "UInt")
+	if !Length || Length >= 32768 || StrGet(Path, Length, "UTF-16") != StrReplace(_VendorDir . "\ergopti_nav_owner.dll", "/", "\")
+		return
+	CanStopFn := DllCall("GetProcAddress", "Ptr", Module, "AStr", "ErgoptiNav_CanStop", "Ptr")
+	CaptureFn := DllCall("GetProcAddress", "Ptr", Module, "AStr", "ErgoptiNav_GetTerminalCapture", "Ptr")
+	if !CanStopFn || !CaptureFn
+		return
+	Row := Rows[4], Started := A_TickCount, CanStop := 0
+	Status := DllCall(CanStopFn, "UChar*", &CanStop, "Int")
+	Row["status"] := Status == 0 ? "PASS" : "FAIL", Row["scope"] := "native_readonly"
+	Row["reason"] := Status == 0 ? "native_aggregate_drain_observed" : "native_query_refused"
+	Row["duration_ms"] := TickElapsed(Started), Row["values"]["native_status"] := Status
+	Row["values"]["can_stop"] := Status == 0 ? CanStop : -1
+	if Status != 0
+		Row["errors"] := [Map("native_status", Status)]
+	Row["values"]["record_count"] := _LLM_TerminalOutputRecords.Count
+	Row["values"]["pending_count"] := 0, Row["values"]["unknown_count"] := IsObject(_LLM_TerminalOutputUnknown) ? 1 : 0
+	for _, Record in _LLM_TerminalOutputRecords {
+		Row["values"]["pending_count"] += Record["pending"] ? 1 : 0
+		Row["values"]["unknown_count"] += Record["unknown"] ? 1 : 0
+	}
+	Token := 0
+	if _HSE_TerminalOwner is Map && !(_HSE_TerminalOwner.Get("Port", 0) is Map)
+		Token := _HSE_TerminalOwner.Get("Id", 0)
+	else if _HSE_TerminalReplayPending is Map && !(_HSE_TerminalReplayPending.Get("Port", 0) is Map)
+		Token := _HSE_TerminalReplayPending.Get("Token", 0)
+	if !(Token is Integer) || Token <= 0
+		return
+	Row := Rows[3], Started := A_TickCount, Snapshot := Buffer(28, 0)
+	Status := DllCall(CaptureFn, "UInt64", Token, "Ptr", Snapshot, "Int")
+	Row["values"]["native_status"] := Status
+	Row["duration_ms"] := TickElapsed(Started), Row["scope"] := "native_readonly"
+	Row["reason"] := Status == 0 ? "native_capture_state_observed" : "native_capture_not_present"
+	Row["status"] := Status == 0 ? "PASS" : (Status == 8 ? "UNRUN" : "FAIL")
+	if Status != 0 && Status != 8
+		Row["errors"] := [Map("native_status", Status)]
+	if Status == 0 {
+		if NumGet(Snapshot, 0, "UInt64") != Token
+			throw Error("Native capture identity changed during its diagnostic read.")
+		Row["values"]["token"] := Token
+		for Index, Field in ["phase", "queued", "replayed", "last_os_error", "release_kind"]
+			Row["values"][Field] := NumGet(Snapshot, 8 + (Index - 1) * 4, "UInt")
+	}
+}
+
 ; Log tag of the snapshot line, shared with the other drivers.
 ; @returns {String}
 DiagSnapshot_Module() {
