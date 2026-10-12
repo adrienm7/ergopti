@@ -150,6 +150,16 @@ if (sources.length < MIN_SOURCES) {
 // Shared policy is a reader only through a real native method delegation.
 sources.push(...delegatedMenuSources(sources, path.join(DRIVERS, '_shared', 'lua')));
 
+// This owner captured every source before querying fields and sections. Keep
+// that exact ordered snapshot, splitting and excluding full-line comments once.
+const readerSources = sources.map(({ rel, src }) => ({
+	rel,
+	lines: src.split('\n').filter((line) => {
+		const t = line.trimStart();
+		return !t.startsWith('--') && !t.startsWith(';') && !t.startsWith('//');
+	})
+}));
+
 /** Files that reference a token outside a comment. */
 function readersOf(token) {
 	const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -161,12 +171,8 @@ function readersOf(token) {
 		new RegExp(`'${escaped}'`)
 	];
 	const hits = [];
-	for (const { rel, src } of sources) {
-		for (const line of src.split('\n')) {
-			const t = line.trimStart();
-			// A comment naming a key is prose, not a reader. Both dead sections were
-			// named in one, which is how a naive scan would have missed them.
-			if (t.startsWith('--') || t.startsWith(';') || t.startsWith('//')) continue;
+	for (const { rel, lines } of readerSources) {
+		for (const line of lines) {
 			if (patterns.some((p) => p.test(line))) {
 				hits.push(rel);
 				break;
