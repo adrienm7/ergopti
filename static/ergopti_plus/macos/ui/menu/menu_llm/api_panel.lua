@@ -136,16 +136,20 @@ end
 --- @param label string Mutation label for diagnostics.
 --- @return boolean committed
 local function reset_prediction_identity(keymap, label)
-	if type(keymap) ~= "table" or type(keymap.reset_predictions) ~= "function" then
-		Logger.error(LOG, "Cannot %s: keymap.reset_predictions is unavailable.", tostring(label))
+	if type(keymap) ~= "table" or type(keymap.reset_predictions_for_configuration) ~= "function" then
+		Logger.error(LOG, "Cannot %s: keymap.reset_predictions_for_configuration is unavailable.", tostring(label))
+		pcall_log("notify(api configuration unavailable)", notifications.notify,
+			i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
 		return false
 	end
 	local ok, committed = xpcall(function()
-		return keymap.reset_predictions(false)
+		return keymap.reset_predictions_for_configuration()
 	end, debug.traceback)
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Cannot %s: prediction identity reset did not commit (result: %s).",
 			tostring(label), tostring(committed))
+		pcall_log("notify(api configuration reset refusal)", notifications.notify,
+			i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
 		return false
 	end
 	return true

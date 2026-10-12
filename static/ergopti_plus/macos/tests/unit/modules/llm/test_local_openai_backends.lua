@@ -502,7 +502,10 @@ local function with_panel(scenario)
 			local ctx = {
 				state = { llm_backend = "ollama", llm_model = "" },
 				paused = false,
-				keymap = { reset_predictions = function() return true end },
+				keymap = {
+					reset_predictions = function() return true end,
+					reset_predictions_for_configuration = function() return true end,
+				},
 				update_menu = function() world.menus = world.menus + 1 end,
 				WarmupCtrl = { warmup = function() world.warmups = world.warmups + 1 end },
 				activate_api = function() world.activations = world.activations + 1 end,

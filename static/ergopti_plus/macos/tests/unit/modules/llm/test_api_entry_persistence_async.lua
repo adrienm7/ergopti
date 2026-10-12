@@ -165,6 +165,92 @@ local function with_persistence_fixture(options, body)
 end
 
 helpers.describe("LLM API persistence transaction", function()
+	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("commits accepted menu fields through the actual credential transaction " .. provider_id .. " (api-add-quarantined-persistence)", function()
+			local foreign = { private_setting = "untouched", nested = { retained = true } }
+			with_persistence_fixture({ initial_store = { foreign_setting = foreign } }, function(llm, fixture)
+				local remote = fixture.api_remote
+				local file = assert(io.open(helpers.driver_root() .. "../_shared/modules/llm/api_providers.json", "rb"))
+				local raw = file:read("*a"); assert(file:close())
+				local catalogue = assert(require("adapters.json_codec").decode(raw))
+				remote.PROVIDER_ORDER = { provider_id }
+				remote.PROVIDERS = { [provider_id] = assert(catalogue.providers[provider_id]) }
+				remote.get_active_entry = function()
+					for _, entry in ipairs(remote.get_entries()) do
+						if entry.id == remote.get_active_entry_id() then return entry end
+					end
+				end
+				remote.check_availability = function(_, callback) callback(); return true end
+				helpers.with_fresh_modules({ "ui.menu.menu_llm.api_panel", "infra.dialog_util",
+					"infra.i18n", "infra.manifest_menu", "infra.notifications" }, function()
+					local prompts, updates, warmups = 0, 0, 0
+					local notices = {}
+					package.loaded["infra.i18n"] = { get = function(key) return key end }
+					package.loaded["infra.dialog_util"] = {
+						text_prompt = function()
+							prompts = prompts + 1
+							return "OK", ({ "http://127.0.0.1:8000/v1", "inert-form-secret", "selected-model" })[prompts]
+						end,
+						block_alert = function() return "button.cancel" end,
+					}
+					package.loaded["infra.notifications"] = { notify = function(_, _, kind)
+						notices[#notices + 1] = kind
+						return true
+					end }
+					local renderer = assert(require("menu.renderer").new({
+						platform = "hs",
+						manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+						json_decode = require("adapters.json_codec").decode,
+						i18n = { get = package.loaded["infra.i18n"].get, section = function() return {} end },
+						logger = helpers.make_logger_stub(),
+					}))
+					package.loaded["infra.manifest_menu"] = {
+						command_row = renderer.command_row, template_rows = renderer.template_rows,
+						get_array = renderer.get_array, render_rows = function(rows) return rows end,
+					}
+					local panel = require("ui.menu.menu_llm.api_panel")
+					local context = {
+						state = { llm_backend = "api", llm_model = "previous-model" },
+						paused = false, is_paused = function() return false end,
+						keymap = { reset_predictions_for_configuration = function() return true end },
+						update_menu = function() updates = updates + 1 end,
+						WarmupCtrl = { warmup = function() warmups = warmups + 1 end },
+					}
+					local _, rows = panel.build(context)
+					local add
+					for _, row in ipairs(rows) do
+						if row.items and row.items[1] then add = row.items[1].action end
+					end
+					helpers.assert_type(add, "function")
+					add()
+					helpers.assert_eq(prompts, 3)
+					helpers.assert_eq(#fixture.encrypt_jobs, 1, "the real persistence coordinator owns the exact token")
+					helpers.assert_eq(fixture.encrypt_jobs[1].cleartext, "inert-form-secret")
+					helpers.assert_eq(fixture.store[API_STATE_KEY], nil, "no durable entry before Keychain ACK")
+					helpers.assert_eq(updates, 0)
+					helpers.assert_eq(warmups, 0)
+					helpers.assert_eq(#notices, 0)
+					local id = fixture.encrypt_jobs[1].id
+					fixture.encrypt_jobs[1].callback(true, "keychain:" .. id, nil)
+					helpers.assert_eq(fixture.store[API_STATE_KEY].active_id, id)
+					helpers.assert_eq(fixture.store[API_STATE_KEY].entries[1].token, "keychain:" .. id)
+					helpers.assert_eq(fixture.store[API_STATE_KEY].entries[1].model, "selected-model")
+					helpers.assert_eq(fixture.store[API_STATE_KEY].entries[1].provider, provider_id)
+					helpers.assert_eq(fixture.store[API_STATE_KEY].entries[1].base_url, "http://127.0.0.1:8000/v1")
+					helpers.assert_eq(fixture.get_entries()[1].id, id, "the exact staged entry remains the committed runtime identity")
+					helpers.assert_eq(context.state.llm_model, "selected-model")
+					helpers.assert_eq(updates, 1)
+					helpers.assert_eq(warmups, 1)
+					helpers.assert_eq(notices[1], "success")
+					helpers.assert_eq(fixture.store.foreign_setting, foreign, "foreign settings keep their original identity")
+					helpers.assert_true(not contains_string(fixture.store, "inert-form-secret"),
+						"personal settings never acquire plaintext credentials")
+				end)
+			end)
+		end)
+
+	end
+
 	helpers.it("migrates legacy plaintext without copying it into the combined state", function()
 		local initial = {
 			llm_api_entries = {

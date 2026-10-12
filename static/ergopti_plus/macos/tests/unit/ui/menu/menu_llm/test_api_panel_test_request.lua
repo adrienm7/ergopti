@@ -18,7 +18,7 @@ local function fixture_context()
 		state = { llm_backend = "api", llm_model = "probe-model" },
 		paused = false,
 		is_paused = function() return false end,
-		keymap = { reset_predictions = function() return true end },
+		keymap = { reset_predictions_for_configuration = function() return true end },
 		update_menu = function() end,
 		WarmupCtrl = { warmup = function() end },
 	}
@@ -593,7 +593,7 @@ helpers.describe("Active API commands: strict native pause receipt", function()
 			local remote = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
 			local ctx, paused, resets, writes = fixture_context(), false, 0, 0
 			ctx.is_paused = function() return paused end
-			ctx.keymap.reset_predictions = function() resets = resets + 1; return true end
+			ctx.keymap.reset_predictions_for_configuration = function() resets = resets + 1; return true end
 			package.loaded["modules.llm"].persist_api_entries = function() writes = writes + 1 end
 			package.loaded["infra.dialog_util"].block_alert = function(_, _, affirmative)
 				paused = true
@@ -615,20 +615,28 @@ helpers.describe("Active API commands: strict native pause receipt", function()
 end)
 
 helpers.describe("API Add: retained native admission", function()
-	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.keymap.llm_bridge", "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
-	local function install_add()
+	local function install_add(provider_id)
 		local entry = { id = "old", provider = "openai", model = "old-model", token = "inert-old-secret" }
-		local remote = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
+		local remote, _, notices = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
+		if provider_id then
+			local file = assert(io.open(helpers.driver_root() .. "../_shared/modules/llm/api_providers.json", "rb"))
+			local raw = file:read("*a"); assert(file:close())
+			local catalogue = assert(require("adapters.json_codec").decode(raw))
+			remote.PROVIDER_ORDER = { provider_id }
+			remote.PROVIDERS[provider_id] = assert(catalogue.providers[provider_id])
+		end
 		local ctx = fixture_context()
 		local observed = { prompts = 0, resets = 0, writes = 0, probes = 0, paused = false }
 		ctx.is_paused = function() return observed.paused end
-		ctx.keymap.reset_predictions = function() observed.resets = observed.resets + 1; return true end
+		ctx.keymap.reset_predictions_for_configuration = function() observed.resets = observed.resets + 1; return true end
 		package.loaded["infra.dialog_util"].text_prompt = function(_, _, _, affirmative)
 			observed.prompts = observed.prompts + 1
 			if observed.on_prompt then observed.on_prompt(observed.prompts) end
 			if observed.cancel_at == observed.prompts then return "button.cancel", "" end
-			return affirmative, ({ "https://example.invalid/v1", "inert-new-secret", "new-model" })[observed.prompts]
+			return affirmative, ({ provider_id and "http://127.0.0.1:8000/v1" or "https://example.invalid/v1",
+				"inert-new-secret", "new-model" })[observed.prompts]
 		end
 		remote.check_availability = function(_, callback)
 			observed.probes = observed.probes + 1
@@ -646,8 +654,68 @@ helpers.describe("API Add: retained native admission", function()
 				action = row.items[1].action
 			end
 		end
-		return action, ctx, remote, observed, entry
+		return action, ctx, remote, observed, entry, notices
 	end
+	local BridgeFixture = require("tests.support.llm_bridge_fixture")
+	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("publishes accepted API fields through real quarantined cleanup " .. provider_id .. " (api-add-quarantined-config)", function()
+			helpers.with_fresh_modules(owned, function()
+				BridgeFixture.with_bridge_fixture(function(f)
+					local action, ctx, remote, observed, entry = install_add(provider_id)
+					local resets, inference = 0, 0
+					f.engine.perform_check = function() inference = inference + 1 end
+					f.engine.start_timer = function() inference = inference + 1 end
+					f.engine.reset = function() resets = resets + 1; return true end
+					ctx.keymap.reset_predictions = f.bridge.reset_predictions
+					ctx.keymap.reset_predictions_for_configuration = f.bridge.reset_quarantined_context
+					f.bridge.set_runtime_quarantined(true)
+					helpers.assert_eq(f.bridge.is_runtime_available(), false)
+					action()
+					helpers.assert_eq(observed.prompts, 3)
+					helpers.assert_eq(resets, 1, "configuration must retire the real prediction owner")
+					helpers.assert_eq(observed.probes, 1, "all accepted fields reach the exact validation owner")
+					helpers.assert_eq(observed.writes, 1, "the accepted validation must enter persistence")
+					helpers.assert_eq(#remote.get_entries(), 2)
+					helpers.assert_eq(remote.get_entries()[1], entry)
+					helpers.assert_eq(remote.get_entries()[2].token, "inert-new-secret")
+					helpers.assert_eq(remote.get_entries()[2].provider, provider_id)
+					helpers.assert_eq(remote.get_entries()[2].base_url, "http://127.0.0.1:8000/v1")
+					helpers.assert_eq(ctx.state.llm_model, "new-model")
+					helpers.assert_eq(f.bridge.is_runtime_available(), false,
+						"configuration cleanup must never reopen quarantined inference")
+					helpers.assert_eq(inference, 0, "configuration cleanup cannot start document inference")
+				end)
+			end)
+		end)
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("reports exact API configuration cleanup " .. mode .. " " .. provider_id .. " (api-add-quarantined-config)", function()
+				helpers.with_fresh_modules(owned, function()
+					BridgeFixture.with_bridge_fixture(function(f)
+						local action, ctx, remote, observed, entry, notices = install_add(provider_id)
+						f.engine.reset = function()
+							if mode == "throw" then error("inert cleanup refusal") end
+							if mode == "false" then return false end
+						end
+						ctx.keymap.reset_predictions = f.bridge.reset_predictions
+						ctx.keymap.reset_predictions_for_configuration = f.bridge.reset_quarantined_context
+						f.bridge.set_runtime_quarantined(true)
+						helpers.assert_eq(action(), false)
+						helpers.assert_eq(observed.prompts, 3)
+						helpers.assert_eq(observed.probes, 0)
+						helpers.assert_eq(observed.writes, 0)
+						helpers.assert_eq(#remote.get_entries(), 1)
+						helpers.assert_eq(remote.get_entries()[1], entry)
+						helpers.assert_eq(remote.get_active_entry_id(), entry.id)
+						helpers.assert_eq(#notices, 1, "operational refusal must be visible")
+						helpers.assert_eq(notices[1].level, "error")
+						helpers.assert_eq(f.bridge.is_runtime_available(), false)
+					end)
+				end)
+			end)
+		end
+
+	end
+
 	local function assert_no_staging(ctx, remote, observed, entry)
 		helpers.assert_eq(observed.resets, 0, "no prediction owner is reset")
 		helpers.assert_eq(observed.writes, 0, "no Keychain publication owner is entered")
@@ -656,6 +724,24 @@ helpers.describe("API Add: retained native admission", function()
 		helpers.assert_eq(remote.get_entries()[1], entry, "original record and secret identity remain exact")
 		helpers.assert_eq(remote.get_active_entry_id(), entry.id)
 		helpers.assert_eq(ctx.state.llm_model, "probe-model")
+	end
+	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
+		for field = 1, 3 do
+			for _, boundary in ipairs({ "cancel", "pause" }) do
+				helpers.it("preserves " .. provider_id .. " Add after " .. boundary .. " at field " .. field
+					.. " (api-add-native-field-custody)", function()
+					helpers.with_fresh_modules(owned, function()
+						local action, ctx, remote, observed, entry, notices = install_add(provider_id)
+						if boundary == "cancel" then observed.cancel_at = field
+						else observed.on_prompt = function(index) if index == field then observed.paused = true end end end
+						helpers.assert_eq(action(), false)
+						helpers.assert_eq(observed.prompts, field)
+						assert_no_staging(ctx, remote, observed, entry)
+						helpers.assert_eq(#notices, 0, "cancellation cannot invent an operational error")
+					end)
+				end)
+			end
+		end
 	end
 	for _, fault in ipairs({ "paused", "missing", "nil", "number", "table", "throw", "backend" }) do
 		helpers.it("refuses retained Add before a prompt after native admission becomes " .. fault, function()
@@ -707,7 +793,7 @@ helpers.describe("API Add: retained native admission", function()
 				local action, ctx, remote, observed, entry = install_add()
 				remote.PROVIDERS.openai.format = format
 				remote.test_request = function() observed.probes = observed.probes + 1; return true end
-				ctx.keymap.reset_predictions = function()
+				ctx.keymap.reset_predictions_for_configuration = function()
 					observed.resets = observed.resets + 1
 					observed.paused = true
 					return true
