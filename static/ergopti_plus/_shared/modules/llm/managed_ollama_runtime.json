@@ -51,7 +51,8 @@
 		"static/ergopti_plus/_shared/go/native_http/listener_event_darwin.go",
 		"static/ergopti_plus/_shared/go/native_http/listener_event_linux.go",
 		"static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go",
-		"static/ergopti_plus/_shared/go/native_http/listener_event_test.go"
+		"static/ergopti_plus/_shared/go/native_http/listener_event_test.go",
+		"static/ergopti_plus/_shared/go/native_http/failure_stage_test.go"
 	],
 	"assets": {
 		"macos-arm64": {
@@ -71,6 +72,9 @@
 		"timeout_seconds": 300,
 		"maximum_log_bytes": 16777216,
 		"required_passes": [
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire",
+			"TestPublicNativeDoPreservesClosedFailureProvenanceAndPrivacy",
 			"TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody",
 			"TestPrivateAdmissionRequiresExactSecretAndLoopback",
 			"TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon",

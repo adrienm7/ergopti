@@ -13123,6 +13123,25 @@ test precondition failure, not a Lua defect or a successful permission grant.
   error text. Receive a new real Apple Silicon attempt before marking the
   installation defect fixed.
 
+  Issue94 follow-up: the native generic HTTP worker and its Python/Go
+  receivers now preserve nine closed refusal stages and their exact permitted
+  reasons. The Python bootstrap fact retains the stage only after actual child
+  retirement; public Go `Do` preserves it as well as `RoundTrip`. Success and
+  legacy failure frames keep their original contract. Unknown, duplicated,
+  null, mismatched and successful stage-bearing frames refuse. Generator
+  controls pass18/0; actual Python receiving passes6 tests with35 independent
+  vectors, with21 genuine predecessor assertion failures. Actual Go receiving
+  passes70 test events with zero skips and terminal package PASS, exit0. The
+  complete portable Mac composition passes18,998/18,998, actual exit0;
+  Hammerspoon doubles under Linux do not qualify a native Mac. The full JS run
+  remains416/426, exit1; all eight affected composition checks now pass
+  targeted successors, while two known source-policy failures remain with Root.
+  The publication fixture preserves its24 cases with added admission/refusal
+  controls. No full-green result is inferred. Native Swift/XCTest,
+  Darwin networking and installed MLX receiving remain unrun. Ship the signed
+  producer and strict receivers together; do not enable production qualification
+  or infer a historical failure's stage from its old `unavailable` reason.
+
 - [ ] **137.** Publish the selected AI provider before model loading completes.
 
   In v1.0.0 the macOS local-provider transition updates its core and preferences
