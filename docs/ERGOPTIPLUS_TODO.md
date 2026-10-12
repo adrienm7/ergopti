@@ -5795,9 +5795,31 @@ diagnostic producer inventory follows only the owned source fingerprint; all
 22 existing source-receiving controls pass with the independent label oracle
 unchanged. Fresh Windows-only
 manual [38279233467](https://github.com/adrienm7/ergopti/actions/runs/38279233467)
-owns the new complete-cohort result. Full production units, E2E, compiler-warning,
-startup, packaging, installation and device acceptance remain required; item 42
-and transversal items 16/38 stay partial.
+now provides authenticated complete-cohort receiving on the private instrumented
+source: dry8, candidate8 PASS, original2 PASS/six exact inverse failures, then
+restored8 PASS. All four children retire; the candidate and all 3,273 runtime
+pins are restored without cleanup errors. The parent includes final receipt
+writing in 37,692 ms against its unchanged 180,000 ms budget. This does not
+qualify the composed newer Dev tree or a warning-clean build: all 5,218 baseline
+warnings and both admitted fixture warnings remain explicit. The whole run is
+FAIL (2 successful jobs, 4 failed, 6 skipped; Release skipped). Native13 again
+passes six original subjects before the seventh is interrupted; only six of
+sixteen custody reports complete, and the remaining original/fault subjects do
+not execute. Core gives 412/413 with its actual Python 3.12.15 receiver timeout.
+Full production units, E2E, startup, packaging, installation and device acceptance
+remain required; item 42 and transversal items 16/38 stay partial.
+
+The four-expression correction is reconciled with Dev ba41b79d, preserving the
+incoming recovery/settlement, scalar and classification-cache owners. Its only
+producer-inventory conflict keeps every upstream field and updates the owned
+source fingerprint; independent updater labels remain unchanged. Selected
+local verification passes formatting and all 1,908 AHK BOM/LF checks; native
+Windows gates remain unavailable locally. The composed JS run gives 422/426:
+one managed-Git-ancestor Linux uninstall fixture refusal (unchanged outside-Git
+replay PASS), plus the unchanged upstream macOS pinned-read ratchet, bare Lua
+gsub return and layout-default consumer failures. Their original assertions and
+source bytes are preserved; no whole-suite green result or final-tree native
+acceptance is claimed.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
