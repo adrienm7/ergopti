@@ -1006,7 +1006,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	SameRegistry(Left, Right) {
 		; NativeLive still binds the canonical scalar owner before comparison.
 		if Left is String
-			return (Right is String) && StrCompare(Left, Right, true) == 0
+			return (Right is String) && Left == Right
 		if Left is Integer || Left is Float
 			return (Right is Integer || Right is Float) && Left = Right
 		if Left is Map {
@@ -1119,7 +1119,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		; Only deterministic parsing/classification is reused. Every caller still
 		; reads its genuine source and rechecks live registry/owner admission.
 		if Row.HasOwnProp("classification_image")
-				&& StrCompare(Image.source, Row.classification_image.source, true) == 0
+				&& Image.source == Row.classification_image.source
 			return Row.classification_image.classification
 		try {
 			Classification := Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
