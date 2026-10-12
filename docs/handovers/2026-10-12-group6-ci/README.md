@@ -147,6 +147,37 @@ proved. Prior211e results cannot fill these missing outcomes. No duplicate
 Windows replay is justified by this source-data-only repair. Group1's shared
 CI lease remains owned by Group1 even after its run terminates.
 
+## Brew deadline and final UI observation
+
+The authentic211e archive failure raises the literal admission error
+`Owned Automation prompt exceeded its deadline`. It previously bypassed the
+timeout channel, which observed only `subprocess.TimeoutExpired`. The bounded
+collector now observes that exact built-in string only for an actual permission
+request in the UI-observer stage. It retains the original exception object and
+physical cleanup; private objects and string subclasses are never compared.
+
+The latest validated UI base fields and closed discovery counts also survive
+later checkpoints. Button and identity details are omitted. The original256
+historical files and4096-byte envelope remain unchanged. Existing native facts
+do not distinguish a missing prompt from an unqualified or unrelated window;
+neither these counters nor a deadline supplies consent, API status or success.
+
+Twelve additive portable controls are enrolled in the existing Brew test module
+and therefore its unchanged official unittest-discovery command. All original
+test methods,246 assertion calls,3 subprocess calls and10 cleanup bodies remain.
+The original collector fails six assertions; an intermediate proposal fails
+four private-equality subcontrols and is superseded by the typed refinement.
+Actual native receiving of this refinement remains pending.
+
+The official Group1 attempt1 log archive is now received through the supported
+`actions/runs/38218957837/attempts/1/logs` endpoint:473515 bytes, SHA256
+`01150935a02d1568c79283c7fbbce3df1c9befb930763e1464bfe95c4be64c83`.
+The aggregate endpoint's separate403 refusal remains recorded. No transport
+signature, proxy or TLS policy was altered. The endpoint refusal disclosed the
+new exact host `results-receiver.actions.githubusercontent.com`; it is saved
+additively in the environment draft, without claiming runtime activation.
+Detailed Windows/Core receiving is separate from this macOS diagnostic change.
+
 ## Verified obsolete branch cleanup
 
 The following3 remote refs had no open PR or active CI, were integrated in
