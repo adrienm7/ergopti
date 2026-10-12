@@ -150,7 +150,12 @@ foreach($taskProof in $taskProofs){
   if(!$taskArchiveError.partial_retained -or $taskArchiveError.reason -cne 'archive_creation_failed'){throw 'Partial archive cleanup debt disappeared.'}
   continue
  }
- if($taskProof.exit_code -ne 0 -or !$taskProof.archive_created -or $taskProof.stderr_bytes -ne 0){throw ('Worker archive acknowledgement failed: '+$taskProof.case)}
+ $taskPrimaryRefusal=@('foreign-physical','missing-component','redaction-refusal','false-installed-origin','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason') -contains $taskProof.case
+ $taskExpectedExit=$(if($taskPrimaryRefusal){1}else{0})
+ if($taskProof.exit_code -ne $taskExpectedExit -or !$taskProof.archive_created -or $taskProof.stderr_bytes -ne 0){throw ('Worker primary outcome or archive acknowledgement failed: '+$taskProof.case)}
+ $taskTerminal=Get-Content -LiteralPath (Join-Path $taskProof.path 'progress.json') -Raw -Encoding UTF8|ConvertFrom-Json
+ if($taskTerminal.phase -cne $(if($taskPrimaryRefusal){'failed'}else{'completed'}) -or $taskTerminal.session_id -cne ([IO.Path]::GetFileName($taskProof.path)) -or !$taskTerminal.archive_created){throw 'Collector primary refusal was promoted, or its valid archive became inaccessible.'}
+ if($taskPrimaryRefusal -and !(Test-Path -LiteralPath (Join-Path $taskProof.path 'failure.json'))){throw 'Primary refusal lost its exact local error receipt.'}
  $taskManifest=Get-Content -LiteralPath (Join-Path $taskProof.path 'manifest.json') -Raw -Encoding UTF8|ConvertFrom-Json
  if(@('redaction-refusal','false-installed-origin') -notcontains $taskProof.case -and ($taskManifest.build_kind -cne 'worker_control' -or $taskManifest.source_sha -cne $taskSourceSha)){throw 'Worker controls claimed resident product provenance.'}
  if($taskProof.case -eq 'false-installed-origin' -and ($taskManifest.build_kind -cne 'unverified_input' -or
