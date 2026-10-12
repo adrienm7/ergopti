@@ -128,6 +128,57 @@ physical typing or complete integration-green claim follows from these checks.
 Full suites are rerun after this coherent checkpoint; all affected items remain
 open until their actual native/physical acceptance and remaining software work.
 
+#### Linux startup discovery regression receiving
+
+The complete Linux units on `ba41b79db` pass 13,450/13,450 across 521 modules.
+The subsequent startup E2E exposed ten failures: its child deliberately removed
+the required luv ABI while retaining the real HTTP adapter. The production
+discovery refusal was correct. The fixture now controls only declared catalogue
+loopback requests and delegates every unrelated HTTP owner unchanged; two
+additional custody/delegation regressions preserve all 39 prior cases.
+
+On isolated fresh `dev 6d1efd3d0` plus correction `508201914`, the normal Linux
+E2E entry completes 193/193 with six native digest checks and subprocess exit 0.
+An earlier invocation printed the same successful footer but returned exit 1;
+that receipt remains failed and its exit discrepancy is not attributed. The
+independent rerun records the actual subprocess status and source SHA. Actual
+curl/libuv receiving on the composed correction passes 262 streaming and 136
+local API checks. Controlled startup HTTP replies do not qualify native network
+behavior. Windows/macOS and physical input remain unqualified by this checkpoint.
+
+#### Received Windows delivery and collector corrections
+
+The archived Windows session's 15 atomic commits after `7184fbf58b` through
+`fca9d29769` are received on current dev; its divergent earlier history is not
+imported. The seven-file `fae726662` increment is preserved as an unqualified
+snapshot. Main's stricter canonical publication/admission guards remain intact.
+Native owner correction `680bb62e3d0cba970f4db44015d0aeae19400629` contains the
+real archived MSVC DLL: SHA256 `E4133FA294B78920D6A558CA284F0CCDB96807FA10D15DEC6E1CF046731C972A`.
+All 18 source/recipe inputs and its artifact hash match; this container did not
+compile or execute that DLL on Windows. The previous startup failure from the
+old DLL's missing exports requires fresh Windows receiving on this successor.
+
+Follow-up fixes keep post-READY model failures within their current menu owner,
+archive only bytes actually produced by the collector, preserve foreign file
+successors through original exclusive streams, and retain primary failure while
+keeping its verified diagnostic ZIP accessible. Collection source controls pass
+62/0, shared page behavior passes, all 21 locales retain collection captions.
+Native collector receiving remains UNRUN: 30 PowerShell controls, 13 AHK owner
+cases and two resident-observation cases. Newly authored model failure/deadline
+cases also require actual Windows execution. Portable C receiving passes 43/43,
+route/output/trace matrices pass 8/7/6; source census, custody, bootstrap, bundle,
+encoding (1,910) and syntax (1,890) controls pass. Diagnostic source pins are
+regenerated canonically; the independent original oracle is unchanged.
+
+The packaged Windows Diagnostics page now offers translated collection, cancel,
+guided observations and archive-folder actions; exact installed-release receiving
+without developer tools remains open. The stable v1.0.1 does not contain this
+feature. Windows-specific collection is explicitly unavailable on macOS/Linux.
+Item 49 still requires complete production capture/observer migration and output
+emission; physical hooks, modifier delivery, UIA/rendering and full native suites
+are not qualified by these portable/source results. No native qualification flag
+is raised. Full composed JS/macOS gates remain pending at this checkpoint.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
@@ -5795,6 +5846,55 @@ installation gates are skipped. Core JavaScript gives 412/413, with the actual
 portable Python receiver startup timeout retained. These bounded receipts do
 not qualify the final uninstrumented production tree or complete item 42;
 exact-source integrated qualification and installed acceptance remain required.
+
+The remaining Windows captured read, no-op and ordinary write predicates now
+compare complete String units with case-sensitive native equality, including the
+captured final candidate. Read-only access still grants no write readiness;
+invalid/newer schema, registry withdrawal and genuine terminal-owner checks stay
+strict. Six additive actual API controls cover BOM reads, no-op reconciliation
+and both ordinary source/candidate operands without writing NUL bytes to disk.
+They retain the full original fixture prefix and preserve uncertain cleanup.
+
+Authenticated private Windows run
+[38275831892](https://github.com/adrienm7/ergopti/actions/runs/38275831892) passes
+all eight captured-image controls on the candidate. Restoring only the four new
+comparisons preserves the two prior passes and causes the six exact expected
+caller-NUL failures. Its controller then refuses the stdout encoding of those
+six failure separators; the final restored-candidate child remains unexecuted.
+Candidate source and all 3,273 original runtime pins are genuinely restored,
+with all three started children retired and no cleanup errors. This is bounded
+regression evidence, not a complete four-phase or whole-suite PASS. A strictly
+phase-specific receiving correction preserves every expectation and raw byte;
+its 20 transport controls and 19 selected Node commands pass. The updater
+diagnostic producer inventory follows only the owned source fingerprint; all
+22 existing source-receiving controls pass with the independent label oracle
+unchanged. Fresh Windows-only
+manual [38279233467](https://github.com/adrienm7/ergopti/actions/runs/38279233467)
+now provides authenticated complete-cohort receiving on the private instrumented
+source: dry8, candidate8 PASS, original2 PASS/six exact inverse failures, then
+restored8 PASS. All four children retire; the candidate and all 3,273 runtime
+pins are restored without cleanup errors. The parent includes final receipt
+writing in 37,692 ms against its unchanged 180,000 ms budget. This does not
+qualify the composed newer Dev tree or a warning-clean build: all 5,218 baseline
+warnings and both admitted fixture warnings remain explicit. The whole run is
+FAIL (2 successful jobs, 4 failed, 6 skipped; Release skipped). Native13 again
+passes six original subjects before the seventh is interrupted; only six of
+sixteen custody reports complete, and the remaining original/fault subjects do
+not execute. Core gives 412/413 with its actual Python 3.12.15 receiver timeout.
+Full production units, E2E, startup, packaging, installation and device acceptance
+remain required; item 42 and transversal items 16/38 stay partial.
+
+The four-expression correction is reconciled with Dev ba41b79d, preserving the
+incoming recovery/settlement, scalar and classification-cache owners. Its only
+producer-inventory conflict keeps every upstream field and updates the owned
+source fingerprint; independent updater labels remain unchanged. Selected
+local verification passes formatting and all 1,908 AHK BOM/LF checks; native
+Windows gates remain unavailable locally. The composed JS run gives 422/426:
+one managed-Git-ancestor Linux uninstall fixture refusal (unchanged outside-Git
+replay PASS), plus the unchanged upstream macOS pinned-read ratchet, bare Lua
+gsub return and layout-default consumer failures. Their original assertions and
+source bytes are preserved; no whole-suite green result or final-tree native
+acceptance is claimed.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the

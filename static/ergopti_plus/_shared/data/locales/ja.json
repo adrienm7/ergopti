@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "別の起動コマンド：起動は別のコマンドまたはインストールに設定されています。既存の設定は保持されます。",
 	"menu.llm.model_parent_with_health": "%s選択中のモデル：%s",
 	"config.read_only.newer_schema": "この設定は、より新しいバージョンの ErgoptiPlus で保存されています。設定内容は変更されていません。設定を変更する前に ErgoptiPlus を更新し、再読み込みしてください。",
-	"menu.llm.save_unavailable": "利用できません: ErgoptiPlus が一時停止中の場合は再開するか、診断を開いて設定を保存できない理由を確認してください。"
+	"menu.llm.save_unavailable": "利用できません: ErgoptiPlus が一時停止中の場合は再開するか、診断を開いて設定を保存できない理由を確認してください。",
+	"healthcheck.collection.start": "Windows 診断を収集",
+	"healthcheck.collection.guided": "キーボードと画面の確認手順",
+	"healthcheck.collection.skip": "物理的な確認をスキップ",
+	"healthcheck.collection.open": "フォルダーを開く",
+	"healthcheck.collection.complete": "アーカイブを作成しました。ZIP を手動で会話に添付してください。",
+	"healthcheck.collection.unavailable": "この Windows 収集機能は macOS と Linux では使用できません。",
+	"healthcheck.collection.guide": "下のテスト用テキストを入力してください。テキスト欄にフォーカスした状態で Ctrl を押して離し、次に Shift を押して離してください。",
+	"healthcheck.collection.visual": "テスト用テキストをはっきり読めます。",
+	"healthcheck.collection.failed": "収集に失敗しました。未完了の操作についてローカルフォルダーを確認してください。"
 }

@@ -13,6 +13,7 @@
 #Warn All, StdOut
 
 global TraceDll := ""
+global TraceModule := 0
 global TraceGui := 0
 global TraceEditor := 0
 global TraceInput := 0
@@ -154,7 +155,7 @@ TraceInstallAhk() {
 TraceRetire(Reason, Code) {
 	global TraceRecording, TraceInput, TraceHotkeyInstalled, TraceCriterionFn
 	global TraceSessionActive, TraceNativeStarted, TraceOwner, TraceToken, TraceGeneration
-	global TraceGui
+	global TraceGui, TraceModule
 	TraceRecording := false
 	if IsObject(TraceInput) {
 		try TraceInput.Stop()
@@ -239,6 +240,11 @@ TraceNativeRecord(Entries, Offset) {
 if A_Args.Length != 4 || A_AhkVersion != "2.0.26" || A_PtrSize != 8
 	throw Error("Use the supervisor with AutoHotkey 2.0.26 x64.")
 TraceDll := A_Args[1]
+; DllCall by path alone unloads an otherwise unowned DLL after each call.
+; The hook thread, callbacks and InitOnce state retain the module until process exit.
+TraceModule := DllCall("LoadLibraryW", "Str", TraceDll, "Ptr")
+if !TraceModule
+	throw OSError()
 RequestedSequence := A_Args[2]
 Samples := Integer(A_Args[3])
 SendMarker := A_Args[4]

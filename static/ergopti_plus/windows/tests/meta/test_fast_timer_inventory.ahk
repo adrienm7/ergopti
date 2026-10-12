@@ -77,6 +77,7 @@ _FTI_Inventory() {
 		"_SR_TreePoll",                 "100",   ; only armed while a Job-owned tree is live or its capture held
 		"_LLM_NavEventOwnerServiceFn",  "100",   ; native receipt/fault drain, disarmed on Stop
 		"_SpotlightTick",               "100",   ; only armed while spotlight is open
+		"this.CollectionTimer",          "100",   ; bounded diagnostic progress/guided transitions; disarmed on worker retirement
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
 		"this.Timer",                    "150",   ; exact managed Ollama session/debt/READY custody; canceled on retirement
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode

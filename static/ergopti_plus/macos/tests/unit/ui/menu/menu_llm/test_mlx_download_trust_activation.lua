@@ -75,6 +75,7 @@ helpers.describe("MLX downloader system trust admission", function()
 end)
 
 local producer_name = "ui.menu.menu_llm.models_manager_mlx_download"
+local producer_location = producer_name:gsub("%.", "/") .. ".lua"
 -- Selected by a declaration unique to ui/menu/menu_llm/models_manager_mlx_download.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
@@ -85,7 +86,7 @@ helpers.assert_true(type(producer_source) == "string" and producer_source ~= "",
 local function with_source_root(directory, callback)
 	local saved = package.preload[producer_name]
 	package.preload[producer_name] = function()
-		return assert(load(producer_source, "@" .. directory .. "/ui/menu/menu_llm/models_manager_mlx_download.lua"))()
+		return assert(load(producer_source, "@" .. directory .. "/" .. producer_location))()
 	end
 	local ok, err = xpcall(callback, debug.traceback)
 	package.preload[producer_name] = saved

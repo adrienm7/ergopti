@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "Otro comando de inicio: El inicio está configurado para otro comando o instalación. Se conserva su configuración.",
 	"menu.llm.model_parent_with_health": "%sModelo seleccionado: %s",
 	"config.read_only.newer_schema": "Esta configuración se guardó con una versión más reciente de ErgoptiPlus. Se han conservado tus ajustes. Actualiza ErgoptiPlus y vuelve a cargarlo antes de cambiar los ajustes.",
-	"menu.llm.save_unavailable": "No disponible: reanuda ErgoptiPlus si está en pausa o abre Diagnóstico para comprobar por qué no se pueden guardar los ajustes."
+	"menu.llm.save_unavailable": "No disponible: reanuda ErgoptiPlus si está en pausa o abre Diagnóstico para comprobar por qué no se pueden guardar los ajustes.",
+	"healthcheck.collection.start": "Recopilar diagnóstico de Windows",
+	"healthcheck.collection.guided": "Pasos guiados con teclado y pantalla",
+	"healthcheck.collection.skip": "Omitir pasos físicos",
+	"healthcheck.collection.open": "Abrir carpeta",
+	"healthcheck.collection.complete": "Archivo creado. Adjunte el ZIP manualmente a la conversación.",
+	"healthcheck.collection.unavailable": "Este recopilador de Windows no está disponible en macOS y Linux.",
+	"healthcheck.collection.guide": "Escriba el texto de prueba de abajo. Mantenga y suelte Ctrl y luego Shift por separado, con el campo de texto activo.",
+	"healthcheck.collection.visual": "Puedo leer claramente el texto de prueba.",
+	"healthcheck.collection.failed": "La recopilación falló. Revise la carpeta local para ver las operaciones incompletas."
 }
