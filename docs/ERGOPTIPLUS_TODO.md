@@ -5598,6 +5598,31 @@ uninstall control separately passes when its fixture is outside the managed
 Git ancestors. This is mixed-environment evidence, not one green full run.
 Item 42 and transversal items 16/38 remain partial.
 
+The two captured Windows transition/recovery predicates now compare complete
+String units with case-sensitive native equality instead of C-string comparison.
+Existing type, source, registry, presence and native-owner checks stay in order;
+caller-only units after NUL cannot borrow a captured source prefix. Two additive
+real-file controls retain the genuine terminal bundle and every original fixture
+assertion. Cleanup preserves the primary failure and deletes its own files only
+after acknowledged retirement and complete unchanged-byte proof.
+
+Authenticated private Windows run
+[38258619763](https://github.com/adrienm7/ergopti/actions/runs/38258619763), source
+`bb1eda77`, passes both controls with SDK 2.0.26 and the exact executable hash.
+A separate same-child benchmark passes 49 semantic controls and 880 paired QPC
+samples: two separately allocated equal 32 MiB strings take median 116.099 ms
+before and 48.897 ms after per ten comparisons, paired median ratio 2.369.
+This measures that primitive and workload, not a whole-transaction speedup.
+All original Native38 and Native14 subjects, source pins and cleanup rules pass.
+Native13 remains incomplete: six original subjects pass, the seventh is
+interrupted at the unchanged budget, the eighth/ninth and all four fault
+subjects never execute. Only six of sixteen required custody reports complete.
+The composed main AHK suite, E2E, compiler-warning, startup, packaging and
+installation gates are skipped. Core JavaScript gives 412/413, with the actual
+portable Python receiver startup timeout retained. These bounded receipts do
+not qualify the final uninstrumented production tree or complete item 42;
+exact-source integrated qualification and installed acceptance remain required.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical

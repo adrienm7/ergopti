@@ -2190,3 +2190,114 @@ _CMJ_OwnedRecoveryProducer() {
 	}
 }
 Test("config journal owned settlement: only the original recovery producer can mint its outcome", _CMJ_OwnedRecoveryProducer)
+; Caller-held predicates must reject additional source units after a literal NUL.
+; The native reader is never asked to decode NUL-bearing bytes in this subject.
+_CMJ_CapturedTransitionRejectsCallerNulSuffix(Side) {
+	global ConfigurationFile
+	HadPath := IsSet(ConfigurationFile)
+	PreviousPath := HadPath ? ConfigurationFile : ""
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = true`n# genuine original image`n'
+	Candidate := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = false`n# genuine candidate image`n'
+	Bundle := false
+	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
+	try {
+		AssertEqual(12, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v12 registry")
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		BeforeBytes := FileRead(Path, "RAW")
+		AssertEqual(StrLen(Source), BeforeBytes.Size, "the genuine original native image has its complete independent ASCII byte count")
+		loop BeforeBytes.Size
+			AssertEqual(Ord(SubStr(Source, A_Index, 1)), NumGet(BeforeBytes, A_Index - 1, "UChar"),
+				"the initial raw byte vector equals the handwritten source")
+		OriginalBytesValid := true
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path])
+		AssertTrue(Bundle is Object, "the captured predicate requires an actual native terminal bundle")
+		OriginalBundleId := Bundle.id
+		AssertTrue(ConfigSchemaPrepareOwnedSource(Path, Bundle), "the real prepare_owned handoff owns this source")
+		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path))
+		Guard := ConfigMigrateBoot(Path, "capture_transition", Map("present", 1, "content", Candidate), Bundle)
+		AssertTrue(HasMethod(Guard, "Call"), "the genuine capture_transition request must return its actual predicate")
+		AssertTrue(Guard.Call(Source, 1, Candidate, 1), "exact original and candidate images are admitted")
+		AssertTrue(Guard.Call(Candidate, 1, Source, 1), "both genuine images retain the issued transition permission")
+		Nul := Chr(0), Suffix := "fixed-caller-suffix"
+		AssertEqual(1, StrLen(Nul)), AssertEqual(0, Ord(Nul))
+		CallerSource := Source . Nul . Suffix
+		CallerCandidate := Candidate . Nul . Suffix
+		AssertTrue(CallerSource is String), AssertTrue(CallerCandidate is String)
+		AssertEqual(StrLen(Source) + 1 + StrLen(Suffix), StrLen(CallerSource))
+		AssertEqual(StrLen(Candidate) + 1 + StrLen(Suffix), StrLen(CallerCandidate))
+		AssertEqual(0, Ord(SubStr(CallerSource, StrLen(Source) + 1, 1)))
+		AssertEqual(0, Ord(SubStr(CallerCandidate, StrLen(Candidate) + 1, 1)))
+		if Side == "source"
+			AssertFalse(Guard.Call(CallerSource, 1, Candidate, 1),
+				"caller source units after NUL are outside both genuinely captured images")
+		else if Side == "next"
+			AssertFalse(Guard.Call(Source, 1, CallerCandidate, 1),
+				"caller next-content units after NUL cannot borrow genuine candidate permission")
+		else
+			throw Error("Unknown caller-only NUL regression side")
+		AssertFalse(Guard.Call(1, 1, Candidate, 1), "the existing Source String guard rejects a numeric caller")
+		AssertTrue(Guard.Call(Source, 1, Candidate, 1), "exact source repair preserves the same still-live captured predicate")
+		Bundle.id := OriginalBundleId + 1
+		AssertFalse(Guard.Call(Source, 1, Candidate, 1), "actual native bundle identity withdrawal refuses the retained predicate")
+		Bundle.id := OriginalBundleId
+		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path), "exact bundle repair restores its actual native ownership")
+		AssertTrue(Guard.Call(Source, 1, Candidate, 1), "the same guard accepts the exactly repaired real bundle")
+	} catch as Err {
+		PrimaryError := Err
+	}
+	; Each teardown action remains independent of earlier body/cleanup failures.
+	try ConfigurationFile := HadPath ? PreviousPath : unset
+	catch as Err
+		CleanupErrors.Push({ stage: "global_restore", error: Err })
+	if Bundle is Object && IsSet(OriginalBundleId) {
+		try Bundle.id := OriginalBundleId
+		catch as Err
+			CleanupErrors.Push({ stage: "bundle_id_restore", error: Err })
+	}
+	ReleaseAcknowledged := !(Bundle is Object)
+	if Bundle is Object {
+		try {
+			Released := _ConfigWriteTerminalRelease(Bundle)
+			ReleaseAcknowledged := (Released is Integer) && Released == 1
+			if !ReleaseAcknowledged
+				throw Error("The actual terminal bundle retirement was not acknowledged")
+		} catch as Err
+			CleanupErrors.Push({ stage: "bundle_release", error: Err })
+	}
+	SourceUnchanged := false
+	try {
+		if !IsSet(BeforeBytes)
+			throw Error("No complete original native byte receipt was captured")
+		AfterBytes := FileRead(Path, "RAW")
+		AssertEqual(BeforeBytes.Size, AfterBytes.Size, "caller-only predicate checks never change the native file length")
+		loop BeforeBytes.Size
+			AssertEqual(NumGet(BeforeBytes, A_Index - 1, "UChar"), NumGet(AfterBytes, A_Index - 1, "UChar"),
+				"caller-only predicate checks preserve every actual raw byte")
+		SourceUnchanged := OriginalBytesValid
+	} catch as Err
+		CleanupErrors.Push({ stage: "raw_byte_proof", error: Err })
+	if ReleaseAcknowledged && SourceUnchanged {
+		try _CMJ_Cleanup(Dir, Path)
+		catch as Err
+			CleanupErrors.Push({ stage: "fixture_cleanup", error: Err })
+	} else {
+		CleanupErrors.Push({ stage: "directory_retained", error: Error("Retained fixture directory because native retirement or unchanged original byte proof is unavailable: " . Dir) })
+	}
+	for Secondary in CleanupErrors {
+		; Framework diagnostics are bounded and cannot replace the primary error.
+		Detail := SubStr(StrReplace(StrReplace(Secondary.error.Message, "`r", " "), "`n", " "), 1, 512)
+		try _TestPrint("# ERGOPTI_PRIVATE_CALLER_NUL_CLEANUP side=" . Side . " stage=" . Secondary.stage
+			. " dir=" . Dir . " detail=" . Detail)
+	}
+	if IsObject(PrimaryError)
+		throw PrimaryError
+	if CleanupErrors.Length > 0
+		throw CleanupErrors[1].error
+}
+Test("config journal: captured native transition rejects caller-only Source NUL suffix",
+	_CMJ_CapturedTransitionRejectsCallerNulSuffix.Bind("source"))
+Test("config journal: captured native transition rejects caller-only NextContent NUL suffix",
+	_CMJ_CapturedTransitionRejectsCallerNulSuffix.Bind("next"))
