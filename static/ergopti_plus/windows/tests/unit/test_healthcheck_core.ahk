@@ -678,7 +678,7 @@ _TestHC_CollectionState(TestCase) {
 				AssertTrue(D.Result["cancel_control_failed"])
 				AssertEqual("cleanup_pending", D.Result["phase"])
 				AssertFalse(D.Terminal, "Control write failure cannot invent worker retirement.")
-			} else if TestCase == "archive-ack" || TestCase == "archive-good" {
+			} else if TestCase == "archive-ack" || TestCase == "archive-good" || TestCase == "archive-failed" {
 				FileAppend("synthetic archive bytes", D.Archive, "UTF-8-RAW")
 				Ack := Map("schema_version", 1, "session_id", D.Id, "archive_committed", true,
 					"bytes", FileGetSize(D.Archive), "sha256", CryptoSha256Bytes(FileRead(D.Archive, "RAW")))
@@ -688,6 +688,13 @@ _TestHC_CollectionState(TestCase) {
 					AssertFalse(D.Result["archive_created"], "Existence and size alone cannot acknowledge an archive.")
 					AssertFalse(D.Completed(0, _HC_ValueToJson(Ack), ""), "A duplicate completion cannot replace a failed terminal receipt.")
 					AssertFalse(D.Result["archive_created"])
+				} else if TestCase == "archive-failed" {
+					AssertTrue(D.Completed(1, _HC_ValueToJson(Ack), ""))
+					AssertEqual("failed", D.Result["phase"], "A valid ZIP cannot promote the worker's primary failure.")
+					AssertTrue(D.Result["archive_created"], "Failed collection retains its exact acknowledged evidence archive.")
+					AssertFalse(D.Result["owner_pending"], "Only canonical native completion retires worker custody.")
+					AssertTrue(D.Result["worker_tree_retired"])
+					AssertTrue(D.Result["folder_available"])
 				} else {
 					AssertTrue(D.Completed(0, _HC_ValueToJson(Ack), ""))
 					AssertTrue(D.Result["archive_created"])
@@ -759,3 +766,5 @@ _TestHC_ResidentIdentityDebt() {
 	}
 }
 Test("Diagnostics collection preserves existing identity handle debt (groups247-resident-observations)", _TestHC_ResidentIdentityDebt)
+
+Test("Diagnostics collection primary failure retains its verified archive (groups247-collection)", (*) => _TestHC_CollectionState("archive-failed"))

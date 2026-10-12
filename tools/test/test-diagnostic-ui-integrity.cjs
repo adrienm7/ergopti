@@ -457,6 +457,28 @@ for (const [name, required] of [
 		'The independently withdrawn actual custody boundary was still admitted.'
 	);
 }
+/** Primary collection errors preserve a useful archive without claiming completion. */
+function receiveCollectorFailure(source) {
+	return {
+		'primary exit': source.includes('if ($null -ne $taskFailure) { exit 1 }'),
+		'primary progress': source.includes(
+			"phase=$(if($null -ne $taskFailure){'failed'}else{'completed'})"
+		)
+	};
+}
+const collectorFailure = receiveCollectorFailure(collectorSource);
+for (const [name, required] of [
+	['primary exit', 'if ($null -ne $taskFailure) { exit 1 }'],
+	['primary progress', "phase=$(if($null -ne $taskFailure){'failed'}else{'completed'})"]
+]) {
+	report('Collection source: ' + name, collectorFailure[name], 'Primary refusal was promoted.');
+	report(
+		'Collection source inverse: ' + name,
+		collectorSource.split(required).length === 2 &&
+			!receiveCollectorFailure(collectorSource.replace(required, ''))[name],
+		'The missing primary outcome remained admitted.'
+	);
+}
 if (process.argv.includes('--native-collection')) {
 	if (process.platform !== 'win32') throw new Error('Native collection controls require Windows.');
 	const { spawnSync } = require('node:child_process');

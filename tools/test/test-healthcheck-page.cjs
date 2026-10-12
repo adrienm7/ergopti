@@ -949,6 +949,29 @@ for (const driver of ['linux', 'macos', 'windows']) {
 		fail('opening the archive accepted a page-supplied path');
 	page.sandbox.receiveDiagnostics({
 		type: 'collection',
+		collection: {
+			phase: 'failed',
+			archive_created: true,
+			folder_available: true,
+			owner_pending: false
+		}
+	});
+	const strings = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8')
+	);
+	if (
+		page.elements['collection-progress'].textContent !== strings['healthcheck.collection.failed'] ||
+		page.elements['btn-collection-open'].hidden ||
+		page.elements['btn-collect-windows'].disabled ||
+		!page.elements['btn-collection-cancel'].hidden
+	)
+		fail('a primary failure lost its honest caption, retained archive action or terminal custody');
+	page.elements['btn-collection-open'].dispatch('click');
+	if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collection_open' }))
+		fail('a retained failure archive did not use the closed host action');
+
+	page.sandbox.receiveDiagnostics({
+		type: 'collection',
 		collection: { phase: 'failed', archive_created: false }
 	});
 	if (

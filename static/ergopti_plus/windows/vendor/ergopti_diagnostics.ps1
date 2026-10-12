@@ -532,5 +532,8 @@ try {
 		throw
 	}
 	[ordered]@{schema_version=1; session_id=$taskId; archive_committed=$true; bytes=(Get-Item -LiteralPath $taskArchive).Length; sha256=(Get-CollectionHash $taskArchive)} | ConvertTo-Json -Compress
-	Write-CollectionJson 'progress.json' ([ordered]@{schema_version=1; session_id=$taskId; phase='completed'; completed=$taskRows.Count; total=$taskContract.checks.Count; archive_created=$true; results=@($taskRows.ToArray())})
+	Write-CollectionJson 'progress.json' ([ordered]@{schema_version=1; session_id=$taskId; phase=$(if($null -ne $taskFailure){'failed'}else{'completed'}); completed=$taskRows.Count; total=$taskContract.checks.Count; archive_created=$true; results=@($taskRows.ToArray())})
 }
+
+# A valid failure archive is available, but it cannot turn a primary refusal into completion.
+if ($null -ne $taskFailure) { exit 1 }
