@@ -505,3 +505,40 @@ Source work. The proposed SDK helper has source-only header identity, not loader
 or native qualification. Root owns workflow cache admission, receiver clocks
 and the strict Windows Job adapter. Existing direct-child close cannot prove
 all descendants retired. No stopped trust/account/PAC/curl experiment is rerun.
+
+## Source-authenticated Windows SDK admission
+
+The next independent source slice requires an explicit absolute
+`ERGOPTI_WINDOWS_AHK_ARCHIVE`, authenticates the canonical pinned archive before
+ZIP parsing, receives one exact `AutoHotkey64.exe` member and compares it with
+the acquired interpreter image. It rejects nonregular members, Windows aliases,
+invalid ranges/descriptors/CRC and wrong AMD64/PE32+ executable header flags.
+The supplied FileVersion is explicitly unqualified metadata; headers are not
+Windows loader or executed-image authority.
+
+Initial and repeated SDK admission precede the complete cohort loop; final SDK
+receiving follows the original final guards. The rejected intermediate placed
+its repeat inside a catch-and-continue and could attempt two later children.
+An actual same-byte inode replacement reproduces that refusal transition; the
+corrected outer guard produces zero mocked launches and all cohorts UNRUN.
+Original missing-archive code similarly attempts three mocked children; the
+corrected code attempts none. No mock is counted as native execution.
+
+The final canonical-formatted helper has SHA256
+`975971064a7772f09656b229bfa0e8540ad6c021f55b03581e9236d1a4e7fd02`.
+Its complete normalized program AST equals independently reviewed
+`6e3cf247ed24ba6cadadf39790b6bc842ab19b47eb7298f467141d77bd9564b6`.
+Actual final52 pure controls, registered22 controls and genuine official2.0.26
+inert archive/image joins pass in independent receiving. The pinned archive
+SHA256 is `43522aa3122a57784ac5db30abf85c2244475c36acd7796e2c993355f9e926ae`;
+all37 CRCs and selected image
+`a2a54b8abc476d7671d4de0771bb54bf5f2373d79ff6871d0ba6a62c3b88ae00`
+were independently received as data. No interpreter was installed or executed.
+
+All33 original collector predicates,88 prior assertions,2307-byte child,22
+registrations,21 source pins and independent23-label oracle remain intact.
+Root must supply and authenticate the archive even on cache hits, compose the
+existing held-image/whole-tree owner and enroll the clean original23 launcher.
+Those are separate source prerequisites. Actual Windows APIs, SDK execution,
+process-tree closure, complete Unit/E2E/build/install and macOS/enterprise
+receiving remain unqualified. Source tests do not close36/62 or16/38.
