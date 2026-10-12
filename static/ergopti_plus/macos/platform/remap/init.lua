@@ -1230,7 +1230,14 @@ end
 local function resolve_current_layout_actions(label)
 	if M.AVAILABLE_ACTIONS == nil then return true, 0 end
 	return run_async_step(label, function()
-		return Config.resolve_layout_actions(M.AVAILABLE_ACTIONS)
+		local count, form = Config.resolve_layout_actions(M.AVAILABLE_ACTIONS)
+		if form ~= "ansi" and form ~= "iso" then
+			error("The resolved action list has no valid virtual keyboard convention.")
+		end
+		-- The generator must consume the convention that resolved these actions,
+		-- rather than rereading a changed layout registry for the virtual HID.
+		if _state then _state.virtual_keyboard_type = form end
+		return count
 	end)
 end
 

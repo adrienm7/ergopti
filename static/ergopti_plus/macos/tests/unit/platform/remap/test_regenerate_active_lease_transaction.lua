@@ -51,6 +51,7 @@ local function load_active_remap(options)
 		classifier_phases = {},
 		saved_bindings = {},
 		built_bindings = {},
+		build_forms = {},
 		errors = {},
 	}
 
@@ -99,13 +100,15 @@ local function load_active_remap(options)
 			calls.resolves = calls.resolves + 1
 			calls.resolve_phases[#calls.resolve_phases + 1] = calls.phase
 			append("resolve")
-			return 1
+			if options.omit_layout_form then return 1 end
+			return 1, options.layout_form or "ansi"
 		end,
 	}
 	package.loaded["platform.remap.generator"] = {
 		build_karabiner_json = function(...)
 			local binding = (select(1, ...)).tap_hold_config.left_shift or {}
 			calls.built_bindings[#calls.built_bindings + 1] = { tap = binding.tap, hold = binding.hold }
+			calls.build_forms[#calls.build_forms + 1] = (select(1, ...)).virtual_keyboard_type or "missing"
 			calls.builds = calls.builds + 1
 			calls.build_phases[#calls.build_phases + 1] = calls.phase
 			calls.build_tokens[#calls.build_tokens + 1] = select(7, ...)
@@ -267,6 +270,7 @@ local function load_active_remap(options)
 	calls.classifier_phases = {}
 	calls.saved_bindings = {}
 	calls.built_bindings = {}
+	calls.build_forms = {}
 	calls.errors = {}
 
 	function calls.record_result(ok, reason)
@@ -370,6 +374,29 @@ helpers.describe("live menu mutations during exact lease transitions", function(
 end)
 
 helpers.describe("karabiner active-lease regeneration", function()
+	for _, form in ipairs({ "ansi", "iso" }) do
+		helpers.it("(layout-form-generation) carries the resolved " .. form .. " convention into the same build", function()
+			local remap, calls = load_active_remap({ layout_form = form })
+			helpers.assert_true(remap.regenerate(calls.record_result))
+			helpers.assert_eq(calls.build_forms[1], form,
+				"logical action keycodes and virtual HID must use one captured keyboard form")
+		end)
+	end
+
+	for _, case in ipairs({ { label = "missing" }, { label = "invalid", layout_form = "invalid" } }) do
+		helpers.it("(layout-form-generation) refuses the " .. case.label .. " resolved convention before building", function()
+			local remap, calls = load_active_remap()
+			package.loaded["platform.remap.config"].resolve_layout_actions = function()
+				return 1, case.layout_form
+			end
+			helpers.assert_eq(remap.regenerate(calls.record_result), false)
+			helpers.assert_eq(calls.builds, 0)
+			helpers.assert_eq(calls.deploys, 0)
+			helpers.assert_eq(#calls.results, 1)
+			helpers.assert_eq(calls.results[1].reason, "layout-resolution-failed")
+		end)
+	end
+
 	helpers.it("keeps the exact generation ACTIVE through atomic replacement", function()
 		local remap, calls = load_active_remap()
 		helpers.assert_true(remap.regenerate(function(ok, reason)

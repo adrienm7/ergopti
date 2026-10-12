@@ -1520,3 +1520,81 @@ end)
 -- those tests have run so test discovery order cannot make later modules read
 -- from the synthetic in-memory filesystem.
 package.loaded["adapters.file_system"] = nil
+
+helpers.describe("virtual keyboard follows the active layout (iso-typing-convention)", function()
+	helpers.it("the extra ISO physical key reaches code 50 rather than the layout's code 10", function()
+		local state = make_state()
+		state.virtual_keyboard_type = "iso"
+		local result = Generator.build_karabiner_json(state, { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
+		helpers.assert_not_nil(result)
+		local source = assert(io.open(helpers.shared("../../layouts/registry/ergopti/ergopti.keylayout"), "rb"))
+		local xml = source:read("*a"); source:close()
+		local base = assert(xml:match('<keyMap index="0">(.-)</keyMap>'))
+		helpers.assert_true(base:find('<key code="10" output="$"/>', 1, true) ~= nil,
+			"the shipped ISO source declares the top-left dollar key")
+		helpers.assert_true(base:find('<key code="50" action="ê"/>', 1, true) ~= nil,
+			"the shipped ISO source declares the extra-key action")
+		helpers.assert_true(xml:match('<action id="ê">%s*<when state="none" output="ê"/>') ~= nil,
+			"the extra-key action really types ê at the base level")
+		-- Independently declared HID-to-Carbon semantics and ISO layout outputs.
+		-- This is a portable receiving model, not a native Quartz/USB observation.
+		local carbon = {
+			ansi = { non_us_backslash = 10, grave_accent_and_tilde = 50 },
+			iso = { non_us_backslash = 50, grave_accent_and_tilde = 10 },
+		}
+		local layout = { [10] = "$", [50] = "ê" }
+		local virtual = result.profiles[1].virtual_hid_keyboard.keyboard_type_v2
+		helpers.assert_eq(layout[carbon[virtual].non_us_backslash], "ê", "ISO key left of Z")
+		helpers.assert_eq(layout[carbon[virtual].grave_accent_and_tilde], "$", "ISO key left of 1")
+		state.virtual_keyboard_type = "ansi"
+		result = Generator.build_karabiner_json(state, { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
+		local ansi_layout = { [10] = "<", [50] = "`" }
+		virtual = result.profiles[1].virtual_hid_keyboard.keyboard_type_v2
+		helpers.assert_eq(ansi_layout[carbon[virtual].non_us_backslash], "<", "non-Ergopti ANSI source")
+		helpers.assert_eq(ansi_layout[carbon[virtual].grave_accent_and_tilde], "`")
+	end)
+
+	helpers.it("rejects a malformed captured form instead of silently selecting ANSI", function()
+		for _, form in ipairs({ false, "jis", "", 10 }) do
+			local state = make_state()
+			state.virtual_keyboard_type = form
+			local result, reason = Generator.build_karabiner_json(state, { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
+			helpers.assert_nil(result)
+			helpers.assert_true(type(reason) == "string" and reason ~= "")
+		end
+	end)
+
+	helpers.it("updates only the selected profile's virtual type and retains source bytes and personal fields", function()
+		local state = make_state()
+		state.virtual_keyboard_type = "iso"
+		local generated = Generator.build_karabiner_json(state, { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
+		local path = "/fake/iso-form.json"
+		local original = {
+			global = { show_in_menu_bar = false }, profiles = {
+				{ selected = true, name = "Personal", devices = { { ignore = true } },
+					virtual_hid_keyboard = { keyboard_type_v2 = "ansi", country_code = 33, personal = "kept" },
+					complex_modifications = { parameters = { personal = 19 }, rules = { { description = "Personal", manipulators = {} } } },
+				},
+				{ selected = false, name = "Other", virtual_hid_keyboard = { keyboard_type_v2 = "jis", country_code = 81 } },
+			},
+		}
+		_fs_data[path] = _G.hs.json.encode(original)
+		local bytes = _fs_data[path]
+		local merged, reason, source, changed = Generator.merge_into_existing_config(generated, path)
+		helpers.assert_nil(reason)
+		helpers.assert_true(changed)
+		helpers.assert_eq(merged.profiles[1].virtual_hid_keyboard,
+			{ keyboard_type_v2 = "iso", country_code = 33, personal = "kept" })
+		helpers.assert_eq(merged.profiles[2], original.profiles[2])
+		helpers.assert_eq(merged.global, original.global)
+		helpers.assert_eq(merged.profiles[1].devices, original.profiles[1].devices)
+		helpers.assert_eq(merged.profiles[1].complex_modifications.parameters, { personal = 19 })
+		helpers.assert_eq(merged.profiles[1].complex_modifications.rules[1].description, "Personal")
+		helpers.assert_eq(_fs_data[path], bytes, "planning does not publish")
+		helpers.assert_eq(source.content, bytes, "CAS still owns the exact pre-read source")
+		_fs_data[path] = _G.hs.json.encode(merged)
+		local again, _, _, changed_again = Generator.merge_into_existing_config(generated, path)
+		helpers.assert_eq(changed_again, false, "identical form and rules require no publication")
+		helpers.assert_eq(again, merged)
+	end)
+end)
