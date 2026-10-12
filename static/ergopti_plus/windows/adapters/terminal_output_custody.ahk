@@ -70,9 +70,8 @@ class TerminalOutputConsumer {
 			}
 			return false
 		} catch as Err {
-			Status := LLM_NavEventOwner_TerminalOutputCustodyStatus(this.Handle)
-			if Status is Map && Status["unknown"]
-				this.Blocked := true
+			; A malformed post-emission receipt cannot be repaired by mutating it back.
+			this.Blocked := true
 			throw Err
 		} finally {
 			this.Busy := false

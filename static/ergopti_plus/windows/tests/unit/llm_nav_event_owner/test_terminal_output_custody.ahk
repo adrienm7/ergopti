@@ -493,6 +493,10 @@ _LNTOC_ConsumerCase(TestCase) {
 			return Attempt["unit_count"] + 1
 		if TestCase == "emit-throw"
 			throw Error("Injected uncertain emission.")
+		if TestCase == "unit-mutation"
+			Attempt["units"][1]["utf16"] := 0x7A
+		if TestCase == "handle-mutation"
+			Consumer.Handle["plan_id"] += 1
 		return Attempt["unit_count"]
 	}
 	if TestCase == "cancel-unsent" {
@@ -505,7 +509,8 @@ _LNTOC_ConsumerCase(TestCase) {
 		State.AckStatus := 4
 	if TestCase == "ack-throw"
 		State.Throw := "acknowledge"
-	if TestCase == "invalid-receipt" || TestCase == "oversized-receipt" || TestCase == "emit-throw" || TestCase == "ack-throw" {
+	if TestCase == "invalid-receipt" || TestCase == "oversized-receipt" || TestCase == "emit-throw" || TestCase == "ack-throw"
+		|| TestCase == "unit-mutation" || TestCase == "handle-mutation" {
 		AssertThrows(() => Consumer.Service())
 		AssertTrue(Consumer.Blocked)
 		AssertFalse(Consumer.Service()), AssertFalse(Consumer.Cancel())
@@ -541,6 +546,6 @@ _LNTOC_ConsumerCase(TestCase) {
 }
 
 for _LNTOC_ConsumerName in ["surrogate", "zero-up", "cancel-unsent", "admission-refusal", "ack-refusal",
-	"ack-throw", "invalid-receipt", "oversized-receipt", "emit-throw"]
+	"ack-throw", "invalid-receipt", "oversized-receipt", "emit-throw", "unit-mutation", "handle-mutation"]
 	Test("terminal output consumer: " . _LNTOC_ConsumerName . " (todo49-output-consumer)",
 		_LNTOC_WithState.Bind(_LNTOC_ConsumerCase.Bind(_LNTOC_ConsumerName)))
