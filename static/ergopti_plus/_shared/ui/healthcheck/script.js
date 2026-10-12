@@ -47,9 +47,10 @@
 	function renderCollection() {
 		var supported = state.snapshot && state.snapshot.driver === 'windows';
 		var active =
-			collection.phase !== 'idle' &&
-			collection.phase !== 'completed' &&
-			collection.phase !== 'failed';
+			isTrue(collection.owner_pending) ||
+			(collection.phase !== 'idle' &&
+				collection.phase !== 'completed' &&
+				collection.phase !== 'failed');
 		var button = document.getElementById('btn-collect-windows');
 		button.disabled = !supported || active;
 		button.title = supported ? '' : t('healthcheck.collection.unavailable');

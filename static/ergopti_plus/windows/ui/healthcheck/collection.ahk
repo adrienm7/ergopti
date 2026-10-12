@@ -55,7 +55,7 @@ class DiagnosticCollectionWindows {
 		this.Cancelled := false
 		this.Gui := 0
 		this.Result := Map("schema_version", 1, "session_id", this.Id, "phase", "collecting", "completed", 0,
-			"total", this.Contract["checks"].Length)
+			"total", this.Contract["checks"].Length, "owner_pending", true)
 		this.CollectionTimer := ObjBindMethod(this, "Tick")
 		this.Started := A_TickCount
 		this.Task := 0
@@ -97,6 +97,7 @@ class DiagnosticCollectionWindows {
 				SetTimer(this.CollectionTimer, 100)
 			} else if !this.Terminal {
 				this.Terminal := true
+				this.Result["owner_pending"] := false
 				this.DisarmExit()
 				LoggerDone("DiagnosticsCollection", "Diagnostic collection launch failed before worker ownership.")
 			}
@@ -168,13 +169,14 @@ class DiagnosticCollectionWindows {
 	AcceptProgress(Value) {
 		if this.Terminal
 			return false
-		if !(Value is Map) || Value.Get("session_id", "") !== this.Id || Value.Get("schema_version", 0) != 1
+		if !(Value is Map) || Value.Get("session_id", "") !== this.Id || !(Value.Get("schema_version", 0) is Integer)
+			|| Value.Get("schema_version", 0) != 1
 			throw Error("Foreign diagnostic progress refused.")
 		if !this.Contains(["collecting", "guided", "failed", "completed"], Value.Get("phase", ""))
 			throw Error("Invalid diagnostic progress phase.")
 		Rows := Value.Get("results", 0)
 		if !(Rows is Array) || !(Value.Get("completed", -1) is Integer) || Value["completed"] != Rows.Length
-			|| Value.Get("total", 0) != this.Contract["checks"].Length || Rows.Length > Value["total"]
+			|| !(Value.Get("total", 0) is Integer) || Value.Get("total", 0) != this.Contract["checks"].Length || Rows.Length > Value["total"]
 			throw Error("Invalid diagnostic progress census.")
 		Seen := Map()
 		for Row in Rows {
@@ -185,8 +187,14 @@ class DiagnosticCollectionWindows {
 				throw Error("Invalid diagnostic progress result.")
 			Seen[Row["id"]] := true
 		}
+		Projected := Value.Clone()
+		Projected["owner_pending"] := true
+		Projected["archive_created"] := false
+		Projected["folder_available"] := false
+		if Projected["phase"] == "completed"
+			Projected["phase"] := "retiring"
 		if !this.ProgressFault
-			this.Result := Value
+			this.Result := Projected
 		return true
 	}
 
@@ -233,6 +241,7 @@ class DiagnosticCollectionWindows {
 		}
 		this.Result["phase"] := ExitCode == 0 && Committed && !this.ProgressFault ? "completed" : "failed"
 		this.Result["archive_created"] := Committed
+		this.Result["owner_pending"] := false
 		this.Result["worker_tree_retired"] := true
 		this.Result["folder_available"] := !!DirExist(this.Directory)
 		Path := this.Directory . "\archive-error.json"
