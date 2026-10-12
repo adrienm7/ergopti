@@ -1347,7 +1347,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		RecoveryPhase := Row.phase, RecoveryBundle := OwnerBundle
 		RecoveredMatch(Source, Present, Expected) {
 			return Expected is Object && (Source is String) && (Present is Integer)
-				&& Present == Expected.present && StrCompare(Source, Expected.source, true) == 0
+				&& Present == Expected.present && Source == Expected.source
 		}
 		if !RecoveredMatch(Image.source, Image.present, OldImage) && !RecoveredMatch(Image.source, Image.present, NewImage)
 			return false
@@ -1381,7 +1381,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		OldPresent := Image.present, OldContent := Image.source, ExactBundle := OwnerBundle
 		Matches(Source, Present, ExpectedSource, ExpectedPresent) {
 			return (Present is Integer) && Present == ExpectedPresent && (Source is String)
-				&& StrCompare(Source, ExpectedSource, true) == 0
+				&& Source == ExpectedSource
 		}
 		return (Source, Present, NextContent, NextPresent) => RegistryLive(Row) && Destinations[Key] == Row
 			&& Row.phase == "owned" && Row.owned_bundle == ExactBundle
