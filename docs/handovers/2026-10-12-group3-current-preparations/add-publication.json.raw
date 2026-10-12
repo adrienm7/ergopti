@@ -1,0 +1,15 @@
+{
+  "sha": "180275f4315e2d28b4eb7845cfa0f868a3b7968e",
+  "parent": "3fdfa8600b8574d5ce24a43683df31dbfeefb5ee",
+  "tree": "77f02dce582a5be429f5af628f9b469f4f9ef4cc",
+  "owned": [
+    "docs/ERGOPTIPLUS_TODO.md",
+    "static/ergopti_plus/_shared/lua/test/physical_editor_contract.lua",
+    "static/ergopti_plus/_shared/ui/physical_shortcuts/script.js",
+    "tools/test/browser/physical-shortcuts.playwright.cjs"
+  ],
+  "selected_exit": 0,
+  "selected_seconds": 4123.790560163994,
+  "native": "Separate receiving required; no native success inferred.",
+  "dev_ci_lock_changed": false
+}

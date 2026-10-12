@@ -1,0 +1,81 @@
+{
+  "role": "independent focused runtime evidence receiving",
+  "verdict": "RECEIVING_CLEAR_FOCUSED_CONTROLS_AND_NATIVE_FILESYSTEM_ONLY",
+  "receipt_sha256": "81d82bd9ce7a27ad8a6834936ea870fcf6e700a6d16ee580ed5dfc1d015721d1",
+  "source_review_sha256": "4d7ea3906acb5c969fa15f76b962dfb7b6052162a521b7f94ad6c185037378ce",
+  "checks_sha256": "0ec4735ec3b99db2fbd1736738133a0b097f7e8048e7280ba0b9e469aea71a20",
+  "report_sha256": "029f72cb2116d44b0a70939bf8cb452699036fe70141fc8d3733b31d6f10e07d",
+  "scope_by_ABI": {
+    "LuaJIT": {
+      "controlled": 55,
+      "safe_integer": 3,
+      "genuine_filesystem": 8,
+      "opened": 72,
+      "closed": 72,
+      "EBADF_after_each_close": true,
+      "refused_close": 0,
+      "original_and_V3_safe_integer": "1PASS/2FAIL; preserved"
+    },
+    "Lua5.4": {
+      "controlled": 55,
+      "safe_integer": 3,
+      "genuine_filesystem": 8,
+      "opened": 72,
+      "closed": 72,
+      "EBADF_after_each_close": true,
+      "refused_close": 0,
+      "original_and_V3_safe_integer": "3PASS/0FAIL; preserved"
+    }
+  },
+  "artifact_pins": [
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/receipt.json",
+      "sha256": "81d82bd9ce7a27ad8a6834936ea870fcf6e700a6d16ee580ed5dfc1d015721d1"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-exact-owner-proposal-private-v4-safe-integer/receipt.json",
+      "sha256": "3b8b45a8f68dc538f026d2da01625f8b78d42891ce1a98b184e35bea6fbaa7c8"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/reviews/linux-shipped-identity-safe-integer-independent-v4/review.json",
+      "sha256": "4d7ea3906acb5c969fa15f76b962dfb7b6052162a521b7f94ad6c185037378ce"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-exact-owner-proposal-private-v4-safe-integer/run.lua",
+      "sha256": "bacee5b0d4b13ff665b107a96c898a0af5240a7305338f11a8de8569e94d515b"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-exact-owner-proposal-private-v4-safe-integer/append-safe-integer.lua",
+      "sha256": "d8da44568f9e596f817f4dda8e86150daa17cabace839a3b2304ea332571e59e"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-execute.py",
+      "sha256": "3bcf94fdfc600b7c0951205b7fb2cecedec64b324ae4fa77d76efb1bcb7c128b"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-regression-preparation-private-v1/prepare_native.py",
+      "sha256": "cbc620a6ff38f0da64a77ee70462f187793170d6023cfe3330c11040270edca5"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/native-luajit.json",
+      "sha256": "e4593724108e472fa737d083ec8da4fd05250522bb6777b34dfb0840377f1b94"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/native-lua5.4.json",
+      "sha256": "e4593724108e472fa737d083ec8da4fd05250522bb6777b34dfb0840377f1b94"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/oracle.retained.json",
+      "sha256": "121ad8d51326ed67a1170369358637ca90c30c6ff5a40881be5df5f25d6bca49"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/continuation-2026-10-11/linux-shipped-identity-v4-focused-receiving-private-v1/cleanup.json",
+      "sha256": "be3cec0809b6a532e9231d6d7262aa6eaf27261007278f5190bebc8d04ecf499"
+    }
+  ],
+  "reviewer_execution": "none; evidence/source reads only",
+  "fresh_current_root_qualification": "not inferred; execution epoch45b414 differs legitimately from current integrated Root",
+  "full_Linux_and_input_and_package_and_install": "UNRUN/unqualified by focused receiving",
+  "custody": "pending separate owner receiving; no source grant inferred",
+  "canonical_or_index_or_ref_changes": false
+}

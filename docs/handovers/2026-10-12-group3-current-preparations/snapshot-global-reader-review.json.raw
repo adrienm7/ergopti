@@ -1,0 +1,139 @@
+{
+  "additional_hold": null,
+  "all15_proposed_fixtures_in_static_graph": true,
+  "bare_assume_global_scopes_inspected": 2,
+  "canonical_mutations": false,
+  "custody": "PENDING_NOT_GRANTED",
+  "explicit_named_global_reader_found": false,
+  "implicit_dynamic_external_reads": "NOT_EXHAUSTIVELY_PROVEN_ABSENT",
+  "inspected_source_pins": [
+    {
+      "bytes": 109644,
+      "path": "static/ergopti_plus/windows/tests/run_all.ahk",
+      "sha256": "c6acb481a79e3e5861dd7b0693ba631f5b52fdbf26a19140c852a8ce4d98f8cf"
+    },
+    {
+      "bytes": 37612,
+      "path": "static/ergopti_plus/windows/tests/test_framework.ahk",
+      "sha256": "9e77b664c76e3632c6f4b019bd420ddcac76f86ea52ab1da3cbf81a1b5f745e9"
+    },
+    {
+      "bytes": 45598,
+      "path": "static/ergopti_plus/windows/ui/tooltip/core.ahk",
+      "sha256": "7e73a5443ccbf732ba8e644b491cfa779379e29866a34b93bd59046eadb73b3f"
+    },
+    {
+      "bytes": 94423,
+      "path": "static/ergopti_plus/windows/tests/unit/test_manifest_menu_declarations_are_read.ahk",
+      "sha256": "2a6e49df63d371fef09f12d45a7c7baf1ec2015d434a6d5633f501fe5c22625f"
+    },
+    {
+      "bytes": 6873,
+      "path": "static/ergopti_plus/windows/tests/meta/test_walker_batch_has_an_inprocess_drain.ahk",
+      "sha256": "ad9a1a81a696c7fe1976f5e6753e328be4161e214d22616ddad3d8ea2591a89c"
+    },
+    {
+      "bytes": 13362,
+      "path": "static/ergopti_plus/windows/tests/unit/test_walker_title_cap_enforced.ahk",
+      "sha256": "63fe62c38827e9987b7adc82378828d5829222733dc51b5ef071e223e7d95b93"
+    },
+    {
+      "bytes": 3083,
+      "path": "static/ergopti_plus/windows/tests/meta/test_suite_watchdog_manifest.ahk",
+      "sha256": "876fad5588f2dd848f2b45aa1ba6a86cca72d9fc4cf492bd50484cc6cdaac6d6"
+    },
+    {
+      "bytes": 999,
+      "path": "static/ergopti_plus/windows/tests/meta/test_suite_unique_includes.ahk",
+      "sha256": "3f8a55d240d2807ed7753fe51542128f92a919f51df24e2da256ac4ad9af3753"
+    },
+    {
+      "bytes": 15606,
+      "path": "static/ergopti_plus/windows/tests/unit/test_file_read_activity.ahk",
+      "sha256": "104fff992c67e2cd6f3a52f0208bb113d2968374bb8b017d832e388b4ceea3cb"
+    },
+    {
+      "bytes": 199572,
+      "path": "static/ergopti_plus/windows/tests/unit/test_updater.ahk",
+      "sha256": "f4e1ad3fe70f5a211022c2f62d00b7ab2efeba26d8bb0abc9ba7e03a6f98c956"
+    },
+    {
+      "bytes": 4337,
+      "path": "static/ergopti_plus/windows/tests/unit/test_llm_menu_fixture_isolation.ahk",
+      "sha256": "39624246a1b14014a5c10e22df45a9722ee8587921526e7fa204286f51673f9a"
+    },
+    {
+      "bytes": 3529,
+      "path": "static/ergopti_plus/windows/tests/unit/test_llm_fixture_setup.ahk",
+      "sha256": "1b2781c62aac496a9e03c02e1d9c5953754171cd63e6f93089673c0c768192b5"
+    },
+    {
+      "bytes": 42135,
+      "path": "static/ergopti_plus/windows/tests/unit/test_personal_toml_live_transactions.ahk",
+      "sha256": "702956d2d603d0e37be6c71d5e8c52a61fd7a0dbc4cffbfe4d6fd8c872d77992"
+    },
+    {
+      "bytes": 123719,
+      "path": "static/ergopti_plus/windows/vendor/WebView2.ahk",
+      "sha256": "3e9d99b46e358a1ccbe7dce4f9b1140c409b445629af90c5bc9bb8aa168b54bf"
+    },
+    {
+      "bytes": 424058,
+      "path": "static/ergopti_plus/windows/vendor/UIA.ahk",
+      "sha256": "60e307b87f022cfa05f7184eb5c5b0ddd8fb3da0362fea128fe805db09938233"
+    },
+    {
+      "bytes": 10013,
+      "path": "static/ergopti_plus/windows/ui/menu/menu_layout.ahk",
+      "sha256": "888bf4268ec0361a8a7a63d21c8efa60c7fe74852cc1daf7bf15b7431f6b491d"
+    },
+    {
+      "bytes": 45829,
+      "path": "static/ergopti_plus/windows/adapters/hotkey_registrar.ahk",
+      "sha256": "66920a92fb43336a629b9add0dd7b1cf78c429b7a0b4cf32e74e45d4773d3acb"
+    },
+    {
+      "bytes": 18782,
+      "path": "static/ergopti_plus/windows/infra/config_unused_keys.ahk",
+      "sha256": "9b04dc6fd4cf2efe08f4b3daa3e9f0c949438c6541f0cc1e256a5ab03b2644f8"
+    },
+    {
+      "bytes": 32123,
+      "path": "static/ergopti_plus/windows/modules/llm/local_servers.ahk",
+      "sha256": "552c94257bf46fe9f4c7923ec630245709036c875ae71e9a305e2ec4cd16f154"
+    },
+    {
+      "bytes": 10184,
+      "path": "static/ergopti_plus/windows/modules/llm/prediction_keylogger.ahk",
+      "sha256": "9a03863e9c6439de122c0ec570cc4a10ca6e642c5a44f630acb3b7172cc6e6ca"
+    },
+    {
+      "bytes": 23987,
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_deps_checker.ahk",
+      "sha256": "320be25949e8fd62b5f69112b577e0e87cc9c87b57f279841dce977da4eb6af5"
+    },
+    {
+      "bytes": 13709,
+      "path": "static/ergopti_plus/windows/platform/remap/nav_layer_table.ahk",
+      "sha256": "634ae69304f1674fe5fb28f0a49b9289d6aaa986267eb043f327269fd53bd2e7"
+    }
+  ],
+  "literal_include_traversal_files": 1817,
+  "literal_include_unresolved_edges": 15,
+  "native_and_tests": "UNRUN",
+  "prior_review_mutated": false,
+  "prior_review_sha256": "0fdd758d91d2b420f145f05791d68c6d0bccdd3db1c4c7c8775c4a7535b66ee9",
+  "queried_registration_globals": [
+    "Owner",
+    "Name",
+    "Source",
+    "Index",
+    "Callback",
+    "Worker",
+    "Count",
+    "Command"
+  ],
+  "report_sha256": "b9aea76d352fb9d8d223e005784441d09e9c2f1adbe64cbeacfa7cd9e5addd2d",
+  "semantic_exhaustiveness": "NOT_ESTABLISHED_REGEX_NOT_SEMANTIC_PROOF",
+  "verdict": "NO_CONCRETE_INTENTIONAL_READER_FOUND_BOUNDED_SOURCE_ONLY"
+}

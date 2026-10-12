@@ -36,6 +36,7 @@ local function fixture()
 			if f.on_interpreter then f.on_interpreter() end
 			if f.unavailable then return nil, "unavailable" end
 			local target = "/native/" .. commands[1]
+			if f.identities[target] == nil then return nil, "unavailable" end
 			return { executable = target, token = f.identities[target].token }
 		end,
 		retire = function()
@@ -55,13 +56,18 @@ local function fixture()
 end
 
 helpers.describe("shared private program discovery", function()
-	helpers.it("preserves the POSIX catalogue while validating Windows-only provider metadata", function()
+	helpers.it("preserves the existing providers while admitting PowerShell on POSIX", function()
 		for _, platform in ipairs({ "linux", "hs" }) do
 			local providers = assert(Shared.catalogue(RAW, platform))
-			helpers.assert_eq(#providers, 4)
-			for index, id in ipairs({ "shell", "bash", "python", "executable" }) do
+			helpers.assert_eq(#providers, 5)
+			for index, id in ipairs({ "shell", "bash", "python", "powershell", "executable" }) do
 				helpers.assert_eq(providers[index].id, id)
-				helpers.assert_eq(#providers[index].prefix, 0)
+				if id == "powershell" then
+					helpers.assert_eq(providers[index].commands[platform], { "pwsh" })
+					helpers.assert_eq(providers[index].prefix, { "-NoProfile", "-NonInteractive", "-File" })
+				else
+					helpers.assert_eq(#providers[index].prefix, 0)
+				end
 			end
 			helpers.assert_eq(providers[3].commands[platform][1], "python3")
 		end
@@ -203,4 +209,71 @@ helpers.describe("shared private program discovery", function()
 		helpers.assert_eq(f.closes, 0)
 		helpers.assert_eq(Json.decode_lossless(RAW).version, 1)
 	end)
+end)
+
+
+--- These ports model native metadata; they never execute a PowerShell engine.
+helpers.describe("POSIX PowerShell provider literal contract", function()
+	for _, platform in ipairs({ "linux", "hs" }) do
+		local function session(available)
+			local f = fixture()
+			f.names = { "été 日本 e\204\129.ps1" }
+			f.identities[ROOT .. "/" .. f.names[1]] = {
+				kind = "file", token = "powershell-script:original", readable = true, executable = false,
+			}
+			if available then
+				f.identities["/native/pwsh"] = { kind = "file", token = "pwsh:original", readable = true, executable = true }
+			end
+			f.owner = assert(Shared.new(platform, RAW, f.ports))
+			return f
+		end
+
+		helpers.it(platform .. " resolves a non-executable ps1 with the exact interpreter prefix and literal argv", function()
+			local f = session(true)
+			local packet = assert(f.owner.discover())
+			helpers.assert_eq(#packet.providers, 5)
+			helpers.assert_eq(packet.providers[4], { id = "powershell", available = true })
+			helpers.assert_eq(#packet.choices, 1)
+			helpers.assert_eq(packet.choices[1].provider, "powershell")
+			helpers.assert_eq(packet.choices[1].label, f.names[1])
+			local arguments = { "", "two words", "日本", "e\204\129", "$(literal)`quote`'\"", "one\ntwo" }
+			local scalar = assert(f.owner.resolve(packet.choices[1].key, arguments))
+			local parsed = assert(Parameter.parse(scalar, platform))
+			helpers.assert_eq(parsed.executable, "/native/pwsh")
+			helpers.assert_eq(parsed.arguments, {
+				"-NoProfile", "-NonInteractive", "-File", ROOT .. "/" .. f.names[1],
+				"", "two words", "日本", "e\204\129", "$(literal)`quote`'\"", "one\ntwo",
+			})
+			helpers.assert_eq(arguments, { "", "two words", "日本", "e\204\129", "$(literal)`quote`'\"", "one\ntwo" })
+		end)
+
+		helpers.it(platform .. " reports missing pwsh without selecting a shell or manufacturing a script choice", function()
+			local f = session(false)
+			local packet = assert(f.owner.discover())
+			helpers.assert_eq(packet.providers[4], { id = "powershell", available = false, reason = "interpreter_unavailable" })
+			helpers.assert_eq(packet.choices, {})
+			helpers.assert_eq(f.owner.resolve("1:1", {}), nil)
+		end)
+
+		for _, replacement in ipairs({ "script", "interpreter", "path" }) do
+			helpers.it(platform .. " refuses a chosen ps1 after exact " .. replacement .. " substitution", function()
+				local f = session(true)
+				local packet = assert(f.owner.discover())
+				if replacement == "script" then
+					f.identities[ROOT .. "/" .. f.names[1]].token = "changed-script"
+				elseif replacement == "interpreter" then
+					f.identities["/native/pwsh"].token = "changed-engine"
+				else
+					local original = f.ports.interpreter
+					f.ports.interpreter = function(commands)
+						if commands[1] == "pwsh" then return nil, "unavailable" end
+						return original(commands)
+					end
+				end
+				local scalar, reason = f.owner.resolve(packet.choices[1].key, {})
+				helpers.assert_eq(scalar, nil)
+				helpers.assert_eq(reason, "stale_discovery")
+			end)
+		end
+	end
 end)
