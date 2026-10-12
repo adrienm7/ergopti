@@ -204,28 +204,131 @@ function Get-CollectionStreamHash($Stream) {
 	finally { $taskSha.Dispose() }
 }
 
+function Initialize-CollectionFileIdentity {
+	if ($null -ne ('ErgoptiDiagnosticPrivate.FileIdentityV1' -as [type])) { return }
+	Add-Type -Language CSharp -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace ErgoptiDiagnosticPrivate {
+    public static class FileIdentityV1 {
+        // BY_HANDLE_FILE_INFORMATION consists of exactly thirteen DWORDs.
+        // FILETIME pairs stay explicit DWORDs; there is no architecture-sized field.
+        [StructLayout(LayoutKind.Sequential, Pack = 4, Size = 52)]
+        private struct ByHandleFileInformation {
+            public UInt32 FileAttributes;
+            public UInt32 CreationTimeLow;
+            public UInt32 CreationTimeHigh;
+            public UInt32 LastAccessTimeLow;
+            public UInt32 LastAccessTimeHigh;
+            public UInt32 LastWriteTimeLow;
+            public UInt32 LastWriteTimeHigh;
+            public UInt32 VolumeSerialNumber;
+            public UInt32 FileSizeHigh;
+            public UInt32 FileSizeLow;
+            public UInt32 NumberOfLinks;
+            public UInt32 FileIndexHigh;
+            public UInt32 FileIndexLow;
+        }
+
+        public sealed class Identity {
+            public readonly UInt32 VolumeSerialNumber;
+            public readonly UInt32 FileIndexHigh;
+            public readonly UInt32 FileIndexLow;
+            internal Identity(UInt32 volume, UInt32 high, UInt32 low) {
+                VolumeSerialNumber = volume;
+                FileIndexHigh = high;
+                FileIndexLow = low;
+            }
+        }
+
+        [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetFileInformationByHandle(
+            SafeFileHandle file, out ByHandleFileInformation information);
+
+        public static Identity Capture(FileStream stream) {
+            if (stream == null) {
+                throw new ArgumentNullException("stream");
+            }
+            // SafeHandle marshalling retains the handle during the native call.
+            // Reading this property may flush FileStream's own buffer, but the
+            // helper never closes the stream, seeks it or reads/writes its bytes.
+            SafeFileHandle handle = stream.SafeFileHandle;
+            if (handle == null || handle.IsInvalid || handle.IsClosed) {
+                throw new InvalidOperationException("Invalid diagnostic evidence handle.");
+            }
+            if (Marshal.SizeOf(typeof(ByHandleFileInformation)) != 52) {
+                throw new InvalidOperationException("Diagnostic file identity ABI refused.");
+            }
+            ByHandleFileInformation information;
+            if (!GetFileInformationByHandle(handle, out information)) {
+                int error = Marshal.GetLastWin32Error();
+                throw new Win32Exception(error, "Native diagnostic file identity query failed.");
+            }
+            if (information.NumberOfLinks != 1) {
+                throw new InvalidOperationException("Multiple-link diagnostic evidence refused.");
+            }
+            return new Identity(information.VolumeSerialNumber,
+                information.FileIndexHigh, information.FileIndexLow);
+        }
+    }
+}
+'@
+}
+
+function Get-CollectionFileIdentity {
+	[CmdletBinding()]
+	param([Parameter(Mandatory = $true)][IO.FileStream]$Stream)
+	Initialize-CollectionFileIdentity
+	$taskFileIdentity = [ErgoptiDiagnosticPrivate.FileIdentityV1]::Capture($Stream)
+	# This three-field private receipt contains neither a path nor user content.
+	# Keep it out of manifests, results, progress, stdout and diagnostic archives.
+	return [ordered]@{
+		volume_serial = $taskFileIdentity.VolumeSerialNumber
+		file_index_high = $taskFileIdentity.FileIndexHigh
+		file_index_low = $taskFileIdentity.FileIndexLow
+	}
+}
+
 function Write-CollectionText($Name, $Text) {
 	$taskBytes = $taskEncoding.GetBytes($Text)
 	if ($taskBytes.Length -gt $taskContract.max_output_bytes) { throw 'Diagnostic payload limit exceeded.' }
 	$taskTarget = Join-Path $taskRoot $Name
-	if (Test-Path -LiteralPath $taskTarget) {
-		# A previous producer receipt permits replacement only while its bytes still match.
-		if (!$taskEvidenceReceipts.ContainsKey($Name) -or
-			(Get-Item -LiteralPath $taskTarget).Length -ne $taskEvidenceReceipts[$Name].bytes -or
-			(Get-CollectionHash $taskTarget) -cne $taskEvidenceReceipts[$Name].sha256) { throw 'Foreign diagnostic output refused.' }
-	}
-	$taskStaging = $taskTarget + '.tmp'
-	$taskOutput = [IO.File]::Open($taskStaging, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-	try { $taskOutput.Write($taskBytes, 0, $taskBytes.Length); $taskOutput.Flush() } finally { $taskOutput.Dispose() }
-	if (!$taskEvidenceReceipts.ContainsKey($Name)) {
+	if ($taskEvidenceReceipts.ContainsKey($Name)) {
+		$taskPrior = $taskEvidenceReceipts[$Name]
+		# The acquired exclusive stream is both the receipt verifier and the writer.
+		$taskOutput = [IO.File]::Open($taskTarget, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+		try {
+			$taskIdentity = Get-CollectionFileIdentity $taskOutput
+			if (!(Test-CollectionFileIdentity $taskIdentity $taskPrior.identity) -or
+				$taskOutput.Length -ne $taskPrior.bytes -or (Get-CollectionStreamHash $taskOutput) -cne $taskPrior.sha256) { throw 'Foreign diagnostic output refused.' }
+			$taskOutput.Position = 0
+			$taskOutput.SetLength(0)
+			$taskOutput.Write($taskBytes, 0, $taskBytes.Length); $taskOutput.Flush()
+		} finally { $taskOutput.Dispose() }
+	} else {
+		if (Test-Path -LiteralPath $taskTarget) { throw 'Foreign diagnostic output refused.' }
+		$taskStaging = $taskTarget + '.tmp'
+		$taskOutput = [IO.File]::Open($taskStaging, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+		try {
+			$taskOutput.Write($taskBytes, 0, $taskBytes.Length); $taskOutput.Flush()
+			$taskIdentity = Get-CollectionFileIdentity $taskOutput
+		} finally { $taskOutput.Dispose() }
 		# File.Move refuses a first destination created after the earlier census.
 		[IO.File]::Move($taskStaging, $taskTarget)
-	} else {
-		Move-Item -LiteralPath $taskStaging -Destination $taskTarget -Force
 	}
 	$taskExpected = [IO.MemoryStream]::new($taskBytes, $false)
-	try { $taskEvidenceReceipts[$Name] = [ordered]@{bytes=$taskBytes.Length; sha256=(Get-CollectionStreamHash $taskExpected)} }
+	try { $taskEvidenceReceipts[$Name] = [ordered]@{bytes=$taskBytes.Length; sha256=(Get-CollectionStreamHash $taskExpected); identity=$taskIdentity} }
 	finally { $taskExpected.Dispose() }
+}
+
+function Test-CollectionFileIdentity($Current, $Expected) {
+	return $Current.volume_serial -eq $Expected.volume_serial -and
+		$Current.file_index_high -eq $Expected.file_index_high -and $Current.file_index_low -eq $Expected.file_index_low
 }
 
 function Write-CollectionJson($Name, $Value) {
@@ -374,7 +477,7 @@ try {
 				try {
 					$taskBitmap.Save($taskImage, [Drawing.Imaging.ImageFormat]::Png)
 					$taskImage.Flush(); $taskImage.Position = 0
-					$taskEvidenceReceipts['synthetic-window.png'] = [ordered]@{bytes=$taskImage.Length; sha256=(Get-CollectionStreamHash $taskImage)}
+					$taskEvidenceReceipts['synthetic-window.png'] = [ordered]@{bytes=$taskImage.Length; sha256=(Get-CollectionStreamHash $taskImage); identity=(Get-CollectionFileIdentity $taskImage)}
 				} finally { $taskImage.Dispose() }
 			} finally { $taskBitmap.Dispose() }
 			$taskGraphics = $taskForm.CreateGraphics()
@@ -516,7 +619,7 @@ try {
 					$taskInput = [IO.File]::Open($taskEvidencePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
 					try {
 						$taskProduced = $taskEvidenceReceipts[$taskEvidence]
-						if ($taskInput.Length -ne $taskProduced.bytes -or (Get-CollectionStreamHash $taskInput) -cne $taskProduced.sha256) { throw 'Diagnostic evidence changed after production.' }
+						if (!(Test-CollectionFileIdentity (Get-CollectionFileIdentity $taskInput) $taskProduced.identity) -or $taskInput.Length -ne $taskProduced.bytes -or (Get-CollectionStreamHash $taskInput) -cne $taskProduced.sha256) { throw 'Diagnostic evidence changed after production.' }
 						$taskInput.Position = 0
 						$taskEntry = $taskZip.CreateEntry($taskEvidence)
 						$taskEntryStream = $taskEntry.Open()

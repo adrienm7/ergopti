@@ -768,3 +768,50 @@ _TestHC_ResidentIdentityDebt() {
 Test("Diagnostics collection preserves existing identity handle debt (groups247-resident-observations)", _TestHC_ResidentIdentityDebt)
 
 Test("Diagnostics collection primary failure retains its verified archive (groups247-collection)", (*) => _TestHC_CollectionState("archive-failed"))
+
+/** Receives a real exclusive native writer without inventing a progress or retirement ACK. */
+_TestHC_CollectionExclusiveProgress(Scenario := "retry") {
+	D := DiagnosticCollectionWindows()
+	Root := A_Temp . "\ergopti-hc-exclusive-" . D.Id
+	D.Directory := Root . "\" . D.Id
+	D.Archive := D.Directory . ".zip"
+	DirCreate(D.Directory)
+	Handle := 0
+	try {
+		D.Write("progress.json", Map("schema_version", 1, "session_id", D.Id, "phase", "guided", "completed", 0,
+			"total", D.Contract["checks"].Length, "results", []))
+		Handle := DllCall("CreateFileW", "Str", D.Directory . "\progress.json", "UInt", 0xC0000000,
+			"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Handle && Handle != -1, "The native writer must own an exclusive real file handle.")
+		if Scenario == "deadline"
+			D.Started := A_TickCount - D.Contract["deadline_ms"] - 1
+		D.Tick()
+		AssertFalse(D.ProgressFault, "A sharing conflict is not invalid progress or a worker completion.")
+		AssertFalse(D.Terminal, "A retry cannot attest to native task retirement.")
+		AssertEqual(Scenario == "deadline", D.Cancelled, "The original deadline still cancels behind a busy writer.")
+		AssertTrue(DllCall("CloseHandle", "Ptr", Handle, "Int"))
+		Handle := 0
+		if Scenario == "malformed" {
+			FileDelete(D.Directory . "\progress.json")
+			FileAppend("invalid JSON", D.Directory . "\progress.json", "UTF-8-RAW")
+			D.Tick()
+			AssertTrue(D.ProgressFault, "Actual malformed bytes must still fail closed after the writer retires.")
+			AssertTrue(D.Cancelled)
+			AssertEqual("invalid_progress", D.Result["reason"])
+		} else if Scenario == "retry" {
+			D.Tick()
+			AssertFalse(D.ProgressFault)
+			AssertEqual("guided", D.Result["phase"], "The next normal read receives the actual committed progress.")
+			AssertTrue(D.Result["owner_pending"])
+			AssertFalse(D.Result["archive_created"])
+		}
+	} finally {
+		if Handle
+			AssertTrue(DllCall("CloseHandle", "Ptr", Handle, "Int"))
+		SetTimer(D.CollectionTimer, 0)
+		DirDelete(Root, true)
+	}
+}
+Test("Diagnostics collection retries actual exclusive progress writes (groups247-collection)", _TestHC_CollectionExclusiveProgress)
+Test("Diagnostics collection preserves malformed progress refusal after sharing (groups247-collection)", _TestHC_CollectionExclusiveProgress.Bind("malformed"))
+Test("Diagnostics collection keeps its deadline behind exclusive progress (groups247-collection)", _TestHC_CollectionExclusiveProgress.Bind("deadline"))

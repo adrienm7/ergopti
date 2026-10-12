@@ -15,7 +15,7 @@ $taskRuntimeVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($Runtime).Prod
 if($taskRuntimeVersion -cnotmatch '^[0-9]+[.][0-9]+[.][0-9]+$'){throw 'The fixture requires its actual runtime identity.'}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $env:PSModulePath="$env:SystemRoot/System32/WindowsPowerShell/v1.0/Modules;"+$env:PSModulePath
-foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout','resident-observed','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason','approved-name-failure','approved-name-image','produced-evidence-change','foreign-evidence-output','foreign-evidence-stage','first-evidence-publication-race')){
+foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout','resident-observed','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason','approved-name-failure','approved-name-image','produced-evidence-change','foreign-evidence-output','foreign-evidence-stage','first-evidence-publication-race','repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update')){
  $taskId='ergopti-diagnostic-'+[Guid]::NewGuid().ToString('N');$taskDirectory=Join-Path $taskRoot $taskId
  [IO.Directory]::CreateDirectory($taskDirectory)|Out-Null
  $taskRunWorker=$taskWorker;$taskRunContract=$taskContract
@@ -36,9 +36,43 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
  if($taskCase -eq 'first-evidence-publication-race'){
   $taskRunWorker=Join-Path $taskRoot 'first-evidence-publication-control.ps1'
   $taskSource=[IO.File]::ReadAllText($taskWorker)
-  $taskSeam="$"+'taskOutput.Dispose() }'
-  if(([regex]::Matches($taskSource,[regex]::Escape($taskSeam)).Count) -ne 1){throw 'First publication control requires the exact closed output seam.'}
-  $taskSource=$taskSource.Replace($taskSeam,$taskSeam+"`n"+'if ($Name -ceq '+"'manifest.json') { [IO.File]::WriteAllText("+'$taskTarget'+", '"+$taskSentinel+"', "+'$taskEncoding) }')
+  $taskSeam='[IO.File]::Move($taskStaging, $taskTarget)'
+  if(([regex]::Matches($taskSource,[regex]::Escape($taskSeam)).Count) -ne 1){throw 'First publication control requires the exact no-overwrite move seam.'}
+  $taskSource=$taskSource.Replace($taskSeam,'if ($Name -ceq '+"'manifest.json') { [IO.File]::WriteAllText("+'$taskTarget'+", '"+$taskSentinel+"', "+'$taskEncoding) }'+"`n"+$taskSeam)
+  [IO.File]::WriteAllText($taskRunWorker,$taskSource,[Text.UTF8Encoding]::new($false))
+ }
+ if(@('repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update') -contains $taskCase){
+  $taskRunWorker=Join-Path $taskRoot ($taskCase+'-control.ps1')
+  $taskSource=[IO.File]::ReadAllText($taskWorker)
+  $taskSeam='$taskPrior = $taskEvidenceReceipts[$Name]'
+  $taskInjection=@'
+if ($Name -ceq 'progress.json' -and !(Test-Path -LiteralPath (Join-Path $taskRoot 'successor-proof.bin'))) {
+ $taskOriginalBytes=[IO.File]::ReadAllBytes($taskTarget)
+ if ('CONTROL_CASE' -ceq 'repeated-evidence-hardlink') {
+  New-Item -ItemType HardLink -Path ($taskTarget+'.foreign-link') -Target $taskTarget | Out-Null
+ } else {
+  [IO.File]::Move($taskTarget,$taskTarget+'.predecessor')
+  $taskSuccessorBytes=$(if('CONTROL_CASE' -ceq 'repeated-evidence-successor'){$taskEncoding.GetBytes('CONTROL_SENTINEL')}else{$taskOriginalBytes})
+  [IO.File]::WriteAllBytes($taskTarget,$taskSuccessorBytes)
+ }
+ [IO.File]::WriteAllBytes((Join-Path $taskRoot 'successor-proof.bin'),[IO.File]::ReadAllBytes($taskTarget))
+}
+'@
+  if($taskCase -eq 'exclusive-evidence-update'){
+   $taskSeam='$taskOutput.SetLength(0)'
+   $taskInjection=@'
+if ($Name -ceq 'progress.json' -and !(Test-Path -LiteralPath (Join-Path $taskRoot 'exclusive-update-proof.json'))) {
+ $taskCompetingRefusal=$false; $taskCompetingCode=0
+ try { $taskCompeting=[IO.File]::Open($taskTarget,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None); $taskCompeting.Dispose() }
+ catch { $taskCompetingCode=$_.Exception.GetBaseException().HResult -band 0xffff; $taskCompetingRefusal=@(32,33) -contains $taskCompetingCode }
+ [IO.File]::WriteAllText((Join-Path $taskRoot 'exclusive-update-proof.json'),([ordered]@{writer_refused=$taskCompetingRefusal;error_code=$taskCompetingCode}|ConvertTo-Json -Compress),$taskEncoding)
+}
+'@
+  }
+  if(([regex]::Matches($taskSource,[regex]::Escape($taskSeam)).Count) -ne 1){throw 'Repeated update control requires the exact acquired-stream seam.'}
+  $taskInjection=$taskInjection.Replace('CONTROL_CASE',$taskCase).Replace('CONTROL_SENTINEL',$taskSentinel)
+  if($taskCase -eq 'exclusive-evidence-update'){$taskSource=$taskSource.Replace($taskSeam,$taskInjection+"`n"+$taskSeam)}
+  else{$taskSource=$taskSource.Replace($taskSeam,$taskSeam+"`n"+$taskInjection)}
   [IO.File]::WriteAllText($taskRunWorker,$taskSource,[Text.UTF8Encoding]::new($false))
  }
  if($taskCase -eq 'query-timeout'){
@@ -94,7 +128,7 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
  $taskAck=@{session_id=$taskId;physical_text='SKIP';physical_display='SKIP'}
  if($taskCase -eq 'foreign-physical'){$taskAck.session_id='foreign-session'}
  [IO.File]::WriteAllText((Join-Path $taskDirectory 'physical.json'),($taskAck|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
- if(@('cancel','approved-name-failure','approved-name-image','produced-evidence-change') -contains $taskCase){[IO.File]::WriteAllText((Join-Path $taskDirectory 'cancel'),'cancel',[Text.UTF8Encoding]::new($false))}
+ if(@('cancel','approved-name-failure','approved-name-image','produced-evidence-change','repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update') -contains $taskCase){[IO.File]::WriteAllText((Join-Path $taskDirectory 'cancel'),'cancel',[Text.UTF8Encoding]::new($false))}
  $taskForeignName=$null
  if($taskCase -eq 'approved-name-failure'){$taskForeignName='failure.json'}
  if($taskCase -eq 'approved-name-image'){$taskForeignName='synthetic-window.png'}
@@ -110,7 +144,7 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
  $taskOutput=$taskProcess.StandardOutput.ReadToEndAsync();$taskErrors=$taskProcess.StandardError.ReadToEndAsync()
  $taskExited=$taskProcess.WaitForExit(20000)
  if(!$taskExited){throw ('Collector control retained PID '+$taskProcess.Id+'; no competitor was launched.')}
- $taskRow=[ordered]@{case=$taskCase;scope=$(if($taskCase -eq 'query-timeout'){'injected_query_delay'}elseif(@('produced-evidence-change','first-evidence-publication-race') -contains $taskCase){'injected_evidence_change'}else{'actual_worker_control'});worker_sha256=(Get-FileHash -LiteralPath $taskRunWorker -Algorithm SHA256).Hash;exit_code=$taskProcess.ExitCode;stderr_bytes=$taskErrors.Result.Length;archive_created=(Test-Path -LiteralPath ($taskDirectory+'.zip'));path=$taskDirectory;results=@();checks=@()}
+ $taskRow=[ordered]@{case=$taskCase;scope=$(if($taskCase -eq 'query-timeout'){'injected_query_delay'}elseif(@('produced-evidence-change','first-evidence-publication-race','repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update') -contains $taskCase){'injected_evidence_change'}else{'actual_worker_control'});worker_sha256=(Get-FileHash -LiteralPath $taskRunWorker -Algorithm SHA256).Hash;exit_code=$taskProcess.ExitCode;stderr_bytes=$taskErrors.Result.Length;archive_created=(Test-Path -LiteralPath ($taskDirectory+'.zip'));path=$taskDirectory;results=@();checks=@()}
  if($taskRow.archive_created){
   $taskCommitted=$taskOutput.Result|ConvertFrom-Json
   if($taskCommitted.schema_version -ne 1 -or $taskCommitted.session_id -cne $taskId -or $taskCommitted.archive_committed -ne $true -or
@@ -137,6 +171,14 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
 }
 $taskExpectedChecks=Get-Content -LiteralPath $taskContract -Raw -Encoding UTF8|ConvertFrom-Json
 foreach($taskProof in $taskProofs){
+ if(@('repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink') -contains $taskProof.case){
+  $taskProgressPath=Join-Path $taskProof.path 'progress.json';$taskProofPath=Join-Path $taskProof.path 'successor-proof.bin'
+  if($taskProof.exit_code -ne 1 -or $taskProof.archive_created -or !(Test-Path -LiteralPath $taskProofPath) -or
+   (Get-FileHash -LiteralPath $taskProgressPath -Algorithm SHA256).Hash -cne (Get-FileHash -LiteralPath $taskProofPath -Algorithm SHA256).Hash){throw 'A foreign repeated-update successor was rewritten or its refusal disappeared.'}
+  if($taskProof.case -eq 'repeated-evidence-hardlink' -and
+   (Get-FileHash -LiteralPath ($taskProgressPath+'.foreign-link') -Algorithm SHA256).Hash -cne (Get-FileHash -LiteralPath $taskProofPath -Algorithm SHA256).Hash){throw 'A foreign hardlink alias changed.'}
+  continue
+ }
  if(@('foreign-evidence-output','foreign-evidence-stage','first-evidence-publication-race') -contains $taskProof.case){
   $taskForeignName=$(if($taskProof.case -ne 'foreign-evidence-stage'){'manifest.json'}else{'manifest.json.tmp'})
   if($taskProof.exit_code -ne 1 -or $taskProof.archive_created -or [IO.File]::ReadAllText((Join-Path $taskProof.path $taskForeignName)) -cne $taskSentinel){throw 'A foreign evidence output or stage was adopted, changed or archived.'}
@@ -174,6 +216,14 @@ foreach($taskProof in $taskProofs){
   @($taskById.cleanup.receipt.operations_unfinished|Where-Object {$_.operation -ceq 'host_worker_retirement' -and $_.state -ceq 'awaiting_host_ack'}).Count -ne 1){throw 'A live worker claimed its own future host-tree retirement.'}
  if($taskById.physical_text.status -ceq 'PASS' -or $taskById.physical_display.status -ceq 'PASS'){throw 'Automated controls invented physical qualification.'}
  if($taskProof.case -eq 'native' -and ($taskById.native_uia.status -cne 'PASS' -or $taskById.native_render.status -cne 'PASS')){throw 'Actual native synthetic collection failed.'}
+ if($taskProof.case -eq 'exclusive-evidence-update'){
+  $taskExclusive=Get-Content -LiteralPath (Join-Path $taskProof.path 'exclusive-update-proof.json') -Raw -Encoding UTF8|ConvertFrom-Json
+  if($taskExclusive.writer_refused -ne $true -or @(32,33) -notcontains $taskExclusive.error_code){throw 'A competing writer acquired the exclusive update stream.'}
+  $taskZip=[IO.Compression.ZipFile]::OpenRead($taskProof.path+'.zip')
+  try{if(@($taskZip.Entries|Where-Object {$_.FullName -ceq 'exclusive-update-proof.json'}).Count){throw 'The private ownership control entered the archive.'}}
+  finally{$taskZip.Dispose()}
+ }
+
  if(@('cancel','deadline') -contains $taskProof.case -and $taskById.physical_text.status -cne 'SKIP'){throw 'Cancellation promoted physical evidence.'}
  if($taskProof.case -eq 'missing-component' -and $taskById.components.status -cne 'FAIL'){throw 'Missing component admitted.'}
  if($taskProof.case -eq 'redaction-refusal' -and $taskById.redaction.status -cne 'FAIL'){throw 'Private identity admitted.'}
