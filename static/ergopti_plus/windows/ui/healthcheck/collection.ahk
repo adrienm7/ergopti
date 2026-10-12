@@ -137,15 +137,21 @@ class DiagnosticCollectionWindows {
 			return
 		Path := this.Directory . "\progress.json"
 		if FileExist(Path) {
+			Reading := true
 			try {
 				if FileGetSize(Path) > this.Contract["max_output_bytes"]
 					throw Error("Diagnostic progress payload exceeded its contract.")
-				Value := JsonParse(FileRead(Path, "UTF-8"))
+				Raw := FileRead(Path, "UTF-8")
+				Reading := false
+				Value := JsonParse(Raw)
 				if !(Value is Map) || Value.Get("session_id", "") != this.Id || Value.Get("schema_version", 0) != 1
 					throw Error("Foreign diagnostic progress refused.")
 				this.AcceptProgress(Value)
 				this.Publish()
 			} catch as Err {
+				; Exclusive producer writes can briefly refuse reads; parsing and publication errors still fail closed.
+				if Reading && Err is OSError && (Err.Number == 32 || Err.Number == 33)
+					return
 				if !this.ProgressFault {
 					this.ProgressFault := true
 					this.Result["phase"] := "failed"

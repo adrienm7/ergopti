@@ -422,10 +422,12 @@ function receiveEvidenceCustody(source) {
 			!archive.includes('[IO.File]::OpenRead('),
 		'private first creation':
 			source.includes(
-				'[IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None'
+				"$taskImage = [IO.File]::Open((Join-Path $taskRoot 'synthetic-window.png'), [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)"
 			) &&
 			source.includes("$taskEvidenceReceipts['synthetic-window.png'] =") &&
-			source.includes('[IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None') &&
+			source.includes(
+				'$taskOutput = [IO.File]::Open($taskStaging, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)'
+			) &&
 			source.includes("throw 'Foreign diagnostic output refused.'") &&
 			source.includes('[IO.File]::Move($taskStaging, $taskTarget)'),
 		'all text producers':
@@ -441,7 +443,7 @@ for (const [name, required] of [
 	['same stream copy', '$taskInput.CopyTo($taskEntryStream)'],
 	[
 		'private first creation',
-		'[IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None'
+		"$taskImage = [IO.File]::Open((Join-Path $taskRoot 'synthetic-window.png'), [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)"
 	],
 	['all text producers', 'Write-CollectionText $Name $taskJson']
 ]) {
@@ -457,6 +459,53 @@ for (const [name, required] of [
 		'The independently withdrawn actual custody boundary was still admitted.'
 	);
 }
+/** Equal-byte foreign successors require native identity; path names cannot author updates. */
+function receiveOwnedStream(source) {
+	const body = source.slice(
+		source.indexOf('function Write-CollectionText('),
+		source.indexOf('function Write-CollectionJson(')
+	);
+	return {
+		'exclusive acquired update':
+			body.includes(
+				'$taskOutput = [IO.File]::Open($taskTarget, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)'
+			) &&
+			body.includes('(Get-CollectionStreamHash $taskOutput) -cne $taskPrior.sha256') &&
+			body.includes('$taskOutput.SetLength(0)') &&
+			body.indexOf('(Get-CollectionStreamHash $taskOutput) -cne $taskPrior.sha256') <
+				body.indexOf('$taskOutput.SetLength(0)') &&
+			!body.includes('Move-Item'),
+		'private native identity':
+			body.includes('Test-CollectionFileIdentity $taskIdentity $taskPrior.identity') &&
+			source.includes('information.NumberOfLinks != 1') &&
+			source.includes('GetFileInformationByHandle(handle, out information)'),
+		'busy progress read':
+			collectionSource.includes(
+				'if Reading && Err is OSError && (Err.Number == 32 || Err.Number == 33)'
+			) &&
+			collectionSource.indexOf('Reading := false') <
+				collectionSource.indexOf('Value := JsonParse(Raw)')
+	};
+}
+const collectionSource = read('windows/ui/healthcheck/collection.ahk');
+const ownedStream = receiveOwnedStream(collectorSource);
+for (const [name, required] of [
+	['exclusive acquired update', '(Get-CollectionStreamHash $taskOutput) -cne $taskPrior.sha256'],
+	['private native identity', 'Test-CollectionFileIdentity $taskIdentity $taskPrior.identity']
+]) {
+	report('Collection source: ' + name, ownedStream[name], 'Existing output ownership was lost.');
+	report(
+		'Collection source inverse: ' + name,
+		collectorSource.split(required).length === 2 &&
+			!receiveOwnedStream(collectorSource.replace(required, ''))[name],
+		'The withdrawn exclusive update guard remained admitted.'
+	);
+}
+report(
+	'Collection source: busy progress read',
+	ownedStream['busy progress read'],
+	'Native producer sharing must retry without admitting invalid progress.'
+);
 /** Primary collection errors preserve a useful archive without claiming completion. */
 function receiveCollectorFailure(source) {
 	return {
