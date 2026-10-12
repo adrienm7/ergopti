@@ -1500,7 +1500,7 @@ assert.deepStrictEqual(
 // both the mandatory verdict and automatic release admission remain strict.
 const manualPackageJob = pipeline.job('package-linux');
 assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['test-linux', 'e2e-linux']);
-assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), []);
+assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['test-linux']);
 assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), null);
 assert.strictEqual(
 	pipeline.field(manualPackageJob, 'if'),

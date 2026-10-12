@@ -723,7 +723,7 @@ for (const [job, platform] of [
 }
 /** Requires actual native Ollama inputs and receiving before Brew can fail. */
 function checkManagedOllamaNative(body) {
-	assert.equal(pipeline.field(body, 'needs'), null);
+	assert.equal(pipeline.field(body, 'needs'), '[e2e-hs, tooltip-canvas]');
 	assert.equal(pipeline.field(body, 'if'), null);
 	assert.equal(pipeline.field(body, 'continue-on-error'), null);
 	assert.equal(pipeline.field(body, 'runs-on'), '${{ matrix.runner }}');
@@ -794,6 +794,12 @@ assert.deepEqual(
 );
 assert.ok(pipeline.job('macos').includes('tag: ${{ needs.validate.outputs.tag }}'));
 for (const [from, to] of [
+	['    needs: [e2e-hs, tooltip-canvas]\n', ''],
+	['needs: [e2e-hs, tooltip-canvas]', 'needs: []'],
+	['needs: [e2e-hs, tooltip-canvas]', 'needs: [e2e-hs]'],
+	['needs: [e2e-hs, tooltip-canvas]', 'needs: [tooltip-canvas]'],
+	['needs: [e2e-hs, tooltip-canvas]', 'needs: [e2e-hs, test-linux]'],
+	['needs: [e2e-hs, tooltip-canvas]', 'needs: [package-macos]'],
 	['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest'],
 	['fail-fast: false', 'fail-fast: true'],
 	['runner: macos-15-intel', 'runner: macos-15'],
@@ -2110,9 +2116,9 @@ for (const field of ['device', 'inode']) {
 }
 console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
 
-/** Pins a native arm64 full application job without unrelated dependencies or publication. */
+/** Pins a native arm64 full application job after packaging and without publication. */
 function checkColdJob(body) {
-	assert.equal(pipeline.field(body, 'needs'), null);
+	assert.equal(pipeline.field(body, 'needs'), '[package-macos]');
 	assert.equal(pipeline.field(body, 'runs-on'), 'macos-15');
 	assert.equal(pipeline.field(body, 'if'), null);
 	assert.equal(pipeline.field(body, 'continue-on-error'), null);
@@ -2156,6 +2162,11 @@ function checkColdJob(body) {
 const coldJob = pipeline.job('cold-bootstrap-native');
 checkColdJob(coldJob);
 for (const [from, to] of [
+	['    needs: [package-macos]\n', ''],
+	['needs: [package-macos]', 'needs: []'],
+	['needs: [package-macos]', 'needs: [test-linux]'],
+	['needs: [package-macos]', 'needs: [e2e-hs]'],
+	['needs: [package-macos]', 'needs: [cold-bootstrap-native]'],
 	['runs-on: macos-15', 'runs-on: ubuntu-latest'],
 	['timeout-minutes: 90', 'timeout-minutes: 5'],
 	['runs-on: macos-15', 'needs: package-macos\n    runs-on: macos-15'],
@@ -2180,7 +2191,7 @@ assert.match(
 	/cold-bootstrap-native-/
 );
 console.log(
-	`[OK] Cold native verdict retained existing launch/job assertions and rejected ${coldRejections} independent receipt mutations plus 10 workflow mutations.`
+	`[OK] Cold native verdict retained existing launch/job assertions and rejected ${coldRejections} independent receipt mutations plus 15 workflow mutations.`
 );
 
 // A compiler failure must retain its actual transcript before unrelated tests.

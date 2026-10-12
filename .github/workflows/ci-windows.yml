@@ -516,6 +516,7 @@ jobs:
 
   e2e-ahk:
     name: 'E2E tests (engine)'
+    needs: [test-ahk]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

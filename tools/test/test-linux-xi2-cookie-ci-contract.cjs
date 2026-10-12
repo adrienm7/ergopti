@@ -89,7 +89,11 @@ function verify(subject) {
 	assert.strictEqual(pipeline.field(owner.body, 'runs-on'), 'ubuntu-latest');
 	assert.strictEqual(pipeline.field(owner.body, 'if'), null, 'ordinary mandatory owner admission');
 	assert.strictEqual(pipeline.field(owner.body, 'continue-on-error'), null);
-	assert.deepStrictEqual(pipeline.needsOf(owner.body), [], 'unit and E2E are independent entries');
+	assert.deepStrictEqual(
+		pipeline.needsOf(owner.body),
+		['test-linux'],
+		'the full unit prerequisite must finish before E2E'
+	);
 	const build = jobs.find((job) => job.id === 'package-linux');
 	assert.deepStrictEqual(
 		pipeline.needsOf(build.body),
@@ -566,7 +570,7 @@ console.log(
 	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals4; ABI29/cookies3 native UNRUN'
 );
 
-// The parallel suites converge before packaging; a manual diagnostic never qualifies release.
+// The ordered suites converge before packaging; a manual diagnostic never qualifies release.
 for (const [name, before, replacement] of [
 	['package omits unit', '    needs: [test-linux, e2e-linux]', '    needs: [e2e-linux]'],
 	['package omits E2E', '    needs: [test-linux, e2e-linux]', '    needs: [test-linux]'],
@@ -577,7 +581,7 @@ for (const [name, before, replacement] of [
 		"(needs.e2e-linux.result == 'failure')"
 	],
 	['E2E success omitted', "needs.e2e-linux.result == 'success' || ", ''],
-	['serial entry restored', '  e2e-linux:\n', '  e2e-linux:\n    needs: [test-linux]\n'],
+	['unit prerequisite omitted', '    needs: [test-linux]\n', ''],
 	['verdict omits unit', '      - test-linux\n', ''],
 	['verdict omits E2E', '      - e2e-linux\n', ''],
 	[
@@ -598,5 +602,5 @@ for (const [name, before, replacement] of [
 	);
 }
 console.log(
-	'PASS parallel XI2 prerequisites: 9 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
+	'PASS ordered XI2 prerequisites: 9 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
 );
