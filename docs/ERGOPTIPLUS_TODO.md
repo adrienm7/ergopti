@@ -10252,6 +10252,15 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   default capture limit and original deadlines remain unchanged. Actual native
   Snapshot and full Windows qualification remain required after this correction.
 
+  Exact hosted Windows receiving at `6b498d643` now passes all 22 controlled
+  Snapshot cases before refusing complete stdout/TAP equality. The failing
+  mode and byte cause remain unknown; no 16-case native qualification is claimed.
+  Supplemental diagnostics retain actual closed lengths, digests, bounded byte
+  previews, phase and exit facts without changing the strict receiver, original
+  cases or budgets. All 7 modeled metadata controls pass with all 22 old controls
+  and five real-child guards; omitting only the optional TAP observer guard fails
+  exact primary-error preservation. A diagnostic fault cannot grant native success.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
