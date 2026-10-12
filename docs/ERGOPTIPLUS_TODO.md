@@ -128,6 +128,24 @@ physical typing or complete integration-green claim follows from these checks.
 Full suites are rerun after this coherent checkpoint; all affected items remain
 open until their actual native/physical acceptance and remaining software work.
 
+#### Linux startup discovery regression receiving
+
+The complete Linux units on `ba41b79db` pass 13,450/13,450 across 521 modules.
+The subsequent startup E2E exposed ten failures: its child deliberately removed
+the required luv ABI while retaining the real HTTP adapter. The production
+discovery refusal was correct. The fixture now controls only declared catalogue
+loopback requests and delegates every unrelated HTTP owner unchanged; two
+additional custody/delegation regressions preserve all 39 prior cases.
+
+On isolated fresh `dev 6d1efd3d0` plus correction `508201914`, the normal Linux
+E2E entry completes 193/193 with six native digest checks and subprocess exit 0.
+An earlier invocation printed the same successful footer but returned exit 1;
+that receipt remains failed and its exit discrepancy is not attributed. The
+independent rerun records the actual subprocess status and source SHA. Actual
+curl/libuv receiving on the composed correction passes 262 streaming and 136
+local API checks. Controlled startup HTTP replies do not qualify native network
+behavior. Windows/macOS and physical input remain unqualified by this checkpoint.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)

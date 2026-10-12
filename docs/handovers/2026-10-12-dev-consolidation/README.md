@@ -343,6 +343,31 @@ Zenity/GTK and real devices remain unrun here.
 
 ## Test-optimization coordination
 
+### Linux startup discovery follow-up
+
+Correction `508201914424fe1f28cd642f999d64c026a6ebc3` is based on fresh
+`dev 6d1efd3d016c4e2f693d8fb49158534ac8e425c7`. Only the existing startup child,
+owned HTTP fixture and local-discovery regression module change. The installed
+startup fixture removes luv for its scripted clock; its declared catalogue
+loopback requests now model ordinary connection refusal with owned retirement,
+while unrelated HTTP requests retain their actual adapter and exact arguments.
+Production infrastructure refusal, startup error assertions and the runner stay
+unchanged. All 39 prior discovery assertions remain, with two additional cases.
+
+The normal E2E entry, launched by the pinned Node runner, completes 193/193 plus
+six native digest checks with actual subprocess status 0 in 90,114 ms. An earlier
+invocation returned 1 despite its successful footer; it remains failed with an
+unattributed exit discrepancy. The independent subprocess receipt names the
+source SHA and status, rather than deriving success from footer text. Private
+receipts remain outside Git. The preceding full Linux unit run on `ba41b79db`
+completed 13,450/13,450 in 521 modules. Actual curl/libuv receiving on the composed
+correction completed 262 streaming and 136 local API checks with exit 0.
+
+Use the Linux commands above with the pinned native ABI. Expect 193 E2E cases,
+six digest cases and zero exit status; retain stdout and the process status.
+The controlled startup edge is software evidence, not a live network or input
+device claim. No native Windows/macOS qualification is implied.
+
 No existing-path tests were moved. The only new JS CHECKS entry in this follow-up
 is `tools/test/test-windows-api-add-production.cjs`, alias
 `test:windows-api-add-production`, committed in `b2bf6e473`. It belongs with AI
