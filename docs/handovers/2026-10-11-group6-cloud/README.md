@@ -1122,3 +1122,106 @@ proceeds under the maintainer's existing G6 authorization with public notice
 The R2 removal observation and official Windows PAC-safe branch remain separate
 unadopted preparations. Normal selected serial gates must still qualify the
 final source; TODO36/62 and transversal16/38 remain open.
+
+## Removal diagnostic composed with the polling correction
+
+The exact Root6113764617 three cuts are now adopted over published poll
+`df2762ba00c51d56531b2a19d36fa0441b8efbcd`, after its selected serial format,
+414JS and18609MacLua assertions passed with132 before/final Source/HEAD/index
+bindings equal. The removal-only seven fixture hunks preserve the entire named
+polling body; its new source SHA256 is
+`d9cb9fbd0d28a18f2b52aa898c7dfeb714b285af3e0aadb8bb5bc950071c8780`.
+The new owning nine-case class is byte-exact to the frozen reviewed R2 proposal;
+all250 old functions/providers/assertions and156 original case identities remain.
+The current wrapper keeps every previous byte except its single156-to165
+count, including the bounded failure diagnostic and original60000ms child limit.
+
+REMOVE alone projects bounded already-settled original stderr and the same
+retired child/status. ADD retains its original positional adapter. The same
+native trust commands,15s clocks, settlement/primary/cancellation/capture and
+uncertain-close debt laws remain. The observation cannot restore trust, grant
+native acceptance or justify retry. Actual current-source165 controls pass in
+13.192s with zero failures/errors/skips; Ruff check/format and Node syntax pass.
+Historical full16545.164s and original27 assertion/prior-adapter2 assertion
+refusals stay separate. Normal final selected serial gates and exact-source
+Darwin receiving still qualify the new composition independently.
+
+Source histories identify the three spans in G6/network6bf/909/544/0aa/6e4/859/e91
+commits. No actual G4-authored same-span reservation was received; the prior
+blanket G4-pending wording was our conservative request. Root's finite handback,
+maintainer authorization and fresh public notice6116025187 support this own-span
+continuation without inventing a silence grant or changing any G4-owned caller,
+serving policy or assertion. Existing paths and original ordering are retained
+for the coordinated test migration. Shared Root PAC module/profile publication
+and the official updater23 PAC-safe entry remain genuinely reserved and unadopted.
+The callable local updater23 remains available before tracked PAC publication.
+
+The [Source-only composition capsule](native-removal-r2-on-poll-source.tar.gz)
+has16 safe regular members and SHA256
+`0b95d85151ced369151d28b845bfa245b8176da862edb548187f694a42b69c9c`.
+It retains authentic Root custody, source history and complete three-file
+forward/inverse preservation; it contains no new execution/native credit.
+
+## Actual predecessor a18 native result
+
+Manual [38188708204](https://github.com/adrienm7/ergopti/actions/runs/38188708204)
+actually tests `a18f22edd3153884e67a78500417dbea6342e978`, attempt1, Windows+macOS,
+and ends FAIL:23 jobs,8 successful/8 failed/7 skipped/zero cancelled. Release
+actually skips and Linux is unselected. Only the verified owned lock8e68093f
+is released after complete terminal API receiving. This run tests neither the
+new poll nor removal composition.
+
+Core executes413 passing checks/one failure of414: the Python3.12.15/x64 original
+156 child times out at60000ms, with status null/SIGTERM. The new diagnostic
+retains122 dots and three closed fixture frames; these do not prove all156
+methods or all child retirement. New Source22 and standalone clock32 normal
+entries succeed; their individual success stdout is not retained in the Core log.
+Both actual architectures pass SourcePAC10 and execute PAC14 with12 passes/two
+failed methods/no skips. Each independent HTTP cohort attempts two methods,
+zero passes/three errors including teardown; trust-add15s and restoration remain
+unresolved. Native archive25 has24 passes/one failed owned Automation deadline;
+Brew6 is unexecuted. Exact Windows planned11165 starts1984:1983 pass with
+joined durations,zero assertion failures/zero within-plan skips,one started
+nonterminal and9181 unstarted. The watchdog stays1320000ms; current stopping
+case is hotstring-category-owner immediate1 refusal, without a proved hang cause.
+All23 updater names remain unexecuted. Nine interactive exclusions are outside
+the denominator. Forty-four raw names contain replacement characters, while
+genuine manifest names remain unchanged;1939 raw-to-manifest names match exactly.
+
+Both current clock artifacts independently join424 Git inputs,18 recipe and16
+staged inputs, all nine payload hashes and16 raw samples within actual Python
+intervals. Compile/sign/strict verify/clock owners close with status0 and no
+retained group/file/stream debt. Compiler/interpreter/kernel-image authority
+remains explicitly unknown; the Swift45s factory stays held. Numerical/Source
+receiving is distinct from successful HTTP and complete package/install/enterprise
+acceptance. No native success from a historical epoch is carried forward.
+
+The [bounded actual receiving capsule](native-a18-bounded-receiving.tar.gz) is
+2262040 bytes,439 safe regular members, SHA256
+`88f16724dee07d64326e63f945bdff53ef6a241e91c849dea4b8f31ed7707f10`;
+its inventory SHA256 is
+`2a8d0b0b0ed4ef22dc9a072a84c9224dcdcdfda3e12b8b873ff17b334164424f`.
+It preserves actual raw/API/ZIP/inventory/source joins and exact dispositions.
+TODO36/62 and transversal16/38 remain open; no Dev integration or branch deletion.
+
+### Final exact census guard composition
+
+The first selected removal gate retains its actual failure: format and18609
+MacLua pass, JS411/414 with three failures. Two checks refuse because the
+clock selector guard still requires156 while the owning wrapper correctly
+requires165. Its G6-owned expected exact count now also requires165; an added
+mutation in the original selector control proves the obsolete156 row refuses.
+All32 control identities and every old mutation/assertion remain. Current32
+controls pass with the existing admitted temporary root and original60s limit.
+The Source-only capsule above continues to bind its exact three original cuts;
+this additional one-literal guard and refusal vector are separate source changes.
+
+The third initial JS failure is an actual60000ms timeout in the unchanged PAC
+fourteen-case child. Its current same-access direct replay passes all fourteen
+in1.045s, together with66 original portable contract controls. The cause is
+unresolved; no timer, assertion or source is changed to forgive it. An earlier
+clock replay refused EROFS before any case because its existing owned temporary
+root was outside that call's sandbox; the subsequent same-root authorized call
+passes32. These dispositions stay distinct. The full failed raw log and134
+before/final Source/HEAD/index bindings are retained; final selected gates must
+be rerun after the actual count correction before publication.
