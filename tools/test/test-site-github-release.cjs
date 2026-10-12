@@ -50,6 +50,113 @@ const newerDev = Array.from({ length: 10 }, (_, index) => ({
 	published_at: new Date(Date.UTC(2026, 9, 9, 0, 0, 0) - index * 1000).toISOString()
 }));
 
+/** Execute the unchanged prebuild module body with checked inert Git and owned file ports. */
+function branchWrites(env, attached, commit, failAt) {
+	const os = require('node:os');
+	const acorn = require('acorn');
+	const { resolveSiteContext } = require('../dev/site-context.cjs');
+	const source = fs.readFileSync(path.join(ROOT, 'tools/dev/write-branch.js'), 'utf8');
+	const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+	const imports = ast.body.filter((node) => node.type === 'ImportDeclaration');
+	assert.ok(imports.length >= 3 && imports.length <= 4);
+	for (const node of imports)
+		assert.ok(
+			[
+				'child_process',
+				'fs',
+				'path',
+				'node:child_process',
+				'node:fs',
+				'node:path',
+				'./site-context.cjs'
+			].includes(node.source.value)
+		);
+	const body = ast.body
+		.filter((node) => node.type !== 'ImportDeclaration')
+		.map((node) => source.slice(node.start, node.end))
+		.join('\n');
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-site-branch-test-'));
+	const calls = [],
+		writes = [];
+	const answer = (value) => {
+		if (value instanceof Error) throw value;
+		return value + '\n';
+	};
+	const execFile = (command, args) => {
+		assert.equal(command, 'git');
+		calls.push(args);
+		if (JSON.stringify(args) === JSON.stringify(['symbolic-ref', '--quiet', '--short', 'HEAD']))
+			return answer(attached);
+		assert.deepEqual(args, ['rev-parse', '--verify', 'HEAD^{commit}']);
+		return answer(commit);
+	};
+	try {
+		new Function(
+			'execSync',
+			'execFileSync',
+			'writeFileSync',
+			'mkdirSync',
+			'resolve',
+			'resolveSiteContext',
+			'process',
+			'console',
+			body
+		)(
+			(command) => {
+				assert.equal(command, 'git rev-parse --abbrev-ref HEAD');
+				calls.push(command);
+				return answer(attached);
+			},
+			execFile,
+			(file, text, encoding) => {
+				const stage = path.dirname(file) === path.join(owned, 'static') ? 'static' : 'root';
+				assert.ok(
+					file === path.join(owned, 'static', 'version.json') ||
+						file === path.join(owned, 'version.json')
+				);
+				if (failAt === stage) throw new Error('controlled ' + stage + ' failure');
+				fs.writeFileSync(file, text, encoding);
+				writes.push(file);
+			},
+			(directory, options) => {
+				assert.equal(directory, path.join(owned, 'static'));
+				if (failAt === 'mkdir') throw new Error('controlled mkdir failure');
+				fs.mkdirSync(directory, options);
+			},
+			path.resolve,
+			resolveSiteContext,
+			{ env, cwd: () => owned },
+			{ log() {} }
+		);
+		assert.deepEqual(writes, [
+			path.join(owned, 'static', 'version.json'),
+			path.join(owned, 'version.json')
+		]);
+		return {
+			documents: writes.map((file) => JSON.parse(fs.readFileSync(file, 'utf8'))),
+			git_calls: calls
+		};
+	} catch (error) {
+		if (!failAt) assert.equal(writes.length, 0, 'rejected identity cannot write metadata');
+		throw error;
+	} finally {
+		assert.equal(path.resolve(path.dirname(owned)), path.resolve(os.tmpdir()));
+		assert.ok(path.basename(owned).startsWith('ergopti-site-branch-test-'));
+		fs.rmSync(owned, { recursive: true });
+	}
+}
+
+function siteTarget(branch, base) {
+	const source = 'a'.repeat(40);
+	return {
+		ERGOPTI_SITE_TARGET: branch,
+		ERGOPTI_SITE_SOURCE_SHA: source,
+		BASE_PATH: base,
+		GITHUB_ACTIONS: 'true',
+		GITHUB_SHA: source
+	};
+}
+
 async function main() {
 	let checks = 0;
 	async function check(name, body) {
@@ -281,8 +388,101 @@ async function main() {
 			assert.equal(branch.detectDev(), expected === 'dev');
 		}
 	});
-	assert.equal(checks, 16, 'every declared behavior control must complete');
-	console.log('Website release resolver: 16 actual-source controls passed; no network used.');
+	await check('site-branch-identity: failed Git refuses before either metadata write', async () => {
+		assert.throws(
+			() => branchWrites({}, new Error('controlled Git failure')),
+			/controlled Git failure/
+		);
+	});
+	await check('site-branch-identity: detached local HEAD refuses before writing', async () => {
+		assert.throws(() => branchWrites({}, 'HEAD'), /attached branch/);
+	});
+	await check('site-branch-identity: legitimate attached feature branches stay exact', async () => {
+		for (const branch of ['main', 'dev', 'codex/feature-site', 'feature/site-identity']) {
+			const result = branchWrites({}, branch);
+			assert.deepEqual(result.documents, [{ branch }, { branch }]);
+			assert.deepEqual(result.git_calls, [['symbolic-ref', '--quiet', '--short', 'HEAD']]);
+		}
+	});
+	await check('site-branch-identity: both explicit targets bind the same real commit', async () => {
+		for (const [branch, base_path] of [
+			['main', ''],
+			['dev', '/dev']
+		]) {
+			const env = siteTarget(branch, base_path);
+			const result = branchWrites(env, 'HEAD', env.ERGOPTI_SITE_SOURCE_SHA);
+			const expected = { branch, base_path, source_sha: env.ERGOPTI_SITE_SOURCE_SHA };
+			assert.deepEqual(result.documents, [expected, expected]);
+			assert.deepEqual(result.git_calls, [['rev-parse', '--verify', 'HEAD^{commit}']]);
+		}
+	});
+	await check('site-branch-identity: incomplete or foreign target context refuses', async () => {
+		for (const edit of [
+			(env) => {
+				delete env.ERGOPTI_SITE_TARGET;
+			},
+			(env) => {
+				delete env.ERGOPTI_SITE_SOURCE_SHA;
+			},
+			(env) => {
+				delete env.BASE_PATH;
+			},
+			(env) => {
+				env.ERGOPTI_SITE_TARGET = 'feature/site';
+			},
+			(env) => {
+				env.ERGOPTI_SITE_TARGET = 'HEAD';
+			},
+			(env) => {
+				env.BASE_PATH = '';
+			},
+			(env) => {
+				env.BASE_PATH = '/development';
+			},
+			(env) => {
+				env.ERGOPTI_SITE_SOURCE_SHA = 'invalid';
+			},
+			(env) => {
+				env.GITHUB_SHA = 'b'.repeat(40);
+			},
+			(env) => {
+				delete env.GITHUB_SHA;
+			}
+		]) {
+			const env = siteTarget('dev', '/dev');
+			edit(env);
+			assert.throws(() => branchWrites(env, 'HEAD', 'a'.repeat(40)), /Site build context refused/);
+		}
+	});
+	await check('site-branch-identity: wrong checkout and failed commit lookup refuse', async () => {
+		assert.throws(
+			() => branchWrites(siteTarget('dev', '/dev'), 'HEAD', 'b'.repeat(40)),
+			/checked-out commit/
+		);
+		assert.throws(
+			() => branchWrites(siteTarget('dev', '/dev'), 'HEAD', new Error('controlled commit failure')),
+			/controlled commit failure/
+		);
+	});
+	await check('site-branch-identity: GitHub cannot silently use local mode', async () => {
+		assert.throws(() => branchWrites({ GITHUB_ACTIONS: 'true' }, 'dev'), /explicit site target/);
+	});
+	await check('site-branch-identity: ambiguous branch metadata refuses', async () => {
+		for (const branch of ['', 'main\ndev', 'feature\u0000name', ' feature name '])
+			assert.throws(() => branchWrites({}, branch), /attached branch/);
+	});
+	await check('site-branch-identity: directory and both write failures propagate', async () => {
+		for (const stage of ['mkdir', 'static', 'root'])
+			assert.throws(
+				() => branchWrites({}, 'codex/site', undefined, stage),
+				new RegExp('controlled ' + stage + ' failure')
+			);
+	});
+
+	assert.equal(checks, 25, 'every declared behavior control must complete');
+	console.log(
+		'Website release resolver and branch identity: 25 actual-source controls passed; no network used.'
+	);
 }
 main().catch((error) => {
 	console.error(error);

@@ -1,33 +1,24 @@
 #!/usr/bin/env node
-import { execSync } from 'child_process';
-import { writeFileSync, mkdirSync } from 'fs';
-import { resolve } from 'path';
-
-function getBranch() {
-	try {
-		const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
-		return branch;
-	} catch (e) {
-		return null;
-	}
-}
+import { execFileSync } from 'node:child_process';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { resolveSiteContext } from './site-context.cjs';
 
 function main() {
-	const branch = getBranch() || 'main';
+	const context = resolveSiteContext(process.env, (args) =>
+		execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+	);
+	const text = JSON.stringify(context, null, 2) + '\n';
 	const outDir = resolve(process.cwd(), 'static');
-	try {
-		mkdirSync(outDir, { recursive: true });
-	} catch (e) {}
+	mkdirSync(outDir, { recursive: true });
 	const outFile = resolve(outDir, 'version.json');
-	writeFileSync(outFile, JSON.stringify({ branch }, null, 2), 'utf8');
-	console.log('Wrote', outFile, 'branch=', branch);
+	writeFileSync(outFile, text, 'utf8');
+	console.log('Wrote', outFile, 'branch=', context.branch);
 
-	// Also write to project root so Vite serves it at /version.json
-	try {
-		const rootOut = resolve(process.cwd(), 'version.json');
-		writeFileSync(rootOut, JSON.stringify({ branch }, null, 2), 'utf8');
-		console.log('Wrote', rootOut, 'branch=', branch);
-	} catch (e) {}
+	// The development server reads the same metadata at the project root.
+	const rootOut = resolve(process.cwd(), 'version.json');
+	writeFileSync(rootOut, text, 'utf8');
+	console.log('Wrote', rootOut, 'branch=', context.branch);
 }
 
 main();

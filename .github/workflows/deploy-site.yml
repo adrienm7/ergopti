@@ -99,6 +99,8 @@ jobs:
       - name: Build SvelteKit site
         env:
           BASE_PATH: ${{ steps.target.outputs.base_path }}
+          ERGOPTI_SITE_TARGET: ${{ github.ref_name }}
+          ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}
         run: |
           npm run build
           cmp -- static/CNAME build/CNAME
