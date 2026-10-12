@@ -1323,7 +1323,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		; Read ownership does not grant write READY or extend a native bundle.
 		return (Source, Present) => RegistryLive(Row) && Destinations[Key] == Row
 			&& (Present is Integer) && Present == ExpectedPresent && (Source is String)
-			&& StrCompare(Source, ExpectedSource, true) == 0
+			&& Source == ExpectedSource
 	}
 	if Request == "capture_recovery" {
 		if !(Row.phase == "prepared" || Row.phase == "owned" || Row.phase == "ready")
@@ -1401,7 +1401,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			&& Row.phase == ExpectedNoopPhase && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
 			&& (Request == "capture_reconcile_noop" || !_ConfigPublicationHasRecoveryDebt(FilePath))
 			&& (ExpectedNoopPhase != "owned" || Row.owned_bundle == ExpectedNoopBundle)
-			&& (Source is String) && StrCompare(Source, ExpectedNoopSource, true) == 0
+			&& (Source is String) && Source == ExpectedNoopSource
 			&& (Present is Integer) && Present == ExpectedNoopPresent
 	}
 	if Request == "check_write"
@@ -1425,8 +1425,8 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		&& (ExpectedWritePhase != "owned" || Row.owned_bundle == ExpectedWriteBundle)
 		&& TOML_WriteRefusal(FilePath) == "" && !_ConfigPublicationHasRecoveryDebt(FilePath)
 		&& (Present is Integer) && Present == ExpectedWritePresent && (Source is String)
-		&& StrCompare(Source, ExpectedWriteSource, true) == 0 && (FinalCandidate is String)
-		&& StrCompare(FinalCandidate, ExpectedCandidate, true) == 0
+		&& Source == ExpectedWriteSource && (FinalCandidate is String)
+		&& FinalCandidate == ExpectedCandidate
 }
 
 /** Read-only constructor handoff; actual migration keeps its later boot timing. */
