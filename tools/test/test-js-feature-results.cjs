@@ -150,6 +150,61 @@ for (const feature of ['properties', 'mutation'])
 		() => createMatrix({ features: [feature] }, 'refs/heads/main'),
 		/unique literal slugs/
 	);
+// Reused success is bound to the same immutable literal plan, not a fabricated plan attempt.
+const mixed = journals();
+mixed[0][0].ci_run_attempt = '1';
+const mixedResult = validateFeatureJournals(inventory, mixed, context);
+assert.equal(mixedResult.checks, 3);
+assert.equal(mixedResult.run_id, context.run_id);
+assert.equal(mixedResult.run_attempt, '2');
+assert.deepEqual(
+	mixedResult.features.map((row) => [row.feature, row.producer_run_attempt]),
+	[
+		['input', '2'],
+		['menus', '1']
+	]
+);
+const retained = journals();
+for (const rows of retained) rows[0].ci_run_attempt = '1';
+assert.equal(validateFeatureJournals(inventory, retained, context).checks, 3);
+assert.equal(validateFeatureJournals(inventory, mixed.reverse(), context).checks, 3);
+for (const run_attempt of ['', '0', '02', '-1', '9007199254740992', 2, null, undefined]) {
+	assert.throws(() => validateFeatureJournals(inventory, journals(), { ...context, run_attempt }));
+	const malformed = journals();
+	malformed[0][0].ci_run_attempt = run_attempt;
+	assert.throws(() => validateFeatureJournals(inventory, malformed, context));
+}
+for (const mutate of [
+	(rows) => {
+		rows[0][0].ci_source_sha = 'c'.repeat(40);
+	},
+	(rows) => {
+		rows[0][0].ci_run_id = '124';
+	},
+	(rows) => {
+		rows[0][0].inventory_sha256 = 'd'.repeat(64);
+	},
+	(rows) => {
+		rows[0][2].status = 'FAIL';
+	},
+	(rows) => {
+		rows[0][2].exit_code = 1;
+	},
+	(rows) => {
+		rows[0].pop();
+	},
+	(rows) => {
+		rows[0][2].check_id = 'foreign';
+	},
+	(rows) => {
+		rows[1] = structuredClone(rows[0]);
+	}
+]) {
+	const old = journals();
+	old[0][0].ci_run_attempt = '1';
+	mutate(old);
+	assert.throws(() => validateFeatureJournals(inventory, old, context));
+}
 const mutations = [
 	[
 		'wrong platform',
@@ -189,9 +244,9 @@ const mutations = [
 		}
 	],
 	[
-		'attempt mismatch',
+		'future producer attempt',
 		(rows) => {
-			rows[0][0].ci_run_attempt = '1';
+			rows[0][0].ci_run_attempt = '3';
 		}
 	],
 	[

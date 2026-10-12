@@ -6,12 +6,21 @@
 function requireEvidence(condition, message) {
 	if (!condition)
 		throw new Error(
-			`${message}. Re-run the affected feature lot as part of rerunning all jobs, or start a new complete run on the same commit. Partial reruns cannot combine prior-attempt journals.`
+			`${message}. Re-run the affected feature lot on this source/run, or start a new complete run. Retained success journals require the exact source, run and canonical inventory, with a valid producer attempt no newer than this receiving attempt.`
 		);
 }
 
 function duration(value) {
 	return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+/** Admit only actual positive attempts; missing or unsafe values cannot grant reuse. */
+function attempt(value) {
+	requireEvidence(
+		typeof value === 'string' && /^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(Number(value)),
+		'Invalid actual CI producer or receiving attempt'
+	);
+	return Number(value);
 }
 
 /** Returns counts only after all declared checks completed successfully exactly once. */
@@ -23,6 +32,7 @@ function validateFeatureJournals(inventory, journals, context) {
 	requireEvidence(/^[a-f0-9]{40}$/.test(context.source || ''), 'Invalid CI source identity');
 	for (const key of ['run_id', 'run_attempt'])
 		requireEvidence(/^[1-9][0-9]*$/.test(context[key] || ''), `Invalid CI ${key}`);
+	const receivingAttempt = attempt(context.run_attempt);
 	requireEvidence(/^[a-f0-9]{64}$/.test(inventory.digest || ''), 'Invalid inventory digest');
 	requireEvidence(
 		Array.isArray(inventory.features) && inventory.features.length > 0,
@@ -63,7 +73,7 @@ function validateFeatureJournals(inventory, journals, context) {
 		requireEvidence(
 			header.ci_source_sha === context.source &&
 				header.ci_run_id === context.run_id &&
-				header.ci_run_attempt === context.run_attempt,
+				attempt(header.ci_run_attempt) <= receivingAttempt,
 			`${feature}: wrong source, run or attempt`
 		);
 		const checks = expectedChecks.filter((check) => check.feature === feature);
@@ -127,7 +137,12 @@ function validateFeatureJournals(inventory, journals, context) {
 			duration(footer.duration_ms) && footer.duration_ms + 0.001 >= footer.child_duration_ms,
 			`${feature}: invalid suite duration`
 		);
-		summaries.push({ feature, checks: checks.length, duration_ms: footer.duration_ms });
+		summaries.push({
+			feature,
+			checks: checks.length,
+			duration_ms: footer.duration_ms,
+			producer_run_attempt: header.ci_run_attempt
+		});
 	}
 	requireEvidence(
 		remaining.size === 0 && allIds.size === expectedChecks.length,
@@ -137,7 +152,9 @@ function validateFeatureJournals(inventory, journals, context) {
 		features: summaries.sort((a, b) => a.feature.localeCompare(b.feature)),
 		checks: allIds.size,
 		inventory_sha256: inventory.digest,
-		source: context.source
+		source: context.source,
+		run_id: context.run_id,
+		run_attempt: context.run_attempt
 	};
 }
 
