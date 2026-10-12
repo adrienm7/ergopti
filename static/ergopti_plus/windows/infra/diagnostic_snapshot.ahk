@@ -54,7 +54,7 @@ DiagSnapshot_CollectionIdentity() {
 		if SourceSha == ""
 			SourceSha := "unknown"
 	}
-	Identity := Map("compiled", A_IsCompiled ? 1 : 0, "version", Updater_CurrentVersion(),
+	Identity := Map("compiled", A_IsCompiled ? 1 : 0, "evidence_origin", "resident_driver", "version", Updater_CurrentVersion(),
 		"source_sha", SourceSha, "architecture", A_PtrSize == 8 ? "x64" : "x86",
 		"runtime", A_AhkVersion, "receiver_title", t("healthcheck.collection.start"))
 	Rules := JsonParse(FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8"))
