@@ -5,6 +5,7 @@
 
 	import KeyboardEmulation from '$lib/keyboard/KeyboardEmulation.svelte';
 	import { base } from '$app/paths';
+	import { getMagicKeyUrls, getFrenchMagicKeyUrl } from '$lib/js/hotstringDataUrls.js';
 
 	import magicSampleToml from './magic_sample.toml?raw';
 	let remplacements = {};
@@ -40,7 +41,7 @@
 	remplacementsSample = parseTomlSimple(magicSampleToml);
 
 	if (typeof window !== 'undefined') {
-		fetch(base + '/hotstrings/magic.toml')
+		fetch(getFrenchMagicKeyUrl(base))
 			.then((response) => response.text())
 			.then((text) => {
 				remplacements = parseTomlSimple(text);
@@ -49,6 +50,7 @@
 
 	// TOML sections viewer for magickey.toml
 	import { onMount } from 'svelte';
+	import { parse as parseToml } from 'smol-toml';
 	let tomlSections = [];
 	let tomlMeta = { sections_order: [], sections: {} };
 	let orderedSections = [];
@@ -108,11 +110,17 @@
 
 	onMount(async () => {
 		try {
-			const res = await fetch(base + '/hotstrings/magickey.toml');
-			const text = await res.text();
-			const parsed = parseTomlSections(text);
-			tomlSections = parsed.sections;
-			tomlMeta = parsed.meta;
+			const parsed = await Promise.all(
+				getMagicKeyUrls(base).map(async (url) => {
+					const res = await fetch(url);
+					return parseTomlSections(await res.text());
+				})
+			);
+			tomlSections = parsed.flatMap((document) => document.sections);
+			tomlMeta = {
+				sections_order: parsed.flatMap((document) => document.meta.sections_order),
+				sections: Object.assign({}, ...parsed.map((document) => document.meta.sections))
+			};
 			// build orderedSections using meta.sections_order (skip "-")
 			orderedSections = [];
 			const byName = new Map(tomlSections.map((s) => [s.name, s]));
@@ -157,6 +165,24 @@
 	});
 
 	function parseTomlSections(text) {
+		const publishedMeta = parseToml(text)._meta;
+		if (
+			publishedMeta !== undefined &&
+			(!publishedMeta || typeof publishedMeta !== 'object' || Array.isArray(publishedMeta))
+		) {
+			throw new TypeError('Hotstring metadata must be a TOML table');
+		}
+		const sourceOrder = publishedMeta?.sections_order ?? [];
+		const sourceTitles = publishedMeta?.sections ?? {};
+		if (
+			!Array.isArray(sourceOrder) ||
+			sourceOrder.some((name) => typeof name !== 'string' || !name)
+		) {
+			throw new TypeError('Hotstring section order must contain strings');
+		}
+		if (!sourceTitles || typeof sourceTitles !== 'object' || Array.isArray(sourceTitles)) {
+			throw new TypeError('Hotstring section titles must be a TOML table');
+		}
 		const sections = [];
 		const headerRegex = /^(\[\[([^\]]+)\]\]|\[([^\]]+)\])/gm;
 		const indices = [];
@@ -164,7 +190,6 @@
 		while ((match = headerRegex.exec(text)) !== null) {
 			indices.push({ index: match.index, raw: match[0], name: (match[2] || match[3]).trim() });
 		}
-		if (indices.length === 0) return { sections: [], meta: { sections_order: [], sections: {} } };
 		for (let i = 0; i < indices.length; i++) {
 			const name = indices[i].name;
 			const start = indices[i].index + indices[i].raw.length;
@@ -200,30 +225,31 @@
 			sections.push({ name, entries });
 		}
 
-		// extract meta (_meta and _meta.sections)
-		const meta = { sections_order: [], sections: {} };
-		const normal = [];
-		for (const s of sections) {
-			if (s.name === '_meta') {
-				// parse lines like sections_order = ["replace", "repeat", "-"]
-				for (const e of s.entries) {
-					const line = e.raw;
-					const m = line.match(/^sections_order\s*=\s*\[(.*)\]$/);
-					if (m) {
-						const items = m[1]
-							.split(',')
-							.map((x) => x.trim().replace(/^"|"$/g, ''))
-							.filter(Boolean);
-						meta.sections_order = items;
-					}
-				}
-			} else if (s.name === '_meta.sections') {
-				for (const e of s.entries) {
-					meta.sections[e.key] = e.output;
-				}
-			} else {
-				normal.push(s);
+		const meta = { sections_order: sourceOrder, sections: {} };
+		const normal = sections.filter(
+			(section) => section.name !== '_meta' && section.name !== '_meta.sections'
+		);
+		for (const [name, value] of Object.entries(sourceTitles)) {
+			if (!normal.some((section) => section.name === name)) {
+				throw new TypeError('Hotstring title names an unknown section: ' + name);
 			}
+			const title = typeof value === 'string' ? value : value?.fr;
+			if (
+				typeof value !== 'string' &&
+				(!value ||
+					typeof value !== 'object' ||
+					Array.isArray(value) ||
+					!Object.hasOwn(value, 'fr') ||
+					Object.values(value).some((label) => typeof label !== 'string' || !label.trim()))
+			) {
+				throw new TypeError(
+					'Hotstring localized title requires nonempty strings and a French label: ' + name
+				);
+			}
+			if (typeof title !== 'string' || !title.trim()) {
+				throw new TypeError('Hotstring section title must be a nonempty string: ' + name);
+			}
+			meta.sections[name] = title;
 		}
 
 		// merge same-name normal sections
