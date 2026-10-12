@@ -28,6 +28,99 @@ Test("managed bootstrap: exact committed enable hands off READY source (groups24
 Test("managed bootstrap: unauthorized source cannot borrow enable handoff (groups247-managed)", _G4B_EnableHandoffForeign)
 Test("managed bootstrap: enable handoff cannot bless another model (groups247-managed)", _G4B_EnableHandoffModel)
 
+_G4B_ReadyMenuPullDeadline() {
+	F := _G4B_Fixture()
+	Done := 0, Published := 0
+	Pull(Target, Model, Callback) {
+		Done := Callback
+		return true
+	}
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready)
+		F.Now += F.Flow.Plan["deadline_ms"] * 2
+		F.Flow.Port["pull"] := Pull
+		AssertTrue(F.Flow.PullModel("qwen3:0.6b", (*) => Published += 1))
+		AssertTrue(HasMethod(Done, "Call"))
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Ready, "a new consented pull does not inherit an expired bootstrap clock")
+		F.Now += F.Flow.Plan["deadline_ms"]
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Cancelled, "a READY menu pull reaches the original configured operation deadline")
+		AssertFalse(F.Flow.Ready, "expired model work cannot retain READY admission")
+		Done.Call(0)
+		AssertEqual(0, Published, "late model completion cannot publish after the operation deadline")
+		AssertEqual(1, F.ReadyCalls, "the original bootstrap success remains a single terminal callback")
+		AssertEqual(0, F.FailedCalls, "a later menu operation does not replay the completed bootstrap failure callback")
+	} finally F.Close()
+}
+Test("managed bootstrap: READY menu pull has a separate captured deadline (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullDeadline)
+
+_G4B_ReadyMenuPullSuccessor() {
+	F := _G4B_Fixture()
+	Callbacks := [], Published := 0
+	Pull(Target, Model, Callback) {
+		F.Pulls += 1
+		Callbacks.Push(Callback)
+		return true
+	}
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		F.Model := "qwen3:0.6b"
+		F.Flow.Port["pull"] := Pull
+		ConsentCount := F.Consents.Length
+		AssertTrue(F.Flow.PullModel(F.Model, (*) => Published += 1))
+		AssertFalse(F.Flow.PullModel(F.Model), "an unfinished request refuses another consent and dispatch")
+		AssertEqual(ConsentCount + 1, F.Consents.Length)
+		AssertEqual(1, Callbacks.Length)
+		Callbacks[1].Call(0)
+		AssertEqual(1, Published)
+		AssertTrue(F.Flow.Ready)
+		AssertEqual(0, F.Runtime.Stops)
+		AssertTrue(F.Flow.PullModel(F.Model, (*) => Published += 1))
+		Successor := F.Flow.MenuPull
+		Callbacks[1].Call(0)
+		AssertTrue(F.Flow.MenuPull == Successor, "the retired callback cannot settle its replacement")
+		AssertEqual(1, Published)
+		F.Flow.Cancel()
+		Callbacks[2].Call(0)
+		AssertEqual(1, Published, "cancelled requests cannot publish a late fresh-tags response")
+	} finally F.Close()
+}
+Test("managed bootstrap: READY menu callbacks retain exact request custody (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullSuccessor)
+
+_G4B_ReadyMenuPullDebt() {
+	F := _G4B_Fixture()
+	Done := 0
+	Pull(Target, Model, Callback) {
+		Done := Callback
+		return true
+	}
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		F.Flow.Port["pull"] := Pull
+		AssertTrue(F.Flow.PullModel("qwen3:0.6b"))
+		CapturedBudget := F.Flow.Plan["deadline_ms"]
+		F.Flow.Plan["deadline_ms"] := CapturedBudget * 10
+		Owner := Map("task", {requestTerminate: (*) => "true"}, "building", false,
+			"accepted", true, "terminal", 0, "callback", Done)
+		F.Flow.PullTask := Owner
+		F.Now += CapturedBudget
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Cancelled, "changing later policy cannot extend the captured request budget")
+		AssertTrue(F.Flow.PullTask == Owner, "a string ACK cannot release native task ownership")
+		AssertFalse(F.Flow.CanReplace(), "unknown physical retirement blocks a new bootstrap")
+		F.Flow._Pulled(Owner, 0)
+		AssertTrue(F.Flow.CanReplace(), "only exact task completion releases the retained request")
+		AssertEqual(1, F.ReadyCalls)
+		AssertEqual(0, F.FailedCalls)
+	} finally F.Close()
+}
+Test("managed bootstrap: READY menu deadline preserves unknown native retirement (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullDebt)
+
 class _G4B_Fixture {
 	__New() {
 		global _LLM_Deps_Epoch, LLM_OLLAMA_BASE_URL, _LLM_Deps_State, _LLM_Deps_Checking
@@ -147,6 +240,7 @@ class _G4B_Runtime {
 		this.Owned := false
 		this.Starts := 0
 		this.Stops := 0
+		this.LiveIdentity := true
 		this.Record := Map("ready_image_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	}
 	Start(Target, Authority, Ready, Exit) {
@@ -177,6 +271,9 @@ class _G4B_Runtime {
 	}
 	HasOwner() {
 		return this.Owned
+	}
+	IdentityReady() {
+		return this.Owned && this.LiveIdentity
 	}
 }
 
@@ -530,9 +627,14 @@ _G4B_EnableOwner(State) {
 		F.Flow.MenuIntent := _G4B_LiveMenuIntent()
 		F.Flow.AuxGeneration := LLM_AuxGeneration()
 		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready, "Managed readiness must precede enable admission.")
+		AssertFalse(F.Flow.MenuIntent["enabled"], "The fixture must capture an OFF enable intent.")
 		_LLM_ManagedBootstrap := F.Flow
+		State["port"]["writer"] := _G4B_EnableWriter.Bind(State, F.Flow)
+		State["port"]["persistence_notify"] := _G4B_EnableNotify.Bind(State)
 		AssertTrue(LLM_Menu_OnToggle(State["port"]), "The actual tray enable owner starts its fresh origin probe.")
 		_LEA_Answer(State, Map("ok", true, "status", 200, "body", '{"version":"0.24.0"}'))
+		AssertTrue(State.Get("handoff_bytes_match", false), "The prepared handoff equals the actual complete writer image. " . State.Get("refusal", ""))
 		AssertEqual(State["writes"], 1)
 		AssertEqual(State["applies"], 1, "The actual durable source handoff precedes live application.")
 		F.Flow._Tick()
@@ -546,6 +648,32 @@ _G4B_EnableOwner(State) {
 		F.Close()
 		_LLM_ManagedBootstrap := Saved
 	}
+}
+
+/** Observes exact bytes independently at the actual publication boundary. */
+_G4B_EnableWriter(State, Flow, Path, Updates) {
+	global _LLM_ManagedBootstrap
+	AssertTrue(IsObject(_LLM_ManagedBootstrap) && _LLM_ManagedBootstrap == Flow, "The managed flow still owns writer admission.")
+	AssertTrue(Flow.Ready, "Managed readiness survives until writer dispatch.")
+	AssertTrue(Flow.EnableHandoff is Map, "Managed writer dispatch requires the prepared handoff.")
+	Token := Flow.EnableHandoff
+	Written := _LEA_Write(State, Path, Updates)
+	State["handoff_bytes_match"] := Token is Map
+		&& _LLM_Menu_EnableSourceMatches(Token["source"], _LLM_Menu_EnableReadSource())
+	if Token is Map {
+		Observed := _LLM_Menu_EnableReadSource()
+		AssertEqual(Token["source"]["bytes"].Size, Observed["bytes"].Size, "Complete publication byte sizes agree.")
+	}
+	return Written
+}
+
+/** Retains only this fixture's synthetic transaction refusal for failed assertions. */
+_G4B_EnableNotify(State, Message, Options) {
+	State["refusal"] := Message
+	for Line in LoggerRingBufferSnapshot()
+		if InStr(Line, "Could not persist the confirmed LLM enabled-state change")
+			State["refusal"] := Line
+	return true
 }
 _G4B_EnableOwnerCase() {
 	_LEA_WithFixture(_G4B_EnableOwner)
@@ -652,3 +780,223 @@ _G4B_RejectArrayTags() {
 	} finally F.Close()
 }
 Test("managed bootstrap: model receipt uses actual normalized-name set contract (groups247-managed)", _G4B_RejectArrayTags)
+
+/** Cleanup ownership must not grant HTTP admission to a replaced listener. */
+_G4B_DeadListenerRefuses() {
+	global _LLM_ManagedBootstrap
+	Saved := _LLM_ManagedBootstrap
+	F := _G4B_Fixture()
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		_LLM_ManagedBootstrap := F.Flow
+		AssertEqual(LLM_OllamaRequestOrigin(), F.Flow.Target["origin"])
+		F.Runtime.LiveIdentity := false
+		AssertTrue(F.Runtime.HasOwner(), "Physical cleanup ownership remains retained.")
+		AssertThrows(LLM_OllamaRequestOrigin, "A dead captured server cannot borrow a replacement listener.")
+	} finally {
+		F.Close()
+		_LLM_ManagedBootstrap := Saved
+	}
+}
+Test("managed bootstrap: retained READY refuses dead listener (groups247-live-identity)", _G4B_DeadListenerRefuses)
+
+/** A superseded deferred retry must tolerate callbacks cleared by prior success. */
+_G4B_OptionalRetryCallbacks() {
+	global _LLM_Deps_Epoch
+	AssertFalse(LLM_Deps_AsyncCheck("", , , false, _LLM_Deps_Epoch - 1))
+}
+Test("managed bootstrap: stale retry accepts absent callbacks (groups247-optional-callbacks)", _G4B_OptionalRetryCallbacks)
+
+/** Failure publication remains usable after the one-shot callback was retired. */
+_G4B_OptionalFailureCallback() {
+	global _LLM_Deps_Epoch
+	AssertFalse(LLM_Deps_Fail("Synthetic superseded failure", , _LLM_Deps_Epoch - 1))
+}
+Test("managed bootstrap: stale failure accepts absent callback (groups247-optional-callbacks)", _G4B_OptionalFailureCallback)
+
+/** The real deferred callback must not read an unset retired observer. */
+_G4B_OptionalDeferredRetry() {
+	global _LLM_Deps_Epoch, _LLM_Deps_Checking, _LLM_Deps_State
+	Saved := [_LLM_Deps_Epoch, _LLM_Deps_Checking, _LLM_Deps_State]
+	Errors := []
+	Handler := (Err, *) => Errors.Push(Err.Message)
+	OnError(Handler)
+	try {
+		_LLM_Deps_Checking := false
+		LLM_Deps_CheckAndInstall("", , , false)
+		_LLM_Deps_Epoch += 1
+		Sleep(150)
+		AssertEqual(Errors.Length, 0, "A superseded callback must retire before any network dispatch.")
+	} finally {
+		OnError(Handler, 0)
+		_LLM_Deps_Epoch := Saved[1]
+		_LLM_Deps_Checking := Saved[2]
+		_LLM_Deps_State := Saved[3]
+	}
+}
+Test("managed bootstrap: deferred retry preserves absent callbacks (groups247-optional-callbacks)", _G4B_OptionalDeferredRetry)
+
+/** Uses an actual owned Windows listener; this is not Ollama installation qualification. */
+_G4B_NativeListenerIdentity() {
+	Root := A_Temp . "\ergopti-native-listener-" . DllCall("GetCurrentProcessId", "UInt") . "-" . A_TickCount
+	DirCreate(Root)
+	Observed := Map("terminal", false, "exit", -1, "stderr", "")
+	PowerShell := A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+	Fixture := A_ScriptDir . "\fixtures\ollama_live_identity_listener.ps1"
+	Task := ShellRunner_SpawnTreeOwned(PowerShell, ["-NoLogo", "-NoProfile", "-NonInteractive",
+		"-ExecutionPolicy", "Bypass", "-File", Fixture, "-Directory", Root],
+		Observe, , , 4096, true, true)
+	Observe(Code, Out, Err) {
+		Observed["exit"] := Code
+		Observed["stderr"] := Err
+		Observed["terminal"] := true
+	}
+	try {
+		AssertTrue(Task.start(), "The owned native listener must launch.")
+		Deadline := A_TickCount + 5000
+		while !FileExist(Root . "\ready.json") && A_TickCount < Deadline && !Observed["terminal"]
+			Sleep(10)
+		AssertTrue(FileExist(Root . "\ready.json"), "The real process must publish its listener identity.")
+		Native := JsonParse(FileRead(Root . "\ready.json", "UTF-8"))
+		Receipt := Map("child_pid", Native["pid"], "child_created_filetime", Native["created_filetime"])
+		Target := Map("port", Native["port"], "origin", "http://127.0.0.1:" . Native["port"], "executable", PowerShell)
+		AssertTrue(OllamaNativeIdentityReady(Receipt, Target), "PID, birth time, executable and actual listener must agree.")
+		Stale := Receipt.Clone()
+		Stale["child_created_filetime"] += 1
+		AssertFalse(OllamaNativeIdentityReady(Stale, Target), "A live PID cannot substitute for its captured birth identity.")
+		ForeignImage := Target.Clone()
+		ForeignImage["executable"] := A_AhkPath
+		AssertFalse(OllamaNativeIdentityReady(Receipt, ForeignImage), "The listener PID alone cannot admit another executable.")
+		ForeignOrigin := Target.Clone()
+		ForeignOrigin["origin"] .= "/api"
+		AssertFalse(OllamaNativeIdentityReady(Receipt, ForeignOrigin), "Configured origin must be the exact captured authority.")
+		FileAppend("stop`n", Root . "\stop", "UTF-8-RAW")
+		Deadline := A_TickCount + 5000
+		while !Observed["terminal"] && A_TickCount < Deadline
+			Sleep(10)
+		AssertTrue(Observed["terminal"], "Natural tree retirement must be acknowledged.")
+		AssertEqual(0, Observed["exit"], "The actual helper must exit successfully after releasing its listener.")
+		AssertEqual("", Observed["stderr"], "Native listener errors cannot become a successful retirement receipt.")
+		AssertFalse(OllamaNativeIdentityReady(Receipt, Target), "Retained READY cannot admit a terminated listener.")
+	} finally {
+		if !Observed["terminal"] {
+			FileAppend("stop`n", Root . "\stop", "UTF-8-RAW")
+			if !Task.requestTerminate()
+				throw Error("Owned native listener cleanup remains pending.")
+		}
+		DirDelete(Root, true)
+	}
+}
+Test("managed bootstrap: exact native listener identity rejects stale authority (groups247-native-identity)", _G4B_NativeListenerIdentity)
+
+/** The exact native dispatch path remains injected, never a Linux native claim. */
+class _G4B_NativeDispatchTask {
+	__New(Mode, Retirement) {
+		this.Mode := Mode
+		this.Retirement := Retirement
+		this.Starts := 0
+		this.Stops := 0
+		this.Done := 0
+		this.Withdraw := 0
+	}
+	start() {
+		this.Starts += 1
+		if HasMethod(this.Withdraw, "Call")
+			this.Withdraw.Call()
+		if this.Mode == "start_throw" || this.Mode == "start_withdraw"
+			throw Error("Synthetic native start refusal")
+		return false
+	}
+	requestTerminate() {
+		this.Stops += 1
+		return this.Retirement
+	}
+	Complete() {
+		this.Done.Call(0, "", "")
+	}
+}
+
+/** Exercises the real menu -> native dispatch -> cancellation -> observer path. */
+_G4B_NativeDispatchFailure(Mode, Retirement := true, Bootstrap := false) {
+	F := _G4B_Fixture()
+	Task := _G4B_NativeDispatchTask(Mode, Retirement)
+	Spawns := 0, Published := 0
+	Spawn(Executable, Arguments, Done, *) {
+		Spawns += 1
+		AssertEqual(Executable, A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe")
+		AssertEqual(Arguments[Arguments.Length], "qwen3:0.6b", "The native worker receives the exact consented tag.")
+		AssertTrue(InStr(Arguments[7], "ollama-model-pull.ps1"), "The managed worker remains the production entry point.")
+		if Mode == "factory_throw"
+			throw Error("Synthetic lazy native task construction refusal")
+		Task.Done := Done
+		return Task
+	}
+	try {
+		if Bootstrap
+			F.Model := "qwen3:0.6b"
+		F.Start()
+		F.Flow.Plan["directory"] := "C:\managed-workers"
+		F.Flow.Plan["helper"] := "C:\managed-workers\ollama_managed_files.ps1"
+		F.Flow.Plan["helper_sha256"] := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		F.Flow.Sources["C:\managed-workers\ollama-runtime-launch.ps1"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		F.Flow.Target["ready_file_identity"] := "34567890:3456789012345678"
+		F.Flow.Target["ready_image_sha256"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		OriginalFailed := F.Flow.OnFailed
+		if Mode == "start_withdraw"
+			Task.Withdraw := (*) => F.Flow.Cancel()
+		F.Flow.Port["pull"] := (Target, Model, Done) => F.Flow._NativePull(Model, Done, Spawn)
+		if Bootstrap {
+			F.Runtime.PublishReady()
+			AssertEqual(0, F.ReadyCalls, "Initial acquisition has not completed its bootstrap.")
+			AssertEqual(1, F.FailedCalls, "Initial native dispatch refusal still notifies its original failure observer.")
+		} else {
+			F.Runtime.PublishReady()
+			AssertTrue(F.Flow.Ready)
+			AssertFalse(F.Flow.PullModel("qwen3:0.6b", (*) => Published += 1))
+			AssertEqual(1, F.ReadyCalls, "The original completed bootstrap remains one-shot.")
+			AssertEqual(0, F.FailedCalls, "Later native construction/start failure belongs to its menu operation.")
+		}
+		AssertEqual(1, Spawns)
+		AssertTrue(F.Flow.OnFailed == OriginalFailed, "Routing preserves the bootstrap observer instead of suppressing it globally.")
+		AssertTrue(F.Flow.Cancelled)
+		AssertFalse(F.Flow.Ready)
+		AssertEqual(0, F.Flow.MenuPull)
+		AssertEqual(0, Published)
+		if Mode == "factory_throw" {
+			AssertEqual(0, Task.Starts)
+			AssertEqual(0, Task.Stops, "Lazy factory refusal returned no native task to terminate.")
+			AssertEqual(0, F.Flow.PullTask)
+			AssertTrue(F.Flow.CanReplace())
+		} else {
+			AssertEqual(1, Task.Starts)
+			AssertTrue(Task.Stops >= 1, "Cancellation attempts retirement of the exact returned task.")
+			if Retirement is Integer && Retirement == true {
+				AssertEqual(0, F.Flow.PullTask)
+				AssertTrue(F.Flow.CanReplace(), "Only canonical native closure acknowledges retirement.")
+			} else {
+				Owner := F.Flow.PullTask
+				AssertTrue(Owner is Map && Owner["task"] == Task)
+				AssertFalse(F.Flow.CanReplace(), "Refused or string retirement keeps exact native custody.")
+				AssertFalse(F.Flow._Pulled(Map("task", Task), 0), "A forged completion cannot retire the captured task owner.")
+				AssertTrue(F.Flow.PullTask == Owner)
+			}
+			Task.Complete()
+			Task.Complete()
+			AssertEqual(0, F.Flow.PullTask)
+			AssertTrue(F.Flow.CanReplace(), "Exact canonical completion settles otherwise unknown physical custody.")
+			AssertEqual(0, Published, "Late and duplicate completions cannot publish a cancelled request.")
+		}
+		AssertEqual(Bootstrap ? 1 : 0, F.FailedCalls)
+	} finally F.Close()
+}
+
+Test("managed bootstrap: READY native factory throw preserves bootstrap observer (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("factory_throw"))
+Test("managed bootstrap: READY native start false preserves bootstrap observer (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false"))
+Test("managed bootstrap: READY native start throw preserves bootstrap observer (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw"))
+Test("managed bootstrap: READY native start false retains string retirement debt (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false", "true"))
+Test("managed bootstrap: READY native start throw retains refused retirement debt (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw", false))
+Test("managed bootstrap: initial native factory throw still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("factory_throw", true, true))
+Test("managed bootstrap: initial native start false still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false", true, true))
+Test("managed bootstrap: initial native start throw still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw", true, true))
+Test("managed bootstrap: READY reentrant cancellation retains native failure custody (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_withdraw"))

@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "Annat startkommando: Uppstart är inställd för ett annat kommando eller en annan installation. Den befintliga inställningen bevaras.",
 	"menu.llm.model_parent_with_health": "%sVald modell: %s",
 	"config.read_only.newer_schema": "Den här konfigurationen sparades med en nyare version av ErgoptiPlus. Dina inställningar har bevarats. Uppdatera ErgoptiPlus och läs in det igen innan du ändrar inställningar.",
-	"menu.llm.save_unavailable": "Inte tillgängligt: återuppta ErgoptiPlus om det är pausat, eller öppna Diagnostik för att se varför inställningarna inte kan sparas."
+	"menu.llm.save_unavailable": "Inte tillgängligt: återuppta ErgoptiPlus om det är pausat, eller öppna Diagnostik för att se varför inställningarna inte kan sparas.",
+	"healthcheck.collection.start": "Samla Windows-diagnostik",
+	"healthcheck.collection.guided": "Guidade steg med tangentbord och skärm",
+	"healthcheck.collection.skip": "Hoppa över fysiska steg",
+	"healthcheck.collection.open": "Öppna mapp",
+	"healthcheck.collection.complete": "Arkivet har skapats. Bifoga ZIP-filen manuellt i samtalet.",
+	"healthcheck.collection.unavailable": "Den här Windows-insamlaren är inte tillgänglig på macOS och Linux.",
+	"healthcheck.collection.guide": "Skriv testtexten nedan. Håll och släpp Ctrl och sedan Shift var för sig med textfältet aktivt.",
+	"healthcheck.collection.visual": "Jag kan tydligt läsa testtexten.",
+	"healthcheck.collection.failed": "Insamlingen misslyckades. Kontrollera den lokala mappen för ofullständiga åtgärder."
 }

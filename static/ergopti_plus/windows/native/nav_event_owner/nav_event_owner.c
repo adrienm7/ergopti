@@ -3339,10 +3339,13 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
 	memcpy(&candidate, &g_nav_state.terminal_output, sizeof(candidate));
 	status = candidate.initialized ? ERGOPTI_OUTPUT_OK
 		: ErgoptiOutput_Initialize(&candidate, owner);
-	if (status == ERGOPTI_OUTPUT_OK)
-		status = ErgoptiOutput_Plan(&candidate, owner, token, sequence,
-			&g_nav_state.terminal_routes, &g_nav_state.terminal_events[0].route,
-			text, length, 1, &key);
+	if (status != ERGOPTI_OUTPUT_OK) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return NavTerminalOutputStatus(status);
+	}
+	status = ErgoptiOutput_Plan(&candidate, owner, token, sequence,
+		&g_nav_state.terminal_routes, &g_nav_state.terminal_events[0].route,
+		text, length, 1, &key);
 	if (status == ERGOPTI_OUTPUT_OK) {
 		memcpy(&g_nav_state.terminal_output, &candidate, sizeof(g_nav_state.terminal_output));
 		*out_key = key;
