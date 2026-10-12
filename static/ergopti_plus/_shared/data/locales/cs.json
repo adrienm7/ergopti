@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "Jiný příkaz při spuštění: Spouštění je nastaveno pro jiný příkaz nebo instalaci. Stávající nastavení zůstává zachováno.",
 	"menu.llm.model_parent_with_health": "%sVybraný model: %s",
 	"config.read_only.newer_schema": "Tato konfigurace byla uložena novější verzí ErgoptiPlus. Vaše nastavení byla zachována. Před změnou nastavení aktualizujte ErgoptiPlus a znovu jej načtěte.",
-	"menu.llm.save_unavailable": "Nedostupné: obnovte ErgoptiPlus, pokud je pozastaven, nebo otevřete diagnostiku a zjistěte, proč nelze nastavení uložit."
+	"menu.llm.save_unavailable": "Nedostupné: obnovte ErgoptiPlus, pokud je pozastaven, nebo otevřete diagnostiku a zjistěte, proč nelze nastavení uložit.",
+	"healthcheck.collection.start": "Shromáždit diagnostiku Windows",
+	"healthcheck.collection.guided": "Průvodce klávesnicí a obrazovkou",
+	"healthcheck.collection.skip": "Přeskočit fyzické kroky",
+	"healthcheck.collection.open": "Otevřít složku",
+	"healthcheck.collection.complete": "Archiv vytvořen. Přiložte ZIP do konverzace ručně.",
+	"healthcheck.collection.unavailable": "Tento kolektor Windows není dostupný na macOS a Linuxu.",
+	"healthcheck.collection.guide": "Napište níže uvedený zkušební text. V aktivním textovém poli zvlášť podržte a uvolněte Ctrl a potom Shift.",
+	"healthcheck.collection.visual": "Zkušební text mohu jasně přečíst.",
+	"healthcheck.collection.failed": "Shromažďování selhalo. Zkontrolujte nedokončené operace v místní složce."
 }

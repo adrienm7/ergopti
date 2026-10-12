@@ -153,13 +153,48 @@ local function with_offer(scenario)
 		local world = { probes = {}, dialogs = {}, actions = {}, installed = false }
 		local probe_clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
 		assert(type(probe_clients) == "table", "the probe clients must be reachable")
+		world.native_clients = {}
 		for _, id in ipairs(LocalServers.ORDER) do
-			probe_clients[id] = {
-				get = function(url, _, callback)
-					world.probes[#world.probes + 1] = { id = id, url = url, callback = callback }
-					return true
-				end,
-			}
+			local active, observers = nil, {}
+			local client = {}
+			local function retire(request)
+				if active ~= request then return false end
+				active = nil
+				local pending = observers
+				observers = {}
+				for _, callback in ipairs(pending) do callback() end
+				return true
+			end
+			-- Each HTTP double retains one exact request. Accepted cancellation
+			-- retires it immediately unless a scenario deliberately holds cleanup.
+			function client.get(url, _, callback)
+				assert(active == nil, "a native predecessor must retire before another get")
+				local request = { cancelled = false }
+				active = request
+				world.probes[#world.probes + 1] = { id = id, url = url, callback = function(response)
+					if retire(request) ~= true or request.cancelled then return false end
+					return callback(response)
+				end }
+				return true
+			end
+			function client.cancel()
+				if active == nil then return true end
+				active.cancelled = true
+				if world.hold_cancellation then return false end
+				return retire(active)
+			end
+			function client.isSettled() return active == nil end
+			function client.onSettled(callback)
+				assert(type(callback) == "function")
+				if active == nil then callback() else observers[#observers + 1] = callback end
+				return true
+			end
+			function client.settle_cancelled()
+				assert(active ~= nil and active.cancelled, "only the original cancelled request can retire")
+				return retire(active)
+			end
+			world.native_clients[id] = client
+			probe_clients[id] = client
 		end
 		package.loaded["modules.llm"] = { api_remote = api, DEFAULT_STATE = { llm_ollama_port = 11434 } }
 		package.loaded["ui.menu.menu_llm.runtime_install_offer"] = {
@@ -257,6 +292,42 @@ helpers.describe("The offer lists what the real sweep found (unreachable-backend
 			helpers.assert_eq(Offer.offer(world.request), true, "the failed dialog no longer counts as open")
 			world.answer({})
 			helpers.assert_eq(world.actions, { "start" })
+		end)
+	end)
+end)
+
+helpers.describe("Unreachable offer exact native predecessor (unreachable-backend-native-owner)", function()
+	helpers.it("keeps the original caller pending until cancelled native requests retire and fresh answers arrive (unreachable-backend-native-owner)", function()
+		with_offer(function(Offer, world, api, LocalServers)
+			world.pick = nil
+			Offer.offer(world.request)
+			helpers.assert_eq(#world.probes, 4)
+			helpers.assert_eq(#world.dialogs, 0)
+			local old = {}
+			for index, probe in ipairs(world.probes) do old[index] = probe.callback end
+			world.hold_cancellation = true
+			local menu_sweeps = 0
+			api.detect_local_servers(function() menu_sweeps = menu_sweeps + 1 end)
+			helpers.assert_eq(#world.probes, 4, "refused native cancellation cannot acquire successor requests")
+			helpers.assert_eq(#world.dialogs, 0)
+			helpers.assert_eq(menu_sweeps, 0)
+			for _, id in ipairs(LocalServers.ORDER) do
+				helpers.assert_eq(world.native_clients[id].isSettled(), false)
+				helpers.assert_true(world.native_clients[id].settle_cancelled())
+			end
+			helpers.assert_eq(#world.probes, 8, "only actual predecessor terminals admit the new sweep")
+			helpers.assert_eq(#world.dialogs, 0, "physical retirement alone is not a models verdict")
+			for _, callback in ipairs(old) do
+				helpers.assert_eq(callback(models_answer({ "stale-model" })), false)
+			end
+			helpers.assert_eq(#world.dialogs, 0)
+			helpers.assert_eq(menu_sweeps, 0)
+			world.answer({ omlx = models_answer({ "fresh-model" }) })
+			helpers.assert_eq(menu_sweeps, 1)
+			helpers.assert_eq(#world.dialogs, 1)
+			helpers.assert_eq(world.actions, {})
+			helpers.assert_true(world.dialogs[1].choices[1]:find("fresh-model", 1, true) ~= nil)
+			helpers.assert_nil(world.dialogs[1].choices[1]:find("stale-model", 1, true))
 		end)
 	end)
 end)

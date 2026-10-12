@@ -11,6 +11,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../../adapters/ollama_identity.ahk
+
 /** Holds one exact server task; accepted launch never means AI is enabled. */
 class OllamaRuntimeOwner {
 	/**
@@ -24,7 +26,7 @@ class OllamaRuntimeOwner {
 			throw TypeError("Runtime ownership requires a trusted launcher path.")
 		if !HasMethod(Options.Get("on_retired", 0), "Call")
 			throw TypeError("Runtime ownership requires an independent physical retirement observer.")
-		for Name in ["spawn", "factory", "read_ready", "clock", "on_error", "on_retired"]
+		for Name in ["spawn", "factory", "read_ready", "live_identity", "clock", "on_error", "on_retired"]
 			if Options.Has(Name) && !HasMethod(Options[Name], "Call")
 				throw TypeError("Runtime native port must be callable.", -1, Name)
 		this.Options := Options.Clone()
@@ -48,6 +50,8 @@ class OllamaRuntimeOwner {
 	}
 
 	_StartNonCritical(Target, Authority, OnReady, OnExit) {
+		if !OllamaNativeIdentityDrain()
+			return false
 		if !this._ValidTarget(Target) || !(Authority is Map)
 				|| !HasMethod(Authority.Get("authorize", 0), "Call")
 				|| !HasMethod(Authority.Get("is_current", 0), "Call")
@@ -125,13 +129,15 @@ class OllamaRuntimeOwner {
 		PreviousCritical := Critical("Off")
 		try {
 			Record := this.Record
-			return !(Record is Map) || this._CancelRecord(Record)
+			IdentityRetired := OllamaNativeIdentityDrain()
+			RuntimeRetired := !(Record is Map) || this._CancelRecord(Record)
+			return IdentityRetired && RuntimeRetired
 		} finally Critical(PreviousCritical)
 	}
 
 	/** @returns {Boolean} Includes stable ownership and unacknowledged cleanup. */
 	HasOwner() {
-		return this.Record is Map
+		return this.Record is Map || OllamaNativeIdentityHasDebt()
 	}
 
 	_Current(Record) {
@@ -317,6 +323,7 @@ class OllamaRuntimeOwner {
 			if !this._Owns(Record) || Record["cancelled"] || Record["terminal"] || Record["ready"]
 				return false
 			Record["ready"] := true
+			Record["process_receipt"] := Receipt.Clone()
 			Record["ready_file_identity"] := Receipt["ready_file_identity"]
 			Record["ready_image_sha256"] := Observation["image_sha256"]
 			Callback := Record["on_ready"]
@@ -327,6 +334,23 @@ class OllamaRuntimeOwner {
 		if HasMethod(Callback, "Call")
 			Callback.Call(Target.Clone(), Receipt.Clone())
 		return true
+	}
+
+	/** A retained cleanup task alone cannot authorize another HTTP request. */
+	IdentityReady() {
+		Record := this.Record
+		if !(Record is Map) || !this._Owns(Record) || !Record["ready"]
+				|| Record["cancelled"] || Record["terminal"] || !this._Current(Record)
+			return false
+		Probe := this.Options.Get("live_identity", OllamaNativeIdentityReady)
+		try {
+			Result := Probe.Call(Record.Get("process_receipt", 0), Record["target"].Clone())
+			return Result is Integer && Result == true && this._Owns(Record) && this._Current(Record)
+				&& !Record["cancelled"] && !Record["terminal"]
+		} catch as Err {
+			this._Report("live identity", Err)
+			return false
+		}
 	}
 
 	_AdoptConstruction(Record, Task) {

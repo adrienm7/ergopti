@@ -4527,6 +4527,7 @@ int main(int argc, char **argv)
 {
 	uint32_t index;
 	uint32_t passed = 0;
+	/* Irrecoverable simulated lost-edge debt owns the final process lifetime. */
 	NavTestCase tests[] = {
 		{"A7 receipt survives B swap", TestA7ReceiptSurvivesBSwap},
 		{"repaint swap rejects stale index", TestRepaintSwapRejectsStaleIndex},
@@ -4596,13 +4597,13 @@ int main(int argc, char **argv)
 		{"plan validation is atomic", TestPlanValidationIsAtomic},
 		{"nav-stale-physical-modifier",
 			TestStalePhysicalModifierCannotArmRoutes},
-		{"terminal output custody preserves fault debt (todo49-output-custody)",
-			TestTerminalOutputCustodyPreservesFaultDebt},
 		{"hook trace refuses unauthenticated sessions (todo49-hook-trace)",
 			TestHookTraceRefusesUnauthenticatedSessions},
 		{"hook trace excludes deterministic dispatch (todo49-hook-trace)",
 			TestHookTraceDoesNotQualifyTestDispatch},
-		{"native editor receiver matrix", ErgoptiEditor_TestReplacements}
+		{"native editor receiver matrix", ErgoptiEditor_TestReplacements},
+		{"terminal output custody preserves fault debt (todo49-output-custody)",
+			TestTerminalOutputCustodyPreservesFaultDebt}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));
 	uint32_t selected_count = test_count;

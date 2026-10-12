@@ -380,6 +380,11 @@ const UNIVERSE_PREFIXES = [
 	'static/img',
 	'static/favicon.ico',
 	VENDOR_REL,
+	`${DRIVER_REL}/modules/llm/ollama_managed_files.ps1`,
+	`${DRIVER_REL}/modules/llm/ollama_managed_acquisition.ps1`,
+	`${DRIVER_REL}/modules/llm/ollama_download_archive.ps1`,
+	`${DRIVER_REL}/modules/llm/ollama-runtime-launch.ps1`,
+	`${DRIVER_REL}/modules/llm/ollama-model-pull.ps1`,
 	`${DRIVER_REL}/_generated`
 ];
 const universe = new Map(tracked(UNIVERSE_PREFIXES).map((rel) => [arcnameOf(rel), rel]));
@@ -903,6 +908,17 @@ if (selection && refs) {
 	const mutations = [
 		['drop', `${SHARED_REL}/modules/llm/models.json`, 'a file name passed to a helper'],
 		['drop', 'vendor/sqlite3.dll', 'a root-anchored file'],
+		...[
+			'ollama_managed_files.ps1',
+			'ollama_managed_acquisition.ps1',
+			'ollama_download_archive.ps1',
+			'ollama-runtime-launch.ps1',
+			'ollama-model-pull.ps1'
+		].map((name) => [
+			'drop',
+			`${DRIVER_REL}/modules/llm/${name}`,
+			'a separately executed managed Ollama worker'
+		]),
 		['drop', 'vendor/ergopti_user_hotstrings.ahk', 'the separately executed user callback worker'],
 		[
 			'drop',

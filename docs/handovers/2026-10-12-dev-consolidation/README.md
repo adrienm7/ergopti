@@ -343,6 +343,160 @@ Zenity/GTK and real devices remain unrun here.
 
 ## Test-optimization coordination
 
+### Terminal Mac receiving and preserved next native patch
+
+The full portable Mac suite on `0cd3c15aa86bf116c87a3db2bc5660205b61ec11`
+finished with 18,945 passes, six failures and 1,576 modules, exit 1. Three of
+those failures are corrected by `dcf146842` and `b046f00ff`: the unchanged closure
+guard passes 7/0 after distinct names remove a nested-local scanner false
+positive, and the exact scope census includes 99 original plus eight explicitly
+named scalar scenarios. Its two success/failure tests replay 214 complete
+callbacks and pass 2/0. Actual root discovery/authentication owners pass 117/0
+and 20/0; original discovery also passed, so this is not a native callback bug
+claim. A subsequent correction of the four unreachable-offer HTTP doubles keeps
+all six original scenarios and adds held-cancellation, stale/duplicate reply and
+carried-caller custody. Its actual canonical cohort passes 7/0 after the original
+3/3 failure. The fixture now models get/cancel/isSettled/onSettled; production
+correctly refuses missing native infrastructure. All six full-run failures now
+have targeted passing successors. The full suite has not been rerun after these
+three corrections. An incorrect
+module filter was rejected with zero cases; that invocation is not evidence.
+Fresh dev `2bfcf853c` was integrated at this terminal checkpoint, preserving G6.
+
+The complete Linux suite on `08c7886ba6f48d272cfd2768e5750c3282add211` passes
+13,452/13,452 across 521 modules, with subprocess status 0, signal null and
+elapsed time 572,293 ms. The structured receipt and exact log remain private
+outside Git. This is actual Linux LuaJIT/native-ABI software execution; real
+keyboard/touchpad input and interactive desktop receiving remain separate.
+
+[The pending modifier correction](pending-modifier-custody.patch) has SHA256
+`7e5990669183cf953f31660e881f6bf62baf4026d2b5f68f2378954559d0bfcf`.
+It is implemented and verified in a Linux scratch source, not applied to the
+live C/vendor recipe. It changes exactly `terminal_output_plan.c`, `.h` and
+`_test.c`. All 124 original assertions remain in order; 33 are added. Independent
+vectors cover eight LR families, both axes, two source-origin combinations and
+an unrelated held modifier: 64 cohorts, 320 target edges and 32 setup edges.
+The 192 zero-output refusals retain closed cohort admission. Eight matrices pass
+normally and with ASan/UBSan/LSan; the original and always-emit, missing-final-UP
+and missing-right-Ctrl mutations fail. The independent review confirms exact
+original-edge consumption and retained partial ACK debt. Remapped modifiers
+still need their own qualified delivery/cleanup before production activation.
+
+On the fresh Windows checkout, coordinate these three C paths and vendor with
+Root, apply the patch and rebuild before committing changed live source:
+
+```powershell
+git apply --check docs/handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch
+git apply docs/handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch
+powershell -NoProfile -File tools/build/build_windows_nav_owner.ps1 -UpdateTracked
+powershell -NoProfile -File tools/build/build_windows_nav_owner.ps1
+node tools/test/test-ahk-full-startup-smoke.cjs
+```
+
+Require canonical MSVC/SDK prerequisites, the new output matrix census of eight,
+all original C/route/trace cases and exact new DLL/source fingerprints. The
+preceding E4133 DLL cannot qualify these changed inputs. No backend selection,
+hook-order assumption, production-cohort activation or physical proof is added.
+Remove this pending patch only when its exact changes and matching native
+artifact are durably integrated. Both transfer refs remain preserved until
+fresh integration/PR/CI checks authorize their cleanup.
+
+[Windows continuation prompt](windows-receiving-prompt.md) is ready for local
+receiving. The one-click collector is on dev and absent from stable v1.0.1;
+Root must publish its new release before installed-user receiving. Private
+issue 94 logs and test transcripts stay outside Git. Do not upload their content.
+
+### Received Windows software checkpoint
+
+Receive only the 15 commits after `7184fbf58b` through `fca9d29769` from the
+archived session, plus the exact seven-file `fae726662` increment. The latter is
+an unqualified snapshot, not a native pass. The historical native receipts in
+[Windows delivery](../2026-10-11-groups-247/windows-delivery.md) belong to that
+session and source; they were not rerun on this Linux host. Existing stricter
+main publication/admission assertions survive composition unchanged.
+
+Received vendor commit `680bb62e3d0cba970f4db44015d0aeae19400629` contains the
+real archived MSVC artifact, SHA256
+`E4133FA294B78920D6A558CA284F0CCDB96807FA10D15DEC6E1CF046731C972A`, with exact
+18-input source/recipe fingerprint
+`28151596A8EE33BDF11D2BE1212455F3D77263871268B8844CC7DE15016C5E43`.
+Container verification confirms both hashes and every input; it does not qualify
+native loading/startup. Root owns subsequent Windows startup/build receiving.
+
+Actual Linux-host C controls pass 43/43, route/output/trace matrices 8/7/6;
+trace protocol has three positive and 54 negative controls. Source census retains
+44 authored C cases and six inverse selections, forty exports and thirteen
+withdrawals. AHK custody source controls retain five ABI bindings, twelve authored
+cases and thirteen inverses. Bootstrap source controls and the Windows bundle
+closure pass: 323 shipped files and 55 inverse selection controls. Encoding
+verifies 1,910 AHK files, syntax scans 1,890 sources. Canonical diagnostic source
+seal controls pass 22; architecture controls pass nine. These source counts are
+not additional native executions.
+
+Collector follow-ups pass 62 source/withdrawal controls and actual shared-page
+VM behavior. Produced byte receipts exclude unproduced allowed names; same-stream
+identity/hash verification refuses successors and hard links; primary failure
+retains failed status and a verified ZIP. Native PowerShell/AHK remains UNRUN.
+Post-READY model construction/start failure now uses the current menu operation,
+with exact cleanup even after reentrant cancellation; its nine new AHK cases
+remain UNRUN. No production qualification flag changes.
+
+Windows VM prerequisites: pinned AutoHotkey 2.0.26 x64, Node 22.22.2, stock
+Windows PowerShell 5.1/.NET, interactive desktop, private TEMP/TMP on NTFS and
+the exact received DLL/manifest. These controlled owners need no physical input
+device or Ollama installation:
+
+```powershell
+$env:ERGOPTI_AHK_RUNTIME = 'C:\path\to\AutoHotkey64.exe'
+node tools/test/test-diagnostic-ui-integrity.cjs --native-collection
+& $env:ERGOPTI_AHK_RUNTIME /ErrorStdOut=UTF-8 static\ergopti_plus\windows\tests\run_all.ahk --only=groups247-collection
+& $env:ERGOPTI_AHK_RUNTIME /ErrorStdOut=UTF-8 static\ergopti_plus\windows\tests\run_all.ahk --only=groups247-resident-observations
+node tools/test/test-ahk-full-startup-smoke.cjs
+```
+
+Expect 30 stock worker controls, 13 collection cases, two resident cases, no
+failures and fresh actual terminal receipts. Sharing retries retain deadlines;
+malformed data refuses. Private source/input/control data must not enter a ZIP.
+Fresh startup must resolve all twelve previously missing native exports. If a
+native rebuild is needed, use `tools/build/build_windows_nav_owner.ps1
+-UpdateTracked` on Windows with the canonical MSVC/SDK prerequisites; never
+fabricate a manifest or substitute an adapter fallback.
+
+Installed receiving remains separate: the publication owner must build a new
+release from dev. On that exact release, open Diagnostics and select collection;
+retain its ZIP and actual source/version/terminal status, close/reopen during
+collection, cancel a run, and confirm the folder action. A clean VM without
+developer tools must prove packaged operation. Guided keyboard/display steps
+require the real device; skip/cancel never means PASS. Windows production output
+cohort migration/emission and unavailable native collector providers are still
+software work. Native macOS, oMLX, real ISO input and installed UI acceptance
+remain distinct, executable tasks in the preceding handover.
+
+### Linux startup discovery follow-up
+
+Correction `508201914424fe1f28cd642f999d64c026a6ebc3` is based on fresh
+`dev 6d1efd3d016c4e2f693d8fb49158534ac8e425c7`. Only the existing startup child,
+owned HTTP fixture and local-discovery regression module change. The installed
+startup fixture removes luv for its scripted clock; its declared catalogue
+loopback requests now model ordinary connection refusal with owned retirement,
+while unrelated HTTP requests retain their actual adapter and exact arguments.
+Production infrastructure refusal, startup error assertions and the runner stay
+unchanged. All 39 prior discovery assertions remain, with two additional cases.
+
+The normal E2E entry, launched by the pinned Node runner, completes 193/193 plus
+six native digest checks with actual subprocess status 0 in 90,114 ms. An earlier
+invocation returned 1 despite its successful footer; it remains failed with an
+unattributed exit discrepancy. The independent subprocess receipt names the
+source SHA and status, rather than deriving success from footer text. Private
+receipts remain outside Git. The preceding full Linux unit run on `ba41b79db`
+completed 13,450/13,450 in 521 modules. Actual curl/libuv receiving on the composed
+correction completed 262 streaming and 136 local API checks with exit 0.
+
+Use the Linux commands above with the pinned native ABI. Expect 193 E2E cases,
+six digest cases and zero exit status; retain stdout and the process status.
+The controlled startup edge is software evidence, not a live network or input
+device claim. No native Windows/macOS qualification is implied.
+
 No existing-path tests were moved. The only new JS CHECKS entry in this follow-up
 is `tools/test/test-windows-api-add-production.cjs`, alias
 `test:windows-api-add-production`, committed in `b2bf6e473`. It belongs with AI

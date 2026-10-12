@@ -123,6 +123,8 @@ _TDL_GitCommitFromWorktreePointer() {
 		FileAppend(Sha . "`n", Root . "\repo\.git\refs\heads\feature", "UTF-8-RAW")
 		AssertEqual("3b924cd46", DiagSnapshot_GitCommit(Root . "\wt\static"),
 			"a linked worktree resolves its branch through the common directory")
+		AssertEqual(Sha, DiagSnapshot_GitCommit(Root . "\wt\static", true),
+			"the collector manifest retains the complete source id without spawning Git")
 		AssertEqual("", DiagSnapshot_GitCommit(A_Temp . "\ergopti_tdl_no_repo_" . A_TickCount),
 			"outside a repository there is no commit")
 	} finally {

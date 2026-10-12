@@ -41,6 +41,38 @@
 	var exportSequence = 0;
 	var pendingExport = null;
 	var sharedText = null;
+	var collection = { phase: 'idle' };
+
+	/** Collection controls expose exact host state without accepting a page-supplied path. */
+	function renderCollection() {
+		var supported = state.snapshot && state.snapshot.driver === 'windows';
+		var active =
+			isTrue(collection.owner_pending) ||
+			(collection.phase !== 'idle' &&
+				collection.phase !== 'completed' &&
+				collection.phase !== 'failed');
+		var button = document.getElementById('btn-collect-windows');
+		button.disabled = !supported || active;
+		button.title = supported ? '' : t('healthcheck.collection.unavailable');
+		document.getElementById('btn-collection-cancel').hidden = !active;
+		document.getElementById('btn-collection-guided').hidden = collection.phase !== 'guided';
+		document.getElementById('btn-collection-skip').hidden = collection.phase !== 'guided';
+		document.getElementById('btn-collection-open').hidden =
+			!isTrue(collection.archive_created) && !isTrue(collection.folder_available);
+		document.getElementById('collection-progress').textContent = !supported
+			? t('healthcheck.collection.unavailable')
+			: collection.phase === 'idle'
+				? ''
+				: collection.phase === 'completed'
+					? t('healthcheck.collection.complete')
+					: collection.phase === 'failed'
+						? t('healthcheck.collection.failed')
+						: t(
+								'healthcheck.deep_tests.progress',
+								collection.completed || 0,
+								collection.total || 0
+							);
+	}
 
 	/** Invalid observations refuse sharing without disabling cleanup or local display. */
 	function pageObservations() {
@@ -296,6 +328,7 @@
 		document.getElementById('chk-details').checked = isTrue(state.snapshot.detailed);
 		setToolbarEnabled(true);
 		showCheckProgress();
+		renderCollection();
 	}
 
 	// ===============================
@@ -378,6 +411,7 @@
 		if (message.type !== 'action' || message.action === 'cancel') sharedText = null;
 		switch (message.type) {
 			case 'init':
+				collection = message.collection || { phase: 'idle' };
 				state.config = message.config;
 				state.snapshot = message.snapshot;
 				startChecks();
@@ -400,6 +434,11 @@
 				break;
 			case 'action':
 				onActionResult(message);
+				break;
+			case 'collection':
+				if (!message.collection || typeof message.collection.phase !== 'string') return;
+				collection = message.collection;
+				renderCollection();
 				break;
 		}
 	};
@@ -464,6 +503,17 @@
 
 	Object.keys(TOOLBAR).forEach(function (id) {
 		document.getElementById(id).addEventListener('click', TOOLBAR[id]);
+	});
+	[
+		'collect-windows',
+		'collection-cancel',
+		'collection-guided',
+		'collection-skip',
+		'collection-open'
+	].forEach(function (id) {
+		document.getElementById('btn-' + id).addEventListener('click', function () {
+			post({ action: id.replace(/-/g, '_') });
+		});
 	});
 
 	document.getElementById('chk-extensive').addEventListener('change', function (event) {

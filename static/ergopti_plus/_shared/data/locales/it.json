@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "Altro comando di avvio: L’avvio è configurato per un altro comando o un’altra installazione. L’impostazione esistente viene mantenuta.",
 	"menu.llm.model_parent_with_health": "%sModello selezionato: %s",
 	"config.read_only.newer_schema": "Questa configurazione è stata salvata da una versione più recente di ErgoptiPlus. Le impostazioni sono state conservate. Aggiorna ErgoptiPlus e ricaricalo prima di modificare le impostazioni.",
-	"menu.llm.save_unavailable": "Non disponibile: riprendi ErgoptiPlus se è in pausa oppure apri Diagnostica per verificare perché non è possibile salvare le impostazioni."
+	"menu.llm.save_unavailable": "Non disponibile: riprendi ErgoptiPlus se è in pausa oppure apri Diagnostica per verificare perché non è possibile salvare le impostazioni.",
+	"healthcheck.collection.start": "Raccogli diagnostica Windows",
+	"healthcheck.collection.guided": "Passaggi guidati con tastiera e schermo",
+	"healthcheck.collection.skip": "Salta i passaggi fisici",
+	"healthcheck.collection.open": "Apri cartella",
+	"healthcheck.collection.complete": "Archivio creato. Allega manualmente lo ZIP alla conversazione.",
+	"healthcheck.collection.unavailable": "Questo raccoglitore Windows non è disponibile su macOS e Linux.",
+	"healthcheck.collection.guide": "Digita il testo di prova qui sotto. Tieni premuto e rilascia Ctrl, poi Shift, separatamente, con il campo di testo attivo.",
+	"healthcheck.collection.visual": "Riesco a leggere chiaramente il testo di prova.",
+	"healthcheck.collection.failed": "La raccolta è fallita. Controlla la cartella locale per le operazioni incomplete."
 }

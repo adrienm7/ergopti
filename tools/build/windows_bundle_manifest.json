@@ -31,6 +31,31 @@
 			"source": "static/ergopti_plus/windows/vendor",
 			"dest": "vendor",
 			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report and screen-brightness workers, and the bounded PAC worker with its runtime identity receipt and license."
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
+			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1",
+			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1",
+			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1",
+			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1",
+			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
 		}
 	],
 	"exclude": [
@@ -93,11 +118,8 @@
 		},
 		{
 			"name": "build-provenance",
-			"globs": [
-				"static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json",
-				"static/ergopti_plus/_shared/ui/vendor/vendor-manifest.json"
-			],
-			"why": "Provenance records checked by build_windows_nav_owner.ps1 and the vendor audit tests, never read at run time."
+			"globs": ["static/ergopti_plus/_shared/ui/vendor/vendor-manifest.json"],
+			"why": "Web vendor audit provenance is checked only during development; native DLL provenance ships for diagnostic identity checks."
 		},
 		{
 			"name": "compile-time-sources",
@@ -212,6 +234,38 @@
 		{
 			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt",
 			"dest": "vendor/ergopti_network_pac.LICENSE.txt"
+		},
+		{
+			"dest": "vendor/ergopti_nav_owner.manifest.json",
+			"source": "static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json"
+		},
+		{
+			"dest": "vendor/ergopti_diagnostics.ps1",
+			"source": "static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1"
+		},
+		{
+			"dest": "static/ergopti_plus/_shared/modules/diagnostics/collection.json",
+			"source": "static/ergopti_plus/_shared/modules/diagnostics/collection.json"
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1",
+			"dest": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1"
 		}
 	]
 }

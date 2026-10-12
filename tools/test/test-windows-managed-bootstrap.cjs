@@ -104,6 +104,70 @@ assert.match(
 	/Assert-OllamaModelProcess \$server \$receipt\.child_created_filetime \$request\.port/
 );
 assert.match(worker, /CreationTime\(\$Process\.Handle\)/);
+// READY menu requests own their native dispatch failure; completed bootstrap
+// callbacks remain available to the initial-bootstrap path. Capture before a
+// reentrant native boundary can retire the request. These are source controls.
+function assertNativePullFailureScope(source) {
+	const native = source.slice(source.indexOf('\n\t_NativePull('), source.indexOf('\n\t_Pulled('));
+	assert.ok(
+		native.startsWith('\n\t_NativePull('),
+		'Inspect the actual production native pull method.'
+	);
+	assert.match(
+		native,
+		/MenuOperation := HasMethod\(OnDone, "Call"\) && this\.MenuPull is Map \? this\.MenuPull : 0/
+	);
+	assert.ok(native.indexOf('MenuOperation :=') < native.indexOf('Owner := Map('));
+	assert.match(
+		native,
+		/Factory := HasMethod\(SpawnFn, "Call"\) \? SpawnFn : ShellRunner_SpawnTreeOwned/
+	);
+	assert.match(native, /Task := Factory\.Call\(A_WinDir/);
+	assert.match(native, /Owner\["task"\] := Task/);
+	assert.match(native, /if Accepted\s+return true/);
+	assert.match(
+		native,
+		/if MenuOperation is Map \{\s+try return this\._MenuPullFail\(MenuOperation\)\s+finally this\.Cancel\(\)\s+\}\s+return this\._Fail\("model_dispatch"\)/
+	);
+}
+assertNativePullFailureScope(flow);
+const scopedFailure =
+	'if MenuOperation is Map {\n\t\t\ttry return this._MenuPullFail(MenuOperation)\n\t\t\tfinally this.Cancel()\n\t\t}\n\t\treturn this._Fail("model_dispatch")';
+const bootstrapFailure = 'return this._Fail("model_dispatch")';
+const withdrawnFailureScope = flow.replace(scopedFailure, bootstrapFailure);
+assert.notEqual(withdrawnFailureScope, flow, 'Withdraw the actual production failure scope.');
+assert.throws(() => assertNativePullFailureScope(withdrawnFailureScope), {
+	code: 'ERR_ASSERTION'
+});
+assertNativePullFailureScope(withdrawnFailureScope.replace(bootstrapFailure, scopedFailure));
+const nativeCleanup = 'finally this.Cancel()';
+const withdrawnCleanup = flow.replace(
+	scopedFailure,
+	scopedFailure.replace(nativeCleanup, 'finally Sleep(0)')
+);
+assert.notEqual(withdrawnCleanup, flow, 'Withdraw the actual native-construction cleanup retry.');
+assert.throws(() => assertNativePullFailureScope(withdrawnCleanup), { code: 'ERR_ASSERTION' });
+assertNativePullFailureScope(withdrawnCleanup.replace('finally Sleep(0)', nativeCleanup));
+const nativeCases = fs.readFileSync(
+	path.join(root, 'tests/unit/test_ollama_managed_bootstrap.ahk'),
+	'utf8'
+);
+for (const name of [
+	'READY native factory throw preserves bootstrap observer',
+	'READY native start false preserves bootstrap observer',
+	'READY native start throw preserves bootstrap observer',
+	'READY native start false retains string retirement debt',
+	'READY native start throw retains refused retirement debt',
+	'initial native factory throw still notifies failure',
+	'initial native start false still notifies failure',
+	'initial native start throw still notifies failure',
+	'READY reentrant cancellation retains native failure custody'
+]) {
+	assert.ok(
+		nativeCases.includes(`Test("managed bootstrap: ${name} (groups247-native-dispatch)"`),
+		name
+	);
+}
 process.stdout.write(
 	'Windows managed bootstrap production composition: PASS (portable source checks only).\n'
 );

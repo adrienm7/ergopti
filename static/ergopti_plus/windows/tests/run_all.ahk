@@ -1861,6 +1861,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
+#Include ../ui/healthcheck/collection.ahk
 #Include unit/test_ui_warm_hosts.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include ../ui/healthcheck/probes.ahk
