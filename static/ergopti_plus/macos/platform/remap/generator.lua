@@ -24,7 +24,9 @@
 --- 4. Mode-Gated Merge: every manipulator carries one generation mode and one
 ---    irreversible revocation condition; regeneration replaces only exact
 ---    managed rule tags while preserving personal rules, parameters, profiles,
----    devices, mappings, virtual HID settings, and global Karabiner preferences.
+---    devices, mappings, unrelated virtual HID settings, and global Karabiner
+---    preferences. Only the selected profile's keyboard type follows the active
+---    layout convention, so ISO output does not land on the ANSI swap partner.
 --- 5. Exact-Modifier Triggers: an action marked `exact_modifiers` in
 ---    actions.json is a Hammerspoon trigger told apart only by its modifiers,
 ---    so every rule sending one claims and lifts all held modifiers but Caps
@@ -46,6 +48,7 @@ local ControlSignals = require("keymap.control_signals")
 local NavLayer = require("platform.remap.nav_layer")
 local ScriptChordRules = require("platform.remap.script_chord_rules")
 local Defaults = require("platform.remap.defaults")
+local Layout = require("modules.keymap.layout")
 
 local LOG = "karabiner"
 
@@ -1736,6 +1739,15 @@ function M.build_karabiner_json(
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
+	local form_ok, virtual_form = pcall(function()
+		if state.virtual_keyboard_type ~= nil then return state.virtual_keyboard_type end
+		return Layout.keyboard_form()
+	end)
+	if not form_ok or (virtual_form ~= "ansi" and virtual_form ~= "iso") then
+		local err = "the active layout virtual keyboard convention is unavailable: " .. tostring(virtual_form)
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+		return nil, err
+	end
 	local _, catalogue_err = ActionCatalogue.index_by_id(available_actions)
 	if catalogue_err then
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", catalogue_err)
@@ -2081,7 +2093,7 @@ function M.build_karabiner_json(
 				devices              = { { identifiers = { is_keyboard = true }, simple_modifications = {} } },
 				name                 = "Default profile",
 				selected             = true,
-				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = "ansi" },
+				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = virtual_form },
 			}
 		}
 	}
@@ -3200,7 +3212,23 @@ function M.merge_into_existing_config(
 		return nil, detail, nil, nil, legacy_conflict_refusal(signature_conflicts)
 	end
 
+	local requested_virtual = generated_profile.virtual_hid_keyboard
+	local requested_type = type(requested_virtual) == "table" and requested_virtual.keyboard_type_v2 or nil
+	if requested_type ~= nil and requested_type ~= "ansi" and requested_type ~= "iso" then
+		return nil, "generated virtual keyboard convention must be ansi or iso"
+	end
+	if requested_type ~= nil and selected_profile.virtual_hid_keyboard ~= nil
+		and type(selected_profile.virtual_hid_keyboard) ~= "table" then
+		return nil, "existing virtual keyboard settings are not an object"
+	end
 	local changed = false
+	-- Only this owned field follows the active source; country code and every
+	-- unrelated virtual-HID/profile/personal setting remain the user's values.
+	if requested_type ~= nil then
+		local virtual = selected_profile.virtual_hid_keyboard
+		if virtual == nil then virtual = {}; selected_profile.virtual_hid_keyboard = virtual end
+		if virtual.keyboard_type_v2 ~= requested_type then virtual.keyboard_type_v2 = requested_type; changed = true end
+	end
 	for profile_index, classified in pairs(classified_profiles) do
 		local profile = existing.profiles[profile_index]
 		local merged_rules = merge_managed_rule_block(

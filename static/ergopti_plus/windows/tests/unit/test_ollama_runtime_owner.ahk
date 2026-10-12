@@ -2,6 +2,8 @@
 
 #Requires AutoHotkey v2.0
 
+Test("Ollama runtime: cancellation captures exact file cleanup without READY", _ORT_CancelReceipt)
+Test("Ollama runtime: foreign cancellation receipt cannot grant file cleanup", _ORT_CancelForeignReceipt)
 Test("Ollama runtime: canonical lazy task adopted before start", _ORT_Adoption)
 Test("Ollama runtime: failed start strict physical ACK without callback", _ORT_FailedStart)
 Test("Ollama runtime: nonBoolean termination cannot release leases", _ORT_FalseAck)
@@ -48,7 +50,7 @@ class _ORT_Fixture {
 			"spawn", ObjBindMethod(this, "Spawn"), "read_ready", ObjBindMethod(this, "Read"),
 			"clock", ObjBindMethod(this, "Clock"),
 			"on_retired", ObjBindMethod(this, "Retire"), "on_error", ObjBindMethod(this, "Error")))
-		this.Receipt := Map("launcher_pid", 5001, "child_pid", 5002, "leases_held", 1,
+		this.Receipt := Map("launcher_pid", 5001, "child_pid", 5002, "child_created_filetime", 133700000000000000, "leases_held", 1,
 			"ready_file_identity", "34567890:3456789012345678")
 		for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
 			this.Receipt[Name] := this.Target[Name]
@@ -118,7 +120,8 @@ class _ORT_Fixture {
 	Exit(Code, Target) {
 		this.ExitCalls += 1
 	}
-	Retire(*) {
+	Retire(Target) {
+		this.RetireTarget := Target.Clone()
 		Assert(!A_IsCritical, "File retirement runs outside Critical.")
 		this.RetireCalls += 1
 		return this.RetireValue
@@ -175,7 +178,7 @@ _ORT_ReadyOnce() {
 }
 
 _ORT_ReadyForeign() {
-	for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin", "launcher_pid", "child_pid", "leases_held", "ready_file_identity"] {
+	for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin", "launcher_pid", "child_pid", "child_created_filetime", "leases_held", "ready_file_identity"] {
 		F := _ORT_Fixture()
 		Assert(F.Run(), "Runtime admitted before foreign receipt.")
 		F.Receipt[Name] := Name == "child_pid" ? 5001 : Name == "leases_held" ? "1" : "foreign"
@@ -289,3 +292,36 @@ _ORT_Deadline() {
 		Assert(F.Owner.Stop(), "Cleanup remains independent of the readiness budget.")
 	}
 }
+
+_ORT_CancelReceipt() {
+	F := _ORT_Fixture()
+	Assert(F.Run(), "Accepted runtime owns its exact lazy task.")
+	AssertEqual(F.ReadyCalls, 0, "No logical readiness has been published.")
+	Assert(F.Owner.Stop(), "Independent file retirement ACK releases only the owned task.")
+	AssertEqual(F.ReadyCalls, 0, "Cancellation-only capture never invokes readiness.")
+	AssertEqual(F.RetireTarget["ready_file_identity"], F.Receipt["ready_file_identity"], "The exact task's unconsumed receipt reaches physical cleanup.")
+	AssertEqual(F.RetireTarget["ready_image_sha256"], "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+}
+
+_ORT_CancelForeignReceipt() {
+	F := _ORT_Fixture()
+	Assert(F.Run(), "Accepted runtime owns its exact task.")
+	F.Receipt["runtime_ticket"] := "ffffffffffffffffffffffffffffffff"
+	Assert(F.Owner.Stop(), "Fixture native file owner independently acknowledges absence; capture supplies no grant.")
+	AssertEqual(F.ReadyCalls, 0)
+	AssertEqual(F.RetireTarget["ready_file_identity"], "", "A different runtime ticket cannot authorize receipt deletion.")
+	AssertEqual(F.RetireTarget["ready_image_sha256"], "")
+}
+
+_ORT_MissingCreationIdentity() {
+	F := _ORT_Fixture()
+	try {
+		F.Receipt.Delete("child_created_filetime")
+		AssertTrue(F.Run())
+		AssertFalse(F.Owner.ObserveReady(), "An older readiness receipt cannot invent child creation provenance.")
+		AssertEqual(F.ReadyCalls, 0)
+		AssertTrue(F.Owner.Stop())
+		AssertEqual(F.RetireTarget["ready_file_identity"], "", "An older image cannot grant retirement metadata.")
+	} finally F.Owner.Stop()
+}
+Test("managed runtime: missing creation identity cannot qualify ready or cleanup (groups247-managed)", _ORT_MissingCreationIdentity)

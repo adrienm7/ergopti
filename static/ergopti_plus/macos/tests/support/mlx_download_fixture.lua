@@ -259,7 +259,7 @@ local function with_fixture(plan, callback)
 						}
 					end,
 					encode = function(value)
-						if type(value) == "string" then return require("json").encode(value) end
+						assert(type(value) == "table", "Hammerspoon 1.1.1 JSON encode requires a table")
 						return string.format(
 							'{"model":"%s","log_path":"%s","exit_path":"%s","script_path":"%s","repo":"%s","pid":%s}',
 							tostring(value.model or ""), tostring(value.log_path or ""),

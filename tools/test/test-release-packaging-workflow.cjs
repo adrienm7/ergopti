@@ -118,6 +118,11 @@ if (windowsUpload !== null && !/^\s+name:\s*assets-windows\s*$/m.test(windowsUpl
 	);
 }
 const packageWindows = pipeline.job(PACKAGE_JOB[WINDOWS_BOX]);
+if (!pipeline.needsOf(packageWindows).includes('test-ahk')) {
+	errors.push(
+		`${PACKAGE_JOB[WINDOWS_BOX]} must need test-ahk: independent suites must both pass before a release exe is built`
+	);
+}
 if (!pipeline.needsOf(packageWindows).includes('e2e-ahk')) {
 	errors.push(
 		`${PACKAGE_JOB[WINDOWS_BOX]} must need e2e-ahk: a release exe is built only after the suites passed`

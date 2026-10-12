@@ -47,6 +47,7 @@ helpers.describe("api_remote: the API token never reaches the log", function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote", {})
 		local logger = require("infra.logger")
 
+		helpers.admit_logger_privacy(logger)
 		-- Capture EVERY line the logger emits, at every level — the leak was a
 		-- debug line, and a capture restricted to errors would miss it entirely.
 		local captured = {}

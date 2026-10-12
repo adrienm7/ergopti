@@ -266,10 +266,10 @@ Test("layout menu: the native status is grayed and management remains usable (la
 ; These cases use the real filesystem, sparse writer and native WAL owner.
 ; Only the replacement-process launch is controlled: a launch is not completion.
 _LMH_SelectionFixture() {
-	Fixture := _ScopeOwnerFixture()
 	Source := '[layout]`nemulated_layout = "ergol"`nergopti_base = false`nergopti_variant = "ergopti_plus"`nergopti_alt_gr = false`ndirect_access_digits = "symbols"`nfuture_owner = "retain"`n[category_enabled]`nlayout = false`n[private]`nvalue = "unchanged"`n'
+	Fixture := _ScopeOwnerFixture(Source)
+	Source := Fixture.source
 	AssertTrue(FSWriteDurable(Fixture.path, Source))
-	Fixture.source := Source
 	Fixture.options["stamp"] := "layout-selection"
 	return Fixture
 }
@@ -308,6 +308,11 @@ _LMH_SelectionPendingCase(Id, Expected, Base, Plus) {
 		Loaded := Map("layout", Map("emulated_layout", "", "ergopti_base", false, "ergopti_variant", "ergopti"))
 		SuccessorPath := Fixture.directory . "\successor-config.toml"
 		AssertTrue(FSWriteCreateDurable(SuccessorPath, FSReadUtf8Exact(Fixture.path)))
+		; The retained parent terminal barrier permits a detached read, not migration.
+		SuccessorPreparation := ConfigSchemaPrepareSource(SuccessorPath)
+		AssertEqual("current", SuccessorPreparation["status"])
+		AssertEqual(1, SuccessorPreparation["read_only"])
+		AssertFalse(ConfigSchemaCanPrepareWrite(SuccessorPath), "read-only preparation cannot grant successor write readiness")
 		AssertTrue(ApplyConfigToml(Loaded, SuccessorPath) >= 1, "the actual native loader must admit a fresh detached candidate source")
 		AssertEqual(Id, LayoutManager_ActiveId(Loaded), "the real detached loader resolves the selected built-in or registry source")
 		AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))

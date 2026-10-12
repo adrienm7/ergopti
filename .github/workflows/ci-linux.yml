@@ -228,7 +228,6 @@ jobs:
 
   e2e-linux:
     name: 'E2E tests'
-    needs: [test-linux]
     runs-on: ubuntu-latest
     env:
       # Python-owned native children also resolve the production shared modules.
@@ -260,7 +259,7 @@ jobs:
       # injection. It is a corpus-driven replay of the engine's on_char() logic
       # layer, not an OS-level end-to-end test.
       #
-      # Unit tests have already passed. Within this E2E job, this step and
+      # Unit tests run independently. Within this E2E job, this step and
       # every harness after it run with `if: ${{ !cancelled() }}`: a red E2E still
       # lets the kernel, display and tray harnesses report what they measured,
       # while a run cancelled by a newer push stops at once instead of spending
@@ -3502,8 +3501,8 @@ jobs:
   package-linux:
     name: 'Package'
     runs-on: ubuntu-latest
-    needs: [e2e-linux]
-    if: ${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
+    needs: [test-linux, e2e-linux]
+    if: ${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
@@ -4297,7 +4296,14 @@ jobs:
       - name: Launch the installed binary (rpm)
         if: matrix.kind == 'rpm'
         shell: bash
-        run: /usr/bin/ergopti --help
+        run: |
+          set -euo pipefail
+          account="$(id -un)"
+          if [ -z "$account" ]; then
+              echo '::error::Native account identity was unavailable for installed RPM launch.' >&2
+              exit 1
+          fi
+          USER="$account" LOGNAME="$account" /usr/bin/ergopti --help
 
       - name: The installed shared data tree resolves and opens (rpm)
         if: matrix.kind == 'rpm'

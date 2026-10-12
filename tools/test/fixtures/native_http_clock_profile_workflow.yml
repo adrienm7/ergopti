@@ -1,0 +1,63 @@
+# Reviewed proposed workflow producer input, not live wiring or native qualification.
+jobs:
+  managed-ollama-native:
+    steps:
+      - name: Receive actual independent managed HTTP native clients
+        if: ${{ !cancelled() }}
+        id: native_http_clock
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"
+          mkdir -p "$(dirname "$receipt")"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"
+          profile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile "$receipt")"
+          if [ "$mode" = deferred ] && [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then
+              echo "[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false."
+              exit 0
+          fi
+          status=0
+          if [ "$mode" = deferred ]; then
+              test "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
+              echo "[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false."
+          elif [ "$mode" = full ]; then
+              set -euo pipefail
+              status=0
+              echo "clock_expected=true" >> "$GITHUB_OUTPUT"
+              clock_root="$RUNNER_TEMP/native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}"
+              mkdir -m 700 "$clock_root" "$clock_root/private-cache"
+              clock_status=0
+              set +e
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py 2>&1 | tee "$clock_root/owned-process.log"
+              owned_status=("${PIPESTATUS[@]}")
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"
+              public_status=("${PIPESTATUS[@]}")
+              set -e
+              node tools/ci/native_http_clock_evidence.cjs begin "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ matrix.architecture }}" "$clock_root/source-before.json" || clock_status=1
+              set +e
+              ERGOPTI_NATIVE_CLOCK_EVIDENCE="$clock_root/payload" "$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"
+              client_status=("${PIPESTATUS[@]}")
+              set -e
+              for code in "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}"; do
+                  if [ "$code" -ne 0 ]; then status=1; fi
+              done
+              node -e '    const fs = require('"'"'node:fs'"'"');'$'\n''    const args = process.argv.slice(2);'$'\n''    if (args.length !== 7 || args.slice(1).some(value => !/^(?:0|[1-9][0-9]{0,2})$/.test(value) || Number(value) > 255)) process.exit(1);'$'\n''    fs.writeFileSync(args[0], JSON.stringify({schema:1, owned_process:{command:Number(args[1]),capture:Number(args[2])},public_native:{command:Number(args[3]),capture:Number(args[4])},independent_client:{command:Number(args[5]),capture:Number(args[6])}}) + '"'"'\n'"'"', {flag:'"'"'wx'"'"',mode:0o600});'$'\n' - "$clock_root/native-statuses.json" "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}" || clock_status=1
+              node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ matrix.architecture }}" "$clock_root/clock-verdict.json" || clock_status=1
+              if [ "$clock_status" -ne 0 ]; then status=1; fi
+              exit "$status"
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
+          exit "$status"
+        timeout-minutes: 5
+      - name: Retain independent native HTTP clock receiving
+        if: ${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}

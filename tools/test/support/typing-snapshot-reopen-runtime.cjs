@@ -22,12 +22,9 @@ function nativeSnapshots() {
 	].find((candidate) => fs.existsSync(candidate));
 	assert.ok(ahk, 'native snapshot verification requires AutoHotkey v2 on Windows');
 	const runner = path.resolve(__dirname, '../../../static/ergopti_plus/windows/tests/run_all.ahk');
-	// The legacy framework removes this path before reading its result override.
-	assert.equal(
-		fs.existsSync(path.join(path.dirname(runner), 'test_results.txt')),
-		false,
-		'cannot run snapshot fixture over an existing checkout results file'
-	);
+	const legacy = path.join(path.dirname(runner), 'test_results.txt');
+	// The runner owns its explicit temporary receipt; prior checkout evidence is retained.
+	const prior = fs.existsSync(legacy) ? fs.readFileSync(legacy) : null;
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-typing-reopen-'));
 	try {
 		const resultsFile = path.join(temporary, 'results.txt');
@@ -72,6 +69,17 @@ function nativeSnapshots() {
 		return records;
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
+		assert.equal(
+			fs.existsSync(legacy),
+			prior !== null,
+			'snapshot receiving preserves checkout receipt presence'
+		);
+		if (prior !== null)
+			assert.deepEqual(
+				fs.readFileSync(legacy),
+				prior,
+				'snapshot receiving preserves existing checkout receipt bytes'
+			);
 	}
 }
 

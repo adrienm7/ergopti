@@ -28,6 +28,7 @@ local Logger = require("infra.logger")
 
 
 
+helpers.admit_logger_privacy(Logger)
 -- ===================================================
 -- ===================================================
 -- ======= 1/ Timer-callback error capture ===========
@@ -93,6 +94,7 @@ helpers.describe("logger — runtime error capture", function()
 	helpers.it("hands an uncaught timer error to the error handler, with its template (error-dialog-template)", function()
 		package.loaded["infra.logger"] = nil
 		local Fresh = require("infra.logger")
+		helpers.admit_logger_privacy(Fresh)
 		local hs = _G.hs
 		local saved = {
 			doAfter     = hs.timer.doAfter,

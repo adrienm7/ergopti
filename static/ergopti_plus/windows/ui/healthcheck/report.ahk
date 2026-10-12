@@ -6,7 +6,7 @@
 ; What the diagnostics page's buttons do on this machine once
 ; HealthCheck_ValidateAction accepted them: copy the report, save it as a
 ; Markdown file under the logs folder and select it in Explorer, report it on
-; GitHub (copy it, then open the bug form with the report prefilled) and open
+; GitHub (copy, save and reveal its attachment, then open the bug template) and open
 ; a folder. Also the Debug menu's "Report a bug", which opens the diagnostics
 ; window at its preview, and "Suggest a feature".
 ;
@@ -14,9 +14,9 @@
 ; 1. Shared output is rebuilt from the host snapshot through a closed typed
 ;    policy. Free text, paths and unknown fields are excluded regardless of
 ;    the page or details checkbox. Only approved technical content leaves.
-; 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
-;    report to its budget; the clipboard holds it whole. A report saves no
-;    file and selects nothing: Explorer would take the focus from the form.
+; 2. The clipboard and attachment hold the complete approved report.
+;    GitHub receives stable host version, OS and driver metadata. Editable
+;    fields stay out of the URL; the browser opens after attachment reveal.
 ; 3. Paths come from the snapshot the host collected, by field id; a folder
 ;    that does not exist yet is created before it is opened; a file that does
 ;    not exist yet (today's errors file before the day's first warning) is
@@ -94,6 +94,51 @@ _HCShare_Project(Value, Rule, &Present) {
 	return 0
 }
 
+/** Classifies known technical messages without exporting their text or claiming cause. */
+HealthCheck_RecentErrorFacts(Entries, Source, Schema) {
+	Observed := Entries is Array, Events := [], Count := 0, Specs := Schema["recent_error_facts"]
+	if Observed {
+		for Index, Entry in Entries {
+			Count += 1
+			First := Entry is String ? StrSplit(Entry, ["`r", "`n"])[1] : ""
+			Start := InStr(First, Specs["owner_prefix"], true)
+			Marker := Start ? InStr(First, Specs["failure_marker"], true, Start + StrLen(Specs["owner_prefix"])) : 0
+			Reason := Marker ? SubStr(First, Marker + StrLen(Specs["failure_marker"])) : ""
+			for Rule in Specs["rules"] {
+				Event := 0, Candidate := Reason
+				if Rule.Has("message_prefix") {
+					Position := InStr(First, Rule["message_prefix"], true)
+					Candidate := Position ? SubStr(First, Position) : ""
+					if Rule.Has("number_marker") {
+						NumberAt := InStr(Candidate, Rule["number_marker"], true, StrLen(Rule["message_prefix"]) + 1)
+						Candidate := NumberAt ? SubStr(Candidate, NumberAt) : ""
+					}
+				}
+				if Rule.Has("literal") && Candidate == Rule["literal"]
+					Event := Map("entry_index", Index, "code", Rule["code"])
+				else if Rule.Has("prefix") && SubStr(Candidate, 1, StrLen(Rule["prefix"])) == Rule["prefix"] {
+					Value := SubStr(Candidate, StrLen(Rule["prefix"]) + 1)
+					if Rule["suffix"] != "" {
+						Finish := InStr(Value, Rule["suffix"], true)
+						Value := Finish ? SubStr(Value, 1, Finish - 1) : ""
+					}
+					if StrLen(Value) <= 11 && Value != "-0" && RegExMatch(Value, "^-?(?:0|[1-9]\d*)$") {
+						ValueNumber := _HCShare_Project(Number(Value), Map("kind", "integer", "minimum", Rule["minimum"], "maximum", Rule["maximum"]), &Present)
+						if Present
+							Event := Map("entry_index", Index, "code", Rule["code"], Rule["field"], ValueNumber)
+					}
+				}
+				if Event is Map {
+					Events.Push(Event)
+					break
+				}
+			}
+		}
+	}
+	return Map("observed", Observed, "source", Source == "errors_file" || Source == "ring" ? Source : "unavailable",
+		"qualification", "log_observation_only", "examined_entries", Count, "excluded_entries", Count - Events.Length, "events", Events)
+}
+
 /** Returns a detached technical projection; unknown fields cannot be shared. */
 HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	Policy := Schema.Get("share_policy", 0)
@@ -102,7 +147,58 @@ HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	Driver := Snapshot.Get("driver", "")
 	if !(Driver == "windows" || Driver == "macos" || Driver == "linux")
 		throw Error("The diagnostic sharing identity is unavailable.")
-	return _HCShare_Project(Snapshot, Policy["projection"], &Present)
+	Safe := _HCShare_Project(Snapshot, Policy["projection"], &Present)
+	Sections := Snapshot.Get("sections", 0)
+	Issues := Sections is Map ? Sections.Get("issues", 0) : 0
+	if Issues is Map
+		Safe["sections"]["issues"]["recent_error_facts"] := HealthCheck_RecentErrorFacts(Issues.Get("recent", 0), Issues.Get("recent_source", "unavailable"), Schema)
+	return Safe
+}
+
+/** Rebuilds only schema-owned installed-page records, without native authority. */
+HealthCheck_PageChecks(Results, Schema) {
+	if !(Results is Map)
+		return false
+	Accepted := Map(), Expected := Map()
+	for Spec in Schema["diagnostic_checks"]["items"] {
+		Id := Spec["id"], Expected[Id] := true, Row := Results.Get(Id, 0)
+		if !(Row is Map) || !(Row.Get("scope", "") == Spec["scope"])
+			return false
+		for Key in Row
+			if !(Key == "state" || Key == "scope" || Key == "reason" || Key == "ms")
+				return false
+		Rule := Schema["share_policy"]["projection"]["fields"]["page_check_observations"]["fields"]["results"]["fields"][Id]
+		Clean := _HCShare_Project(Row, Rule, &Present)
+		if !Clean.Has("state") || !Clean.Has("scope")
+			return false
+		for Key in ["state", "scope", "reason", "ms"]
+			if Clean.Has(Key) != Row.Has(Key) || (Row.Has(Key) && !(Clean[Key] == Row[Key]))
+				return false
+		State := Row.Get("state", "")
+		if Spec.Has("reason") {
+			if !(State == "not_run") || !(Row.Get("reason", "") == Spec["reason"]) || Row.Has("ms")
+				return false
+		} else if State == "ok" || State == "error" {
+			if !Row.Has("ms") || (Row.Has("reason") && !(Row["reason"] == "invalid_diagnostic_model"))
+				return false
+		} else if Row.Has("ms") || (State == "cancelled" ? Row.Has("reason") : !(Row.Get("reason", "") == "opt_in_required"))
+			return false
+		Accepted[Id] := Clean
+	}
+	for Id in Results
+		if !Expected.Has(Id)
+			return false
+	return Map("source", "installed_page_reported", "qualification", "unqualified", "results", Accepted)
+}
+
+/** Retains page observations only on the exact host report generation. */
+HealthCheck_CapturePageChecks(Snapshot, Action) {
+	if !Action.Has("page_check_observations")
+		return true
+	if !(Action["generated_at"] == Snapshot["generated_at"]) || Action["snapshot_revision"] != Snapshot.Get("export_revision", 0)
+		return false
+	Snapshot["page_check_observations"] := Action["page_check_observations"]
+	return true
 }
 
 
@@ -132,7 +228,7 @@ _HCShare_Cell(Value) {
 _HCShare_Table(Rows, Title := "") {
 	if !Rows.Length
 		return ""
-	Text := (Title == "" ? "" : "## " . t(Title) . "`n`n") . "| | |`n| --- | --- |`n"
+	Text := (Title == "" ? "" : "## " . Title . "`n`n") . "| | |`n| --- | --- |`n"
 	for Row in Rows
 		Text .= Row . "`n"
 	return Text
@@ -162,12 +258,12 @@ _HCShare_Readable(Safe, Schema) {
 			Label := Key
 			for Field in Section.Get("fields", [])
 				if Field["id"] == Key {
-					Label := t("healthcheck.field." . Key)
+					Label := _HCShare_English(Schema, "healthcheck.field." . Key)
 					break
 				}
 			_HCShare_Rows(Data[Key], Policy["sections"]["fields"][Id]["fields"][Key], Label, Rows)
 		}
-		TableText := _HCShare_Table(Rows, "healthcheck.section." . Id)
+		TableText := _HCShare_Table(Rows, _HCShare_English(Schema, "healthcheck.section." . Id))
 		if TableText != ""
 			Text .= "`n" . TableText
 	}
@@ -175,8 +271,16 @@ _HCShare_Readable(Safe, Schema) {
 	for Key in ["probes", "retired_probes"]
 		if Safe.Has(Key)
 			_HCShare_Rows(Safe[Key], Policy[Key], Key, Rows)
-	TableText := _HCShare_Table(Rows, "healthcheck.deep_tests.probe_inventory")
+	TableText := _HCShare_Table(Rows, _HCShare_English(Schema, "healthcheck.deep_tests.probe_inventory"))
 	return Text . (TableText == "" ? "" : "`n" . TableText)
+}
+
+/** Resolves an export label without changing or falling back to UI locale. */
+_HCShare_English(Schema, Key) {
+	Strings := Schema.Get("export_strings", 0)
+	if !(Strings is Map) || !Strings.Has(Key) || !(Strings[Key] is String) || Strings[Key] == ""
+		throw Error("English export label unavailable: " . Key)
+	return Strings[Key]
 }
 
 /** Builds file and issue-form content only from the host-retained snapshot. */
@@ -184,12 +288,15 @@ HealthCheck_ShareDocument(Snapshot, Schema) {
 	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema)
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
-	Text := "# ErgoptiPlus diagnostics`n`n" . t(Schema["share_policy"]["notice_key"])
-		. "`n`ndriver-suites: not_run`npage-model-checks: not_collected`n`n" . _HCShare_Readable(Safe, Schema)
+	Text := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
+		. "`n`ndriver-suites: not_run`npage-model-checks: " . (Safe.Has("page_check_observations") ? "installed_page_reported (unqualified)" : "not_collected") . "`n`n" . _HCShare_Readable(Safe, Schema)
 		. "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
 	Name := Schema["report"]["name_prefix"] . Safe["driver"] . "-"
 		. RegExReplace(Safe.Get("generated_at", "unknown"), "[^A-Za-z0-9_.-]", "_") . Schema["report"]["name_suffix"]
-	return Map("snapshot", Safe, "text", Text, "name", Name,
+	Summary := "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.`n"
+		. "Driver: " . Safe["driver"] . "`nVersion: " . Versions.Get("ergopti_version", "unknown")
+		. "`nCommit: " . Versions.Get("commit", "unknown") . "`nDriver suites: NOT_RUN"
+	return Map("snapshot", Safe, "text", Text, "name", Name, "summary", Summary,
 		"fields", Map("driver", Safe["driver"], "version", Versions.Get("ergopti_version", "unknown"), "os", Safe["driver"]))
 }
 
@@ -306,23 +413,30 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 	return Path
 }
 
-; Reports on GitHub: copies the full report, then opens the bug form with that
-; same report prefilled. Nothing is saved and nothing is selected: the browser
-; opening is the last side effect, so the form keeps the focus.
-; @param Action {Map} { text, fields } The page's text and identity fields.
-; @throws {Error} When the clipboard or the browser refuses.
-_HCReport_Report(Effects, Config, Action, Rules, Context) {
+; Reports on GitHub: copies and saves the complete approved report, then
+; reveals its local attachment before opening the bug form with stable host
+; version, OS and driver fields. Editable fields stay outside the URL; the
+; browser opens last and no attachment is uploaded automatically.
+; @param Action {Map} Host-approved report text and technical identity fields.
+; @throws {Error} When clipboard, attachment completion or browser opening refuses.
+_HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
-	; First, and whole: the link may cut the report to fit GitHub's budget
+	; Copy the complete reviewed report independently of its short metadata URL
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
+	; The complete reviewed document stays in a local attachment, never the URL.
+	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
 	Fields := Map()
-	for Id, Value in Action["fields"]
-		Fields[Id] := Value
-	Fields[Config["templates"]["templates"]["bug"]["report_field"]] := Text
+	; Only the host-derived technical identity is stable enough to prefill.
+	for Id in ["version", "os", "driver"]
+		Fields[Id] := Action["fields"][Id]
+	ReportField := Config["templates"]["templates"]["bug"]["report_field"]
+	if !(ReportField is String) || ReportField == ""
+		throw Error("The bug template names no report field.")
 	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
 	if !Effects["open_url"].Call(Url)
 		throw Error("The browser could not be opened.")
+	return Path
 }
 
 ; Performs one action of the diagnostics page, already validated.
@@ -350,6 +464,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 			Action["text"] := Document["text"]
 			Action["fields"] := Document["fields"]
 			Action["name"] := Document["name"]
+			Action["summary"] := Document["summary"]
 		}
 		switch Name {
 			case "copy":
@@ -359,7 +474,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"],
 					Action["text"])
 			case "report":
-				_HCReport_Report(Effects, Config, Action, Rules, Context)
+				Outcome["path"] := _HCReport_Report(Effects, Config, Action, Rules, Context, Paths)
 			case "open_path":
 				Id := Action["id"]
 				if !Paths.Has(Id)

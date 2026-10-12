@@ -709,6 +709,8 @@ global _LLM_Menu_Loaded := false
 ; Definitions-only chord translation and hotkey identities; registers no hotkey.
 #Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../adapters/llm_nav_event_owner.ahk
+#Include ../adapters/terminal_output_preview.ahk
+#Include ../adapters/terminal_output_custody.ahk
 #Include ../adapters/llm_automation.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
@@ -738,6 +740,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
 #Include unit/test_local_server_private_publication.ahk
+#Include unit/test_llm_api_add_production.ahk
 #Include unit/test_local_server_write_admission.ahk
 #Include unit/test_local_server_join.ahk
 #Include unit/test_local_server_scope_cohort.ahk
@@ -2039,6 +2042,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_tree_owned.ahk
 #Include unit/test_ollama_install_files_port.ahk
 #Include unit/test_ollama_runtime_owner.ahk
+#Include unit/test_ollama_managed_bootstrap.ahk
 #Include unit/test_run_program_actions.ahk
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk
@@ -2102,11 +2106,11 @@ _LogBootProgress("keylogger modules + tests included")
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
 ; or a blocking dialog in a headless CI context). The current corpus normally
-; uses a small fraction of this per-test budget; the cap remains three minutes
-; below CI's 25-minute process timeout so partial TAP can still be validated.
+; now includes measured full-cohort file authority work. The finite 120-minute
+; cap reserves five minutes below CI's process bound for partial TAP validation.
 global _SUITE_STARTUP_BUDGET_MS := 120000
-global _SUITE_PER_TEST_BUDGET_MS := 200
-global _SUITE_MAX_TIMEOUT_MS := 1320000
+global _SUITE_PER_TEST_BUDGET_MS := 650
+global _SUITE_MAX_TIMEOUT_MS := 7200000
 global _SUITE_TIMEOUT_MS := _SuiteTimeoutForCount(TEST_REGISTRY.Length)
 
 ; Saturation deliberately reserves time for CI to publish partial results.

@@ -3,7 +3,12 @@
 'use strict';
 
 const fs = require('node:fs');
-const { cleanTranscript, evaluate, readPacQualification } = require('./swift_xctest_evidence.cjs');
+const {
+	cleanTranscript,
+	evaluate,
+	readPacQualification,
+	readBrewQualification
+} = require('./swift_xctest_evidence.cjs');
 
 // Fixed reviewed inventory, deliberately independent of source discovery/generation.
 const EXPECTED = Object.freeze([
@@ -77,7 +82,7 @@ function empty(reason) {
 	};
 }
 
-function judge(verdict, transcript, admission = null) {
+function judge(verdict, transcript, admission = null, brewAdmission = null) {
 	const result = empty('invalid-evidence');
 	if (
 		!verdict ||
@@ -108,7 +113,8 @@ function judge(verdict, transcript, admission = null) {
 		verdict.script_status,
 		verdict.tee_status,
 		undefined,
-		admission
+		admission,
+		brewAdmission
 	);
 	const sameSummary =
 		(verdict.summary === null && parsed.summary === null) ||
@@ -120,6 +126,7 @@ function judge(verdict, transcript, admission = null) {
 	if (
 		!sameSummary ||
 		JSON.stringify(verdict.qualification) !== JSON.stringify(parsed.qualification) ||
+		JSON.stringify(verdict.brew_qualification) !== JSON.stringify(parsed.brew_qualification) ||
 		verdict.complete !== parsed.complete ||
 		verdict.exit_status !== parsed.exit_status ||
 		verdict.failures.length !== parsed.failures.length ||
@@ -172,6 +179,7 @@ function judge(verdict, transcript, admission = null) {
 		);
 	result.root_qualified =
 		parsed.qualification === undefined &&
+		parsed.brew_qualification === undefined &&
 		parsed.complete &&
 		parsed.script_status === 0 &&
 		parsed.tee_status === 0 &&
@@ -184,14 +192,18 @@ function judge(verdict, transcript, admission = null) {
 function main(args = process.argv.slice(2), log = console.log) {
 	let result = empty('input-unavailable');
 	const validArgs =
-		args.length === 3 || (args.length === 5 && args[3] === '--pac-qualification-receipt');
+		args.length === 3 ||
+		([5, 7].includes(args.length) &&
+			args[3] === '--pac-qualification-receipt' &&
+			(args.length === 5 || args[5] === '--brew-qualification-receipt'));
 	const sha = validArgs && /^[0-9a-f]{40}$/.test(args[2]) ? args[2] : 'unknown';
 	if (sha !== 'unknown') {
 		try {
 			result = judge(
 				JSON.parse(fs.readFileSync(args[0], 'utf8')),
 				fs.readFileSync(args[1], 'utf8'),
-				args.length === 5 ? readPacQualification(args[4]) : null
+				args.length >= 5 ? readPacQualification(args[4]) : null,
+				args.length === 7 ? readBrewQualification(args[6]) : null
 			);
 		} catch {
 			result = empty('invalid-evidence');

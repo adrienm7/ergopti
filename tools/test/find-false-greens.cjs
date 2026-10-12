@@ -112,6 +112,29 @@ function isComment(line, ext) {
 // ==================================================
 
 /**
+ * Masks physical AHK quoted data and trailing comments in one lexical pass.
+ * A quote of the other kind remains data; a backtick escapes the next quoted character.
+ * @param {string} line One physical source line.
+ * @returns {string} Code whose braces can be counted without string/comment data.
+ */
+function ahkStructuralCode(line) {
+	let code = '',
+		quote = null;
+	for (let at = 0; at < line.length; at++) {
+		const ch = line[at];
+		if (quote !== null) {
+			if (ch === '`') at++;
+			else if (ch === quote) quote = null;
+			continue;
+		}
+		if (ch === ';') break;
+		if (ch === '"' || ch === "'") quote = ch;
+		else code += ch;
+	}
+	return code;
+}
+
+/**
  * Splits an AHK source into its function definitions, tracking WHICH open brace
  * belongs to a function versus to a control block. Distinguishing the two is the
  * whole point: `Test(...)` inside a top-level `Loop Files { … }` is a normal
@@ -144,10 +167,7 @@ function ahkFunctionBlocks(src) {
 		current.body.push(line);
 		// Ignore braces inside strings and trailing comments: a `"{"` literal would
 		// otherwise unbalance the whole file and swallow every later function.
-		const code = line
-			.replace(/"(?:[^"`]|`.)*"/g, '""')
-			.replace(/'[^']*'/g, "''")
-			.replace(/;.*$/, '');
+		const code = ahkStructuralCode(line);
 		for (const ch of code) {
 			if (ch === '{') depth++;
 			else if (ch === '}') depth--;
@@ -189,10 +209,7 @@ function ahkAllFunctionBlocks(src) {
 		let j = i;
 		for (; j < lines.length; j++) {
 			body.push(lines[j]);
-			const code = lines[j]
-				.replace(/"(?:[^"`]|`.)*"/g, '""')
-				.replace(/'[^']*'/g, "''")
-				.replace(/;.*$/, '');
+			const code = ahkStructuralCode(lines[j]);
 			for (const ch of code) {
 				if (ch === '{') depth++;
 				else if (ch === '}') depth--;
@@ -232,10 +249,7 @@ function ahkEnclosingFunction(src) {
 		}
 		const raw = line.match(/^[ \t]*([A-Za-z_]\w*)\s*\([^()]*\)\s*\{/);
 		const def = raw && !isControlKeyword(raw[1]) ? raw : null;
-		const code = line
-			.replace(/"(?:[^"`]|`.)*"/g, '""')
-			.replace(/'[^']*'/g, "''")
-			.replace(/;.*$/, '');
+		const code = ahkStructuralCode(line);
 		let first = true;
 		for (const ch of code) {
 			if (ch === '{') {

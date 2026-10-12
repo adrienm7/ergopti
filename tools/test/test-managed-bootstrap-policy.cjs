@@ -294,4 +294,65 @@ for (const [area, field, value] of [
 	assert.throws(() => render(bootstrap, Buffer.from(JSON.stringify(original))));
 	controls++;
 }
+
+// Go default setup discovers a real module and every compile-time embed input.
+const goRoot = path.join(root, 'static/ergopti_plus/_shared/go/native_http');
+const goSource = fs.readFileSync(path.join(goRoot, 'network_bootstrap.go'), 'utf8');
+const goModule = fs.readFileSync(path.join(goRoot, 'go.mod'), 'utf8');
+const canonicalEmbeds = new Map([
+	['managed_ollama_bootstrap.json', bootstrap],
+	['proxy_policy.json', proxy]
+]);
+function admitGoClosure(moduleText, inputs) {
+	assert.match(
+		moduleText,
+		/^module github\.com\/adrienm7\/ergopti\/static\/ergopti_plus\/_shared\/go\/native_http$/m
+	);
+	assert.match(moduleText, /^go 1\.22$/m, 'integer range tests require Go 1.22');
+	assert.doesNotMatch(
+		moduleText,
+		/^(?:require|replace|exclude)\b/m,
+		'the standalone bridge is standard-library only'
+	);
+	const names = [...goSource.matchAll(/^\/\/go:embed ([^\r\n]+)$/gm)].map((match) => match[1]);
+	assert.deepEqual(names, [...canonicalEmbeds.keys()]);
+	assert.equal(inputs.size, canonicalEmbeds.size);
+	for (const [name, bytes] of canonicalEmbeds) assert.deepEqual(inputs.get(name), bytes);
+}
+const goInputs = new Map(
+	[...canonicalEmbeds.keys()].map((name) => [name, fs.readFileSync(path.join(goRoot, name))])
+);
+admitGoClosure(goModule, goInputs);
+const { renderOutputs } = require('../codegen/codegen-managed-bootstrap.cjs');
+const ownerOutputs = renderOutputs(bootstrap, proxy);
+for (const [name, bytes] of goInputs)
+	assert.deepEqual(ownerOutputs.get(path.join(goRoot, name)), bytes);
+assert.equal(
+	ownerOutputs.size,
+	3,
+	'Swift and both Go embed outputs share the existing generator owner'
+);
+for (const name of canonicalEmbeds.keys()) {
+	const absent = new Map(goInputs);
+	absent.delete(name);
+	assert.throws(() => admitGoClosure(goModule, absent));
+	const stale = new Map(goInputs);
+	stale.set(name, Buffer.concat([stale.get(name), Buffer.from(' ')]));
+	assert.throws(() => admitGoClosure(goModule, stale));
+	controls += 2;
+}
+assert.throws(() => admitGoClosure(goModule.replace('go 1.22', 'go 1.21'), goInputs));
+assert.throws(() =>
+	admitGoClosure(
+		goModule.replace('module github.com/adrienm7/', 'module foreign.invalid/'),
+		goInputs
+	)
+);
+const nativeContract = JSON.parse(
+	fs.readFileSync(path.join(shared, 'llm/managed_ollama_runtime.json'))
+);
+const shipping = /^go(\d+)\.(\d+)\.\d+$/.exec(nativeContract.go_version);
+assert.ok(shipping && (Number(shipping[1]) > 1 || Number(shipping[2]) >= 22));
+controls += 5;
+
 console.log(`Managed bootstrap policy: ${controls} controls passed; native SDK not executed.`);

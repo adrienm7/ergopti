@@ -35,8 +35,10 @@ end
 --- The documents a host works from, read from their single sources.
 --- @return table
 local function documents()
+	local schema = shared_json("modules/diagnostics/schema.json")
+	schema.export_strings = shared_json("data/locales/en.json")
 	return {
-		schema     = shared_json("modules/diagnostics/schema.json"),
+		schema     = schema,
 		templates  = shared_json("modules/diagnostics/issue_templates.json"),
 		redaction  = shared_json("modules/diagnostics/redaction.json"),
 		repository = shared_json("modules/updater/defaults.json").github,
@@ -142,16 +144,16 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#calls.copy, 1)
 		helpers.assert_eq(calls.copy[1], approved_text(false))
-		helpers.assert_eq(result.path, nil, "a report names no file")
+		helpers.assert_eq(result.path, calls.reveal[1], "the complete local attachment is returned")
 
 		local url = calls.open_url[1]
-		helpers.assert_eq(query_value(url, "diagnostics"), calls.copy[1],
-			"the form's diagnostics field is the report the clipboard holds")
+		helpers.assert_eq(query_value(url, "diagnostics"), nil,
+			"the form receives no query default that could reset an edit")
 		helpers.assert_eq(query_value(url, "os"), "macos")
 		local repo = documents().repository
-		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
-		helpers.assert_eq(url:sub(1, #prefix), prefix)
-		helpers.assert_contains(url, "driver=macos")
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos"
+		helpers.assert_eq(url, prefix, "the canonical bug URL contains only stable host metadata")
+		helpers.assert_eq(query_value(url, "driver"), "macos")
 		helpers.assert_true(not url:find("jdoe", 1, true), "the URL carries no account name: " .. url)
 		helpers.assert_true(not url:find("%2FUsers%2F", 1, true), "the URL carries no home folder: " .. url)
 	end)
@@ -159,12 +161,12 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 	-- The report used to be saved and revealed in Finder too: the reveal
 	-- finished after the browser opened, so Finder took the focus from the
 	-- form (report-focus)
-	helpers.it("report saves nothing, reveals nothing and opens the browser last (report-focus)", function()
+	helpers.it("report saves its attachment and opens the browser last (report-focus)", function()
 		local _, calls = perform({ action = "report", text = REPORT, fields = { driver = "macos" } })
-		helpers.assert_eq(#calls.save, 0, "a report saves no file")
-		helpers.assert_eq(#calls.reveal, 0, "a report reveals nothing in Finder")
+		helpers.assert_eq(#calls.save, 1, "a report saves the complete local attachment")
+		helpers.assert_eq(#calls.reveal, 1, "the attachment is revealed before the browser")
 		helpers.assert_eq(#calls.open, 0, "a report opens no folder")
-		helpers.assert_eq(calls.order, { "copy", "open_url" }, "the browser opens last, after the clipboard")
+		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" }, "the browser opens last, after the clipboard and local attachment")
 	end)
 
 	helpers.it("report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)", function()
@@ -175,12 +177,11 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(#calls.copy[1] > templates.max_url_bytes, true, "the fixture exceeds the URL budget")
 		local url = calls.open_url[1]
 		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
-		helpers.assert_eq(query_value(url, "version"), "2.4.0", "the identity fields survive the cut")
+		helpers.assert_eq(query_value(url, "version"), "2.4.0", "only validated host identity is prefilled")
 		local prefilled = query_value(url, "diagnostics")
-		local marker = templates.truncation_marker
-		helpers.assert_eq(prefilled:sub(-#marker), marker, "the cut report ends with the truncation marker")
-		local kept = prefilled:sub(1, #prefilled - #marker)
-		helpers.assert_eq(calls.copy[1]:sub(1, #kept), kept, "the prefill is the start of the copied report")
+		helpers.assert_eq(prefilled, nil, "long output never prefills or resets the issue form")
+		helpers.assert_true(#url < 1200, "the editable URL stays short independently of report length")
+		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved attachment preserves the whole report")
 	end)
 
 	helpers.it("report stops before the browser when the clipboard refuses (report-bug-flow)", function()
@@ -297,7 +298,7 @@ helpers.describe("closed diagnostic sharing corpus", function()
 			end
 			local readable = document.text:match("^(.-)```json")
 			for _, id in ipairs({ "versions", "hardware", "system", "input", "ai", "permissions", "issues" }) do
-				assert(readable:find("## " .. require("infra.i18n").get("healthcheck.section." .. id), 1, true), "readable section omitted")
+				assert(readable:find("## " .. config.schema.export_strings["healthcheck.section." .. id], 1, true), "readable section omitted")
 			end
 			assert(readable:find("| probes.appleevent_transport.native_status | -1744 |", 1, true))
 			assert(readable:find("| probes.appleevent_transport.cleanup | pending |", 1, true))
@@ -305,6 +306,146 @@ helpers.describe("closed diagnostic sharing corpus", function()
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.state, "timeout")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.cleanup, "pending")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.native_status, -1744)
+		end
+	end)
+end)
+
+helpers.describe("English attachment export boundaries", function()
+	helpers.it("does not consult localized labels or copy free private fields", function()
+		local config = documents()
+		local doc = Share.document(host_snapshot(false), config.schema, "LOCALIZED-EXPORT-CANARY")
+		helpers.assert_true(not doc.text:find("LOCALIZED-EXPORT-CANARY", 1, true))
+		helpers.assert_contains(doc.text, config.schema.export_strings[config.schema.share_policy.notice_key])
+		helpers.assert_true(not doc.text:find(HOME, 1, true))
+	end)
+	helpers.it("retains clipboard and refuses browser when attachment save fails", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {} },
+			function(overrides) overrides.save = function() return nil, "inert write refusal" end end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#calls.copy, 1)
+		helpers.assert_eq(#calls.reveal, 0)
+		helpers.assert_eq(#calls.open_url, 0)
+	end)
+	helpers.it("browser refusal never claims successful report after saving attachment", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {} },
+			function(overrides) overrides.open_url = function() return false end end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#calls.save, 1)
+		helpers.assert_eq(calls.save[1].text, calls.copy[1])
+	end)
+end)
+
+helpers.describe("default attachment completion", function()
+	helpers.it("requires write and close acknowledgement before reveal or browser", function()
+		for _, refusal in ipairs({ "none", "write", "close", "both" }) do
+			local config = documents()
+			local snapshot = host_snapshot(false)
+			local doc = Share.document(snapshot, config.schema, "ignored")
+			local Report, calls, overrides = load_report()
+			overrides.save = nil -- Exercise the actual production default, not an effect replacement.
+			local original_open = io.open
+			local original_attributes = hs.fs.attributes
+			local writes, closes = 0, 0
+			hs.fs.attributes = function() return "directory" end
+			io.open = function(_, mode)
+				assert(mode == "wb", "only the attachment write is admitted")
+				return {
+					write = function(_, text)
+						writes = writes + 1
+						assert(text == doc.text, "the complete approved text reaches the real save owner")
+						if refusal == "write" or refusal == "both" then return nil, "write-refused" end
+						return true
+					end,
+					close = function()
+						closes = closes + 1
+						if refusal == "close" or refusal == "both" then return nil, "close-refused" end
+						return true
+					end,
+				}
+			end
+			local ok, err = xpcall(function()
+				local result = Report.perform({ action = "report", text = doc.text, fields = {} },
+					paths(), config, Report.redaction_context(overrides), overrides, snapshot)
+				helpers.assert_eq(result.ok, refusal == "none")
+				helpers.assert_eq(writes, 1)
+				helpers.assert_eq(closes, 1, "a failed write still closes its exact file")
+				helpers.assert_eq(#calls.reveal, refusal == "none" and 1 or 0)
+				helpers.assert_eq(#calls.open_url, refusal == "none" and 1 or 0)
+			end, debug.traceback)
+			io.open = original_open
+			hs.fs.attributes = original_attributes
+			if not ok then error(err, 0) end
+		end
+	end)
+end)
+
+helpers.describe("stable-metadata report URL", function()
+	helpers.it("stable-metadata report URL keeps complete output local and rejects page-derived query fields", function()
+		local result, calls = perform({ action = "report", text = REPORT,
+			fields = { diagnostics = "private query text", title = "PRIVATE_TITLE", description = "PRIVATE_DESCRIPTION", reproduction = "PRIVATE_REPRODUCTION", version = "9.9.9", os = "private host", driver = "foreign" } })
+		helpers.assert_eq(result.ok, true)
+		local repo = documents().repository
+		helpers.assert_eq(calls.open_url[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macos&driver=macos")
+		for _, id in ipairs({ "title", "description", "reproduction", "diagnostics", "architecture" }) do helpers.assert_nil(query_value(calls.open_url[1], id)) end
+		helpers.assert_eq(calls.save[1].text, calls.copy[1])
+		helpers.assert_eq(calls.copy[1], approved_text(false))
+		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" })
+	end)
+end)
+
+helpers.describe("retained installed-page observations", function()
+	helpers.it("keeps useful page outcomes without qualifying suites and refuses stale identity", function()
+		local config = documents()
+		local rows = {}
+		for _, spec in ipairs(config.schema.diagnostic_checks.items) do
+			rows[spec.id] = spec.reason and { state = "not_run", scope = spec.scope, reason = spec.reason }
+				or { state = "ok", scope = spec.scope, ms = 3 }
+		end
+		local observed = assert(Share.page_checks(rows, config.schema))
+		local snapshot = host_snapshot(false)
+		snapshot.export_revision = 1
+		local action = { page_check_observations = observed, generated_at = snapshot.generated_at, snapshot_revision = 2 }
+		helpers.assert_eq(Share.capture_page_checks(snapshot, action), false)
+		helpers.assert_eq(snapshot.page_check_observations, nil)
+		action.snapshot_revision = 1
+		helpers.assert_eq(Share.capture_page_checks(snapshot, action), true)
+		local doc = Share.document(snapshot, config.schema, "PRIVATE_LOCALE")
+		helpers.assert_contains(doc.text, "installed_page_reported (unqualified)")
+		helpers.assert_contains(doc.text, "page_check_observations.results.redaction.ms")
+		helpers.assert_eq(doc.snapshot.page_check_observations.results.driver_suites.state, "not_run")
+		rows.redaction.text = "PRIVATE_TEXT"
+		helpers.assert_eq(Share.page_checks(rows, config.schema), nil)
+	end)
+end)
+
+helpers.describe("closed recent error facts", function()
+	helpers.it("keeps observed technical failure codes and excludes every private message", function()
+		local config = documents()
+		local corpus = shared_json("tests/corpus/healthcheck/recent_error_fact_vectors.json")
+		for _, vector in ipairs(corpus.vectors) do
+			local original = Json.encode(vector.snapshot)
+			local doc = Share.document(vector.snapshot, config.schema, "PRIVATE_LOCALE")
+			helpers.assert_eq(doc.snapshot.sections.issues.recent_error_facts, vector.expected)
+			for _, canary in ipairs(corpus.canaries) do
+				helpers.assert_true(not doc.text:find(canary, 1, true), canary)
+			end
+			helpers.assert_contains(doc.text, "lease_watchdog_exit")
+			helpers.assert_contains(doc.text, "log_observation_only")
+			for _, action in ipairs({ "copy", "save", "report" }) do
+				local Report, calls, overrides = load_report()
+				local outcome = Report.perform({ action = action, text = doc.text, name = doc.name, fields = {} },
+					paths(), config, Report.redaction_context(overrides), overrides, vector.snapshot)
+				helpers.assert_eq(outcome.ok, true, "the real report sink receives the retained fact snapshot")
+				if action ~= "save" then helpers.assert_eq(calls.copy[1], doc.text) end
+				if action ~= "copy" then helpers.assert_eq(calls.save[1].text, doc.text) end
+				for _, canary in ipairs(corpus.canaries) do
+					-- The fixed public GitHub scheme is intentional; private identities remain forbidden.
+					if canary ~= "https://" then
+						for _, url in ipairs(calls.open_url) do helpers.assert_true(not url:find(canary, 1, true), canary) end
+					end
+				end
+			end
+			helpers.assert_eq(Json.encode(vector.snapshot), original)
 		end
 	end)
 end)

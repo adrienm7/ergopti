@@ -121,6 +121,7 @@ local function build_tray(observe_layout)
 	local lines = {}
 	package.loaded["infra.logger"] = nil
 	local real_logger = require("infra.logger")
+	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	for _, level in ipairs({ "warn", "error" }) do
 		spy[level] = function(module_name, fmt, ...)

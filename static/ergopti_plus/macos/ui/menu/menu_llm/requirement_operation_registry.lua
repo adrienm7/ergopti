@@ -16,6 +16,20 @@ local LOG = "menu_llm.requirements"
 -- by its existing terminal-plus-physical-child join. No registry GC can erase
 -- a live requirement's migration fence.
 local retained_operations = {}
+-- Passive routing only. Live operations and their exact native children remain
+-- strongly owned by the registry; this lookup cannot retire either authority.
+local capability_registries = setmetatable({}, { __mode = "kv" })
+
+--- Observes the original operations of an authenticated backend capability.
+--- @param capability table Opaque backend owner token.
+--- @param callback function Called once after the captured operations retire.
+--- @return table|nil lease Cancellable observation, never a native owner.
+--- @return boolean committed
+function M.when_owner_settled(capability, callback)
+	local registry = capability_registries[capability]
+	if registry == nil then return nil, false end
+	return registry.when_settled(capability, callback)
+end
 
 --- Reports whether original backend requirements have physically retired.
 --- This query never cancels, retries or acquires a descendant owner.
@@ -53,6 +67,9 @@ function M.new(opts)
 		operation.released = true
 		operations[operation] = nil
 		retained_operations[operation] = nil
+		local observers = {}
+		for observer in pairs(operation.observers) do observers[#observers + 1] = observer end
+		for _, observer in ipairs(observers) do observer.check() end
 		return true
 	end
 
@@ -95,7 +112,50 @@ function M.new(opts)
 		end
 		local capability = {}
 		capabilities[capability] = label
+		capability_registries[capability] = registry
 		return capability
+	end
+
+	--- Captures the current operations only; future successors are never borrowed.
+	--- Cancellation removes this passive listener without settling any child.
+	--- @param capability table Opaque token returned by create_owner().
+	--- @param callback function Called at most once after exact retirement.
+	--- @return table|nil lease
+	--- @return boolean committed
+	function registry.when_settled(capability, callback)
+		if capabilities[capability] == nil or type(callback) ~= "function" then
+			return nil, false
+		end
+		local pending = {}
+		local active = true
+		local observer = {}
+		function observer.cancel()
+			active = false
+			for operation in pairs(pending) do operation.observers[observer] = nil end
+			pending = {}
+			return true
+		end
+		function observer.check()
+			if active ~= true then return end
+			for operation in pairs(pending) do
+				if operation.released == true then
+					operation.observers[observer] = nil
+					pending[operation] = nil
+				end
+			end
+			if next(pending) ~= nil then return end
+			active = false
+			local ok, err = xpcall(callback, debug.traceback)
+			if not ok then Logger.error(LOG, "%s settlement observer raised: %s.", backend, tostring(err)) end
+		end
+		for operation in pairs(operations) do
+			if operation.capability == capability then
+				pending[operation] = true
+				operation.observers[observer] = true
+			end
+		end
+		observer.check()
+		return observer, true
 	end
 
 	--- Starts one logical operation. A terminal operation that still has exact
@@ -128,6 +188,7 @@ function M.new(opts)
 			logical_terminal = false,
 			released = false,
 			children = {},
+			observers = {},
 		}
 		operations[operation] = true
 		retained_operations[operation] = backend
