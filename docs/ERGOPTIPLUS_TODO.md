@@ -4355,6 +4355,30 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-12 the Dev 2203 timestamp addition overwrote the Brew diagnostic's
+validated last-census projection with the full UI observation. The corrective
+copy retains the timestamp while excluding optional button/identity fields
+from that census. The new control fails against exact 2203 and passes after the
+correction; all 220 existing method bodies remain unchanged. The registered
+portable suite passes 221/0, and the owned-process controls pass 30/0, without
+skips or macOS native acceptance. Original 246 requirements, three subprocess
+calls, ten finalizers and all deadlines remain unchanged. Actual Automation,
+all six Brew scenarios and macOS package/install acceptance remain required.
+
+The exact ba41 composition checkpoint passes formatting for392 files and Linux
+13450/0. Full JS423/426 retains three reproduced upstream failures;
+simulated Hammerspoon retains18945 passes and six failures in unchanged upstream
+closure-policy, backend-dialog and metrics-scenario tests. Source/index/HEAD
+fences remain equal. The maintainer authorizes this bounded diagnostic slice's
+regular Dev delivery with those limits documented. Complete passing composition
+and native macOS qualification remain unproved; other owners' assertions remain.
+
+The already published Dev 33c source receives Linux-only manual 38277200107,
+attempt 1: packaging and all 17 installation/launch jobs pass. This does not
+qualify the macOS archive/Brew scope or later Dev descendants. The
+[integrated Linux checkpoint](handovers/2026-10-12-group6-ci/README.md)
+retains the exact source, receipts and limitations. Item 36 and16/38 stay open.
+
 2026-10-12 the Brew fixture now retains the exact observed Automation prompt
 deadline through its existing closed timeout channel and the last validated UI
 census after the unchanged256-phase history limit. Private error objects and
@@ -7471,6 +7495,29 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+The ba41 successor's Linux unit composition passes13450/0, while its full JS and
+simulated Hammerspoon checks retain the documented three/six upstream failures.
+Fresh Dev is checked independently through Git and API before delivery. Root
+owns the incoming Windows config_write_lease source-pin reconciliation; Group6
+does not regenerate that JSON or infer source/native qualification from older
+22-control evidence. The frozen23-label oracle and UNRUN dispositions remain;
+regular partial delivery keeps the original updater and enterprise limits open.
+
+2026-10-12 published Dev 33c receives Linux-only manual 38277200107, attempt 1:
+Unit 13268/0, E2E, packaging and all 17 installation/launch jobs pass. Actual
+Ollama runtime/model/inference and terminal physical closure pass in 418.027615 s;
+all 1365 before/final source hashes match exact Git blobs independently. Closed
+diagnostics reach real-model-chat, terminal-physical-shutdown and lua-complete
+without boundary refusal. Actual window 34/0/0, family 5/0/0 and external
+recovery 1/0/0 pass. This neither attributes the earlier Root timeout nor proves a
+causal effect of flushing. Consent is scripted; daemon entrypoint, physical
+GUI/devices and enterprise networks are excluded from runtime acceptance.
+E2E cleanup terminates orphan Sway, leaving broader Wayland closure unproved.
+See the [integrated Linux checkpoint](handovers/2026-10-12-group6-ci/README.md).
+Later Dev sources and the separate Brew projection correction have distinct
+qualification obligations. Windows/macOS native and enterprise requirements
+remain open; items 62/16/38 stay open and22 remains excluded.
 
 2026-10-12 official run38214117862 on211e66051 passes Linux Unit13268/0, E2E,
 package and all17 installation/launch jobs. Actual Ollama installation, model,

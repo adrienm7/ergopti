@@ -276,3 +276,111 @@ The own local bootstrap ref `work` at2a8864ae33b3f7ab51fcf8978038c427c5a17104
 was deleted conditionally after proving its commits remain inMain63cf3d005d.
 Canonical feature and all protected publication,Root,PR87 and peer refs remain.
 No commits or registered worktree were lost; no workflow was stopped.
+
+## Integrated Dev Linux receiving and Brew projection correction
+
+Source `33c4152a99836445387c8a0eac1166cf8918abed`, tree
+`596057d951be3d1335303dbb1a63819767c0959a`, was published to Dev before
+[manual run 38277200107](https://github.com/adrienm7/ergopti/actions/runs/38277200107),
+attempt 1, with `os_lanes=linux`. Its complete Linux chain finishes naturally:
+21 successful jobs, zero failures and all 17 install/launch rows successful.
+Windows, macOS and Release are skipped. Earlier no-integration statements
+describe their historical source checkpoints; later Dev descendants do not
+inherit this exact-source native verdict.
+
+| Scope             | Received result                                                       | Qualification limits                                                                                            |
+| ----------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Common            | 414 JS checks and27 properties pass.                                  | Unselected Windows/macOS native lanes remain unexecuted.                                                        |
+| Linux Unit        | 13268 assertions pass.                                                | Physical keyboard acceptance is unproved.                                                                       |
+| Official Ollama   | Runtime/model/inference and terminal closure pass in 418.027615 s.    | Consent is scripted; daemon entrypoint, physical GUI and enterprise networks are excluded from this fixture.    |
+| Cursor/window     | 34 distinct cases, family 5 and recovery 1 pass, zero failures/skips. | Owned virtual X11 displays/focus; physical displays/devices remain unqualified.                                 |
+| E2E               | Hotstrings 193, HTTP 262, XKB 53 and genuine Nix runtime7 pass.       | Cleanup terminates orphan Sway; broader Wayland child closure remains unproved.                                 |
+| Packaging/install | Five formats build; Flatpak/tarball smokes and17 matrix jobs pass.    | Fedora WebKit/lgi limitations, conditional scenario skips and AppImage extraction without FUSE remain explicit. |
+
+The Ollama artifact 11760192673 ZIP matches its API SHA256
+`7c16f346010d9c24c65bed366eb5a162d1b3dbd1b825ffbf00332e572b984fbb`;
+its public JSON SHA256 is
+`90fea5575c5220a0208e71c7e24f03ba46bb002998d2316c3e291afa3907cf99`.
+All1365 before/final pins independently match exact 33c Git blob bytes.
+Child status0 and closure adopted1/pending0/rescue0 are received. Work reaches
+real-model-chat, cleanup terminal-physical-shutdown and boundary lua-complete
+with null observed refusal. The 1198635318-byte archive matches
+`15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb`.
+This success does not explain the earlier Root run on52ac or establish causality for the flushes.
+
+The actual window log has34 distinct JSON cases. Anchored summaries report
+window 34/0/0, family 5/0/0 and external recovery 1/0/0, agreeing with the mandatory
+E2E receipt. Artifact 11761092241 ZIP matches API SHA256
+`c98d4f856bf3a29df15a748d7c3455cc8b7d6bb46cc3005322d82f4b102f7f5c`;
+its public JSON SHA256 is
+`42a27fe5b4c6c3df9b0f322ab5cf0e95a0890f43dff79b0272e2ea7c147afc23`.
+The 1644018-byte terminal log has SHA256
+`54a2b3dbe8f2a881deee0f8e2d088728136b046cf3f144931ce6fab852750f14`.
+No visible-search refusal diagnostic appears on this successful path.
+
+The 17 install rows comprise five ordinary-user source distributions, nine
+first-install containers and three package smokes. Each distribution log
+independently confirms13268 passing assertions. All20 mandatory Linux assertion
+artifacts,21 job logs and the Ollama receipt retain source/run/attempt/digest
+joins; upload timestamps match the exact attempt's steps. The receiver downloads
+no bulk model/runtime artifact. Tarball, deb, rpm, AppImage and Flatpak are built.
+
+The terminal evidence capsule is immutable Git blob
+`7a49b16396e190f3b9927314daf815c5bbd00787`,3266733 bytes,77 regular members,
+SHA256 `883c5334fff8d81f8c72eadd281157e5a7808d1c4e9a0b5931597a99847f33d4`.
+POST/GET is byte-exact; the finite inventory verifies every member. Private
+stderr, signed transport URLs and inactive proposals are excluded.
+
+At the next safe checkpoint, fresh Dev advanced to
+`ba41b79db7f9b3618ba3290cff1516a6a9d5e797`; all commits were integrated without
+altering the running gate. Independent review found Dev 2203's timestamp addition
+copied full native_ui over the admitted last-census projection. Group6 corrects
+only that copy source, preserving Root's timestamps and repeated observations.
+The additive regression fails on exact 2203 and passes on the correction;
+all 220 existing method bodies remain exact and the registered suite passes 221/0.
+The three original timestamp controls and30 owned-process controls pass.
+All246 requirements, three subprocess calls, ten finalizers and256/4096 bounds
+remain unchanged. The original Windows source controls pass 22 with native and
+official flags false; all 21 source pins and the independent oracle stay sealed.
+
+This successor is portable diagnostic work, outside the 33c native receipt.
+It grants no Automation, Brew, macOS package/install or enterprise qualification.
+Root's runner, failure-diagnostic test, workflows and inventories stay reserved.
+No earlier macOS source cohort is reused for changed Dev inputs. Items36/62 and
+transversal 16/38 remain open;22 remains excluded. No item or feature is deleted.
+
+## Partial diagnostic delivery and upstream composition limits
+
+At exact source `ba41b79db7f9b3618ba3290cff1516a6a9d5e797`, formatting passes392
+files. The complete JS gate records423/426 passes and retains three failures:
+the macOS pinned-source-read ratchet observes76 against75; the gsub source guard
+misclassifies a compound return in shared local_server_auth.lua; and the layout
+defaults guard treats a pure registry metadata lookup as a settings consumer.
+All three reproduce from immutable ba41 Git blobs outside the checkout. No
+other-owner correction is applied; Root retains that work, including the causal
+gsub guard. The inactive proposal to wrap correct Lua is withdrawn.
+
+The canonical serial composition run uses the existing toolchain and temporary
+directory with the required fixture/process access. Simulated Hammerspoon
+records18945 passes and six failures in533.229s: one closure-policy case in
+api_remote.lua, three backend-dialog cases and two metrics-scenario floor cases
+(expected99, actual107). Their test/subject bytes match exact ba41 and are outside
+the five Group6 paths. Linux records13450 passes and zero failures in199.623s.
+All9842 tracked source files, index entries, HEAD and status remain fenced.
+Earlier sandbox EROFS/EPERM and missing-tool attempts are retained separately;
+they do not establish source defects. The full composed checkpoint is not green.
+
+The maintainer expressly authorizes coherent partial Dev delivery with these
+upstream limits recorded. The owned lot remains the Brew helper/test, existing
+homebrew enrollment guard, TODO36/62 and this handover. Independent TODO receiving
+retains218 blocks and changes only36/62; the other216 and the preamble stay exact.
+The feature remains because both items are incomplete. Main, Root's reserved
+runner/failure-diagnostic/workflow paths and feature inventories are untouched
+apart from inherited upstream bytes.
+
+Fresh Dev Git/API receiving and post-merge checks remain mandatory before the
+regular nonforce feature/Dev pushes. Root owns the incoming config_write_lease
+source-pin reconciliation; Group6 does not modify its candidate JSON. A stale
+source seal is reported as a source-only limitation and grants no original23,
+Windows or official qualification. No new native run is dispatched solely for
+diagnostic retention, and no original deadline or consent assertion changes.
