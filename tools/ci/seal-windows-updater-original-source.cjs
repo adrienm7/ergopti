@@ -1,7 +1,29 @@
 // tools/ci/seal-windows-updater-original-source.cjs
 // Refresh only source pins; original native behavior expectations remain independent.
 'use strict';
-const assert = require('node:assert/strict');
+const nativeAssertions = require('node:assert/strict');
+const { isNativeError } = require('node:util').types;
+const declaredDiagnostics = new WeakMap();
+const pairedWriteFailures = new WeakSet();
+const nativeMessageDescriptor = Object.getOwnPropertyDescriptor;
+const assert = Object.fromEntries(
+	['ok', 'equal', 'match', 'deepEqual'].map((method) => {
+		const predicate = nativeAssertions[method];
+		return [
+			method,
+			(...args) => {
+				try {
+					return Reflect.apply(predicate, nativeAssertions, args);
+				} catch (failure) {
+					const diagnostic = args.at(-1);
+					if (isNativeError(failure) && typeof diagnostic === 'string')
+						declaredDiagnostics.set(failure, diagnostic);
+					throw failure;
+				}
+			}
+		];
+	})
+);
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -36,12 +58,39 @@ const sourcePaths = Object.freeze([
 	'tools/test/validate-ahk-suite-manifest.cjs'
 ]);
 const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-const git = (args) =>
-	execFileSync('git', args, {
-		cwd: root,
-		env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
-		maxBuffer: 32 * 1024 * 1024
-	});
+const git = (args) => {
+	try {
+		return execFileSync('git', args, {
+			cwd: root,
+			env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
+			maxBuffer: 32 * 1024 * 1024,
+			stdio: 'pipe'
+		});
+	} catch (failure) {
+		if (isNativeError(failure))
+			declaredDiagnostics.set(failure, `Source seal Git ${args[0]} request refused.`);
+		throw failure;
+	}
+};
+function refusalDiagnostic(failure) {
+	if (pairedWriteFailures.has(failure))
+		return 'SOURCE_SEAL_REFUSAL stage=write_and_close error_count=2';
+	const declared = declaredDiagnostics.get(failure);
+	if (declared !== undefined) return declared;
+	if (isNativeError(failure)) {
+		const message = nativeMessageDescriptor(failure, 'message');
+		if (message && Object.hasOwn(message, 'value') && typeof message.value === 'string') {
+			for (const admitted of [
+				'Regular unaliased source/image required.',
+				'Source/image acquisition refused.',
+				'Source/image changed during receiving.',
+				'Source/image receiving and closure refused.'
+			])
+				if (message.value === admitted) return admitted;
+		}
+	}
+	return 'SOURCE_SEAL_REFUSAL stage=unclassified error_count=unknown';
+}
 function actualFile(relative) {
 	const absolute = path.join(root, relative);
 	for (let parent = path.dirname(absolute); parent !== root; parent = path.dirname(parent)) {
@@ -152,6 +201,8 @@ function main(args) {
 			path.join(root, inputsPath),
 			fs.constants.O_RDWR | (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0)
 		);
+		let sealingFailed = false,
+			sealingFailure;
 		try {
 			const acquired = fs.fstatSync(fd, { bigint: true });
 			assert.ok(
@@ -172,8 +223,25 @@ function main(args) {
 			}
 			fs.ftruncateSync(fd, encoded.length);
 			assert.deepEqual(actualFile(inputsPath).bytes, encoded, 'Published source seal differs.');
+		} catch (error) {
+			sealingFailed = true;
+			sealingFailure = error;
+			throw error;
 		} finally {
-			fs.closeSync(fd);
+			try {
+				fs.closeSync(fd);
+			} catch (closureFailure) {
+				if (sealingFailed) {
+					const refusal = new AggregateError(
+						[sealingFailure, closureFailure],
+						'Source seal write and closure refused.',
+						{ cause: sealingFailure }
+					);
+					pairedWriteFailures.add(refusal);
+					throw refusal;
+				}
+				throw closureFailure;
+			}
 		}
 	}
 	for (const relative of sourcePaths)
@@ -200,7 +268,7 @@ if (require.main === module) {
 	try {
 		main(process.argv.slice(2));
 	} catch (error) {
-		console.error(error.message);
 		process.exitCode = 1;
+		console.error(refusalDiagnostic(error));
 	}
 }
