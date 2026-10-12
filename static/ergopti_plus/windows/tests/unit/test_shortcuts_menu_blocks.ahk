@@ -1515,3 +1515,37 @@ for Outcome in ["failed", "empty", "missing"]
 	Test("shortcut extension observed result: changed " . Outcome . " selection disagrees then repairs", _SMB_ExtensionObservedNative.Bind(Outcome, "mapping"))
 Test("shortcut extension observed result: withdrawn source refuses before native allocation", (*) => _SMB_ExtensionObservedNative("populated", "withdraw"))
 Test("shortcut extension observed result: genuine late withdrawal clears the unpublished native owner", (*) => _SMB_ExtensionObservedNative("failed", "late_withdraw"))
+
+
+; Reuse the original real file/builder/Win32 oracle; never derive its output from the recipe.
+_SMB_ExtensionConstructionSelection(Outcome) {
+	Root := _MR_GetManifestRoot(), Recipe := Root["shortcut_extension_construction_ahk"]
+	Saved := Recipe["append_outcomes"]
+	try {
+		Changed := []
+		for Existing in Saved
+			if Existing != Outcome
+				Changed.Push(Existing)
+		Recipe["append_outcomes"] := Changed
+		AssertThrows(() => _SMB_ExtensionObservedNative(Outcome),
+			"changing actual shared placement makes the unchanged independent native oracle red")
+		Recipe["append_outcomes"] := Saved
+		_SMB_ExtensionObservedNative(Outcome)
+	} finally Recipe["append_outcomes"] := Saved
+}
+for _SMB_ConstructionOutcome in ["failed", "empty", "missing"]
+	Test("shortcut extension construction: shared placement disagrees then restores " . _SMB_ConstructionOutcome,
+		_SMB_ExtensionConstructionSelection.Bind(_SMB_ConstructionOutcome))
+
+_SMB_ExtensionConstructionSourceRefusal() {
+	Root := _MR_GetManifestRoot(), Recipe := Root["shortcut_extension_construction_ahk"]
+	try {
+		Root.Delete("shortcut_extension_construction_ahk")
+		AssertThrows(() => _SMB_ExtensionObservedNative("populated"),
+			"missing real construction source cannot satisfy the original native oracle")
+		Root["shortcut_extension_construction_ahk"] := Recipe
+		_SMB_ExtensionObservedNative("populated")
+	} finally Root["shortcut_extension_construction_ahk"] := Recipe
+}
+Test("shortcut extension construction: source refuses then exact native repair restores",
+	_SMB_ExtensionConstructionSourceRefusal)
