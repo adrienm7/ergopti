@@ -889,3 +889,114 @@ _G4B_NativeListenerIdentity() {
 	}
 }
 Test("managed bootstrap: exact native listener identity rejects stale authority (groups247-native-identity)", _G4B_NativeListenerIdentity)
+
+/** The exact native dispatch path remains injected, never a Linux native claim. */
+class _G4B_NativeDispatchTask {
+	__New(Mode, Retirement) {
+		this.Mode := Mode
+		this.Retirement := Retirement
+		this.Starts := 0
+		this.Stops := 0
+		this.Done := 0
+		this.Withdraw := 0
+	}
+	start() {
+		this.Starts += 1
+		if HasMethod(this.Withdraw, "Call")
+			this.Withdraw.Call()
+		if this.Mode == "start_throw" || this.Mode == "start_withdraw"
+			throw Error("Synthetic native start refusal")
+		return false
+	}
+	requestTerminate() {
+		this.Stops += 1
+		return this.Retirement
+	}
+	Complete() {
+		this.Done.Call(0, "", "")
+	}
+}
+
+/** Exercises the real menu -> native dispatch -> cancellation -> observer path. */
+_G4B_NativeDispatchFailure(Mode, Retirement := true, Bootstrap := false) {
+	F := _G4B_Fixture()
+	Task := _G4B_NativeDispatchTask(Mode, Retirement)
+	Spawns := 0, Published := 0
+	Spawn(Executable, Arguments, Done, *) {
+		Spawns += 1
+		AssertEqual(Executable, A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe")
+		AssertEqual(Arguments[Arguments.Length], "qwen3:0.6b", "The native worker receives the exact consented tag.")
+		AssertTrue(InStr(Arguments[7], "ollama-model-pull.ps1"), "The managed worker remains the production entry point.")
+		if Mode == "factory_throw"
+			throw Error("Synthetic lazy native task construction refusal")
+		Task.Done := Done
+		return Task
+	}
+	try {
+		if Bootstrap
+			F.Model := "qwen3:0.6b"
+		F.Start()
+		F.Flow.Plan["directory"] := "C:\managed-workers"
+		F.Flow.Plan["helper"] := "C:\managed-workers\ollama_managed_files.ps1"
+		F.Flow.Plan["helper_sha256"] := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		F.Flow.Sources["C:\managed-workers\ollama-runtime-launch.ps1"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		F.Flow.Target["ready_file_identity"] := "34567890:3456789012345678"
+		F.Flow.Target["ready_image_sha256"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		OriginalFailed := F.Flow.OnFailed
+		if Mode == "start_withdraw"
+			Task.Withdraw := (*) => F.Flow.Cancel()
+		F.Flow.Port["pull"] := (Target, Model, Done) => F.Flow._NativePull(Model, Done, Spawn)
+		if Bootstrap {
+			F.Runtime.PublishReady()
+			AssertEqual(0, F.ReadyCalls, "Initial acquisition has not completed its bootstrap.")
+			AssertEqual(1, F.FailedCalls, "Initial native dispatch refusal still notifies its original failure observer.")
+		} else {
+			F.Runtime.PublishReady()
+			AssertTrue(F.Flow.Ready)
+			AssertFalse(F.Flow.PullModel("qwen3:0.6b", (*) => Published += 1))
+			AssertEqual(1, F.ReadyCalls, "The original completed bootstrap remains one-shot.")
+			AssertEqual(0, F.FailedCalls, "Later native construction/start failure belongs to its menu operation.")
+		}
+		AssertEqual(1, Spawns)
+		AssertTrue(F.Flow.OnFailed == OriginalFailed, "Routing preserves the bootstrap observer instead of suppressing it globally.")
+		AssertTrue(F.Flow.Cancelled)
+		AssertFalse(F.Flow.Ready)
+		AssertEqual(0, F.Flow.MenuPull)
+		AssertEqual(0, Published)
+		if Mode == "factory_throw" {
+			AssertEqual(0, Task.Starts)
+			AssertEqual(0, Task.Stops, "Lazy factory refusal returned no native task to terminate.")
+			AssertEqual(0, F.Flow.PullTask)
+			AssertTrue(F.Flow.CanReplace())
+		} else {
+			AssertEqual(1, Task.Starts)
+			AssertTrue(Task.Stops >= 1, "Cancellation attempts retirement of the exact returned task.")
+			if Retirement is Integer && Retirement == true {
+				AssertEqual(0, F.Flow.PullTask)
+				AssertTrue(F.Flow.CanReplace(), "Only canonical native closure acknowledges retirement.")
+			} else {
+				Owner := F.Flow.PullTask
+				AssertTrue(Owner is Map && Owner["task"] == Task)
+				AssertFalse(F.Flow.CanReplace(), "Refused or string retirement keeps exact native custody.")
+				AssertFalse(F.Flow._Pulled(Map("task", Task), 0), "A forged completion cannot retire the captured task owner.")
+				AssertTrue(F.Flow.PullTask == Owner)
+			}
+			Task.Complete()
+			Task.Complete()
+			AssertEqual(0, F.Flow.PullTask)
+			AssertTrue(F.Flow.CanReplace(), "Exact canonical completion settles otherwise unknown physical custody.")
+			AssertEqual(0, Published, "Late and duplicate completions cannot publish a cancelled request.")
+		}
+		AssertEqual(Bootstrap ? 1 : 0, F.FailedCalls)
+	} finally F.Close()
+}
+
+Test("managed bootstrap: READY native factory throw preserves bootstrap observer (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("factory_throw"))
+Test("managed bootstrap: READY native start false preserves bootstrap observer (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false"))
+Test("managed bootstrap: READY native start throw preserves bootstrap observer (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw"))
+Test("managed bootstrap: READY native start false retains string retirement debt (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false", "true"))
+Test("managed bootstrap: READY native start throw retains refused retirement debt (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw", false))
+Test("managed bootstrap: initial native factory throw still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("factory_throw", true, true))
+Test("managed bootstrap: initial native start false still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false", true, true))
+Test("managed bootstrap: initial native start throw still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw", true, true))
+Test("managed bootstrap: READY reentrant cancellation retains native failure custody (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_withdraw"))
