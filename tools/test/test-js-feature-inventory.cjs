@@ -49,6 +49,21 @@ assert.equal(
 	true
 );
 
+const portableNavigation = inventory.checks.filter(
+	(check) => check.args[0] === 'tools/test/run-nav-event-owner-portable.cjs'
+);
+assert.equal(portableNavigation.length, 1, 'portable navigation retains one execution owner');
+assert.deepEqual(portableNavigation[0].platforms, ['linux']);
+for (const platform of ['linux', 'win32', 'darwin']) {
+	assert.equal(
+		selectFeature(inventory, 'input-and-actions', platform).some(
+			(check) => check.id === portableNavigation[0].id
+		),
+		platform === 'linux',
+		`${platform}: the POSIX navigation fixture runs only on its supported host`
+	);
+}
+
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-js-feature-inventory-'));
 const fixtureRoot = path.join(temporaryRoot, 'fixture');
 const featuresRoot = path.join(fixtureRoot, 'tools/test/features');

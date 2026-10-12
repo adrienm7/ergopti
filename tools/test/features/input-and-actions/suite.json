@@ -16,7 +16,8 @@
 			"name": "Windows navigation executes every portable production C case",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/run-nav-event-owner-portable.cjs"],
-			"repro": "node tools/test/run-nav-event-owner-portable.cjs"
+			"repro": "node tools/test/run-nav-event-owner-portable.cjs",
+			"platforms": ["linux"]
 		},
 		{
 			"id": "js-0421",
