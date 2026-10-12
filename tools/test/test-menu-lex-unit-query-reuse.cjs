@@ -47,9 +47,34 @@ for (const [statement, expected] of [
 ]) {
 	assert.deepEqual(parser.positions(quoted, statement), expected);
 }
+for (const [statement, expected] of [
+	['"x"', [2]],
+	["'x'", [6]],
+	['[[x]]', [10]],
+	['x', []]
+]) {
+	assert.deepEqual(parser.positions(quoted, statement), expected, 'literal-leading token identity');
+}
 assert.deepEqual(parser.positions(parser.lex('emit("😀é")\r\nx = 1'), 'emit("😀é")'), [0]);
 assert.deepEqual(parser.positions(parser.lex('owner.x = 1\nowner:x()\nx = 2'), 'x'), [10]);
 assert.deepEqual(parser.positions(parser.lex('--[[ x = 1 ]]\nx = 2'), 'x'), [0]);
+
+// A cold query must inspect its possible starts, not every unrelated token.
+// The clock profile identified the scan; count actual reads without a flaky
+// wall-time threshold or changing any value observed by the matcher.
+const sparse = parser.lex('unrelated = 1\n'.repeat(1000) + 'needle = "wanted"\n');
+let sparseReads = 0;
+sparse.tokens = new Proxy(sparse.tokens, {
+	get(target, property, receiver) {
+		if (/^\d+$/.test(String(property))) sparseReads++;
+		return Reflect.get(target, property, receiver);
+	}
+});
+assert.deepEqual(parser.positions(sparse, 'needle = "wanted"'), [3000]);
+assert.ok(sparseReads <= 8, 'a cold sparse query must inspect only matching token starts');
+sparseReads = 0;
+assert.deepEqual(parser.positions(sparse, 'missing = "wanted"'), []);
+assert.equal(sparseReads, 0, 'a missing first token needs no source token scan');
 
 // Install a read-only observation port before the first query. The real unit's
 // token values remain intact; no global prototypes or parser operations change.
@@ -80,7 +105,7 @@ assert.deepEqual(parser.rootPositions(unit, 'x'), [0, 11]);
 reads = 0;
 const absent = parser.positions(unit, 'absent');
 assert.deepEqual(absent, []);
-assert.ok(reads > 0, 'changed query performs its own actual scan');
+assert.equal(reads, 0, 'an absent first token has no candidate to inspect');
 absent.push(999);
 reads = 0;
 assert.deepEqual(parser.positions(unit, 'absent'), []);

@@ -424,10 +424,17 @@ function luaPublicationParser() {
 		const tokens = scriptTokens(text, '.lua'),
 			scopes = [],
 			stack = [],
-			closes = new Map();
+			closes = new Map(),
+			firstTokenPositions = new Map();
 		let awaitingDo = 0;
 		for (let at = 0; at < tokens.length; at++) {
 			const token = tokens[at];
+			// Each unit owns one immutable token snapshot. Index possible starts
+			// while computing scopes so new queries do not rescan unrelated code.
+			if (!firstTokenPositions.has(token.kind)) firstTokenPositions.set(token.kind, new Map());
+			const values = firstTokenPositions.get(token.kind);
+			if (!values.has(token.value)) values.set(token.value, []);
+			values.get(token.value).push(at);
 			scopes[at] = stack.length;
 			// A closing Lua label is followed by structural code, not a method name.
 			// Actual Builder.load_top_level ends its native loop after ::continue::.
@@ -454,7 +461,9 @@ function luaPublicationParser() {
 				closes.set(block.at, at);
 			}
 		}
-		return stack.length ? null : { text, tokens, scopes, closes, statementPositions: new Map() };
+		return stack.length
+			? null
+			: { text, tokens, scopes, closes, firstTokenPositions, statementPositions: new Map() };
 	};
 	const positions = (unit, statement) => {
 		if (!unit) return [];
@@ -462,7 +471,10 @@ function luaPublicationParser() {
 		if (retained) return retained.slice();
 		const wanted = scriptTokens(statement, '.lua'),
 			found = [];
-		for (let at = 0; at < unit.tokens.length; at++) {
+		const starts = wanted.length
+			? (unit.firstTokenPositions.get(wanted[0].kind)?.get(wanted[0].value) ?? [])
+			: unit.tokens.keys();
+		for (const at of starts) {
 			if (['.', ':'].includes(unit.tokens[at - 1]?.value)) continue;
 			if (
 				wanted.every((token, offset) => {
