@@ -1,0 +1,45 @@
+{
+	"diagnosis": "UNKNOWN_SOURCE_SUPPORTED_WAIT_NOT_CAUSALLY_PROVEN",
+	"source_images_match_parent_before": true,
+	"original_controls": 14,
+	"outer_limit_ms": 60000,
+	"reviewer_tests_executed": false,
+	"source_pins": [
+		{
+			"path": "/workspace/ergopti/tools/test/native_pac_source_fixture_test.py",
+			"sha256": "18fad6d00795c34202f1379c52739fe17d83bf22b733ee23c2d7282ea4817be9",
+			"bytes": 17197
+		},
+		{
+			"path": "/workspace/ergopti/tools/test/test-native-pac-source-contract.cjs",
+			"sha256": "7a71d2c98243194cf71a7579cd1645ebc8849c0bbd1e8d7b7022d65f377f7df3",
+			"bytes": 28054
+		},
+		{
+			"path": "/workspace/ergopti/static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py",
+			"sha256": "a970fb81eb6d03939fa5908f9620c52ba22c4773b50aac9c5e6068fd40e2f75c",
+			"bytes": 16824
+		},
+		{
+			"path": "/workspace/.ergopti-cloud/continuation-2026-10-12/pac14-timeout-post-gate-readonly-v1/terminal.json",
+			"sha256": "1f465e29096be1c470bf3d4410c30483860024f4af407b93c5589f8e0d309fc5",
+			"bytes": 264
+		},
+		{
+			"path": "/workspace/.ergopti-cloud/continuation-2026-10-12/pac14-timeout-post-gate-readonly-v1/diagnostic.raw.log",
+			"sha256": "37a7ae6dc0a2c6a9f8176f00d86f023ab0b5ff4faf21146177b871e9394d2cfc",
+			"bytes": 2319
+		},
+		{
+			"path": "/workspace/.ergopti-cloud/continuation-2026-10-12/pac14-timeout-post-gate-readonly-v1/original-cjs.raw.log",
+			"sha256": "64d7ece7b1aeb1084f4752d4de42a176ab57e7dbe7bebde9a27bc5b5ef6cfac6",
+			"bytes": 220
+		},
+		{
+			"path": "/workspace/.ergopti-cloud/continuation-2026-10-12/pac14-timeout-post-gate-readonly-v1/command.json",
+			"sha256": "232e075a29f4ca112e378d053172cb2b077f7c568d7dd7021f063a86f134049c",
+			"bytes": 555
+		}
+	],
+	"report_sha256": "dba8d0747ae0fea0e213b76767c1d2403d2a54fb121e04f3f102b64f07bd9ae8"
+}

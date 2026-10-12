@@ -1,0 +1,17 @@
+{
+  "status": "AUTHENTICATED_REMOTE_GIT_SOURCE_OBJECTS; FEATURE_ANCESTRY_JOIN_PENDING",
+  "sha": "50863919e29095c78a5b1a18b55aadbfee5b8c8f",
+  "tree": "99358d1fbec4fa4644885e1cb7ea92e74817cb13",
+  "parents": [
+    "0dcfe101ed06fd82994d728d70abf2b7cf69be05",
+    "ba41b79db7f9b3618ba3290cff1516a6a9d5e797"
+  ],
+  "source_inputs": 21,
+  "native": false,
+  "feature_qualification": false,
+  "refs_moved_by_this_operation": false,
+  "push_workflows_triggered": false,
+  "source_object_url": "https://api.github.com/repos/adrienm7/ergopti/git/commits/50863919e29095c78a5b1a18b55aadbfee5b8c8f",
+  "peer_ref_changes": {},
+  "followup": "Use unchanged owner generator, selected gates, ordinary feature commit/push then normal source-identical ancestry merge/push before qualification."
+}

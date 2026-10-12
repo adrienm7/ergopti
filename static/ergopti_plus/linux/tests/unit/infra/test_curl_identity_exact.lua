@@ -226,3 +226,63 @@ helpers.describe("owned exact native descriptor observation", function()
 		helpers.assert_eq(#state.opens, 0)
 	end)
 end)
+
+
+helpers.describe("regular path exact identity under the existing closed native ledger", function()
+	for _, path in ipairs({ "relative/data.toml", "/independent/data.toml", "literal\r\nfilename.toml" }) do
+		local fixed = path
+		helpers.it("(exact-regular) retains filesystem pathname bytes through the regular entry", function()
+			local native, state = Ports.new({ planned_inode = "9223372036855917341" })
+			local owner = Exact.new(native)
+			local identity = owner:observe_regular(fixed)
+			helpers.assert_eq(identity.inode_decimal, "9223372036855917341")
+			helpers.assert_eq(state.opens[1].path, fixed)
+			helpers.assert_eq(#state.opens, 2)
+			helpers.assert_eq(#state.closes, 2)
+			helpers.assert_true(owner:is_settled())
+		end)
+	end
+	for _, path in ipairs({ "", "bad\0name", string.rep("x", 4097) }) do
+		local fixed = path
+		helpers.it("(exact-regular) seals a rejected regular pathname before native acquisition", function()
+			local native, state = Ports.new()
+			local owner = Exact.new(native)
+			helpers.assert_nil(owner:observe_regular(fixed))
+			helpers.assert_true(owner:is_settled())
+			helpers.assert_eq(#state.opens, 0)
+		end)
+	end
+	helpers.it("(exact-regular) does not relax the original planned executable restriction", function()
+		for _, path in ipairs({ "relative/data.toml", "/literal\r\nfilename" }) do
+			local native, state = Ports.new()
+			local owner = Exact.new(native)
+			helpers.assert_nil(owner:observe_planned(path))
+			helpers.assert_true(owner:is_settled())
+			helpers.assert_eq(#state.opens, 0)
+		end
+	end)
+	for _, shape in ipairs({ "false", "nil", "throw" }) do
+		local fixed = shape
+		helpers.it("(exact-regular) retains the original ambiguous-close ledger for " .. shape, function()
+			local native, state = Ports.new()
+			local close = native.fs_close
+			local calls = 0
+			native.fs_close = function(fd)
+				calls = calls + 1
+				local result = close(fd)
+				if calls == 1 then
+					if fixed == "throw" then error("independent ambiguous close") end
+					if fixed == "false" then return false end
+					return nil
+				end
+				return result
+			end
+			local owner = Exact.new(native)
+			helpers.assert_nil(owner:observe_regular("relative/data.toml"))
+			helpers.assert_eq(owner:is_settled(), false)
+			helpers.assert_eq(#state.closes, 2)
+			owner:cancel(); owner:cancel()
+			helpers.assert_eq(#state.closes, 2, "uncertain descriptors never regain destructive close authority")
+		end)
+	end
+end)

@@ -10912,6 +10912,74 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   committed-source metadata is generated and independently received. No native
   AHK, physical AltGr, simultaneous engine or installation proof follows.
 
+  The shared AHK source-image prerequisite is enrolled in the ordinary Windows
+  unit runner with sixteen independent cases. It preserves the original scalar
+  comparison API and observes original Map modes and typed keys, Array order and
+  holes, typed TOML Boolean wrappers, and generated action Fn/Key/Mods facts.
+  Genuine method Call descriptors and same-function own-Call refusal retain the
+  original normal-boot intrinsic custody premise. The authentic gesture factory,
+  generated data, writer, TOML and native text adapter remain the original test
+  dependencies. All sixteen shipped-AHK cases and native parser execution remain
+  unrun at source admission; targeted Windows CI must qualify them. This test-only
+  enrollment changes no production boot, defaults or simultaneous-input availability
+  and issues no input/modifier/output authority. Item91 remains partial.
+
+  The existing Windows `--ahk` CI contract also dry-loads the authentic whole
+  runner, then executes these sixteen independently named cases before the
+  ordinary full suite. Complete TAP/stdout equality, stderr, native exit, timing
+  and committed-source joins remain mandatory under the existing 30-second
+  native-probe budget. Twenty-two portable receiver controls pass; three causal
+  omissions fail as expected. Actual AHK execution remains unrun. This scoped
+  receipt cannot qualify or bypass the original full-suite watchdog.
+
+  The updater diagnostic now declares the exact committed Snapshot runner
+  source image. The other twenty source pins, historical provenance and
+  independent twenty-three-label oracle remain unchanged; source declarations
+  do not qualify native updater or Snapshot execution.
+
+  Reviewed inactive source preparations and the remaining software, native-CI
+  and device checks are preserved in the 2026-10-12 Group3 handover. Its archive
+  is not an installed feature or a native qualification; all thirteen items
+  and the transversal validation requirements remain open.
+
+  The Snapshot source census now queries only its Windows/shared roots and four
+  authenticated helpers. Real Git receiving reproduces the original ENOBUFS
+  before native launch and preserves all 3,040 admitted source/blob pairs with
+  the finite query; removing any of its six path arguments loses required
+  inputs. All 22 controlled receiving cases, the independent 16-case oracle,
+  default capture limit and original deadlines remain unchanged. Actual native
+  Snapshot and full Windows qualification remain required after this correction.
+
+  Exact hosted Windows receiving at `6b498d643` now passes all 22 controlled
+  Snapshot cases before refusing complete stdout/TAP equality. The failing
+  mode and byte cause remain unknown; no 16-case native qualification is claimed.
+  Supplemental diagnostics retain actual closed lengths, digests, bounded byte
+  previews, phase and exit facts without changing the strict receiver, original
+  cases or budgets. All 7 modeled metadata controls pass with all 22 old controls
+  and five real-child guards; omitting only the optional TAP observer guard fails
+  exact primary-error preservation. A diagnostic fault cannot grant native success.
+
+  The resolved October 12 BA41 source checkpoint completed with selected
+  exit 1: JS 423/426, simulated macOS 18,991 passed / 6 failed, Linux units
+  13,542 passed / 0 failed, Linux E2E 165/175. Actual Linux HTTP checks pass.
+  The unchanged three JS guards fail identically on both complete Git archives.
+  Newer Dev repairs and native receiving remain separate requirements; see
+  the Group 3 handover partial receipt. No qualification or item completion
+  is claimed from this saved source checkpoint.
+
+  The latest Dev composition passes 18,998 simulated macOS units, 101
+  simulated macOS E2E cases, 13,544 Linux units and 193 Linux E2E cases.
+  Actual Linux HTTP checks pass; full source/index/HEAD receiving is exact.
+  Two inherited JS guards remain red (424/426) and Root owns their correction.
+  Windows, native Darwin, package/install and device receiving remain open;
+  the Group 3 handover retains the exact partial result.
+
+  The current updater source seal is generated from published feature source
+  `0ec756d467fbf81b501baebb2aed1737b7aa609d` under the finite Group 6 source grant.
+  All 21 source images, protected 18/4/1/UNRUN fields and the independent
+  oracle are retained. This supplies no native Snapshot, whole-suite or
+  updater outcome; the later Group 3 handover retains exact receiving.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -11127,6 +11195,13 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   qualify physical buffered input, output or installed delivery; item93 and
   transverse16/38 remain open.
 
+  Linux bundled hotstring routes now preserve exact file identities, including
+  inode values above Lua numeric precision. Safe integer metadata is serialized
+  exactly; unsafe numeric metadata uses the existing native descriptor ledger.
+  Shipped files are neither copied nor materialized. Native input/output,
+  installed-runtime and final-source hosted qualification remain required;
+  item93 and transverse16/38 remain open.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
@@ -11238,6 +11313,26 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   or packaged acceptance. The remaining native source/collision/output work stays
   required.
 
+  Window closure now requires the original Editor's literal acknowledgement
+  before the captured native page is closed. Cancellation refusal retains the
+  exact observation for retry; native refusal after Editor closure retries only
+  the original native port. Reentry and external page retirement cannot borrow
+  either acknowledgement. All 37 previous and 14 additional controlled cases
+  pass on LuaJIT and Lua 5.4; the original fails all 14 additions and five guard
+  omissions fail. Native GUI, capture and output qualification remain open;
+  this optional session contract does not enable physical delivery.
+
+  The shared browser now omits the optional previous-slot field for Add;
+  Edit preserves its exact displayed prior identity. The real legacy JSON
+  decoder turns null into an object, so the old Add packet was refused before
+  the picker. Actual Chromium packets joined to the unchanged JSON, Window and
+  Editor reproduce 8 passes / 1 failure originally and 9 passes / 0 failures
+  with the correction on both Lua ABIs. Edit and seven malformed/foreign
+  requests retain their original refusals. The registered browser scenario adds
+  independent exact Add/Edit wire checks, and the shared contract preserves
+  all 51 prior cases with nine appended controls. Native GUI, capture, assignment
+  and output qualification remain required; physical delivery stays unavailable.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -11252,6 +11347,9 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   star-migration authority; native capture and the software work below remain.
   The same acknowledged-draft boundary from item 97 also protects this
   editor; it adds no position, collision, migration or output authority.
+
+  Item 97's closure acknowledgements also protect this editor. Native GUI,
+  source/modifier/output custody and acknowledged star migration remain open.
 
   Remaining software: complete item 97's native capture/source/collision/output
   owners and prove acknowledged star-setting migration while preserving occupied
@@ -11941,6 +12039,25 @@ permission receiving and catalogue discovery still require Mac CI. This is a
 diagnostic correction, not consent, invocation or installed acceptance; item106
 remains partial.
 
+Personal PowerShell scripts are discoverable on Linux and macOS when pwsh
+is available. Missing interpreters retain the existing unavailable reason;
+Windows command preference, literal arguments, interpreter/script identity
+checks and native execution retirement remain unchanged. Actual Linux
+execution has a separate genuine PowerShell receipt; controlled macOS
+metadata tests do not qualify native macOS execution. Hosted and installed
+PowerShell acceptance and the other automation work keep item106 partial.
+
+The existing Apple Shortcuts invocation adapter now delivers its original
+transport, admission or start refusal to the current consumer while retaining
+unacknowledged native cancellation debt. Synchronous completion waits for a
+literal start acknowledgement; callbacks invalidated during cancellation cannot
+publish stale results. The original 56 controlled cases remain byte-exact, with
+21 additive cases. Actual component receiving passes 77/0 on both Lua ABIs;
+the predecessor with those additions passes 64 and fails 13, and five causal
+omissions fail independently. Discovery, native availability and the 20-second
+fence remain unchanged. Full selected and native/installed qualification remain
+required; these component receipts do not complete item 106.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
@@ -12278,6 +12395,13 @@ SDK constants qualify the native Swift Shortcuts product or remote invocation.
   moved cursors, spanning/negative/minimized/closed windows and refused activation.
   Virtual RandR regions and posted-event success cannot prove physical display
   behavior or Dock consumption/modifier retirement.
+
+The received passive Linux window-search diagnostic preserves the original
+five-second deadline, query predicates, window ID and exact refusal/cancellation
+owners. It exposes only fixed title enums, status and UTF-8 byte counts from
+the last completed native search. All thirteen original helper controls pass
+on the joined sources; they execute no hardware main or native GUI. The final
+native source, package and installed window acceptance remains unqualified.
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.

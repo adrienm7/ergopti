@@ -12,7 +12,7 @@ local RAW = [[{"version":1,"providers":[
 local CONFIG = "/Users/élise/ErgoptiPlus"
 local ROOT = CONFIG .. "/scripts"
 
-local function with_native(body)
+local function with_native(body, catalogue)
 	local saved, old_hs, old_open, old_getenv = {}, _G.hs, io.open, os.getenv
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local native = { files = {}, directories = {}, links = {}, logs = {}, closes = 0, pulls = 0, opened = {}, close_handles = {}, config = CONFIG }
@@ -75,7 +75,7 @@ local function with_native(body)
 			helpers.assert_eq(mode, "rb")
 			native.opened[#native.opened + 1] = path
 			if path == "/shared/modules/actions/program_providers.json" then
-				local handle = { read = function() return RAW end }
+				local handle = { read = function() return catalogue or RAW end }
 				function handle:close()
 					native.close_handles[#native.close_handles + 1] = self
 					if native.on_close then native.on_close(path) end
@@ -392,4 +392,41 @@ helpers.describe("native provider fixture scalar boundary", function()
 				argv_count_equal = true, script_argument_equal = true })
 		end)
 	end)
+end)
+
+
+--- Actual bundled provider data, with explicitly controlled Hammerspoon metadata.
+helpers.describe("macOS PowerShell provider metadata boundary", function()
+	local file = assert(io.open(helpers.shared("modules/actions/program_providers.json"), "rb"))
+	local catalogue = file:read("*a"); assert(file:close())
+	for _, available in ipairs({ true, false }) do
+		helpers.it("uses the bundled PowerShell contract with pwsh availability " .. tostring(available), function()
+			with_native(function(adapter, native)
+				local name = "PowerShell été 日本.ps1"
+				native.directories[ROOT] = { name }
+				native.file(ROOT .. "/" .. name, "file", "rw-------")
+				if available then native.file("/bin/pwsh", "file", "rwxr-xr-x") end
+				local owner = assert(adapter.create())
+				local packet = assert(owner.discover())
+				helpers.assert_eq(#packet.providers, 5)
+				if not available then
+					helpers.assert_eq(packet.providers[4], { id = "powershell", available = false, reason = "interpreter_unavailable" })
+					helpers.assert_eq(packet.choices, {})
+					return
+				end
+				helpers.assert_eq(packet.providers[4], { id = "powershell", available = true })
+				helpers.assert_eq(#packet.choices, 1)
+				helpers.assert_eq(packet.choices[1].provider, "powershell")
+				local scalar = assert(owner.resolve(packet.choices[1].key, { "", "two words", "$(literal)`quote`", "日本" }))
+				local parsed = assert(require("program_parameter").parse(scalar, "hs"))
+				helpers.assert_eq(parsed.executable, "/bin/pwsh")
+				helpers.assert_eq(parsed.arguments, {
+					"-NoProfile", "-NonInteractive", "-File", ROOT .. "/" .. name,
+					"", "two words", "$(literal)`quote`", "日本",
+				})
+				native.file("/bin/pwsh", "file", "rwxr-xr-x")
+				helpers.assert_eq(owner.resolve(packet.choices[1].key, {}), nil, "a changed actual metadata receipt revokes the choice")
+			end, catalogue)
+		end)
+	end
 end)
