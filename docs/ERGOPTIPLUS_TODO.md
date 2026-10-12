@@ -5540,8 +5540,19 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   runner/Snapshot/source-helper changes on `80d4588` require fresh current-source
   receiving; full unit, E2E, packaging, installation and device acceptance remain
   pending. The 6,164 original warnings are retained, without a clean-warning
-  claim. Source-pin resealing follows the actual correction commit through its
-  owning generator and preserves the independent behavior oracle.
+  claim. The source seal is regenerated from correction commit
+  `ae3ea68eab70c6089d7149902ed49fc459c676de` through
+  `seal-windows-updater-original-source.cjs`. Only the configuration source
+  fingerprint and source commit change; all 21 paths, protected fields and
+  independent original cohort expectations remain intact. The unchanged
+  portable source-admission test passes all 22 controls after generation.
+  The initial selected local gate reports 421/426 JavaScript checks passed:
+  stale-source admission, two existing Lua source guards, the protected Git
+  ancestor uninstall fixture and insufficient temporary space for a genuine
+  Linux clone remain separately recorded. The unchanged clone/C/header/ELF
+  test passes after verified archival of completed owned fixtures; the unchanged
+  uninstall test separately passes outside a Git ancestor. These replays do not
+  turn the original suite into a wholly successful run or qualify Windows.
 
   Windows direct full-save intent is now recorded before the unchanged unsafe
   serializer refusal. The existing safe path resolver refuses absent or empty
