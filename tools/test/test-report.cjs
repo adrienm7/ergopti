@@ -313,9 +313,9 @@ async function testOutputDrain() {
 		runner,
 		"const fs = require('node:fs'); process.stdout.write(fs.readFileSync(process.argv[2])); process.exitCode = Number(process.argv[3]);\n"
 	);
-	function collect(args) {
+	function collect(args, nodeArgs = []) {
 		return new Promise((resolve, reject) => {
-			const child = spawn(process.execPath, [reporter, ...args], {
+			const child = spawn(process.execPath, [...nodeArgs, reporter, ...args], {
 				env: { ...process.env, GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: '' }
 			});
 			const output = [],
@@ -465,6 +465,105 @@ async function testOutputDrain() {
 				success.signal === null &&
 				success.stdout.includes('(exit 0, format tap).\n')
 		);
+
+		// Observe a real close(code=null, signal) on every host, including Windows.
+		// The preload owns only the reporter's returned child; no close event is fabricated.
+		const signalRunner = path.join(folder, 'signal-runner.cjs');
+		const signalPreload = path.join(folder, 'signal-preload.cjs');
+		fs.writeFileSync(
+			signalRunner,
+			"const fs = require('node:fs'); process.stdout.write(fs.readFileSync(process.argv[2])); " +
+				'setTimeout(() => { process.exitCode = 92; }, 3000);\n'
+		);
+		fs.writeFileSync(
+			signalPreload,
+			[
+				"const cp = require('node:child_process');",
+				"const fs = require('node:fs');",
+				"const assert = require('node:assert/strict');",
+				'const originalSpawn = cp.spawn;',
+				'cp.spawn = (command, args, options) => {',
+				'  assert.equal(command, process.execPath);',
+				'  assert.equal(args[0], ' + JSON.stringify(signalRunner) + ');',
+				'  const expected = fs.readFileSync(args[1]);',
+				'  const child = originalSpawn(command, args, options);',
+				'  let output = Buffer.alloc(0), requested = false, killed = false;',
+				"  child.stdout.on('data', (chunk) => {",
+				'    output = Buffer.concat([output, chunk]);',
+				'    if (!requested && output.equals(expected)) {',
+				'      requested = true;',
+				'      killed = child.kill(args[3]);',
+				'    }',
+				'  });',
+				"  child.on('close', (code, signal) => {",
+				"    fs.writeFileSync(args[2], JSON.stringify({ pid: child.pid, code, signal, requested, killed }), { flag: 'wx' });",
+				'  });',
+				'  return child;',
+				'};',
+				''
+			].join('\n')
+		);
+		for (const [label, output] of [
+			['footer', 'ok 1 - inert owned child\n# 1 passed, 0 failed\n'],
+			['partial', 'ok 1 - inert owned child\n']
+		]) {
+			for (const signal of ['SIGTERM', 'SIGKILL']) {
+				const observed = path.join(folder, label + '-' + signal + '.json');
+				fs.writeFileSync(transcript, output);
+				const result = await collect(
+					[
+						'--name',
+						'signal-child',
+						'--json',
+						jsonPath,
+						'--',
+						process.execPath,
+						signalRunner,
+						transcript,
+						observed,
+						signal
+					],
+					['--require', signalPreload]
+				);
+				const actual = JSON.parse(fs.readFileSync(observed, 'utf8'));
+				check(
+					'signal fixture observes the actual owned child termination',
+					Number.isSafeInteger(actual.pid) &&
+						actual.pid > 0 &&
+						actual.requested &&
+						actual.killed &&
+						actual.code === null &&
+						actual.signal === signal
+				);
+				check(
+					'signal termination cannot become reporter exit0',
+					result.code === 1 && result.signal === null
+				);
+				const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+				check(
+					'signal receipt preserves the termination cause',
+					json.exit_code === 1 && json.signal === signal
+				);
+				check('signal termination retains original stdout bytes', result.stdout.startsWith(output));
+				check(
+					'signal diagnostic names the actual cause',
+					result.stderr === '[report:signal-child] child terminated by signal ' + signal + '\n'
+				);
+				const terminal = result.stdout
+					.split('\n')
+					.find((line) => line.startsWith('[report:signal-child]'));
+				check(
+					'signal summary cannot advertise PASS',
+					terminal && terminal.includes('FAIL') && !terminal.includes('PASS')
+				);
+				check(
+					'signal handling preserves terminal count availability',
+					json.counts_available === (label === 'footer') &&
+						json.passed === (label === 'footer' ? 1 : null) &&
+						json.failed === (label === 'footer' ? 0 : null)
+				);
+			}
+		}
 		const refused = await collect([
 			'--name',
 			'spawn-refused',
