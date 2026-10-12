@@ -80,8 +80,10 @@ function M.new(options)
 	--- Rebinds logical view membership without acknowledging any native cleanup.
 	--- Older waiters remain captured for the next complete current sweep.
 	--- @param next_order table Ordered unique public view identifiers.
+	--- @param refresh boolean|nil Forces a fresh captured source with unchanged membership.
 	--- @return boolean changed
-	function controller.set_order(next_order)
+	function controller.set_order(next_order, refresh)
+		assert(refresh == nil or type(refresh) == "boolean", "local discovery refresh must be boolean")
 		assert(type(next_order) == "table", "local discovery view order is required")
 		local captured, seen, count = {}, {}, 0
 		for key, id in pairs(next_order) do
@@ -91,7 +93,7 @@ function M.new(options)
 			captured[key], seen[id], count = id, true, count + 1
 		end
 		assert(count == #next_order, "local discovery view order must be complete")
-		local changed = #order ~= #captured
+		local changed = refresh == true or #order ~= #captured
 		for index, id in ipairs(captured) do if order[index] ~= id then changed = true end end
 		if not changed then return false end
 		order = captured

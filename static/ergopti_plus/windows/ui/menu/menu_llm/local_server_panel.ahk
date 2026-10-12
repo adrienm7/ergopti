@@ -262,6 +262,8 @@ class LLM_LocalServerPanel {
 			this.Order := Projection["order"].Clone()
 			this.Servers := Projection["servers"]
 			if Projection["stale"] {
+				; A freshly checked source cannot display the old source's model list.
+				this.LastSnapshot := 0
 				; Discovery is optional work: a menu build must not enter managed
 				; HTTP acquisition or hold the driver's startup readiness stack.
 				this._QueueDiscovery(Source)

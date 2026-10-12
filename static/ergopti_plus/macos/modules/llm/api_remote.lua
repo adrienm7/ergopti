@@ -2858,7 +2858,7 @@ end
 --- @return boolean changed
 function M.refresh_local_server_views()
 	local order, views = AuthPolicy.configured_views(_entries, LocalServers.SERVERS, M.PROVIDERS)
-	local changed = LocalServers.configure_views(order, views)
+	local changed = LocalServers.configure_views(order, views, _identity_generation)
 	for id, client in pairs(_local_probe_clients) do
 		if id:match("^configured:") and views[id] == nil and not _retiring_local_probe_clients[client] then
 			local function release()

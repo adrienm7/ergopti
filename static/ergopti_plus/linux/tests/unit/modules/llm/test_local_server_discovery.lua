@@ -543,3 +543,80 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 		end)
 	end
 end)
+
+helpers.describe("Private discovery cache origin (local-cache-identity)",function()
+	for _,change in ipairs({"url","provider","token","root_metadata","foreign_row","same_bytes_reload"}) do
+		helpers.it("refreshes actual menu cache after same-ID "..change.." source change (local-cache-identity)",function()
+			isolated(function(servers,entries,calls,path)
+				local entry=assert(entries.add({provider="openai",label="Personal",model="before",token="initial-token",
+					base_url="http://127.0.0.1:54321/v1"}))
+				local id="configured:"..entry.id
+				local Rows=require("ui.menu.local_server_rows")
+				local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return true end}
+				local function build() return Rows.rows(llm,{},function() end,{is_paused=function() return false end}) end
+				build()
+				for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
+				calls[5].finish(models("old-server-model"))
+				helpers.assert_true(find(build(),"old-server-model")~=nil)
+				local held=servers.capture(id)
+				local reader=assert(io.open(path,"rb"));local bytes=reader:read("*a");reader:close()
+				local raw=assert(Json.decode_lossless(bytes))
+				if change=="url" then raw.entries[1].base_url="http://127.0.0.1:54322/v1"
+				elseif change=="provider" then raw.entries[1].provider="openai_compat"
+				elseif change=="token" then raw.entries[1].token="replacement-token"
+				elseif change=="root_metadata" then raw.foreign={marker="replacement"}
+				elseif change=="foreign_row" then raw.entries[2]={id="foreign",provider="future",label="Foreign",model="opaque",token="foreign-key",base_url="https://example.invalid/v1"} end
+				local writer=assert(io.open(path,"wb"));writer:write(change=="same_bytes_reload" and bytes or Json.encode(raw));writer:close()
+				entries._set_path_for_test(path)
+				local rows=build()
+				helpers.assert_nil(find(rows,"old-server-model"),"same-ID source change cannot present the previous server's cached model")
+				helpers.assert_eq(#calls,10,"actual rows refresh before the cache age decision")
+				helpers.assert_nil(servers.result(id),"new source receipts cannot inherit an old verdict")
+				helpers.assert_nil(servers.apply(held,{model="old-server-model"},function() return true end))
+				helpers.assert_nil(servers.apply(servers.capture(id),{model="old-server-model"},function() return true end))
+				calls[5].callback(models("obsolete-late"))
+				for index=6,9 do calls[index].finish({ok=false,status=0,body=""}) end
+				calls[10].finish(models("current-server-model"))
+				helpers.assert_true(find(build(),"current-server-model")~=nil)
+				helpers.assert_eq(servers.result(id).models[1],"current-server-model")
+				helpers.assert_eq(entries.get(entry.id).model,"before")
+			end)
+		end)
+	end
+end)
+
+helpers.describe("Same-ID native cache retirement (local-cache-identity)",function()
+	helpers.it("retains exact native cleanup debt during a same-ID credential-source refresh (local-cache-identity)",function()
+		isolated(function(servers,entries,calls,path)
+			local entry=assert(entries.add({provider="openai",label="Personal",model="before",token="initial",
+				base_url="http://127.0.0.1:54321/v1"}))
+			local id="configured:"..entry.id
+			local Rows=require("ui.menu.local_server_rows")
+			local function build() return Rows.rows({get_backend=function() return "ollama" end,
+				can_configure_local_servers=function() return true end},{},function() end,{is_paused=function() return false end}) end
+			build()
+			for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
+			calls[5].finish(models("old-model"))
+			servers.rescan(function() return true end)
+			helpers.assert_eq(#calls,10)
+			local reader=assert(io.open(path,"rb"));local raw=assert(Json.decode_lossless(reader:read("*a")));reader:close()
+			raw.entries[1].token="replacement"
+			local writer=assert(io.open(path,"wb"));writer:write(Json.encode(raw));writer:close()
+			entries._set_path_for_test(path)
+			helpers.assert_nil(find(build(),"old-model"))
+			helpers.assert_eq(#calls,10,"new jobs wait behind five exact original native owners")
+			for index=6,10 do helpers.assert_eq(calls[index].cancelled,2,"source fencing and successor admission each request exact cancellation") end
+			calls[10].callback(models("obsolete"))
+			helpers.assert_nil(servers.result(id))
+			calls[6].finish(models("obsolete"))
+			helpers.assert_eq(#calls,11,"only one physically retired catalogue owner admits its successor")
+			for index=7,10 do calls[index].finish(models("obsolete")) end
+			helpers.assert_eq(#calls,15)
+			helpers.assert_eq(calls[15].headers.Authorization,"Bearer replacement")
+			for index=11,14 do calls[index].finish({ok=false,status=0,body=""}) end
+			calls[15].finish(models("new-model"))
+			helpers.assert_true(find(build(),"new-model")~=nil)
+			helpers.assert_nil(find(build(),"obsolete"))
+		end)
+	end)
+end)

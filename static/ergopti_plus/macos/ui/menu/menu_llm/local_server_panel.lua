@@ -364,10 +364,9 @@ function M.rows(ctx)
 	end
 	_ctx = ctx
 	servers().set_failure_handler(on_failure)
-	-- A paused script sends nothing: the rows keep the last verdicts
-	if admitted(ctx) and servers().is_stale() then M.rescan(ctx) end
-
+	-- Source provenance is refreshed before cache age can grant a model view.
 	api_remote.refresh_local_server_views()
+	if admitted(ctx) and servers().is_stale() then M.rescan(ctx) end
 	local data = servers()
 	local receipts = {}
 	for _, id in ipairs(data.view_order()) do receipts[id] = capture_view(id) end

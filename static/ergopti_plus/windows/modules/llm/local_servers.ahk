@@ -130,12 +130,19 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				}
 			}
 		}
+		; The already source-fenced batch also detects secret-only target changes.
+		if !Changed && this.Cache is Map {
+			Targets := this._DisplayTargets(Projection["entries"])
+			for Id in Order
+				if !this.Cache["targets"].Has(Id) || !this._SameTarget(this.Cache["targets"][Id], Targets[Id])
+					Changed := true
+		}
 		PreviousCritical := Critical("On")
 		try {
 			if this.Closed || A_IsSuspended
 				return false
 			if Changed {
-				this.Controller.SetOrder(Order)
+				this.Controller.SetOrder(Order, true)
 				this.Order := Order
 				this.Servers := Servers
 				this.Models.Options["servers"] := Servers

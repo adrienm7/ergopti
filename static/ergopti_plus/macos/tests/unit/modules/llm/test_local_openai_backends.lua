@@ -596,8 +596,11 @@ helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backend
 			helpers.assert_eq(world.persists, 1)
 			helpers.assert_eq(world.activations, 1, "the API backend is selected")
 
-			-- Choosing another model reuses the one entry of the server
+			-- The acknowledged new source needs its own models receipt before reuse.
 			ctx.state.llm_backend = "api"
+			rows = Panel.rows(ctx)
+			helpers.assert_eq(#world.probes, 8, "the stored entry identity starts one fresh joint sweep")
+			answer_sweep(world, { omlx = models_answer({ "Qwen3-8B-4bit", "gemma-3-4b-it" }) })
 			rows = Panel.rows(ctx)
 			omlx = row_starting(rows, "oMLX")
 			helpers.assert_eq(omlx.checked, true)
@@ -991,6 +994,34 @@ helpers.describe("Configured local menu leases and native pause (local-configure
 			helpers.assert_eq(selected, false); helpers.assert_eq(api.get_entries(), { newer })
 			helpers.assert_eq(api.get_active_entry_id(), newer.id)
 			helpers.assert_eq(world.activations, 0)
+		end)
+	end)
+end)
+
+helpers.describe("Local models cache source identity (local-configured-cache)", function()
+	helpers.it("same view membership clears cached models before a changed configured source is shown (local-configured-cache)", function()
+		with_panel(function(Panel, api, LocalServers, world, ctx)
+			local id = "configured:personal"
+			local clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
+			clients[id] = { cancel = function() return true end, isSettled = function() return true end,
+				onSettled = function(callback) callback(); return true end,
+				get = function(url, headers, callback)
+					world.probes[#world.probes + 1] = { id = id, url = url, headers = headers, callback = callback }; return true
+				end }
+			api.set_entries({ { id = "personal", provider = "openai", token = "", model = "before", base_url = "http://localhost:19423/first/v1" } })
+			api.detect_local_servers()
+			world.probe(id).callback(models_answer({ "old-source-model" })); answer_sweep(world, {})
+			helpers.assert_eq(LocalServers.result(id).models, { "old-source-model" })
+			local changed = { id = "personal", provider = "openai_compat", token = "", model = "newer", base_url = "http://localhost:19423/second/v1" }
+			api.set_entries({ changed })
+			local before = #world.probes
+			local rows = Panel.rows(ctx)
+			helpers.assert_eq(LocalServers.result(id), nil, "same view id cannot retain another source's model receipt")
+			helpers.assert_eq(#world.probes - before, 5, "actual rows start one fresh joint sweep before displaying models")
+			helpers.assert_eq(world.probe(id).url, changed.base_url .. "/models")
+			for _, row in ipairs(rows) do
+				for _, item in ipairs(row.items or {}) do helpers.assert_eq(item.label == "old-source-model", false) end
+			end
 		end)
 	end)
 end)
