@@ -382,6 +382,6 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	);
 };
 
-// The registered CLI loads the existing qualification owner, which receives
-// this cached export and runs every scoped control exactly once.
-if (require.main === module) require('./test-macos-dev-qualification-deferral.cjs');
+// The standalone CLI executes its exported owner with the shared exact selector.
+if (require.main === module)
+	module.exports(require('./test-macos-dev-qualification-deferral.cjs').item36Context());

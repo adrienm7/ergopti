@@ -5034,7 +5034,7 @@ for (const [name, from, to] of [
 }
 
 // The temporary Mac exception still requires closed context and retained gates.
-require('./test-macos-dev-qualification-deferral.cjs');
+require('./test-macos-dev-qualification-deferral.cjs').run({ includeLeafControls: false });
 
 // GitHub Pages reads the domain from the deployed root after each replacement.
 const siteRoot = path.resolve(__dirname, '../..');

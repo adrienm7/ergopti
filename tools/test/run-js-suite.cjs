@@ -34,6 +34,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'native qualification JS controls have one default/full and direct CLI owner',
+		cmd: process.execPath,
+		args: ['tools/test/test-js-native-qualification-ownership.cjs'],
+		repro: 'node tools/test/test-js-native-qualification-ownership.cjs'
+	},
+	{
 		name: 'Windows API form retains modal source authority and durable publication',
 		cmd: process.execPath,
 		args: ['tools/test/test-windows-api-add-production.cjs'],

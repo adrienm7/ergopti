@@ -409,9 +409,9 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		'PASS: native PAC/WPAD selected-cohort portable controls=82; actual Darwin/native14 execution UNRUN.'
 	);
 };
-// A normal suite entry executes the complete owning source guard, which invokes
-// this module after defining its exact selector. There is no import-only waiver.
-if (require.main === module) require('./test-macos-dev-qualification-deferral.cjs');
+// The standalone CLI executes its exported owner with the shared exact selector.
+if (require.main === module)
+	module.exports(require('./test-macos-dev-qualification-deferral.cjs').pacContext());
 
 /** Independently discovered Worker12 remains mandatory under the exact v1.0.1 scope. */
 function stableV101PacCollectorControls(repository) {
