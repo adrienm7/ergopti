@@ -365,7 +365,8 @@ const OPENS_SUBMENU = {
 			menu: 'shortcut_extension_result_frame',
 			platforms: ['ahk'],
 			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_shortcuts.ahk' }
+			observed_construction: true,
+			native_sources: { ahk: 'windows/infra/manifest_menu.ahk' }
 		},
 		{
 			menu: 'shortcut_extension_boundary',
@@ -380,8 +381,9 @@ const OPENS_SUBMENU = {
 			menu: 'shortcut_extension_error_frame',
 			platforms: ['ahk', 'linux'],
 			kind: 'compose',
+			observed_construction: true,
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				ahk: 'windows/infra/manifest_menu.ahk',
 				linux: 'linux/ui/menu/menu_builder.lua'
 			}
 		},
@@ -389,7 +391,8 @@ const OPENS_SUBMENU = {
 			menu: 'shortcut_extension_empty_frame',
 			platforms: ['ahk'],
 			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/menu/menu_shortcuts.ahk' }
+			observed_construction: true,
+			native_sources: { ahk: 'windows/infra/manifest_menu.ahk' }
 		}
 	],
 	// Native wrap providers compose these fixed fragments into their existing picker.
@@ -5397,6 +5400,241 @@ function personalInfoProviderComposition(source, declarations, platform) {
 }
 
 /** This mode belongs only to the genuine Windows declared personal DATA frame. */
+
+// One finite construction publication: genuine UI handoff plus declared interpreter operators.
+function shortcutConstructionPublication(sources, target, nativeFile) {
+	const assert = require('node:assert/strict');
+	const windows = sources['windows/ui/menu/menu_shortcuts.ahk'];
+	const nativeRenderer = sources['windows/infra/manifest_menu.ahk'];
+	const policy = manifest.shortcut_extension_construction_ahk;
+	const same = require('node:util').isDeepStrictEqual;
+	// The three original obligations follow the same real construction path:
+	// both complete markers are admitted before allocation; the unchanged result
+	// frame alone maps the three observed failure states to those markers.
+	if (
+		nativeFile !== 'windows/infra/manifest_menu.ahk' ||
+		![
+			'shortcut_extension_result_frame',
+			'shortcut_extension_error_frame',
+			'shortcut_extension_empty_frame'
+		].includes(target) ||
+		!policy ||
+		policy.kind !== 'owned_native_menu' ||
+		policy.platform !== 'ahk' ||
+		!same(Object.keys(policy).sort(), [
+			'append_outcomes',
+			'kind',
+			'platform',
+			'program',
+			'result_frame'
+		]) ||
+		!same(policy.program, [
+			'admit_markers',
+			'allocate_owned_menu',
+			'observe_native_builder',
+			'place_observed_result'
+		]) ||
+		policy.result_frame !== 'shortcut_extension_result_frame' ||
+		!Array.isArray(policy.append_outcomes) ||
+		policy.append_outcomes.length !== 3 ||
+		!same(policy.append_outcomes.slice().sort(), ['empty', 'failed', 'missing']) ||
+		!same(manifest.shortcut_extension_result_frame, [
+			{
+				type: 'include',
+				section: 'shortcut_extension_error_frame',
+				present_when: 'shortcut_extension_builder_failed'
+			},
+			{
+				type: 'include',
+				section: 'shortcut_extension_error_frame',
+				present_when: 'shortcut_extension_builder_empty'
+			},
+			{
+				type: 'include',
+				section: 'shortcut_extension_empty_frame',
+				present_when: 'shortcut_extension_builder_missing'
+			}
+		])
+	)
+		return false;
+	const canonical = fs.readFileSync(
+		path.join(ROOT, 'tools/test/test-ahk-loop-capture.cjs'),
+		'utf8'
+	);
+	const first = canonical.indexOf('function codeLines(src) {'),
+		last = canonical.indexOf('/**', first);
+	if (first < 0 || last <= first) return false;
+	const nativeCodeLines = require('node:vm').runInNewContext(
+		canonical.slice(first, last) + '\ncodeLines'
+	);
+	const originalOwner =
+		'_SC_ExtensionRows() {\n\tglobal _ExtensionsDir\n\tExtShortcutsBaseDir := _ExtensionsDir . "\\"\n\tHasExtShortcuts := false\n\tif DirExist(ExtShortcutsBaseDir) {\n\t\tLoop Files ExtShortcutsBaseDir . "*", "D" {\n\t\t\tMenuAhkPath := A_LoopFileFullPath . "\\shortcuts\\menu.ahk"\n\t\t\tif FileExist(MenuAhkPath) {\n\t\t\t\tHasExtShortcuts := true\n\t\t\t\tbreak\n\t\t\t}\n\t\t}\n\t}\n\tRows := []\n\tif !HasExtShortcuts {\n\t\treturn Rows\n\t}\n\tBoundaryRows := MenuRenderer_TemplateRows("shortcut_extension_boundary", Map(), Map(), Map())\n\tif !(BoundaryRows is Array)\n\t\treturn []\n\tfor Row in BoundaryRows\n\t\tRows.Push(Row)\n\tOwnedMenus := [], Completed := false\n\ttry {\n\t\tLoop Files ExtShortcutsBaseDir . "*", "D" {\n\t\t\tExtId       := A_LoopFileName\n\t\t\tExtDir      := A_LoopFileFullPath\n\t\t\tMenuAhkPath := ExtDir . "\\shortcuts\\menu.ahk"\n\t\t\tif !FileExist(MenuAhkPath)\n\t\t\t\tcontinue\n\t\t\tExtName      := ExtId\n\t\t\tManifestPath := ExtDir . "\\manifest.toml"\n\t\t\tif FileExist(ManifestPath) {\n\t\t\t\ttry {\n\t\t\t\t\tMC := FileRead(ManifestPath, "UTF-8")\n\t\t\t\t\tif RegExMatch(MC, \'name\\s*=\\s*"([^"]+)"\', &NM)\n\t\t\t\t\t\tExtName := NM[1]\n\t\t\t\t}\n\t\t\t}\n\t\t\tMarkerOutcome := "populated"\n\t\t\tMarkerState := Map("shortcut_extension_name", (*) => ExtId,\n\t\t\t\t"shortcut_extension_builder_failed", (*) => MarkerOutcome == "failed",\n\t\t\t\t"shortcut_extension_builder_empty", (*) => MarkerOutcome == "empty",\n\t\t\t\t"shortcut_extension_builder_missing", (*) => MarkerOutcome == "missing")\n\t\t\t; Admit both possible complete markers before native allocation or builders.\n\t\t\tErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())\n\t\t\tEmptyRows := MenuRenderer_TemplateRows("shortcut_extension_empty_frame", Map(), Map(), Map())\n\t\t\tif !(ErrorRows is Array) || ErrorRows.Length == 0\n\t\t\t\t\t|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())\n\t\t\t\t\t|| !(EmptyRows is Array) || EmptyRows.Length == 0\n\t\t\t\t\t|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())\n\t\t\t\treturn []\n\t\t\tResultRows := MenuRenderer_TemplateRows("shortcut_extension_result_frame", Map(), MarkerState, Map())\n\t\t\tif !(ResultRows is Array) || ResultRows.Length != 0\n\t\t\t\treturn []\n\t\t\tExtMenu := Menu()\n\t\t\tOwnedMenus.Push(ExtMenu)\n\t\t\tBuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")\n\t\t\tif IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {\n\t\t\t\tBuildFailed := false\n\t\t\t\ttry {\n\t\t\t\t\t%BuilderFn%(ExtMenu, ExtName)\n\t\t\t\t} catch as Err {\n\t\t\t\t\t; A broken bundled extension is user-actionable, so fail LOUD:\n\t\t\t\t\t; ERROR (not a Warn the user never reads) plus a visible disabled\n\t\t\t\t\t; row in the submenu so a crashed builder is not indistinguishable\n\t\t\t\t\t; from an absent one.\n\t\t\t\t\tLoggerError("Extensions", "BuildExtMenu for \'{1}\' threw: {2}.", ExtId, Err.Message)\n\t\t\t\t\tBuildFailed := true\n\t\t\t\t}\n\t\t\t\t; Even a builder that returns without throwing may have populated\n\t\t\t\t; nothing (bad TOML, missing global) \u2014 an empty submenu is just as\n\t\t\t\t; opaque, so surface the same marker.\n\t\t\t\tif (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {\n\t\t\t\t\tif !BuildFailed\n\t\t\t\t\t\tLoggerError("Extensions", "BuildExtMenu for \'{1}\' added no items \u2014 extension menu is empty.", ExtId)\n\t\t\t\t\t; A label and nothing else: the renderer draws it inert and greyed,\n\t\t\t\t\t; which is exactly what a marker is.\n\t\t\t\t\tMarkerOutcome := BuildFailed ? "failed" : "empty"\n\t\t\t\t}\n\t\t\t} else {\n\t\t\t\tLoggerWarn("Extensions", "No BuildExtMenu_{1} function found \u2014 menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))\n\t\t\t\tMarkerOutcome := "missing"\n\t\t\t}\n\t\t\tif MarkerOutcome != "populated" {\n\t\t\t\tif MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_result_frame", Map(), MarkerState, Map()) == 0\n\t\t\t\t\tthrow Error(MarkerOutcome == "missing"\n\t\t\t\t\t\t? "Shortcut extension empty marker was withdrawn before publication"\n\t\t\t\t\t\t: "Shortcut extension error marker was withdrawn during its native builder")\n\t\t\t}\n\t\t\tRows.Push(Map("label", ExtName, "submenu", ExtMenu))\n\t\t}\n\t\tCompleted := true\n\t} finally {\n\t\tif !Completed\n\t\t\t_SC_ExtensionDisposeOwnedMenus(OwnedMenus)\n\t}\n\treturn Rows\n}\n';
+	const oldConstruction =
+		'\t\t\tMarkerOutcome := "populated"\n\t\t\tMarkerState := Map("shortcut_extension_name", (*) => ExtId,\n\t\t\t\t"shortcut_extension_builder_failed", (*) => MarkerOutcome == "failed",\n\t\t\t\t"shortcut_extension_builder_empty", (*) => MarkerOutcome == "empty",\n\t\t\t\t"shortcut_extension_builder_missing", (*) => MarkerOutcome == "missing")\n\t\t\t; Admit both possible complete markers before native allocation or builders.\n\t\t\tErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())\n\t\t\tEmptyRows := MenuRenderer_TemplateRows("shortcut_extension_empty_frame", Map(), Map(), Map())\n\t\t\tif !(ErrorRows is Array) || ErrorRows.Length == 0\n\t\t\t\t\t|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())\n\t\t\t\t\t|| !(EmptyRows is Array) || EmptyRows.Length == 0\n\t\t\t\t\t|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())\n\t\t\t\treturn []\n\t\t\tResultRows := MenuRenderer_TemplateRows("shortcut_extension_result_frame", Map(), MarkerState, Map())\n\t\t\tif !(ResultRows is Array) || ResultRows.Length != 0\n\t\t\t\treturn []\n\t\t\tExtMenu := Menu()\n\t\t\tOwnedMenus.Push(ExtMenu)\n\t\t\tBuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")\n\t\t\tif IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {\n\t\t\t\tBuildFailed := false\n\t\t\t\ttry {\n\t\t\t\t\t%BuilderFn%(ExtMenu, ExtName)\n\t\t\t\t} catch as Err {\n\t\t\t\t\t; A broken bundled extension is user-actionable, so fail LOUD:\n\t\t\t\t\t; ERROR (not a Warn the user never reads) plus a visible disabled\n\t\t\t\t\t; row in the submenu so a crashed builder is not indistinguishable\n\t\t\t\t\t; from an absent one.\n\t\t\t\t\tLoggerError("Extensions", "BuildExtMenu for \'{1}\' threw: {2}.", ExtId, Err.Message)\n\t\t\t\t\tBuildFailed := true\n\t\t\t\t}\n\t\t\t\t; Even a builder that returns without throwing may have populated\n\t\t\t\t; nothing (bad TOML, missing global) \u2014 an empty submenu is just as\n\t\t\t\t; opaque, so surface the same marker.\n\t\t\t\tif (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {\n\t\t\t\t\tif !BuildFailed\n\t\t\t\t\t\tLoggerError("Extensions", "BuildExtMenu for \'{1}\' added no items \u2014 extension menu is empty.", ExtId)\n\t\t\t\t\t; A label and nothing else: the renderer draws it inert and greyed,\n\t\t\t\t\t; which is exactly what a marker is.\n\t\t\t\t\tMarkerOutcome := BuildFailed ? "failed" : "empty"\n\t\t\t\t}\n\t\t\t} else {\n\t\t\t\tLoggerWarn("Extensions", "No BuildExtMenu_{1} function found \u2014 menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))\n\t\t\t\tMarkerOutcome := "missing"\n\t\t\t}\n\t\t\tif MarkerOutcome != "populated" {\n\t\t\t\tif MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_result_frame", Map(), MarkerState, Map()) == 0\n\t\t\t\t\tthrow Error(MarkerOutcome == "missing"\n\t\t\t\t\t\t? "Shortcut extension empty marker was withdrawn before publication"\n\t\t\t\t\t\t: "Shortcut extension error marker was withdrawn during its native builder")\n\t\t\t}\n';
+	const newConstruction =
+		'\t\t\tConstructorOwner := MenuRenderer_ConstructObservedMenu, ObserverOwner := _SC_ObserveExtensionMenu\n\t\t\tif !(ConstructorOwner is Func) || !(ObserverOwner is Func)\n\t\t\t\t|| Object.Prototype.HasOwnProp.Call(ConstructorOwner, "Call")\n\t\t\t\t|| Object.Prototype.HasOwnProp.Call(ObserverOwner, "Call")\n\t\t\t\treturn []\n\t\t\tExtMenu := ConstructorOwner.Call("shortcut_extension_construction_ahk", ExtId, ExtName, ObserverOwner, OwnedMenus)\n\t\t\tif !(ExtMenu is Menu)\n\t\t\t\treturn []\n';
+	try {
+		function rootOwner(source, name) {
+			const tokens = scriptTokens(source, '.ahk');
+			const code = nativeCodeLines(source);
+			let depth = 0;
+			const matches = [];
+			for (let index = 0; index < tokens.length; index++) {
+				const token = tokens[index];
+				const line = source.slice(0, token.start).split('\n').length - 1;
+				const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+				if (code[line]?.slice(column, column + token.value.length) !== token.value) continue;
+				if (
+					!depth &&
+					token.kind === 'identifier' &&
+					token.value === name &&
+					source.slice(source.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
+					tokens[index + 1]?.value === '('
+				) {
+					let at = index + 2,
+						argumentsDepth = 1;
+					while (at < tokens.length && argumentsDepth) {
+						if (tokens[at].value === '(') argumentsDepth++;
+						if (tokens[at].value === ')') argumentsDepth--;
+						at++;
+					}
+					if (tokens[at]?.value === '{') {
+						let end = at + 1,
+							bodyDepth = 1;
+						while (end < tokens.length && bodyDepth) {
+							const brace = tokens[end];
+							const row = source.slice(0, brace.start).split('\n').length - 1;
+							const col = brace.start - source.lastIndexOf('\n', brace.start - 1) - 1;
+							if (brace.kind === 'symbol' && code[row]?.[col] === brace.value) {
+								if (brace.value === '{') bodyDepth++;
+								if (brace.value === '}') bodyDepth--;
+							}
+							end++;
+						}
+						if (!bodyDepth) matches.push(source.slice(token.start, tokens[end - 1].end) + '\n');
+					}
+				}
+				if (token.kind === 'symbol' && token.value === '{') depth++;
+				if (token.kind === 'symbol' && token.value === '}') depth--;
+			}
+			assert.equal(matches.length, 1, 'one actual root native owner definition');
+			return matches[0];
+		}
+		function constructionOwned(source) {
+			const owned = rootOwner(source, '_SC_ExtensionRows');
+			return (
+				owned.split(newConstruction).length === 2 &&
+				owned.replace(newConstruction, oldConstruction) === originalOwner
+			);
+		}
+		const initialization =
+			'\tObserved := "populated", Native := false\n\tState := Map("shortcut_extension_name", (*) => ExtId,\n\t\t"shortcut_extension_builder_failed", (*) => Observed == "failed",\n\t\t"shortcut_extension_builder_empty", (*) => Observed == "empty",\n\t\t"shortcut_extension_builder_missing", (*) => Observed == "missing")\n';
+		const dispatchPrefix =
+			'\tfor Step in Program {\n\t\tif !Current()\n\t\t\tthrow Error("Shortcut extension construction source was withdrawn")\n\t\tswitch Step {\n';
+		const ownedOperators = {
+			admit_markers:
+				'\t\tcase "admit_markers":\n\t\t\tif TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted\n\t\t\t\t|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)\n\t\t\t\treturn false\n\t\t\tErrorRows := TemplateOwner.Call("shortcut_extension_error_frame", Map(), State, Map())\n\t\t\tif !Current() || !Guard.Call(TemplateOwner) || !Guard.Call(Admission)\n\t\t\t\treturn false\n\t\t\tEmptyRows := TemplateOwner.Call("shortcut_extension_empty_frame", Map(), Map(), Map())\n\t\t\tif !Current() || TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted\n\t\t\t\t|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)\n\t\t\t\treturn false\n\t\t\tif !(ErrorRows is Array) || ErrorRows.Length == 0 || !Admission.Call(ErrorRows, 1, Map())\n\t\t\t\t|| !(EmptyRows is Array) || EmptyRows.Length == 0 || !Admission.Call(EmptyRows, 1, Map())\n\t\t\t\treturn false\n\t\t\tif !Current() || TemplateOwner != MenuRenderer_TemplateRows || !Guard.Call(TemplateOwner)\n\t\t\t\treturn false\n\t\t\tResultRows := TemplateOwner.Call(Recipe["result_frame"], Map(), State, Map())\n\t\t\tif !(ResultRows is Array) || ResultRows.Length != 0 || !Current()\n\t\t\t\treturn false\n',
+			allocate_owned_menu:
+				'\t\tcase "allocate_owned_menu":\n\t\t\tif !ConstructorOwner.Call(Constructor)\n\t\t\t\treturn false\n\t\t\tNative := Constructor.Call()\n\t\t\tOwnedMenus.Push(Native)\n',
+			observe_native_builder:
+				'\t\tcase "observe_native_builder":\n\t\t\tObserved := ObserveNative.Call(ExtId, ExtName, Native)\n\t\t\tif Type(Observed) != "String" || !Results.Has(Observed)\n\t\t\t\tthrow Error("Shortcut extension native observation was refused")\n',
+			place_observed_result:
+				'\t\tcase "place_observed_result":\n\t\t\tif Eligible.Has(Observed) {\n\t\t\t\tif Append != MenuRenderer_AppendTemplate || !Guard.Call(Append)\n\t\t\t\t\tthrow Error("Shortcut extension result placement owner was withdrawn")\n\t\t\t\tif Append.Call(Native, Recipe["result_frame"], Map(), State, Map()) == 0\n\t\t\t\t\tthrow Error(Observed == "missing"\n\t\t\t\t\t\t? "Shortcut extension empty marker was withdrawn before publication"\n\t\t\t\t\t\t: "Shortcut extension error marker was withdrawn during its native builder")\n\t\t\t}'
+		};
+		// Exact finite owner bytes authenticate the complete preflight and active dispatch path.
+		// This physical witness supplies no native outcome or independent caption expectations.
+		const frozenConstructionOwner =
+			'MenuRenderer_ConstructObservedMenu(RecipeKey, ExtId, ExtName, ObserveNative, OwnedMenus) {\n\tstatic Entry := MenuRenderer_ConstructObservedMenu, Guard := _MR_DeclaredParentCallable\n\tstatic RootReader := _MR_GetManifestRoot, Loader := _MM_GetManifestRoot, Snapshot := _MR_ReasonedGroupSnapshot\n\tstatic SourceCurrent := _MR_ReasonedGroupCurrent, TemplateOwner := MenuRenderer_TemplateRows\n\tstatic Admission := _MR_AppendTemplateRowsAdmitted, Append := MenuRenderer_AppendTemplate\n\tstatic Constructor := Menu, ConstructorOwner := _MR_FrameNativeConstructorCurrent\n\tstatic NativeObserver := _SC_ObserveExtensionMenu\n\tif RecipeKey != "shortcut_extension_construction_ahk" || !(OwnedMenus is Array)\n\t\t|| ObserveNative != NativeObserver || NativeObserver != _SC_ObserveExtensionMenu\n\t\t|| Object.Prototype.HasOwnProp.Call(Guard, "Call") || !_MR_DeclaredParentCallable(ObserveNative)\n\t\treturn false\n\tOwnersLive() {\n\t\tif Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, "Call")\n\t\t\treturn false\n\t\tfor Pair in [[Entry, MenuRenderer_ConstructObservedMenu], [RootReader, _MR_GetManifestRoot], [Loader, _MM_GetManifestRoot],\n\t\t\t[Snapshot, _MR_ReasonedGroupSnapshot], [SourceCurrent, _MR_ReasonedGroupCurrent],\n\t\t\t[ConstructorOwner, _MR_FrameNativeConstructorCurrent]]\n\t\t\tif Pair[1] != Pair[2] || !Guard.Call(Pair[1])\n\t\t\t\treturn false\n\t\treturn ObserveNative == NativeObserver && NativeObserver == _SC_ObserveExtensionMenu && Guard.Call(ObserveNative)\n\t}\n\tif !OwnersLive()\n\t\treturn false\n\tRoot := RootReader.Call()\n\tif !(Root is Map) || ObjGetBase(Root) != Map.Prototype\n\t\treturn false\n\tfor Name in ObjOwnProps(Root)\n\t\treturn false\n\tif !Root.Has(RecipeKey)\n\t\treturn false\n\tRecipe := Root[RecipeKey]\n\tif !(Recipe is Map) || ObjGetBase(Recipe) != Map.Prototype\n\t\treturn false\n\tfor Name in ObjOwnProps(Recipe)\n\t\treturn false\n\tif Recipe.Count != 5 || Recipe.Get("kind", "") != "owned_native_menu"\n\t\t|| Recipe.Get("platform", "") != "ahk" || !(Recipe.Get("program", false) is Array)\n\t\t|| Type(Recipe.Get("result_frame", false)) != "String" || Recipe["result_frame"] == ""\n\t\t|| !(Recipe.Get("append_outcomes", false) is Array)\n\t\treturn false\n\tProgram := Recipe["program"], Outcomes := Recipe["append_outcomes"]\n\tif ObjGetBase(Program) != Array.Prototype || ObjGetBase(Outcomes) != Array.Prototype\n\t\t|| ObjGetBase(OwnedMenus) != Array.Prototype\n\t\treturn false\n\tfor Container in [Program, Outcomes, OwnedMenus]\n\t\tfor Name in ObjOwnProps(Container)\n\t\t\treturn false\n\tif Program.Length != 4\n\t\treturn false\n\tFields := Map("kind", true, "platform", true, "program", true, "result_frame", true, "append_outcomes", true)\n\tfor Field in Recipe\n\t\tif !Fields.Has(Field)\n\t\t\treturn false\n\tSteps := Map("admit_markers", true, "allocate_owned_menu", true, "observe_native_builder", true, "place_observed_result", true)\n\tResults := Map("failed", true, "empty", true, "missing", true, "populated", true)\n\tPositions := Map()\n\tfor Index, Step in Program {\n\t\tif Type(Step) != "String" || !Steps.Has(Step) || Positions.Has(Step)\n\t\t\treturn false\n\t\tPositions[Step] := Index\n\t}\n\tif Positions.Count != 4 || Positions["admit_markers"] > Positions["allocate_owned_menu"]\n\t\t|| Positions["allocate_owned_menu"] > Positions["observe_native_builder"]\n\t\t|| Positions["observe_native_builder"] > Positions["place_observed_result"]\n\t\treturn false\n\tEligible := Map()\n\tfor Outcome in Outcomes {\n\t\tif Type(Outcome) != "String" || !Results.Has(Outcome) || Outcome == "populated" || Eligible.Has(Outcome)\n\t\t\treturn false\n\t\tEligible[Outcome] := true\n\t}\n\tRecipeSource := Snapshot.Call(Recipe)\n\tif !RecipeSource || !OwnersLive()\n\t\treturn false\n\tCurrent() {\n\t\tif !OwnersLive() || RootReader.Call() != Root || ObjGetBase(Root) != Map.Prototype\n\t\t\treturn false\n\t\tfor Name in ObjOwnProps(Root)\n\t\t\treturn false\n\t\treturn Root.Has(RecipeKey) && Root[RecipeKey] == Recipe && SourceCurrent.Call(RecipeSource)\n\t}\n\tObserved := "populated", Native := false\n\tState := Map("shortcut_extension_name", (*) => ExtId,\n\t\t"shortcut_extension_builder_failed", (*) => Observed == "failed",\n\t\t"shortcut_extension_builder_empty", (*) => Observed == "empty",\n\t\t"shortcut_extension_builder_missing", (*) => Observed == "missing")\n\tfor Step in Program {\n\t\tif !Current()\n\t\t\tthrow Error("Shortcut extension construction source was withdrawn")\n\t\tswitch Step {\n\t\tcase "admit_markers":\n\t\t\tif TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted\n\t\t\t\t|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)\n\t\t\t\treturn false\n\t\t\tErrorRows := TemplateOwner.Call("shortcut_extension_error_frame", Map(), State, Map())\n\t\t\tif !Current() || !Guard.Call(TemplateOwner) || !Guard.Call(Admission)\n\t\t\t\treturn false\n\t\t\tEmptyRows := TemplateOwner.Call("shortcut_extension_empty_frame", Map(), Map(), Map())\n\t\t\tif !Current() || TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted\n\t\t\t\t|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)\n\t\t\t\treturn false\n\t\t\tif !(ErrorRows is Array) || ErrorRows.Length == 0 || !Admission.Call(ErrorRows, 1, Map())\n\t\t\t\t|| !(EmptyRows is Array) || EmptyRows.Length == 0 || !Admission.Call(EmptyRows, 1, Map())\n\t\t\t\treturn false\n\t\t\tif !Current() || TemplateOwner != MenuRenderer_TemplateRows || !Guard.Call(TemplateOwner)\n\t\t\t\treturn false\n\t\t\tResultRows := TemplateOwner.Call(Recipe["result_frame"], Map(), State, Map())\n\t\t\tif !(ResultRows is Array) || ResultRows.Length != 0 || !Current()\n\t\t\t\treturn false\n\t\tcase "allocate_owned_menu":\n\t\t\tif !ConstructorOwner.Call(Constructor)\n\t\t\t\treturn false\n\t\t\tNative := Constructor.Call()\n\t\t\tOwnedMenus.Push(Native)\n\t\tcase "observe_native_builder":\n\t\t\tObserved := ObserveNative.Call(ExtId, ExtName, Native)\n\t\t\tif Type(Observed) != "String" || !Results.Has(Observed)\n\t\t\t\tthrow Error("Shortcut extension native observation was refused")\n\t\tcase "place_observed_result":\n\t\t\tif Eligible.Has(Observed) {\n\t\t\t\tif Append != MenuRenderer_AppendTemplate || !Guard.Call(Append)\n\t\t\t\t\tthrow Error("Shortcut extension result placement owner was withdrawn")\n\t\t\t\tif Append.Call(Native, Recipe["result_frame"], Map(), State, Map()) == 0\n\t\t\t\t\tthrow Error(Observed == "missing"\n\t\t\t\t\t\t? "Shortcut extension empty marker was withdrawn before publication"\n\t\t\t\t\t\t: "Shortcut extension error marker was withdrawn during its native builder")\n\t\t\t}\n\t\t}\n\t}\n\treturn Native\n}\n';
+		function operatorScopes(source) {
+			const owned = rootOwner(source, 'MenuRenderer_ConstructObservedMenu');
+			if (owned !== frozenConstructionOwner) return false;
+			if (owned.split(initialization + dispatchPrefix).length !== 2) return false;
+			for (const [step, body] of Object.entries(ownedOperators)) {
+				if (owned.split(body).length !== 2) return false;
+			}
+			return true;
+		}
+		return constructionOwned(windows) && operatorScopes(nativeRenderer);
+	} catch {
+		return false;
+	}
+}
+
+// These are physical publication withdrawals, not regenerated native expectations.
+{
+	const assert = require('node:assert/strict');
+	const files = ['windows/ui/menu/menu_shortcuts.ahk', 'windows/infra/manifest_menu.ahk'];
+	const actual = Object.fromEntries(
+		files.map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+	);
+	const nativeFile = files[1];
+	const targets = [
+		'shortcut_extension_result_frame',
+		'shortcut_extension_error_frame',
+		'shortcut_extension_empty_frame'
+	];
+	const originalPolicy = manifest.shortcut_extension_construction_ahk;
+	const originalResult = manifest.shortcut_extension_result_frame;
+	for (const target of targets) {
+		assert.equal(
+			shortcutConstructionPublication(actual, target, nativeFile),
+			true,
+			'all three original obligations have the genuine declared construction path'
+		);
+		assert.equal(
+			shortcutConstructionPublication(actual, target, files[0]),
+			false,
+			'the old UI path cannot lend the new shared admission'
+		);
+	}
+	assert.equal(shortcutConstructionPublication(actual, 'foreign_frame', nativeFile), false);
+	try {
+		for (const policy of [
+			{ ...originalPolicy, kind: 'foreign' },
+			{
+				...originalPolicy,
+				program: originalPolicy.program.filter((step) => step !== 'admit_markers')
+			},
+			{
+				...originalPolicy,
+				append_outcomes: originalPolicy.append_outcomes.filter((outcome) => outcome !== 'missing')
+			},
+			{ ...originalPolicy, result_frame: 'foreign_frame' }
+		]) {
+			manifest.shortcut_extension_construction_ahk = policy;
+			for (const target of targets)
+				assert.equal(
+					shortcutConstructionPublication(actual, target, nativeFile),
+					false,
+					'withdrawing a genuine schedule or outcome obligation withdraws publication'
+				);
+			manifest.shortcut_extension_construction_ahk = originalPolicy;
+			assert.equal(
+				manifest.shortcut_extension_construction_ahk,
+				originalPolicy,
+				'the exact current policy owner is restored'
+			);
+		}
+		manifest.shortcut_extension_result_frame = originalResult.slice(1);
+		for (const target of targets)
+			assert.equal(
+				shortcutConstructionPublication(actual, target, nativeFile),
+				false,
+				'an incomplete original conditional result path cannot borrow preflight markers'
+			);
+	} finally {
+		manifest.shortcut_extension_construction_ahk = originalPolicy;
+		manifest.shortcut_extension_result_frame = originalResult;
+	}
+	assert.equal(manifest.shortcut_extension_construction_ahk, originalPolicy);
+	assert.equal(manifest.shortcut_extension_result_frame, originalResult);
+	assert.equal(
+		shortcutConstructionPublication(actual, targets[0], nativeFile),
+		true,
+		'exact policy and conditional-frame restoration restores publication'
+	);
+}
+
 function personalFrameSources() {
 	return Object.fromEntries(
 		[
@@ -5646,18 +5884,32 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 																manifest[target],
 																opened.selected_group[platform]
 															)
-														: publishesTemplate(
-																fs.readFileSync(path.join(SP, file), 'utf8'),
-																path.extname(file),
-																target
-															) ||
-															publishesIncludedCommands(
-																fs.readFileSync(path.join(SP, file), 'utf8'),
-																path.extname(file),
-																target,
-																manifest,
-																platform
-															))
+														: opened.observed_construction === true && platform === 'ahk'
+															? shortcutConstructionPublication(
+																	Object.fromEntries(
+																		[
+																			'windows/ui/menu/menu_shortcuts.ahk',
+																			'windows/infra/manifest_menu.ahk'
+																		].map((owned) => [
+																			owned,
+																			fs.readFileSync(path.join(SP, owned), 'utf8')
+																		])
+																	),
+																	target,
+																	file
+																)
+															: publishesTemplate(
+																	fs.readFileSync(path.join(SP, file), 'utf8'),
+																	path.extname(file),
+																	target
+																) ||
+																publishesIncludedCommands(
+																	fs.readFileSync(path.join(SP, file), 'utf8'),
+																	path.extname(file),
+																	target,
+																	manifest,
+																	platform
+																))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`

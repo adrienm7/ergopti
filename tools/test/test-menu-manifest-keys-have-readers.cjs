@@ -248,8 +248,25 @@ const includeConsumerAvailable = sources.some(({ src }) => {
 const { startupInputs, startupReaderSections } = require('../lib/menu-native-startup-binding.cjs');
 const startup = startupInputs(ROOT, manifest);
 const startupSections = new Set(startupReaderSections(startup));
+// A recipe's dynamic result_frame is a reader only through its authenticated
+// native construction and real template receiver, never through declaration text.
+const { shortcutConstructionReaderEvidence } = require('../lib/menu-row-availability.cjs');
+const shortcutConstructionReaderSections = (...args) =>
+	shortcutConstructionReaderEvidence(...args)?.sections || [];
+const shortcutWindowsSource = sources.find(
+	({ rel }) => rel === 'windows/ui/menu/menu_shortcuts.ahk'
+)?.src;
+const shortcutRendererSource = sources.find(
+	({ rel }) => rel === 'windows/infra/manifest_menu.ahk'
+)?.src;
+const shortcutReaderSections = new Set(
+	shortcutConstructionReaderSections(manifest, shortcutWindowsSource, shortcutRendererSource)
+);
 const directlyReadSections = sections.filter(
-	(section) => readersOf(section).length > 0 || startupSections.has(section)
+	(section) =>
+		readersOf(section).length > 0 ||
+		startupSections.has(section) ||
+		shortcutReaderSections.has(section)
 );
 let reachableIncludes = new Set(directlyReadSections);
 try {
@@ -399,6 +416,204 @@ for (const section of [...sections].sort()) {
 			`by id ("${base || section}"). The rows are then decorative: the render comes from somewhere ` +
 			'else, and adding a row here changes nothing.'
 	);
+}
+
+// Independent Source withdrawals retain every original reader assertion above.
+assert.deepEqual(
+	[...shortcutReaderSections],
+	['shortcut_extension_result_frame'],
+	'the real declared construction reads its original frame'
+);
+const shortcutOriginalFrame = manifest.shortcut_extension_construction_ahk.result_frame;
+const shortcutCandidate = (mutate) => {
+	const candidate = structuredClone(manifest);
+	mutate(candidate);
+	return candidate;
+};
+for (const mutate of [
+	(m) => delete m.shortcut_extension_construction_ahk,
+	(m) => {
+		m.foreign_recipe = m.shortcut_extension_construction_ahk;
+		delete m.shortcut_extension_construction_ahk;
+	},
+	(m) => {
+		m.shortcut_extension_construction_ahk.result_frame = 'missing_actual_frame';
+	},
+	(m) => {
+		m.shortcut_extension_construction_ahk.program.reverse();
+	},
+	(m) => {
+		delete m.shortcut_extension_construction_ahk.program[0];
+	},
+	(m) => {
+		m.shortcut_extension_construction_ahk.append_outcomes.push('populated');
+	},
+	(m) => {
+		m.shortcut_extension_construction_ahk.extra = true;
+	},
+	(m) => {
+		delete m[shortcutOriginalFrame];
+	}
+])
+	assert.deepEqual(
+		shortcutConstructionReaderSections(
+			shortcutCandidate(mutate),
+			shortcutWindowsSource,
+			shortcutRendererSource
+		),
+		[],
+		'malformed or unread recipe gives no reader credit'
+	);
+const shortcutOtherFrame = shortcutCandidate((m) => {
+	m.independent_other_frame = structuredClone(m[shortcutOriginalFrame]);
+	m.shortcut_extension_construction_ahk.result_frame = 'independent_other_frame';
+});
+assert.deepEqual(
+	shortcutConstructionReaderSections(
+		shortcutOtherFrame,
+		shortcutWindowsSource,
+		shortcutRendererSource
+	),
+	['independent_other_frame'],
+	'reader follows the actual declared value without duplicating native placement policy'
+);
+assert(
+	!shortcutConstructionReaderSections(
+		shortcutOtherFrame,
+		shortcutWindowsSource,
+		shortcutRendererSource
+	).includes(shortcutOriginalFrame),
+	'rerouting cannot grant the old now-unread frame credit'
+);
+const shortcutOrphan = shortcutCandidate((m) => {
+	m.independent_orphan_frame = structuredClone(m[shortcutOriginalFrame]);
+});
+assert.deepEqual(
+	shortcutConstructionReaderSections(shortcutOrphan, shortcutWindowsSource, shortcutRendererSource),
+	[shortcutOriginalFrame],
+	'an orphan copy is not an additional native reader'
+);
+for (const [windows, renderer] of [
+	['', shortcutRendererSource],
+	[shortcutWindowsSource, '']
+])
+	assert.deepEqual(
+		shortcutConstructionReaderSections(manifest, windows, renderer),
+		[],
+		'withdrawn genuine native source refuses'
+	);
+const shortcutConstructorStart =
+	shortcutRendererSource.indexOf('\nMenuRenderer_ConstructObservedMenu(') + 1;
+assert(shortcutConstructorStart > 0, 'actual constructor interval exists');
+const shortcutConstructor = shortcutRendererSource.slice(shortcutConstructorStart);
+assert(shortcutConstructor.endsWith('}\n'), 'constructor is the complete final physical owner');
+const shortcutExecutionStart = shortcutConstructor.indexOf(
+	'\tObserved := "populated", Native := false\n'
+);
+const shortcutExecutionEnd = shortcutConstructor.lastIndexOf('\treturn Native\n');
+assert(
+	shortcutExecutionStart > 0 && shortcutExecutionEnd > shortcutExecutionStart,
+	'complete actual interpreter interval exists'
+);
+const shortcutExecution = shortcutConstructor.slice(shortcutExecutionStart, shortcutExecutionEnd);
+const shortcutChanges = [
+	[shortcutConstructor, ''],
+	['static NativeObserver := _SC_ObserveExtensionMenu', 'static NativeObserver := Foreign'],
+	[shortcutConstructor, shortcutConstructor + shortcutConstructor],
+	[shortcutConstructor, 'class Foreign {\n' + shortcutConstructor + '}\n'],
+	[
+		shortcutConstructor,
+		shortcutConstructor
+			.split('\n')
+			.map((line) => '; ' + line)
+			.join('\n')
+	],
+	[shortcutExecution, '\tif false {\n' + shortcutExecution + '\t}\n'],
+	[shortcutExecution, '\treturn false\n' + shortcutExecution],
+	[
+		'ResultRows := TemplateOwner.Call(Recipe["result_frame"],',
+		'ResultRows := Foreign.Call(Recipe["result_frame"],'
+	],
+	['Append.Call(Native, Recipe["result_frame"],', 'Foreign.Call(Native, Recipe["result_frame"],'],
+	[
+		'if !Current()\n\t\t\tthrow Error("Shortcut extension construction source was withdrawn")',
+		'if false\n\t\t\tthrow Error("Shortcut extension construction source was withdrawn")'
+	],
+	['return _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Map())', 'return []'],
+	[
+		'Def := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)',
+		'return []\n\tDef := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)'
+	],
+	[
+		'Def := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)',
+		'Def := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)\n\treturn []'
+	],
+	['try Present := StateGetters[GetterKey].Call()', 'try Present := Foreign.Call()'],
+	[
+		'Value := CaptionLayout == "" ? StateGetters[CaptionGetter].Call() : ""',
+		'Value := CaptionLayout == "" ? Foreign.Call() : ""'
+	],
+	[
+		'_MR_ExplicitCaption(Item, StateGetters, &Caption, RawTitle)',
+		'_MR_ExplicitCaption(Item, Foreign, &Caption, RawTitle)'
+	],
+	[
+		'_MR_ExplicitCaption(Item, Getters, &Caption, RawTitle := unset) {\n\tI18nKey := _MR_Get(Item, "i18n")\n\tCaption := IsSet(RawTitle) ? RawTitle : t(I18nKey)\n\t_MR_CaptionFormat(Caption, "", &SourceSlot)\n\tGetter := _MR_Get(Item, "caption_getter")\n\tif !_MR_CaptionLayoutMetadata(Item) || Type(_MR_Get(Item, "id")) != "String" || _MR_Get(Item, "id") == ""\n\t\t|| Type(I18nKey) != "String" || I18nKey == "" || Type(Caption) != "String" || Caption == ""\n\t\t|| Caption == I18nKey || SourceSlot || !(Getters is Map) || !Getters.Has(Getter)\n\t\t|| !HasMethod(Getters[Getter], "Call") {\n\t\ttry LoggerError("MenuRenderer", "Invalid explicit caption source \u2014 row refused.")\n\t\treturn false\n\t}\n\tValue := Getters[Getter].Call()\n\tif Type(Value) != "String" {\n\t\ttry LoggerError("MenuRenderer", "Invalid explicit caption receipt \u2014 row refused.")\n\t\treturn false\n\t}\n\tCaption := Item["caption_layout"] == "prefix" ? Caption . Item["caption_joiner"] . Value\n\t\t: Value . Item["caption_joiner"] . Caption\n\treturn true\n}\n',
+		'_MR_ExplicitCaption(Item, Getters, &Caption, RawTitle := unset) {\n\tI18nKey := _MR_Get(Item, "i18n")\n\tCaption := IsSet(RawTitle) ? RawTitle : t(I18nKey)\n\t_MR_CaptionFormat(Caption, "", &SourceSlot)\n\tGetter := _MR_Get(Item, "caption_getter")\n\tif !_MR_CaptionLayoutMetadata(Item) || Type(_MR_Get(Item, "id")) != "String" || _MR_Get(Item, "id") == ""\n\t\t|| Type(I18nKey) != "String" || I18nKey == "" || Type(Caption) != "String" || Caption == ""\n\t\t|| Caption == I18nKey || SourceSlot || !(Getters is Map) || !Getters.Has(Getter)\n\t\t|| !HasMethod(Getters[Getter], "Call") {\n\t\ttry LoggerError("MenuRenderer", "Invalid explicit caption source \u2014 row refused.")\n\t\treturn false\n\t}\n\tValue := Foreign.Call()\n\tif Type(Value) != "String" {\n\t\ttry LoggerError("MenuRenderer", "Invalid explicit caption receipt \u2014 row refused.")\n\t\treturn false\n\t}\n\tCaption := Item["caption_layout"] == "prefix" ? Caption . Item["caption_joiner"] . Value\n\t\t: Value . Item["caption_joiner"] . Caption\n\treturn true\n}\n'
+	]
+];
+for (const [actual, withdrawn] of shortcutChanges) {
+	assert.equal(shortcutRendererSource.split(actual).length, 2, 'one actual withdrawal subject');
+	const position = shortcutRendererSource.indexOf(actual);
+	const changed =
+		shortcutRendererSource.slice(0, position) +
+		withdrawn +
+		shortcutRendererSource.slice(position + actual.length);
+	assert.notEqual(changed, shortcutRendererSource, 'withdrawal actually changes Source');
+	assert.deepEqual(
+		shortcutConstructionReaderSections(manifest, shortcutWindowsSource, changed),
+		[],
+		'copy, dead path or withdrawn actual frame receiver is not a reader'
+	);
+	assert.equal(
+		changed.slice(position, position + withdrawn.length),
+		withdrawn,
+		'withdrawal occupies the original unique Source subject'
+	);
+	const repaired = changed.slice(0, position) + actual + changed.slice(position + withdrawn.length);
+	assert.equal(
+		repaired,
+		shortcutRendererSource,
+		'bounded byte inverse restores the actual receiver'
+	);
+	assert.deepEqual(
+		shortcutConstructionReaderSections(manifest, shortcutWindowsSource, repaired),
+		[shortcutOriginalFrame],
+		'exact repair restores only the real edge'
+	);
+}
+const shortcutHandoff =
+	'ExtMenu := ConstructorOwner.Call("shortcut_extension_construction_ahk", ExtId, ExtName, ObserverOwner, OwnedMenus)';
+assert.equal(shortcutWindowsSource.split(shortcutHandoff).length, 2, 'one real native handoff');
+for (const withdrawn of [
+	shortcutHandoff.replace('ConstructorOwner.Call(', 'Foreign.Call('),
+	'if false\n\t\t\t' + shortcutHandoff
+]) {
+	const changed = shortcutWindowsSource.replace(shortcutHandoff, withdrawn);
+	assert.deepEqual(
+		shortcutConstructionReaderSections(manifest, changed, shortcutRendererSource),
+		[],
+		'wrong or dead native handoff cannot loan the reader'
+	);
+	const repaired = changed.replace(withdrawn, shortcutHandoff);
+	assert.equal(
+		repaired,
+		shortcutWindowsSource,
+		'native handoff inverse preserves every other byte'
+	);
+	assert.deepEqual(shortcutConstructionReaderSections(manifest, repaired, shortcutRendererSource), [
+		shortcutOriginalFrame
+	]);
 }
 
 // ==========================

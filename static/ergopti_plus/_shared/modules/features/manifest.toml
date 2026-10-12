@@ -9647,3 +9647,13 @@ checked_when = ["personal_section_selected"]
 disabled_when = ["personal_section_ready"]
 platforms = ["hs"]
 unavailable = "hide"
+
+
+# Windows native extension production retains its external builder and callback ABI.
+# This finite program owns construction order and observed-result placement.
+[menu.shortcut_extension_construction_ahk]
+kind = "owned_native_menu"
+platform = "ahk"
+program = ["admit_markers", "allocate_owned_menu", "observe_native_builder", "place_observed_result"]
+result_frame = "shortcut_extension_result_frame"
+append_outcomes = ["failed", "empty", "missing"]
