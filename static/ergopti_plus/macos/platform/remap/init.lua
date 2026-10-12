@@ -4661,6 +4661,32 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 			"Karabiner setting mutation continues: the retained '%s' recovery settled on retry.",
 			tostring(phase))
 	end
+	-- A live menu saves first and then regenerates. During a lease transition
+	-- that second step refuses, leaving the new saved choice behind old rules
+	-- until reload. Refuse before saving instead; intentional paused/offline
+	-- edits still persist without claiming that their rules are already live.
+	if _state.enabled == true then
+		local pause_ok, _, script_paused = query_shortcuts_pause_state(
+			"Karabiner setting mutation pause-state query"
+		)
+		if not pause_ok then return false end
+		if not script_paused then
+			local status_ok, phase, snapshot = pcall(LeaseController.status)
+			if not status_ok or type(phase) ~= "string" or type(snapshot) ~= "table"
+				or type(snapshot.activation_blocked) ~= "boolean" then
+				Logger.error(LOG,
+					"Karabiner setting mutation refused because exact lease status is unavailable.")
+				return false
+			end
+			if snapshot.activation_blocked == true or phase == "pausing" or phase == "resuming"
+				or phase == "recovering" or phase == "fencing" or phase == "stopping" then
+				Logger.error(LOG,
+					"Karabiner setting mutation refused during exact lease phase '%s'; retry when the lease is ACTIVE.",
+					tostring(phase))
+				return false
+			end
+		end
+	end
 	local snapshot = clone_settings_state(_state)
 	local candidate = clone_settings_state(snapshot)
 	local mutate_ok, mutate_err = xpcall(function() mutate(candidate) end, debug.traceback)
