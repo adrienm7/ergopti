@@ -34,6 +34,30 @@ const clone = path.join(temporary, 'repo');
 const probe = path.join(temporary, 'probe');
 fs.mkdirSync(probe);
 
+/** Reports only passive evidence bound to this exact observer invocation. */
+function reportSourceObserverStages(args) {
+	if (!args.includes(path.join(root, 'tools/test/fixtures/observe_ahk_source_boot.ps1'))) return;
+	const stages = path.join(probe, 'observer-stages.json');
+	if (!fs.existsSync(stages)) return;
+	try {
+		const nonceIndex = args.indexOf('-Nonce');
+		assert.ok(nonceIndex >= 0 && nonceIndex === args.lastIndexOf('-Nonce'));
+		const nonce = args[nonceIndex + 1];
+		assert.match(nonce, /^[0-9a-f]{32}$/);
+		const record = JSON.parse(fs.readFileSync(stages, 'utf8'));
+		assert.equal(record.schema_version, 1);
+		assert.equal(record.diagnostic_only, true);
+		assert.equal(record.clock, 'stopwatch-monotonic');
+		assert.equal(typeof record.recording_failed, 'boolean');
+		assert.ok(Array.isArray(record.stages));
+		assert.equal(record.nonce_sha256, crypto.createHash('sha256').update(nonce).digest('hex'));
+		console.log('source-observer-stages: ' + JSON.stringify(record));
+	} catch {
+		// Stale, malformed or unreadable diagnostics do not replace the verdict.
+		console.error('Current passive source observer stages are unavailable.');
+	}
+}
+
 /** Runs one private fixture command and retains its complete diagnostics. */
 function run(command, args, cwd = root, timeout = 30000) {
 	const result = spawnSync(command, args, {
@@ -45,6 +69,7 @@ function run(command, args, cwd = root, timeout = 30000) {
 		timeout,
 		maxBuffer: 16 * 1024 * 1024
 	});
+	reportSourceObserverStages(args);
 	assert.ifError(result.error);
 	if (result.status !== 0) {
 		for (const name of ['stdout.txt', 'stderr.txt']) {

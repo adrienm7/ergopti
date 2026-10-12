@@ -146,11 +146,30 @@ $successor = [IntPtr]::Zero
 $receipt = $null
 $deadline = [DateTime]::UtcNow.AddSeconds($ReadyTimeoutSeconds)
 $lastParseFailure = ''
+# Passive timings never admit a process or replace the observer's verdict.
+$observerClock = [Diagnostics.Stopwatch]::StartNew()
+$observerStages = [Collections.Generic.List[object]]::new()
+$observerStageRecordingFailed = $false
+function Add-SourceObserverStage {
+    param([string] $Stage, [long] $Result = -1)
+    try {
+        $observerStages.Add([ordered]@{
+            stage = $Stage
+            elapsed_ms = $observerClock.Elapsed.TotalMilliseconds
+            result = $Result
+        })
+    } catch {
+        # Timing instrumentation cannot alter process admission or cleanup.
+        $script:observerStageRecordingFailed = $true
+    }
+}
+Add-SourceObserverStage 'launch-entered'
 try {
     $initial = Start-Process -FilePath $Ahk -ArgumentList @('/ErrorStdOut', ('"' + $Entry + '"')) `
         -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Root 'stdout.txt') `
         -RedirectStandardError (Join-Path $Root 'stderr.txt')
     $null = $initial.Handle
+    Add-SourceObserverStage 'launch-acquired'
     $ready = Join-Path $Root 'ready.json'
     while ([DateTime]::UtcNow -lt $deadline) {
         $initial.Refresh()
@@ -160,7 +179,10 @@ try {
         if (Test-Path -LiteralPath $ready) {
             try { $receipt = Get-Content -LiteralPath $ready -Raw | ConvertFrom-Json }
             catch { $lastParseFailure = $_.Exception.Message }
-            if ($null -ne $receipt) { break }
+            if ($null -ne $receipt) {
+                Add-SourceObserverStage 'ready-parsed'
+                break
+            }
         }
         Start-Sleep -Milliseconds 30
     }
@@ -179,7 +201,9 @@ try {
     if (($receipt.pid -ne $initial.Id) -ne $ExpectReload.IsPresent) {
         throw 'Source readiness did not come from the expected bootstrap generation.'
     }
+    Add-SourceObserverStage 'native-lookup-entered'
     $native = Get-CimInstance Win32_Process -Filter "ProcessId=$($receipt.pid)"
+    Add-SourceObserverStage 'native-lookup-completed'
     if ($null -eq $native -or $native.ExecutablePath -ine $Ahk -or
         ![SourceBootProcess]::HasExactEntry($native.CommandLine, $Entry)) {
         $ownerEvidence = Get-SourceOwnerEvidence -Native $native -Interpreter $Ahk -Entry $Entry
@@ -188,6 +212,7 @@ try {
     }
     $successor = Get-AdmittedSourceHandle -ProcessId $receipt.pid `
         -CreationFileTime $native.CreationDate.ToFileTimeUtc() -Interpreter $Ahk
+    Add-SourceObserverStage 'handle-acquired'
     $ackStage = Join-Path $Root 'ack.txt.stage'
     $ack = [IO.File]::Open($ackStage, [IO.FileMode]::CreateNew,
         [IO.FileAccess]::Write, [IO.FileShare]::Read)
@@ -197,13 +222,18 @@ try {
         $ack.Flush($true)
     } finally { $ack.Dispose() }
     [IO.File]::Move($ackStage, (Join-Path $Root 'ack.txt'))
-    if ([SourceBootProcess]::WaitForSingleObject($successor, $ExitTimeoutMs) -ne 0) {
+    Add-SourceObserverStage 'ack-published'
+    Add-SourceObserverStage 'terminal-wait-entered'
+    $observerTerminalWait = [SourceBootProcess]::WaitForSingleObject($successor, $ExitTimeoutMs)
+    Add-SourceObserverStage 'terminal-wait-completed' $observerTerminalWait
+    if ($observerTerminalWait -ne 0) {
         throw 'The ready source successor did not exit within its native bound.'
     }
     [uint32]$exitCode = 259
     if (![SourceBootProcess]::GetExitCodeProcess($successor, [ref]$exitCode) -or $exitCode -ne 0) {
         throw "The source successor exited with $exitCode."
     }
+    Add-SourceObserverStage 'successor-exit-accepted' $exitCode
     if (!$initial.WaitForExit($ExitTimeoutMs) -or $initial.ExitCode -ne 0) {
         throw 'The source bootstrap parent did not exit cleanly.'
     }
@@ -222,7 +252,24 @@ try {
     }
     [IO.File]::WriteAllText((Join-Path $Root 'observation.json'),
         ($observation | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+    Add-SourceObserverStage 'observation-completed'
 } finally {
+    # Persist before cleanup so cleanup refusal cannot erase the last actual stage.
+    try {
+        $observerEvidence = [ordered]@{
+            schema_version = 1
+            clock = 'stopwatch-monotonic'
+            nonce_sha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
+                [Text.Encoding]::UTF8.GetBytes($Nonce))).ToLowerInvariant()
+            recording_failed = [bool]$observerStageRecordingFailed
+            diagnostic_only = $true
+            stages = @($observerStages.ToArray())
+        }
+        [IO.File]::WriteAllText((Join-Path $Root 'observer-stages.json'),
+            ($observerEvidence | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+    } catch {
+        Write-Warning 'Passive source observer stage evidence could not be retained.'
+    }
     if ($successor -ne [IntPtr]::Zero) {
         if ([SourceBootProcess]::WaitForSingleObject($successor, 0) -ne 0) {
             if (![SourceBootProcess]::TerminateProcess($successor, 1)) {
