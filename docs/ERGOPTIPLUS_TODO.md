@@ -7092,6 +7092,18 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-12 the Linux native-acceptance checkpoint now explicitly flushes its
+phase before continuing, with a fixed refusal if flushing fails. A terminal
+marker refusal is deferred until unchanged cleanup finishes; original work
+and shutdown errors retain precedence. Seven portable controls pass on LuaJIT
+and Lua5.4. The original LuaJIT loses the before-exit marker; the first flush
+proposal fails all three additive cleanup controls. Root delegated this source
+slice while retaining workflow, runner and Common inventory enrollment. No
+native acceptance was relaunched; the original 930-second timeout cause stays
+unknown and every native deadline and qualification assertion is preserved.
+The new portable test is directly verified but awaits normal-suite enrollment;
+item62 and transversal16/38 remain open.
+
 2026-10-12 the authenticated `dbfdcaa652` Core result is 413/414, with all 165
 earlier receiving controls admitted. The remaining failure is the unchanged
 compiler include-directory assertion: observed0755, required0700. The G6-owned
