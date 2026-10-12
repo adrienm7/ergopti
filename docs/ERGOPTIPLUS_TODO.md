@@ -5772,6 +5772,55 @@ portable Python receiver startup timeout retained. These bounded receipts do
 not qualify the final uninstrumented production tree or complete item 42;
 exact-source integrated qualification and installed acceptance remain required.
 
+The remaining Windows captured read, no-op and ordinary write predicates now
+compare complete String units with case-sensitive native equality, including the
+captured final candidate. Read-only access still grants no write readiness;
+invalid/newer schema, registry withdrawal and genuine terminal-owner checks stay
+strict. Six additive actual API controls cover BOM reads, no-op reconciliation
+and both ordinary source/candidate operands without writing NUL bytes to disk.
+They retain the full original fixture prefix and preserve uncertain cleanup.
+
+Authenticated private Windows run
+[38275831892](https://github.com/adrienm7/ergopti/actions/runs/38275831892) passes
+all eight captured-image controls on the candidate. Restoring only the four new
+comparisons preserves the two prior passes and causes the six exact expected
+caller-NUL failures. Its controller then refuses the stdout encoding of those
+six failure separators; the final restored-candidate child remains unexecuted.
+Candidate source and all 3,273 original runtime pins are genuinely restored,
+with all three started children retired and no cleanup errors. This is bounded
+regression evidence, not a complete four-phase or whole-suite PASS. A strictly
+phase-specific receiving correction preserves every expectation and raw byte;
+its 20 transport controls and 19 selected Node commands pass. The updater
+diagnostic producer inventory follows only the owned source fingerprint; all
+22 existing source-receiving controls pass with the independent label oracle
+unchanged. Fresh Windows-only
+manual [38279233467](https://github.com/adrienm7/ergopti/actions/runs/38279233467)
+now provides authenticated complete-cohort receiving on the private instrumented
+source: dry8, candidate8 PASS, original2 PASS/six exact inverse failures, then
+restored8 PASS. All four children retire; the candidate and all 3,273 runtime
+pins are restored without cleanup errors. The parent includes final receipt
+writing in 37,692 ms against its unchanged 180,000 ms budget. This does not
+qualify the composed newer Dev tree or a warning-clean build: all 5,218 baseline
+warnings and both admitted fixture warnings remain explicit. The whole run is
+FAIL (2 successful jobs, 4 failed, 6 skipped; Release skipped). Native13 again
+passes six original subjects before the seventh is interrupted; only six of
+sixteen custody reports complete, and the remaining original/fault subjects do
+not execute. Core gives 412/413 with its actual Python 3.12.15 receiver timeout.
+Full production units, E2E, startup, packaging, installation and device acceptance
+remain required; item 42 and transversal items 16/38 stay partial.
+
+The four-expression correction is reconciled with Dev ba41b79d, preserving the
+incoming recovery/settlement, scalar and classification-cache owners. Its only
+producer-inventory conflict keeps every upstream field and updates the owned
+source fingerprint; independent updater labels remain unchanged. Selected
+local verification passes formatting and all 1,908 AHK BOM/LF checks; native
+Windows gates remain unavailable locally. The composed JS run gives 422/426:
+one managed-Git-ancestor Linux uninstall fixture refusal (unchanged outside-Git
+replay PASS), plus the unchanged upstream macOS pinned-read ratchet, bare Lua
+gsub return and layout-default consumer failures. Their original assertions and
+source bytes are preserved; no whole-suite green result or final-tree native
+acceptance is claimed.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
