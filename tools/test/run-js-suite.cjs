@@ -244,6 +244,12 @@ const CHECKS = [
 		repro: 'npm run test:ahk-e2e-manifest'
 	},
 	{
+		name: 'AHK live TAP follower preserves UTF-8 and native receipt authority',
+		cmd: process.execPath,
+		args: ['tools/test/test-ahk-tap-follower.cjs'],
+		repro: 'node tools/test/test-ahk-tap-follower.cjs'
+	},
+	{
 		name: 'AHK suite manifest rejects early completion before the slow tail',
 		cmd: 'node',
 		args: ['tools/test/test-ahk-suite-manifest.cjs'],

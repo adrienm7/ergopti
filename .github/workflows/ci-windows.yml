@@ -328,7 +328,7 @@ jobs:
           # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
           # blocks when AHK runs without an inherited console handle, so the
           # file is the only reliable output channel in CI).
-          # FileAppend owns an exclusive handle; read the transcript only after exit.
+          # Shared TAP reads expose live progress without changing the native receipt.
           # /ErrorStdOut routes load-time (parse / nonexistent-function / missing
           # #Include) errors to stderr and exits non-zero instead of popping a modal
           # dialog that no one can dismiss headlessly — which otherwise hangs the
@@ -338,11 +338,18 @@ jobs:
           $qualificationArgument = if ($qualificationProfile) { " --qualification-profile=$qualificationProfile" } else { "" }
           $stdoutFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-suite.stdout.log'
           $stderrFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-suite.stderr.log'
+          . "${{ github.workspace }}\tools\ci\ahk-tap-follower.ps1"
+          $tapFollower = New-AhkTapFollower -Path $resultsFile
+          $tapFailure = $null
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"$qualificationArgument" -NoNewWindow -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
           while (-not $proc.HasExited) {
+              if ($null -eq $tapFailure) {
+                  try { $tapFollower.Poll() | ForEach-Object { Write-Host $_ } }
+                  catch { $tapFailure = $_.Exception.GetType().Name }
+              }
               Start-Sleep -Milliseconds 100
           }
           $proc.WaitForExit()
@@ -359,9 +366,10 @@ jobs:
           if (-not (Test-Path $resultsFile)) {
               Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
           }
-          Get-Content -LiteralPath $resultsFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
-          $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
-          Write-Host $summary
+          if ($null -eq $tapFailure) {
+              try { $tapFollower.Finish() | ForEach-Object { Write-Host $_ } }
+              catch { $tapFailure = $_.Exception.GetType().Name }
+          }
           $manifestFile = "$env:RUNNER_TEMP\windows-ahk-execution-manifest.json"
           node "${{ github.workspace }}\tools\test\validate-ahk-suite-manifest.cjs" `
               --input $resultsFile --json $manifestFile
@@ -378,6 +386,10 @@ jobs:
           if ($exit -ne 0) {
               Write-Host "::error::AHK native process failed (exit $exit)."
               Write-Error "Test suite failed (exit $exit)."; exit $exit
+          }
+          if ($null -ne $tapFailure) {
+              Write-Host "::error::AHK TAP progress read failed ($tapFailure); raw native receipts remain authoritative."
+              exit 2
           }
 
       # The isolated LLM suites. They cannot join run_all.ahk: each installs
@@ -565,15 +577,22 @@ jobs:
           Write-Host "------------------------------------------------------------"
           # Same approach as the unit test suite: AHK writes TAP output to
           # test_results.txt (FileAppend to "*" blocks without a console handle).
-          # FileAppend owns an exclusive handle; read the transcript only after exit.
+          # Shared TAP reads expose live progress without changing the native receipt.
           # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
           # hanging on an undismissable modal dialog in the headless runner.
           $stdoutFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-e2e.stdout.log'
           $stderrFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-e2e.stderr.log'
+          . "${{ github.workspace }}\tools\ci\ahk-tap-follower.ps1"
+          $tapFollower = New-AhkTapFollower -Path $resultsFile
+          $tapFailure = $null
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
           while (-not $proc.HasExited) {
+              if ($null -eq $tapFailure) {
+                  try { $tapFollower.Poll() | ForEach-Object { Write-Host $_ } }
+                  catch { $tapFailure = $_.Exception.GetType().Name }
+              }
               Start-Sleep -Milliseconds 100
           }
           $proc.WaitForExit()
@@ -590,10 +609,17 @@ jobs:
           if (-not (Test-Path $resultsFile)) {
               Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
           }
-          Get-Content -LiteralPath $resultsFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
+          if ($null -eq $tapFailure) {
+              try { $tapFollower.Finish() | ForEach-Object { Write-Host $_ } }
+              catch { $tapFailure = $_.Exception.GetType().Name }
+          }
           if ($exit -ne 0) {
               Write-Host "::error::AHK E2E native process failed (exit $exit)."
               Write-Error "E2E suite failed (exit $exit)."; exit $exit
+          }
+          if ($null -ne $tapFailure) {
+              Write-Host "::error::AHK TAP progress read failed ($tapFailure); raw native receipts remain authoritative."
+              exit 2
           }
 
       - name: Validate complete native E2E corpus execution

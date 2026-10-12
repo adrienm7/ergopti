@@ -26,8 +26,8 @@ process.on('uncaughtException', (error) => {
 
 // A completed TAP receipt cannot compensate for a missing native exit receipt.
 // Start-Process without -Wait must retain its handle before the child exits.
-// Reading the live receipt conflicts with AutoHotkey's exclusive FileAppend.
-// Require the actual workflow to retire its child before any transcript reader.
+// The shared TAP writer permits the explicit incremental follower. Raw readers
+// remain prohibited while it is alive; only final decoder drain waits for exit.
 function assertPostExitTranscript(script, name) {
 	const code = script.replace(/^\s*#.*$/gm, '');
 	const launch = code.indexOf('$proc = Start-Process');
@@ -40,8 +40,17 @@ function assertPostExitTranscript(script, name) {
 	);
 	assert.match(
 		code.slice(joined),
-		/Get-Content -LiteralPath \$resultsFile -Encoding utf8 \| ForEach-Object \{ Write-Host \$_ \}/,
-		`${name}: publish the complete UTF-8 transcript after native exit`
+		/try \{ \$tapFollower\.Finish\(\) \| ForEach-Object \{ Write-Host \$_ \} \}/,
+		`${name}: drain the remaining UTF-8 transcript after native exit`
+	);
+	assert.equal(code.split('$tapFollower.Finish()').length, 2, `${name}: drain exactly once`);
+	assert.ok(code.indexOf('$tapFollower.Finish()') > joined, `${name}: no premature final drain`);
+	assert.match(code, /New-AhkTapFollower -Path \$resultsFile/, `${name}: follow the original TAP`);
+	assert.match(code, /try \{ \$tapFollower\.Poll\(\) \| ForEach-Object \{ Write-Host \$_ \} \}/);
+	assert.match(
+		code,
+		/if \(\$null -ne \$tapFailure\) \{[\s\S]*?exit 2\n\}/,
+		`${name}: progress read failures remain fatal after native evidence`
 	);
 }
 
@@ -158,12 +167,8 @@ for (const [job, name] of [
 		}
 	}
 	assert.throws(
-		() =>
-			assertPostExitTranscript(
-				script.replace('Get-Content -LiteralPath $resultsFile', 'Write-Host $resultsFile'),
-				name
-			),
-		/publish the complete UTF-8 transcript/,
+		() => assertPostExitTranscript(script.replace('$tapFollower.Finish()', '$null'), name),
+		/drain the remaining UTF-8 transcript/,
 		'retiring the writer cannot silently drop its transcript'
 	);
 }
@@ -642,7 +647,9 @@ const streamProgram = [
 ].join('\n');
 try {
 	// Causal predecessor: the actual default pipe transport refuses this output.
-	const buffered = spawnSync(process.execPath, ['-e', streamProgram], { timeout: 10000 });
+	const buffered = spawnSync(process.execPath, ['-e', streamProgram], {
+		timeout: 10000
+	});
 	assert.equal(buffered.error && buffered.error.code, 'ENOBUFS');
 
 	const directory = transportCase('large-complete');
