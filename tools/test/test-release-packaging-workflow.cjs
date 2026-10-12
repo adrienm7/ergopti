@@ -2193,6 +2193,164 @@ errors.push(
 );
 // PUBLISHED_ARCHIVE_POLICY_TESTS_END
 
+// ARCHIVE_DESCRIPTOR_READ_CONTROLS_BEGIN
+// Portable descriptor tests retain actual owner logic without launching native tools.
+{
+	const assert = require('node:assert/strict');
+	const os = require('node:os');
+	const { spawnSync } = require('node:child_process');
+	const privateRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'archive-descriptor-read-'));
+	let cases = 0;
+	let fifoChildren = 0;
+	function loadReader(filename, filesystem, source, helperSource) {
+		const { Module, createRequire } = require('node:module');
+		const resolve = createRequire(filename);
+		const local = new Module(filename, module);
+		local.require = (name) => {
+			if (name === 'node:fs') return filesystem;
+			if (name === '../lib/owned-descriptor-read.cjs') {
+				const helper = new Module(resolve.resolve('../lib/paths.cjs') + '.descriptor-test', module);
+				helper._compile(helperSource, filename + '.descriptor-test');
+				return helper.exports;
+			}
+			return resolve(name);
+		};
+		local._compile(
+			source +
+				'\nmodule.exports.descriptorTestRead = typeof archiveBytes === "function" ? archiveBytes : bytes;\n',
+			filename
+		);
+		return local.exports.descriptorTestRead;
+	}
+	function capture(callback) {
+		let threw = false;
+		let failure;
+		let value;
+		try {
+			value = callback();
+		} catch (error) {
+			threw = true;
+			failure = error;
+		}
+		return { threw, failure, value };
+	}
+	try {
+		const helperSource = fs.readFileSync(
+			path.join(root, 'tools/lib/owned-descriptor-read.cjs'),
+			'utf8'
+		);
+		const payload = path.join(privateRoot, 'payload');
+		fs.writeFileSync(payload, 'Owned archive bytes.');
+		const values = [
+			undefined,
+			null,
+			false,
+			0,
+			-0,
+			NaN,
+			0n,
+			'',
+			new Error('Private injected error.'),
+			Object.create(null)
+		];
+		for (const name of ['macos-release-archives.cjs', 'macos-release-publication.cjs']) {
+			const filename = path.join(root, 'tools/build', name);
+			const source = fs.readFileSync(filename, 'utf8');
+			function fault(primary, closure, readRefused, closeRefused, validation = false) {
+				let opens = 0;
+				let closes = 0;
+				let acquiredFlags;
+				const descriptors = new Set();
+				const filesystem = Object.create(fs);
+				filesystem.openSync = (target, flags) => {
+					assert.equal(target, payload);
+					acquiredFlags = flags;
+					const descriptor = fs.openSync(target, flags);
+					descriptors.add(descriptor);
+					opens++;
+					return descriptor;
+				};
+				filesystem.fstatSync = (descriptor) =>
+					validation ? { isFile: () => false, size: 1 } : fs.fstatSync(descriptor);
+				filesystem.readFileSync = (descriptor) => {
+					assert(descriptors.has(descriptor));
+					if (readRefused) throw primary;
+					return fs.readFileSync(descriptor);
+				};
+				filesystem.closeSync = (descriptor) => {
+					assert(descriptors.delete(descriptor), 'Each owned descriptor closes once.');
+					closes++;
+					fs.closeSync(descriptor);
+					if (closeRefused) throw closure;
+				};
+				const outcome = capture(() =>
+					loadReader(filename, filesystem, source, helperSource)(payload)
+				);
+				assert.equal(opens, 1);
+				assert.equal(closes, 1);
+				assert.equal(descriptors.size, 0);
+				if ((readRefused || validation) && closeRefused) {
+					assert(outcome.threw);
+					assert(outcome.failure instanceof AggregateError);
+					assert.equal(outcome.failure.errors.length, 2);
+					if (validation) {
+						assert(outcome.failure.errors[0] instanceof Error);
+						assert.match(outcome.failure.errors[0].message, /nonempty.*regular file/);
+					} else assert.strictEqual(outcome.failure.errors[0], primary);
+					assert.strictEqual(outcome.failure.errors[1], closure);
+				} else if (readRefused || closeRefused) {
+					assert(outcome.threw);
+					assert.strictEqual(outcome.failure, readRefused ? primary : closure);
+				} else {
+					assert.equal(outcome.threw, false);
+					assert.equal(outcome.value.toString(), 'Owned archive bytes.');
+				}
+				const nonblocking = fs.constants.O_NONBLOCK ?? 0;
+				assert.equal(acquiredFlags & nonblocking, nonblocking);
+				if (process.platform !== 'win32') assert.notEqual(nonblocking, 0);
+				cases++;
+			}
+			for (const primary of values) {
+				for (const closure of values) fault(primary, closure, true, true);
+				fault(primary, undefined, true, false);
+			}
+			for (const closure of values) fault(undefined, closure, false, true);
+			fault(undefined, values.at(-2), false, true, true);
+			fault(undefined, undefined, false, false);
+			if (process.platform !== 'win32') {
+				const fifo = path.join(privateRoot, name + '.fifo');
+				const create = spawnSync('/usr/bin/mkfifo', [fifo], {
+					encoding: 'utf8',
+					timeout: 1500,
+					killSignal: 'SIGKILL'
+				});
+				assert.ifError(create.error);
+				assert.equal(create.status, 0);
+				const script = `const fs = require('node:fs'); const loadReader = ${loadReader.toString()}; const [filename,source,helperSource,fifo] = JSON.parse(process.argv[1]); let closes = 0; const owned = Object.create(fs); owned.closeSync = (fd) => {closes++; return fs.closeSync(fd)}; try {loadReader(filename,owned,source,helperSource)(fifo); process.exitCode=2} catch {process.stdout.write(JSON.stringify({refused:true,closes})+'\\n')}`;
+				const child = spawnSync(
+					process.execPath,
+					['-e', script, JSON.stringify([filename, source, helperSource, fifo])],
+					{ encoding: 'utf8', timeout: 1500, killSignal: 'SIGKILL', maxBuffer: 4096 }
+				);
+				fifoChildren++;
+				assert.ifError(child.error);
+				assert.equal(child.signal, null, 'A killed blocking read is not acceptance.');
+				assert.equal(child.status, 0);
+				assert.deepEqual(JSON.parse(child.stdout), { refused: true, closes: 1 });
+				cases++;
+			}
+		}
+		console.log(
+			`Archive descriptor controls: ${cases} passed; ${fifoChildren} owned FIFO children; native signing unexecuted.`
+		);
+	} catch (error) {
+		errors.push('archive descriptor read/close control refused: ' + error.message);
+	} finally {
+		fs.rmSync(privateRoot, { recursive: true });
+	}
+}
+// ARCHIVE_DESCRIPTOR_READ_CONTROLS_END
+
 if (errors.length > 0) {
 	console.error('[ERROR] Release packaging workflow is unsafe:');
 	for (const error of errors) console.error(`  - ${error}`);

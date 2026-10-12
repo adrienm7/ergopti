@@ -542,3 +542,29 @@ existing held-image/whole-tree owner and enroll the clean original23 launcher.
 Those are separate source prerequisites. Actual Windows APIs, SDK execution,
 process-tree closure, complete Unit/E2E/build/install and macOS/enterprise
 receiving remain unqualified. Source tests do not close36/62 or16/38.
+
+## Archive descriptor receiving and dependency closure
+
+Producer and publication archive readers share the new
+`tools/lib/owned-descriptor-read.cjs`. It preserves exact primary and closure
+failures in order, including thrown falsy values, and closes once without retry.
+Both callers add nonblocking open before their original regular-file checks.
+ENOENT fallback, format selection, signature and installation remain unchanged.
+
+Independent receiving preserves all52 fixture and51 packaging assertions.
+The existing callback passes246 POSIX subcases including two physical FIFO
+readers; the private Windows model passes244 with no FIFO/native execution.
+Original paired errors fail by assertion; actual original FIFO readers block
+and are physically reaped at the unchanged external test bound. The original
+new assertion also failed when Windows lacks O_NONBLOCK: zero versus undefined.
+Its correction normalizes the platform flag while still requiring a nonzero
+bit on POSIX. Models do not qualify Windows or Darwin native behavior.
+
+Two literal source inventory additions bind the helper and seed its actual
+bytes for Source22. All other SDK bodies, predicates and assertions are exact.
+Actual receiving binds the helper, refuses absence, and proves the old roster
+admitted a missing dependency. Composed registered22 controls pass.
+No source pin, independent oracle, registration or Root workflow was changed.
+Root authentic host/held bridge acquisition and process-adapter enrollment,
+actual archive/signature/Brew6, installation and enterprise acceptance remain
+open. Items36/62 and transversal16/38 are retained.
