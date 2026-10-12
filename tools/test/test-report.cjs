@@ -337,6 +337,46 @@ async function testOutputDrain() {
 				stderrResult.signal === null &&
 				stderrResult.stdout.includes('(exit 7, format unknown).\n')
 		);
+
+		const timingRow = {
+			schema: 1,
+			driver: 'macos',
+			id: 1,
+			kind: 'case',
+			module: 'tests.unit.owner',
+			name: 'é boundary',
+			status: 'pass',
+			elapsed_ms: 2,
+			timing_error: ''
+		};
+		const timingOutput = `# lua_timing ${JSON.stringify(timingRow)}\nPassed tests: 1\nFailed tests: 0\n`;
+		fs.writeFileSync(transcript, timingOutput);
+		fs.writeFileSync(
+			stderrRunner,
+			"const fs = require('node:fs'); const b = fs.readFileSync(process.argv[2]); " +
+				"const split = b.indexOf(Buffer.from('é')) + 1; process.stdout.write(b.subarray(0, split)); " +
+				"process.stderr.write('owned interleaved stderr\\n'); " +
+				'setTimeout(() => process.stdout.write(b.subarray(split)), 30);\n'
+		);
+		const unicode = await collect([
+			'--name',
+			'lua-timing-unicode',
+			'--json',
+			jsonPath,
+			'--',
+			process.execPath,
+			stderrRunner,
+			transcript
+		]);
+		const unicodeJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+		check(
+			'Lua timing survives an actual child split inside a UTF-8 codepoint',
+			unicode.code === 0 && JSON.stringify(unicodeJson.timings) === JSON.stringify([timingRow])
+		);
+		check(
+			'Lua timing stream decoding does not alter forwarded child bytes',
+			unicode.stdout.startsWith(timingOutput) && unicode.stderr === 'owned interleaved stderr\n'
+		);
 		fs.writeFileSync(transcript, 'ok 1 - owned success\n# 1 passed, 0 failed\n');
 		const success = await collect(['--name', 'drained-success', '--', 'PARSE_FILE', transcript]);
 		check(
@@ -559,6 +599,47 @@ try {
 	);
 } finally {
 	fs.rmSync(excerptFixture, { recursive: true, force: true });
+}
+
+// Lua timing rows remain separate from verdict and assertion counts.
+{
+	const row = {
+		schema: 1,
+		driver: 'linux',
+		id: 1,
+		kind: 'case',
+		module: 'tests.unit.owner',
+		name: 'Unicode é "quote"',
+		status: 'pass',
+		elapsed_ms: 0,
+		timing_error: ''
+	};
+	const parsed = parseResults(
+		`  ok   subject\n# lua_timing ${JSON.stringify(row)}\nPassed tests: 1\nFailed tests: 0`
+	);
+	check(
+		'Lua timing: actual structured row and Unicode survive',
+		parsed.timings.length === 1 && JSON.stringify(parsed.timings[0]) === JSON.stringify(row)
+	);
+	check(
+		'Lua timing: row does not inflate assertion counts',
+		parsed.passed === 1 && parsed.failed === 0
+	);
+	check(
+		'Lua timing: malformed structured row remains diagnostic failure',
+		parseResults('# lua_timing {').timing_errors.length === 1
+	);
+	check(
+		'Lua timing: no invented duration after a clock failure',
+		parseResults(
+			`# lua_timing ${JSON.stringify({ ...row, elapsed_ms: null, timing_error: 'clock_failed' })}`
+		).timing_errors.length === 1
+	);
+	check(
+		'Lua timing: numeric string duration is refused',
+		parseResults(`# lua_timing ${JSON.stringify({ ...row, elapsed_ms: '0' })}`).timing_errors
+			.length === 1
+	);
 }
 
 testOutputDrain()
