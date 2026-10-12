@@ -20,9 +20,14 @@ worker, AHK collection/resident and startup commands in the handover. Expect
 fresh terminal receipts. Repair failures with causal tests and atomic commits;
 keep native refusal, cleanup debt, cancellation and foreign-file custody intact.
 
-Receive the pending modifier-custody patch only together with a real official
-MSVC rebuild and provenance validation. The preceding E4133 DLL cannot qualify
-changed planner inputs. Production capture/replay cohort remains closed until
+Receive both pending-modifier-custody.patch and pending-modifier-consumer.patch
+only together with a real official MSVC rebuild and provenance validation. The
+preceding E4133 DLL cannot qualify changed planner inputs or the zero-unit AHK
+consumer. Run the existing source custody guard and both todo49-output and
+todo49-natural-custody AHK selections after applying both patches; the latter
+expects 98 new cases, which remain UNRUN in the cloud. These controlled AHK
+cases use test ports and do not qualify real hooks or physical delivery.
+Production capture/replay cohort remains closed until
 complete observer conversion and emitter/cleanup receiving are demonstrated.
 Do not choose SendEvent versus SendInput without actual Windows measurements.
 

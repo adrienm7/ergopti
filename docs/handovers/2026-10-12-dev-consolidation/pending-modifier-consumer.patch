@@ -1,0 +1,238 @@
+--- a/static/ergopti_plus/windows/adapters/terminal_output_custody.ahk
++++ b/static/ergopti_plus/windows/adapters/terminal_output_custody.ahk
+@@ -461,6 +461,10 @@
+ 			|| (Route["axis"] == 2 && (Route["target_scan"] != Route["code"] || Route["target_vk"]))
+ 			|| (Route["axis"] == 1 && (Route["target_vk"] != Route["code"] || Route["target_scan"]))
+ 		throw ValueError("The terminal output modifier is outside its natural subset.")
++	; Match the immutable native planner receipt: other sources may retain this
++	; natural bit. Zero output still requires the exact original FIFO retirement.
++	if ((Snapshot["modifiers_lr_before"] ^ Snapshot["modifiers_lr_after"]) & Route["effective_modifiers_lr"]) == 0
++		return Map("text", "", "count", 0, "units", Buffer(0))
+ 	Units := Buffer(10, 0)
+ 	NumPut("UShort", Route["target_vk"], "UShort", Route["target_scan"], Units, 0)
+ 	NumPut("UChar", 2, "UChar", Event["key_up"], "UChar", Event["repeat"], Units, 6)
+--- a/static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_output_custody.ahk
++++ b/static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_output_custody.ahk
+@@ -549,3 +549,95 @@
+ 	"ack-throw", "invalid-receipt", "oversized-receipt", "emit-throw", "unit-mutation", "handle-mutation"]
+ 	Test("terminal output consumer: " . _LNTOC_ConsumerName . " (todo49-output-consumer)",
+ 		_LNTOC_WithState.Bind(_LNTOC_ConsumerCase.Bind(_LNTOC_ConsumerName)))
++
++
++/** A zero-output natural edge still owns one exact FIFO retirement receipt. */
++_LNTOC_SharedNaturalState(Family, Axis, Origin, Up, Repeat, FamilyIndex) {
++	State := _LNTOC_State([], [])
++	RecipeId := (FamilyIndex - 1) * 2 + (Axis == 2 ? 1 : 2)
++	State.Receipt := _LNTR_Receipt(RecipeId, RecipeId)
++	Other := Family[3] == 1 ? 2 : 1
++	NumPut("UChar", Family[3] | Other, "UChar", Family[3] | Other, State.Receipt, 68)
++	NumPut("UShort", Family[1], "UShort", Family[2], "UChar", Origin,
++		"UChar", Up, "UChar", Repeat, State.Receipt, 136)
++	NumPut("UShort", Axis == 2 ? Family[2] : Family[1], State.Receipt, 172)
++	NumPut("UShort", Axis == 1 ? Family[1] : 0,
++		"UShort", Axis == 2 ? Family[2] : 0, State.Receipt, 174)
++	NumPut("UChar", Axis, "UChar", 4, "UChar", 0, "UChar", Family[3], State.Receipt, 178)
++	return State
++}
++
++_LNTOC_SharedNaturalCase(Family, Axis, Origin, Up, Repeat, FamilyIndex) {
++	State := _LNTOC_SharedNaturalState(Family, Axis, Origin, Up, Repeat, FamilyIndex)
++	Consumer := TerminalOutputConsumer(901, "none", State.Port, _LNTOC_ForbidSharedNaturalEmission)
++	AssertEqual(0, Consumer.Handle["unit_count"], "An unchanged LR bit has no native output unit.")
++	AssertEqual(0, LLM_NavEventOwner_BeginTerminalOutputAttempt(Consumer.Handle))
++	AssertFalse(Consumer.Handle["delivery_enabled"]), AssertFalse(Consumer.Handle["cohort_complete"])
++	State.RetireStatus := 4
++	AssertFalse(Consumer.Service(), "A known refused retirement must retain its zero-output edge.")
++	AssertFalse(Consumer.Retired), AssertFalse(Consumer.Blocked)
++	Status := LLM_NavEventOwner_TerminalOutputCustodyStatus(Consumer.Handle)
++	AssertEqual(0, Status["unit_count"]), AssertEqual(0, Status["accepted"])
++	AssertFalse(Status["pending"]), AssertFalse(Status["unknown"])
++	State.RetireStatus := 0
++	AssertTrue(Consumer.Service(), "The exact zero-output receipt may retire without any emitter.")
++	AssertEqual(1, State.Plans), AssertEqual(0, State.Begins), AssertEqual(0, State.Acks.Length)
++	AssertEqual(2, State.Consumes), AssertEqual(0, State.Cancels)
++	AssertFalse(Consumer.Service()), AssertFalse(Consumer.Cancel())
++	AssertEqual(2, State.Consumes, "A settled edge must never consume the replacement FIFO head.")
++}
++
++_LNTOC_ForbidSharedNaturalEmission(*) {
++	throw Error("A zero-output natural edge must not select or invoke an emitter.")
++}
++
++; Literal VK/SCAN/LR identities, independent of production natural tables.
++for _LNTOC_SharedFamilyIndex, _LNTOC_SharedFamily in [
++	[0xA2, 0x01D, 0x01], [0xA3, 0x11D, 0x02],
++	[0xA4, 0x038, 0x04], [0xA5, 0x138, 0x08],
++	[0xA0, 0x02A, 0x10], [0xA1, 0x036, 0x20],
++	[0x5B, 0x15B, 0x40], [0x5C, 0x15C, 0x80]] {
++	for _LNTOC_SharedAxis in [1, 2] {
++		for _LNTOC_SharedOrigin in [1, 2] {
++			for _LNTOC_SharedEdge in [[0, 0], [0, 1], [1, 0]]
++				Test("terminal output natural custody: " . _LNTOC_SharedFamilyIndex
++					. ":axis" . _LNTOC_SharedAxis . ":origin" . _LNTOC_SharedOrigin
++					. ":up" . _LNTOC_SharedEdge[1] . ":repeat" . _LNTOC_SharedEdge[2]
++					. " (todo49-natural-custody)",
++					_LNTOC_WithState.Bind(_LNTOC_SharedNaturalCase.Bind(_LNTOC_SharedFamily,
++						_LNTOC_SharedAxis, _LNTOC_SharedOrigin, _LNTOC_SharedEdge[1],
++						_LNTOC_SharedEdge[2], _LNTOC_SharedFamilyIndex)))
++		}
++	}
++}
++
++
++/** Even no emitted units cannot erase an uncertain native retirement effect. */
++_LNTOC_SharedNaturalUnknownCase(Mode) {
++	State := _LNTOC_SharedNaturalState([0xA0, 0x02A, 0x10], 2, 1, 1, 0, 5)
++	if Mode == "throw"
++		State.Throw := "consume"
++	else
++		State.RetireStatus := 0.5
++	Consumer := TerminalOutputConsumer(901, "none", State.Port, _LNTOC_ForbidSharedNaturalEmission)
++	AssertEqual(0, Consumer.Handle["unit_count"])
++	AssertThrows(() => Consumer.Service())
++	AssertTrue(Consumer.Blocked), AssertFalse(Consumer.Retired)
++	Status := LLM_NavEventOwner_TerminalOutputCustodyStatus(Consumer.Handle)
++	AssertTrue(Status["unknown"]), AssertEqual(0, Status["unit_count"])
++	AssertEqual(0, Status["accepted"]), AssertFalse(Status["pending"])
++	State.Throw := "", State.RetireStatus := 0
++	AssertFalse(Consumer.Service()), AssertFalse(Consumer.Cancel())
++	AssertFalse(LLM_NavEventOwner_ConsumeTerminalOutput(Consumer.Handle))
++	AssertFalse(LLM_NavEventOwner_CancelTerminalOutput(Consumer.Handle))
++	Copied := Consumer.Handle.Clone()
++	AssertFalse(LLM_NavEventOwner_ConsumeTerminalOutput(Copied))
++	AssertEqual(0, LLM_NavEventOwner_PlanTerminalOutput(901, "none", State.Port))
++	AssertEqual(1, State.Plans), AssertEqual(1, State.Consumes)
++	AssertEqual(0, State.Begins), AssertEqual(0, State.Acks.Length), AssertEqual(0, State.Cancels)
++}
++
++for _LNTOC_SharedUnknownMode in ["throw", "untyped"]
++	Test("terminal output natural custody: uncertain retirement " . _LNTOC_SharedUnknownMode
++		. " (todo49-natural-custody)",
++		_LNTOC_WithState.Bind(_LNTOC_SharedNaturalUnknownCase.Bind(_LNTOC_SharedUnknownMode)))
+--- a/tools/test/test-windows-terminal-output-custody-adapter.cjs
++++ b/tools/test/test-windows-terminal-output-custody-adapter.cjs
+@@ -119,6 +119,63 @@
+ 		12,
+ 		'Every independently authored native AHK case must remain registered.'
+ 	);
++	validateNaturalZeroCustody(source, tests);
++}
++
++/**
++ * Bind zero-unit canonical construction to the retained event-time LR receipt.
++ * @param {string} source - Actual guarded AHK canonical consumer.
++ * @param {string} tests - Literal independent native protocol vectors.
++ * @returns {void}
++ */
++function validateNaturalZeroCustody(source, tests) {
++	const match = source.match(
++		/^_LLM_TerminalOutputCanonical\(Snapshot, State, Owner, Recipes\) \{\n([\s\S]*?)\n\}/m
++	);
++	assert.ok(match, 'The actual canonical terminal consumer must exist.');
++	const body = match[1].replace(/\s+/g, ' ').trim();
++	const zero =
++		'if ((Snapshot["modifiers_lr_before"] ^ Snapshot["modifiers_lr_after"]) & Route["effective_modifiers_lr"]) == 0 return Map("text", "", "count", 0, "units", Buffer(0))';
++	const offset = body.indexOf(zero);
++	assert(offset >= 0, 'Natural zero custody must use the exact retained LR transition.');
++	const identityGuard = body.indexOf(
++		'throw ValueError("The terminal output modifier is outside its natural subset.")'
++	);
++	assert(
++		identityGuard >= 0 && offset > identityGuard && offset < body.indexOf('Units := Buffer(10, 0)'),
++		'Validate the natural identity before constructing either zero or native units.'
++	);
++
++	const families = tests.match(
++		/for _LNTOC_SharedFamilyIndex, _LNTOC_SharedFamily in \[([\s\S]*?)\]\] \{/
++	);
++	assert.ok(families, 'The independent shared-natural family census must remain registered.');
++	const rows = [...families[1].matchAll(/\[(0x[\dA-F]+), (0x[\dA-F]+), (0x[\dA-F]+)/g)].map((row) =>
++		row.slice(1).map(Number)
++	);
++	assert.deepEqual(
++		rows,
++		VK.filter((_, i) => i % 2 === 0).map((vk, i) => [vk, SC[i * 2], SC[i * 2 + 1]])
++	);
++	for (const binding of [
++		'for _LNTOC_SharedAxis in [1, 2]',
++		'for _LNTOC_SharedOrigin in [1, 2]',
++		'for _LNTOC_SharedEdge in [[0, 0], [0, 1], [1, 0]]',
++		'_LNTOC_WithState.Bind(_LNTOC_SharedNaturalCase.Bind(_LNTOC_SharedFamily,',
++		'_LNTOC_SharedAxis, _LNTOC_SharedOrigin, _LNTOC_SharedEdge[1],',
++		'_LNTOC_SharedEdge[2], _LNTOC_SharedFamilyIndex)))',
++		'Consumer := TerminalOutputConsumer(901, "none", State.Port, _LNTOC_ForbidSharedNaturalEmission)',
++		'AssertEqual(0, Consumer.Handle["unit_count"]',
++		'AssertEqual(2, State.Consumes, "A settled edge must never consume the replacement FIFO head.")',
++		'for _LNTOC_SharedUnknownMode in ["throw", "untyped"]',
++		'_LNTOC_WithState.Bind(_LNTOC_SharedNaturalUnknownCase.Bind(_LNTOC_SharedUnknownMode)))',
++		'AssertTrue(Status["unknown"]), AssertEqual(0, Status["unit_count"])',
++		'AssertFalse(LLM_NavEventOwner_ConsumeTerminalOutput(Copied))'
++	])
++		assert(
++			tests.includes(binding),
++			'Shared-natural custody must retain actual consumer/census bindings.'
++		);
+ }
+ 
+ const source = fs.readFileSync(path.join(DRIVER, 'adapters/terminal_output_custody.ahk'), 'utf8');
+@@ -165,9 +222,58 @@
+ 		() => validate(source, tests.replace(binding, 'RemovedValueBinding()')),
+ 		/loop vector must bind/
+ 	);
++// These perturbations are source controls, never simulated native AHK results.
++assert.throws(
++	() =>
++		validateNaturalZeroCustody(
++			source.replace(
++				'Snapshot["modifiers_lr_before"] ^ Snapshot["modifiers_lr_after"]',
++				'Snapshot["modifiers_lr_before"] ^ Snapshot["modifiers_lr_before"]'
++			),
++			tests
++		),
++	/exact retained LR transition/
++);
++assert.throws(
++	() =>
++		validateNaturalZeroCustody(
++			source.replace('"count", 0, "units", Buffer(0)', '"count", 1, "units", Buffer(10)'),
++			tests
++		),
++	/exact retained LR transition/
++);
++assert.throws(() =>
++	validateNaturalZeroCustody(source, tests.replace('[0xA3, 0x11D, 0x02]', '[0xA3, 0x11D, 0x01]'))
++);
++assert.throws(
++	() =>
++		validateNaturalZeroCustody(
++			source,
++			tests.replace(
++				'_LNTOC_WithState.Bind(_LNTOC_SharedNaturalCase.Bind(_LNTOC_SharedFamily,',
++				'RemovedSharedNaturalBinding('
++			)
++		),
++	/consumer\/census bindings/
++);
++
++assert.throws(
++	() =>
++		validateNaturalZeroCustody(
++			source.replace(
++				'throw ValueError("The terminal output modifier is outside its natural subset.")',
++				'return Map("text", "", "count", 0, "units", Buffer(0))'
++			),
++			tests
++		),
++	/Validate the natural identity/
++);
++console.log(
++	'Natural modifier canonical custody: 96 matrix cases, 2 uncertain-retirement cases and 5 negative source controls passed.'
++);
+ console.log(
+ 	'AHK custody source bindings: 5 native ABI bindings, 12 authored cases and 13 negative controls passed.'
+ );
+ console.log(
+-	'Source selection only; all 12 AHK cases and Windows native delivery remain UNRUN here.'
+-);
++	'Source controls only; the retained 29-case AHK output protocol checkpoint and 98 additional authored AHK cases are UNRUN here. Windows native delivery remains UNRUN.'
++);
