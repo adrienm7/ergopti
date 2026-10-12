@@ -2476,3 +2476,103 @@ Test("config journal: captured ordinary write rejects caller-only Source NUL suf
 	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_write", "source"))
 Test("config journal: captured ordinary write rejects caller-only FinalCandidate NUL suffix",
 	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_write", "candidate"))
+
+
+; Caller-held values never borrow an image by ending at an embedded NUL.
+; Physical source bytes remain ASCII; no transition or native publication occurs.
+_CMJ_UpstreamExactCallerNul(Kind) {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = true`n'
+	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
+	try {
+		AssertEqual(12, ConfigMigrateCurrentVersion(), "the independent current image requires the actual v12 registry")
+		AssertTrue(FSWriteDurable(Path, Source))
+		BeforeBytes := FileRead(Path, "RAW")
+		AssertEqual(StrLen(Source), BeforeBytes.Size)
+		loop StrLen(Source)
+			AssertEqual(Ord(SubStr(Source, A_Index, 1)), NumGet(BeforeBytes, A_Index - 1, "UChar"),
+				"every native source byte equals the handwritten ASCII image")
+		OriginalBytesValid := true
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "genuine boot grants the original ready phase")
+		Nul := Chr(0)
+		AssertEqual(1, StrLen(Nul)), AssertEqual(0, Ord(Nul))
+		if Kind == "registry" {
+			Registry := ConfigMigrateShippedRegistry(), Step := Registry["steps"][1]
+			OriginalReason := Step["reason"]
+			AssertTrue(OriginalReason is String)
+			Guard := ConfigMigrateBoot(Path, "capture_noop")
+			AssertTrue(HasMethod(Guard, "Call")), AssertTrue(Guard.Call(Source, 1))
+			AssertTrue(ConfigSchemaAcknowledgeNoop(Path, Guard))
+			Suffix := "caller-registry-suffix", ChangedReason := OriginalReason . Nul . Suffix
+			AssertEqual(StrLen(OriginalReason) + 1 + StrLen(Suffix), StrLen(ChangedReason))
+			AssertEqual(0, Ord(SubStr(ChangedReason, StrLen(OriginalReason) + 1, 1)))
+			Step["reason"] := ChangedReason
+			AssertFalse(ConfigSchemaCanPrepareWrite(Path), "native registry admission must revoke when its real reason gains units after NUL")
+			AssertFalse(Guard.Call(Source, 1), "the retained original noop must lose the genuinely changed registry owner")
+			AssertFalse(ConfigSchemaAcknowledgeNoop(Path, Guard), "native noop acknowledgement cannot consume the withdrawn registry")
+			Step["reason"] := OriginalReason
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+			AssertTrue(Guard.Call(Source, 1)), AssertTrue(ConfigSchemaAcknowledgeNoop(Path, Guard))
+		} else if Kind == "memo" {
+			Exact := ConfigMigrateBoot(Path, "capture_write", Source)
+			AssertTrue(HasMethod(Exact, "Call")), AssertTrue(Exact.Call(Source, 1, Source))
+			DuplicateTail := '`n[_meta]`nschema_version = 99`n'
+			Malformed := Source . Nul . DuplicateTail
+			AssertEqual(StrLen(Source) + 1 + StrLen(DuplicateTail), StrLen(Malformed))
+			AssertEqual(0, Ord(SubStr(Malformed, StrLen(Source) + 1, 1)))
+			; This is the existing duplicate-table rule, not an invented NUL ban.
+			ParserRefusal := ""
+			try TOML_ParseDocument(Malformed)
+			catch ValueError as Err
+				ParserRefusal := Err.Message
+			AssertEqual("Duplicate or closed TOML table namespace", ParserRefusal,
+				"the actual independent parser refuses the complete duplicate metadata header")
+			Rejected := ConfigMigrateBoot(Path, "capture_write", Malformed)
+			AssertFalse(HasMethod(Rejected, "Call"), "classification memo must not issue write admission for the parse-refused complete caller candidate")
+			AssertFalse(Rejected)
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path), "candidate refusal leaves genuine unchanged source readiness intact")
+			Repaired := ConfigMigrateBoot(Path, "capture_write", Source)
+			AssertTrue(HasMethod(Repaired, "Call")), AssertTrue(Repaired.Call(Source, 1, Source))
+		} else
+			throw ValueError("Unknown upstream complete caller-image regression")
+	} catch as Err {
+		PrimaryError := Err
+	}
+	if IsSet(Step) && IsSet(OriginalReason) {
+		try Step["reason"] := OriginalReason
+		catch as Err
+			CleanupErrors.Push({ stage: "registry_restore", error: Err })
+	}
+	SourceUnchanged := false
+	try {
+		if !IsSet(BeforeBytes)
+			throw Error("No complete original native byte receipt was captured")
+		AfterBytes := FileRead(Path, "RAW")
+		AssertEqual(BeforeBytes.Size, AfterBytes.Size)
+		loop BeforeBytes.Size
+			AssertEqual(NumGet(BeforeBytes, A_Index - 1, "UChar"), NumGet(AfterBytes, A_Index - 1, "UChar"),
+				"caller-only admission checks preserve every physical source byte")
+		SourceUnchanged := OriginalBytesValid
+	} catch as Err
+		CleanupErrors.Push({ stage: "raw_byte_proof", error: Err })
+	if SourceUnchanged {
+		try _CMJ_Cleanup(Dir, Path)
+		catch as Err
+			CleanupErrors.Push({ stage: "fixture_cleanup", error: Err })
+	} else
+		CleanupErrors.Push({ stage: "directory_retained", error: Error("Retained uncertain native source: " . Dir) })
+	for Secondary in CleanupErrors {
+		Detail := SubStr(StrReplace(StrReplace(Secondary.error.Message, "`r", " "), "`n", " "), 1, 512)
+		try _TestPrint("# ERGOPTI_UPSTREAM_CALLER_NUL_CLEANUP kind=" . Kind . " stage=" . Secondary.stage
+			. " dir=" . Dir . " detail=" . Detail)
+	}
+	if IsObject(PrimaryError)
+		throw PrimaryError
+	if CleanupErrors.Length > 0
+		throw CleanupErrors[1].error
+}
+Test("config journal: actual registry reason NUL suffix revokes captured native admission",
+	_CMJ_UpstreamExactCallerNul.Bind("registry"))
+Test("config journal: classification memo cannot admit caller NUL duplicate metadata candidate",
+	_CMJ_UpstreamExactCallerNul.Bind("memo"))
