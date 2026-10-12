@@ -219,9 +219,6 @@ class OwnedFixtureBuild:
         self.executable.parent.mkdir(parents=True)
         swift = [self._stage(path, Path(path).name) for path in SWIFT_INPUTS]
         compatibility = self.root / "CPOSIXCompatibility"
-        # Keep the compiler's private include directory independent of the caller's umask.
-        compatibility.mkdir(mode=0o700)
-        compatibility.chmod(0o700)
         for path in HEADER_INPUTS:
             self._stage(path, Path("CPOSIXCompatibility") / Path(path).name)
         module = compatibility / "module.modulemap"
