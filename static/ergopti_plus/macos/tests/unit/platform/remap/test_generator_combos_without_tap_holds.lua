@@ -138,6 +138,7 @@ helpers.with_fresh_modules({
 	"infra.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
+	"modules.keymap.layout_registry",
 	"toml_codec",
 }, function()
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -159,6 +160,8 @@ helpers.with_fresh_modules({
 		read = SourceFile.read,
 		read_with_status = function(path) return SourceFile.read(path), "ok" end,
 	}
+
+	package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 
 	local Config    = helpers.load_with_stubs("platform.remap.config")
 	local Generator = helpers.load_with_stubs("platform.remap.generator")
