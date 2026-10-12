@@ -1,8 +1,8 @@
 # .github/workflows/ci-common.yml
 #
-# Common owns the unchanged shared-validation matrix on isolated fresh runners.
-# The root caller forwards the canonical plan and awaits every matrix result.
-# Parent ci.yml owns concurrency; this workflow must not cancel its caller.
+# Common runs its canonical feature lots on independent fresh runners, validates
+# their exact source-bound union, then runs browser E2E once. Parent ci.yml owns
+# concurrency and awaits this entire lane before publication.
 
 name: Common
 
@@ -34,13 +34,44 @@ permissions:
   contents: read
 
 jobs:
+  prepare-common:
+    name: 'Prepare feature inventory'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Check formatting
+        run: |
+          python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"
+          node tools/lint/format.cjs --check
+
+      - name: Plan every canonical feature and additional suite
+        id: plan
+        run: |
+          set -euo pipefail
+          matrix="$(node tools/ci/js-feature-matrix.cjs)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   shared-validation:
-    name: '${{ matrix.suite }}'
+    name: 'Unit — ${{ matrix.feature }}'
+    needs: [prepare-common]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        suite: ${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}
+      matrix: ${{ fromJSON(needs.prepare-common.outputs.matrix) }}
     env:
       ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
       ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
@@ -62,25 +93,13 @@ jobs:
       - run: npm ci
 
       - name: Install native validation tools
-        # test-shared-root-resolvers.cjs EXECUTES each driver's lib/paths.lua
-        # rather than reading it — a resolver that returns nil is invisible to
-        # static inspection, which is how the language menu came to offer 2
-        # locales of 21. The gate fails rather than skips when no interpreter is
-        # present, so this job needs one. The installed Linux registry probe
-        # also requires luv's exact descriptor admission on stock Lua 5.4.
-        # The Sparkle appcast fixture is parsed
-        # with xmllint so malformed release metadata cannot pass by string shape.
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils
 
-      # One style per language: Prettier (JavaScript, Svelte, CSS, HTML, JSON,
-      # Markdown, YAML) and Ruff (Python), at the version format.cjs pins.
-      - name: Check formatting
-        run: |
-          python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"
-          node tools/lint/format.cjs --check
-
       - name: Run shared validation suite
+        env:
+          SUITE: ${{ matrix.suite }}
+          FEATURE: ${{ matrix.feature }}
         run: |
           set -euo pipefail
           mode=full
@@ -92,41 +111,101 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo '[DEFERRED] core-js-suite: qualified=false; properties and mutation unchanged.'
           elif [ "$mode" = full ]; then
-              npm run test:${{ matrix.suite }}
+              case "$SUITE" in
+                  js) npm run test:js -- --feature "$FEATURE" ;;
+                  properties) npm run test:properties ;;
+                  mutation) npm run test:mutation ;;
+                  *) exit 1 ;;
+              esac
           else
               exit 1
           fi
 
-      # Actual WebView rendering belongs to the shared JS lane. Native bridges
-      # are recorded; Chromium and WebKit cover both renderer families.
-      - name: Install shared UI browsers
-        if: matrix.suite == 'js'
-        run: node tools/ci/install-playwright.cjs chromium webkit
-
-      - name: Test shared layer editor rendering
-        if: matrix.suite == 'js'
-        run: npm run test:browser:layer-editor
-
-      - name: Test shared physical shortcut rendering
-        if: matrix.suite == 'js'
-        run: npm run test:browser:physical-shortcuts
-
-      - name: Test shared Versions installation rendering
-        if: matrix.suite == 'js'
-        run: npm run test:browser:changelog-install
-
       - name: Retain the source-bound Core JavaScript qualification
-        if: always() && matrix.suite == 'js'
+        if: always() && matrix.suite == 'js' && matrix.feature == 'test-infrastructure'
         uses: actions/upload-artifact@v4
         with:
           name: assets-qualification-core-js
           path: ${{ runner.temp }}/stable-core-js-suite.json
           if-no-files-found: warn
+          overwrite: true
 
       - name: Retain shared validation timings, including interrupted runs
         if: always() && matrix.suite == 'js'
         uses: actions/upload-artifact@v4
         with:
-          name: core-js-timings
+          name: core-js-timings-${{ matrix.feature }}
           path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson
           if-no-files-found: warn
+          overwrite: true
+
+  common-unit-verdict:
+    name: 'Verify complete unit inventory'
+    needs: [prepare-common, shared-validation]
+    runs-on: ubuntu-latest
+    env:
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Download exact source-bound qualification
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-qualification-core-js
+          path: qualification
+
+      - name: Download completed feature timings
+        uses: actions/download-artifact@v4
+        with:
+          pattern: core-js-timings-*
+          path: feature-timings
+
+      - name: Require every declared check exactly once
+        run: |
+          set -euo pipefail
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json)"
+          if [ "$mode" = full ]; then
+              node tools/ci/validate-js-feature-results.cjs feature-timings
+          elif [ "$mode" = deferred ]; then
+              echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'
+          else
+              exit 1
+          fi
+
+  common-e2e:
+    name: 'E2E browser rendering'
+    needs: [common-unit-verdict]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Install shared UI browsers
+        run: node tools/ci/install-playwright.cjs chromium webkit
+
+      - name: Test shared layer editor rendering
+        run: npm run test:browser:layer-editor
+
+      - name: Test shared physical shortcut rendering
+        run: npm run test:browser:physical-shortcuts
+
+      - name: Test shared Versions installation rendering
+        run: npm run test:browser:changelog-install

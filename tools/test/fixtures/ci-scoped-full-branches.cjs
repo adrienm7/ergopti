@@ -65,17 +65,62 @@ function projectScopedSteps(text, rel) {
 	const policy = validateBoundary();
 	let result = text;
 	const seen = new Set();
+	const seenConsumers = new Set();
 	for (const job of raw.jobsOfText(text, rel))
 		for (const step of raw.steps(job.body)) {
 			const matches = contract.slots.filter(
 				(slot) => slot.file === rel && slot.job === job.id && slot.step === step.name
 			);
+			const consumers = contract.receipt_consumers.filter(
+				(owner) => owner.file === rel && owner.job === job.id && owner.step === step.name
+			);
 			const lines = raw.runOf(step.body);
 			if (!lines) {
-				assert.equal(matches.length, 0, 'the reviewed scoped command must retain its run body');
+				assert.equal(
+					matches.length + consumers.length,
+					0,
+					'the reviewed scoped command must retain its run body'
+				);
 				continue;
 			}
 			const code = lines.join('\n');
+			if (consumers.length) {
+				assert.equal(consumers.length, 1, 'duplicate receipt consumer');
+				assert.equal(matches.length, 0, 'a receipt consumer cannot become an issuer');
+				const consumer = consumers[0];
+				const issuer = contract.slots.filter(
+					(slot) =>
+						slot.file === rel &&
+						slot.job === consumer.issuer_job &&
+						slot.step === consumer.issuer_step
+				);
+				assert.equal(issuer.length, 1, 'the receipt consumer must retain its original issuer');
+				assert.equal(
+					contract.protocols[issuer[0].protocol].scope,
+					consumer.scope,
+					'consumer scope must match issuer'
+				);
+				assert.equal(
+					policy.scopes[consumer.scope].path,
+					rel,
+					'consumer workflow must match issuer'
+				);
+				assert.equal(
+					policy.scopes[consumer.scope].args[0],
+					consumer.issuer_job,
+					'original issuer job must remain'
+				);
+				assert.equal(
+					policy.scopes[consumer.scope].args[1],
+					consumer.issuer_command,
+					'original issuer command must remain'
+				);
+				assert.equal(code, consumer.body, 'unknown or weakened readonly receipt consumer');
+				const identity = job.id + '/' + step.name;
+				assert.ok(!seenConsumers.has(identity), 'duplicate readonly receipt consumer');
+				seenConsumers.add(identity);
+				continue;
+			}
 			if (!matches.length && !code.includes('--validate-scope-receipt')) continue;
 			assert.equal(
 				matches.length,
@@ -146,6 +191,19 @@ function projectScopedSteps(text, rel) {
 		[...seen].sort(),
 		expected.sort(),
 		'every reviewed scoped command owner must remain'
+	);
+	const expectedConsumers = contract.receipt_consumers
+		.filter((owner) => owner.file === rel)
+		.map((owner) => owner.job + '/' + owner.step);
+	assert.equal(
+		new Set(expectedConsumers).size,
+		expectedConsumers.length,
+		'receipt consumers must be unique'
+	);
+	assert.deepEqual(
+		[...seenConsumers].sort(),
+		expectedConsumers.sort(),
+		'every readonly receipt consumer must remain'
 	);
 	return result;
 }

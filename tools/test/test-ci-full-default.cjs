@@ -220,8 +220,16 @@ check('every scoped full body remains owned; all other product scripts remain ex
 				assert.equal(Full.stepField(step.body, 'run'), Raw.stepField(step.body, 'run'));
 			}
 		}
-	assert.equal(jobs - 1, 27);
-	assert.equal(jobs, 28);
+	assert.deepEqual(
+		Raw.jobsOfText(
+			source.find((entry) => entry.rel === '.github/workflows/ci-common.yml').text,
+			'.github/workflows/ci-common.yml'
+		).map((job) => job.id),
+		['prepare-common', 'shared-validation', 'common-unit-verdict', 'common-e2e'],
+		'Common preserves preparation, every unit lot, complete coverage and browser E2E'
+	);
+	assert.equal(jobs - 1, 30);
+	assert.equal(jobs, 31);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))

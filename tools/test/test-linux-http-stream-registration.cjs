@@ -11,6 +11,18 @@
  */
 
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -109,10 +121,7 @@ function validate(root) {
 		55,
 		'native executed assertion floor'
 	);
-	assert(
-		read('tools/test/run-js-suite.cjs').includes(`args: ['${CONTRACT}']`),
-		'static gate must join the actual JS suite'
-	);
+	assert(ownsCheck(loadInventory(root), CONTRACT), 'static gate must join the actual JS suite');
 	assert(
 		read('tools/test/test-npm-aliases-match-the-suite.cjs').includes(`'${NATIVE}',`),
 		'native execution has an explicit separate owner'
@@ -217,6 +226,10 @@ function main() {
 			fs.mkdirSync(path.dirname(target), { recursive: true });
 			fs.copyFileSync(path.join(ROOT, relative), target);
 		}
+
+		fs.cpSync(path.join(ROOT, 'tools/test/features'), path.join(fixture, 'tools/test/features'), {
+			recursive: true
+		});
 		fs.cpSync(path.join(ROOT, '.github/workflows'), path.join(fixture, '.github/workflows'), {
 			recursive: true
 		});
@@ -273,9 +286,14 @@ function main() {
 				/native executed assertion floor/
 			],
 			[
-				'tools/test/run-js-suite.cjs',
-				(source) =>
-					source.replace(`args: ['${CONTRACT}']`, "args: ['removed-registration-contract']"),
+				'tools/test/features/release-ci/suite.json',
+				(source) => {
+					const data = JSON.parse(source);
+					const checks = data.checks.filter((check) => check.args[0] === CONTRACT);
+					assert.equal(checks.length, 1, 'mutation reaches the actual feature owner');
+					checks[0].args = ['removed-registration-contract'];
+					return JSON.stringify(data);
+				},
 				/actual JS suite/
 			]
 		];

@@ -1,6 +1,8 @@
 // tools/test/test-macos-launch-qualification-lifetime.cjs
 'use strict';
 
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+
 /** Calls the actual model module with owned filesystem and synchronous inert child ports. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -19,17 +21,20 @@ assert.equal(
 	'the asynchronous suite must not import this model'
 );
 assert.equal(code.includes("require('./test-macos-launch-qualification-lifetime.cjs');"), false);
-const runner = fs.readFileSync(path.join(__dirname, 'run-js-suite.cjs'), 'utf8');
+const runner = loadInventory(path.resolve(__dirname, '../..')).checks;
 for (const file of [
 	'test-macos-launch-qualification.cjs',
 	'test-macos-launch-qualification-lifetime.cjs'
 ]) {
-	const entry = "args: ['tools/test/" + file + "']";
-	assert.equal(
-		runner.split(entry).length,
-		2,
-		'each model needs exactly one independent runner entry'
+	const entries = runner.filter((check) => check.args.includes('tools/test/' + file));
+	assert.equal(entries.length, 1, 'each model needs exactly one independent runner entry');
+	assert.equal(entries[0].cmd, '$NODE_EXECUTABLE', 'the exact command owner remains mandatory');
+	assert.deepEqual(
+		entries[0].args,
+		['tools/test/' + file],
+		'the exact argument vector remains mandatory'
 	);
+	assert.equal(entries[0].platforms, undefined, 'the mandatory model cannot become conditional');
 }
 let controls = 0;
 function exercise(source, assigned, refuseBody) {

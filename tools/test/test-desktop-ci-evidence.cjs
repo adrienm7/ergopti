@@ -26,6 +26,8 @@ const crypto = require('node:crypto');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 const pipeline = require('./ci-full-default.cjs');
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const { createMatrix } = require('../ci/js-feature-matrix.cjs');
 const {
 	healthyUpgrade,
 	runContractCases,
@@ -572,19 +574,45 @@ try {
 	fs.rmSync(startupEvidenceRoot, { recursive: true, force: true });
 }
 
-/** Pins a fresh shallow checkout and the exact independently gated core suites. */
-function checkCore(caller, body) {
+/** Pin fresh feature runners and the exact independently gated additional suites. */
+function checkCore(caller, body, prepare, browser, planner = createMatrix) {
 	assert.deepEqual(pipeline.needsOf(caller), ['validate']);
 	assert.equal(pipeline.field(caller, 'if'), null);
 	assert.equal(pipeline.field(caller, 'uses'), './.github/workflows/ci-common.yml');
-	assert.deepEqual(pipeline.needsOf(body), []);
+	assert.deepEqual(pipeline.needsOf(body), ['prepare-common']);
 	assert.equal(pipeline.field(body, 'if'), null);
 	assert.match(body, /^      fail-fast: false$/m);
-	assert.ok(
-		body.includes(
-			`        suite: \${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}`
-		)
+	assert.equal(
+		pipeline.field(body, 'strategy'),
+		'fail-fast: false matrix: ${{ fromJSON(needs.prepare-common.outputs.matrix) }}'
 	);
+	assert.deepEqual(pipeline.needsOf(prepare), []);
+	assert.equal(pipeline.field(prepare, 'if'), null);
+	assert.equal(pipeline.field(prepare, 'outputs'), 'matrix: ${{ steps.plan.outputs.matrix }}');
+	assert.equal(
+		pipeline.stepField(
+			pipeline.step(prepare, 'Plan every canonical feature and additional suite'),
+			'id'
+		),
+		'plan'
+	);
+	assert.deepEqual(
+		pipeline.runOf(pipeline.step(prepare, 'Plan every canonical feature and additional suite')),
+		[
+			'set -euo pipefail',
+			'matrix="$(node tools/ci/js-feature-matrix.cjs)"',
+			'echo "matrix=$matrix" >> "$GITHUB_OUTPUT"'
+		]
+	);
+	const inventory = loadInventory(path.resolve(__dirname, '../..'));
+	for (const ref of ['refs/heads/main', 'refs/heads/dev']) {
+		const rows = planner(inventory, ref).include;
+		assert.deepEqual(rows, [
+			...inventory.features.map((feature) => ({ suite: 'js', feature })),
+			{ suite: 'properties', feature: 'properties' },
+			...(ref === 'refs/heads/main' ? [{ suite: 'mutation', feature: 'mutation' }] : [])
+		]);
+	}
 	const steps = pipeline.steps(body);
 	const checkout = steps.filter(
 		(step) => pipeline.stepField(step.body, 'uses') === 'actions/checkout@v4'
@@ -593,21 +621,31 @@ function checkCore(caller, body) {
 	assert.equal(pipeline.stepField(checkout[0].body, 'with'), null);
 	assert.doesNotMatch(body, /\bgit (?:fetch|pull|clone)\b/);
 	assert.equal(
-		pipeline.stepField(pipeline.step(body, 'Run shared validation suite'), 'run'),
-		'npm run test:${{ matrix.suite }}'
+		pipeline.stepField(pipeline.step(body, 'Run shared validation suite'), 'env'),
+		'SUITE: ${{ matrix.suite }} FEATURE: ${{ matrix.feature }}'
 	);
+	assert.deepEqual(pipeline.runOf(pipeline.step(body, 'Run shared validation suite')), [
+		'case "$SUITE" in',
+		'    js) npm run test:js -- --feature "$FEATURE" ;;',
+		'    properties) npm run test:properties ;;',
+		'    mutation) npm run test:mutation ;;',
+		'    *) exit 1 ;;',
+		'esac'
+	]);
 	assert.ok(steps.some((step) => pipeline.stepField(step.body, 'run') === 'npm ci'));
 	assert.match(
 		body,
 		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y lua5\.4 lua-luv libxml2-utils/
 	);
+	assert.deepEqual(pipeline.needsOf(browser), ['common-unit-verdict']);
+	assert.equal(pipeline.field(browser, 'if'), null);
 	for (const [name, command] of [
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
 	]) {
-		const step = pipeline.step(body, name);
-		assert.equal(pipeline.stepField(step, 'if'), "matrix.suite == 'js'");
+		const step = pipeline.step(browser, name);
+		assert.equal(pipeline.stepField(step, 'if'), null);
 		assert.equal(pipeline.stepField(step, 'run'), command);
 		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 	}
@@ -615,30 +653,39 @@ function checkCore(caller, body) {
 
 const coreCaller = pipeline.job('core');
 const core = pipeline.job('shared-validation');
+const corePrepare = pipeline.job('prepare-common');
+const coreBrowser = pipeline.job('common-e2e');
 assert.equal(pipeline.locate('shared-validation').file, '.github/workflows/ci-common.yml');
-checkCore(coreCaller, core);
+checkCore(coreCaller, core, corePrepare, coreBrowser);
 for (const [from, to] of [
 	['needs: [validate]', 'needs: [macos]'],
 	['./.github/workflows/ci-common.yml', './.github/workflows/foreign.yml']
 ]) {
 	const changed = coreCaller.replace(from, to);
 	assert.notEqual(changed, coreCaller, from + ' must mutate the actual Common caller');
-	assert.throws(() => checkCore(changed, core), from);
+	assert.throws(() => checkCore(changed, core, corePrepare, coreBrowser), from);
 }
+for (const drop of ['mutation', 'properties']) {
+	assert.throws(
+		() =>
+			checkCore(coreCaller, core, corePrepare, coreBrowser, (inventory, ref) => ({
+				include: createMatrix(inventory, ref).include.filter((row) => row.suite !== drop)
+			})),
+		'dropping the actual ' + drop + ' row'
+	);
+}
+assert.throws(
+	() =>
+		checkCore(coreCaller, core, corePrepare, coreBrowser, (inventory) =>
+			createMatrix(inventory, 'refs/heads/dev')
+		),
+	'main must retain its actual mutation row'
+);
 for (const [from, to] of [
-	['refs/heads/main', 'refs/heads/never'],
-	['"js","properties","mutation"', '"js","properties"'],
-	['"js","properties"', '"js"'],
 	['fail-fast: false', 'fail-fast: true'],
-	['run: npm run test:${{ matrix.suite }}', 'run: npm run test:${{ matrix.suite }} -- --only lint'],
-	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
-	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
-	[
-		'run: npm run test:browser:changelog-install',
-		'continue-on-error: true\n        run: npm run test:browser:changelog-install'
-	],
-	['node tools/ci/install-playwright.cjs chromium webkit', 'npx playwright install chromium'],
-	["if: matrix.suite == 'js'", "if: matrix.suite == 'never'"],
+	['js) npm run test:js -- --feature "$FEATURE" ;;', 'js) npm run test:js -- --only lint ;;'],
+	['needs: [prepare-common]', 'needs: []'],
+	['FEATURE: ${{ matrix.feature }}', 'FEATURE: foreign'],
 	[
 		'- uses: actions/checkout@v4',
 		'- uses: actions/checkout@v4\n        with:\n          fetch-depth: 0'
@@ -646,7 +693,24 @@ for (const [from, to] of [
 ]) {
 	const changed = core.replace(from, to);
 	assert.notEqual(changed, core, from + ' must actually mutate the shared gate');
-	assert.throws(() => checkCore(coreCaller, changed), from);
+	assert.throws(() => checkCore(coreCaller, changed, corePrepare, coreBrowser), from);
+}
+for (const [from, to] of [
+	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
+	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
+	[
+		'run: npm run test:browser:changelog-install',
+		'continue-on-error: true\n        run: npm run test:browser:changelog-install'
+	],
+	['node tools/ci/install-playwright.cjs chromium webkit', 'npx playwright install chromium'],
+	[
+		'run: npm run test:browser:layer-editor',
+		"if: matrix.suite == 'never'\n        run: npm run test:browser:layer-editor"
+	]
+]) {
+	const changed = coreBrowser.replace(from, to);
+	assert.notEqual(changed, coreBrowser, from + ' must actually mutate the browser gate');
+	assert.throws(() => checkCore(coreCaller, core, corePrepare, changed), from);
 }
 
 for (const [job, platform] of [

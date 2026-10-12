@@ -2,6 +2,19 @@
 
 /** Independent mandatory archive/source-control registration and receipt refusals. */
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
+
 const assert = require('node:assert/strict');
 const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const fs = require('node:fs');
@@ -13,7 +26,7 @@ const Controls = require('./run-linux-archive-source-controls.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
 const aliases = JSON.parse(read('package.json')).scripts;
-const inventory = read('tools/test/run-js-suite.cjs');
+const inventory = loadInventory(ROOT);
 const coverage = JSON.parse(read('.github/linux-ci-coverage.json'));
 const workflow = read('.github/workflows/ci-linux.yml');
 const ARCHIVE = 'Qualify native updater archive pipeline';
@@ -69,12 +82,12 @@ function validateRegistration(scripts, suite, planner, catalogue) {
 		'test-linux-updater-archive-receipt.cjs',
 		'test-linux-updater-archive-registration.cjs'
 	])
-		assert.ok(suite.includes("args: ['tools/test/" + file + "']"));
+		assert.ok(ownsCheck(suite, 'tools/test/' + file));
 	for (const file of [
 		'run-linux-updater-archive-native.cjs',
 		'run-linux-archive-source-controls.cjs'
 	])
-		assert.ok(!suite.includes("args: ['tools/test/" + file + "']"));
+		assert.ok(!suite.checks.some((check) => check.args.includes('tools/test/' + file)));
 	for (const [gate, alias] of Object.entries(commands)) {
 		assert.equal(planner.GATE_COMMANDS[gate]?.npm, alias);
 		assert.equal(planner.GATE_COMMANDS[gate]?.platform, 'linux');
@@ -166,7 +179,12 @@ for (const file of [
 		assert.throws(() =>
 			validateRegistration(
 				aliases,
-				inventory.replace("args: ['tools/test/" + file + "']", "args: ['missing']"),
+				{
+					...inventory,
+					checks: inventory.checks.map((check) =>
+						check.args[0] === 'tools/test/' + file ? { ...check, args: ['missing'] } : check
+					)
+				},
 				Planner,
 				coverage
 			)

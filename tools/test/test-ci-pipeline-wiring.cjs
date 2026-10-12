@@ -435,20 +435,6 @@ const STEP_CONDITIONS = [
 	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native updater archive pipeline', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify archive crypto and bin parent source controls', NOT_CANCELLED],
-	[COMMON_BOX, 'shared-validation', 'Install shared UI browsers', "matrix.suite == 'js'"],
-	[COMMON_BOX, 'shared-validation', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
-	[
-		COMMON_BOX,
-		'shared-validation',
-		'Test shared physical shortcut rendering',
-		"matrix.suite == 'js'"
-	],
-	[
-		COMMON_BOX,
-		'shared-validation',
-		'Test shared Versions installation rendering',
-		"matrix.suite == 'js'"
-	],
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
@@ -1117,10 +1103,18 @@ if (/^\s*secrets:\s*inherit\b/m.test(pipeline.text())) {
 	);
 }
 
-const COMMON_MATRIX = `\${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}`;
+const COMMON_MATRIX = '${{ fromJSON(needs.prepare-common.outputs.matrix) }}';
 const COMMON_INPUTS = ['release', 'version', 'tag', 'prerelease', 'channel'];
+const COMMON_DISPATCH = [
+	'case "$SUITE" in',
+	'    js) npm run test:js -- --feature "$FEATURE" ;;',
+	'    properties) npm run test:properties ;;',
+	'    mutation) npm run test:mutation ;;',
+	'    *) exit 1 ;;',
+	'esac'
+].join('\n');
 
-/** Preserves one real reusable shared lane and its exact caller/command custody. */
+/** Preserve the reusable Common caller, literal inventory, exact union and browser custody. */
 function commonProblems(files) {
 	const problems = [];
 	const entry = files.find((file) => file.rel === ENTRY);
@@ -1128,7 +1122,11 @@ function commonProblems(files) {
 	const callers = entry ? pipeline.jobsOfText(entry.text, ENTRY) : [];
 	const call = callers.find((job) => job.id === 'core');
 	const children = common ? pipeline.jobsOfText(common.text, COMMON_BOX) : [];
-	const child = children.find((job) => job.id === 'shared-validation');
+	const byId = new Map(children.map((job) => [job.id, job]));
+	const child = byId.get('shared-validation');
+	const prepare = byId.get('prepare-common');
+	const verdict = byId.get('common-unit-verdict');
+	const browser = byId.get('common-e2e');
 	if (!call || pipeline.field(call.body, 'uses') !== './.github/workflows/ci-common.yml')
 		problems.push('core must call the exact reusable Common workflow');
 	if (!call || JSON.stringify(pipeline.needsOf(call.body)) !== JSON.stringify([ROOT]))
@@ -1148,24 +1146,43 @@ function commonProblems(files) {
 		).join('\n');
 	if (!call || fieldBlock(call.body, 'with') !== callerInputs)
 		problems.push('Common caller must forward exactly the five canonical plan inputs');
-	if (children.length !== 1 || !child || pipeline.needsOf(child.body).length !== 0)
-		problems.push('Common must expose exactly one independent shared-validation child');
-	for (const key of ['if', 'continue-on-error', 'uses', 'secrets'])
-		if (child && pipeline.field(child.body, key) !== null)
-			problems.push('shared-validation must set no ' + key);
-	if (!child || pipeline.field(child.body, 'runs-on') !== 'ubuntu-latest')
-		problems.push('shared validation must retain its Ubuntu runner');
-	const strategy =
-		'    strategy:\n      fail-fast: false\n      matrix:\n        suite: ' + COMMON_MATRIX;
+	const dependencies = {
+		'prepare-common': [],
+		'shared-validation': ['prepare-common'],
+		'common-unit-verdict': ['prepare-common', 'shared-validation'],
+		'common-e2e': ['common-unit-verdict']
+	};
+	if (
+		JSON.stringify(children.map((job) => job.id).sort()) !==
+		JSON.stringify(Object.keys(dependencies).sort())
+	)
+		problems.push('Common must retain exactly its four mandatory stages');
+	for (const [id, needs] of Object.entries(dependencies)) {
+		const job = byId.get(id);
+		if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(needs))
+			problems.push(id + ' must await its exact mandatory prerequisites');
+		for (const key of ['if', 'continue-on-error', 'uses', 'secrets'])
+			if (job && pipeline.field(job.body, key) !== null) problems.push(id + ' must set no ' + key);
+		if (!job || pipeline.field(job.body, 'runs-on') !== 'ubuntu-latest')
+			problems.push(id + ' must retain its Ubuntu runner');
+	}
+	const strategy = '    strategy:\n      fail-fast: false\n      matrix: ' + COMMON_MATRIX;
 	if (!child || fieldBlock(child.body, 'strategy') !== strategy)
-		problems.push('Common must retain the exact three/main and two/other suite matrix');
+		problems.push('Common must consume the exact prepared inventory matrix without fail-fast');
+	if (
+		!prepare ||
+		fieldBlock(prepare.body, 'outputs') !==
+			'    outputs:\n      matrix: ${{ steps.plan.outputs.matrix }}'
+	)
+		problems.push('Common must expose the actual prepared matrix');
 	const environment =
 		'    env:\n' +
 		['RELEASE', 'PRERELEASE', 'CHANNEL', 'TAG', 'VERSION']
 			.map((key) => `      ERGOPTI_DEV_RELEASE_${key}: \${{ inputs.${key.toLowerCase()} }}`)
 			.join('\n');
-	if (!child || fieldBlock(child.body, 'env') !== environment)
-		problems.push('Common must retain exact qualification input bindings');
+	for (const job of [child, verdict])
+		if (!job || fieldBlock(job.body, 'env') !== environment)
+			problems.push('Common must retain exact qualification input bindings');
 	if (common) {
 		if (/^concurrency:/m.test(common.text))
 			problems.push('Common must leave concurrency ownership with its root caller');
@@ -1198,21 +1215,60 @@ function commonProblems(files) {
 		if (!common.text.includes('permissions:\n  contents: read\n\njobs:\n'))
 			problems.push('Common must retain read-only contents permission');
 	}
-	const steps = child ? pipeline.steps(child.body) : [];
+	const exactStep = (job, name, command) => {
+		const matches = job ? pipeline.steps(job.body).filter((step) => step.name === name) : [];
+		if (
+			matches.length !== 1 ||
+			pipeline.runOf(matches[0].body)?.join('\n') !== command ||
+			pipeline.stepField(matches[0].body, 'if') !== null ||
+			pipeline.stepField(matches[0].body, 'continue-on-error') !== null
+		)
+			problems.push(name + ' must retain its mandatory exact command');
+		return matches[0]?.body;
+	};
+	const plan = exactStep(
+		prepare,
+		'Plan every canonical feature and additional suite',
+		'set -euo pipefail\nmatrix="$(node tools/ci/js-feature-matrix.cjs)"\necho "matrix=$matrix" >> "$GITHUB_OUTPUT"'
+	);
+	if (!plan || pipeline.stepField(plan, 'id') !== 'plan')
+		problems.push('Common matrix output must come from its actual plan step');
+	const dispatch = exactStep(child, 'Run shared validation suite', COMMON_DISPATCH);
+	if (
+		!dispatch ||
+		pipeline.stepField(dispatch, 'env') !==
+			'SUITE: ${{ matrix.suite }} FEATURE: ${{ matrix.feature }}'
+	)
+		problems.push('Common must dispatch the exact suite and feature from its declared matrix');
+	const consumer = scoped.contract.receipt_consumers[0];
+	exactStep(verdict, consumer.step, consumer.body);
+	for (const [name, artifact, directory] of [
+		[
+			'Download exact source-bound qualification',
+			'name: assets-qualification-core-js',
+			'qualification'
+		],
+		['Download completed feature timings', 'pattern: core-js-timings-*', 'feature-timings']
+	]) {
+		const matches = verdict
+			? pipeline.steps(verdict.body).filter((step) => step.name === name)
+			: [];
+		if (
+			matches.length !== 1 ||
+			pipeline.stepField(matches[0].body, 'uses') !== 'actions/download-artifact@v4' ||
+			pipeline.stepField(matches[0].body, 'with') !== `${artifact} path: ${directory}` ||
+			pipeline.stepField(matches[0].body, 'if') !== null ||
+			pipeline.stepField(matches[0].body, 'continue-on-error') !== null
+		)
+			problems.push(name + ' must acquire its exact source-bound evidence');
+	}
 	for (const [name, command] of [
-		['Run shared validation suite', 'npm run test:${{ matrix.suite }}'],
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
 		['Test shared physical shortcut rendering', 'npm run test:browser:physical-shortcuts'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
-	]) {
-		const matches = steps.filter((step) => step.name === name);
-		if (
-			matches.length !== 1 ||
-			!pipeline.runOf(matches[0].body)?.some((line) => line.trim() === command)
-		)
-			problems.push(name + ' must retain its actual shared command');
-	}
+	])
+		exactStep(browser, name, command);
 	return problems;
 }
 errors.push(...commonProblems(pipeline.files()));
@@ -1250,19 +1306,90 @@ for (const [what, file, from, to] of [
 		'      fail-fast: false\n',
 		'      fail-fast: true\n'
 	],
-	['Common drops mutation', COMMON_BOX, COMMON_MATRIX, `\${{ fromJSON('["js","properties"]') }}`],
+	[
+		'Common withdraws canonical matrix',
+		COMMON_BOX,
+		COMMON_MATRIX,
+		`\${{ fromJSON('["js","properties"]') }}`
+	],
 	[
 		'Common changes release binding',
 		COMMON_BOX,
-		'      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}\n',
-		'      ERGOPTI_DEV_RELEASE_RELEASE: false\n'
+		pipeline.job('shared-validation'),
+		pipeline
+			.job('shared-validation')
+			.replace(
+				'      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}\n',
+				'      ERGOPTI_DEV_RELEASE_RELEASE: false\n'
+			)
 	],
 	['Common changes input type', COMMON_BOX, '        type: boolean\n', '        type: string\n'],
 	[
 		'Common drops shared command',
 		COMMON_BOX,
-		'npm run test:${{ matrix.suite }}',
+		'js) npm run test:js -- --feature "$FEATURE" ;;',
 		'echo skipped-shared-validation'
+	],
+	[
+		'Common omits prepare dependency',
+		COMMON_BOX,
+		'    needs: [prepare-common]\n',
+		'    needs: []\n'
+	],
+	[
+		'Common omits a unit verdict prerequisite',
+		COMMON_BOX,
+		'    needs: [prepare-common, shared-validation]\n',
+		'    needs: [prepare-common]\n'
+	],
+	[
+		'Common browsers bypass exact unit union',
+		COMMON_BOX,
+		'    needs: [common-unit-verdict]\n',
+		'    needs: [shared-validation]\n'
+	],
+	[
+		'Common substitutes matrix planner',
+		COMMON_BOX,
+		'node tools/ci/js-feature-matrix.cjs',
+		'node tools/ci/foreign-matrix.cjs'
+	],
+	['Common drops planner identity', COMMON_BOX, '        id: plan\n', '        id: foreign\n'],
+	[
+		'Common changes feature input',
+		COMMON_BOX,
+		'          FEATURE: ${{ matrix.feature }}\n',
+		'          FEATURE: foreign\n'
+	],
+	[
+		'Common omits property dispatch',
+		COMMON_BOX,
+		'    properties) npm run test:properties ;;',
+		'    properties) echo skipped ;;'
+	],
+	[
+		'Common omits mutation dispatch',
+		COMMON_BOX,
+		'    mutation) npm run test:mutation ;;',
+		'    mutation) echo skipped ;;'
+	],
+	[
+		'Common omits qualified union consumer',
+		COMMON_BOX,
+		'node tools/ci/validate-js-feature-results.cjs feature-timings',
+		'echo skipped-union'
+	],
+	[
+		'Common substitutes qualification artifact',
+		COMMON_BOX,
+		'          name: assets-qualification-core-js\n          path: qualification',
+		'          name: unrelated-qualification\n          path: qualification'
+	],
+	[
+		'Common substitutes feature artifacts',
+		COMMON_BOX,
+		'          pattern: core-js-timings-*\n',
+		'          pattern: unrelated-timings-*\n'
 	],
 	[
 		'Common drops browser command',
@@ -1272,6 +1399,70 @@ for (const [what, file, from, to] of [
 	]
 ])
 	mustCatch(what, file, from, to, commonProblems);
+
+/** Reject additional issuers, missing consumers and changed readonly union commands. */
+function checkCommonReceiptConsumer() {
+	const owners = scoped.contract.receipt_consumers.filter((owner) => owner.file === COMMON_BOX);
+	assert.equal(owners.length, 1);
+	const owner = owners[0];
+	assert.equal(owner.job, 'common-unit-verdict');
+	assert.equal(owner.scope, 'core-js-suite');
+	assert.equal(owner.issuer_job, 'shared-validation');
+	assert.equal(owner.issuer_step, 'Run shared validation suite');
+	assert.equal(owner.issuer_command, 'npm run test:js');
+	const source = pipeline.rawFiles().find((entry) => entry.rel === COMMON_BOX).text;
+	const job = pipeline.jobsOfText(source, COMMON_BOX).find((entry) => entry.id === owner.job);
+	const step = pipeline.step(job.body, owner.step);
+	assert.equal(pipeline.runOf(step).join('\n'), owner.body);
+	assert.ok(scoped.projectScopedSteps(source, COMMON_BOX));
+	const retained = scoped.contract.retained_steps.filter((entry) => entry.file === COMMON_BOX);
+	assert.equal(retained.length, 2);
+	for (const entry of retained) {
+		const child = pipeline
+			.jobsOfText(source, COMMON_BOX)
+			.find((candidate) => candidate.id === entry.job);
+		const transport = pipeline.step(child.body, entry.name).replace(/\n+$/, '');
+		assert.match(transport, /^ {10}overwrite: true$/m);
+		assert.equal(
+			isRetainedQualification(
+				{ rel: COMMON_BOX },
+				{ id: entry.job },
+				{ name: entry.name, body: transport }
+			),
+			true
+		);
+		const missingOverwrite = transport.replace('          overwrite: true', '');
+		assert.notEqual(missingOverwrite, transport);
+		assert.throws(() =>
+			isRetainedQualification(
+				{ rel: COMMON_BOX },
+				{ id: entry.job },
+				{ name: entry.name, body: missingOverwrite }
+			)
+		);
+	}
+	for (const [before, after] of [
+		[owner.step, 'Unknown readonly consumer'],
+		[
+			'--validate-scope-receipt qualification/stable-core-js-suite.json',
+			'--receipt qualification/stable-core-js-suite.json'
+		],
+		[
+			'node tools/ci/validate-js-feature-results.cjs feature-timings',
+			'node tools/ci/validate-js-feature-results.cjs feature-timings || true'
+		],
+		['node tools/ci/validate-js-feature-results.cjs feature-timings', 'echo skipped-union']
+	]) {
+		const changed = source.replace(before, after);
+		assert.notEqual(changed, source);
+		assert.throws(() => scoped.projectScopedSteps(changed, COMMON_BOX));
+	}
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, ''), COMMON_BOX));
+	const unknown =
+		'      - name: Unknown receipt reader\n        run: node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json\n';
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, step + unknown), COMMON_BOX));
+}
+checkCommonReceiptConsumer();
 
 // Release waits for every original job. The dispatch-only verdict cannot run
 // on a release push and is checked independently below.
@@ -2985,8 +3176,13 @@ function namingProblems(files) {
 								candidate.id
 							] === name
 						: /^(Validate|Release) \/ [A-Z][^/]+$/.test(name)
-					: entry.rel === COMMON_BOX && candidate.id === 'shared-validation'
-						? name === '${{ matrix.suite }}'
+					: entry.rel === COMMON_BOX
+						? {
+								'prepare-common': 'Prepare feature inventory',
+								'shared-validation': 'Unit — ${{ matrix.feature }}',
+								'common-unit-verdict': 'Verify complete unit inventory',
+								'common-e2e': 'E2E browser rendering'
+							}[candidate.id] === name
 						: /^[A-Z]/.test(name) && !name.includes(' / ');
 			if (!valid)
 				problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
@@ -3045,7 +3241,7 @@ for (const [what, rel, from, to] of [
 	[
 		'an incorrect Common matrix name',
 		COMMON_BOX,
-		"name: '${{ matrix.suite }}'",
+		"name: 'Unit — ${{ matrix.feature }}'",
 		"name: '${{ matrix.unknown }}'"
 	],
 	[
@@ -4231,8 +4427,7 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	const problems = [];
 	const entry = files.find((file) => file.rel === COMMON_BOX);
 	const core =
-		entry &&
-		pipeline.jobsOfText(entry.text, COMMON_BOX).find((job) => job.id === 'shared-validation');
+		entry && pipeline.jobsOfText(entry.text, COMMON_BOX).find((job) => job.id === 'common-e2e');
 	const steps = core ? pipeline.steps(core.body) : [];
 	const physical = steps.filter((step) => step.name === PHYSICAL_BROWSER_STEP);
 	const at = steps.findIndex((step) => step.name === PHYSICAL_BROWSER_STEP);
@@ -4249,7 +4444,7 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 			'physical shortcut renderer needs one gate immediately after layer rendering and browser installation'
 		);
 	} else if (
-		pipeline.stepField(physical[0].body, 'if') !== "matrix.suite == 'js'" ||
+		pipeline.stepField(physical[0].body, 'if') !== null ||
 		pipeline.stepField(physical[0].body, 'run') !== `npm run ${PHYSICAL_BROWSER_ALIAS}`
 	) {
 		problems.push('physical shortcut renderer must run its exact command on the shared JS lane');
@@ -4262,20 +4457,23 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	return problems;
 }
 errors.push(...physicalBrowserProblems(pipeline.files()));
-const physicalBrowserBody = pipeline.step(pipeline.job('shared-validation'), PHYSICAL_BROWSER_STEP);
+const physicalBrowserBody = pipeline.step(pipeline.job('common-e2e'), PHYSICAL_BROWSER_STEP);
 for (const [what, changed] of [
 	['missing physical browser step', ''],
 	[
-		'missing physical browser condition',
-		physicalBrowserBody.replace("        if: matrix.suite == 'js'\n", '')
+		'disabled formerly conditional physical browser gate',
+		physicalBrowserBody.replace('        run:', '        if: false\n        run:')
 	],
 	[
 		'disabled physical browser condition',
-		physicalBrowserBody.replace("matrix.suite == 'js'", 'false')
+		physicalBrowserBody.replace('        run:', "        if: matrix.suite == 'never'\n        run:")
 	],
 	[
 		'wrong physical browser lane',
-		physicalBrowserBody.replace("matrix.suite == 'js'", "matrix.suite == 'properties'")
+		physicalBrowserBody.replace(
+			'        run:',
+			"        if: matrix.suite == 'properties'\n        run:"
+		)
 	],
 	[
 		'wrong physical browser command',
@@ -4288,7 +4486,7 @@ for (const [what, changed] of [
 	mustCatch(what, COMMON_BOX, physicalBrowserBody, changed, physicalBrowserProblems);
 }
 const layerBrowserBody = pipeline.step(
-	pipeline.job('shared-validation'),
+	pipeline.job('common-e2e'),
 	'Test shared layer editor rendering'
 );
 const misplacedPhysicalBrowser = pipeline.files().map((entry) =>

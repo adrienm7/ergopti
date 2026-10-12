@@ -1145,14 +1145,14 @@
 			"job": "shared-validation",
 			"name": "Retain shared validation timings, including interrupted runs",
 			"condition": "always() && matrix.suite == 'js'",
-			"body": "      - name: Retain shared validation timings, including interrupted runs\n        if: always() && matrix.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: core-js-timings\n          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson\n          if-no-files-found: warn"
+			"body": "      - name: Retain shared validation timings, including interrupted runs\n        if: always() && matrix.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: core-js-timings-${{ matrix.feature }}\n          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson\n          if-no-files-found: warn\n          overwrite: true"
 		},
 		{
 			"file": ".github/workflows/ci-common.yml",
 			"job": "shared-validation",
 			"name": "Retain the source-bound Core JavaScript qualification",
-			"condition": "always() && matrix.suite == 'js'",
-			"body": "      - name: Retain the source-bound Core JavaScript qualification\n        if: always() && matrix.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-core-js\n          path: ${{ runner.temp }}/stable-core-js-suite.json\n          if-no-files-found: warn"
+			"condition": "always() && matrix.suite == 'js' && matrix.feature == 'test-infrastructure'",
+			"body": "      - name: Retain the source-bound Core JavaScript qualification\n        if: always() && matrix.suite == 'js' && matrix.feature == 'test-infrastructure'\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-core-js\n          path: ${{ runner.temp }}/stable-core-js-suite.json\n          if-no-files-found: warn\n          overwrite: true"
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
@@ -1202,6 +1202,18 @@
 			"name": "Retain the contained simultaneous qualification",
 			"condition": "always()",
 			"body": "      - name: Retain the contained simultaneous qualification\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-simultaneous-contained\n          path: ${{ runner.temp }}/stable-linux-simultaneous-native.json\n          if-no-files-found: warn"
+		}
+	],
+	"receipt_consumers": [
+		{
+			"file": ".github/workflows/ci-common.yml",
+			"job": "common-unit-verdict",
+			"step": "Require every declared check exactly once",
+			"scope": "core-js-suite",
+			"issuer_job": "shared-validation",
+			"issuer_step": "Run shared validation suite",
+			"body": "set -euo pipefail\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json)\"\nif [ \"$mode\" = full ]; then\n    node tools/ci/validate-js-feature-results.cjs feature-timings\nelif [ \"$mode\" = deferred ]; then\n    echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'\nelse\n    exit 1\nfi",
+			"issuer_command": "npm run test:js"
 		}
 	]
 }

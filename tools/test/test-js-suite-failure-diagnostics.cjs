@@ -35,6 +35,7 @@ function run(failure, options = {}) {
 			{
 				__dirname,
 				require(name) {
+					if (name === './lib/js-feature-inventory.cjs') return require(name);
 					if (name === 'child_process')
 						return {
 							spawnSync() {
@@ -67,6 +68,7 @@ function run(failure, options = {}) {
 					}
 				},
 				process: {
+					execPath: process.execPath,
 					argv: options.full ? ['node', 'run-js-suite.cjs', '--full'] : [],
 					env: { RUNNER_TEMP: options.local ? undefined : temporaryRoot, GITHUB_SHA: options.sha },
 					platform: process.platform,
@@ -317,7 +319,8 @@ const core = pipeline.job('shared-validation');
 assert(core.indexOf(upload) > core.indexOf(pipeline.step(core, 'Run shared validation suite')));
 assert.equal(pipeline.stepField(upload, 'if'), "always() && matrix.suite == 'js'");
 assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
-assert.match(upload, /^ {10}name: core-js-timings$/m);
+assert.match(upload, /^ {10}name: core-js-timings-\$\{\{ matrix\.feature \}\}$/m);
+assert.match(upload, /^ {10}overwrite: true$/m);
 assert.match(upload, /^ {10}path: \$\{\{ runner.temp \}\}\/ergopti-js-suite-\*\/timings\.ndjson$/m);
 assert.doesNotMatch(
 	upload,
