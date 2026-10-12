@@ -6047,7 +6047,11 @@ console-capture cohort 5/5. The strict desktop receiver correctly refuses its
 assertions remain unchanged. The owning source-seal generator refreshes only
 the TOML fingerprint and source commit from correction `512a5ef8`; all 21 source
 paths, protected fields and independent 18/4/1 expectations remain unchanged.
-All 22 portable source-admission controls pass after generation. The selected
+All 22 portable source-admission controls pass after generation. Linear Dev
+preparation regenerates the immutable source reference from replayed correction
+`4e96523be`, an ancestor of the delivered history; no source hash, protected
+field or independent expectation changes. The fresh-Dev source controls pass
+22/22 and the existing web admission subjects pass 4/4. The selected
 pre-seal local run retains 422/426 and its four explicit failures; separate
 source-seal and environment replays do not make that run wholly green.
 Corrected native receiving, remaining desktop
