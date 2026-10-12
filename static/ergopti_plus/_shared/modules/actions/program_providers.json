@@ -37,6 +37,8 @@
 			"mode": "script",
 			"extensions": ["ps1"],
 			"commands": {
+				"linux": ["pwsh"],
+				"hs": ["pwsh"],
 				"ahk": ["pwsh.exe", "powershell.exe"]
 			},
 			"prefix": ["-NoProfile", "-NonInteractive", "-File"]
