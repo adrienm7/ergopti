@@ -4075,6 +4075,33 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
 
+2026-10-12 local native qualification is mapped to the existing source-bound
+Windows/macOS entry points and exact workflow recipes, without adding a competing
+runner or changing any original assertion/clock. The [local procedure](handovers/2026-10-11-group6-cloud/LOCAL-VALIDATION.md)
+records real session/tool/consent requirements, current-source prerequisites and
+separate native/build/install results. Its commands are unexecuted on this Linux
+host; the current Windows receiver/profile still needs coordinated enrollment.
+Item36 remains open until actual package and installation acceptance succeeds.
+
+2026-10-11 current-source portable qualification is preserved at feature
+`c3a49a115c`, merged without squash from current Dev `da74809cd1`. All six
+selected format/JS/Lua/Linux gates pass; virtual E2E is not native desktop or
+installed-package acceptance. The raw PAC retention metadata successor now
+passes formatting, syntax and bounded omission controls without changing any
+original assertion, but shared adoption, producer enrollment and Windows
+receiving remain pending. See the [terminal checkpoint](handovers/2026-10-11-group6-cloud/README.md).
+Item36 stays open; no original23, Brew6 or full-suite qualification is claimed.
+
+2026-10-11 authentic original producer bytes are received through supported Git
+API blobs: historical f1db PRE/POST, actual PAC pair/LICENSE and twelve targeted
+results join official ZIP digests. This is not our original23 or full-suite
+acceptance; Root's map still matches only19 of21 current updater pins. Missing
+raw prepared/MSVC/header/command evidence is explicit. A finite retention proposal
+preserves original commands/guards and passes three Linux PowerShell controls,
+but remains unadopted and Windows/pipeline receiving is unrun. The current Dev
+composition and held packets are documented in the
+[cloud checkpoint](handovers/2026-10-11-group6-cloud/README.md). Item36 stays open.
+
 2026-10-11 held Windows original23 preparation is now durably preserved with
 its actual custody acknowledgment, complete inverses and Root67600 publisher
 comparison. The reviewed runner still requires exact composition for the two
@@ -7002,6 +7029,60 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+
+2026-10-12 HTTP-clock source tracking now admits the same complete rosters in
+bounded Git batches. Per-file committed bytes, regular-file checks and original
+before/final source procedures remain; all32 independent controls and the60s
+boundary are unchanged. The exact final source passes32 in11.365s. Earlier actual
+baseline/candidate rounds measure17.744s/11.609s and9,857/5,164 child calls.
+A missing builder now refuses its list before15 earlier reads; no accepted source
+pin is omitted. The hosted timeout is not reproduced or claimed repaired.
+See the [source and local validation checkpoint](handovers/2026-10-11-group6-cloud/README.md).
+Native trust/company/installed acceptance and item62 remain open.
+
+2026-10-11 removal custody correction: Root explicitly released the exact
+fixture projection, additive nine-case class and single156-to165 literal in
+comment6113764617. The later Root-pending statement was stale. G4 removal
+custody, any actual overlapping writer, current-wrapper composition and live
+selected/native receiving still remain necessary. The companion metadata and
+custody packets are [durably preserved](handovers/2026-10-11-group6-cloud/README.md).
+No observation grants restoration, resolves hosted trust failures or completes
+managed-company/installed acceptance. Item62 and transversal16/38 stay open.
+
+2026-10-11 full private removal receiving now passes165 actual cases, zero
+failed/errors/skipped, in45.164s under the original60s boundary, with29 candidate
+and live hashes unchanged before/after. Live fixture/registry adoption and native
+trust remain unqualified. The strict library seam passes21 default plus five
+causal controls; G5's exact diagnostic graft passes six portable controls and
+retains every original60s assertion/command. These are held proposals, not timeout
+cause fixes. Actual producer ZIP bytes are now independently received; missing
+raw source/header/compiler evidence and current-profile ownership remain.
+Saved network draft13 adds only the new exact sa3 host and is not activated.
+See the [additional receiving](handovers/2026-10-11-group6-cloud/README.md).
+No item is removed and native/company/installed acceptance remains pending.
+
+2026-10-11 unadopted native successors are durably preserved. The removal-only
+proposal passes nine additive focused controls while retaining250 original
+function texts and156 case identities; full165/native receiving is unrun.
+The genuine publisher extraction passes21 Node and four Linux PowerShell
+controls but still needs shared ownership, a fresh current source census and
+the stronger acquired/final-held reader. Root's historical profile matches
+only19 of21 current updater pins; retain both constructor corrections.
+Actual new producer ZIP downloads are HTTP403/zero bytes. Saved network draft12
+adds only the new exact storage host and is not activated. See the
+[preserved successor checkpoint](handovers/2026-10-11-group6-cloud/README.md).
+No native trust fix, original23/full-suite acceptance or item closure is claimed.
+
+2026-10-11 portable receiver failure diagnostics. Failed, signalled and timed-out
+Python children now emit bounded captured-output tails before the unchanged
+original assertions. The original executable, argv, case roster, success writes
+and 60,000 ms boundary remain exact. Six registered portable controls pass locally,
+with a genuine old-source output-loss refusal and an independently observed
+60000ms timeout; Windows explicitly skips only the POSIX signal observation.
+The [reviewed packet](handovers/2026-10-11-group6-cloud/portable-receiver-failure-output-proposal.tar.gz)
+retains complete preimages, inverse and physical child receiving. Final selected
+qualification is separate; no historical hosted cause or native trust repair is
+claimed. Item 62 remains open.
 
 2026-10-11 native producer and portable timeout receiving are now durably
 preserved. The strict reader correction589991aeb8 passes final format/412JS with
