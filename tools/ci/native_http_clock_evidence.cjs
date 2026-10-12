@@ -50,8 +50,6 @@ const LOADERS = Object.freeze([
 	'tools/test/export-macos-managed-http-test-deps.py',
 	MAC + 'uv.lock'
 ]);
-// Small argv batches reduce process startup while each source remains byte-checked.
-const TRACKING_BATCH_SIZE = 64;
 const MODULE_MAP = Buffer.from(
 	'module CPOSIXCompatibility {\n  umbrella header "CPOSIXCompatibility.h"\n  export *\n}\n'
 );
@@ -280,20 +278,12 @@ function sourceReceipt(repository, epoch) {
 		[Object.keys(original.sources), {}],
 		[INPUTS, sources],
 		[LOADERS, loaders]
-	]) {
-		// Refuse a missing tracked input before acquiring this complete source list.
-		for (let offset = 0; offset < inputs.length; offset += TRACKING_BATCH_SIZE)
-			execFileSync(
-				'git',
-				[
-					'ls-files',
-					'--error-unmatch',
-					'--',
-					...inputs.slice(offset, offset + TRACKING_BATCH_SIZE)
-				],
-				{ cwd: repository, stdio: 'pipe' }
-			);
+	])
 		for (const relative of inputs) {
+			execFileSync('git', ['ls-files', '--error-unmatch', '--', relative], {
+				cwd: repository,
+				stdio: 'pipe'
+			});
 			const actual = regularBytes(path.join(repository, relative));
 			const committed = execFileSync('git', ['show', admitted.candidate + ':' + relative], {
 				cwd: repository,
@@ -308,7 +298,6 @@ function sourceReceipt(repository, epoch) {
 					'Original source bytes changed'
 				);
 		}
-	}
 	// Recheck HEAD, whole tracked cleanliness and original independent inventories
 	// after acquiring every additional input. The historical 402-input procedure
 	// and independent inventories are unchanged; candidate counts are received.
