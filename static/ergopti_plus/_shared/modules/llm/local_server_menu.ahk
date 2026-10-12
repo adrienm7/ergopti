@@ -35,7 +35,14 @@ LocalServerMenuRows(Options) {
 	Tr := Options["tr"], Fmt := Options["format"]
 	Paused := Options["paused"], Actions := Options["actions"]
 	Rows := [Map("separator", true), Map("label", Tr.Call("menu.llm.local_servers.header"), "disabled", true)]
-	Result := Options["result"]
+	Result := Options["result"], Unavailable := false
+	for Id in Options["order"] {
+		Verdict := Result.Call(Id)
+		if Verdict is Map && Verdict.Get("status", "") == "unavailable"
+			Unavailable := true
+	}
+	if Unavailable
+		Rows.Push(Map("label", Tr.Call("healthcheck.status.failed"), "disabled", true))
 	for Id in Options["detected"] {
 		Verdict := Result.Call(Id)
 		Label := Options["servers"][Id]["label"] . " 🖥️ — " . LocalServerMenuHost(Verdict["base_url"])
@@ -46,7 +53,7 @@ LocalServerMenuRows(Options) {
 			"checked", _LocalServerMenuActive(Options, Id),
 			"items", _LocalServerMenuItems(Options, Id, Verdict)))
 	}
-	if Options["detected"].Length == 0 {
+	if Options["detected"].Length == 0 && !Unavailable {
 		Labels := ""
 		for Id in Options["order"]
 			Labels .= (Labels == "" ? "" : ", ") . Options["servers"][Id]["label"]

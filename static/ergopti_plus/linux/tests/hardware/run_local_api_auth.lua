@@ -57,7 +57,7 @@ server:listen(16, function(error)
 			authorization = input:sub(1, boundary):match("[Aa]uthorization: ([^\r\n]+)"),
 			body = input:sub(boundary + 4) }
 		if response.pending then return end
-		local body = route == "/v1/chat/completions" and '{"choices":[{"message":{"content":"native reply"}}]}' or response.body
+		local body = route:match("/chat/completions$") and '{"choices":[{"message":{"content":"native reply"}}]}' or response.body
 		local header = "HTTP/1.1 " .. response.status .. " Fixture\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: " .. #body .. "\r\n\r\n"
 		socket:write(header .. body, function() socket:shutdown(function() close(socket) end) end)
 	end)
@@ -192,14 +192,148 @@ discovery_done = false
 Servers.rescan(function() return true end, function() discovery_done = true end)
 check(run_until(function() return discovery_done end) and #Servers.detected() == 0,
 	"actual malformed models receipt cannot populate native discovery")
+-- Explicit generic entries at this nondefault loopback port are discovery
+-- views of their private rows, never inferred catalogue server identities.
+local configured_entries = {}
+for _, provider in ipairs({ "openai", "openai_compat" }) do
+	local configured = Entries.add({ provider = provider, label = "Personal " .. provider, token = provider == "openai" and "inert-configured-key" or "",
+		model = "before", base_url = base_url .. "/" .. provider })
+	check(configured ~= nil, provider .. " configured discovery stores its actual private source")
+	configured_entries[#configured_entries + 1] = configured
+end
+response = { status = 200, body = '{"object":"list","data":[{"id":"mlx-community/Qwen3-8B-4bit","object":"model","owned_by":"omlx"},{"id":"gemma-3-4b-it-4bit","object":"model","owned_by":"omlx"}]}' }
+discovery_done = false
+local configured_before = #requests
+Servers.rescan(function() return true end, function() discovery_done = true end)
+check(run_until(function() return discovery_done end), "actual configured discovery jointly settles all six curl owners")
+check(#Servers.order() == 6 and #requests == configured_before + 6, "actual configured endpoints append exactly two owned probes without port scanning")
+for index, configured in ipairs(configured_entries) do
+	local id = "configured:" .. configured.id
+	local verdict = Servers.result(id)
+	check(verdict and verdict.status == "up" and verdict.models[1] == "mlx-community/Qwen3-8B-4bit",
+		configured.provider .. " actual configured models publish in their own view")
+	local expected = configured.token ~= "" and "Bearer " .. configured.token or nil
+	local observed_auth, observed_route, observed_matches = nil, "/v1/" .. configured.provider .. "/models", 0
+	for request_index = configured_before + 1, configured_before + 6 do
+		local request = requests[request_index]
+		if request.route == observed_route then observed_auth = request.authorization; observed_matches = observed_matches + 1 end
+	end
+	check(observed_matches == 1 and observed_auth == expected,
+		configured.provider .. " actual configured discovery retains its exact optional authentication")
+	local configured_rows = require("ui.menu.local_server_rows").rows({
+		get_backend = function() return backend end,
+		can_configure_local_servers = function() return true end,
+		set_backend = function(value) backend, writes = value, writes + 1; return true end,
+	}, { prompt = function() return nil end, error = function() end }, function() end,
+		{ is_paused = function() return false end })
+	local configured_choice
+	for _, row in ipairs(configured_rows) do
+		if row.items and row.label:find(Remote.provider(configured.provider).label .. " 🖥️", 1, true) == 1 then
+			for _, child in ipairs(row.items) do
+				if child.label == "mlx-community/Qwen3-8B-4bit" then configured_choice = child; break end
+			end
+		end
+	end
+	check(configured_choice and type(configured_choice.action) == "function",
+		configured.provider .. " actual native menu exposes the originating configured model row")
+	local saved = configured_choice and configured_choice.action()
+	check(saved and saved.selected and backend == "api" and writes == 1 + index,
+		configured.provider .. " actual model action acknowledges its independent backend selection")
+	check(run_until(function() return not Servers.is_sweeping() end), configured.provider .. " post-selection configured sweep retires")
+	check(saved and saved.saved and saved.entry.id == configured.id and saved.entry.provider == configured.provider
+		and saved.entry.label == configured.label and #Entries.list() == 6,
+		configured.provider .. " configured selection acknowledges the originating row without duplicate or rebranding")
+	local native_done, native_text = false, nil
+	check(saved and Remote.chat(saved.entry, nil, {{ role = "user", content = "configured discovery fixture" }}, {}, nil,
+		function(value) native_text, native_done = value, true end), configured.provider .. " configured selection dispatches actual curl chat")
+	check(run_until(function() return native_done end) and native_text == "native reply"
+		and Json.decode(requests[#requests].body).model == "mlx-community/Qwen3-8B-4bit"
+		and requests[#requests].authorization == expected, configured.provider .. " actual configured chat preserves model and authentication")
+	local restarted = require("tests.helpers").load_module("modules.llm.api_entries")
+	restarted._set_path_for_test(private_path)
+	check(restarted.active() and restarted.active().id == configured.id and restarted.active().provider == configured.provider
+		and restarted.active().model == "mlx-community/Qwen3-8B-4bit", configured.provider .. " selected row survives actual private-file restart")
+end
+response = { status = 401, body = '{"error":{"message":"API key required","type":"authentication_error"}}' }
+discovery_done = false
+Servers.rescan(function() return true end, function() discovery_done = true end)
+check(run_until(function() return discovery_done end), "actual protected configured probes settle")
+for _, configured in ipairs(configured_entries) do
+	check(Servers.result("configured:" .. configured.id).status == "needs_key", configured.provider .. " configured 401 never becomes a model or an identity proof")
+end
+-- An answering OpenAI endpoint with no loaded models is reachable, not absent.
+-- Literal independent HTTP controls distinguish empty arrays from malformed lists.
+response = { status = 200, body = '{"object":"list","data":[]}' }
+discovery_done = false
+Servers.rescan(function() return true end, function() discovery_done = true end)
+check(run_until(function() return discovery_done end), "actual empty OpenAI lists jointly settle all six native probes")
+for _, id in ipairs(Servers.order()) do
+	local verdict = Servers.result(id)
+	check(verdict and verdict.status == "up" and #verdict.models == 0,
+		id .. " valid empty models list is reachable without selectable model IDs")
+end
+check(#Servers.detected() == 6, "empty model lists retain all actual reachable server views")
+local empty_rows = require("ui.menu.local_server_rows").rows({
+	get_backend = function() return backend end,
+	can_configure_local_servers = function() return true end,
+	set_backend = function() error("empty model rows cannot acquire the backend setter") end,
+}, { prompt = function() return nil end, error = function() end }, function() end,
+	{ is_paused = function() return false end })
+local no_models_label = require("infra.i18n").get("menu.llm.local_servers.no_models")
+local empty_count, empty_disabled = 0, true
+for _, row in ipairs(empty_rows) do
+	for _, child in ipairs(row.items or {}) do
+		if child.label == no_models_label then
+			empty_count = empty_count + 1
+			empty_disabled = empty_disabled and child.disabled == true and child.action == nil
+		end
+	end
+end
+check(empty_count == 6 and empty_disabled, "actual empty-model menu exposes six disabled no-models rows without selection actions")
+for _, control in ipairs({
+	{ label = "object instead of model array", status = 200, body = '{"object":"list","data":{}}' },
+	{ label = "non-object models root", status = 200, body = '[{"object":"list","data":[]}]' },
+	{ label = "HTTP 404 with a valid empty list", status = 404, body = '{"object":"list","data":[]}' },
+}) do
+	response = { status = control.status, body = control.body }
+	discovery_done = false
+	Servers.rescan(function() return true end, function() discovery_done = true end)
+	check(run_until(function() return discovery_done end), control.label .. " native negative control settles")
+	for _, id in ipairs(Servers.order()) do
+		check(Servers.result(id).status == "down", id .. " " .. control.label .. " is down, never unavailable")
+	end
+	check(#Servers.detected() == 0, control.label .. " cannot publish reachable or selectable model rows")
+end
+-- Real file drift after all six native acquisitions fences their old receipts;
+-- restore exact fixture-owned bytes only after the joint negative publication.
+local source_reader = assert(io.open(private_path, "rb"))
+local exact_source = source_reader:read("*a"); source_reader:close()
+local source_receipt = Servers.capture("configured:" .. configured_entries[1].id)
+response = { status = 200, body = '{"data":[{"id":"obsolete-after-source-drift"}]}' }
+discovery_done = false
+local drift_before = #requests
+Servers.rescan(function() return true end, function() discovery_done = true end)
+local source_writer = assert(io.open(private_path, "wb")); source_writer:write(exact_source .. "\n"); source_writer:close()
+check(run_until(function() return discovery_done end) and #requests == drift_before + 6,
+	"all six acquired native probes settle across actual private-file drift")
+check(#Servers.detected() == 0, "changed physical source refuses every old native positive model response")
+check(Servers.apply(source_receipt, { model = "obsolete-after-source-drift" }, function() return true end) == nil,
+	"changed physical source refuses the captured configured selection")
+local source_restore = assert(io.open(private_path, "wb")); source_restore:write(exact_source); source_restore:close()
+check(Entries.active().model == "mlx-community/Qwen3-8B-4bit",
+	"refused stale discovery never overwrites the acknowledged personal model")
 response = { pending = true }
 local discovery_before, cancelled_publications = #requests, 0
 Servers.rescan(function() return true end, function() cancelled_publications = cancelled_publications + 1 end)
 check(run_until(function() return #requests >= discovery_before + 4 end), "all four cancelled probes reached the actual native server")
+check(run_until(function() return #requests >= discovery_before + 6 end), "both configured pending probes retain actual native cancellation owners")
+local held_configured = Servers.capture("configured:" .. configured_entries[1].id)
 local first_cancel = Servers.cancel()
 check(first_cancel == false, "native kill acknowledgement alone does not settle process and close debt")
 check(run_until(function() return Servers.cancel() == true end) and cancelled_publications == 0,
 	"actual native exit and all close callbacks retire discovery without late publication")
+check(Servers.apply(held_configured, { model = "obsolete" }, function() return true end) == nil,
+	"a held configured menu receipt cannot select after native cancellation")
 check(Servers.shutdown() == true, "the stopped discovery owner acknowledges all exact native debt")
 os.remove(private_path); os.remove(private_path .. ".tmp"); os.remove(private_path .. ".corrupt")
 for _, socket in ipairs(sockets) do close(socket) end

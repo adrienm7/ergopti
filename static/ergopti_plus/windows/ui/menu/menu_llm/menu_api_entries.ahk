@@ -1387,6 +1387,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"entry", ObjBindMethod(this, "Entry"),
 			"entry_bound", ObjBindMethod(this, "EntryBound"),
 			"entries_bound", ObjBindMethod(this, "EntriesBound"),
+			"views_bound", ObjBindMethod(this, "ViewsBound"),
 			"admit", ObjBindMethod(this, "Admit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
@@ -1520,7 +1521,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
 			throw Error("The private API source authority is unavailable.")
 		Held := this._Held(Receipt)
-		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+		if !(ProviderId is String) || !this._ViewAllowed(Held, ProviderId)
 			throw ValueError("The requested local server is outside the native catalogue.")
 		Entry := this._EntryFrom(Held, ProviderId)
 		if !this.Current(Receipt)
@@ -1544,7 +1545,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		Held := this._Held(Receipt)
 		if !(Held is Map)
 			throw Error("The private API source receipt is unavailable.")
-		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+		if !(ProviderId is String) || !this._ViewAllowed(Held, ProviderId)
 			throw ValueError("The requested local server is outside the native catalogue.")
 		if !this.Current(Receipt)
 			throw Error("The private API source authority changed during resolution.")
@@ -1568,7 +1569,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			CapturedIds := ProviderIds.Clone()
 			Seen := Map()
 			for Id in CapturedIds {
-				if !(Id is String) || !Held["servers"].Has(Id) || Seen.Has(Id)
+				if !(Id is String) || !this._ViewAllowed(Held, Id) || Seen.Has(Id)
 					throw ValueError("Private API entry projection refuses an unknown or duplicate provider.")
 				Seen[Id] := true
 			}
@@ -1602,16 +1603,17 @@ class LLM_Menu_ApiPrivateSourceOwner {
 				|| !this.Current(Receipt)
 			return false
 		Held := this._Held(Receipt)
-		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+		if !(ProviderId is String) || !this._ViewAllowed(Held, ProviderId)
 			return false
 		for Key in ["base_url", "token", "model"] {
 			if !Fields.Has(Key) || !(Fields[Key] is String)
 					|| !_LLMRemote_ConfigScalarIsSafe(Fields[Key])
 				return false
 		}
+		Dynamic := SubStr(ProviderId, 1, 11) == "configured:"
 		if Fields.Count != 3 || Trim(Fields["model"]) == ""
 				|| !RegExMatch(Fields["base_url"], "i)^https?://[^[:space:]]+$")
-				|| !LocalServerAuthTokenAllowed(ProviderId, Fields["token"], Held["servers"])
+				|| (!Dynamic && !LocalServerAuthTokenAllowed(ProviderId, Fields["token"], Held["servers"]))
 			return false
 		OldEntry := this._EntryFrom(Held, ProviderId)
 		if !SelectModel && (!(OldEntry is Map) || !(Fields["model"] == OldEntry["Model"]))
@@ -1626,7 +1628,8 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; A generic row keeps its saved provider. Reject address/key edits that
 		; would leave its catalogue affinity or actual provider policy before WAL.
 		if !(NewEntry["Provider"] == ProviderId)
-				&& (!LocalServerAuthEntryMatches(NewEntry["Provider"], NewEntry["BaseUrl"], ProviderId, Held["servers"])
+				&& ((!Dynamic && !LocalServerAuthEntryMatches(NewEntry["Provider"], NewEntry["BaseUrl"], ProviderId, Held["servers"]))
+					|| (Dynamic && !(_LocalServerAuthLoopbackIdentity(NewEntry["BaseUrl"]) is Map))
 					|| !LocalServerAuthEntryTokenAllowed(NewEntry["Provider"], NewEntry["Token"], NewEntry["BaseUrl"], Held["servers"]))
 			return false
 		this.Writing := true
@@ -2041,7 +2044,50 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		return true
 	}
 
+	/** Projects view membership and entries through the exact originating receipt. */
+	ViewsBound(Receipt, BaseOrder) {
+		PreviousCritical := Critical("Off")
+		try {
+			Held := this._Held(Receipt)
+			if !(Held is Map) || !(BaseOrder is Array)
+				return false
+			Order := BaseOrder.Clone(), Servers := Map()
+			for Id in Order {
+				if !(Id is String) || !Held["servers"].Has(Id) || Servers.Has(Id)
+					throw ValueError("Private configured views require the original local catalogue order.")
+				Servers[Id] := Held["servers"][Id].Clone()
+			}
+			Configured := LocalServerAuthConfiguredViews(Held["entries"], Held["servers"], Held["providers"])
+			for Id in Configured["order"] {
+				Order.Push(Id)
+				Servers[Id] := Configured["views"][Id].Clone()
+			}
+			Projection := this.EntriesBound(Order, Receipt)
+			if !(Projection is Map)
+				return false
+			Projection["order"] := Order
+			Projection["servers"] := Servers
+			return Projection
+		} finally Critical(PreviousCritical)
+	}
+
+	_ViewAllowed(Held, Id) {
+		if Held["servers"].Has(Id)
+			return true
+		return SubStr(Id, 1, 11) == "configured:" && this._EntryFrom(Held, Id) is Map
+	}
+
 	_EntryFrom(Held, ProviderId) {
+		if SubStr(ProviderId, 1, 11) == "configured:" {
+			EntryId := SubStr(ProviderId, 12)
+			for Entry in Held["entries"] {
+				if Entry["Id"] == EntryId && Held["providers"].Has(Entry["Provider"])
+						&& ((Entry["Provider"] == "openai") || (Entry["Provider"] == "openai_compat"))
+						&& _LocalServerAuthLoopbackIdentity(Entry["BaseUrl"]) is Map
+					return Entry
+			}
+			return false
+		}
 		; Explicit catalogue identities remain authoritative over generic aliases,
 		; including when a generic entry happens to be the active API selection.
 		for ExactProvider in [true, false] {

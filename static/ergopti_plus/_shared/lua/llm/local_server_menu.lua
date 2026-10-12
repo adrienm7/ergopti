@@ -63,6 +63,12 @@ end
 --- @return table
 function M.rows(options)
 	local rows = { { separator = true }, { label = options.tr("menu.llm.local_servers.header"), disabled = true } }
+	local unavailable = false
+	for _, id in ipairs(options.order) do
+		local result = options.result(id)
+		if result and result.status == Discovery.STATUS_UNAVAILABLE then unavailable = true end
+	end
+	if unavailable then rows[#rows + 1] = { label = options.tr("healthcheck.status.failed"), disabled = true } end
 	for _, id in ipairs(options.detected) do
 		local verdict = options.result(id)
 		local label = options.servers[id].label .. " 🖥️ — " .. M.host_of(verdict.base_url)
@@ -73,7 +79,7 @@ function M.rows(options)
 			checked = options.backend == "api" and active_matches(options, id),
 			items = server_items(options, id, verdict) }
 	end
-	if #options.detected == 0 then
+	if #options.detected == 0 and not unavailable then
 		local labels = {}
 		for _, id in ipairs(options.order) do labels[#labels + 1] = options.servers[id].label end
 		local key = options.sweeping and "menu.llm.local_servers.searching" or "menu.llm.local_servers.none"

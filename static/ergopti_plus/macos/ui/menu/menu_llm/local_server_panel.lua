@@ -60,6 +60,53 @@ local function servers()
 	return require("modules.llm.local_servers")
 end
 
+--- Requires the actual pause owner, including after a retained menu or dialog.
+--- @param ctx table
+--- @return boolean
+local function admitted(ctx)
+	if type(ctx) ~= "table" or ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
+	local ok, paused = pcall(ctx.is_paused)
+	return ok and type(paused) == "boolean" and paused == false
+end
+
+--- Captures an originating entry and current jointly published model view.
+--- @param id string
+--- @return table|nil
+local function capture_view(id)
+	local target = remote().local_server_target(id)
+	if not target then return nil end
+	local models, verdict = {}, servers().result(id)
+	for index, model in ipairs(verdict and verdict.models or {}) do models[index] = model end
+	return { target = target, generation = remote().get_identity_generation(),
+		verdict = verdict, models = models }
+end
+
+--- Rechecks the exact native identity and optionally the admitted model choice.
+--- @param ctx table
+--- @param held table|nil
+--- @param model string|nil
+--- @return boolean
+local function view_current(ctx, held, model)
+	if not admitted(ctx) or not held or held.generation ~= remote().get_identity_generation() then return false end
+	local current = remote().local_server_target(held.target.id)
+	if not current then return false end
+	for _, key in ipairs({ "id", "entry_id", "provider", "base_url", "token" }) do
+		if current[key] ~= held.target[key] then return false end
+	end
+	if model ~= nil then
+		local verdict = servers().result(held.target.id)
+		if not verdict or verdict ~= held.verdict or verdict.status ~= servers().STATUS_UP
+			or #verdict.models ~= #held.models then return false end
+		local found = false
+		for index, value in ipairs(verdict.models) do
+			if value ~= held.models[index] then return false end
+			if value == model then found = true end
+		end
+		return found
+	end
+	return true
+end
+
 --- The host and port of a base URL, for a row or a notice.
 --- @param base_url string
 --- @return string
@@ -100,6 +147,7 @@ end
 --- @param on_done function|nil Called once the sweep settled.
 --- @return boolean started
 function M.rescan(ctx, on_done)
+	if not admitted(ctx) then return false end
 	return remote().detect_local_servers(function(changed)
 		if changed and ctx and type(ctx.update_menu) == "function" then
 			local ok, err = pcall(ctx.update_menu)
@@ -125,17 +173,19 @@ end
 --- @param on_selected function|nil Receives true once the API backend serves
 ---        the model, false when the entry or the backend switch did not commit.
 --- @return boolean started
-function M.select_model(ctx, id, model, on_selected)
+function M.select_model(ctx, id, model, on_selected, receipt)
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held, receipt and model or nil) then return false end
 	Logger.info(LOG, "Local server '%s' model '%s' chosen.", id, model)
 	return ApiPanel.apply_local_server(ctx, id, { model = model }, function(committed)
 		local activated = ctx.state.llm_backend == "api"
-		if committed == true and not activated and type(ctx.activate_api) == "function" then
+		if committed == true and admitted(ctx) and not activated and type(ctx.activate_api) == "function" then
 			local ok, accepted = Logger.callback(LOG, "Local server backend selection", ctx.activate_api)
 			activated = ok == true and accepted == true
 		end
 		if type(on_selected) == "function" then
 			local active = remote().get_active_entry()
-			local selected = committed == true and activated and ctx.state.llm_backend == "api"
+			local selected = committed == true and admitted(ctx) and activated and ctx.state.llm_backend == "api"
 				and type(active) == "table" and remote().local_server_entry(id) == active and active.model == model
 			if committed == true and not selected then
 				-- Leaving MLX waits for its server to stop: the switch lands later
@@ -143,7 +193,7 @@ function M.select_model(ctx, id, model, on_selected)
 			end
 			on_selected(selected)
 		end
-	end)
+	end, function() return view_current(ctx, held, receipt and model or nil) end)
 end
 
 --- Makes a server the prediction backend from outside the engine menu (the
@@ -165,12 +215,14 @@ end
 --- @param ctx table Engine menu context.
 --- @param id string Server id.
 --- @return boolean started
-function M.prompt_address(ctx, id)
-	local server = servers().SERVERS[id]
+function M.prompt_address(ctx, id, receipt)
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held) then return false end
+	local server = remote().local_server_descriptor(id)
 	local current = remote().local_server_target(id).base_url
 	local typed = ask(i18n.get("menu.llm.local_servers.header"),
 		i18n.format("dialog.local_servers.address_prompt", server.label, server.base_url), current)
-	if typed == nil then return false end
+	if typed == nil or not view_current(ctx, held) then return false end
 	if typed == "" then typed = server.base_url end
 	local base = remote().normalize_base_url(typed)
 	if not base then
@@ -180,35 +232,40 @@ function M.prompt_address(ctx, id)
 	end
 	return ApiPanel.apply_local_server(ctx, id, { base_url = base }, function(committed)
 		if committed then M.rescan(ctx, function() M.report_sweep(id) end) end
-	end)
+	end, function() return view_current(ctx, held) end)
 end
 
 --- Asks for the key a server wants, stores it and searches again.
 --- @param ctx table Engine menu context.
 --- @param id string Server id.
 --- @return boolean started
-function M.prompt_key(ctx, id)
-	local server = servers().SERVERS[id]
+function M.prompt_key(ctx, id, receipt)
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held) then return false end
+	local server = remote().local_server_descriptor(id)
 	local typed = ask(i18n.get("menu.llm.local_servers.header"),
 		i18n.format("dialog.local_servers.key_prompt", server.label), "", true)
-	if typed == nil then return false end
+	if typed == nil or not view_current(ctx, held) then return false end
 	return ApiPanel.apply_local_server(ctx, id, { token = typed }, function(committed)
 		if committed then M.rescan(ctx, function() M.report_sweep(id) end) end
-	end)
+	end, function() return view_current(ctx, held) end)
 end
 
 --- Says what a new search found about one server.
 --- @param id string Server id.
 function M.report_sweep(id)
-	local server = servers().SERVERS[id]
+	local server = remote().local_server_descriptor(id)
 	local verdict = servers().result(id)
 	local target = remote().local_server_target(id)
+	if not server or not target then return false end
 	if verdict and verdict.status == servers().STATUS_UP then
 		notify(server.label, i18n.format("llm.local_servers.found_body", #verdict.models), "success")
 	elseif verdict and verdict.status == servers().STATUS_NEEDS_KEY then
 		notify(i18n.format("llm.local_servers.needs_key_title", server.label),
 			i18n.format("llm.local_servers.needs_key_body", server.label), "warning",
 			function() M.prompt_key(_ctx, id) end)
+	elseif verdict and verdict.status == servers().STATUS_UNAVAILABLE then
+		notify(server.label, i18n.get("healthcheck.status.failed"), "error")
 	else
 		notify(i18n.format("llm.local_servers.not_running_title", server.label),
 			i18n.format("llm.local_servers.still_down_body", host_of(target.base_url)), "warning",
@@ -242,7 +299,7 @@ end
 --- @param missing string|nil The model the server refused.
 function M.prompt_model(id, missing)
 	M.rescan(_ctx, function()
-		local server = servers().SERVERS[id]
+		local server = remote().local_server_descriptor(id)
 		local verdict = servers().result(id)
 		if not verdict or verdict.status ~= servers().STATUS_UP then
 			M.report_sweep(id)
@@ -262,7 +319,7 @@ end
 --- @param kind string A FAILURE_* value of modules/llm/local_servers.lua.
 --- @param detail table { status, message, model }.
 local function on_failure(id, kind, detail)
-	local server = servers().SERVERS[id]
+	local server = remote().local_server_descriptor(id)
 	if kind == servers().FAILURE_NOT_RUNNING then
 		notify(i18n.format("llm.local_servers.not_running_title", server.label),
 			i18n.format("llm.local_servers.not_running_body", host_of(remote().local_server_target(id).base_url)),
@@ -308,19 +365,22 @@ function M.rows(ctx)
 	_ctx = ctx
 	servers().set_failure_handler(on_failure)
 	-- A paused script sends nothing: the rows keep the last verdicts
-	if not ctx.paused and servers().is_stale() then M.rescan(ctx) end
+	if admitted(ctx) and servers().is_stale() then M.rescan(ctx) end
 
+	api_remote.refresh_local_server_views()
 	local data = servers()
+	local receipts = {}
+	for _, id in ipairs(data.view_order()) do receipts[id] = capture_view(id) end
 	return ServerMenu.rows({
-		order = data.ORDER, servers = data.SERVERS, detected = data.detected(),
-		result = data.result, sweeping = data.is_sweeping(), paused = ctx.paused,
+		order = data.view_order(), servers = data.view_servers(), detected = data.detected(),
+		result = data.result, sweeping = data.is_sweeping(), paused = not admitted(ctx),
 		backend = ctx.state.llm_backend, active = remote().get_active_entry(),
 		entry_id = function(id) local entry = remote().local_server_entry(id); return entry and entry.id end,
 		tr = i18n.get, format = i18n.format,
 		actions = {
-			select = function(id, model) return M.select_model(ctx, id, model) end,
-			address = function(id) return M.prompt_address(ctx, id) end,
-			key = function(id) return M.prompt_key(ctx, id) end,
+			select = function(id, model) return M.select_model(ctx, id, model, nil, receipts[id]) end,
+			address = function(id) return M.prompt_address(ctx, id, receipts[id]) end,
+			key = function(id) return M.prompt_key(ctx, id, receipts[id]) end,
 			rescan = function() return M.rescan(ctx) end,
 		},
 	})

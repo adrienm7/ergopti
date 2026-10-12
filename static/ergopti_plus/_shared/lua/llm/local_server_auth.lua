@@ -112,6 +112,38 @@ function M.entry_matches(provider, base_url, server_id, servers)
 	return configured ~= nil and canonical ~= nil and configured == canonical
 end
 
+--- Projects configured generic loopback endpoints as views, never new providers.
+--- Canonical endpoints already belong to their declared catalogue row. Unknown
+--- metadata and credentials remain private to the driver's originating entry.
+--- @param entries table Validated native entries in their original order.
+--- @param servers table Validated local catalogue.
+--- @param providers table Actual provider descriptors.
+--- @return table order Configured view identifiers only.
+--- @return table views Public endpoint descriptors without credentials.
+function M.configured_views(entries, servers, providers)
+	local order, views = {}, {}
+	for _, entry in ipairs(entries) do
+		local provider = type(entry) == "table" and providers[entry.provider] or nil
+		if type(entry) == "table" and type(entry.id) == "string" and entry.id ~= ""
+			and type(entry.token) == "string" and type(provider) == "table"
+			and type(provider.label) == "string" and provider.label ~= ""
+			and (entry.provider == "openai" or entry.provider == "openai_compat")
+			and loopback_endpoint(entry.base_url) ~= nil then
+			local canonical = false
+			for id in pairs(servers) do
+				if M.entry_matches(entry.provider, entry.base_url, id, servers) then canonical = true; break end
+			end
+			local id = "configured:" .. entry.id
+			if not canonical and not views[id] then
+				order[#order + 1] = id
+				views[id] = { id = id, entry_id = entry.id, provider = entry.provider,
+					label = provider.label, base_url = entry.base_url }
+			end
+		end
+	end
+	return order, views
+end
+
 --- Validates a complete local OpenAI models receipt, preserving server order.
 --- @param result any Actual native HTTP result.
 --- @return table|nil model_ids

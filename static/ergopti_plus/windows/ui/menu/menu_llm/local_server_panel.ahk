@@ -259,6 +259,8 @@ class LLM_LocalServerPanel {
 			Projection := this.Native.CaptureView(Source)
 			if !(Projection is Map)
 				return this._UnavailableRows()
+			this.Order := Projection["order"].Clone()
+			this.Servers := Projection["servers"]
 			if Projection["stale"] {
 				; Discovery is optional work: a menu build must not enter managed
 				; HTTP acquisition or hold the driver's startup readiness stack.

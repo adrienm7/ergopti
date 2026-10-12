@@ -948,17 +948,29 @@ end
 --- @param fields table { base_url = string|nil, token = string|nil, model = string|nil }.
 --- @param on_done function|nil Receives (committed) once settled.
 --- @return boolean started False when another entry change is in flight.
-function M.apply_local_server(ctx, server_id, fields, on_done)
+function M.apply_local_server(ctx, server_id, fields, on_done, admission)
 	local api_remote = llm_mod.api_remote
-	if not api_remote.is_local_server(server_id) or type(fields) ~= "table" then
+	if not api_remote.is_local_server_view(server_id) or type(fields) ~= "table" then
 		error("api_panel.apply_local_server: a local server id and fields are required")
 	end
 	local LocalServers = require("modules.llm.local_servers")
 	local function done(committed)
 		if type(on_done) == "function" then pcall_log("apply_local_server(on_done)", on_done, committed) end
 	end
-	if _mutation_owner ~= nil then return false end
-	local provider = api_remote.PROVIDERS[server_id]
+	local function admitted()
+		if type(ctx.is_paused) ~= "function" or ctx.paused == true then return false end
+		local ok, paused = pcall(ctx.is_paused)
+		if not ok or type(paused) ~= "boolean" or paused ~= false then return false end
+		if admission ~= nil then
+			if type(admission) ~= "function" then return false end
+			local allowed, value = pcall(admission)
+			if not allowed or value ~= true then return false end
+		end
+		return true
+	end
+	if _mutation_owner ~= nil or not admitted() then return false end
+	local original_identity = api_remote.get_identity_generation()
+	local provider = api_remote.local_server_descriptor(server_id)
 	local existing = api_remote.local_server_entry(server_id)
 	fields = { base_url = fields.base_url, token = fields.token, model = fields.model }
 	-- The default address is stored as "", so a catalogue change reaches the entry
@@ -981,7 +993,9 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	for _, key in ipairs({ "base_url", "token", "model" }) do
 		if fields[key] ~= nil then entry[key] = fields[key] end
 	end
-	if not LocalAuth.entry_matches(entry.provider, entry.base_url, server_id, LocalServers.SERVERS) then
+	local configured = server_id:match("^configured:") ~= nil
+	if not (configured and LocalAuth.entry_token_allowed(entry.provider, "", entry.base_url, {})
+		or not configured and LocalAuth.entry_matches(entry.provider, entry.base_url, server_id, LocalServers.SERVERS)) then
 		Logger.warn(LOG, "Local server entry update refused: configured endpoint affinity changed.")
 		done(false)
 		return false
@@ -1005,16 +1019,23 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	if serving and reset_prediction_identity(ctx.keymap, "apply local server entry") ~= true then
 		return false
 	end
+	if not admitted() or api_remote.get_identity_generation() ~= original_identity then return false end
 	local my_generation = begin_mutation()
 	if not my_generation then return false end
 	api_remote.set_entries(staged)
 	if becomes_active then api_remote.set_active_entry_id(entry.id) end
 	if serving and becomes_active then state.llm_model = entry.model end
+	local staged_identity = api_remote.get_identity_generation()
 	-- A key the user removed leaves no Keychain item behind
 	local cleared_key = existing ~= nil and (existing.token or "") ~= "" and entry.token == ""
 	persist_entries("persist_api_entries(local server)", function(ok, reason, durable)
 		if not mutation_is_current(my_generation) then return end
 		finish_mutation(my_generation)
+		if api_remote.get_identity_generation() ~= staged_identity then
+			Logger.warn(LOG, "Local server entry completion discarded after its native identity changed.")
+			done(false)
+			return
+		end
 		if ok == true or durable == true then
 			if ok ~= true then
 				Logger.error(LOG, "Local server entry committed with cleanup debt: %s", tostring(reason))

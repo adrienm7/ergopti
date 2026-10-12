@@ -1020,6 +1020,7 @@ local function create_menu(deps)
 						local_server_rows = function(activate_api)
 								return LocalServerPanel.rows({
 										state = state, paused = paused, keymap = keymap, update_menu = update_menu,
+										is_paused = deps.script_control and deps.script_control.is_paused,
 										WarmupCtrl = WarmupCtrl, activate_api = activate_api,
 								})
 						end,

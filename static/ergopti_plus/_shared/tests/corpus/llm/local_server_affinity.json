@@ -264,5 +264,150 @@
 			"base_url": "http://localhost:8000/v1",
 			"allowed": false
 		}
+	],
+	"configured_view_cases": [
+		{
+			"name": "canonical endpoints are already declared",
+			"entries": [
+				{
+					"id": "canonical",
+					"provider": "openai_compat",
+					"base_url": "http://127.0.0.1:8000/v1",
+					"token": ""
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		},
+		{
+			"name": "nondefault known generic views retain configured order",
+			"entries": [
+				{
+					"id": "first",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1",
+					"token": "inert-token"
+				},
+				{
+					"id": "second",
+					"provider": "openai_compat",
+					"base_url": "http://[::1]:19424/owned/v1",
+					"token": ""
+				}
+			],
+			"expected_order": ["configured:first", "configured:second"],
+			"expected_views": {
+				"configured:first": {
+					"id": "configured:first",
+					"entry_id": "first",
+					"provider": "openai",
+					"label": "OpenAI",
+					"base_url": "http://localhost:19423/v1"
+				},
+				"configured:second": {
+					"id": "configured:second",
+					"entry_id": "second",
+					"provider": "openai_compat",
+					"label": "OpenAI-compatible",
+					"base_url": "http://[::1]:19424/owned/v1"
+				}
+			}
+		},
+		{
+			"name": "different owned base path is truthfully generic",
+			"entries": [
+				{
+					"id": "path",
+					"provider": "openai",
+					"base_url": "http://localhost:8000/other/v1",
+					"token": ""
+				}
+			],
+			"expected_order": ["configured:path"],
+			"expected_views": {
+				"configured:path": {
+					"id": "configured:path",
+					"entry_id": "path",
+					"provider": "openai",
+					"label": "OpenAI",
+					"base_url": "http://localhost:8000/other/v1"
+				}
+			}
+		},
+		{
+			"name": "foreign remote secret never enters search",
+			"entries": [
+				{
+					"id": "foreign",
+					"provider": "openai",
+					"base_url": "https://api.openai.com/v1",
+					"token": "inert-foreign"
+				},
+				{
+					"id": "invalid",
+					"provider": "openai_compat",
+					"base_url": "http://inert@localhost:19423/v1",
+					"token": "inert"
+				},
+				{
+					"id": "query",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1?token=inert",
+					"token": ""
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		},
+		{
+			"name": "unrelated and exact local providers are not generic views",
+			"entries": [
+				{
+					"id": "local",
+					"provider": "omlx",
+					"base_url": "http://localhost:19423/v1",
+					"token": ""
+				},
+				{
+					"id": "other",
+					"provider": "anthropic",
+					"base_url": "http://localhost:19423/v1",
+					"token": "inert"
+				},
+				{
+					"id": "unknown",
+					"provider": "future",
+					"base_url": "http://localhost:19423/v1",
+					"token": "inert"
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		},
+		{
+			"name": "invalid entry authority is refused",
+			"entries": [
+				{
+					"id": "",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1",
+					"token": ""
+				},
+				{
+					"id": "bad-token",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1",
+					"token": false
+				},
+				{
+					"id": "bad-base",
+					"provider": "openai",
+					"base_url": false,
+					"token": ""
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		}
 	]
 }

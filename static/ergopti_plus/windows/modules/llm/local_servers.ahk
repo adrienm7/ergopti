@@ -37,12 +37,13 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		for Name in ["entry", "capture_source", "source_current", "admit", "apply", "clock", "max_age"]
 			if !HasMethod(Options.Get(Name, 0), "Call")
 				throw TypeError("Local server native port is unavailable.", -1, Name)
-		for Name in ["timer", "on_publish", "on_error", "entry_bound"]
+		for Name in ["timer", "on_publish", "on_error", "entry_bound", "views_bound"]
 			if Options.Has(Name) && !HasMethod(Options[Name], "Call")
 				throw TypeError("Local server optional port must be callable.", -1, Name)
 		this.Options := Options.Clone()
 		this.Models := Options["models_owner"]
 		this.Order := Options["order"].Clone()
+		this.BaseOrder := this.Order.Clone()
 		this.Servers := Options["servers"]
 		this.Pending := Map()
 		this.Jobs := Map()
@@ -85,7 +86,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		if !(Server is Map)
 			return false
 		if Entry is Map {
-			if !(Entry.Get("Id", 0) is String) || !LocalServerAuthEntryMatches(Entry.Get("Provider", ""), Entry.Get("BaseUrl", ""), Id, this.Servers)
+			if !(Entry.Get("Id", 0) is String) || !this._EntryMatches(Id, Server, Entry)
 					|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
 					|| !(Entry.Get("Model", 0) is String)
 				throw TypeError("Local server entry must come from the validated native API owner.")
@@ -96,6 +97,55 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Fields := this.Pending.Get(Id, Map())
 		return Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields.Get("base_url", Server["base_url"]),
 			"token", Fields.Get("token", ""))
+	}
+
+	_EntryMatches(Id, Server, Entry) {
+		if SubStr(Id, 1, 11) == "configured:"
+			return Entry.Get("Id", "") == Server.Get("entry_id", 0)
+				&& Entry.Get("Provider", "") == Server.Get("provider", 0)
+				&& _LocalServerAuthLoopbackIdentity(Entry.Get("BaseUrl", 0)) is Map
+		return LocalServerAuthEntryMatches(Entry.Get("Provider", ""), Entry.Get("BaseUrl", ""), Id, this.Servers)
+	}
+
+	; One receipt-fenced batch provides both public view membership and private
+	; entry targets. Removed views invalidate tickets while their jobs stay owned.
+	_RefreshViews(Source) {
+		if !this.Options.Has("views_bound")
+			return true
+		Projection := this._Call("views_bound", Source, this.BaseOrder)
+		if !(Projection is Map) || Projection.Get("source", 0) != Source
+				|| !(Projection.Get("order", 0) is Array) || !(Projection.Get("servers", 0) is Map)
+			return false
+		Order := Projection["order"].Clone(), Servers := Projection["servers"]
+		Changed := this.Order.Length != Order.Length
+		if !Changed {
+			for Index, Id in Order {
+				if !(this.Order[Index] == Id) || !this.Servers.Has(Id)
+					Changed := true
+				else {
+					for Key in ["id", "entry_id", "provider", "label", "base_url", "auth"] {
+						if !(this.Servers[Id].Get(Key, "") == Servers[Id].Get(Key, ""))
+							Changed := true
+					}
+				}
+			}
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || A_IsSuspended
+				return false
+			if Changed {
+				this.Controller.SetOrder(Order)
+				this.Order := Order
+				this.Servers := Servers
+				this.Models.Options["servers"] := Servers
+				this.ConfigurationGeneration += 1
+				this.ViewGeneration += 1
+				this.Views := Map()
+				this.Cache := 0
+			}
+		} finally Critical(PreviousCritical)
+		return Projection
 	}
 
 	/** Resolves through the declared receipt port; refusal never falls back to absence. */
@@ -178,9 +228,14 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Source := this._Call("capture_source")
 		if !IsObject(Source)
 			return false
+		Projection := this._RefreshViews(Source)
+		if !Projection
+			return false
+		Configuration := this.ConfigurationGeneration
 		PrivateTargets := Map(), Targets := []
 		for Id in this.Order {
-			Target := this._Target(Id, Source)
+			Target := Projection is Map
+				? this._TargetFromEntry(Id, this.Servers[Id], Projection["entries"][Id]) : this._Target(Id, Source)
 			if !(Target is Map)
 				throw Error("Local discovery catalogue target is unavailable.")
 			PrivateTargets[Id] := Target
@@ -436,6 +491,9 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	_DropJob(Job) {
 		if !this._OwnsJob(Job) || Job["busy"]
 			return false
+		; Queue retirement acknowledges the same exact physical request first.
+		if !this._CancelExact(this.Models.Records.Get(Job["id"], 0))
+			return false
 		if !this._Timer(Job["timer"], 0)
 			return false
 		Successor := 0
@@ -515,13 +573,16 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			throw TypeError("A local display view requires the native batch entry owner.")
 		if !this._Admitted()
 			return false
+		Projection := this._RefreshViews(Source)
+		if !Projection
+			return false
 		PreviousCritical := Critical("On")
 		try {
 			Stamp := Map("view", this.ViewGeneration, "configuration", this.ConfigurationGeneration,
 				"models", this.ModelGeneration, "rescan", this.RescanGeneration,
 				"controller", this.Controller.Generation, "cache", this.Cache)
 		} finally Critical(PreviousCritical)
-		Entries := this._Call("entries_bound", this.Order, Source)
+		Entries := Projection is Map ? Projection : this._Call("entries_bound", this.Order, Source)
 		if !(Entries is Map) || Entries.Get("source", 0) != Source
 			return false
 		Targets := this._DisplayTargets(Entries["entries"])
@@ -543,7 +604,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		for Id in this.Order {
 			Verdict := Results.Get(Id, 0)
 			Models := Verdict is Map ? Verdict["models"].Clone() : []
-			if Verdict is Map && !(Verdict["status"] == "down")
+			if Verdict is Map && ((Verdict["status"] == "up") || (Verdict["status"] == "needs_key"))
 				Detected.Push(Id)
 			Receipt := {}
 			Receipts[Id] := Receipt
@@ -568,10 +629,11 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				if !this._SameTarget(Targets[Id], CurrentTargets[Id])
 					return false
 			if Stale
-				return Map("stale", true)
+				return Map("stale", true, "order", this.Order.Clone(), "servers", this.Servers)
 			this.ViewGeneration := Stamp["view"] + 1
 			this.Views := Views
-			return Map("stale", false, "source", Source, "entries", Entries, "receipts", Receipts,
+			return Map("stale", false, "order", this.Order.Clone(), "servers", this.Servers,
+				"source", Source, "entries", Entries, "receipts", Receipts,
 				"results", Results, "detected", Detected, "sweeping", Sweeping,
 				"view", this.ViewGeneration, "configuration", Stamp["configuration"], "models", Stamp["models"],
 				"cache", Cache, "rescan", Stamp["rescan"], "controller", Stamp["controller"])
@@ -585,7 +647,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		for Id in this.Order {
 			Entry := Entries.Get(Id, -1), Server := this.Servers[Id]
 			if Entry is Map {
-				if !(Entry.Get("Id", 0) is String) || !LocalServerAuthEntryMatches(Entry.Get("Provider", ""), Entry.Get("BaseUrl", ""), Id, this.Servers)
+				if !(Entry.Get("Id", 0) is String) || !this._EntryMatches(Id, Server, Entry)
 						|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
 						|| !(Entry.Get("Model", 0) is String)
 					throw TypeError("The native display entry is outside its provider.")
@@ -769,7 +831,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Held := this.Views[ObjPtr(Receipt)], Target := Held["target"], Id := Target["id"]
 		if Fields.Has("base_url") && !RegExMatch(Fields["base_url"], "i)^https?://[^[:space:]]+$")
 			return false
-		if Fields.Has("token") && !LocalServerAuthTokenAllowed(Id, Fields["token"], this.Servers)
+		if Fields.Has("token") && !LocalServerAuthEntryTokenAllowed(Target["provider"], Fields["token"], Fields.Get("base_url", Target["base_url"]), this.Servers)
 			return false
 		CapturedTarget := Target.Clone(), CapturedModels := Held["models"].Clone()
 		PendingOwner := this.Pending.Get(Id, 0)
@@ -936,7 +998,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				return Ids
 			for Id in this.Order {
 				Verdict := Cache["results"].Get(Id, 0)
-				if Verdict is Map && !(Verdict["status"] == "down")
+				if Verdict is Map && ((Verdict["status"] == "up") || (Verdict["status"] == "needs_key"))
 					Ids.Push(Id)
 			}
 			return Ids
