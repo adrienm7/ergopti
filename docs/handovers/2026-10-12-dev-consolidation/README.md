@@ -343,6 +343,58 @@ Zenity/GTK and real devices remain unrun here.
 
 ## Test-optimization coordination
 
+### Terminal Mac receiving and preserved next native patch
+
+The full portable Mac suite on `0cd3c15aa86bf116c87a3db2bc5660205b61ec11`
+finished with 18,945 passes, six failures and 1,576 modules, exit 1. Three of
+those failures are corrected by `dcf146842` and `b046f00ff`: the unchanged closure
+guard passes 7/0 after distinct names remove a nested-local scanner false
+positive, and the exact scope census includes 99 original plus eight explicitly
+named scalar scenarios. Its two success/failure tests replay 214 complete
+callbacks and pass 2/0. Actual root discovery/authentication owners pass 117/0
+and 20/0; original discovery also passed, so this is not a native callback bug
+claim. The three unreachable-backend offer fixture failures are still open.
+The full suite has not been rerun after these two corrections. An incorrect
+module filter was rejected with zero cases; that invocation is not evidence.
+Fresh dev `2bfcf853c` was integrated at this terminal checkpoint, preserving G6.
+
+[The pending modifier correction](pending-modifier-custody.patch) has SHA256
+`7e5990669183cf953f31660e881f6bf62baf4026d2b5f68f2378954559d0bfcf`.
+It is implemented and verified in a Linux scratch source, not applied to the
+live C/vendor recipe. It changes exactly `terminal_output_plan.c`, `.h` and
+`_test.c`. All 124 original assertions remain in order; 33 are added. Independent
+vectors cover eight LR families, both axes, two source-origin combinations and
+an unrelated held modifier: 64 cohorts, 320 target edges and 32 setup edges.
+The 192 zero-output refusals retain closed cohort admission. Eight matrices pass
+normally and with ASan/UBSan/LSan; the original and always-emit, missing-final-UP
+and missing-right-Ctrl mutations fail. The independent review confirms exact
+original-edge consumption and retained partial ACK debt. Remapped modifiers
+still need their own qualified delivery/cleanup before production activation.
+
+On the fresh Windows checkout, coordinate these three C paths and vendor with
+Root, apply the patch and rebuild before committing changed live source:
+
+```powershell
+git apply --check docs/handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch
+git apply docs/handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch
+powershell -NoProfile -File tools/build/build_windows_nav_owner.ps1 -UpdateTracked
+powershell -NoProfile -File tools/build/build_windows_nav_owner.ps1
+node tools/test/test-ahk-full-startup-smoke.cjs
+```
+
+Require canonical MSVC/SDK prerequisites, the new output matrix census of eight,
+all original C/route/trace cases and exact new DLL/source fingerprints. The
+preceding E4133 DLL cannot qualify these changed inputs. No backend selection,
+hook-order assumption, production-cohort activation or physical proof is added.
+Remove this pending patch only when its exact changes and matching native
+artifact are durably integrated. Both transfer refs remain preserved until
+fresh integration/PR/CI checks authorize their cleanup.
+
+[Windows continuation prompt](windows-receiving-prompt.md) is ready for local
+receiving. The one-click collector is on dev and absent from stable v1.0.1;
+Root must publish its new release before installed-user receiving. Private
+issue 94 logs and test transcripts stay outside Git. Do not upload their content.
+
 ### Received Windows software checkpoint
 
 Receive only the 15 commits after `7184fbf58b` through `fca9d29769` from the

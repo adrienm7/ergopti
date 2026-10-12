@@ -1,0 +1,183 @@
+--- a/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c
+@@ -167,10 +167,17 @@
+ 			ErgoptiReplay_NativeKeyEdge edge;
+ 			if (length != 0) return ERGOPTI_OUTPUT_INVALID;
+ 			if (ErgoptiReplay_PrepareNativeEdge(routes, owner, &frozen, &edge) == 0) {
+-				eligible = 1; count = 1;
+-				units[0].kind = ERGOPTI_OUTPUT_NATIVE_EDGE;
+-				units[0].vk = edge.vk; units[0].scan = edge.scan;
+-				units[0].key_up = edge.key_up; units[0].repeat = edge.repeat;
++				eligible = 1;
++				/* Source-owned holds are unioned by the routing core. Releasing
++				 * one source cannot clear a modifier retained by another, and a
++				 * repeated/redundant DOWN has no effective transition to emit. */
++				if (((frozen.modifiers_lr_before ^ frozen.modifiers_lr_after)
++						& frozen.route.effective_modifiers_lr) != 0) {
++					count = 1;
++					units[0].kind = ERGOPTI_OUTPUT_NATIVE_EDGE;
++					units[0].vk = edge.vk; units[0].scan = edge.scan;
++					units[0].key_up = edge.key_up; units[0].repeat = edge.repeat;
++				}
+ 			}
+ 		}
+ 	}
+--- a/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h
++++ b/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h
+@@ -80,8 +80,10 @@
+  * or cancelled sequence cannot be reused. Empty text and literal U+0000 are
+  * valid; unpaired surrogates are rejected. Character UP plans zero units and
+  * still requires explicit original-edge consumption. Natural modifiers use
+- * PrepareNativeEdge; remapped modifiers/prefix/dead/uncertain metadata are
+- * diagnostic only. This API never computes or guesses the canonical string.
++ * PrepareNativeEdge only when their source-owned effective bit changes. A
++ * repeated or crossed-source modifier edge with no effective transition plans
++ * zero units and still requires original-edge consumption. Remapped modifiers,
++ * prefix/dead/uncertain metadata are diagnostic only. This API never computes or guesses the canonical string.
+  */
+ int32_t ErgoptiOutput_Plan(
+ 	ErgoptiOutput_State *state, uint64_t owner, uint64_t token, uint64_t sequence,
+--- a/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c
+@@ -116,6 +116,8 @@
+ 	s.route.target_scan = 0x2A; s.route.effective_modifiers_lr = 0x10;
+ 	for (uint32_t up = 0; up < 2; ++up) {
+ 		s.event.key_up = (uint8_t)up;
++		s.modifiers_lr_before = up ? 0x10 : 0;
++		s.modifiers_lr_after = up ? 0 : 0x10;
+ 		assert(ErgoptiOutput_Plan(&o, OWNER, 10, up + 2, &r, &s, NULL, 0, 1, &key) == 0);
+ 		assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 2, &count, &a) == 0);
+ 		assert(count == 1 && units[0].kind == 2 && units[0].scan == 0x2A);
+@@ -278,6 +280,123 @@
+ 	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 2, &r, &s, NULL, 1025, 1, &key) == -7);
+ }
+ 
++/** Crossed authentic sources keep a natural modifier active until its final UP. */
++static void TestNaturalModifierSourceCustody(void)
++{
++	/* Literal Win32 natural identities and independent left/right bit expectations. */
++	static const struct { uint16_t vk, scan; uint8_t bit; } modifiers[] = {
++		{0xA2, 0x01D, 0x01}, {0xA3, 0x11D, 0x02},
++		{0xA4, 0x038, 0x04}, {0xA5, 0x138, 0x08},
++		{0xA0, 0x02A, 0x10}, {0xA1, 0x036, 0x20},
++		{0x5B, 0x15B, 0x40}, {0x5C, 0x15C, 0x80}
++	};
++	/* One source may repeat, and a replay source cannot retire a physical hold.
++	 * before/after are expected ownership booleans for the selected natural bit. */
++	static const struct {
++		uint64_t source; uint8_t up, repeat, before, after, count;
++	} vectors[] = {
++		{1, 0, 0, 0, 1, 1},
++		{2, 0, 0, 1, 1, 0},
++		{1, 0, 1, 1, 1, 0},
++		{1, 1, 0, 1, 1, 0},
++		{2, 1, 0, 1, 0, 1}
++	};
++	for (uint32_t modifier = 0; modifier < sizeof(modifiers) / sizeof(modifiers[0]); ++modifier) {
++		for (uint32_t axis = 1; axis <= 2; ++axis) {
++			for (uint32_t split_origin = 0; split_origin <= 1; ++split_origin) {
++				for (uint32_t unrelated = 0; unrelated <= 1; ++unrelated) {
++					ErgoptiOutput_State o; ErgoptiReplay_State r; Start(&o, &r);
++					uint32_t background_index = modifier == 0 ? 1 : 0;
++					uint8_t background_mask = unrelated ? modifiers[background_index].bit : 0;
++					ErgoptiReplay_Route routes[2] = {
++						{ .recipe_id = 42, .route_id = 42,
++							.code = axis == 1 ? modifiers[modifier].vk : modifiers[modifier].scan,
++							.axis = (uint8_t)axis, .kind = ERGOPTI_REPLAY_MODIFIER,
++							.target_vk = axis == 1 ? modifiers[modifier].vk : 0,
++							.target_scan = axis == 2 ? modifiers[modifier].scan : 0,
++							.effective_modifiers_lr = modifiers[modifier].bit },
++						{ .recipe_id = 43, .route_id = 43,
++							.code = axis == 1 ? modifiers[background_index].vk : modifiers[background_index].scan,
++							.axis = (uint8_t)axis, .kind = ERGOPTI_REPLAY_MODIFIER,
++							.target_vk = axis == 1 ? modifiers[background_index].vk : 0,
++							.target_scan = axis == 2 ? modifiers[background_index].scan : 0,
++							.effective_modifiers_lr = modifiers[background_index].bit }
++					};
++					assert(ErgoptiReplay_Register(&r, OWNER, 2, 2, routes, 2) == 0);
++					if (unrelated) {
++						ErgoptiReplay_Event background = {
++							.timestamp = 0, .source_id = 3,
++							.vk = modifiers[background_index].vk, .scan = modifiers[background_index].scan,
++							.origin = ERGOPTI_REPLAY_PHYSICAL
++						};
++						ErgoptiReplay_Snapshot held;
++						assert(ErgoptiReplay_Step(&r, OWNER, &background, &held) == 0);
++						assert(held.modifiers_lr_before == 0 && held.modifiers_lr_after == background_mask);
++					}
++					for (uint32_t i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
++						ErgoptiReplay_Event input = {
++							.timestamp = i + 1, .source_id = vectors[i].source,
++							.vk = modifiers[modifier].vk, .scan = modifiers[modifier].scan,
++							.origin = split_origin && vectors[i].source == 2
++								? ERGOPTI_REPLAY_OWNED_REPLAY : ERGOPTI_REPLAY_PHYSICAL,
++							.key_up = vectors[i].up, .repeat = vectors[i].repeat
++						};
++						ErgoptiReplay_Snapshot snapshot; ErgoptiOutput_Key key;
++						ErgoptiOutput_Unit units[2]; uint32_t count, dispatchable; uint64_t attempt;
++						ErgoptiReplay_Event consumed;
++						assert(ErgoptiReplay_Step(&r, OWNER, &input, &snapshot) == 0);
++						assert(snapshot.modifiers_lr_before == (uint8_t)(background_mask
++							| (vectors[i].before ? modifiers[modifier].bit : 0)));
++						assert(snapshot.modifiers_lr_after == (uint8_t)(background_mask
++							| (vectors[i].after ? modifiers[modifier].bit : 0)));
++						if (vectors[i].count == 0) {
++							ErgoptiOutput_State guarded = ERGOPTI_OUTPUT_STATE_INIT;
++							ErgoptiOutput_Key refused;
++							assert(ErgoptiOutput_Initialize(&guarded, OWNER) == 0);
++							assert(ErgoptiOutput_Plan(&guarded, OWNER, 77, i + 1, &r,
++								&snapshot, NULL, 0, 0, &refused) == ERGOPTI_OUTPUT_DIAGNOSTIC);
++							assert(ErgoptiOutput_Inspect(&guarded, OWNER, &refused,
++								units, 2, &count, &dispatchable) == 0);
++							assert(count == 0 && dispatchable == 0);
++							assert(ErgoptiOutput_Consume(&guarded, OWNER, &refused,
++								&consumed) == ERGOPTI_OUTPUT_DIAGNOSTIC);
++							assert(ErgoptiOutput_BeginAttempt(&guarded, OWNER, &refused,
++								units, 2, &count, &attempt) == ERGOPTI_OUTPUT_DIAGNOSTIC);
++							assert(ErgoptiOutput_Cancel(&guarded, OWNER, &refused) == 0);
++						}
++						assert(ErgoptiOutput_Plan(&o, OWNER, 77, i + 1, &r,
++							&snapshot, NULL, 0, 1, &key) == 0);
++						assert(ErgoptiOutput_Inspect(&o, OWNER, &key,
++							units, 2, &count, &dispatchable) == 0);
++						assert(count == vectors[i].count && dispatchable == 1);
++						if (count == 1) {
++							assert(units[0].kind == ERGOPTI_OUTPUT_NATIVE_EDGE);
++							assert(units[0].vk == (axis == 1 ? modifiers[modifier].vk : 0));
++							assert(units[0].scan == (axis == 2 ? modifiers[modifier].scan : 0));
++							assert(units[0].key_up == vectors[i].up && units[0].repeat == 0);
++							assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 2, &count, &attempt) == 0);
++							assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 0) == 0);
++							assert(ErgoptiOutput_Consume(&o, OWNER, &key, &consumed) == ERGOPTI_OUTPUT_DEBT);
++							assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 2, &count, &attempt) == 0);
++							assert(count == 1 && units[0].key_up == vectors[i].up);
++							assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 1) == 0);
++						} else {
++							assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 2,
++								&count, &attempt) == ERGOPTI_OUTPUT_DEBT);
++							assert(!o.attempting && o.accepted == 0);
++						}
++						assert(ErgoptiOutput_Consume(&o, OWNER, &key, &consumed) == 0);
++						assert(consumed.source_id == input.source_id && consumed.origin == input.origin);
++						assert(consumed.key_up == input.key_up && consumed.repeat == input.repeat);
++						assert(consumed.vk == modifiers[modifier].vk && consumed.scan == modifiers[modifier].scan);
++						assert(ErgoptiOutput_Consume(&o, OWNER, &key, &consumed) == ERGOPTI_OUTPUT_STALE);
++					}
++				}
++			}
++		}
++	}
++}
++
+ int main(void)
+ {
+ 	TestLiteralVectors(); puts("PASS output-plan literal Unicode vectors (6)");
+@@ -287,6 +406,7 @@
+ 	TestDiagnosticCopyAndBounds(); puts("PASS output-plan guarded diagnostic copies and 1024-unit text bound");
+ 	TestUnregisteredCoreInterop(); puts("PASS output-plan actual unregistered core snapshots and registration coherence");
+ 	TestSnapshotRepresentationCustody(); puts("PASS output-plan exact nonzero-padding snapshot and edge custody");
+-	puts("PASS terminal output plan: 7 matrices; native Windows output UNRUN");
++	TestNaturalModifierSourceCustody(); puts("PASS output-plan eight natural LR families retain crossed source and unrelated modifier custody");
++	puts("PASS terminal output plan: 8 matrices; native Windows output UNRUN");
+ 	return 0;
+ }
