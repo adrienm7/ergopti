@@ -184,6 +184,7 @@ check('raw loader and full view retain every exact source byte', () => {
 	);
 	assert.deepEqual(view.calls(), Raw.calls());
 	assert.equal(Raw.field(Raw.job('core'), 'if'), null);
+	assert.equal(Raw.field(Raw.job('shared-validation'), 'if'), null);
 	assert.equal(Raw.field(Raw.job('tooltip-canvas'), 'if'), null);
 });
 check('every scoped full body remains owned; all other product scripts remain exact', () => {
@@ -219,8 +220,8 @@ check('every scoped full body remains owned; all other product scripts remain ex
 				assert.equal(Full.stepField(step.body, 'run'), Raw.stepField(step.body, 'run'));
 			}
 		}
-	assert.equal(jobs - 1, 26);
-	assert.equal(jobs, 27);
+	assert.equal(jobs - 1, 27);
+	assert.equal(jobs, 28);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
@@ -310,6 +311,7 @@ check('native custody scope preserves the complete original full block', () => {
 });
 check('mandatory default predicates are the actual workflow predicates', () => {
 	assert.equal(Full.field(Full.job('core'), 'if'), null);
+	assert.equal(Full.field(Full.job('shared-validation'), 'if'), null);
 	assert.equal(Full.field(Full.job('tooltip-canvas'), 'if'), null);
 	assert.equal(
 		Full.field(Full.job('release'), 'if'),

@@ -46,8 +46,8 @@ const SCOPE_IDS = Object.freeze([
 ]);
 const STABLE_EXTRA_SCOPES = Object.freeze({
 	'core-js-suite': {
-		path: '.github/workflows/ci.yml',
-		args: ['core', 'npm run test:js']
+		path: '.github/workflows/ci-common.yml',
+		args: ['shared-validation', 'npm run test:js']
 	},
 	'macos-native-model-receiving': {
 		path: '.github/workflows/ci-macos.yml',

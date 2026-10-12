@@ -14,6 +14,7 @@ const ENTRY_REL = raw.ENTRY_REL;
 const JOBS = [
 	['.github/workflows/ci.yml', 'validate', null],
 	['.github/workflows/ci.yml', 'core', null],
+	['.github/workflows/ci-common.yml', 'shared-validation', null],
 	['.github/workflows/ci.yml', 'macos', "needs.validate.outputs.lane_macos == 'true'"],
 	['.github/workflows/ci.yml', 'windows', "needs.validate.outputs.lane_windows == 'true'"],
 	['.github/workflows/ci.yml', 'linux', "needs.validate.outputs.lane_linux == 'true'"],
@@ -463,7 +464,7 @@ function validateRaw(files) {
 	}
 	const expectedFiles = [...new Set(JOBS.map((row) => row[0]))];
 	if (entries.size !== expectedFiles.length || expectedFiles.some((rel) => !entries.has(rel)))
-		refuse('exact four workflow call graph');
+		refuse('exact five workflow call graph');
 	const jobs = files.flatMap((entry) => raw.jobsOfText(entry.text, entry.rel));
 	if (jobs.length !== JOBS.length) refuse('complete mandatory job inventory');
 	for (const [rel, id, condition] of JOBS) {

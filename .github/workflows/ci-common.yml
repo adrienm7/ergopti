@@ -1,0 +1,132 @@
+# .github/workflows/ci-common.yml
+#
+# Common owns the unchanged shared-validation matrix on isolated fresh runners.
+# The root caller forwards the canonical plan and awaits every matrix result.
+# Parent ci.yml owns concurrency; this workflow must not cancel its caller.
+
+name: Common
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when the canonical plan resolved a release
+        required: true
+        type: boolean
+      version:
+        description: Exact release version, empty outside release
+        required: true
+        type: string
+      tag:
+        description: Exact release tag, empty outside release
+        required: true
+        type: string
+      prerelease:
+        description: Exact prerelease string from the canonical plan
+        required: true
+        type: string
+      channel:
+        description: Exact update channel from the canonical plan
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  shared-validation:
+    name: '${{ matrix.suite }}'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}
+    env:
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Install native validation tools
+        # test-shared-root-resolvers.cjs EXECUTES each driver's lib/paths.lua
+        # rather than reading it — a resolver that returns nil is invisible to
+        # static inspection, which is how the language menu came to offer 2
+        # locales of 21. The gate fails rather than skips when no interpreter is
+        # present, so this job needs one. The installed Linux registry probe
+        # also requires luv's exact descriptor admission on stock Lua 5.4.
+        # The Sparkle appcast fixture is parsed
+        # with xmllint so malformed release metadata cannot pass by string shape.
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils
+
+      # One style per language: Prettier (JavaScript, Svelte, CSS, HTML, JSON,
+      # Markdown, YAML) and Ruff (Python), at the version format.cjs pins.
+      - name: Check formatting
+        run: |
+          python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"
+          node tools/lint/format.cjs --check
+
+      - name: Run shared validation suite
+        run: |
+          set -euo pipefail
+          mode=full
+          if [ "${{ matrix.suite }}" = js ]; then
+              receipt="$RUNNER_TEMP/stable-core-js-suite.json"
+              node tools/ci/dev-release-qualification.cjs --scope core-js-suite --receipt "$receipt"
+              mode="$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt "$receipt")"
+          fi
+          if [ "$mode" = deferred ]; then
+              echo '[DEFERRED] core-js-suite: qualified=false; properties and mutation unchanged.'
+          elif [ "$mode" = full ]; then
+              npm run test:${{ matrix.suite }}
+          else
+              exit 1
+          fi
+
+      # Actual WebView rendering belongs to the shared JS lane. Native bridges
+      # are recorded; Chromium and WebKit cover both renderer families.
+      - name: Install shared UI browsers
+        if: matrix.suite == 'js'
+        run: node tools/ci/install-playwright.cjs chromium webkit
+
+      - name: Test shared layer editor rendering
+        if: matrix.suite == 'js'
+        run: npm run test:browser:layer-editor
+
+      - name: Test shared physical shortcut rendering
+        if: matrix.suite == 'js'
+        run: npm run test:browser:physical-shortcuts
+
+      - name: Test shared Versions installation rendering
+        if: matrix.suite == 'js'
+        run: npm run test:browser:changelog-install
+
+      - name: Retain the source-bound Core JavaScript qualification
+        if: always() && matrix.suite == 'js'
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-core-js
+          path: ${{ runner.temp }}/stable-core-js-suite.json
+          if-no-files-found: warn
+
+      - name: Retain shared validation timings, including interrupted runs
+        if: always() && matrix.suite == 'js'
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-js-timings
+          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson
+          if-no-files-found: warn

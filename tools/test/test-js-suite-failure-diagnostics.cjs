@@ -266,10 +266,10 @@ const pipeline = require('./ci-pipeline.cjs');
 const timingStep = pipeline.findStep(
 	'Retain shared validation timings, including interrupted runs'
 );
-assert.equal(timingStep.file, '.github/workflows/ci.yml');
-assert.equal(timingStep.job, 'core');
+assert.equal(timingStep.file, '.github/workflows/ci-common.yml');
+assert.equal(timingStep.job, 'shared-validation');
 const upload = timingStep.body;
-const core = pipeline.job('core');
+const core = pipeline.job('shared-validation');
 assert(core.indexOf(upload) > core.indexOf(pipeline.step(core, 'Run shared validation suite')));
 assert.equal(pipeline.stepField(upload, 'if'), "always() && matrix.suite == 'js'");
 assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');

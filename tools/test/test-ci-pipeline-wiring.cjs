@@ -97,6 +97,7 @@ const manual = require('../ci/manual-ci-lanes.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ENTRY = pipeline.ENTRY_REL;
+const COMMON_BOX = '.github/workflows/ci-common.yml';
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
@@ -434,10 +435,20 @@ const STEP_CONDITIONS = [
 	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native updater archive pipeline', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify archive crypto and bin parent source controls', NOT_CANCELLED],
-	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
-	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
-	[ENTRY, 'core', 'Test shared physical shortcut rendering', "matrix.suite == 'js'"],
-	[ENTRY, 'core', 'Test shared Versions installation rendering', "matrix.suite == 'js'"],
+	[COMMON_BOX, 'shared-validation', 'Install shared UI browsers', "matrix.suite == 'js'"],
+	[COMMON_BOX, 'shared-validation', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
+	[
+		COMMON_BOX,
+		'shared-validation',
+		'Test shared physical shortcut rendering',
+		"matrix.suite == 'js'"
+	],
+	[
+		COMMON_BOX,
+		'shared-validation',
+		'Test shared Versions installation rendering',
+		"matrix.suite == 'js'"
+	],
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
@@ -1053,8 +1064,8 @@ if (contract !== null) {
 
 // What each caller needs is pinned with the graph shape in section 3.
 const callers = pipeline.calls();
-if (callers.length !== 3)
-	errors.push(`ci.yml must call the three OS lanes, found ${callers.length} call(s)`);
+if (callers.length !== 4)
+	errors.push(`ci.yml must call Common and the three OS lanes, found ${callers.length} call(s)`);
 let gatedSecrets = 0;
 for (const call of callers) {
 	const body = pipeline.job(call.id);
@@ -1105,6 +1116,162 @@ if (/^\s*secrets:\s*inherit\b/m.test(pipeline.text())) {
 		'no job may use secrets: inherit, which hands every secret, PAT_ERGOPTI included, to the called workflow'
 	);
 }
+
+const COMMON_MATRIX = `\${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}`;
+const COMMON_INPUTS = ['release', 'version', 'tag', 'prerelease', 'channel'];
+
+/** Preserves one real reusable shared lane and its exact caller/command custody. */
+function commonProblems(files) {
+	const problems = [];
+	const entry = files.find((file) => file.rel === ENTRY);
+	const common = files.find((file) => file.rel === COMMON_BOX);
+	const callers = entry ? pipeline.jobsOfText(entry.text, ENTRY) : [];
+	const call = callers.find((job) => job.id === 'core');
+	const children = common ? pipeline.jobsOfText(common.text, COMMON_BOX) : [];
+	const child = children.find((job) => job.id === 'shared-validation');
+	if (!call || pipeline.field(call.body, 'uses') !== './.github/workflows/ci-common.yml')
+		problems.push('core must call the exact reusable Common workflow');
+	if (!call || JSON.stringify(pipeline.needsOf(call.body)) !== JSON.stringify([ROOT]))
+		problems.push('Common caller must still await validate alone');
+	for (const key of ['if', 'continue-on-error', 'secrets', 'runs-on', 'strategy', 'env', 'steps'])
+		if (call && pipeline.field(call.body, key) !== null)
+			problems.push('Common caller must set no ' + key);
+	const fieldBlock = (body, key) =>
+		new RegExp('^ {4}' + key + ':\\n((?: {6}[^\\n]*(?:\\n|$)|\\n)*)', 'm')
+			.exec(body)?.[0]
+			.trimEnd();
+	const callerInputs =
+		'    with:\n' +
+		COMMON_INPUTS.map(
+			(key) =>
+				`      ${key}: \${{ needs.validate.outputs.${key}${key === 'release' ? " == 'true'" : ''} }}`
+		).join('\n');
+	if (!call || fieldBlock(call.body, 'with') !== callerInputs)
+		problems.push('Common caller must forward exactly the five canonical plan inputs');
+	if (children.length !== 1 || !child || pipeline.needsOf(child.body).length !== 0)
+		problems.push('Common must expose exactly one independent shared-validation child');
+	for (const key of ['if', 'continue-on-error', 'uses', 'secrets'])
+		if (child && pipeline.field(child.body, key) !== null)
+			problems.push('shared-validation must set no ' + key);
+	if (!child || pipeline.field(child.body, 'runs-on') !== 'ubuntu-latest')
+		problems.push('shared validation must retain its Ubuntu runner');
+	const strategy =
+		'    strategy:\n      fail-fast: false\n      matrix:\n        suite: ' + COMMON_MATRIX;
+	if (!child || fieldBlock(child.body, 'strategy') !== strategy)
+		problems.push('Common must retain the exact three/main and two/other suite matrix');
+	const environment =
+		'    env:\n' +
+		['RELEASE', 'PRERELEASE', 'CHANNEL', 'TAG', 'VERSION']
+			.map((key) => `      ERGOPTI_DEV_RELEASE_${key}: \${{ inputs.${key.toLowerCase()} }}`)
+			.join('\n');
+	if (!child || fieldBlock(child.body, 'env') !== environment)
+		problems.push('Common must retain exact qualification input bindings');
+	if (common) {
+		if (/^concurrency:/m.test(common.text))
+			problems.push('Common must leave concurrency ownership with its root caller');
+		const onStart = common.text.indexOf('\non:\n');
+		const permissionStart = common.text.indexOf('\npermissions:\n');
+		const trigger = common.text.slice(onStart + 1, permissionStart);
+		const names = [...trigger.matchAll(/^ {6}([a-z]+):$/gm)].map((match) => match[1]);
+		if (
+			onStart < 0 ||
+			permissionStart <= onStart ||
+			!trigger.startsWith('on:\n  workflow_call:\n    inputs:\n') ||
+			JSON.stringify(names) !== JSON.stringify(COMMON_INPUTS) ||
+			[...trigger.matchAll(/^ {2}([a-z_]+):$/gm)].some((match) => match[1] !== 'workflow_call')
+		)
+			problems.push('Common must accept only its exact workflow_call interface');
+		for (const key of COMMON_INPUTS) {
+			const type = key === 'release' ? 'boolean' : 'string';
+			if (
+				!new RegExp(
+					'^ {6}' +
+						key +
+						':\\n(?: {8}description:[^\\n]*\\n)? {8}required: true\\n {8}type: ' +
+						type +
+						'(?=\\n|$)',
+					'm'
+				).test(trigger)
+			)
+				problems.push('Common input ' + key + ' must retain its required type');
+		}
+		if (!common.text.includes('permissions:\n  contents: read\n\njobs:\n'))
+			problems.push('Common must retain read-only contents permission');
+	}
+	const steps = child ? pipeline.steps(child.body) : [];
+	for (const [name, command] of [
+		['Run shared validation suite', 'npm run test:${{ matrix.suite }}'],
+		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
+		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
+		['Test shared physical shortcut rendering', 'npm run test:browser:physical-shortcuts'],
+		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
+	]) {
+		const matches = steps.filter((step) => step.name === name);
+		if (
+			matches.length !== 1 ||
+			!pipeline.runOf(matches[0].body)?.some((line) => line.trim() === command)
+		)
+			problems.push(name + ' must retain its actual shared command');
+	}
+	return problems;
+}
+errors.push(...commonProblems(pipeline.files()));
+for (const [what, file, from, to] of [
+	['missing Common workflow call', ENTRY, '    uses: ./.github/workflows/ci-common.yml\n', ''],
+	[
+		'redirected Common workflow call',
+		ENTRY,
+		'./.github/workflows/ci-common.yml',
+		'./.github/workflows/foreign.yml'
+	],
+	[
+		'dropped Common plan input',
+		ENTRY,
+		pipeline.job('core'),
+		pipeline.job('core').replace('      tag: ${{ needs.validate.outputs.tag }}\n', '')
+	],
+	['Common caller skips', ENTRY, "    name: 'Common'\n", "    name: 'Common'\n    if: false\n"],
+	[
+		'Common claims caller concurrency',
+		COMMON_BOX,
+		'\npermissions:\n',
+		'\nconcurrency: caller-group\n\npermissions:\n'
+	],
+	['Common missing child', COMMON_BOX, '  shared-validation:\n', '  foreign:\n'],
+	[
+		'Common child skips',
+		COMMON_BOX,
+		'  shared-validation:\n',
+		'  shared-validation:\n    if: false\n'
+	],
+	[
+		'Common serializes fail-fast',
+		COMMON_BOX,
+		'      fail-fast: false\n',
+		'      fail-fast: true\n'
+	],
+	['Common drops mutation', COMMON_BOX, COMMON_MATRIX, `\${{ fromJSON('["js","properties"]') }}`],
+	[
+		'Common changes release binding',
+		COMMON_BOX,
+		'      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}\n',
+		'      ERGOPTI_DEV_RELEASE_RELEASE: false\n'
+	],
+	['Common changes input type', COMMON_BOX, '        type: boolean\n', '        type: string\n'],
+	[
+		'Common drops shared command',
+		COMMON_BOX,
+		'npm run test:${{ matrix.suite }}',
+		'echo skipped-shared-validation'
+	],
+	[
+		'Common drops browser command',
+		COMMON_BOX,
+		'npm run test:browser:physical-shortcuts',
+		'echo skipped-physical-browser'
+	]
+])
+	mustCatch(what, file, from, to, commonProblems);
 
 // Release waits for every original job. The dispatch-only verdict cannot run
 // on a release push and is checked independently below.
@@ -1174,10 +1341,10 @@ function graphProblems(files) {
 	}
 	const release = topLevel.find((candidate) => candidate.id === 'release');
 	const releaseNeeds = release ? [...pipeline.needsOf(release.body)].sort() : [];
-	const expectedRelease = [ROOT, 'core', ...lanes.map((lane) => lane.id)].sort();
+	const expectedRelease = [ROOT, ...lanes.map((lane) => lane.id)].sort();
 	if (JSON.stringify(releaseNeeds) !== JSON.stringify(expectedRelease)) {
 		problems.push(
-			`release must need exactly the root and the three lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`
+			`release must need exactly the root, Common and the three OS lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`
 		);
 	}
 	const verdict = topLevel.find((candidate) => candidate.id === 'manual-verdict');
@@ -4046,8 +4213,10 @@ const PHYSICAL_BROWSER_SCRIPTS = require('../../package.json').scripts;
 /** Requires the recorded-bridge browser gate immediately after layer rendering. */
 function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	const problems = [];
-	const entry = files.find((file) => file.rel === ENTRY);
-	const core = entry && pipeline.jobsOfText(entry.text, ENTRY).find((job) => job.id === 'core');
+	const entry = files.find((file) => file.rel === COMMON_BOX);
+	const core =
+		entry &&
+		pipeline.jobsOfText(entry.text, COMMON_BOX).find((job) => job.id === 'shared-validation');
 	const steps = core ? pipeline.steps(core.body) : [];
 	const physical = steps.filter((step) => step.name === PHYSICAL_BROWSER_STEP);
 	const at = steps.findIndex((step) => step.name === PHYSICAL_BROWSER_STEP);
@@ -4077,7 +4246,7 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	return problems;
 }
 errors.push(...physicalBrowserProblems(pipeline.files()));
-const physicalBrowserBody = pipeline.step(pipeline.job('core'), PHYSICAL_BROWSER_STEP);
+const physicalBrowserBody = pipeline.step(pipeline.job('shared-validation'), PHYSICAL_BROWSER_STEP);
 for (const [what, changed] of [
 	['missing physical browser step', ''],
 	[
@@ -4100,11 +4269,14 @@ for (const [what, changed] of [
 		)
 	]
 ]) {
-	mustCatch(what, ENTRY, physicalBrowserBody, changed, physicalBrowserProblems);
+	mustCatch(what, COMMON_BOX, physicalBrowserBody, changed, physicalBrowserProblems);
 }
-const layerBrowserBody = pipeline.step(pipeline.job('core'), 'Test shared layer editor rendering');
+const layerBrowserBody = pipeline.step(
+	pipeline.job('shared-validation'),
+	'Test shared layer editor rendering'
+);
 const misplacedPhysicalBrowser = pipeline.files().map((entry) =>
-	entry.rel === ENTRY
+	entry.rel === COMMON_BOX
 		? {
 				...entry,
 				text: entry.text
