@@ -444,6 +444,60 @@ async function modelMain(f, code) {
 		assert.equal(v.sha256, sha(bytes));
 		assert.equal(v.identity.size, String(bytes.length));
 		refuses(() => f.api.readSourceFile(file, bytes.length - 1), /acquisition/);
+		// Faults exercise the actual reader and descriptor; none is native acceptance.
+		const originalRead = new Error('Independent source receiving refusal');
+		const originalClose = new Error('Independent closure acknowledgment refusal');
+		for (const vector of [
+			{ read: true, value: originalRead, close: true },
+			{ read: true, value: undefined, close: true },
+			{ read: true, value: null, close: true },
+			{ read: true, value: false, close: true },
+			{ read: true, value: originalRead, close: false },
+			{ read: false, close: true }
+		]) {
+			const actualOpen = fs.openSync,
+				actualStat = fs.fstatSync,
+				actualClose = fs.closeSync;
+			let descriptor,
+				closeAttempts = 0,
+				refused = false,
+				failure;
+			try {
+				fs.openSync = (...args) => (descriptor = actualOpen(...args));
+				fs.fstatSync = (...args) => {
+					if (vector.read) throw vector.value;
+					return actualStat(...args);
+				};
+				fs.closeSync = (fd) => {
+					closeAttempts += 1;
+					actualClose(fd);
+					if (vector.close) throw originalClose;
+				};
+				try {
+					f.api.readSourceFile(file);
+				} catch (error) {
+					refused = true;
+					failure = error;
+				}
+			} finally {
+				fs.openSync = actualOpen;
+				fs.fstatSync = actualStat;
+				fs.closeSync = actualClose;
+			}
+			assert.equal(refused, true, 'Both single and paired refusals deny receiving');
+			assert.equal(closeAttempts, 1, 'Uncertain close is not retried');
+			assert.throws(
+				() => actualStat(descriptor),
+				(error) => error.code === 'EBADF'
+			);
+			if (vector.read && vector.close) {
+				assert.ok(failure instanceof AggregateError, 'Both original failures survive');
+				assert.equal(failure.cause, vector.value);
+				assert.deepEqual(failure.errors, [vector.value, originalClose]);
+				assert.equal(failure.errors[0], vector.value);
+				assert.equal(failure.errors[1], originalClose);
+			} else assert.equal(failure, vector.read ? vector.value : originalClose);
+		}
 	});
 	control('real hardlink and symlink reader aliases refuse', () => {
 		const f = fixture(),
