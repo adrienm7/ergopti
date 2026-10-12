@@ -4089,6 +4089,13 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-12 official run38214117862 on211e66051 passes Linux packaging and all17
+installation/launch jobs. macOS archive qualification still has24 passes and
+one owned Automation deadline failure; all six Brew operations are unexecuted,
+and macOS packaging/installation is skipped. Current authenticated receipts and
+their limits are preserved in the [official runner checkpoint](handovers/2026-10-12-group6-ci/README.md).
+Item36 and transversal16/38 remain open; no release or Dev integration occurred.
+
 2026-10-12 resumed exact `dbfdcaa652` native receiving confirms 24/25 archive
 controls pass, one owned Automation deadline fails and all six Brew scenarios
 remain unexecuted. Original logs, archive digest, 348 safe members and 407 source
@@ -7091,6 +7098,25 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-12 official run38214117862 on211e66051 passes Linux Unit13268/0, E2E,
+package and all17 installation/launch jobs. Actual Ollama installation, model,
+inference and terminal physical closure pass in439.879821s with1365 independent
+Git source pins. This does not attribute the earlier Root timeout. Windows
+passes1989 cases before its global watchdog; all23 updater cases are unexecuted.
+Each macOS native PAC cohort has12 passes/two failures and independent HTTP
+retains two method errors plus a teardown error and trust-restoration debt.
+See the [official runner checkpoint](handovers/2026-10-12-group6-ci/README.md).
+Root owns supplemental enrollment; full enterprise acceptance remains open.
+
+2026-10-12 the Linux acceptance collector now projects ordered, closed build and
+guardian milestones separately from acceptance and physical-closure evidence.
+Only the original exact guardian deadline exception can supply the bounded
+observed reason; elapsed time and private error arguments cannot. Ten portable
+controls pass, with six assertion failures against the original collector.
+Original subprocess calls, qualification predicates, cleanup and deadlines are
+unchanged. These diagnostics do not attribute the earlier Root timeout. New
+normal-suite enrollment remains owned by Root; item62 stays open.
 
 2026-10-12 the separate Linux cursor-window fixture now retains only closed
 metadata from the last already-produced visible-window search at its original
