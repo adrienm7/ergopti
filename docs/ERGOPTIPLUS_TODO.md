@@ -108,6 +108,26 @@ then schedules one owned finalization. Seven portable lifecycle cohorts pass
 Native Hammerspoon/WebKit/MLX execution remains NOT_RUN; no qualification flag
 changes. These software results do not close issue 94 or the affected TODO items.
 
+#### Configured local discovery and source-bound model caches
+
+Two further atomic changes complete explicit generic-local endpoint discovery
+on Windows, macOS and Linux, then invalidate stale model caches when the original
+entry's URL, provider, credential or private source changes. Catalogue identity
+is not inferred from model replies; configured views retain actual entry IDs,
+ordered rows and unknown private fields. Failed native construction/dispatch
+is presented as unavailable, HTTP authentication refusal requires a key, ordinary
+connection failure remains down and a valid empty model list remains reachable.
+Cancellation retains each physical operation until its exact retirement ACK.
+
+Final composed Mac policy/factory/model/adapter cohorts pass 192/192. Five Linux
+production cohorts pass 258/258 and the actual curl/libuv/private-file fixture
+passes 136/136. Windows encoding (1,908 files), syntax (1,888 sources), complete
+registration and API Add source controls pass. The 26 new native Windows
+discovery/affinity/cache cases remain NOT_RUN. No native macOS, installed oMLX,
+physical typing or complete integration-green claim follows from these checks.
+Full suites are rerun after this coherent checkpoint; all affected items remain
+open until their actual native/physical acceptance and remaining software work.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)

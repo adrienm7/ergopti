@@ -232,6 +232,55 @@ child retires, then automatic failed-cycle finalization. These checks need a
 native VM and GUI session; no physical keyboard, display or trackpad is required.
 Native results remain NOT_RUN. Full integration suites are still pending.
 
+## Configured local endpoint discovery
+
+Two subsequent atomic changes add explicit configured local endpoint views and
+retire logical model caches on exact entry/source identity changes across all
+three drivers. The private credential/URL remains bound to the originating entry;
+generic model replies never establish a product identity. Ordinary network errors,
+authentication refusal, valid empty lists and actual native admission failure have
+distinct truthful menu states. Native cancellation debt remains retained until
+the same physical request acknowledges retirement. Entry order and unknown private
+data survive publication/refusal/reload.
+
+On the final composed source, the four Mac cohorts pass 20, 37, 117 and 18 cases
+(192/192). Five Linux production cohorts pass 258/258, including independent
+literal loopback/affinity vectors. The actual Linux fixture passes 136/136 with
+real curl/libuv, scoped owned loopback servers, private JSON restart, exact model
+selection, empty/protected/malformed responses, stale source refusal and complete
+process/pipe/handle retirement. No installed oMLX product is used. Windows source
+gates pass; 26 native Windows discovery/affinity/cache cases remain NOT_RUN.
+
+Replay portable Mac cohorts from the macOS driver directory:
+
+```sh
+lua tests/run.lua --only tests.unit.modules.llm.test_local_server_configured_affinity
+lua tests/run.lua --only tests.unit.modules.llm.test_local_openai_backends
+lua tests/run.lua --only tests.unit.modules.llm.test_local_server_auth_policy
+lua tests/run.lua --only tests.unit.adapters.test_http_client_timeout_transaction
+```
+
+Replay actual Linux receiving from the Linux driver directory:
+
+```sh
+LUA_CPATH="$LUA_CPATH_5_1" ERGOPTI_NATIVE_LUA_CPATH="$LUA_CPATH_5_1" luajit tests/hardware/run_local_api_auth.lua
+```
+
+For native Mac/Windows receiving, use an active GUI session and a real local
+OpenAI-compatible server with a known model ID and explicitly captured base URL.
+Add that generic entry without a key when the server is keyless, then search and
+select its model. Expect the same entry ID/provider, no foreign-data loss and
+actual chat to that URL. Test a nondefault port and `/v1` base path. Change URL,
+provider and credentials under the same ID while a models reply is pending;
+expect old rows/refused replies to be unusable, then a fresh probe. Stop the
+server, return 401 and return an empty models list: expect down, needs-key and
+reachable/no-models states respectively. Pause/cancel during a pending reply and
+replace the private configuration: expect no stale publication or premature
+retirement claim. These are native VM/server checks, not physical device tests.
+The Windows native tests keep the original owning registration order; no test
+files move and Root owns later inventory migration. Full integration suites are
+still pending on this checkpoint.
+
 ## API addition and local receiving
 
 API Add uses the real private source and durable writer. macOS configuration
