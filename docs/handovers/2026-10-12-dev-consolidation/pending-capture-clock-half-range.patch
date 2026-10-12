@@ -1,0 +1,103 @@
+--- a/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c
+@@ -852,7 +852,7 @@
+ 				return false;
+ 			state->terminal_clock_epoch += 0x100000000ull;
+ 			*timestamp = state->terminal_clock_epoch + tick;
+-		} else if (tick - state->terminal_clock_tick > 0x80000000u) {
++		} else if (tick - state->terminal_clock_tick >= 0x80000000u) {
+ 			if (state->terminal_clock_epoch >= 0x100000000ull)
+ 				*timestamp -= 0x100000000ull;
+ 			return false;
+--- a/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner_test.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner_test.c
+@@ -2831,6 +2831,89 @@
+ 		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count)
+ 		== ERGOPTI_NAV_STATUS_OK);
+ 	TEST_ASSERT(name, output_count == 5);
++	/* Exact half-DWORD distances are ambiguous; raw FIFO ownership survives
++	 * metadata refusal, and the next authentic edge uses the retained anchor. */
++	{
++		static const struct {
++			uint32_t anchor, tick, next;
++			uint64_t lifted, next_lifted;
++			int32_t status;
++		} bounds[] = {
++			{0u, 0x80000000u, 1u, 0x80000000ull, 1ull, ERGOPTI_REPLAY_STALE_EVENT},
++			{0x80000000u, 0u, 0x80000001u, 0ull, 0x80000001ull, ERGOPTI_REPLAY_STALE_EVENT},
++			{0u, 0x7FFFFFFFu, 0x80000000u, 0x7FFFFFFFull, 0x80000000ull, ERGOPTI_REPLAY_OK},
++			{0u, 0x80000001u, 1u, 0x80000001ull, 1ull, ERGOPTI_REPLAY_STALE_EVENT},
++			{0x7FFFFFFFu, 0u, 0x80000000u, 0ull, 0x80000000ull, ERGOPTI_REPLAY_STALE_EVENT},
++			{0x80000001u, 0u, 1u, 0x100000000ull, 0x100000001ull, ERGOPTI_REPLAY_OK},
++			{UINT32_MAX, 0u, 1u, 0x100000000ull, 0x100000001ull, ERGOPTI_REPLAY_OK}
++		};
++		const ErgoptiReplay_Route natural[2] = {
++			{ .recipe_id = 9001, .route_id = 1, .code = VK_LSHIFT,
++				.axis = ERGOPTI_REPLAY_VK, .kind = ERGOPTI_REPLAY_MODIFIER,
++				.target_vk = VK_LSHIFT, .effective_modifiers_lr = ERGOPTI_REPLAY_LSHIFT },
++			{ .recipe_id = 9002, .route_id = 2, .code = VK_RSHIFT,
++				.axis = ERGOPTI_REPLAY_VK, .kind = ERGOPTI_REPLAY_MODIFIER,
++				.target_vk = VK_RSHIFT, .effective_modifiers_lr = ERGOPTI_REPLAY_RSHIFT }
++		};
++		for (uint32_t boundary = 0; boundary < sizeof(bounds) / sizeof(bounds[0]); ++boundary) {
++			const uint32_t times[5] = { bounds[boundary].anchor, bounds[boundary].tick,
++				bounds[boundary].next, bounds[boundary].next + 1u, bounds[boundary].next + 2u };
++			const uint16_t keys[5] = { VK_LSHIFT, VK_LSHIFT, VK_LSHIFT, VK_RSHIFT, VK_RSHIFT };
++			const uint16_t codes[5] = { 0x2A, 0x2A, 0x2A, 0x36, 0x36 };
++			const uint8_t edges[5] = { ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP,
++				ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP };
++			TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
++			TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11,
++				natural, 2) == ERGOPTI_REPLAY_OK);
++			TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == ERGOPTI_NAV_STATUS_OK);
++			for (uint32_t edge_index = 0; edge_index < 5; ++edge_index) {
++				TEST_ASSERT(name, ErgoptiNav_TestSetHookTime(times[edge_index]) == ERGOPTI_NAV_STATUS_OK);
++				TEST_ASSERT(name, TestHookFlow(name, keys[edge_index], codes[edge_index],
++					edges[edge_index], ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
++					&result, &mask, &passed, &ordered));
++				TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
++			}
++			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 1, &peek) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, peek.route.status == bounds[boundary].status);
++			TEST_ASSERT(name, peek.route.event.timestamp == bounds[boundary].lifted);
++			TEST_ASSERT(name, peek.route.event.vk == VK_LSHIFT && peek.route.event.key_up == 1);
++			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 2, &peek) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, peek.route.event.timestamp == bounds[boundary].next_lifted);
++			TEST_ASSERT(name, peek.route.status == (bounds[boundary].status == ERGOPTI_REPLAY_STALE_EVENT
++				? ERGOPTI_REPLAY_OK : ERGOPTI_REPLAY_ORPHAN_EDGE));
++			if (bounds[boundary].status == ERGOPTI_REPLAY_STALE_EVENT) {
++				TEST_ASSERT(name, peek.route.modifiers_lr_before == ERGOPTI_REPLAY_LSHIFT);
++				TEST_ASSERT(name, peek.route.modifiers_lr_after == 0);
++			}
++			retained_count = UINT32_MAX;
++			TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
++				retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count) == ERGOPTI_NAV_STATUS_BUSY);
++			TEST_ASSERT(name, retained_count == UINT32_MAX);
++			TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
++				ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, 2, output, 8, &output_count) == ERGOPTI_NAV_STATUS_OS_ERROR);
++			TEST_ASSERT(name, output_count == 2 && output[0].vk == 0 && output[0].sc == 0x2A
++				&& output[0].kind == ERGOPTI_NAV_EVENT_DOWN
++				&& output[1].vk == 0 && output[1].sc == 0x2A && output[1].kind == ERGOPTI_NAV_EVENT_UP);
++			TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &capture) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, capture.queued == 3 && capture.replayed == 2);
++			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &peek) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, peek.route.event.timestamp == bounds[boundary].next_lifted);
++			TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
++				ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, output_count == 3 && output[0].vk == 0 && output[0].sc == 0x2A
++				&& output[0].kind == ERGOPTI_NAV_EVENT_UP
++				&& output[1].vk == 0 && output[1].sc == 0x36 && output[1].kind == ERGOPTI_NAV_EVENT_DOWN
++				&& output[2].vk == 0 && output[2].sc == 0x36 && output[2].kind == ERGOPTI_NAV_EVENT_UP);
++			TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &capture) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, capture.queued == 0 && capture.replayed == 5
++				&& capture.phase == ERGOPTI_NAV_TERMINAL_IDLE);
++			TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
++				retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count) == ERGOPTI_NAV_STATUS_OK);
++			TEST_ASSERT(name, retained_count == 0);
++		}
++	}
+ 	return true;
+ }
+ 

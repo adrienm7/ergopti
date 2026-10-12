@@ -1,0 +1,383 @@
+--- a/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c
+@@ -215,6 +215,85 @@
+ 	*count = remaining; *attempt_id = state->attempt_id;
+ 	return ERGOPTI_OUTPUT_OK;
+ }
++/** Data layout only: selecting a native send backend remains a separate task. */
++static int OutputWin32LayoutSupported(void)
++{
++#if (defined(_M_X64) || defined(_M_ARM64) || defined(__x86_64__) \
++		|| defined(__aarch64__)) && UINTPTR_MAX == UINT64_MAX \
++		&& !defined(__AARCH64EB__) \
++		&& (!defined(__BYTE_ORDER__) || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
++	return 1;
++#else
++	return 0;
++#endif
++}
++
++/** Reject writable aliases before any caller output or custody is touched. */
++static int OutputRangesOverlap(const void *a, size_t an, const void *b, size_t bn)
++{
++	uintptr_t ap = (uintptr_t)a, bp = (uintptr_t)b;
++	if (an > UINTPTR_MAX - ap || bn > UINTPTR_MAX - bp) return 1;
++	return ap < bp + bn && bp < ap + an;
++}
++
++/** Validates units independently of byte construction to make refusal atomic. */
++static int OutputWin32UnitValid(const ErgoptiOutput_Unit *unit)
++{
++	if (unit->reserved != 0 || unit->key_up > 1 || unit->repeat > 1
++			|| (unit->key_up && unit->repeat)) return 0;
++	if (unit->kind == ERGOPTI_OUTPUT_UNICODE)
++		return unit->vk == 0 && unit->scan == 0;
++	if (unit->kind != ERGOPTI_OUTPUT_NATIVE_EDGE || unit->utf16 != 0
++			|| unit->vk > 255 || unit->scan > 511 || (unit->vk && unit->scan)) return 0;
++	return unit->vk != 0 || (unit->scan & 0xFFu) != 0;
++}
++
++int32_t ErgoptiOutput_SerializeAttempt(
++	const ErgoptiOutput_State *state, uint64_t owner, const ErgoptiOutput_Key *key,
++	uint64_t attempt_id, ErgoptiOutput_Win32Input *packets,
++	uint32_t capacity, uint32_t *count)
++{
++	int32_t status = CheckKey(state, owner, key);
++	size_t bytes;
++	if (status != 0) return status;
++	if (!state->dispatchable) return ERGOPTI_OUTPUT_DIAGNOSTIC;
++	if (!state->attempting || attempt_id == 0 || attempt_id != state->attempt_id)
++		return ERGOPTI_OUTPUT_STALE;
++	if (!OutputWin32LayoutSupported() || packets == NULL || count == NULL
++			|| capacity > ERGOPTI_OUTPUT_MAX_UNITS) return ERGOPTI_OUTPUT_INVALID;
++	if (state->count > ERGOPTI_OUTPUT_MAX_UNITS || state->accepted >= state->count
++			|| state->attempt_count != state->count - state->accepted)
++		return ERGOPTI_OUTPUT_INVALID;
++	if (capacity < state->attempt_count) return ERGOPTI_OUTPUT_CAPACITY;
++	bytes = state->attempt_count * sizeof(packets[0]);
++	if (OutputRangesOverlap(packets, bytes, state, sizeof(*state))
++			|| OutputRangesOverlap(packets, bytes, key, sizeof(*key))
++			|| OutputRangesOverlap(packets, bytes, count, sizeof(*count))
++			|| OutputRangesOverlap(count, sizeof(*count), state, sizeof(*state))
++			|| OutputRangesOverlap(count, sizeof(*count), key, sizeof(*key)))
++		return ERGOPTI_OUTPUT_INVALID;
++	for (uint32_t i = 0; i < state->attempt_count; ++i)
++		if (!OutputWin32UnitValid(&state->units[state->accepted + i]))
++			return ERGOPTI_OUTPUT_INVALID;
++	for (uint32_t i = 0; i < state->attempt_count; ++i) {
++		const ErgoptiOutput_Unit *unit = &state->units[state->accepted + i];
++		ErgoptiOutput_Win32Input packet = {0};
++		packet.type = 1; /* INPUT_KEYBOARD. */
++		packet.extra_info = ERGOPTI_NAV_TERMINAL_REPLAY_MARKER;
++		packet.flags = unit->key_up ? 2u : 0u; /* KEYEVENTF_KEYUP. */
++		if (unit->kind == ERGOPTI_OUTPUT_UNICODE) {
++			packet.scan = unit->utf16;
++			packet.flags |= 4u; /* KEYEVENTF_UNICODE; literal UTF-16 code unit. */
++		} else if (unit->scan != 0) {
++			packet.scan = unit->scan & 0xFFu;
++			packet.flags |= 8u | ((unit->scan & 0x100u) ? 1u : 0u);
++		} else packet.vk = unit->vk;
++		memcpy(&packets[i], &packet, sizeof(packet));
++	}
++	*count = state->attempt_count;
++	return ERGOPTI_OUTPUT_OK;
++}
++
+ int32_t ErgoptiOutput_Acknowledge(
+ 	ErgoptiOutput_State *state, uint64_t owner, const ErgoptiOutput_Key *key,
+ 	uint64_t attempt_id, uint32_t accepted)
+--- a/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h
++++ b/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h
+@@ -16,6 +16,9 @@
+ #define ERGOPTI_OUTPUT_MAX_UTF16 1024u
+ #define ERGOPTI_OUTPUT_MAX_UNITS (ERGOPTI_OUTPUT_MAX_UTF16 * 2u)
+ #define ERGOPTI_OUTPUT_STATE_INIT {0}
++
++/* One marker owner shared by raw replay and retained output serialization. */
++#define ERGOPTI_NAV_TERMINAL_REPLAY_MARKER 0x4552475054524D31ull
+ 
+ enum ErgoptiOutput_Status {
+ 	ERGOPTI_OUTPUT_OK = 0,
+@@ -113,6 +116,48 @@
+ 	uint64_t *attempt_id);
+ 
+ /**
++ * Fixed x64/ARM64 Win32 INPUT representation, never a pointer into retained custody.
++ * Reserved bytes cover alignment and the unused MOUSEINPUT union tail. The
++ * Windows receiving build must additionally pin this against its SDK INPUT.
++ */
++typedef struct ErgoptiOutput_Win32Input {
++	uint32_t type;
++	uint32_t reserved0;
++	uint16_t vk;
++	uint16_t scan;
++	uint32_t flags;
++	uint32_t time;
++	uint32_t reserved1;
++	uint64_t extra_info;
++	uint64_t reserved2;
++} ErgoptiOutput_Win32Input;
++
++_Static_assert(sizeof(ErgoptiOutput_Win32Input) == 40, "Win32 INPUT size changed.");
++_Static_assert(offsetof(ErgoptiOutput_Win32Input, vk) == 8, "Win32 VK offset changed.");
++_Static_assert(offsetof(ErgoptiOutput_Win32Input, scan) == 10, "Win32 scan offset changed.");
++_Static_assert(offsetof(ErgoptiOutput_Win32Input, flags) == 12, "Win32 flags offset changed.");
++_Static_assert(offsetof(ErgoptiOutput_Win32Input, time) == 16, "Win32 time offset changed.");
++_Static_assert(offsetof(ErgoptiOutput_Win32Input, extra_info) == 24, "Win32 marker offset changed.");
++
++/**
++ * Serializes an existing immutable attempt without starting, sending, accepting
++ * or retiring it. Exactly one retained unit maps to one x64/ARM64 INPUT packet, so an
++ * eventual exact native accepted-prefix count can use Acknowledge unchanged.
++ * A suffix may begin with a stranded Unicode UP or low surrogate; never compose
++ * or discard it. No repeat expansion, surrogate aggregation or extra edges occur.
++ * Uses the existing native owner replay marker; callers cannot supply a foreign
++ * marker or send-level admission grant. Only x64/ARM64 pointer layouts qualify
++ * for construction; other host architectures refuse. This helper never emits.
++ * Capacity is at most MAX_UNITS. Refusal changes neither outputs nor state;
++ * outputs must not alias custody, the key, or each other. Concurrent access must
++ * be serialized by the same native owner that protects Plan/Begin/Acknowledge.
++ */
++int32_t ErgoptiOutput_SerializeAttempt(
++	const ErgoptiOutput_State *state, uint64_t owner, const ErgoptiOutput_Key *key,
++	uint64_t attempt_id, ErgoptiOutput_Win32Input *packets,
++	uint32_t capacity, uint32_t *count);
++
++/**
+  * Commits only an exact accepted prefix. Zero acceptance closes the attempt
+  * while retaining all debt. An invalid count/identity leaves the attempt intact.
+  * Retrying copies only the remaining suffix, including a stranded Unicode UP.
+--- a/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c
+@@ -278,6 +278,188 @@
+ 	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 2, &r, &s, NULL, 1025, 1, &key) == -7);
+ }
+ 
++/** Each expectation is literal Win32 data, independent of serializer branches. */
++static void AssertWin32Packet(const ErgoptiOutput_Win32Input *p,
++	uint16_t vk, uint16_t scan, uint32_t flags)
++{
++	const ErgoptiOutput_Win32Input expected = {
++		.type = 1, .vk = vk, .scan = scan, .flags = flags,
++		.extra_info = 0x4552475054524D31ull
++	};
++	assert(memcmp(p, &expected, 40) == 0);
++}
++
++static void TestWin32UnicodeAttemptPrefixes(void)
++{
++	static const struct { uint16_t text[3]; uint32_t length; } vectors[] = {
++		{{0x0061},1}, {{0x00E9},1}, {{0x0065,0x0301},2},
++		{{0xD83D,0xDE00},2}, {{0x0000},1}, {{0x0061,0xD83D,0xDE00},3}
++	};
++	for (uint32_t v = 0; v < sizeof(vectors) / sizeof(vectors[0]); ++v) {
++		uint32_t total = vectors[v].length * 2;
++		for (uint32_t prefix = 0; prefix <= total; ++prefix) {
++			ErgoptiOutput_State o, retained; ErgoptiReplay_State r; Start(&o, &r);
++			ErgoptiReplay_Snapshot s = Snapshot(); ErgoptiOutput_Key key;
++			ErgoptiOutput_Unit units[6]; ErgoptiOutput_Win32Input packets[6];
++			uint32_t count = 99; uint64_t attempt, old_attempt;
++			s.event.repeat = 1; /* Repeat is an edge annotation, never extra INPUTs. */
++			assert(ErgoptiOutput_Plan(&o, OWNER, 10, 1, &r, &s,
++				vectors[v].text, vectors[v].length, 1, &key) == 0);
++			assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 6, &count, &attempt) == 0);
++			old_attempt = attempt;
++			memcpy(&retained, &o, sizeof(o)); memset(packets, 0xA5, sizeof(packets));
++			assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 6, &count) == 0);
++			assert(count == total && memcmp(&retained, &o, sizeof(o)) == 0);
++			for (uint32_t i = 0; i < count; ++i)
++				AssertWin32Packet(&packets[i], 0, vectors[v].text[i / 2], i % 2 ? 6 : 4);
++			packets[0].scan = 0x007A; /* External copies do not rewrite retained units. */
++			assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 6, &count) == 0);
++			AssertWin32Packet(&packets[0], 0, vectors[v].text[0], 4);
++			assert(ErgoptiOutput_Cancel(&o, OWNER, &key) == -8);
++			assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, prefix) == 0);
++			count = 99; memset(packets, 0xA5, sizeof(packets));
++			assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, old_attempt, packets, 6, &count) == -6);
++			assert(count == 99 && packets[0].type == 0xA5A5A5A5u);
++			ErgoptiReplay_Event edge;
++			if (prefix < total) {
++				assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == -8);
++				assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 6, &count, &attempt) == 0);
++				assert(attempt != old_attempt && count == total - prefix);
++				assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, old_attempt, packets, 6, &count) == -6);
++				memcpy(&retained, &o, sizeof(o));
++				assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 6, &count) == 0);
++				assert(count == total - prefix && memcmp(&retained, &o, sizeof(o)) == 0);
++				for (uint32_t i = 0; i < count; ++i) {
++					uint32_t original = prefix + i;
++					AssertWin32Packet(&packets[i], 0, vectors[v].text[original / 2], original % 2 ? 6 : 4);
++				}
++				assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, count) == 0);
++			}
++			assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0);
++			assert(edge.scan == 0x10 && edge.repeat == 1);
++		}
++	}
++}
++
++static void TestWin32NaturalKeysFromActualReplay(void)
++{
++	/* VK, encoded scan, effective LR bit, literal scan-mode DOWN flags. */
++	static const struct { uint16_t vk, scan; uint8_t lr; uint32_t flags; } vectors[] = {
++		{0xA2,0x01D,0x01,8}, {0xA3,0x11D,0x02,9},
++		{0xA4,0x038,0x04,8}, {0xA5,0x138,0x08,9},
++		{0xA0,0x02A,0x10,8}, {0xA1,0x036,0x20,8},
++		{0x5B,0x15B,0x40,9}, {0x5C,0x15C,0x80,9}
++	};
++	for (uint32_t v = 0; v < 8; ++v) for (uint32_t axis = 1; axis <= 2; ++axis) {
++		ErgoptiOutput_State o = ERGOPTI_OUTPUT_STATE_INIT;
++		ErgoptiReplay_State r = ERGOPTI_REPLAY_STATE_INIT;
++		ErgoptiReplay_Route route = {.recipe_id = 1, .route_id = 1,
++			.kind = ERGOPTI_REPLAY_MODIFIER, .axis = (uint8_t)axis,
++			.effective_modifiers_lr = vectors[v].lr};
++		route.code = axis == 1 ? vectors[v].vk : vectors[v].scan;
++		if (axis == 1) route.target_vk = vectors[v].vk;
++		else route.target_scan = vectors[v].scan;
++		assert(ErgoptiOutput_Initialize(&o, OWNER) == 0);
++		assert(ErgoptiReplay_Initialize(&r, OWNER) == 0);
++		assert(ErgoptiReplay_Register(&r, OWNER, 1, 2, &route, 1) == 0);
++		for (uint32_t up = 0; up < 2; ++up) {
++			ErgoptiReplay_Event event = {.timestamp = up + 1, .source_id = 1,
++				.vk = vectors[v].vk, .scan = vectors[v].scan, .key_up = (uint8_t)up,
++				.origin = ERGOPTI_REPLAY_PHYSICAL};
++			ErgoptiReplay_Snapshot s; ErgoptiOutput_Key key;
++			ErgoptiOutput_Unit unit; ErgoptiOutput_Win32Input packet;
++			uint32_t count; uint64_t attempt; ErgoptiReplay_Event consumed;
++			assert(ErgoptiReplay_Step(&r, OWNER, &event, &s) == 0);
++			assert(ErgoptiOutput_Plan(&o, OWNER, 10, up + 1, &r, &s, NULL, 0, 1, &key) == 0);
++			assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, &unit, 1, &count, &attempt) == 0);
++			assert(count == 1);
++			assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, &packet, 1, &count) == 0);
++			assert(count == 1);
++			if (axis == 1) AssertWin32Packet(&packet, vectors[v].vk, 0, up ? 2 : 0);
++			else AssertWin32Packet(&packet, 0, vectors[v].scan & 0xFFu, vectors[v].flags | (up ? 2 : 0));
++			assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 1) == 0);
++			assert(ErgoptiOutput_Consume(&o, OWNER, &key, &consumed) == 0);
++			assert(consumed.key_up == up && consumed.scan == vectors[v].scan);
++		}
++	}
++}
++
++static void TestWin32SerializationRefusalsAndBounds(void)
++{
++	ErgoptiOutput_State o, retained; ErgoptiReplay_State r; Start(&o, &r);
++	ErgoptiReplay_Snapshot s = Snapshot(); ErgoptiOutput_Key key, foreign;
++	uint16_t text[] = {0xD83D,0xDE00};
++	ErgoptiOutput_Unit units[4]; ErgoptiOutput_Win32Input packets[4], unchanged[4];
++	uint32_t count = 99; uint64_t attempt;
++	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 1, &r, &s, text, 2, 1, &key) == 0);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, 1, packets, 4, &count) == -6);
++	assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, units, 4, &count, &attempt) == 0);
++	count = 99; memset(packets, 0xA5, sizeof(packets)); memcpy(unchanged, packets, sizeof(packets));
++	memcpy(&retained, &o, sizeof(o));
++	assert(ErgoptiOutput_SerializeAttempt(NULL, OWNER, &key, attempt, packets, 4, &count) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER + 1, &key, attempt, packets, 4, &count) == -4);
++	for (uint32_t i = 0; i < 3; ++i) {
++		foreign = key;
++		if (i == 0) ++foreign.token;
++		if (i == 1) ++foreign.sequence;
++		if (i == 2) ++foreign.plan_id;
++		assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &foreign, attempt, packets, 4, &count) == -6);
++	}
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt + 1, packets, 4, &count) == -6);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 3, &count) == -7);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 2049, &count) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, NULL, 4, &count) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 4, NULL) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt,
++		(ErgoptiOutput_Win32Input *)&o, 4, &count) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt,
++		(ErgoptiOutput_Win32Input *)&key, 4, &count) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 4, &packets[0].type) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 4, &o.accepted) == -1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 4, (uint32_t *)&key) == -1);
++	assert(count == 99 && memcmp(packets, unchanged, sizeof(packets)) == 0);
++	assert(memcmp(&retained, &o, sizeof(o)) == 0);
++	/* Corrupted intrinsic unit data cannot partially overwrite an earlier packet. */
++	for (uint32_t bad = 0; bad < 8; ++bad) {
++		memcpy(&o, &retained, sizeof(o));
++		ErgoptiOutput_Unit *last = &o.units[3];
++		if (bad == 0) last->reserved = 1;
++		if (bad == 1) last->key_up = 2;
++		if (bad == 2) last->repeat = 1;
++		if (bad == 3) last->vk = 1;
++		if (bad == 4) last->kind = 0;
++		if (bad == 5) { last->kind = 2; last->utf16 = 0; last->vk = 0xA0; last->scan = 0x2A; }
++		if (bad == 6) { last->kind = 2; last->utf16 = 0; last->scan = 0x100; }
++		if (bad == 7) { last->kind = 2; last->utf16 = 0; last->vk = 256; }
++		ErgoptiOutput_State invalid; memcpy(&invalid, &o, sizeof(o));
++		assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 4, &count) == -1);
++		assert(count == 99 && memcmp(packets, unchanged, sizeof(packets)) == 0);
++		assert(memcmp(&invalid, &o, sizeof(o)) == 0);
++	}
++	memcpy(&o, &retained, sizeof(o));
++	assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 0) == 0);
++	assert(ErgoptiOutput_Cancel(&o, OWNER, &key) == 0);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 4, &count) == -6);
++	assert(ErgoptiOutput_Plan(&o, OWNER, 11, 2, &r, &s, text, 2, 0, &key) == 1);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, packets, 4, &count) == 1);
++	assert(count == 99 && memcmp(packets, unchanged, sizeof(packets)) == 0);
++	assert(ErgoptiOutput_Cancel(&o, OWNER, &key) == 0);
++	/* Upper bound has exactly 2048 packets, retaining every last Unicode UP. */
++	uint16_t maximum[1024];
++	ErgoptiOutput_Unit maximum_units[2048]; ErgoptiOutput_Win32Input maximum_packets[2048];
++	for (uint32_t i = 0; i < 1024; ++i) maximum[i] = 0x0061;
++	assert(ErgoptiOutput_Plan(&o, OWNER, 12, 3, &r, &s, maximum, 1024, 1, &key) == 0);
++	assert(ErgoptiOutput_BeginAttempt(&o, OWNER, &key, maximum_units, 2048, &count, &attempt) == 0);
++	assert(ErgoptiOutput_SerializeAttempt(&o, OWNER, &key, attempt, maximum_packets, 2048, &count) == 0);
++	assert(count == 2048);
++	AssertWin32Packet(&maximum_packets[0], 0, 0x0061, 4);
++	AssertWin32Packet(&maximum_packets[2047], 0, 0x0061, 6);
++	assert(ErgoptiOutput_Cancel(&o, OWNER, &key) == -8);
++	assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 2048) == 0);
++	ErgoptiReplay_Event edge;
++	assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0);
++}
++
+ int main(void)
+ {
+ 	TestLiteralVectors(); puts("PASS output-plan literal Unicode vectors (6)");
+@@ -287,6 +469,9 @@
+ 	TestDiagnosticCopyAndBounds(); puts("PASS output-plan guarded diagnostic copies and 1024-unit text bound");
+ 	TestUnregisteredCoreInterop(); puts("PASS output-plan actual unregistered core snapshots and registration coherence");
+ 	TestSnapshotRepresentationCustody(); puts("PASS output-plan exact nonzero-padding snapshot and edge custody");
+-	puts("PASS terminal output plan: 7 matrices; native Windows output UNRUN");
++	TestWin32UnicodeAttemptPrefixes(); puts("PASS output-plan Win32 UTF16 packets and every accepted prefix (6 vectors, 26 prefix cohorts)");
++	TestWin32NaturalKeysFromActualReplay(); puts("PASS output-plan Win32 native VK/extended scan packets (8 LR families, 32 edges)");
++	TestWin32SerializationRefusalsAndBounds(); puts("PASS output-plan Win32 immutable custody, atomic refusal, aliases and maximum bound");
++	puts("PASS terminal output plan: 10 matrices; native Windows output UNRUN");
+ 	return 0;
+ }
+--- a/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c
+@@ -21,6 +21,19 @@
+ #include "nav_event_owner.h"
+ #include "editor_replace.h"
+ #include "hook_trace.h"
++
++/* A genuine Windows build pins the pure x64/ARM64 wire shape to its own SDK. */
++_Static_assert(sizeof(INPUT) == sizeof(ErgoptiOutput_Win32Input), "SDK INPUT size changed.");
++_Static_assert(offsetof(INPUT, type) == offsetof(ErgoptiOutput_Win32Input, type), "SDK INPUT type changed.");
++_Static_assert(offsetof(INPUT, ki.wVk) == offsetof(ErgoptiOutput_Win32Input, vk), "SDK VK offset changed.");
++_Static_assert(offsetof(INPUT, ki.wScan) == offsetof(ErgoptiOutput_Win32Input, scan), "SDK scan offset changed.");
++_Static_assert(offsetof(INPUT, ki.dwFlags) == offsetof(ErgoptiOutput_Win32Input, flags), "SDK flags offset changed.");
++_Static_assert(offsetof(INPUT, ki.time) == offsetof(ErgoptiOutput_Win32Input, time), "SDK time offset changed.");
++_Static_assert(offsetof(INPUT, ki.dwExtraInfo) == offsetof(ErgoptiOutput_Win32Input, extra_info), "SDK marker offset changed.");
++#if !defined(ERGOPTI_NAV_TESTING)
++_Static_assert(INPUT_KEYBOARD == 1 && KEYEVENTF_EXTENDEDKEY == 1 && KEYEVENTF_KEYUP == 2
++	&& KEYEVENTF_UNICODE == 4 && KEYEVENTF_SCANCODE == 8, "SDK keyboard flag values changed.");
++#endif
+ 
+ 
+ 
+--- a/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h
++++ b/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h
+@@ -51,7 +51,6 @@
+ #define ERGOPTI_NAV_AHK_SEND_LEVEL_BASE 0xFFC3D44Du
+ #define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY 8192u
+ #define ERGOPTI_NAV_TERMINAL_ROUTE_BUSY (-11)
+-#define ERGOPTI_NAV_TERMINAL_REPLAY_MARKER 0x4552475054524D31ull
+ 
+ /** Return codes shared by every fallible API entry point. */
+ typedef enum ErgoptiNav_Status {

@@ -31,6 +31,8 @@ Production capture/replay cohort remains closed until
 complete observer conversion and emitter/cleanup receiving are demonstrated.
 Do not choose SendEvent versus SendInput without actual Windows measurements.
 
+Also receive pending-capture-clock-half-range.patch and pending-owned-win32-payload-serialization.patch using pending-native-output-receiving.md and the exact frozen manifests in this handover directory. They are implemented portable source corrections, not changes already applied to the live DLL. Verify all four patch hashes and source preimages, preserve the complete additive regression union and compose the shared matrix-count footer to eleven. Do not blindly sequentially apply independent test patches or discard either cohort. Run the documented official MSVC rebuild, provenance verification, native binaries and existing AHK/source selections; record actual results. Clock portable43/43 and selected full sanitizers, serializer10 matrices/full sanitizers/six compiled inverses are real Linux results; the combined11, real Windows SDK, new source-bound DLL and AHK/native emission remain UNRUN. Complete the lock-held serializer bridge, emitter/unknown-outcome custody and remaining nonhook cohort conversion as software work while admission remains closed. Distinguish Windows VM compiler/API receiving from genuine physical holdings/suppression, and never infer SendEvent/SendInput policy or hook order from portable results.
+
 The one-click collector is implemented on dev and absent from stable v1.0.1.
 Coordinate a new release with Root. After publication, install the exact release
 on a clean Windows VM without developer tools. In Diagnostics select collection,
