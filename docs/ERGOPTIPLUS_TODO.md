@@ -5503,6 +5503,33 @@ portable Python receiver startup timeout retained. These bounded receipts do
 not qualify the final uninstrumented production tree or complete item 42;
 exact-source integrated qualification and installed acceptance remain required.
 
+The remaining Windows captured read, no-op and ordinary write predicates now
+compare complete String units with case-sensitive native equality, including the
+captured final candidate. Read-only access still grants no write readiness;
+invalid/newer schema, registry withdrawal and genuine terminal-owner checks stay
+strict. Six additive actual API controls cover BOM reads, no-op reconciliation
+and both ordinary source/candidate operands without writing NUL bytes to disk.
+They retain the full original fixture prefix and preserve uncertain cleanup.
+
+Authenticated private Windows run
+[38275831892](https://github.com/adrienm7/ergopti/actions/runs/38275831892) passes
+all eight captured-image controls on the candidate. Restoring only the four new
+comparisons preserves the two prior passes and causes the six exact expected
+caller-NUL failures. Its controller then refuses the stdout encoding of those
+six failure separators; the final restored-candidate child remains unexecuted.
+Candidate source and all 3,273 original runtime pins are genuinely restored,
+with all three started children retired and no cleanup errors. This is bounded
+regression evidence, not a complete four-phase or whole-suite PASS. A strictly
+phase-specific receiving correction preserves every expectation and raw byte;
+its 20 transport controls and 19 selected Node commands pass. The updater
+diagnostic producer inventory follows only the owned source fingerprint; all
+22 existing source-receiving controls pass with the independent label oracle
+unchanged. Fresh Windows-only
+manual [38279233467](https://github.com/adrienm7/ergopti/actions/runs/38279233467)
+owns the new complete-cohort result. Full production units, E2E, compiler-warning,
+startup, packaging, installation and device acceptance remain required; item 42
+and transversal items 16/38 stay partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
