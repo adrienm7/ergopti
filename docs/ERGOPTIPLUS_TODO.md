@@ -7709,6 +7709,26 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-12 the source sealer now preserves exact write/validation and descriptor
+closure failures together, including thrown falsy values, with one close
+attempt and no uncertain retry. Its actual CLI emits only owned fixed refusal
+diagnostics, never private exception getters, coercions or assertion diff
+payloads. Genuine assertion labels and Git operation refusals remain useful.
+All30 original predicate calls stay exact; the Node assertion singleton and
+prototypes remain unchanged. Actual CLI56 and writer57 portable controls pass;
+the original has53 CLI counterexamples and28 paired writer counterexamples.
+The unchanged historical15 and registered22 controls pass. Normal enrollment
+executes exactly12 CLI cases and six identity vectors in about3.34s; the wider
+research matrices remain separately retained. No rollback, transactionality,
+Windows/process closure or native updater acceptance is claimed.
+
+The sibling writer limitation recorded by the earlier reader-only slice is
+therefore repaired at source level. Original23, SDK/cache authentication,
+whole-tree owner enrollment and all native/package/enterprise requirements
+remain independent. The SDK pure-helper and Root-owned process adapter are
+being reviewed separately; no stopped CA/PAC/account/curl experiment or
+new native receipt is inferred. Items62 and transversal16/38 remain open.
+
 The ba41 successor's Linux unit composition passes13450/0, while its full JS and
 simulated Hammerspoon checks retain the documented three/six upstream failures.
 Fresh Dev is checked independently through Git and API before delivery. Root
