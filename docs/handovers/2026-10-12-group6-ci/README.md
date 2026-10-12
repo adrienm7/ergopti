@@ -137,8 +137,9 @@ not Windows acceptance or normal-suite enrollment. Oracle SHA256 remains
 Group1 manual38218957837 on6b85331f5c6a31d516c2e9f0824bd1073e622b0c already
 tested identical Windows,shared,build/native and Windows workflow inputs.
 It failed: annotations report1976 terminal records of11211 planned, with missing
-footer. Actual pass count, last case, timing and all23 updater dispositions are
-unknown. The official129250-byte manifest artifact11734552827 has SHA256
+footer. At the original checkpoint, actual pass count, last case, timing and
+all23 updater dispositions were unknown. The official129250-byte manifest
+artifact11734552827 has SHA256
 `c09794f9b2f058dd06c88d2334be3d6d62cfc895bda34dc8a7104537744578de`,
 but its payload and raw job log were refused at
 `productionresultssa14.blob.core.windows.net`. The additive network requirement
@@ -167,7 +168,7 @@ and therefore its unchanged official unittest-discovery command. All original
 test methods,246 assertion calls,3 subprocess calls and10 cleanup bodies remain.
 The original collector fails six assertions; an intermediate proposal fails
 four private-equality subcontrols and is superseded by the typed refinement.
-Actual native receiving of this refinement remains pending.
+Actual native receiving of this refinement is recorded below.
 
 The official Group1 attempt1 log archive is now received through the supported
 `actions/runs/38218957837/attempts/1/logs` endpoint:473515 bytes, SHA256
@@ -177,6 +178,63 @@ signature, proxy or TLS policy was altered. The endpoint refusal disclosed the
 new exact host `results-receiver.actions.githubusercontent.com`; it is saved
 additively in the environment draft, without claiming runtime activation.
 Detailed Windows/Core receiving is separate from this macOS diagnostic change.
+
+## Current-source native receiving
+
+[Manual run38256370073](https://github.com/adrienm7/ergopti/actions/runs/38256370073)
+tests exact94fe8e1451d6036b96af7ba5189ed0542863ccfc, attempt1, macOS only.
+It ends naturally with9 successful,5 failed and5 skipped jobs; no cancellation.
+Release / Publish, Windows, Linux and macOS package/install are skipped.
+Core414, properties, stub Unit18,616/0 and virtual E2E101 with one explicit skip
+pass. Those stub results do not qualify the failed native lane.
+
+Archive qualification remains24 passing methods and one failed method. Actual
+Sparkle XZ wrong-key refusal, retry, installation and relaunch passes30.294s.
+Native archive/signature and CI-install controls pass. Artifact11749904264 is
+283799 bytes, SHA256
+`fa7071af9570e2d7a285002f35bf154b8f9d40d77a131620020081850a596ad4`;
+all348 safe members match extraction,407 archive and410 SDK source hashes
+match immutable Git blobs. The actual collector contains the reviewed diagnostic
+change; it supplies observations, not functional Automation acceptance.
+
+Brew refuses at `consent-observer` / `exit-wait`, with27.64ms supplied budget
+on the original parent deadline. Its last validated UI observation now survives
+the history cap: one unrelated7-node window, no matching consent candidates.
+The278 omitted phases remain omitted; the last observation has no timestamp
+and cannot prove that no consent prompt existed elsewhere. Permission output
+remains `api-call-starting`, without returned API status. Both reported owners
+close and the helper's final groups/debt arrays are empty. All6 Brew operations
+are UNEXECUTED. The separate no-prompt SDK method passes with OSStatus-600;
+it does not qualify the private fixture's permission prerequisite.
+
+Both native PAC architectures retain12/14 passes and two failures; their source
+cohorts pass10/10 and409 source hashes each match Git. WPAD's add command exits0,
+but no same-call post-add certificate-presence/trust query is received. TLS then
+fails-1202/-9813 with zero payload/routes; removal times out. The separate wire
+fixture's add also times out, then removal exits1 with restoration failure.
+Command settlement does not prove effective trust or restoration. Independent
+ARM HTTP retains two method errors and one teardown error. Native model and
+installed enterprise acceptance remain unqualified. No deadline, permission,
+trust or success assertion is weakened; no causal functional fix is inferred.
+
+The original Group1 attempt1 archive now resolves the earlier receiving gap.
+Windows records1976 passes, zero assertion failures, then case1977 starts only
+2.6506969s before the1320000ms global watchdog. The received terminal duration
+sum is1315621.966ms. All23 original updater registrations match their source
+but are absent from live records: UNSTARTED/nativeUNEXECUTED. This establishes
+global budget exhaustion, not an intrinsic last-case hang. Core412/413 fails
+the original156-control portable Python suite at60000ms; internal cause remains
+unknown because that old wrapper discarded streams before asserting. Existing
+72b29be3999a8666938736e1fb5fc25defb6c263 already retains bounded failure tails
+before the unchanged assertion; current enrollment165 has separate coverage.
+The byte-exact recovered proof capsule is Git blob
+`ad676c15d9e5f69c1bb2e392cff0ba2b53960f42`,1123597 bytes,24 regular members,
+SHA256 `5a14cff1c33220731ebfb679b3699ce870a2d61bfb0650da5fcfde2af9423666`.
+
+Items36/62 and transversal16/38 stay open. Item22 remains excluded. The feature
+branch is retained, no TODO is removed and no Group6 Dev integration occurs.
+No Windows local test, duplicate native dispatch or peer interruption is made.
+Root's workflow, runner and feature inventory custody remains unchanged.
 
 ## Verified obsolete branch cleanup
 
