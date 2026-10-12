@@ -266,6 +266,32 @@ lock-held DLL/consumer bridge, emitter orchestration and full nonhook
 handler/observer conversion remain software work. No SendEvent/SendInput choice
 or physical acceptance is inferred.
 
+Item 49 also retains the [replay writable-output correction](handovers/2026-10-12-dev-consolidation/pending-replay-output-protection.patch)
+with [receiving commands and source inventory](handovers/2026-10-12-dev-consolidation/replay-output-receiving.md).
+An aliased output formerly erased live state before ownership refusal; exact
+span/overflow protection now preserves it. An independent actual C caller is
+red on the original (state erased, exit 1) and green on the correction (every
+state byte retained, exit 0). All 108 original assertions remain, with 32 added;
+8/8 core, 43/43 production-C/POSIX cases, 7/7 neighboring output matrices and
+full sanitizer checks pass. Five compiled guard mutants fail. This pending
+source patch leaves active C/DLL provenance intact until an actual official
+Windows MSVC rebuild; native SDK/DLL/desktop/hooks are UNRUN. Production observer
+conversion and emission remain software work; item 49 is not closed.
+
+Item 49 now retains the implemented [lock-held native serializer bridge](handovers/2026-10-12-dev-consolidation/native-serializer-bridge.patch)
+and [strict companion source guard](handovers/2026-10-12-dev-consolidation/native-serializer-source-binding.patch),
+with [receiving instructions](handovers/2026-10-12-dev-consolidation/native-serializer-bridge-receiving.md).
+The API authenticates the current FIFO and retained attempt under one lock,
+protects the whole owner from writable aliases, and copies owned packets without
+sending, ACKing or consuming. Existing FAULTED debt remains settleable. All
+1,352 original native assertions remain, with 102 added. The independently
+composed five C cuts now pass 8 core / 11 output matrices / 43 owner cases and
+full sanitizers, actual exit 0; no combined-count expectation is presented as
+proof. The 41-export source guard retains all original assertions and adds
+14 inverse controls. Native SDK/MSVC/DLL/AHK and physical receiving remain UNRUN;
+live source/DLL provenance and closed admission are unchanged. Backend delivery
+and complete observer conversion remain software work, so item 49 stays open.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
@@ -5526,6 +5552,34 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+
+  Windows registry string fields and raw-image memo keys now compare complete,
+  case-sensitive strings, including embedded NUL suffixes. Actual bounded
+  [run 38306795892](https://github.com/adrienm7/ergopti/actions/runs/38306795892)
+  on private `ad6b2e2e6f6b555516d670bf3169f4763673554e` receives two dry
+  selections, two candidate passes, two exact original-code causal failures and
+  two restored-candidate passes. All eight SDK 2.0.26 children retire; source
+  restoration is acknowledged and the complete parent takes 64,911 ms within
+  180,000 ms. The original 79 test declarations and 696 assertions remain
+  intact; the two additive API cases use actual boot/native owners and keep
+  NUL data in memory. This is the frozen `f6057f4` control context. Later
+  runner/Snapshot/source-helper changes on `80d4588` require fresh current-source
+  receiving; full unit, E2E, packaging, installation and device acceptance remain
+  pending. The 6,164 original warnings are retained, without a clean-warning
+  claim. The source seal is regenerated from correction commit
+  `ae3ea68eab70c6089d7149902ed49fc459c676de` through
+  `seal-windows-updater-original-source.cjs`. Only the configuration source
+  fingerprint and source commit change; all 21 paths, protected fields and
+  independent original cohort expectations remain intact. The unchanged
+  portable source-admission test passes all 22 controls after generation.
+  The initial selected local gate reports 421/426 JavaScript checks passed:
+  stale-source admission, two existing Lua source guards, the protected Git
+  ancestor uninstall fixture and insufficient temporary space for a genuine
+  Linux clone remain separately recorded. The unchanged clone/C/header/ELF
+  test passes after verified archival of completed owned fixtures; the unchanged
+  uninstall test separately passes outside a Git ancestor. These replays do not
+  turn the original suite into a wholly successful run or qualify Windows.
+
   Windows direct full-save intent is now recorded before the unchanged unsafe
   serializer refusal. The existing safe path resolver refuses absent or empty
   paths without creating a generation; implicit drains remain separate.
@@ -6008,6 +6062,29 @@ the unchanged unit, startup, packaging and installation gates on the final
 source. Those gates and physical acceptance remain unexecuted;
 the completed run has 3 successful, 4 failed and 5 skipped jobs, with Release
 skipped. Its integration lease is released; the unfinished feature branch stays.
+
+Actual official Windows run
+[38315163515](https://github.com/adrienm7/ergopti/actions/runs/38315163515)
+on private proposed composition `4bf40f3c` passes E2E 70/70 and the first
+console-capture cohort 5/5. The strict desktop receiver correctly refuses its
+216-byte compiler-warning prefix: `_TOML_DocumentToken` named a local variable
+`Run`, shadowing the native global function. Its seven local uses now name
+`QuoteRun`; token semantics, independent corpus, warning policy and receiver
+assertions remain unchanged. The owning source-seal generator refreshes only
+the TOML fingerprint and source commit from correction `512a5ef8`; all 21 source
+paths, protected fields and independent 18/4/1 expectations remain unchanged.
+All 22 portable source-admission controls pass after generation. Linear Dev
+preparation regenerates the immutable source reference from replayed correction
+`4e96523be`, an ancestor of the delivered history; no source hash, protected
+field or independent expectation changes. The fresh-Dev source controls pass
+22/22 and the existing web admission subjects pass 4/4. The selected
+pre-seal local run retains 422/426 and its four explicit failures; separate
+source-seal and environment replays do not make that run wholly green.
+Corrected native receiving, remaining desktop
+cohorts, full units and packaging/install remain unexecuted. Core passes
+424/426 with the retained Lua gsub and macOS layout-default source failures;
+the complete workflow fails with 3 successful, 4 failed and 5 skipped jobs,
+including Release skipped. Item 42 and transversal items 16/38 remain partial.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -7721,6 +7798,23 @@ The unchanged historical15 and registered22 controls pass. Normal enrollment
 executes exactly12 CLI cases and six identity vectors in about3.34s; the wider
 research matrices remain separately retained. No rollback, transactionality,
 Windows/process closure or native updater acceptance is claimed.
+
+2026-10-12 the original Windows updater collector now authenticates the fixed
+canonical SDK archive before parsing, binds its exact unique interpreter bytes
+and AMD64/PE32+ executable headers, and compares original/final file identities.
+An explicit absolute ERGOPTI_WINDOWS_AHK_ARCHIVE is mandatory; no cache fallback
+or public contract override exists. FileVersion remains reported, unqualified
+metadata; header checks do not establish native loader behavior.
+
+SDK admission occurs before the entire cohort loop. An intermediate per-cohort
+catch could allow two later mocked launches after an identity refusal; the
+corrected transition refuses all launches and leaves all cohorts UNRUN. All33
+original predicates,88 prior assertions,2307-byte child,22 registrations,21 pins
+and independent23-label oracle remain intact. The final helper passes52 portable
+controls, registered22 controls and genuine pinned2.0.26 inert archive/image
+receiving. No SDK executable was installed or run in this container. Root-owned
+cache authentication, held-image/whole-tree owner enrollment and actual original23
+Windows/complete build-install receiving remain open. Items62 and16/38 stay open.
 
 The sibling writer limitation recorded by the earlier reader-only slice is
 therefore repaired at source level. Original23, SDK/cache authentication,

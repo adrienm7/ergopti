@@ -1,0 +1,23 @@
+{
+	"canonical_base": "ae684ed723c82bb158dd873a9e928be2e105a9c1",
+	"path": "tools/test/test-windows-hook-trace-source.cjs",
+	"before_sha256": "972f4cd8c61a5f6bd61eeb3c85986ea9e1d97e11bb1665fb4f841cb4cb947020",
+	"after_sha256": "0c5f0c307291751f152ac055ac40c95e62614123aee85be59efd6d3b961ede9e",
+	"patch_sha256": "c874ab778e1dec01cf3ade1cf5d434f4a01c40fab6588fbcde62f93a858be0f7",
+	"preserved_original_export_arrays": [37, 3],
+	"preserved_original_assert_statements": 37,
+	"only_original_assertion_extension": "The exact known serializer is appended to the strict expected export set; original predicate/message otherwise unchanged.",
+	"preserved_original_mutation_entries": 13,
+	"existing_module_custody_inverses": 4,
+	"additive_serializer_inverses": 14,
+	"execution": {
+		"original_guard_composed41_source_exit": 1,
+		"corrected_guard_composed41_source_exit": 0,
+		"qualification": "Source only; Windows/native UNRUN."
+	},
+	"dependencies": {
+		"native_serializer_bridge_patch": "2ff7f370089dec54ec58b6521af63c0f8dd347bf8317b252ded08a713da5ca10",
+		"pure_serializer_patch": "c34435adcce905b74019fad3792f8b4a8ef6cdbda94ec8c1a78d640d808ee7ff",
+		"ahk_loader_required_export": "ErgoptiNav_SerializeTerminalOutputAttempt"
+	}
+}

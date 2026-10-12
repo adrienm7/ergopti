@@ -22,6 +22,7 @@ const SOURCE_ROOTS = Object.freeze([
 	'tools/ci/run-windows-updater-original-diagnostic-cohort.cjs',
 	'tools/ci/windows-updater-original-diagnostic-cohort-inputs.json',
 	'tools/ci/windows-updater-original-source.cjs',
+	'tools/ci/windows-updater-sdk-auth.cjs',
 	ORACLE_PATH,
 	'tools/test/validate-ahk-suite-manifest.cjs',
 	'tools/ci/manual-ci-lanes.cjs',
