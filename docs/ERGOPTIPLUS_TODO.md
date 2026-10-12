@@ -11244,6 +11244,14 @@ permission receiving and catalogue discovery still require Mac CI. This is a
 diagnostic correction, not consent, invocation or installed acceptance; item106
 remains partial.
 
+Personal PowerShell scripts are discoverable on Linux and macOS when pwsh
+is available. Missing interpreters retain the existing unavailable reason;
+Windows command preference, literal arguments, interpreter/script identity
+checks and native execution retirement remain unchanged. Actual Linux
+execution has a separate genuine PowerShell receipt; controlled macOS
+metadata tests do not qualify native macOS execution. Hosted and installed
+PowerShell acceptance and the other automation work keep item106 partial.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
