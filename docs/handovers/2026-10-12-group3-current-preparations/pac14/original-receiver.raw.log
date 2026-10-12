@@ -1,0 +1,7 @@
+Planned cases: 14
+..............
+----------------------------------------------------------------------
+Ran 14 tests in 2.362s
+
+OK
+Native PAC source contract: 66 portable controls passed; native Swift/SSPI not executed.

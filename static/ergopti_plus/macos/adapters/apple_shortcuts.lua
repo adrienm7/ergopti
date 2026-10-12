@@ -257,6 +257,13 @@ function M.new(ports)
 				finish(entry.success == true and admitted_now, not admitted_now and "admission_refused"
 					or entry.success == true and "completed" or "execution_refused")
 			end
+			local function refuse(reason)
+				-- Cancellation can invalidate this consumer while retaining native debt.
+				cancel(entry)
+				entry.constructing = false
+				if generation ~= epoch or choices[key] ~= selected then return end
+				finish(false, reason)
+			end
 			local ok, handle = pcall(ports.invoke, scalar, allowed, function(success)
 				if entry.completed then entry.success = false; cancel(entry); return end
 				entry.completed, entry.success = true, success == true
@@ -269,10 +276,12 @@ function M.new(ports)
 			end
 			entry.handle = handle
 			local watching, observed = pcall(handle.onSettled, complete)
-			entry.constructing = false
-			if not watching or observed ~= true or not allowed() then cancel(entry); return end
+			if not watching or observed ~= true then refuse("transport_refused"); return end
+			if not allowed() then refuse("admission_refused"); return end
 			local started, receipt = pcall(handle.start)
-			if not started or receipt ~= true then cancel(entry); return end
+			if not started or receipt ~= true then refuse("start_refused"); return end
+			-- A synchronous completion cannot outrun the literal start acknowledgement.
+			entry.constructing = false
 			complete()
 		end)
 	end

@@ -1,0 +1,20 @@
+Planned cases: 14
+test_actual_held_target_join_interruption_preserves_primary_without_retry (__main__.PACSourcePeerTests.test_actual_held_target_join_interruption_preserves_primary_without_retry) ... ok
+test_actual_listener_close_then_exception_never_retries_closed_reference (__main__.PACSourcePeerTests.test_actual_listener_close_then_exception_never_retries_closed_reference) ... ok
+test_actual_request_start_without_acknowledgement_retains_worker_and_socket (__main__.PACSourcePeerTests.test_actual_request_start_without_acknowledgement_retains_worker_and_socket) ... ok
+test_actual_serving_start_acquisition_without_acknowledgement_retains_debt (__main__.PACSourcePeerTests.test_actual_serving_start_acquisition_without_acknowledgement_retains_debt) ... ok
+test_actual_shutdown_start_acquisition_without_acknowledgement_retains_debt (__main__.PACSourcePeerTests.test_actual_shutdown_start_acquisition_without_acknowledgement_retains_debt) ... ok
+test_actual_stdin_eof_retires_owned_process_and_both_listeners (__main__.PACSourcePeerTests.test_actual_stdin_eof_retires_owned_process_and_both_listeners) ... ok
+test_default_trust_refuses_generated_anchor (__main__.PACSourcePeerTests.test_default_trust_refuses_generated_anchor) ... ok
+test_invalid_vectors_are_not_silently_repaired (__main__.PACSourcePeerTests.test_invalid_vectors_are_not_silently_repaired) ... ok
+test_numeric_listener_binding_never_acquires_unused_reverse_dns (__main__.PACSourcePeerTests.test_numeric_listener_binding_never_acquires_unused_reverse_dns) ... ok
+test_oversized_and_non200_peers_are_real (__main__.PACSourcePeerTests.test_oversized_and_non200_peers_are_real) ... ok
+test_owned_anchor_preserves_hostname_verification (__main__.PACSourcePeerTests.test_owned_anchor_preserves_hostname_verification) ... ok
+test_redirect_and_authentication_peers_preserve_authority_difference (__main__.PACSourcePeerTests.test_redirect_and_authentication_peers_preserve_authority_difference) ... ok
+test_truncated_body_is_not_successful_eof (__main__.PACSourcePeerTests.test_truncated_body_is_not_successful_eof) ... ok
+test_utf_vectors_are_actual_complete_peer_bytes (__main__.PACSourcePeerTests.test_utf_vectors_are_actual_complete_peer_bytes) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 2.025s
+
+OK

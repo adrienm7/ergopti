@@ -1,0 +1,34 @@
+[
+  {
+    "path": "tools/test/ci-pipeline.cjs",
+    "sha256": "218541aa704890e91df5fba31dff48456def4ed4e46e00a733f84b866d4b73f5",
+    "bytes": 20161
+  },
+  {
+    "path": ".github/workflows/ci.yml",
+    "sha256": "826e8825083745bf92acc11802e410aad09487d4d60818d481f8d471e2369f35",
+    "bytes": 57054
+  },
+  {
+    "path": ".github/workflows/ci-windows.yml",
+    "sha256": "9fda9bad22d0eec1c4d5394f13f657e66c473aaf705ec1e963ad1f5f4c6cb3cc",
+    "bytes": 72291
+  },
+  {
+    "path": ".github/workflows/ci-linux.yml",
+    "sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db",
+    "bytes": 242578
+  },
+  {
+    "path": ".github/workflows/ci-macos.yml",
+    "sha256": "803f432b4d0d7dd7a871574b14dcb857a9feb30f896c40e236d21e4d9bf2b946",
+    "bytes": 134887,
+    "private_postimage": true
+  },
+  {
+    "path": "tools/test/test-ci-pipeline-wiring.cjs",
+    "sha256": "b8a92a921efe72cb1b00f8efc7edd8a72e5dac4cdf16f51f177e0a7b8c7cd3b1",
+    "bytes": 234973,
+    "private_postimage": true
+  }
+]
