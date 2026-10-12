@@ -146,6 +146,39 @@ curl/libuv receiving on the composed correction passes 262 streaming and 136
 local API checks. Controlled startup HTTP replies do not qualify native network
 behavior. Windows/macOS and physical input remain unqualified by this checkpoint.
 
+#### Received Windows delivery and collector corrections
+
+The archived Windows session's 15 atomic commits after `7184fbf58b` through
+`fca9d29769` are received on current dev; its divergent earlier history is not
+imported. The seven-file `fae726662` increment is preserved as an unqualified
+snapshot. Main's stricter canonical publication/admission guards remain intact.
+Native owner correction `680bb62e3d0cba970f4db44015d0aeae19400629` contains the
+real archived MSVC DLL: SHA256 `E4133FA294B78920D6A558CA284F0CCDB96807FA10D15DEC6E1CF046731C972A`.
+All 18 source/recipe inputs and its artifact hash match; this container did not
+compile or execute that DLL on Windows. The previous startup failure from the
+old DLL's missing exports requires fresh Windows receiving on this successor.
+
+Follow-up fixes keep post-READY model failures within their current menu owner,
+archive only bytes actually produced by the collector, preserve foreign file
+successors through original exclusive streams, and retain primary failure while
+keeping its verified diagnostic ZIP accessible. Collection source controls pass
+62/0, shared page behavior passes, all 21 locales retain collection captions.
+Native collector receiving remains UNRUN: 30 PowerShell controls, 13 AHK owner
+cases and two resident-observation cases. Newly authored model failure/deadline
+cases also require actual Windows execution. Portable C receiving passes 43/43,
+route/output/trace matrices pass 8/7/6; source census, custody, bootstrap, bundle,
+encoding (1,910) and syntax (1,890) controls pass. Diagnostic source pins are
+regenerated canonically; the independent original oracle is unchanged.
+
+The packaged Windows Diagnostics page now offers translated collection, cancel,
+guided observations and archive-folder actions; exact installed-release receiving
+without developer tools remains open. The stable v1.0.1 does not contain this
+feature. Windows-specific collection is explicitly unavailable on macOS/Linux.
+Item 49 still requires complete production capture/observer migration and output
+emission; physical hooks, modifier delivery, UIA/rendering and full native suites
+are not qualified by these portable/source results. No native qualification flag
+is raised. Full composed JS/macOS gates remain pending at this checkpoint.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
