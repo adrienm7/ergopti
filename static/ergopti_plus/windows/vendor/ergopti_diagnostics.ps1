@@ -160,12 +160,14 @@ function Add-CollectionResult($Id, $Status, $Evidence, $Reason, $Duration = 0, $
 
 try {
 	if ($taskRequest.redaction_verified -ne $true -or @('0','1') -cnotcontains [string]$taskRequest.compiled) { throw 'Host redaction admission is missing.' }
+	if (@('resident_driver','worker_control') -cnotcontains $taskRequest.evidence_origin -or
+		($taskRequest.evidence_origin -ceq 'worker_control' -and $taskRequest.compiled -eq 1)) { throw 'Invalid collection evidence origin.' }
 	$taskComponents = New-Object Collections.Generic.List[object]
 	$taskComponentPaths = @{}
 	# The request contains only a host-side closed projection; never copy request paths or arbitrary logs.
 	$taskCandidateIdentity = [ordered]@{
 		schema_version=1; session_id=$taskId; started_at=$taskStarted.ToString('o'); ended_at=$null
-		build_kind=$(if($taskRequest.compiled -eq 1){'installed_binary'}else{'interpreted_source'})
+		build_kind=$(if($taskRequest.evidence_origin -ceq 'worker_control'){'worker_control'}elseif($taskRequest.compiled -eq 1){'installed_binary'}else{'interpreted_source'})
 		version=$taskRequest.version; source_sha=$taskRequest.source_sha
 		architecture=$taskRequest.architecture; windows=[Environment]::OSVersion.Version.ToString()
 		runtime=$taskRequest.runtime; components=@($taskComponents.ToArray())
@@ -351,11 +353,13 @@ try {
 			$taskUnfinished.Add([ordered]@{operation='control_file'; name=$taskControlName})
 		}
 	}
-	Add-CollectionResult 'cleanup' $(if($taskCleanupErrors.Count){'FAIL'}else{'PASS'}) 'automatic' $(if($taskCleanupErrors.Count){'owned_cleanup_debt'}else{'owned_window_and_control_files_retired'}) 0 ([ordered]@{window_retired=($null -eq $taskForm); operations_unfinished=@($taskUnfinished.ToArray()); errors=@($taskCleanupErrors.ToArray()); user_configuration_touched=$false; clipboard_touched=$false; external_servers_touched=$false})
+	# An archive written by a live worker cannot attest to that worker's later tree retirement.
+	$taskUnfinished.Add([ordered]@{operation='host_worker_retirement'; state='awaiting_host_ack'; pid=$PID; input_free=$true})
+	Add-CollectionResult 'cleanup' $(if($taskCleanupErrors.Count){'FAIL'}else{'PASS'}) 'automatic' $(if($taskCleanupErrors.Count){'owned_cleanup_debt'}else{'owned_window_and_control_files_retired'}) 0 ([ordered]@{scope='owned_window_and_control_files'; window_retired=($null -eq $taskForm); operations_unfinished=@($taskUnfinished.ToArray()); errors=@($taskCleanupErrors.ToArray()); user_configuration_touched=$false; clipboard_touched=$false; external_servers_touched=$false})
 	Write-CollectionJson 'results.json' ([ordered]@{schema_version=1; session_id=$taskId; results=@($taskRows.ToArray())})
 	$taskIdentity.ended_at=[DateTime]::UtcNow.ToString('o')
 	Write-CollectionJson 'manifest.json' $taskIdentity
-	$taskSummary = "# Ergopti Windows diagnostic`n`nSession: $taskId`nInstalled binary evidence: $($taskRequest.compiled -eq 1)`nNo production or physical cohort qualification is granted by collection.`n`n"
+	$taskSummary = "# Ergopti Windows diagnostic`n`nSession: $taskId`nEvidence origin: $($taskIdentity.build_kind)`nInstalled binary evidence: $($taskIdentity.build_kind -ceq 'installed_binary')`nNo production or physical cohort qualification is granted by collection.`n`n"
 	if ($null -ne $taskFailure) { $taskSummary += "Collection failed: $($taskFailure.reason) (HRESULT $($taskFailure.error_code)). Review failure.json before using any partial evidence.`n`n" }
 	foreach($taskRow in $taskRows){$taskSummary += "$($taskRow.id): $($taskRow.status) [$($taskRow.evidence_class)] $($taskRow.reason)`n"}
 	$taskSummary += "`nNext action: attach this local ZIP manually. Review FAIL, SKIP and UNRUN with the maintainer. Isolated native input needs an exclusive owner; AI installation and model download require separate consent. macOS and Linux were not executed here.`n"

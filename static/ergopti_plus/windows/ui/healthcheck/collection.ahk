@@ -233,6 +233,7 @@ class DiagnosticCollectionWindows {
 		}
 		this.Result["phase"] := ExitCode == 0 && Committed && !this.ProgressFault ? "completed" : "failed"
 		this.Result["archive_created"] := Committed
+		this.Result["worker_tree_retired"] := true
 		this.Result["folder_available"] := !!DirExist(this.Directory)
 		Path := this.Directory . "\archive-error.json"
 		if FileExist(Path) {

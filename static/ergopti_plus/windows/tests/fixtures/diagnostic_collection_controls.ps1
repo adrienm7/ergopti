@@ -9,9 +9,13 @@ $taskContract=Join-Path $Checkout 'static/ergopti_plus/_shared/modules/diagnosti
 $taskPowerShell=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
 $taskProofs=New-Object Collections.Generic.List[object]
 $taskSentinel='sk-'+('A'*32)
+$taskSourceSha=(& git -C $Checkout rev-parse HEAD).Trim()
+if($LASTEXITCODE -ne 0 -or $taskSourceSha -cnotmatch '^[0-9a-f]{40}$'){throw 'The fixture requires its actual checkout commit identity.'}
+$taskRuntimeVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($Runtime).ProductVersion
+if($taskRuntimeVersion -cnotmatch '^[0-9]+[.][0-9]+[.][0-9]+$'){throw 'The fixture requires its actual runtime identity.'}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $env:PSModulePath="$env:SystemRoot/System32/WindowsPowerShell/v1.0/Modules;"+$env:PSModulePath
-foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','existing-partial','archive-limit','owner-observed','query-timeout')){
+foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout')){
  $taskId='ergopti-diagnostic-'+[Guid]::NewGuid().ToString('N');$taskDirectory=Join-Path $taskRoot $taskId
  [IO.Directory]::CreateDirectory($taskDirectory)|Out-Null
  $taskRunWorker=$taskWorker;$taskRunContract=$taskContract
@@ -32,9 +36,10 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
   @{id='native_owner';path=(Join-Path $Checkout 'static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll')},
   @{id='native_manifest';path=(Join-Path $Checkout 'static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json')},
   @{id='collector';path=$taskRunWorker},@{id='contract';path=$taskRunContract})
- $taskRequest=@{schema_version=1;redaction_verified=$true;compiled=0;version='local';source_sha='97f4e08fff32c43933c09e3d0a7b83abde8b4c9e';architecture='x64';runtime='2.0.26';contract_path=$taskRunContract;components=$taskComponents}
+ $taskRequest=@{schema_version=1;redaction_verified=$true;compiled=0;evidence_origin='worker_control';version='local';source_sha=$taskSourceSha;architecture='x64';runtime=$taskRuntimeVersion;contract_path=$taskRunContract;components=$taskComponents}
  if($taskCase -eq 'missing-component'){$taskRequest.components[0].path=Join-Path $taskDirectory 'missing.ahk'}
  if($taskCase -eq 'redaction-refusal'){$taskRequest.version='token='+$taskSentinel}
+ if($taskCase -eq 'false-installed-origin'){$taskRequest.compiled=1}
  if($taskCase -eq 'owner-observed'){
   $taskRequest.input_owner=@{pid=$PID;created_filetime=[Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToFileTimeUtc();mutex='exempt';mutex_handle_retained=0;dispatcher_started=0;native_started=0;native_quarantined=0}
  }
@@ -86,6 +91,10 @@ foreach($taskProof in $taskProofs){
   continue
  }
  if($taskProof.exit_code -ne 0 -or !$taskProof.archive_created -or $taskProof.stderr_bytes -ne 0){throw ('Worker archive acknowledgement failed: '+$taskProof.case)}
+ $taskManifest=Get-Content -LiteralPath (Join-Path $taskProof.path 'manifest.json') -Raw -Encoding UTF8|ConvertFrom-Json
+ if(@('redaction-refusal','false-installed-origin') -notcontains $taskProof.case -and ($taskManifest.build_kind -cne 'worker_control' -or $taskManifest.source_sha -cne $taskSourceSha)){throw 'Worker controls claimed resident product provenance.'}
+ if($taskProof.case -eq 'false-installed-origin' -and ($taskManifest.build_kind -cne 'unverified_input' -or
+  !([IO.File]::ReadAllText((Join-Path $taskProof.path 'summary.md')).Contains('Installed binary evidence: False')))){throw 'Rejected identity retained an installed-binary evidence claim.'}
  foreach($taskCheck in $taskProof.checks){if(!$taskCheck.ok){throw ('Archive control failed: '+$taskProof.case+'/'+$taskCheck.id)}}
  if($taskProof.results.Count -ne $taskExpectedChecks.checks.Count){throw ('Result census failed: '+$taskProof.case)}
  foreach($taskId in $taskExpectedChecks.checks){if(@($taskProof.results|Where-Object {$_.id -ceq $taskId}).Count -ne 1){throw 'Missing or duplicate result.'}}
@@ -96,11 +105,14 @@ foreach($taskProof in $taskProofs){
   if($taskResult.status -ceq 'PASS' -and $taskResult.evidence_class -ceq 'unexecuted'){throw 'Unexecuted evidence became PASS.'}
  }
  if($taskById.cleanup.status -cne 'PASS'){throw 'Native child or control cleanup failed.'}
+ if($taskById.cleanup.receipt.scope -cne 'owned_window_and_control_files' -or
+  @($taskById.cleanup.receipt.operations_unfinished|Where-Object {$_.operation -ceq 'host_worker_retirement' -and $_.state -ceq 'awaiting_host_ack'}).Count -ne 1){throw 'A live worker claimed its own future host-tree retirement.'}
  if($taskById.physical_text.status -ceq 'PASS' -or $taskById.physical_display.status -ceq 'PASS'){throw 'Automated controls invented physical qualification.'}
  if($taskProof.case -eq 'native' -and ($taskById.native_uia.status -cne 'PASS' -or $taskById.native_render.status -cne 'PASS')){throw 'Actual native synthetic collection failed.'}
  if(@('cancel','deadline') -contains $taskProof.case -and $taskById.physical_text.status -cne 'SKIP'){throw 'Cancellation promoted physical evidence.'}
  if($taskProof.case -eq 'missing-component' -and $taskById.components.status -cne 'FAIL'){throw 'Missing component admitted.'}
  if($taskProof.case -eq 'redaction-refusal' -and $taskById.redaction.status -cne 'FAIL'){throw 'Private identity admitted.'}
+ if($taskProof.case -eq 'false-installed-origin' -and $taskById.redaction.status -cne 'FAIL'){throw 'A worker control was admitted as installed product evidence.'}
  if($taskProof.case -eq 'query-timeout' -and $taskById.native_uia.status -cne 'FAIL'){throw 'Timed-out query admitted.'}
  if($taskProof.case -eq 'owner-observed' -and ($taskById.callbacks.status -cne 'UNRUN' -or $taskById.callbacks.receipt.observation -cne 'PASS' -or
   $taskById.callbacks.receipt.reason -cne 'exclusive_input_session_not_admitted' -or $taskById.callbacks.receipt.isolated_input_allowed)){throw 'Observed host ownership granted an isolated native input session.'}
