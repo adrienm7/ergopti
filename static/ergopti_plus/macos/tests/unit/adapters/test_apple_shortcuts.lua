@@ -634,3 +634,206 @@ H.describe("Apple Shortcut invocation watcher and start refusals", function()
 		H.assert_true(f.owner.invalidate()); assert_false(f.owner.pending()); H.assert_eq(result.calls, 0)
 	end)
 end)
+
+-- Query transport callbacks here are controlled software ports, not native
+-- processes, Shortcuts execution, permissions or an automation-retirement grant.
+local function query_ack_fixture(operation, configure, on_finished)
+	local f, selected = fixture(), nil
+	if operation == "revalidate" then selected = f.discover().choices[1].key end
+	local result = { calls = 0 }
+	local construct = f.ports.query
+	f.ports.query = function(request, done)
+		local task = construct(request, done)
+		result.task = task
+		configure(task, f, result)
+		return task
+	end
+	function result.restore_query() f.ports.query = construct end
+	local function finished(value, reason)
+		result.calls = result.calls + 1
+		result.value, result.terminal_reason = value, reason
+		if on_finished then on_finished(f, result, value, reason) end
+	end
+	function result.begin()
+		if operation == "discover" then
+			result.accepted, result.start_reason = f.owner.discover(finished)
+		else
+			result.accepted, result.start_reason = f.owner.resolve(selected, {}, finished)
+		end
+	end
+	return f, result
+end
+
+H.describe("Apple Shortcut query start acknowledgement", function()
+	for _, operation in ipairs({ "discover", "revalidate" }) do
+		for _, acknowledgement in ipairs({ "false", "throw", "true" }) do
+			H.it(operation .. " synchronous completion with " .. acknowledgement .. " ACK waits for query admission", function()
+				local f, result = query_ack_fixture(operation, function(task, owner_fixture, observed)
+					task.start = function()
+						task.starts = task.starts + 1
+						if acknowledgement == "true" then owner_fixture.reply(task, { owner_fixture.rows[1] })
+						else task.finish(nil, 1, "") end
+						task.retire()
+						observed.calls_before_ack = observed.calls
+						if acknowledgement == "throw" then error("controlled query start acknowledgement") end
+						return acknowledgement == "true"
+					end
+				end)
+				result.begin(); local task = result.task
+				H.assert_eq(result.calls_before_ack, 0, "query completion cannot precede the literal start ACK")
+				H.assert_eq(result.accepted, acknowledgement == "true")
+				H.assert_eq(result.calls, 1)
+				H.assert_eq(task.starts, 1); H.assert_eq(task.cancels, acknowledgement == "true" and 0 or 1)
+				H.assert_true(task.physical); assert_false(f.owner.pending())
+				if acknowledgement == "true" then
+					H.assert_nil(result.start_reason); H.assert_nil(result.terminal_reason)
+					if operation == "discover" then H.assert_eq(#result.value.choices, 1)
+					else
+						H.assert_eq(require("program_parameter").parse(result.value, "hs"), {
+							executable = "/usr/bin/shortcuts", arguments = { "run", ID1 } })
+					end
+				else
+					H.assert_eq(result.start_reason, "start_refused")
+					H.assert_nil(result.value); H.assert_eq(result.terminal_reason, "query_refused")
+				end
+				result.restore_query(); H.assert_eq(#f.discover().choices, 2)
+				H.assert_eq(result.calls, 1)
+			end)
+		end
+	end
+	for _, acknowledgement in ipairs({ "false", "throw" }) do
+		H.it("query " .. acknowledgement .. " start refusal releases only after late exact settlement", function()
+			local f, result = query_ack_fixture("discover", function(task)
+				task.start = function()
+					task.starts = task.starts + 1; task.finish(nil, 1, "")
+					if acknowledgement == "throw" then error("controlled query start refusal") end
+					return false
+				end
+			end)
+			result.begin(); local task = result.task
+			assert_false(result.accepted); H.assert_eq(result.start_reason, "start_refused")
+			H.assert_eq(result.calls, 0); H.assert_eq(task.cancels, 1); H.assert_true(f.owner.pending())
+			local accepted, reason = f.owner.discover(function() result.calls = result.calls + 1 end)
+			assert_false(accepted); H.assert_eq(reason, "cleanup_pending"); H.assert_eq(#f.tasks, 1)
+			task.retire()
+			H.assert_true(task.physical); assert_false(f.owner.pending()); H.assert_eq(result.calls, 0)
+			result.restore_query(); H.assert_eq(#f.discover().choices, 2); H.assert_eq(result.calls, 0)
+		end)
+	end
+	for _, acknowledgement in ipairs({ "false", "throw" }) do
+		H.it("query " .. acknowledgement .. " watcher refusal releases only after late exact settlement", function()
+			local f, result = query_ack_fixture("discover", function(task)
+				local watch = task.onSettled
+				task.onSettled = function(callback)
+					watch(callback); task.finish(nil, 1, "")
+					if acknowledgement == "throw" then error("controlled query watcher refusal") end
+					return false
+				end
+			end)
+			result.begin(); local task = result.task
+			assert_false(result.accepted); H.assert_eq(result.start_reason, "transport_refused")
+			H.assert_eq(result.calls, 0); H.assert_eq(task.starts, 0); H.assert_eq(task.cancels, 1)
+			H.assert_true(f.owner.pending()); task.retire()
+			assert_false(f.owner.pending()); H.assert_eq(result.calls, 0)
+			result.restore_query(); H.assert_eq(#f.discover().choices, 2); H.assert_eq(result.calls, 0)
+		end)
+	end
+	for _, operation in ipairs({ "discover", "revalidate" }) do
+		H.it(operation .. " asynchronous accepted query preserves ordinary delivery", function()
+			local f, result = query_ack_fixture(operation, function() end)
+			result.begin(); local task = result.task
+			H.assert_true(result.accepted); H.assert_nil(result.start_reason); H.assert_eq(result.calls, 0)
+			f.reply(task, { f.rows[1] }); H.assert_eq(result.calls, 0); H.assert_true(f.owner.pending())
+			task.retire(); H.assert_eq(result.calls, 1); H.assert_nil(result.terminal_reason)
+			assert_false(f.owner.pending()); H.assert_eq(task.cancels, 0)
+			if operation == "discover" then H.assert_eq(#result.value.choices, 1)
+			else H.assert_eq(require("program_parameter").parse(result.value, "hs").arguments, { "run", ID1 }) end
+		end)
+	end
+end)
+
+H.describe("Apple Shortcut resolved start failure ownership", function()
+	for _, acknowledgement in ipairs({ "false", "throw" }) do
+		H.it("query forged valid reply with " .. acknowledgement .. " ACK delivers only closed failure", function()
+			local f, result = query_ack_fixture("discover", function(task, owner_fixture, observed)
+				task.start = function()
+					task.starts = task.starts + 1
+					owner_fixture.reply(task, { owner_fixture.rows[1] }); task.retire()
+					observed.calls_before_ack = observed.calls
+					if acknowledgement == "throw" then error("controlled rejected valid query reply") end
+					return false
+				end
+			end)
+			result.begin(); local task = result.task
+			H.assert_eq(result.calls_before_ack, 0)
+			assert_false(result.accepted); H.assert_eq(result.start_reason, "start_refused")
+			H.assert_eq(result.calls, 1); H.assert_nil(result.value)
+			H.assert_eq(result.terminal_reason, "query_refused")
+			H.assert_eq(task.starts, 1); H.assert_eq(task.cancels, 1)
+			H.assert_true(task.physical); assert_false(f.owner.pending())
+			task.retire(); H.assert_eq(result.calls, 1)
+			result.restore_query(); H.assert_eq(#f.discover().choices, 2)
+			H.assert_eq(result.calls, 1)
+		end)
+	end
+	H.it("closed query start failure preserves a callback-created successor", function()
+		local f, result = query_ack_fixture("discover", function(task, _, observed)
+			task.start = function()
+				task.starts = task.starts + 1; task.finish(nil, 1, ""); task.retire()
+				observed.calls_before_ack = observed.calls
+				return false
+			end
+		end, function(owner_fixture, observed)
+			-- Store observations only; assertions must not disappear inside start's pcall.
+			observed.callback_saw_resolved_ack = observed.calls_before_ack ~= nil
+			observed.restore_query()
+			observed.successor_calls = 0
+			observed.successor_accepted, observed.successor_reason = owner_fixture.owner.discover(function(value, reason)
+				observed.successor_calls = observed.successor_calls + 1
+				observed.successor_value, observed.successor_terminal = value, reason
+			end)
+			observed.successor = owner_fixture.tasks[#owner_fixture.tasks]
+		end)
+		result.begin(); local old, successor = result.task, result.successor
+		H.assert_eq(result.calls_before_ack, 0); H.assert_true(result.callback_saw_resolved_ack)
+		assert_false(result.accepted); H.assert_eq(result.start_reason, "start_refused")
+		H.assert_eq(result.calls, 1); H.assert_nil(result.value); H.assert_eq(result.terminal_reason, "query_refused")
+		H.assert_true(result.successor_accepted); H.assert_nil(result.successor_reason)
+		H.assert_eq(#f.tasks, 2); H.assert_true(successor ~= old); H.assert_true(f.owner.pending())
+		H.assert_eq(old.cancels, 1); H.assert_eq(successor.cancels, 0); H.assert_eq(successor.starts, 1)
+		H.assert_eq(result.successor_calls, 0)
+		old.retire(); H.assert_true(f.owner.pending()); H.assert_eq(result.calls, 1)
+		f.reply(successor); H.assert_eq(result.successor_calls, 0); successor.retire()
+		H.assert_eq(result.successor_calls, 1); H.assert_nil(result.successor_terminal)
+		H.assert_eq(#result.successor_value.choices, 2); assert_false(f.owner.pending())
+		H.assert_eq(result.calls, 1); H.assert_eq(successor.cancels, 0)
+	end)
+	H.it("query settlement observer cannot erase an invalidation-created successor", function()
+		local f, old_calls, successor_calls = fixture(), 0, 0
+		local successor_value, successor_reason, invalidated, accepted, start_reason
+		H.assert_true(f.owner.discover(function() old_calls = old_calls + 1 end))
+		local old = f.tasks[1]
+		f.reply(old); H.assert_eq(old_calls, 0); H.assert_true(f.owner.pending())
+		local observed = false
+		old.isSettled = function()
+			if old.physical and not observed then
+				observed = true
+				invalidated = f.owner.invalidate()
+				accepted, start_reason = f.owner.discover(function(value, reason)
+					successor_calls = successor_calls + 1; successor_value, successor_reason = value, reason
+				end)
+			end
+			return old.physical
+		end
+		old.retire()
+		H.assert_true(observed); H.assert_true(invalidated); H.assert_true(accepted); H.assert_nil(start_reason)
+		H.assert_eq(#f.tasks, 2); H.assert_eq(old_calls, 0); H.assert_true(f.owner.pending())
+		local successor = f.tasks[2]
+		H.assert_eq(old.cancels, 1); H.assert_eq(successor.starts, 1); H.assert_eq(successor.cancels, 0)
+		old.retire(); H.assert_true(f.owner.pending()); H.assert_eq(old_calls, 0)
+		f.reply(successor); H.assert_eq(successor_calls, 0); successor.retire()
+		H.assert_eq(successor_calls, 1); H.assert_nil(successor_reason)
+		H.assert_eq(#successor_value.choices, 2); assert_false(f.owner.pending())
+		H.assert_eq(old_calls, 0); H.assert_eq(successor.cancels, 0)
+	end)
+end)
