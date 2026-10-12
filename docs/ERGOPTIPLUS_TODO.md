@@ -87,6 +87,27 @@ logger stalls are not treated as a proved cause. These fixes and their
 regressions continue in a second atomic delivery. Root retains CI/test migration
 and `windows/tests/unit/test_hotstrings_config.ahk` fixture isolation.
 
+#### Issue 94 scalar encoding and startup settlement
+
+Four subsequent atomic corrections route native macOS scalar strings through
+the existing shared JSON string encoder: typing-statistics request reset,
+selected paths, action-picker refusal and the MLX helper's Python directory.
+They preserve UTF-8/control bytes, recipient currency, cancellation and encoding
+refusals; no native codec is replaced. The three UI cohorts pass 16, 29 and 42
+checks on the composed source, including 19 genuine original-source failures.
+Actual Node evaluates 15 captured production callback scripts with 20 passing
+checks. The MLX cohort passes 20/20 and actual emitted Python trust receiving
+passes five independent vectors. Windows/Linux do not use the native Hammerspoon
+scalar encoder; their distinct bridges remain covered by their own suites.
+
+Startup now observes retirement of the exact original requirement snapshot and
+finishes its retained failed cycle without a separate user resume. It retains
+the prediction lock and cleanup debt until physical retirement acknowledgement,
+then schedules one owned finalization. Seven portable lifecycle cohorts pass
+167/167; the three new late-retirement cases fail against the original source.
+Native Hammerspoon/WebKit/MLX execution remains NOT_RUN; no qualification flag
+changes. These software results do not close issue 94 or the affected TODO items.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
