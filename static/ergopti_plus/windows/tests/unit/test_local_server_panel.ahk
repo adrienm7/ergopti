@@ -1347,3 +1347,154 @@ _LSCF_RemovedViewRetainsDebt() {
 	} finally Fixture.Dispose()
 }
 Test("configured-local-view: removal retains exact native cancellation debt until acknowledged", _LSCF_RemovedViewRetainsDebt)
+
+
+class _LSCI_ReadyChild extends _LSPN_ReadyChild {
+	start() {
+		_LSM_ChildReceipt.Prototype.start.Call(this)
+		Request := this.Fixture.Requests[this.Fixture.Requests.Length]
+		this.ResponseStatus := 200
+		this.ResponseBody := InStr(Request.Url, ":1942", true)
+			? this.Fixture.IdentityBody : '{"data":[]}'
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 Fixture`r`n`r`n"))
+		this.OnDone.Call(0, this.ResponseBody, "")
+		this.ResponseDelivered := true
+		return true
+	}
+}
+
+_LSCI_ReadyFactory(Fixture, OnDone) {
+	return _LSCI_ReadyChild(Fixture, OnDone)
+}
+
+_LSCI_PendingFactory(Fixture, OnDone) {
+	Request := Fixture.Requests[Fixture.Requests.Length]
+	if InStr(Request.Url, ":19423", true) {
+		Child := _LSM_ChildReceipt()
+		Child.TerminateAllowed := false
+		return Child
+	}
+	return _LSCI_ReadyChild(Fixture, OnDone)
+}
+
+_LSCI_ReplaceSource(Fixture, Mode) {
+	global _LLM_Menu
+	Entry := _LLM_Menu["api_entries"][2]
+	if Mode == "url"
+		Entry["BaseUrl"] := "http://127.0.0.1:19424/custom/v1"
+	else if Mode == "provider"
+		Entry["Provider"] := "openai_compat"
+	else if Mode == "token"
+		Entry["Token"] := "replacement-private-token"
+	Fixture.World.ApiImage := _LLM_Menu_SerializeApiEntries(Map("api_entries", _LLM_Menu["api_entries"]))
+	AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+	_LSPB_Stamp(Fixture.World)
+}
+
+_LSCI_FindConfiguredRow(Rows) {
+	for Row in Rows
+		if InStr(Row.Get("label", ""), ":1942", true)
+			return Row
+	return false
+}
+
+_LSCI_DriveDiscovery(Fixture) {
+	Record := Fixture.Panel.Discovery
+	AssertTrue(Record is Map && Fixture.RepairTimers.Has(ObjPtr(Record["timer"])))
+	global _DriverReady, _LLM_MenuBuildCoordinator
+	HadReady := IsSet(_DriverReady), HadCoordinator := IsSet(_LLM_MenuBuildCoordinator)
+	Ready := HadReady ? _DriverReady : false
+	Coordinator := HadCoordinator ? _LLM_MenuBuildCoordinator : 0
+	try {
+		_DriverReady := true
+		_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(() => true, () => false)
+		Fixture.Panel._RepairTick(Record)
+	} finally {
+		_DriverReady := HadReady ? Ready : unset
+		_LLM_MenuBuildCoordinator := HadCoordinator ? Coordinator : unset
+	}
+}
+
+_LSCI_JoinedPublishedSourceReplacement() {
+	global _LLM_Menu
+	for Mode in ["url", "provider", "token"] {
+		Fixture := _LSPN_Fixture()
+		try {
+			_LSCF_InstallSource(Fixture)
+			Fixture.IdentityBody := '{"data":[{"id":"old-owned"}]}'
+			Fixture.NativeSpawn := _LSCI_ReadyFactory.Bind(Fixture)
+			AssertTrue(Fixture.Native.Rescan())
+			OldRow := _LSCI_FindConfiguredRow(_LSPV_PreparedRows(Fixture))
+			AssertTrue(OldRow is Map)
+			AssertEqual("old-owned", OldRow["items"][1]["label"])
+			OldSelect := OldRow["items"][1]["action"]
+			OldCache := Fixture.Native.Cache
+			Requests := Fixture.Requests.Length
+			_LSCI_ReplaceSource(Fixture, Mode)
+			Fixture.IdentityBody := '{"data":[{"id":"new-owned"},{"id":"new-second"}]}'
+			AssertFalse(Fixture.Native._CacheCurrent(OldCache), "identical entry IDs cannot borrow old source provenance")
+			Image := FSReadUtf8Exact(Fixture.World.ApiPath)
+			OldSelect.Call()
+			AssertEqual(Image, FSReadUtf8Exact(Fixture.World.ApiPath), "retained model callbacks cannot write under the replacement source")
+			Rows := _LSPV_PreparedRows(Fixture)
+			AssertFalse(Fixture.Panel.LastSnapshot is Map, "fresh preparation removes stale model labels before deferred discovery")
+			AssertFalse(_LSCI_FindConfiguredRow(Rows) is Map)
+			_LSCI_DriveDiscovery(Fixture)
+			Rows := _LSPV_PreparedRows(Fixture)
+			NewRow := _LSCI_FindConfiguredRow(Rows)
+			if !(NewRow is Map)
+				NewRow := _LSCI_FindConfiguredRow(_LSPV_PreparedRows(Fixture))
+			AssertTrue(NewRow is Map)
+			AssertEqual("new-owned", NewRow["items"][1]["label"])
+			AssertEqual("new-second", NewRow["items"][2]["label"])
+			AssertTrue(Fixture.Requests.Length > Requests, "fresh source forces a probe before the old cache age expires")
+			AssertEqual("generic-active", _LLM_Menu["api_entries"][2]["Id"])
+			AssertEqual("active-model", _LLM_Menu["api_entries"][2]["Model"])
+		} finally Fixture.Dispose()
+	}
+}
+Test("local-server-cache-identity: actual joined rows re-probe equal IDs after URL, provider or token replacement", _LSCI_JoinedPublishedSourceReplacement)
+
+_LSCI_JoinedReplacementRetainsOldDebt() {
+	Fixture := _LSPN_Fixture()
+	try {
+		_LSCF_InstallSource(Fixture)
+		Fixture.Owner.Options["timeout_ms"] := 60000
+		Fixture.IdentityBody := '{"data":[{"id":"old-owned"}]}'
+		Fixture.NativeSpawn := _LSCI_ReadyFactory.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		AssertTrue(_LSCI_FindConfiguredRow(_LSPV_PreparedRows(Fixture)) is Map)
+		Fixture.NativeSpawn := _LSCI_PendingFactory.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		Id := "configured:generic-active"
+		Job := Fixture.Native.Jobs[Id], Record := Fixture.Owner.Records[Id]
+		Child := Fixture.Children[Fixture.Children.Length]
+		AssertFalse(Child.TerminateAllowed)
+		Generation := Fixture.Native.Controller.Generation
+		_LSCI_ReplaceSource(Fixture, "url")
+		Fixture.IdentityBody := '{"data":[{"id":"new-owned"}]}'
+		Fixture.NativeSpawn := _LSCI_ReadyFactory.Bind(Fixture)
+		Source := Fixture.World.Owner.Capture()
+		Projection := Fixture.Native.CaptureView(Source)
+		AssertTrue(Projection["stale"], "descriptor replacement revokes an equal-membership in-flight sweep")
+		AssertTrue(Fixture.Native.Controller.Generation > Generation)
+		AssertFalse(Fixture.Native.Controller.IsSweeping())
+		AssertEqual(0, Fixture.Native.Controller.Results.Count)
+		AssertTrue(Fixture.Native.Rescan())
+		Fixture.Native.RetryPending()
+		AssertTrue(Fixture.Native.Jobs[Id] == Job)
+		AssertTrue(Fixture.Owner.Records[Id] == Record)
+		AssertTrue(Record["request"].Handle == Child, "fresh logical ownership cannot release the old native child")
+		AssertFalse(Fixture.Native.Result(Id) is Map)
+		Child.TerminateAllowed := true
+		Fixture.Native.RetryPending()
+		Rows := _LSPV_PreparedRows(Fixture)
+		Row := _LSCI_FindConfiguredRow(Rows)
+		if !(Row is Map)
+			Row := _LSCI_FindConfiguredRow(_LSPV_PreparedRows(Fixture))
+		AssertTrue(Row is Map)
+		AssertEqual("new-owned", Row["items"][1]["label"])
+		AssertFalse(Fixture.Owner.Records.Has(Id))
+	} finally Fixture.Dispose()
+}
+Test("local-server-cache-identity: equal-membership source refresh preserves exact old native debt until acknowledged", _LSCI_JoinedReplacementRetainsOldDebt)

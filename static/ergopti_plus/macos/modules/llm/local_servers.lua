@@ -196,13 +196,16 @@ local controller = Discovery.new({
 })
 
 local view_order, view_servers = M.ORDER, M.SERVERS
+local source_generation, pending_generation, pending_at_refresh = nil, 0, 0
 
 --- Captures configured view membership without changing registered providers.
 --- Native HTTP clients retain retirement ownership independently of this view.
 --- @param configured_order table
 --- @param configured_servers table Public endpoint descriptors without credentials.
+--- @param generation number Actual native entry identity generation.
 --- @return boolean changed
-function M.configure_views(configured_order, configured_servers)
+function M.configure_views(configured_order, configured_servers, generation)
+	assert(type(generation) == "number", "configured view source identity is required")
 	local next_order, next_servers = {}, {}
 	for _, id in ipairs(M.ORDER) do next_order[#next_order + 1] = id; next_servers[id] = M.SERVERS[id] end
 	for _, id in ipairs(configured_order) do
@@ -210,8 +213,10 @@ function M.configure_views(configured_order, configured_servers)
 		next_order[#next_order + 1] = id
 		next_servers[id] = configured_servers[id]
 	end
-	local changed = controller.set_order(next_order)
+	local source_changed = source_generation ~= generation or pending_at_refresh ~= pending_generation
+	local changed = controller.set_order(next_order, source_changed)
 	view_order, view_servers = next_order, next_servers
+	source_generation, pending_at_refresh = generation, pending_generation
 	return changed
 end
 
@@ -272,7 +277,10 @@ function M.set_pending(id, fields)
 	end
 	local pending = _pending[id] or {}
 	for _, key in ipairs({ "base_url", "token" }) do
-		if fields[key] ~= nil then pending[key] = fields[key] end
+		if fields[key] ~= nil and fields[key] ~= pending[key] then
+			pending[key] = fields[key]
+			pending_generation = pending_generation + 1
+		end
 	end
 	_pending[id] = pending
 end
@@ -287,6 +295,7 @@ end
 --- Forgets what waited for a server once its API entry holds it.
 --- @param id string
 function M.clear_pending(id)
+	if _pending[id] ~= nil then pending_generation = pending_generation + 1 end
 	_pending[id] = nil
 end
 

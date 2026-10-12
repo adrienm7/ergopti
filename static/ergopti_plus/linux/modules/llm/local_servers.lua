@@ -17,20 +17,31 @@ local catalogue_order, catalogue_servers = Catalogue.load({})
 local order, servers = catalogue_order, catalogue_servers
 local requests, pending, view_receipts = {}, {}, setmetatable({}, { __mode = "k" })
 local closed, view_generation, configuration_generation = false, 0, 0
+local cached_source, source_initialized = nil, false
 local controller = Discovery.new({ order = order, clock = Clock.now_ms,
 	max_age = function() return Timings.ms("llm", "local_server_detection_max_age_ms") end,
-	on_publish = function(_, changed) if changed then view_generation = view_generation + 1 end end,
+	on_publish = function(_, changed)
+		if changed then view_generation = view_generation + 1 end
+		-- A joint negative source refusal may publish while no physical source
+		-- receipt is admitted. It never authorizes a model for that source.
+		cached_source, source_initialized = Entries.capture_source(), true
+	end,
 	on_error = function(kind) Logger.warn(LOG, "Local discovery %s was refused.", kind) end })
 
---- Synchronizes view membership without acknowledging any retired native owner.
+--- Synchronizes private source identity and view membership without acknowledging
+--- any retired native owner. Credentials never enter the shared cache authority.
 local function refresh_views()
 	local providers = {}
 	for _, id in ipairs({ "openai", "openai_compat" }) do providers[id] = Remote.provider(id) end
 	local configured_order, configured = Auth.configured_views(Entries.list(), catalogue_servers, providers)
+	local source = Entries.capture_source()
+	local source_changed = source_initialized and ((cached_source ~= nil and not Entries.source_is_current(cached_source))
+		or (cached_source == nil and source ~= nil))
+	cached_source, source_initialized = source, true
 	local next_order, next_servers = {}, {}
 	for _, id in ipairs(catalogue_order) do next_order[#next_order + 1] = id; next_servers[id] = catalogue_servers[id] end
 	for _, id in ipairs(configured_order) do next_order[#next_order + 1] = id; next_servers[id] = configured[id] end
-	local changed = controller.set_order(next_order)
+	local changed = controller.set_order(next_order, source_changed)
 	order, servers = next_order, next_servers
 	if changed then
 		view_generation = view_generation + 1
@@ -243,8 +254,8 @@ end
 function M.shutdown() closed = true; return M.cancel() end
 function M.order() refresh_views(); local copy = {}; for index,id in ipairs(order) do copy[index] = id end; return copy end
 function M.servers() refresh_views(); return servers end
-function M.result(id) return controller.result(id) end
-function M.detected() return controller.detected() end
-function M.is_stale() return controller.is_stale() end
+function M.result(id) refresh_views(); return controller.result(id) end
+function M.detected() refresh_views(); return controller.detected() end
+function M.is_stale() refresh_views(); return controller.is_stale() end
 function M.is_sweeping() return controller.is_sweeping() end
 return M

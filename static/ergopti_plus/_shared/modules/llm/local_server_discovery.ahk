@@ -165,10 +165,14 @@ class LocalServerDiscoveryController {
 		} finally Critical(PreviousCritical)
 	}
 
-	/** Replaces only logical membership; native retirement remains with its owner. */
-	SetOrder(Order) {
-		if !(Order is Array)
-			throw TypeError("Local discovery order must be an array.")
+	/**
+	 * @param {Array} Order Copied unique logical identities.
+	 * @param {Boolean} Refresh Revokes same-membership provenance when requested.
+	 * @returns {Boolean} Logical state changed; native retirement remains owned.
+	 */
+	SetOrder(Order, Refresh := false) {
+		if !(Order is Array) || !(Refresh is Integer) || (Refresh != 0 && Refresh != 1)
+			throw TypeError("Local discovery order requires an array and a typed refresh flag.")
 		Captured := [], Seen := Map()
 		Seen.CaseSense := "On"
 		for Id in Order {
@@ -186,7 +190,7 @@ class LocalServerDiscoveryController {
 						Equal := false
 				}
 			}
-			if Equal
+			if Equal && !Refresh
 				return false
 			this.Order := Captured
 			this.Generation += 1
