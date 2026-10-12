@@ -292,7 +292,8 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 208 tests in /);
+	// Retain 205 original controls, three published UI controls and twelve Dev controls.
+	assert.match(result.stderr, /Ran 220 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });

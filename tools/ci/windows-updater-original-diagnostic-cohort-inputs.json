@@ -1,0 +1,76 @@
+{
+	"status": "SEALED_CANDIDATE_SOURCE_PINS",
+	"cohorts": [
+		{
+			"id": "channel-replacement",
+			"filter": "(updater-channel-replacement-transaction)",
+			"expected_names": [
+				"Updater AHK-31: channel admission precedes persistence and releases on failure (updater-channel-replacement-transaction)",
+				"Updater AHK-31: action leases serialize channel, cadence and install ingress (updater-channel-replacement-transaction)",
+				"Updater AHK-31: real async wrappers stop at admission refusal (updater-channel-replacement-transaction)",
+				"Updater AHK-31: interval action lease spans post-commit cancellation (updater-channel-replacement-transaction)",
+				"Updater AHK-31: failed channel persistence restores the exact retired cadence (updater-channel-replacement-transaction)",
+				"Updater AHK-31: failed cadence retirement aborts before persistence (updater-channel-replacement-transaction)",
+				"Updater AHK-31: registry swap preserves reentrant replacement (updater-channel-replacement-transaction)",
+				"Updater AHK-31: non-leased terminal blocks Reload until callback return (updater-channel-replacement-transaction)",
+				"Updater AHK-31: simultaneous terminal claims balance independently (updater-channel-replacement-transaction)",
+				"Updater AHK-31: deferred Reload timeout crosses a DWORD boundary and is exact-once (updater-channel-replacement-transaction)",
+				"Updater AHK-31: deferred Reload arm failure owns one recovery (updater-channel-replacement-transaction)",
+				"Updater AHK-31: Setter initial arm failure has one owned terminal (updater-channel-replacement-transaction)",
+				"Updater AHK-31: active COM lease blocks deferred Reload (updater-channel-replacement-transaction)",
+				"Updater AHK-31: Reload and recovery false/throw paths are exact (updater-channel-replacement-transaction)",
+				"Updater AHK-31: default recovery types cadence, scheduler and menu effect (updater-channel-replacement-transaction)",
+				"Updater AHK-31: stale timed-out continuation cannot retire successor (updater-channel-replacement-transaction)",
+				"Updater AHK-31: channel epoch rejects ABA publication (updater-channel-replacement-transaction)",
+				"Updater AHK-31: background arm cannot cross channel admission (updater-channel-replacement-transaction)"
+			]
+		},
+		{
+			"id": "global-config-barrier",
+			"filter": "(updater-global-config-barrier)",
+			"expected_names": [
+				"Updater AHK-34: global terminal collision precedes all preference effects (updater-global-config-barrier)",
+				"Updater AHK-34: channel Reload retains global config ownership through recovery (updater-global-config-barrier)",
+				"Updater AHK-34: interval writer owns config before failure publication (updater-global-config-barrier)",
+				"Updater AHK-34: interval publication replaces stale reentrant live state (updater-global-config-barrier)"
+			]
+		},
+		{
+			"id": "inherited-critical",
+			"filter": "(updater-channel-inherited-critical)",
+			"expected_names": [
+				"Updater AHK-31: channel action never inherits caller Critical (updater-channel-inherited-critical)"
+			]
+		}
+	],
+	"source_sha256": {
+		"static/ergopti_plus/windows/_generated/update_channels.ahk": "67d2977b59553b5a58cc9386dc1a3304e56a3706dc57d7c07a221e7075680a4b",
+		"static/ergopti_plus/windows/_generated/update_schedule.ahk": "d13e790c22ce73d57a6dd7b6ace50d73f3f2b74ca43593a0f9177d0c89decaf7",
+		"static/ergopti_plus/windows/infra/config_io.ahk": "47e22ba2103e60688da7f12ab30b03aa058ec714d69b844f8183d990aacd1959",
+		"static/ergopti_plus/windows/infra/config_migrate.ahk": "79d9c299d965af93d48501869d1f03e5b123f9aa4d2c483b01baac2f42835b4e",
+		"static/ergopti_plus/windows/infra/config_transition_runtime.ahk": "4891105e29131a5b45d1909f073293751e4295f9805d7b3dba638bac18d7bc00",
+		"static/ergopti_plus/windows/infra/config_write_lease.ahk": "e52ac1cd68145dbc85275c5615438090b75d0bbe89cf15bd3688873efd52499a",
+		"static/ergopti_plus/windows/infra/toml/toml_document.ahk": "011ccb5fcc13fd0a29ed3a63374f46960672db6f05ce726642e52bdbea4ed964",
+		"static/ergopti_plus/windows/modules/updater.ahk": "ad15ad8814701a032a6de9bf6e1c72efac36eb7040c3c03c399ec7acc6603957",
+		"static/ergopti_plus/windows/modules/updater/changelog.ahk": "62e59046174046da6ff12288464dc42c495edb96a7465d3da935e0b675502eef",
+		"static/ergopti_plus/windows/modules/updater/channels.ahk": "b6c9fd5bb292d346ac774517d63a4a311fed937689122115cad6ec733f07ac5a",
+		"static/ergopti_plus/windows/modules/updater/config_backup.ahk": "10e29db58b4f14c972d114ddf5b637da9b1341c0cbbd10aaee0a4c171e40327b",
+		"static/ergopti_plus/windows/modules/updater/core.ahk": "bab9935fa0dad8414e6498e7829e4e6a0d2a05dc96f9999607229acd8b18d9a6",
+		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "c4ea711e38ca3827e884dc84dc8ab579cf18086e3df59bd7ecb132c7b23110d4",
+		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "e9030aa25027ad0398ebe915d6da78b772719f726c72b650c463b318f07e8de4",
+		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "964896291f50265e5222a62591ebe7f9aafa139a15463203f8b930ba8bda15ce",
+		"static/ergopti_plus/windows/tests/run_all.ahk": "4bc0e96a090ea9ba07978d56fa3ca53516e9dc90a30cb8de488924138e73e640",
+		"static/ergopti_plus/windows/tests/test_framework.ahk": "9e77b664c76e3632c6f4b019bd420ddcac76f86ea52ab1da3cbf81a1b5f745e9",
+		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "bd8da17011d8002692a51058cdcd47edf2d058c8ced967ad52c469f0698db928",
+		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "f4e1ad3fe70f5a211022c2f62d00b7ab2efeba26d8bb0abc9ba7e03a6f98c956",
+		"static/ergopti_plus/windows/tests/unit/updater/test_global_config_admission.ahk": "7b18aa55409e939a0e5a7685f041bf2a7a72867c97cfca2018ceae1eb414a5b1",
+		"tools/test/validate-ahk-suite-manifest.cjs": "ba8a3c26d6271e819fb3669e3e7ac95d30793d88c4a20e8173c636f7805da287"
+	},
+	"original_label_oracle_sha256": "2b00c32567273c9e671b3460fe54b52059032b0188f10103076523d58b59eb01",
+	"diagnostic_only": true,
+	"private_cost_fixture_admitted": false,
+	"role": "candidate",
+	"source_pin_base": "0fc9aacf7dbba840b3cbfc00c561b833b748b454",
+	"runtime_qualification": "UNRUN",
+	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
+}

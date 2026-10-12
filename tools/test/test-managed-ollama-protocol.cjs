@@ -355,7 +355,7 @@ if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
 	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 20]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 163]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 172]);
 	cases.push(['tools/test/macos_native_http_clock_passive_receiving_controls.py', 21]);
 	const clockResult = spawnSync(
 		process.execPath,
@@ -404,12 +404,179 @@ if (process.platform !== 'win32') {
 		'SKIP actual POSIX process peers on Windows; Apple SDK receiving is separate.\n'
 	);
 }
+function receivePortableFailureOutput() {
+	const vm = require('node:vm');
+	const source = fs.readFileSync(__filename, 'utf8');
+	const start = source.indexOf('\nfor (const [script, expected] of cases) {') + 1;
+	const end = source.indexOf('// These injected ports', start);
+	assert.ok(start > 0 && end > start, 'The actual portable receiving loop must exist.');
+	const loop = source.slice(start, end);
+	const repository = path.resolve(__dirname, '../..');
+	let controls = 0;
+	function receive(result, sinkRefuses = false) {
+		const writes = [];
+		let failure = null;
+		try {
+			vm.runInNewContext(
+				loop,
+				{
+					cases: [['passive-output-control', 1]],
+					assert,
+					path,
+					__dirname,
+					pythonExecutable: () => process.execPath,
+					spawnSync: (executable, argv, options) => {
+						assert.equal(executable, process.execPath);
+						assert.deepEqual(Array.from(argv), ['passive-output-control']);
+						assert.deepEqual({ ...options }, { cwd: repository, encoding: 'utf8', timeout: 60000 });
+						return result;
+					},
+					process: {
+						stdout: { write: (value) => writes.push(['stdout', value]) },
+						stderr: {
+							write: (value) => {
+								if (sinkRefuses) throw new Error('Optional diagnostic sink refused.');
+								writes.push(['stderr', value]);
+							}
+						}
+					}
+				},
+				{ timeout: 1000 }
+			);
+		} catch (error) {
+			failure = error;
+		}
+		return { writes, failure };
+	}
+	function child(code, kind) {
+		// This private child supplies a genuine result to the unchanged 60s receiver.
+		// Its short timeout belongs only to this diagnostic control.
+		const executable =
+			kind === 'missing'
+				? path.join(os.tmpdir(), `ergopti-missing-${process.pid}-${Date.now()}`)
+				: process.execPath;
+		if (kind === 'missing') assert.equal(fs.existsSync(executable), false);
+		const result = spawnSync(executable, ['-e', code], {
+			encoding: 'utf8',
+			timeout: kind === 'timeout' ? 3000 : 60000
+		});
+		if (result.pid && process.platform !== 'win32') {
+			assert.throws(
+				() => process.kill(result.pid, 0),
+				{ code: 'ESRCH' },
+				'The real control child must already be reaped.'
+			);
+		}
+		const actual = receive(result);
+		if (kind === 'success') {
+			assert.equal(result.error, undefined);
+			assert.equal(result.signal, null);
+			assert.equal(result.status, 0);
+			assert.equal(actual.failure, null);
+			assert.deepEqual(actual.writes, [
+				['stdout', result.stdout],
+				['stdout', result.stderr]
+			]);
+		} else {
+			assert.equal(actual.failure?.code, 'ERR_ASSERTION');
+			assert.equal(
+				actual.writes.length,
+				1,
+				'A failed child must emit its captured output before refusal.'
+			);
+			assert.equal(actual.writes[0][0], 'stderr');
+			assert.match(actual.writes[0][1], /^PORTABLE_RECEIVER_FAILURE /);
+			const fact = JSON.parse(actual.writes[0][1].slice('PORTABLE_RECEIVER_FAILURE '.length));
+			assert.deepEqual(fact, {
+				script: 'passive-output-control',
+				status: result.status,
+				signal: result.signal,
+				error_code: result.error?.code || null,
+				stdout_tail: result.stdout?.slice(-8192) || '',
+				stderr_tail: result.stderr?.slice(-8192) || '',
+				native_qualified: false
+			});
+			const refusedSink = receive(result, true);
+			assert.equal(refusedSink.failure?.code, actual.failure.code);
+			assert.equal(refusedSink.failure?.message, actual.failure.message);
+			assert.equal(refusedSink.failure?.actual, actual.failure.actual);
+			assert.equal(refusedSink.failure?.expected, actual.failure.expected);
+			assert.equal(refusedSink.failure?.operator, actual.failure.operator);
+			if (kind === 'missing') assert.equal(result.error?.code, 'ENOENT');
+			if (kind === 'timeout') {
+				assert.equal(result.error?.code, 'ETIMEDOUT');
+				assert.match(fact.stdout_tail, /TIMEOUT_STDOUT/);
+				assert.match(fact.stderr_tail, /TIMEOUT_STDERR/);
+			}
+			if (kind === 'signal') assert.equal(result.signal, 'SIGTERM');
+			if (kind === 'nonzero') assert.equal(result.status, 7);
+			if (kind === 'bounded') {
+				assert.equal(fact.stdout_tail.length, 8192);
+				assert.equal(fact.stderr_tail.length, 8192);
+				assert.ok(
+					fact.stdout_tail.endsWith('LAST_STDOUT') && !fact.stdout_tail.includes('FIRST_STDOUT')
+				);
+				assert.ok(
+					fact.stderr_tail.endsWith('LAST_STDERR') && !fact.stderr_tail.includes('FIRST_STDERR')
+				);
+			}
+		}
+		controls += 1;
+	}
+	child(
+		"process.stdout.write('SUCCESS_STDOUT'); process.stderr.write('Ran 1 test in 0.001s\\nOK\\n');",
+		'success'
+	);
+	child(
+		"process.stdout.write('FAILED_STDOUT', () => process.stderr.write('FAILED_STDERR', () => process.exit(7)));",
+		'nonzero'
+	);
+	if (process.platform !== 'win32')
+		child(
+			"process.stdout.write('SIGNAL_STDOUT', () => process.stderr.write('SIGNAL_STDERR', () => process.kill(process.pid, 'SIGTERM')));",
+			'signal'
+		);
+	else
+		process.stdout.write(
+			'SKIP actual POSIX signal child on Windows; nonzero and timeout receiving remain mandatory.\n'
+		);
+	child('', 'missing');
+	child(
+		"process.stdout.write('FIRST_STDOUT' + 'O'.repeat(12000) + 'LAST_STDOUT', () => process.stderr.write('FIRST_STDERR' + 'E'.repeat(12000) + 'LAST_STDERR', () => process.exit(8)));",
+		'bounded'
+	);
+	child(
+		"process.stdout.write('TIMEOUT_STDOUT'); process.stderr.write('TIMEOUT_STDERR'); setInterval(() => {}, 1000);",
+		'timeout'
+	);
+	process.stdout.write(`PORTABLE_FAILURE_OUTPUT controls=${controls} native=false\n`);
+}
+receivePortableFailureOutput();
 for (const [script, expected] of cases) {
 	const result = spawnSync(pythonExecutable(), [script], {
 		cwd: path.resolve(__dirname, '../..'),
 		encoding: 'utf8',
 		timeout: 60000
 	});
+	// Preserve child output before the original spawn assertions reject it.
+	// Optional diagnostics cannot replace the original failure or extend its budget.
+	if (result.error || result.signal !== null || result.status !== 0) {
+		try {
+			process.stderr.write(
+				`PORTABLE_RECEIVER_FAILURE ${JSON.stringify({
+					script,
+					status: result.status,
+					signal: result.signal,
+					error_code: result.error?.code || null,
+					stdout_tail: typeof result.stdout === 'string' ? result.stdout.slice(-8192) : '',
+					stderr_tail: typeof result.stderr === 'string' ? result.stderr.slice(-8192) : '',
+					native_qualified: false
+				})}\n`
+			);
+		} catch {
+			// A failed diagnostic sink leaves every original assertion authoritative.
+		}
+	}
 	assert.equal(result.error, undefined, 'the portable receiver must start');
 	assert.equal(result.signal, null, 'the portable receiver must retire');
 	assert.equal(result.status, 0, result.stderr || result.stdout);
