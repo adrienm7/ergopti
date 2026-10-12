@@ -384,3 +384,50 @@ source-pin reconciliation; Group6 does not modify its candidate JSON. A stale
 source seal is reported as a source-only limitation and grants no original23,
 Windows or official qualification. No new native run is dispatched solely for
 diagnostic retention, and no original deadline or consent assertion changes.
+
+## Published diagnostic delivery and next native enrollment
+
+Atomic `2688661e837d069056df17c2101330c892108f4d` is integrated without squash
+through Dev `d91baccc8eaac1577827c47d0bc6b646e925efc0`; fresh received Dev
+`08c7886ba6f48d272cfd2768e5750c3282add211` retains the complete delivery.
+Feature `feat/release-network` remains because36/62 are incomplete. The final
+15-member safe receipt is Git blob `04678837324691c2e9c6b649f496cffc556977a2`,
+15307 bytes, SHA256
+`f131438ec10ea72e908f778320b2dbcfbfe30c79c5ff886ac9b0006fdab6c510`.
+No local-only correction or retained validation process remains from that lot.
+Main is unchanged; no item is removed.
+
+Read-only Brew continuation checks the actual94fe permission chronology, rather
+than treating the final27.64ms polling budget as the initial budget. Request
+starts at33.537267s; the first observer starts at33.822563s,285.296ms later.
+The73 retained UI observations have zero matching prompts;278 omitted phases
+prevent claiming absence over the complete request. Three existing portable
+deadline/foreground/readiness controls pass with no errors or skips. The API
+return, worker join and fresh no-prompt permission requery remain unreceived.
+No functional cause is established and no native acceptance is repeated.
+
+Root receives the existing original23 Windows launcher at
+`tools/ci/run-windows-updater-original-diagnostic-cohort.cjs`, Git blob
+`82b6946fd66e94ecd0e8893c1fe4df73eab2b4a1`, SHA256
+`e7572508bc7bacc8d0db3afe2c8693aa2b6cc4458c9ae2af5ca39e95fa979541`.
+The immutable label oracle stays18/4/1;21 current source pins match. Official
+invocation requires real x64 Windows, actual run/attempt/SHA, workflow_dispatch
+and ERGOPTI_DEV_RELEASE_RELEASE=false. It remains supplemental diagnostics
+with300000ms shared selection/execution and30000ms disposal acknowledgment,
+strict clean source and original child/oracle/terminal predicates. No authentic
+original23 native receipt exists; source22 is not native acceptance.
+
+No workflow currently invokes that launcher. Root must compose enrollment on a
+fresh clean Windows checkout or before tracked PAC-Publish, after acquiring the
+pinned AHK runtime. The existing CLI is used directly; no new workflow selector,
+alternative test tree, cost fixture or dirty-source exception is proposed. Full
+Unit/E2E/build/install remain required. Prior cybersecurity stops and all live
+gates are preserved. Queued enrollment is not qualification.
+
+The Swift PAC wire owner lacks the already prepared same-call admin-trust query.
+Activation of the45-second factory remains held: historical94fe numerical clock
+observations do not provide missing original staged16 payloads or compiler,
+interpreter and kernel execution identity for changed Dev. Passive evidence
+completion is prepared outside the checkout for ownership review. It grants no
+clock, factory, TLS, model or corporate-network acceptance; no trust or deadline
+is changed. Root retains workflow, runner, inventory and source-guard ownership.
