@@ -179,6 +179,36 @@ emission; physical hooks, modifier delivery, UIA/rendering and full native suite
 are not qualified by these portable/source results. No native qualification flag
 is raised. Full composed JS/macOS gates remain pending at this checkpoint.
 
+#### Terminal Mac suite and pending native modifier correction
+
+The full portable Mac run on published `0cd3c15aa` completed 18,945 passes and
+six failures in 1,576 modules, exit 1. It is not a green suite. Three failures
+are repaired separately: distinct discovery acknowledgement names remove a
+nested-local scanner false positive, and the metrics scope census now preserves
+99 original scenarios plus the eight explicitly listed scalar regressions.
+The unchanged guard passes 7/0, discovery/authentication modules 117/0 and 20/0,
+and scope receiving 2/0 with 214 complete callbacks. Original discovery behavior
+also passed before the naming change; no native nil-global defect is claimed.
+The three unreachable-server offer failures remain open while their stale HTTP
+fixture is corrected; no complete Mac rerun is claimed after these changes.
+
+Item 49 has an implemented pure-C correction retained in the
+[pending modifier patch](handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch).
+The old planner emits redundant natural modifier edges even when another source
+still holds that bit. Eight LR families, both VK/SCAN axes, physical/owned-replay
+separation and an unrelated held modifier cover 64 cohorts and 320 target edges;
+192 checks retain disabled-cohort refusal. Eight matrices pass normally and with
+complete sanitizers; the original and three independent mutations fail. All 124
+original assertions remain, with 33 added. This correction is not yet applied
+to the live native sources: its three recipe inputs require an actual MSVC DLL
+rebuild and matching manifest first. The preceding E4133 artifact remains valid
+only for the preceding live source. Production cohort migration and emission
+remain unfinished. Native or physical acceptance is not inferred from C tests.
+
+The [Windows continuation prompt](handovers/2026-10-12-dev-consolidation/windows-receiving-prompt.md)
+includes the release/one-click receiving route and native prerequisites. Root
+continues to own publication and CI; no release or direct main push is made.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
@@ -5891,10 +5921,23 @@ source fingerprint; independent updater labels remain unchanged. Selected
 local verification passes formatting and all 1,908 AHK BOM/LF checks; native
 Windows gates remain unavailable locally. The composed JS run gives 422/426:
 one managed-Git-ancestor Linux uninstall fixture refusal (unchanged outside-Git
-replay PASS), plus the unchanged upstream macOS pinned-read ratchet, bare Lua
-gsub return and layout-default consumer failures. Their original assertions and
+replay PASS), plus the unchanged upstream macOS pinned-read, gsub-return and
+layout-default source-check failures. These failed checks do not by themselves
+prove application defects. Their original assertions and
 source bytes are preserved; no whole-suite green result or final-tree native
 acceptance is claimed.
+
+Integrated manual run
+[38285216938](https://github.com/adrienm7/ergopti/actions/runs/38285216938)
+receives the exact Dev 6d1efd3d tree: Windows E2E passes all 70 cases; Core
+passes 423/426 with the same three macOS/source-contract failures. Windows
+units never start because the hook-free native build rejects a potentially
+uninitialized `key` in `nav_event_owner.c` (`C4701`/`C2220`). The native owner
+subsequently publishes its correction in 680bb62e; receive that source and rerun
+the unchanged unit, startup, packaging and installation gates on the final
+source. Those gates and physical acceptance remain unexecuted;
+the completed run has 3 successful, 4 failed and 5 skipped jobs, with Release
+skipped. Its integration lease is released; the unfinished feature branch stays.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the

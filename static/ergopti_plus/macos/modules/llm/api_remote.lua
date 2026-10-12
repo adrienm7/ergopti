@@ -2986,7 +2986,7 @@ function M.detect_local_servers(on_done)
 				if not ok or started ~= true then native_failure()
 				elseif delivered then deliver(buffered) end
 			end
-			local ok, registered = xpcall(function()
+			local ok, observation_accepted = xpcall(function()
 				if client.isSettled() == true then dispatch(); return true end
 				client.cancel()
 				if client.isSettled() == true then dispatch(); return true end
@@ -3005,7 +3005,7 @@ function M.detect_local_servers(on_done)
 				if registered == true and observed then resume() end
 				return registered
 			end, debug.traceback)
-			if not ok or registered ~= true then native_failure() end
+			if not ok or observation_accepted ~= true then native_failure() end
 			return true
 		end
 		if target.token == "" then return probe("") end
