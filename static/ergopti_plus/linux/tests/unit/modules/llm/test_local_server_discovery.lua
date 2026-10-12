@@ -620,3 +620,41 @@ helpers.describe("Same-ID native cache retirement (local-cache-identity)",functi
 		end)
 	end)
 end)
+
+helpers.describe("Scripted startup discovery transport custody (startup-local-http-edge)",function()
+	helpers.it("models absent default listeners through acknowledged operations rather than disabling dispatch (startup-local-http-edge)",function()
+		isolated(function(servers,_,calls)
+			local port=package.loaded["adapters.http_client"]
+			local _,probes=require("tests.support.owned_http_fixture").local_discovery(port)
+			local logger=require("logger.shim")
+			local previous,errors=logger.error,{}
+			logger.error=function(_,message) errors[#errors+1]=message end
+			local ok,err=pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end))
+				helpers.assert_eq(servers.is_sweeping(),false)
+				helpers.assert_eq(#probes,4);helpers.assert_eq(#calls,0,"only local discovery owns the controlled edge")
+				for index,id in ipairs({"omlx","lmstudio","llamacpp","jan"}) do
+					helpers.assert_eq(probes[index].id,id)
+					helpers.assert_eq(probes[index].owner,"llm_local_server:"..id)
+					helpers.assert_eq(servers.result(id).status,"down","scripted connection refusal is not native dispatch unavailability")
+				end
+				helpers.assert_eq(#errors,0,"faithful startup transport creates no infrastructure error")
+				helpers.assert_true(servers.cancel(),"all software operation receipts acknowledge their exact retirement")
+			end)
+			logger.error=previous
+			if not ok then error(err,0) end
+		end)
+	end)
+	helpers.it("forwards every unrelated owner with its original arguments and operation identity (startup-local-http-edge)",function()
+		isolated(function(_,_,calls)
+			local port=package.loaded["adapters.http_client"]
+			require("tests.support.owned_http_fixture").local_discovery(port)
+			local headers,options,callback={Authorization="inert"},{owner="original-updater"},function() end
+			local operation=port.get_owned("https://example.invalid/owned",headers,options,callback)
+			helpers.assert_eq(#calls,1);helpers.assert_eq(operation,calls[1].operation)
+			helpers.assert_eq(calls[1].headers,headers);helpers.assert_eq(calls[1].options,options)
+			helpers.assert_eq(calls[1].callback,callback);helpers.assert_eq(calls[1].url,"https://example.invalid/owned")
+			calls[1].finish({ok=false,status=0,body=""})
+		end)
+	end)
+end)
