@@ -24,6 +24,7 @@ local i18n      = require("infra.i18n")
 local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 
 local LOG = "menu_llm.models"
 
@@ -824,6 +825,49 @@ function M.new(deps)
 			and ollama_ok == true and ollama_settled == true,
 			mlx_had == true or ollama_had == true
 	end
+	--- Observes the original operations beneath both private backend capabilities.
+	--- @param capability table Opaque public owner token.
+	--- @param callback function Called once after both captured snapshots retire.
+	--- @return table|nil lease Passive cancellable listener.
+	--- @return boolean committed
+	function obj.when_requirements_settled(capability, callback)
+		local owned = requirement_capabilities[capability]
+		if type(owned) ~= "table" or type(callback) ~= "function" then return nil, false end
+		local leases = {}
+		local completed = {}
+		local active = true
+		local installing = true
+		local lease = {}
+		function lease.cancel()
+			active = false
+			for _, child in ipairs(leases) do child.cancel() end
+			return true
+		end
+		local function deliver()
+			if active ~= true or installing == true
+				or completed.mlx ~= true or completed.ollama ~= true then return end
+			active = false
+			Logger.callback(LOG, "Requirement snapshot settlement", callback)
+		end
+		for _, backend in ipairs({ "mlx", "ollama" }) do
+			local ok, child, committed = xpcall(function()
+				return RequirementRegistry.when_owner_settled(owned[backend], function()
+					completed[backend] = true
+					deliver()
+				end)
+			end, debug.traceback)
+			if ok ~= true or type(child) ~= "table" or committed ~= true then
+				lease.cancel()
+				Logger.error(LOG, "%s requirement settlement observation was refused.", backend)
+				return nil, false
+			end
+			leases[#leases + 1] = child
+		end
+		installing = false
+		deliver()
+		return lease, true
+	end
+
 	--- Downloads a model as the local Ollama server names it (the AI agent's
 	--- and the screen reading's local models) through the Ollama download
 	--- window, whatever backend the AI menu uses for predictions.
