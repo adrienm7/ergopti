@@ -7210,6 +7210,15 @@ portable Python suite at60000ms; the existing bounded failure-output correction
 already preserves its streams without changing that clock or its assertions.
 Root still owns clean original23 enrollment; item62 remains open.
 
+2026-10-12 the regular delivery slice receives current Dev0fc9aacf, preserving
+the incoming complete captured-source comparison. Its config_migrate.ahk change
+correctly refuses the old updater source seal. The owning generator refreshes
+only that input hash and the explicit reviewed base; all21 inputs,23 labels,
+18/4/1 cohorts and the independent oracle remain unchanged. This is source-only
+metadata repair, not native updater acceptance. Final composed gates and the
+regular Dev delivery checkpoint are recorded in the official runner handover;
+the native and physical limits above remain open.
+
 2026-10-12 exact94fe8e1451d6 macOS-only manual38256370073 ends with9 successful,
 5 failed and5 skipped jobs; Release is skipped. Core414 and stub Unit18616/0
 pass. Both PAC architectures retain12/14 passes and two failures, with409
