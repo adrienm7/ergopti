@@ -3021,6 +3021,19 @@ The wizard WAL control now observes the current terminal-bundle token that owns 
 
 Actual Linux wizard acceptance now covers real GTK/WebKit, Xvfb and DBus, using the production Manager, HostBridge and writer under isolated XDG directories and the saved GTK namespace selector. Three fresh processes passed cancellation (8/8 native assertions), seven-page Finish with every answer set to No (42/42), and persisted-folder/English-locale startup plus explicit rerun (47/47); the controller separately passed 34/34 independent file checks. The moved-folder config retains schema 12, the four declared default-off masters, and explicit typed false for default-on key combinations. Fresh-process DOM controls show the four masters off; rerun cancellation preserves exact config/bootstrap bytes. All three native sessions and owned Xvfb cleanup were acknowledged, with no cleanup errors; the 654 pinned runtime sources matched at final reconciliation. Evidence: V4 actual receipt `4a799953eaecb670a166f6aea94d03a23b6da8eff926bb00a9863e66bde4998e`. Both earlier V3 FAIL receipts remain preserved (missing namespace selector, then private policy-key interpretation). This historical V4 scenario did not qualify Browse, recommendations or all locales. Subsequent genuine V7 receiving on the published title sources passes five fresh processes: cancel 8/8, all-No Finish 42/42, reopen 47/47, 21-locale DOM/title rendering 1,435/1,435, and recommended import 35/35, plus 114 independent file assertions. Genuine chooser V5 passes cancel/accept/cancel/retry with 55 native assertions and 94 controller checks, including exactly 21 product-file/empty-target checks. Manager retirement, owned-session disposal and source/index/HEAD reconciliation pass. GSettings memory and disabled Mesa disk caching isolate native preference writes; physical input, Wayland, installed-daemon restart and Windows/macOS device acceptance remain unexecuted. The preserved failed chooser attempt and original assertions are retained in [the October 11 Group 1 handover](handovers/2026-10-11-config-menus/README.md). Item 7 and transversal items 16/38 remain open.
 
+The macOS wizard preserves its original same-source singleton acknowledgment
+when native deletion refuses, without reviving page or focus authority. Its
+retained cleanup owner refuses a different configuration path before focus or
+retargeting; exact Finish/Cancel cleanup remains retryable. Factory errors stay
+diagnostic data and never become owned native WebViews. Fresh configured Lua
+5.4 receiving passes all 14 focus cases and all nine unchanged window-outcome
+cases. The exact committed predecessor gives focus 8/6 and outcomes 9/0; the
+previous overbroad guard gives 10/4 and 8/1, reproducing the original same-source
+assertion. Exact repair returns 14/0 and 9/0 with restored Source/runtime inputs.
+Raw portable receiving `2bf335167ef5c491` preserves all original assertions.
+Full selected validation is required before commit. Native AppKit, packaging,
+installation and device acceptance remain pending; items 7, 16 and 38 stay open.
+
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
   registry values through one owner. Remaining: turning the switch off or «
