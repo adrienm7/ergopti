@@ -115,6 +115,7 @@ local function with_remap(files, run)
 		"infra.toml.codec",
 		"platform.remap.config",
 		"platform.remap.generator",
+		"modules.keymap.layout_registry",
 		"platform.remap.managed_rule_removal",
 		"toml_codec",
 	}, function()
@@ -135,6 +136,8 @@ local function with_remap(files, run)
 		package.loaded["infra.toml.codec"] = toml_stub
 		local fs = memory_file_system(files)
 		package.loaded["adapters.file_system"] = fs
+
+		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 
 		local Config    = helpers.load_with_stubs("platform.remap.config")
 		local Generator = helpers.load_with_stubs("platform.remap.generator")
