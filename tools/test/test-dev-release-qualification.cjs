@@ -473,7 +473,14 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const pipeline = require('./ci-pipeline.cjs');
 	const workflows = {
 		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'publication-plan', 'release'],
-		'ci-common.yml': ['prepare-common', 'shared-validation', 'common-unit-verdict', 'common-e2e'],
+		'ci-common.yml': [
+			'prepare-common',
+			'shared-validation',
+			'common-unit-verdict',
+			'common-e2e',
+			'common-build',
+			'common-testbuild'
+		],
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 		'ci-macos.yml': ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
 		'ci-linux.yml': ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
@@ -560,8 +567,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert.equal(jobs - 1, 25);
-	assert.equal(jobs, 26);
+	assert.equal(jobs - 1, 27);
+	assert.equal(jobs, 28);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');

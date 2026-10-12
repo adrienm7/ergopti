@@ -22,6 +22,8 @@ const JOBS = [
 	['.github/workflows/ci-common.yml', 'shared-validation', null],
 	['.github/workflows/ci-common.yml', 'common-unit-verdict', null],
 	['.github/workflows/ci-common.yml', 'common-e2e', null],
+	['.github/workflows/ci-common.yml', 'common-build', null],
+	['.github/workflows/ci-common.yml', 'common-testbuild', null],
 	['.github/workflows/ci.yml', 'macos', "needs.validate.outputs.lane_macos == 'true'"],
 	['.github/workflows/ci.yml', 'windows', "needs.validate.outputs.lane_windows == 'true'"],
 	['.github/workflows/ci.yml', 'linux', "needs.validate.outputs.lane_linux == 'true'"],

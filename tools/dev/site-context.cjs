@@ -7,6 +7,16 @@ function requireContext(condition, message) {
 	if (!condition) throw new Error('Site build context refused: ' + message);
 }
 
+/** Validate the two actual site deployment targets without confusing them with a Git ref. */
+function resolveSiteTarget(branch, base) {
+	requireContext(branch === 'main' || branch === 'dev', 'the target must be main or dev.');
+	requireContext(
+		base === (branch === 'main' ? '' : '/dev'),
+		'the target and BASE_PATH must agree explicitly.'
+	);
+	return { branch, base_path: base };
+}
+
 /**
  * Keep the deployment target separate from the source commit, including matrix builds.
  * @param {Record<string, string|undefined>} env Explicit process environment.
@@ -26,13 +36,8 @@ function resolveSiteContext(env, git) {
 		);
 		return { branch };
 	}
-	const branch = env.ERGOPTI_SITE_TARGET;
-	requireContext(branch === 'main' || branch === 'dev', 'the target must be main or dev.');
-	const base = branch === 'main' ? '' : '/dev';
-	requireContext(
-		Object.hasOwn(env, 'BASE_PATH') && env.BASE_PATH === base,
-		'the target and BASE_PATH must agree explicitly.'
-	);
+	requireContext(Object.hasOwn(env, 'BASE_PATH'), 'BASE_PATH must be explicit.');
+	const { branch, base_path: base } = resolveSiteTarget(env.ERGOPTI_SITE_TARGET, env.BASE_PATH);
 	const source = env.ERGOPTI_SITE_SOURCE_SHA;
 	requireContext(
 		typeof source === 'string' && /^[a-f0-9]{40}$/.test(source),
@@ -45,4 +50,4 @@ function resolveSiteContext(env, git) {
 	return { branch, base_path: base, source_sha: actual };
 }
 
-module.exports = { resolveSiteContext };
+module.exports = { resolveSiteContext, resolveSiteTarget };
