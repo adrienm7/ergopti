@@ -6021,7 +6021,13 @@ console-capture cohort 5/5. The strict desktop receiver correctly refuses its
 216-byte compiler-warning prefix: `_TOML_DocumentToken` named a local variable
 `Run`, shadowing the native global function. Its seven local uses now name
 `QuoteRun`; token semantics, independent corpus, warning policy and receiver
-assertions remain unchanged. Corrected native receiving, remaining desktop
+assertions remain unchanged. The owning source-seal generator refreshes only
+the TOML fingerprint and source commit from correction `512a5ef8`; all 21 source
+paths, protected fields and independent 18/4/1 expectations remain unchanged.
+All 22 portable source-admission controls pass after generation. The selected
+pre-seal local run retains 422/426 and its four explicit failures; separate
+source-seal and environment replays do not make that run wholly green.
+Corrected native receiving, remaining desktop
 cohorts, full units and packaging/install remain unexecuted. Core passes
 424/426 with the retained Lua gsub and macOS layout-default source failures;
 the complete workflow fails with 3 successful, 4 failed and 5 skipped jobs,
