@@ -114,22 +114,23 @@ end
 local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
-	-- Only the generic OpenAI-compatible entry has no URL of its own.
-	if provider.base_url == "" then
-		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), "")
+	-- OpenAI selects the wire schema, not a fixed host. Keep its declared
+	-- default visible while allowing the same custom endpoint as the generic form.
+	if provider.base_url == "" or provider.id == "openai" then
+		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), provider.base_url)
 		if not base_url or base_url == "" then return end
 		if not remote.normalize_base_url(base_url) then
 			dialogs.error(tr("menu.llm.api_prompt_url") .. " " .. base_url, heading)
 			return
 		end
 	end
-	local prompt = type(remote.token_allowed) == "function" and remote.token_allowed(provider.id, "") == true
+	local prompt = type(remote.token_allowed) == "function" and remote.token_allowed(provider.id, "", base_url) == true
 		and fill(tr("dialog.local_servers.key_prompt"), { provider.label }) or tr("menu.llm.api_prompt_token")
 	local token = dialogs.prompt(heading, prompt, "", true)
 	if not token then return end
 	-- The actual provider owns optional authentication; never trim secret bytes.
 	if token == "" and (type(remote.token_allowed) ~= "function"
-		or remote.token_allowed(provider.id, token) ~= true) then return end
+		or remote.token_allowed(provider.id, token, base_url) ~= true) then return end
 	local model = dialogs.prompt(heading, tr("menu.llm.api_prompt_model"), provider.default_model)
 	if not model then return end
 	model = model:match("^%s*(.-)%s*$")

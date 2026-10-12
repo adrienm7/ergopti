@@ -54,8 +54,8 @@ local function with_persistence_fixture(options, body)
 		set_active_entry_id = function(value) active_id = value end,
 		get_active_entry_id = function() return active_id end,
 		prewarm_active_entry_decrypt = function() end,
-		-- No fixture provider is a local server: every entry needs its key
-		is_local_server = function() return false end,
+		-- Only a scenario that names its canonical local owner grants keyless auth.
+		is_local_server = function(provider) return provider == options.local_provider end,
 	}
 
 	package.loaded["modules.llm.profiles"] = { BUILTIN_PROFILES = {} }
@@ -165,6 +165,78 @@ local function with_persistence_fixture(options, body)
 end
 
 helpers.describe("LLM API persistence transaction", function()
+	for _, provider in ipairs({ "openai", "openai_compat", "omlx" }) do
+		for _, endpoint in ipairs({ "http://127.0.0.1:8000/v1", "http://localhost:8517/v1" }) do
+			helpers.it("persists and reloads keyless " .. provider .. " at " .. endpoint
+				.. " without credential work (api-local-keyless-persistence)", function()
+				local foreign = { nested = { private = "untouched" } }
+				local entry = {
+					id = "local-entry", provider = provider, token = "", model = "local-model",
+					base_url = endpoint, label = "personal label", private_annotation = { retained = true },
+				}
+				local result
+				local store = { foreign_setting = foreign }
+				with_persistence_fixture({ entries = { entry }, active_id = entry.id,
+					initial_store = store, local_provider = provider == "omlx" and provider or nil }, function(llm, fixture)
+					llm.persist_api_entries(function(ok, reason, durable)
+						result = { ok = ok, reason = reason, durable = durable }
+					end)
+					helpers.assert_eq(result.ok, true, "explicit keyless loopback must enter the real durable owner")
+					helpers.assert_eq(result.durable, true)
+					helpers.assert_eq(#fixture.encrypt_jobs, 0, "an absent key must never create a Keychain account")
+					helpers.assert_eq(#fixture.delete_jobs, 0, "keyless publication cannot delete foreign credentials")
+					helpers.assert_eq(store[API_STATE_KEY].active_id, entry.id)
+					helpers.assert_eq(store[API_STATE_KEY].entries[1].token, "")
+					helpers.assert_eq(store[API_STATE_KEY].entries[1].base_url, endpoint)
+					helpers.assert_eq(store[API_STATE_KEY].entries[1].provider, provider)
+					helpers.assert_eq(store[API_STATE_KEY].entries[1].label, entry.label)
+					helpers.assert_true(store[API_STATE_KEY].entries[1].private_annotation.retained)
+					helpers.assert_eq(store.foreign_setting, foreign)
+				end)
+				with_persistence_fixture({ initial_store = store,
+					local_provider = provider == "omlx" and provider or nil }, function(llm, fixture)
+					helpers.assert_eq(llm.load_api_entries(), true, "the exact durable keyless record must survive restart")
+					helpers.assert_eq(fixture.get_active_id(), entry.id)
+					helpers.assert_eq(fixture.get_entries()[1].token, "")
+					helpers.assert_eq(fixture.get_entries()[1].base_url, endpoint)
+					helpers.assert_eq(fixture.get_entries()[1].provider, provider)
+					helpers.assert_eq(#fixture.encrypt_jobs, 0)
+					helpers.assert_eq(#fixture.delete_jobs, 0)
+					helpers.assert_eq(store.foreign_setting, foreign)
+				end)
+			end)
+		end
+	end
+	for _, endpoint in ipairs({ "https://api.openai.com/v1", "http://example.invalid:8000/v1",
+		"http://127.0.0.1:8000/v1?token=private", "http://personal@localhost:8000/v1", "" }) do
+		for _, provider in ipairs({ "openai", "openai_compat" }) do
+			helpers.it("refuses keyless " .. provider .. " outside the explicit local grant " .. endpoint
+				.. " (api-local-keyless-persistence)", function()
+				local entry = { id = "entry-a", provider = provider, token = "", model = "model-a", base_url = endpoint }
+				local result
+				with_persistence_fixture({ entries = { entry }, active_id = entry.id }, function(llm, fixture)
+					llm.persist_api_entries(function(ok, reason, durable)
+						result = { ok = ok, reason = reason, durable = durable }
+					end)
+					helpers.assert_eq(result.ok, false)
+					helpers.assert_eq(result.reason, "invalid_api_state")
+					helpers.assert_eq(result.durable, false)
+					helpers.assert_eq(fixture.store[API_STATE_KEY], nil)
+					helpers.assert_eq(#fixture.encrypt_jobs, 0)
+					helpers.assert_eq(#fixture.delete_jobs, 0)
+				end)
+				with_persistence_fixture({ initial_store = { [API_STATE_KEY] = {
+					version = 1, entries = { entry }, active_id = entry.id, pending_keychain_deletes = {},
+				} } }, function(llm, fixture)
+					helpers.assert_eq(llm.load_api_entries(), false)
+					helpers.assert_eq(#fixture.get_entries(), 0)
+					helpers.assert_eq(#fixture.encrypt_jobs, 0)
+					helpers.assert_eq(#fixture.delete_jobs, 0)
+				end)
+			end)
+		end
+	end
+
 	for _, provider_id in ipairs({ "openai", "openai_compat" }) do
 		helpers.it("commits accepted menu fields through the actual credential transaction " .. provider_id .. " (api-add-quarantined-persistence)", function()
 			local foreign = { private_setting = "untouched", nested = { retained = true } }

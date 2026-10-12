@@ -88,3 +88,20 @@ _LSMR_PausedActionsAndSearching() {
 	AssertEqual("menu.llm.local_servers.none|LM Studio, llama.cpp", Rows[3]["label"])
 }
 Test("local server menu: pause suppresses actions and retains honest search status", _LSMR_PausedActionsAndSearching)
+
+_LSMR_GenericCheckedIdentity() {
+	Options := _LSMR_Options()
+	Options["active"] := Map("id", "generic-selected", "provider", "openai_compat", "model", "first")
+	Options["entry_id"] := (Id) => Id == "lmstudio" ? "generic-selected" : ""
+	Rows := LocalServerMenuRows(Options)
+	AssertTrue(Rows[3]["checked"], "the exact source-owned generic entry checks its catalogue row")
+	AssertTrue(Rows[3]["items"][2]["checked"])
+	Options["entry_id"] := (Id) => Id == "lmstudio" ? "explicit-precedence" : ""
+	Rows := LocalServerMenuRows(Options)
+	AssertFalse(Rows[3]["checked"], "an explicit selected target cannot borrow a generic active ID")
+	AssertFalse(Rows[3]["items"][2]["checked"])
+	Options["active"] := Map("id", "foreign-active", "provider", "lmstudio", "model", "first")
+	Rows := LocalServerMenuRows(Options)
+	AssertFalse(Rows[3]["checked"], "provider and model equality cannot substitute for the exact target ID")
+}
+Test("local-server-affinity: checked rows use source-owned entry IDs", _LSMR_GenericCheckedIdentity)

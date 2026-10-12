@@ -85,16 +85,16 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		if !(Server is Map)
 			return false
 		if Entry is Map {
-			if !(Entry.Get("Id", 0) is String) || !(Entry.Get("Provider", "") == Id)
+			if !(Entry.Get("Id", 0) is String) || !LocalServerAuthEntryMatches(Entry.Get("Provider", ""), Entry.Get("BaseUrl", ""), Id, this.Servers)
 					|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
 					|| !(Entry.Get("Model", 0) is String)
 				throw TypeError("Local server entry must come from the validated native API owner.")
-			return Map("id", Id, "entry_id", Entry["Id"],
+			return Map("id", Id, "entry_id", Entry["Id"], "provider", Entry["Provider"],
 				"base_url", Entry["BaseUrl"] == "" ? Server["base_url"] : Entry["BaseUrl"],
 				"token", Entry["Token"])
 		}
 		Fields := this.Pending.Get(Id, Map())
-		return Map("id", Id, "entry_id", "", "base_url", Fields.Get("base_url", Server["base_url"]),
+		return Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields.Get("base_url", Server["base_url"]),
 			"token", Fields.Get("token", ""))
 	}
 
@@ -585,15 +585,15 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		for Id in this.Order {
 			Entry := Entries.Get(Id, -1), Server := this.Servers[Id]
 			if Entry is Map {
-				if !(Entry.Get("Id", 0) is String) || !(Entry.Get("Provider", "") == Id)
+				if !(Entry.Get("Id", 0) is String) || !LocalServerAuthEntryMatches(Entry.Get("Provider", ""), Entry.Get("BaseUrl", ""), Id, this.Servers)
 						|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
 						|| !(Entry.Get("Model", 0) is String)
 					throw TypeError("The native display entry is outside its provider.")
-				Targets[Id] := Map("id", Id, "entry_id", Entry["Id"],
+				Targets[Id] := Map("id", Id, "entry_id", Entry["Id"], "provider", Entry["Provider"],
 					"base_url", Entry["BaseUrl"] == "" ? Server["base_url"] : Entry["BaseUrl"], "token", Entry["Token"])
 			} else if (Entry is Integer) && Entry == 0 {
 				Fields := this.Pending.Get(Id, Map())
-				Targets[Id] := Map("id", Id, "entry_id", "", "base_url", Fields.Get("base_url", Server["base_url"]),
+				Targets[Id] := Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields.Get("base_url", Server["base_url"]),
 					"token", Fields.Get("token", ""))
 			} else throw TypeError("The native display entry lacks a typed absence verdict.")
 		}
@@ -878,7 +878,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	_SameTarget(Before, After) {
 		if !(Before is Map) || !(After is Map)
 			return false
-		for Key in ["id", "entry_id", "base_url", "token"]
+		for Key in ["id", "entry_id", "provider", "base_url", "token"]
 			if !(Before[Key] == After[Key])
 				return false
 		return true

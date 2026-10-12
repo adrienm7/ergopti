@@ -874,3 +874,30 @@ helpers.describe("Local discovery: live response identity (local-openai-backends
 		end
 	end)
 end)
+
+helpers.describe("Configured generic local model mutation (local-configured-affinity)", function()
+	for _, provider in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("retains " .. provider .. " identity, foreign metadata and position through model ACK (local-configured-affinity)", function()
+			with_panel(function(Panel, api, _, world, ctx)
+				local before = { id = "before", provider = "openai", token = "fixture", model = "cloud-before" }
+				local configured = { id = "generic", provider = provider, token = "fixture", model = "before",
+					base_url = "http://127.0.0.1:8000/v1", label = "Personal label", foreign = { retained = true } }
+				local after = { id = "after", provider = "openai", token = "fixture", model = "cloud-after" }
+				api.set_entries({ before, configured, after }); api.set_active_entry_id(configured.id)
+				ctx.state.llm_backend = "api"
+				local selected
+				helpers.assert_true(Panel.select_model(ctx, "omlx", "mlx-community/Qwen3-8B-4bit", function(value) selected = value end))
+				local saved = api.get_entries()
+				helpers.assert_eq(#saved, 3)
+				helpers.assert_eq(saved[1], before); helpers.assert_eq(saved[3], after)
+				helpers.assert_eq(saved[2].provider, provider); helpers.assert_eq(saved[2].id, configured.id)
+				helpers.assert_eq(saved[2].label, configured.label); helpers.assert_eq(saved[2].foreign, configured.foreign)
+				helpers.assert_eq(saved[2].base_url, configured.base_url)
+				helpers.assert_eq(saved[2].token, configured.token)
+				helpers.assert_eq(saved[2].model, "mlx-community/Qwen3-8B-4bit")
+				helpers.assert_eq(world.persists, 1); helpers.assert_eq(selected, true)
+				helpers.assert_eq(configured.model, "before", "the old row is not mutated before its publisher ACK")
+			end)
+		end)
+	end
+end)

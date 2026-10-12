@@ -28,6 +28,7 @@ local ManifestMenu   = require("infra.manifest_menu")
 local ProviderUses   = require("modules.llm.provider_uses")
 local EntryNames     = require("llm.api_entry_names")
 local EntryIdentity  = require("llm.api_entry_identity")
+local LocalAuth      = require("llm.local_server_auth")
 
 local LOG = "api_panel"
 
@@ -499,7 +500,14 @@ function M.build(ctx)
 						string.format("API %s — Token", p.label),
 						"",
 						i18n.get("menu.llm.api_prompt_token"))
-					if not token_ok or token == "" then return false end
+					if not token_ok then return false end
+					if not LocalAuth.entry_token_allowed(pid, token, base_url,
+						require("modules.llm.local_servers").SERVERS) then
+						Logger.error(LOG, "API entry creation requires a key for this configured endpoint.")
+						pcall_log("notify(api authentication refusal)", notifications.notify,
+							i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
+						return false
+					end
 					local model_ok, model = prompt_field(
 						string.format("API %s — Model", p.label),
 						p.default_model,
@@ -954,7 +962,7 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	local existing = api_remote.local_server_entry(server_id)
 	fields = { base_url = fields.base_url, token = fields.token, model = fields.model }
 	-- The default address is stored as "", so a catalogue change reaches the entry
-	if fields.base_url == provider.base_url then fields.base_url = "" end
+	if (not existing or existing.provider == server_id) and fields.base_url == provider.base_url then fields.base_url = "" end
 	if not existing and fields.model == nil then
 		LocalServers.set_pending(server_id, fields)
 		done(true)
@@ -962,23 +970,29 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	end
 
 	local pending = LocalServers.pending(server_id)
-	local entry = {
-		id       = existing and existing.id or ("local-" .. server_id),
-		provider = server_id,
-		base_url = existing and existing.base_url or pending.base_url or "",
-		token    = existing and existing.token or pending.token or "",
-		model    = existing and existing.model or "",
-	}
+	local entry = {}
+	-- Existing entries retain their producer's metadata and original row position.
+	for key, value in pairs(existing or {}) do entry[key] = value end
+	entry.id = existing and existing.id or ("local-" .. server_id)
+	entry.provider = existing and existing.provider or server_id
+	entry.base_url = existing and existing.base_url or pending.base_url or ""
+	entry.token = existing and existing.token or pending.token or ""
+	entry.model = existing and existing.model or ""
 	for _, key in ipairs({ "base_url", "token", "model" }) do
 		if fields[key] ~= nil then entry[key] = fields[key] end
+	end
+	if not LocalAuth.entry_matches(entry.provider, entry.base_url, server_id, LocalServers.SERVERS) then
+		Logger.warn(LOG, "Local server entry update refused: configured endpoint affinity changed.")
+		done(false)
+		return false
 	end
 	local previous_entries = {}
 	local staged = {}
 	for _, e in ipairs(api_remote.get_entries() or {}) do
 		previous_entries[#previous_entries + 1] = e
-		if e ~= existing then staged[#staged + 1] = e end
+		staged[#staged + 1] = e == existing and entry or e
 	end
-	staged[#staged + 1] = entry
+	if not existing then staged[#staged + 1] = entry end
 
 	local state = ctx.state
 	local previous_active_id = api_remote.get_active_entry_id()

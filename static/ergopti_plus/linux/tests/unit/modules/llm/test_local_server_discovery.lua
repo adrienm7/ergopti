@@ -231,3 +231,29 @@ helpers.describe("local discovery constructor and terminal source fences", funct
 		end)
 	end)
 end)
+
+helpers.describe("Configured generic loopback discovery (local-configured-affinity)", function()
+	for _, provider in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("probes and persists the originating " .. provider .. " row (local-configured-affinity)", function()
+			isolated(function(servers, entries, calls, path)
+				local entry = assert(entries.add({ provider = provider, label = "Personal label", model = "before",
+					token = "inert-token", base_url = "http://127.0.0.1:8000/v1/" }))
+				helpers.assert_eq(servers.target("omlx").entry_id, entry.id)
+				helpers.assert_true(servers.rescan(function() return true end))
+				helpers.assert_eq(calls[1].url, "http://127.0.0.1:8000/v1/models")
+				helpers.assert_eq(calls[1].headers.Authorization, "Bearer inert-token")
+				helpers.assert_nil(calls[2].headers.Authorization, "a configured credential never crosses catalogue origins")
+				calls[1].finish({ ok = true, status = 200, body = '{"object":"list","data":[{"id":"mlx-community/Qwen3-8B-4bit","object":"model","owned_by":"omlx"}]}' })
+				for index = 2, 4 do calls[index].finish({ ok = false, status = 0, body = "" }) end
+				local receipt = servers.capture("omlx")
+				local saved = assert(servers.apply(receipt, { model = "mlx-community/Qwen3-8B-4bit" }, function() return true end))
+				helpers.assert_true(saved.saved); helpers.assert_eq(saved.entry.id, entry.id)
+				helpers.assert_eq(saved.entry.provider, provider); helpers.assert_eq(saved.entry.label, "Personal label")
+				helpers.assert_eq(#entries.list(), 1)
+				local file = assert(io.open(path, "rb")); local raw = assert(Json.decode(file:read("*a"))); file:close()
+				helpers.assert_eq(raw.entries[1].provider, provider); helpers.assert_eq(raw.entries[1].id, entry.id)
+				helpers.assert_eq(raw.entries[1].model, "mlx-community/Qwen3-8B-4bit")
+			end)
+		end)
+	end
+end)

@@ -305,14 +305,31 @@ _LLM_Menu_BuildApiProviderChoices(providers, order := 0) {
 }
 
 
-_LLM_Menu_PromptApiEntry(EditId) {
+_LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _LLM_Menu_PromptApiEntry(EditId)
+		try return _LLM_Menu_PromptApiEntry(EditId, Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_API_SERVERS
+	; Every modal can pump a later menu/source publication. Keep the originating
+	; private files and RAM through the existing retained two-target transaction.
+	if !((Port is Integer) && Port == 0) && !(Port is Map)
+		throw TypeError("API entry prompts require an optional native port Map.")
+	Options := Port is Map ? Port : Map()
+	InputFn := Options.Get("input", Ui_InputBox)
+	if !HasMethod(InputFn, "Call")
+		throw TypeError("The API entry input port is not callable.")
+	SourceOptions := Options.Get("source_options", Map())
+	if !(SourceOptions is Map)
+		throw TypeError("API entry source options must be a native Map.")
+	Owner := LLM_Menu_ApiPrivateSourceOwner(SourceOptions)
+	NotifyFn := Options.Get("notify", SourceOptions.Get("notify", 0))
+	Receipt := Owner.Capture()
+	if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration is unavailable")
 	existing := ""
 	if (EditId != "") {
 		for e in _LLM_Menu["api_entries"] {
@@ -326,47 +343,60 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; Step 1 — provider id.
 	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER)
 	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
-	ib := Ui_InputBox(
+	ib := InputFn.Call(
 		Format(t("menu.llm.api_prompt_provider"), provider_choices),
 		t("menu.llm.api_window_title"), "w520 h150", def_provider)
 	if (ib.Result != "OK")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration changed during a prompt")
 	if LLM_API_PROVIDERS.Count == 0 {
 		try LoggerError("LLM.menu",
 			"Cannot add an API entry: the provider catalogue is empty (api_providers.json failed to load).")
 		try Ui_MsgBox(t("menu.llm.api_providers_unavailable"), t("menu.llm.api_window_title"), "Iconx")
-		return
+		return false
 	}
 	if !_LLM_Menu_TryProviderPrompt(ib.Result, ib.Value,
-			LLM_API_PROVIDERS, &provider_id)
-		return
+			LLM_API_PROVIDERS, &provider_id, NotifyFn)
+		return false
 	provider := LLM_API_PROVIDERS[provider_id]
 
 	; Step 2 — base URL (prefilled with the provider default).
 	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
-	ib := Ui_InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
+	ib := InputFn.Call(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
 		"w520 h130", def_url)
 	if (ib.Result != "OK")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration changed during a prompt")
 	new_url := Trim(ib.Value)
 
 	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
 	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
-	KeyPrompt := LocalServerAuthTokenAllowed(provider_id, "", LLM_LOCAL_API_SERVERS)
+	KeyPrompt := LocalServerAuthEntryTokenAllowed(provider_id, "", new_url, LLM_LOCAL_API_SERVERS)
 		? Format(t("dialog.local_servers.key_prompt"), provider["Label"]) : t("menu.llm.api_prompt_token")
-	ib := Ui_InputBox(KeyPrompt, t("menu.llm.api_window_title"),
+	ib := InputFn.Call(KeyPrompt, t("menu.llm.api_window_title"),
 		"w520 h130 Password", def_token)
 	if (ib.Result != "OK")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration changed during a prompt")
 	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
 
 	; Step 4 — model.
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
-	ib := Ui_InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_window_title"),
+	ib := InputFn.Call(t("menu.llm.api_prompt_model"), t("menu.llm.api_window_title"),
 		"w420 h130", def_model)
-	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model)
-		return
+	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model, NotifyFn)
+		return false
+
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration changed during a prompt")
 
 	; Persist. Name holds the automatic name only because builds before
 	; 2026-10 refuse an entry without one; no build reads it any more.
@@ -382,8 +412,13 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		(existing != "") ? "the LLM API-entry edit"
 			: "the LLM API-entry creation",
 		(Candidate) => _LLM_Menu_UpsertApiEntryCandidate(Candidate,
-			new_entry, EditId), _LLM_Menu_ApplyApiEntriesCommitted)
-	if !Committed
+			new_entry, EditId),
+		SourceOptions.Get("apply", _LLM_Menu_ApplyApiEntriesCommitted), Owner.Port,
+		NotifyFn, SourceOptions.Get("acquire", 0), SourceOptions.Get("settle", 0),
+		SourceOptions.Get("collect", 0), SourceOptions.Get("build_config", 0),
+		SourceOptions.Get("serialize", 0), SourceOptions.Get("pause", 0),
+		Receipt, Owner, (*) => true)
+	if !((Committed is Integer) && Committed == 1)
 		return false
 	new_name := _LLM_Menu_ApiEntryDisplayName(new_entry)
 
@@ -393,8 +428,15 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; named: a decisions entry does not become the active one.
 	if (EditId == "") {
 		try {
-			if _LLM_Menu_AskTestNewApiEntry()
-				_LLM_Menu_TestActiveApiEntry(0, new_entry["Id"])
+			AskFn := Options.Get("ask_test", 0)
+			TestFn := Options.Get("test_entry", 0)
+			Ask := HasMethod(AskFn, "Call") ? AskFn.Call() : _LLM_Menu_AskTestNewApiEntry()
+			if (Ask is Integer) && Ask == 1 {
+				if HasMethod(TestFn, "Call")
+					TestFn.Call(0, new_entry["Id"])
+				else
+					_LLM_Menu_TestActiveApiEntry(0, new_entry["Id"])
+			}
 		} catch as AskErr {
 			try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
 				AskErr.Message)
@@ -419,7 +461,8 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		"backend", "api",
 		"endpoint", new_entry["BaseUrl"],
 		"identity", new_entry["Id"]))
-	try LLM_RemoteIsReady_Async(new_entry,
+	ReadyFn := Options.Get("ready", LLM_RemoteIsReady_Async)
+	try ReadyFn.Call(new_entry,
 		_LLM_Menu_MakeApiValidationHandler(new_name, new_entry["Id"],
 			ValidationOwner), ValidationOwner)
 	catch as Err {
@@ -1580,6 +1623,12 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		NewEntry["BaseUrl"] := Fields["base_url"]
 		NewEntry["Token"] := Fields["token"]
 		NewEntry["Model"] := Fields["model"]
+		; A generic row keeps its saved provider. Reject address/key edits that
+		; would leave its catalogue affinity or actual provider policy before WAL.
+		if !(NewEntry["Provider"] == ProviderId)
+				&& (!LocalServerAuthEntryMatches(NewEntry["Provider"], NewEntry["BaseUrl"], ProviderId, Held["servers"])
+					|| !LocalServerAuthEntryTokenAllowed(NewEntry["Provider"], NewEntry["Token"], NewEntry["BaseUrl"], Held["servers"]))
+			return false
 		this.Writing := true
 		try {
 			Committed := LLM_Menu_CommitApiEntriesMutation("the local AI server selection",
@@ -1993,16 +2042,23 @@ class LLM_Menu_ApiPrivateSourceOwner {
 	}
 
 	_EntryFrom(Held, ProviderId) {
-		First := false
-		for Entry in Held["entries"] {
-			if Entry["Provider"] != ProviderId
-				continue
-			if Entry["Id"] == Held["active_id"]
-				return Entry
-			if !(First is Map)
-				First := Entry
+		; Explicit catalogue identities remain authoritative over generic aliases,
+		; including when a generic entry happens to be the active API selection.
+		for ExactProvider in [true, false] {
+			First := false
+			for Entry in Held["entries"] {
+				if (Entry["Provider"] == ProviderId) != ExactProvider
+						|| !LocalServerAuthEntryMatches(Entry["Provider"], Entry["BaseUrl"], ProviderId, Held["servers"])
+					continue
+				if Entry["Id"] == Held["active_id"]
+					return Entry
+				if !(First is Map)
+					First := Entry
+			}
+			if First is Map
+				return First
 		}
-		return First
+		return false
 	}
 
 	_Mutate(Candidate, NewEntry, EditId, SelectModel) {

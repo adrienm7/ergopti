@@ -84,6 +84,31 @@ check(run_until(function() return completed end), "native local chat completes")
 check(text == "native reply" and reason == nil and not Http.isActive() and not Remote.is_active(), "actual chat receipt releases both owners")
 check(requests[2].method == "POST" and requests[2].route == "/v1/chat/completions" and requests[2].authorization == nil
 	and Json.decode(requests[2].body).model == "fixture-model", "keyless chat retains selected model and omits blank Bearer")
+-- Generic API identities at a nondefault loopback port retain their configured
+-- URL and may prove keyless availability without inheriting a catalogue identity.
+for _, provider in ipairs({ "openai", "openai_compat" }) do
+	entry.provider, entry.model = provider, "mlx-community/Qwen3-8B-4bit"
+	response = { status = 200, body = '{"object":"list","data":[{"id":"mlx-community/Qwen3-8B-4bit","object":"model","owned_by":"omlx"},{"id":"gemma-3-4b-it-4bit","object":"model","owned_by":"omlx"}]}' }
+	local observed = models()
+	check(observed.ids and observed.ids[1] == "mlx-community/Qwen3-8B-4bit" and observed.ids[2] == "gemma-3-4b-it-4bit",
+		provider .. " actual nondefault loopback models preserve opaque oMLX IDs")
+	check(requests[#requests].route == "/v1/models" and requests[#requests].authorization == nil,
+		provider .. " actual keyless request omits Authorization")
+	local generic_done, generic_text, generic_reason = false, nil, nil
+	check(Remote.chat(entry, nil, { { role = "user", content = "inert generic fixture" } }, {}, nil,
+		function(value, failure) generic_text, generic_reason, generic_done = value, failure, true end) == true,
+		provider .. " selected model dispatches actual configured chat")
+	check(run_until(function() return generic_done end) and generic_text == "native reply" and generic_reason == nil,
+		provider .. " native selected-model chat completes")
+	check(Json.decode(requests[#requests].body).model == entry.model and requests[#requests].authorization == nil,
+		provider .. " actual chat retains the selected model and omitted key")
+	response = { status = 401, body = '{"error":{"message":"API key required","type":"authentication_error"}}' }
+	local protected = models()
+	check(protected.ids == nil and protected.reason == "http_failure",
+		provider .. " protected loopback is not promoted by optional credential admission")
+end
+entry.provider, entry.model = "lmstudio", "fixture-model"
+response = { status = 200, body = '{"data":[{"id":"fixture-model"}]}' }
 entry.token = "inert-provided-token"
 local supplied = models()
 check(supplied.ids ~= nil and requests[#requests].authorization == "Bearer inert-provided-token", "provided local credentials reach the actual header unchanged")

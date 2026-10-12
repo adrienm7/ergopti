@@ -25,10 +25,19 @@ local controller = Discovery.new({ order = order, clock = Clock.now_ms,
 function M.target(id)
 	local server = servers[id]
 	if not server then return nil end
-	for _, entry in ipairs(Entries.list()) do
-		if entry.provider == id then
-			return { id = id, entry_id = entry.id, base_url = entry.base_url ~= "" and entry.base_url or server.base_url,
-				token = entry.token }
+	local active = Entries.active()
+	for _, exact in ipairs({ true, false }) do
+		local function matches(entry)
+			return entry ~= nil and (entry.provider == id) == exact
+				and Auth.entry_matches(entry.provider, entry.base_url, id, servers)
+		end
+		local entry = matches(active) and active or nil
+		if not entry then
+			for _, candidate in ipairs(Entries.list()) do if matches(candidate) then entry = candidate; break end end
+		end
+		if entry then
+			return { id = id, entry_id = entry.id, provider = entry.provider,
+				base_url = entry.base_url ~= "" and entry.base_url or server.base_url, token = entry.token }
 		end
 	end
 	local fields = pending[id] or {}
@@ -36,7 +45,7 @@ function M.target(id)
 end
 
 local function same_target(a, b)
-	return a and b and a.id == b.id and a.entry_id == b.entry_id and a.base_url == b.base_url and a.token == b.token
+	return a and b and a.id == b.id and a.entry_id == b.entry_id and a.provider == b.provider and a.base_url == b.base_url and a.token == b.token
 end
 
 local function admitted(admit)

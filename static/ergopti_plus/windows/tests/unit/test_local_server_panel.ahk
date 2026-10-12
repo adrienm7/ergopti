@@ -1201,3 +1201,35 @@ _LSPN_CancellationDebtChildFactory(Fixture, Index, OnDone) {
 		Child.TerminateAllowed := false
 	return Child
 }
+
+_LSPN_GenericAffinityCheckedView() {
+	global _LLM_Menu, Features
+	for Explicit in [false, true] {
+		Fixture := _LSPN_Fixture()
+		try {
+			_LSP_AffinitySource(Fixture.World, Explicit)
+			_LLM_Menu["backend"] := "api"
+			Features["llm"]["models"]["selected"] := "api"
+			Fixture.World.ConfigImage := StrReplace(Fixture.World.ConfigImage, 'selected = "ollama"', 'selected = "api"')
+			AssertTrue(FSWriteDurable(Fixture.World.ConfigPath, Fixture.World.ConfigImage))
+			_LSPB_Stamp(Fixture.World)
+			Fixture.Prepare()
+			Rows := _LSPV_PreparedRows(Fixture)
+			Found := 0
+			for Row in Rows {
+				if Row.Get("label", "") != "" && InStr(Row["label"], "oMLX 🖥️", true) {
+					Found := Row
+					break
+				}
+			}
+			AssertTrue(Found is Map, "the actual joined native panel must render the canonical configured oMLX target")
+			AssertEqual(!Explicit, Found["checked"], "checked state follows exact source-owned target ID and explicit precedence")
+			AssertEqual(Explicit ? "explicit-local" : "generic-active", Fixture.Panel.LastSnapshot["entry_ids"]["omlx"])
+			if !Explicit {
+				AssertEqual("openai", Fixture.Panel.LastSnapshot["active"]["provider"])
+				AssertEqual("generic-active", Fixture.Panel.LastSnapshot["active"]["id"])
+			}
+		} finally Fixture.Dispose()
+	}
+}
+Test("local-server-affinity: actual joined panel checks the original generic entry identity", _LSPN_GenericAffinityCheckedView)

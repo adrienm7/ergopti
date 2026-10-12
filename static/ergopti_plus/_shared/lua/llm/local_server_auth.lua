@@ -55,6 +55,63 @@ function M.token_allowed(provider_id, token, servers)
 	return type(server) == "table" and server.auth == "optional"
 end
 
+--- Captures only a canonical loopback origin and exact base path.
+--- The common OpenAI response shape does not identify a server implementation.
+--- @param raw any
+--- @return string|nil
+local function loopback_endpoint(raw)
+	if type(raw) ~= "string" or raw:find("[%c%s]") or raw:find("\\", 1, true) then return nil end
+	local scheme, authority, path = raw:match("^([%a][%w+%.%-]*)://([^/?#]+)(.*)$")
+	if not scheme or authority:find("@", 1, true) or path:find("[?#]") then return nil end
+	scheme = scheme:lower()
+	if scheme ~= "http" and scheme ~= "https" then return nil end
+	local host, port
+	if authority:sub(1, 1) == "[" then
+		host, port = authority:match("^(%[::1%]):(%d+)$")
+		if authority == "[::1]" then host = authority end
+	else
+		host, port = authority:match("^([^:]+):(%d+)$")
+		if not host and not authority:find(":", 1, true) then host = authority end
+	end
+	if not host then return nil end
+	host = host:lower()
+	if host ~= "localhost" and host ~= "127.0.0.1" and host ~= "[::1]" then return nil end
+	local number = port and tonumber(port) or (scheme == "https" and 443 or 80)
+	if not number or number < 1 or number > 65535 then return nil end
+	return scheme .. ":" .. tostring(number) .. (path:gsub("/+$", ""))
+end
+
+--- Checks optional credentials only in the actual configured endpoint context.
+--- A keyless loopback request proves availability through HTTP; it does not grant
+--- product identity or readiness, and a remote generic URL still requires a key.
+--- @param provider any
+--- @param token any
+--- @param base_url any
+--- @param servers table Validated local catalogue.
+--- @return boolean
+function M.entry_token_allowed(provider, token, base_url, servers)
+	if M.token_allowed(provider, token, servers) then return true end
+	return token == "" and (provider == "openai" or provider == "openai_compat")
+		and loopback_endpoint(base_url) ~= nil
+end
+
+--- Matches a configured entry without transferring its credentials to another URL.
+--- Exact catalogue providers remain authoritative; generic providers need explicit
+--- canonical loopback affinity, never a model name, user label or shared wire shape.
+--- @param provider any
+--- @param base_url any
+--- @param server_id any
+--- @param servers table Validated catalogue.
+--- @return boolean
+function M.entry_matches(provider, base_url, server_id, servers)
+	local server = type(servers) == "table" and servers[server_id] or nil
+	if type(server) ~= "table" or type(provider) ~= "string" or type(base_url) ~= "string" then return false end
+	if provider == server_id then return true end
+	if provider ~= "openai" and provider ~= "openai_compat" then return false end
+	local configured, canonical = loopback_endpoint(base_url), loopback_endpoint(server.base_url)
+	return configured ~= nil and canonical ~= nil and configured == canonical
+end
+
 --- Validates a complete local OpenAI models receipt, preserving server order.
 --- @param result any Actual native HTTP result.
 --- @return table|nil model_ids
