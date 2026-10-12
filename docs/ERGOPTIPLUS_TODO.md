@@ -56,6 +56,16 @@ foreign metadata and acknowledged persistence across all three drivers.
 Remote generic APIs still require credentials. Source changes during Windows
 modal forms refuse without overwriting the successor.
 
+The subsequent reconciliation preserves latest `dev 33c4152a` through merge
+`d734f24c70952fa89bfd848a503172103071d3c5`. Both independent receiving cohorts
+remain enrolled: actual portable HTTP facts pass 172/172 and archive acceptance
+passes 220/220. The strict clock gate passes all 32 controls; Homebrew and managed
+Ollama protocol gates pass. Incoming Linux diagnostic controls pass 10, seven
+and 13 cases. The canonical Windows diagnostic source sealer refreshes only its
+21 source pins against the immutable merge; its 22 source controls pass without
+changing the independent original oracle. None is native macOS or Windows
+qualification. Root still owns CI optimization and test migration.
+
 The macOS portable full suite passes 18,858/18,858 across 1,576 modules.
 Linux E2E passes 193/193 plus six actual native digest checks; actual curl/libuv
 streaming and local API receiving pass 262 and 72 checks. Linux full units

@@ -155,6 +155,17 @@ The historical source ancestors and every original group commit are preserved.
 The final SHA is the documentation commit published on dev; resolve it through
 Git rather than relying on a container-local ref. Main remains unchanged.
 
+Latest upstream `dev 33c4152a99836445387c8a0eac1166cf8918abed` is preserved by
+merge `d734f24c70952fa89bfd848a503172103071d3c5`. The original and incoming test
+cohorts remain complete: actual portable HTTP receiving facts pass 172/172,
+archive acceptance 220/220 and the clock source controls 32/32. Homebrew and
+managed Ollama protocol gates pass. Incoming Linux diagnostic boundary/flush/
+window controls pass 10/10, 7/7 and 13/13. The Windows diagnostic source generator
+updates only its 21 source hashes from that immutable merge; its 22/22 source
+controls pass with the original independent cohort oracle unchanged. These are
+portable controls, not native macOS/Windows receiving. No timeout or assertion
+was relaxed while combining the cohorts.
+
 | Gate                                     | Actual result                                                                                                         | Evidence boundary                                                                                                                                                         |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pinned macOS full Lua unit/meta runner   | 18,858 passed, 0 failed; 1,576 modules; exit 0                                                                        | Production Lua and explicit native doubles on Linux, including mandatory copied-application E2E corpus; no Darwin receiving                                               |
