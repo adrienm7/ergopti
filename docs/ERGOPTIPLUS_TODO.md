@@ -11305,6 +11305,17 @@ execution has a separate genuine PowerShell receipt; controlled macOS
 metadata tests do not qualify native macOS execution. Hosted and installed
 PowerShell acceptance and the other automation work keep item106 partial.
 
+The existing Apple Shortcuts invocation adapter now delivers its original
+transport, admission or start refusal to the current consumer while retaining
+unacknowledged native cancellation debt. Synchronous completion waits for a
+literal start acknowledgement; callbacks invalidated during cancellation cannot
+publish stale results. The original 56 controlled cases remain byte-exact, with
+21 additive cases. Actual component receiving passes 77/0 on both Lua ABIs;
+the predecessor with those additions passes 64 and fails 13, and five causal
+omissions fail independently. Discovery, native availability and the 20-second
+fence remain unchanged. Full selected and native/installed qualification remain
+required; these component receipts do not complete item 106.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
