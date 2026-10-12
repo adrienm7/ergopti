@@ -53,6 +53,7 @@ local LOG = "llm.local_servers"
 M.STATUS_UP        = Discovery.STATUS_UP          -- the models endpoint listed the models
 M.STATUS_NEEDS_KEY = Discovery.STATUS_NEEDS_KEY   -- the server answered 401 or 403
 M.STATUS_DOWN      = Discovery.STATUS_DOWN        -- nothing, or something else, answered
+M.STATUS_UNAVAILABLE = Discovery.STATUS_UNAVAILABLE -- native probe infrastructure refused acquisition
 
 -- Why a request to a local server failed
 M.FAILURE_NOT_RUNNING   = "not_running"
@@ -193,6 +194,34 @@ local controller = Discovery.new({
 		end
 	end,
 })
+
+local view_order, view_servers = M.ORDER, M.SERVERS
+
+--- Captures configured view membership without changing registered providers.
+--- Native HTTP clients retain retirement ownership independently of this view.
+--- @param configured_order table
+--- @param configured_servers table Public endpoint descriptors without credentials.
+--- @return boolean changed
+function M.configure_views(configured_order, configured_servers)
+	local next_order, next_servers = {}, {}
+	for _, id in ipairs(M.ORDER) do next_order[#next_order + 1] = id; next_servers[id] = M.SERVERS[id] end
+	for _, id in ipairs(configured_order) do
+		assert(type(configured_servers[id]) == "table" and next_servers[id] == nil, "configured view membership is invalid")
+		next_order[#next_order + 1] = id
+		next_servers[id] = configured_servers[id]
+	end
+	local changed = controller.set_order(next_order)
+	view_order, view_servers = next_order, next_servers
+	return changed
+end
+
+--- Returns the current native view order, keeping the canonical catalogue intact.
+--- @return table
+function M.view_order() return view_order end
+
+--- Returns current public view descriptors, never configured credentials.
+--- @return table
+function M.view_servers() return view_servers end
 
 --- Probes every target at once and publishes the verdicts together.
 --- Native acquisition and retirement remain the injected probe's responsibility.

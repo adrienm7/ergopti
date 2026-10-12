@@ -1233,3 +1233,117 @@ _LSPN_GenericAffinityCheckedView() {
 	}
 }
 Test("local-server-affinity: actual joined panel checks the original generic entry identity", _LSPN_GenericAffinityCheckedView)
+
+class _LSCF_ConfiguredChild extends _LSPN_ReadyChild {
+	start() {
+		_LSM_ChildReceipt.Prototype.start.Call(this)
+		Fixture := this.Fixture
+		Request := Fixture.Requests[Fixture.Requests.Length]
+		Config := FSReadUtf8Exact(Request.ConfigPath)
+		Configured := InStr(Config, ":19423/custom/v1/models", true) > 0
+		this.ResponseStatus := Configured ? Fixture.ConfiguredStatus : 200
+		this.ResponseBody := Configured ? Fixture.ConfiguredBody
+			: InStr(Config, ":1234/v1/models", true) ? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 " . this.ResponseStatus . " Fixture`r`n`r`n"))
+		this.OnDone.Call(0, this.ResponseBody, "")
+		this.ResponseDelivered := true
+		return true
+	}
+}
+
+_LSCF_ConfiguredChildFactory(Fixture, OnDone) {
+	return _LSCF_ConfiguredChild(Fixture, OnDone)
+}
+
+_LSCF_InstallSource(Fixture) {
+	global _LLM_Menu, Features
+	_LSP_ConfiguredSource(Fixture.World)
+	_LLM_Menu["backend"] := "api"
+	Features["llm"]["models"]["selected"] := "api"
+	Fixture.World.ConfigImage := StrReplace(Fixture.World.ConfigImage, 'selected = "ollama"', 'selected = "api"')
+	AssertTrue(FSWriteDurable(Fixture.World.ConfigPath, Fixture.World.ConfigImage))
+	_LSPB_Stamp(Fixture.World)
+}
+
+_LSCF_JoinedConfiguredView(Status := 200) {
+	global _SharedDir, _LLM_Menu, LLM_LOCAL_API_SERVERS, LLM_API_PROVIDERS
+	Fixture := _LSPN_Fixture()
+	try {
+		Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
+		_LSCF_InstallSource(Fixture)
+		Fixture.ConfiguredStatus := Status
+		Fixture.ConfiguredBody := Corpus["omlx_models_body"]
+		Fixture.NativeSpawn := _LSCF_ConfiguredChildFactory.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		AssertEqual(5, Fixture.Native.Order.Length)
+		AssertEqual(5, Fixture.Requests.Length)
+		AssertEqual(4, LLM_LOCAL_API_SERVERS.Count, "ephemeral views cannot register local provider capabilities")
+		AssertFalse(LLM_API_PROVIDERS.Has("configured:generic-active"))
+		AssertContains(Fixture.Configs[5], "http://127.0.0.1:19423/custom/v1/models")
+		AssertFalse(InStr(Fixture.Configs[5], "Authorization:", true), "an explicit empty key must not become a blank Bearer header")
+		Verdict := Fixture.Native.Result("configured:generic-active")
+		AssertEqual(Status == 200 ? "up" : "needs_key", Verdict["status"])
+		Rows := _LSPV_PreparedRows(Fixture)
+		Found := 0
+		for Row in Rows {
+			if InStr(Row.Get("label", ""), "19423", true) {
+				Found := Row
+				break
+			}
+		}
+		AssertTrue(Found is Map, "the source-owned nondefault endpoint must have a truthful configured row")
+		AssertFalse(InStr(Found["label"], "oMLX", true), "a common models payload cannot brand a nondefault configured endpoint")
+		AssertTrue(Found["checked"])
+		if Status == 200 {
+			AssertEqual(Corpus["omlx_model_ids"][1], Found["items"][1]["label"])
+			AssertEqual(Corpus["omlx_model_ids"][2], Found["items"][2]["label"])
+			Found["items"][1]["action"].Call()
+			AssertEqual(3, _LLM_Menu["api_entries"].Length)
+			AssertEqual("generic-active", _LLM_Menu["api_entries"][2]["Id"])
+			AssertEqual("openai", _LLM_Menu["api_entries"][2]["Provider"])
+			AssertEqual("Personal active name", _LLM_Menu["api_entries"][2]["Name"])
+			AssertEqual(Corpus["omlx_model_ids"][1], _LLM_Menu["api_entries"][2]["Model"])
+		} else {
+			AssertEqual(0, Verdict["models"].Length, "401/403 response data cannot admit models")
+			AssertFalse(Found["items"][1]["label"] == Corpus["omlx_model_ids"][1])
+			AssertEqual("active-model", _LLM_Menu["api_entries"][2]["Model"])
+		}
+	} finally Fixture.Dispose()
+}
+Test("configured-local-view: actual joined owners discover, select and persist the original nondefault row", _LSCF_JoinedConfiguredView)
+Test("configured-local-view: actual nondefault authentication refusal never admits response models", _LSCF_JoinedConfiguredView.Bind(401))
+
+_LSCF_RemovedViewRetainsDebt() {
+	global _LLM_Menu
+	Fixture := _LSPN_Fixture()
+	try {
+		_LSCF_InstallSource(Fixture)
+		Fixture.Owner.Options["timeout_ms"] := 60000
+		AssertTrue(Fixture.Native.Rescan())
+		AssertEqual(5, Fixture.Requests.Length)
+		Child := Fixture.Children[5]
+		Child.TerminateAllowed := false
+		Id := "configured:generic-active"
+		Job := Fixture.Native.Jobs[Id]
+		NativeRecord := Fixture.Owner.Records[Id]
+		_LLM_Menu["api_entries"].RemoveAt(2)
+		_LLM_Menu["api_entry_id"] := "generic-first"
+		Fixture.World.ConfigImage := StrReplace(Fixture.World.ConfigImage, 'api_entry_id = "generic-active"', 'api_entry_id = "generic-first"')
+		Fixture.World.ApiImage := _LLM_Menu_SerializeApiEntries(Map("api_entries", _LLM_Menu["api_entries"]))
+		AssertTrue(FSWriteDurable(Fixture.World.ConfigPath, Fixture.World.ConfigImage))
+		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+		_LSPB_Stamp(Fixture.World)
+		Fixture.NativeSpawn := _LSPN_ReadyChildFactory.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		Fixture.Native.RetryPending()
+		AssertEqual(4, Fixture.Native.Order.Length)
+		AssertTrue(Fixture.Native.Jobs.Get(Id, 0) == Job, "removed logical membership cannot release the exact unsettled native job")
+		AssertTrue(Fixture.Owner.Records.Get(Id, 0) == NativeRecord, "the original child and artifact owner survive cancellation refusal")
+		AssertFalse(Fixture.Native.Capture(Id), "removed views cannot mint an action receipt")
+		Child.TerminateAllowed := true
+		Fixture.Native.RetryPending()
+		AssertFalse(Fixture.Native.Jobs.Has(Id))
+		AssertFalse(Fixture.Owner.Records.Has(Id))
+	} finally Fixture.Dispose()
+}
+Test("configured-local-view: removal retains exact native cancellation debt until acknowledged", _LSCF_RemovedViewRetainsDebt)

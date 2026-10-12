@@ -127,3 +127,37 @@ LocalServerAuthEntryTokenAllowed(Provider, Token, BaseUrl, Servers) {
 		&& ((Provider == "openai") || (Provider == "openai_compat"))
 		&& _LocalServerAuthLoopbackIdentity(BaseUrl) is Map
 }
+
+/** Returns credential-free configured views, preserving validated entry order. */
+LocalServerAuthConfiguredViews(Entries, Servers, Providers) {
+	Order := [], Views := Map()
+	Views.CaseSense := "On"
+	if !(Entries is Array) || !(Servers is Map) || !(Providers is Map)
+		return Map("order", Order, "views", Views)
+	for Entry in Entries {
+		if !(Entry is Map) || !(Entry.Get("Id", 0) is String) || Entry["Id"] == ""
+				|| !(Entry.Get("Provider", 0) is String) || !(Entry.Get("BaseUrl", 0) is String)
+				|| !(Entry.Get("Token", 0) is String)
+			continue
+		Provider := Entry["Provider"]
+		if !(Provider == "openai") && !(Provider == "openai_compat")
+			continue
+		Descriptor := Providers.Get(Provider, 0)
+		Label := Descriptor is Map ? Descriptor.Get("Label", Descriptor.Get("label", 0)) : 0
+		if !(Label is String) || Label == "" || !(_LocalServerAuthLoopbackIdentity(Entry["BaseUrl"]) is Map)
+			continue
+		Canonical := false
+		for Id, Server in Servers {
+			if LocalServerAuthEntryMatches(Provider, Entry["BaseUrl"], Id, Servers) {
+				Canonical := true
+				break
+			}
+		}
+		Id := "configured:" . Entry["Id"]
+		if Canonical || Views.Has(Id)
+			continue
+		Views[Id] := Map("id", Id, "entry_id", Entry["Id"], "provider", Provider, "label", Label, "base_url", Entry["BaseUrl"])
+		Order.Push(Id)
+	}
+	return Map("order", Order, "views", Views)
+}

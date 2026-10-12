@@ -447,18 +447,26 @@ end
 --- Publishes an acknowledged local model/configuration selection in its original
 --- row position. Unknown rows, root data and entry fields remain owned by their
 --- original producer. The independent backend preference is selected separately.
---- @param provider string Catalogue-owned local provider.
+--- @param provider string Catalogue provider or exact configured discovery view.
 --- @param fields table Closed model/base_url/token updates.
 --- @param source table Opaque physical source receipt.
 --- @param admit function Actual current pause/scope admission.
 --- @param select boolean|nil True for a model choice; false retains the existing active entry.
+--- @param entry_id string|nil Exact configured source row captured by discovery.
 --- @return table|nil entry
 --- @return string|nil reason
-function M.upsert_local(provider, fields, source, admit, select)
+function M.upsert_local(provider, fields, source, admit, select, entry_id)
 	local _, servers = LocalCatalogue.load({})
-	local server = servers[provider]
+	local dynamic = type(provider) == "string" and provider:sub(1, 11) == "configured:"
+	local _, configured = AuthPolicy.configured_views(M.list(), servers, {
+		openai = require("modules.llm.api_remote").provider("openai"),
+		openai_compat = require("modules.llm.api_remote").provider("openai_compat"),
+	})
+	local server = dynamic and configured[provider] or servers[provider]
+	if dynamic and (not server or server.entry_id ~= entry_id) then return nil, "configured API identity is not current" end
 	if not server or type(fields) ~= "table" or type(admit) ~= "function"
 		or (select ~= nil and type(select) ~= "boolean")
+		or (entry_id ~= nil and type(entry_id) ~= "string")
 		or not M.source_is_current(source) then return nil, "local API source is not current" end
 	for key, value in pairs(fields) do
 		if (key ~= "model" and key ~= "base_url" and key ~= "token") or type(value) ~= "string" then
@@ -472,8 +480,10 @@ function M.upsert_local(provider, fields, source, admit, select)
 	local active = M.active()
 	for _, exact in ipairs({ true, false }) do
 		for position, entry in ipairs(current.entries) do
-			if (entry.provider == provider) == exact
-				and AuthPolicy.entry_matches(entry.provider, entry.base_url, provider, servers) then
+			if (dynamic and entry.id == entry_id and entry.provider == server.provider and entry.base_url == server.base_url)
+				or (not dynamic and (entry.provider == provider) == exact
+					and AuthPolicy.entry_matches(entry.provider, entry.base_url, provider, servers)
+					and (entry_id == nil or entry.id == entry_id)) then
 				if not previous_entry or (active and active.id == entry.id) then
 					index, previous_entry = position, entry
 				end
@@ -481,6 +491,7 @@ function M.upsert_local(provider, fields, source, admit, select)
 		end
 		if previous_entry then break end
 	end
+	if entry_id ~= nil and not previous_entry then return nil, "local API entry identity is not current" end
 	local token = fields.token
 	if token == nil then token = previous_entry and previous_entry.token or "" end
 	local model = fields.model
@@ -490,8 +501,11 @@ function M.upsert_local(provider, fields, source, admit, select)
 		base_url = previous_entry and previous_entry.base_url ~= "" and previous_entry.base_url or server.base_url
 	end
 	local entry_provider = previous_entry and previous_entry.provider or provider
+	local dynamic_addresses = dynamic and AuthPolicy.configured_views({ { id = entry_id, provider = entry_provider,
+		base_url = base_url, token = token } }, {}, { [entry_provider] = require("modules.llm.api_remote").provider(entry_provider) }) or nil
 	if model == "" or not AuthPolicy.entry_token_allowed(entry_provider, token, base_url, servers)
-		or not AuthPolicy.entry_matches(entry_provider, base_url, provider, servers)
+		or (not dynamic and not AuthPolicy.entry_matches(entry_provider, base_url, provider, servers))
+		or (dynamic and #dynamic_addresses ~= 1)
 		or not require("modules.llm.api_remote").normalize_base_url(base_url) then
 		return nil, "local API model, address or authentication is not supported"
 	end

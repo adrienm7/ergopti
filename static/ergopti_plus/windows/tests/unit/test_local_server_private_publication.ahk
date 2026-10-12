@@ -1708,3 +1708,68 @@ _LSP_AffinityKeyless(World) {
 	AssertTrue(_LLMRemoteResolveEntry(Restart["entries"][2]) is Map, "the saved entry must remain usable by the real native resolver")
 }
 Test("local-server-affinity: actual generic private publication preserves keyless loopback identity", (*) => _LSP_WithWorld(_LSP_AffinityKeyless))
+
+_LSP_ConfiguredSource(World) {
+	global _LLM_Menu
+	Receipt := _LSP_AffinitySource(World)
+	_LLM_Menu["api_entries"][2]["BaseUrl"] := "http://127.0.0.1:19423/custom/v1"
+	_LLM_Menu["api_entries"][2]["Token"] := ""
+	World.ApiImage := _LLM_Menu_SerializeApiEntries(Map("api_entries", _LLM_Menu["api_entries"]))
+	AssertTrue(FSWriteDurable(World.ApiPath, World.ApiImage))
+	AssertFalse(World.Owner.Current(Receipt))
+	return World.Capture()
+}
+
+_LSP_ConfiguredPrivatePublication(World, Canonical := false) {
+	global _LLM_Menu, LLM_API_PROVIDER_ORDER
+	Receipt := _LSP_ConfiguredSource(World)
+	Base := []
+	for Id in LLM_API_PROVIDER_ORDER {
+		if Id == "omlx" || Id == "lmstudio" || Id == "llamacpp" || Id == "jan"
+			Base.Push(Id)
+	}
+	Projection := World.Owner.ViewsBound(Receipt, Base)
+	AssertEqual(5, Projection["order"].Length, "four declared providers precede one configured endpoint view")
+	AssertEqual("configured:generic-active", Projection["order"][5])
+	View := Projection["servers"]["configured:generic-active"]
+	AssertEqual("openai", View["provider"])
+	AssertEqual("generic-active", View["entry_id"])
+	AssertFalse(View.Has("token"))
+	AssertFalse(View.Has("model"))
+	AssertFalse(View.Has("Name"))
+	Entry := World.Owner.EntryBound("configured:generic-active", Receipt)
+	AssertEqual("generic-active", Entry["Id"])
+	AssertEqual("openai", Entry["Provider"])
+	Url := Canonical ? "http://localhost:8000/v1" : "http://[::1]:19424/other/v1"
+	Fields := Map("base_url", Url, "token", "", "model", "selected-generic-model")
+	Saved := World.Owner.Apply("configured:generic-active", Fields, Receipt, ObjBindMethod(World, "Admission"), true)
+	AssertTrue(Saved is Map && Saved["saved"] == true, "a safe endpoint edit must acknowledge the exact original row after durability")
+	AssertEqual("generic-active", Saved["entry_id"])
+	AssertEqual(3, _LLM_Menu["api_entries"].Length)
+	Actual := _LLM_Menu["api_entries"][2]
+	AssertEqual("openai", Actual["Provider"])
+	AssertEqual("Personal active name", Actual["Name"])
+	AssertEqual("", Actual["Token"])
+	AssertEqual(Url, Actual["BaseUrl"])
+	AssertTrue(_LLMRemoteResolveEntry(Actual) is Map)
+	New := World.Capture()
+	AssertFalse(World.Owner.Current(Receipt))
+	Projection := World.Owner.ViewsBound(New, Base)
+	AssertEqual(Canonical ? 4 : 5, Projection["order"].Length, "canonical transitions remove only the ephemeral configured view")
+	AssertEqual("generic-active", World.Owner.EntryBound("configured:generic-active", New)["Id"],
+		"post-save acknowledgement stays bound to the original entry independently of displayed membership")
+}
+Test("configured-local-view: actual private writer preserves nondefault generic endpoint and keyless identity", (*) => _LSP_WithWorld(_LSP_ConfiguredPrivatePublication))
+Test("configured-local-view: canonical endpoint transition retains the original durable acknowledgement", (*) => _LSP_WithWorld((World) => _LSP_ConfiguredPrivatePublication(World, true)))
+
+_LSP_ConfiguredSourceRefusesDrift(World) {
+	Receipt := _LSP_ConfiguredSource(World)
+	Foreign := StrReplace(World.ApiImage, "19423", "19425")
+	AssertTrue(FSWriteDurable(World.ApiPath, Foreign))
+	AssertFalse(World.Owner.ViewsBound(Receipt, ["omlx", "lmstudio", "llamacpp", "jan"]))
+	AssertFalse(World.Owner.Apply("configured:generic-active", Map("base_url", "http://localhost:19423/custom/v1", "token", "", "model", "late"),
+		Receipt, ObjBindMethod(World, "Admission"), true))
+	AssertEqual(Foreign, FSReadUtf8Exact(World.ApiPath))
+	AssertEqual(0, World.ApplyCalls)
+}
+Test("configured-local-view: stale private source cannot project or persist configured endpoints", (*) => _LSP_WithWorld(_LSP_ConfiguredSourceRefusesDrift))

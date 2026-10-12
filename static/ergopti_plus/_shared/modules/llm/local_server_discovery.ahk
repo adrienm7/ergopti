@@ -52,6 +52,10 @@ class LocalServerDiscoveryController {
 		Status := Response.Get("status", 0)
 		if Status == 401 || Status == 403
 			return Map("status", "needs_key", "models", [])
+		if Response.Has("ok") && Response["ok"] is Integer && Response["ok"] == false
+				&& Response.Has("status") && Response["status"] is Integer && Response["status"] == 0
+				&& Response.Get("probe_error", 0) is Integer && Response.Get("probe_error", 0) == true
+			return Map("status", "unavailable", "models", [])
 		Models := LocalServerAuthModelsReceipt(Response)
 		return Map("status", Models is Array ? "up" : "down",
 			"models", Models is Array ? Models : [])
@@ -128,7 +132,7 @@ class LocalServerDiscoveryController {
 		Results := this.Results
 		for Id in this.Order {
 			Verdict := Results.Get(Id, 0)
-			if Verdict is Map && !(Verdict["status"] == "down")
+			if Verdict is Map && ((Verdict["status"] == "up") || (Verdict["status"] == "needs_key"))
 				Ids.Push(Id)
 		}
 		return Ids
@@ -158,6 +162,39 @@ class LocalServerDiscoveryController {
 			if !this.HasCheckedAt
 				return true
 			return Now - this.CheckedAt >= Age
+		} finally Critical(PreviousCritical)
+	}
+
+	/** Replaces only logical membership; native retirement remains with its owner. */
+	SetOrder(Order) {
+		if !(Order is Array)
+			throw TypeError("Local discovery order must be an array.")
+		Captured := [], Seen := Map()
+		Seen.CaseSense := "On"
+		for Id in Order {
+			if !(Id is String) || Id == "" || Seen.Has(Id)
+				throw ValueError("Local discovery order requires unique nonempty identities.")
+			Seen[Id] := true
+			Captured.Push(Id)
+		}
+		PreviousCritical := Critical("On")
+		try {
+			Equal := this.Order.Length == Captured.Length
+			if Equal {
+				for Index, Id in Captured {
+					if !(this.Order[Index] == Id)
+						Equal := false
+				}
+			}
+			if Equal
+				return false
+			this.Order := Captured
+			this.Generation += 1
+			this.Active := false
+			this.CheckedAt := 0
+			this.HasCheckedAt := false
+			this.Results := Map()
+			return true
 		} finally Critical(PreviousCritical)
 	}
 

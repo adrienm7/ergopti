@@ -111,3 +111,15 @@ helpers.describe("Configured loopback optional credentials (local-configured-aff
 		end)
 	end
 end)
+
+helpers.describe("Configured generic endpoint view projection (local-configured-views)", function()
+	local _, servers = Policy.catalogue(read("modules/llm/local_servers.json"), {})
+	local providers = read("modules/llm/api_providers.json").providers
+	for _, vector in ipairs(read("tests/corpus/llm/local_server_affinity.json").configured_view_cases) do
+		helpers.it(vector.name .. " (local-configured-views)", function()
+			local order, views = Policy.configured_views(vector.entries, servers, providers)
+			helpers.assert_eq(order, vector.expected_order); helpers.assert_eq(views, vector.expected_views)
+			for _, view in pairs(views) do helpers.assert_eq(view.token, nil); helpers.assert_eq(view.model, nil) end
+		end)
+	end
+end)

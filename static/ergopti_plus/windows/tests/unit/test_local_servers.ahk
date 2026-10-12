@@ -747,3 +747,94 @@ _LSO_GenericAffinityOwnsTarget() {
 	} finally Fixture.Dispose()
 }
 Test("local-server-affinity: actual curl and discovery owners retain generic target identity", _LSO_GenericAffinityOwnsTarget)
+
+
+; Native-dispatch controls exercise production owners without qualifying Windows wire I/O.
+_LSI_RefuseFactory(Fixture, Mode) {
+	if Mode == "stale"
+		Fixture.Drift("same-key")
+	if Mode == "wrong_type"
+		return {}
+	throw Error("controlled native request construction failure")
+}
+
+_LSI_ActualConstructionFailure() {
+	for Mode in ["throw", "wrong_type", "stale"] {
+		Fixture := _LSO_Fixture()
+		try {
+			Fixture.Transport.Options["request"] := _LSI_RefuseFactory.Bind(Fixture, Mode)
+			AssertTrue(Fixture.Native.Rescan())
+			AssertEqual(0, Fixture.Requests.Length)
+			AssertEqual(0, Fixture.Transport.Records.Count)
+			if Mode == "stale" {
+				AssertEqual(0, Fixture.Published.Length, "source drift cannot become a native infrastructure verdict")
+				AssertEqual(0, Fixture.Native.Detected().Length)
+			} else {
+				AssertEqual("unavailable", Fixture.Native.Result("lmstudio")["status"])
+				AssertEqual(0, Fixture.Native.Detected().Length)
+				AssertEqual(0, Fixture.Native.Result("lmstudio")["models"].Length)
+			}
+		} finally Fixture.Dispose()
+	}
+}
+Test("local-server-unavailable: actual constructor refusal remains distinct from stale source", _LSI_ActualConstructionFailure)
+
+_LSI_ActualManagedRefusal(Stale := false) {
+	for Mode in (Stale ? ["foreign"] : ["foreign", "terminal"]) {
+		Fixture := _LSO_Fixture()
+		Fixture.ManagedStates := []
+		try {
+			Fixture.Transport.Options.Delete("request")
+			Fixture.Transport.Options["clock"] := (*) => A_TickCount
+			Fixture.Transport.DefineProp("_NativeRequest", {Call: _LSCJ_ManagedFactory.Bind(Fixture)})
+			AssertTrue(Fixture.Native.Rescan())
+			AssertEqual(1, Fixture.ManagedStates.Length)
+			State := Fixture.ManagedStates[1], Request := State["request"]
+			SetTimer(Request.ManagedAdmissionFn, 0)
+			NativeRecord := Fixture.Transport.Records["lmstudio"]
+			Job := Fixture.Native.Jobs["lmstudio"]
+			if Stale
+				Fixture.Drift("old-key")
+			if Mode == "terminal"
+				Request._OnManagedDone(1, '{"schema_version":1,"child_quiesced":true,"ok":false,"status":0}', "")
+			else {
+				State["retire"] := false
+				_ManagedCurlControlAck(State, "foreign")
+				Request._PollManagedAdmission()
+			}
+			AssertFalse(Request.ManagedPayloadPublished, "refused admission never publishes provider secrets")
+			AssertFalse(FileExist(State["directory"] . "transport.json"))
+			Fixture.Native.RetryPending()
+			if Stale {
+				AssertFalse(Request.HasOwnProp("NativeDispatchRefused"), "lost source ownership cannot manufacture a native infrastructure failure")
+				AssertEqual(0, Fixture.Published.Length)
+			} else {
+				AssertTrue(Request.NativeDispatchRefused)
+				AssertEqual("unavailable", Fixture.Native.Result("lmstudio")["status"])
+				AssertEqual(0, Fixture.Native.Detected().Length)
+			}
+			if Mode == "foreign" {
+				AssertEqual(ObjPtr(NativeRecord), ObjPtr(Fixture.Transport.Records["lmstudio"]), "logical classification retains the exact unsettled request")
+				AssertEqual(ObjPtr(Job), ObjPtr(Fixture.Native.Jobs["lmstudio"]), "logical classification retains the exact native queue debt")
+				AssertEqual(ObjPtr(State["job"]), ObjPtr(Request.Handle))
+				State["retire"] := true
+				Fixture.Native.RetryPending()
+				AssertEqual(0, Fixture.Transport.Records.Count)
+				AssertEqual(0, Fixture.Native.Jobs.Count)
+			}
+		} finally {
+			for State in Fixture.ManagedStates
+				State["retire"] := true
+			try {
+				if Fixture.Transport.HasOwnProp("_NativeRequest")
+					Fixture.Transport.DeleteProp("_NativeRequest")
+				Fixture.Dispose()
+			} finally {
+				for State in Fixture.ManagedStates
+					_ManagedCurlControlRelease(State)
+			}
+		}
+	}
+}
+Test("local-server-unavailable: actual managed admission and pretransport terminal refuse without releasing debt", _LSI_ActualManagedRefusal)
+Test("local-server-unavailable: managed source withdrawal never becomes infrastructure failure", _LSI_ActualManagedRefusal.Bind(true))

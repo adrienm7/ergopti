@@ -257,3 +257,289 @@ helpers.describe("Configured generic loopback discovery (local-configured-affini
 		end)
 	end
 end)
+
+helpers.describe("Configured explicit loopback discovery views (local-configured-view)", function()
+	for _, provider in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("discovers a nondefault " .. provider .. " address without rebranding its identity (local-configured-view)", function()
+			isolated(function(servers, entries, calls, path)
+				local entry = assert(entries.add({provider=provider,label="Personal generic",model="before",token="",
+					base_url="http://127.0.0.1:54321/v1"}))
+				local id="configured:"..entry.id
+				helpers.assert_true(servers.rescan(function() return true end))
+				helpers.assert_eq(#calls,5,"the explicit configured loopback source is appended after the four declared defaults")
+				helpers.assert_eq(table.concat(servers.order(),","),"omlx,lmstudio,llamacpp,jan,"..id)
+				helpers.assert_eq(calls[5].url,"http://127.0.0.1:54321/v1/models")
+				helpers.assert_nil(calls[5].headers.Authorization)
+				for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
+				calls[5].finish({ok=true,status=200,body='{"object":"list","data":[{"id":"mlx-community/Qwen3-8B-4bit","object":"model","owned_by":"omlx"}]}'})
+				helpers.assert_eq(servers.result(id).models[1],"mlx-community/Qwen3-8B-4bit")
+				helpers.assert_eq(servers.result("omlx").status,"down","generic models metadata does not establish a catalogue identity")
+				local saved=assert(servers.apply(servers.capture(id),{model="mlx-community/Qwen3-8B-4bit"},function() return true end))
+				helpers.assert_true(saved.saved); helpers.assert_eq(saved.entry.provider,provider)
+				helpers.assert_eq(saved.entry.id,entry.id); helpers.assert_eq(saved.entry.label,"Personal generic")
+				helpers.assert_eq(#entries.list(),1)
+				local reader=assert(io.open(path,"rb"));local raw=assert(Json.decode_lossless(reader:read("*a")));reader:close()
+				helpers.assert_eq(raw.entries[1].provider,provider);helpers.assert_eq(raw.entries[1].id,entry.id)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("Configured discovery view custody (local-configured-view)", function()
+	helpers.it("retains removed configured native owners until exact physical retirement (local-configured-view)", function()
+		isolated(function(servers,entries,calls)
+			local entry=assert(entries.add({provider="openai",label="Personal",model="before",token="secret",
+				base_url="http://localhost:54321/v1"}))
+			local id="configured:"..entry.id
+			servers.rescan(function() return true end)
+			helpers.assert_eq(#calls,5);helpers.assert_eq(calls[5].headers.Authorization,"Bearer secret")
+			local receipt=servers.capture(id)
+			helpers.assert_true(entries.remove(entry.id))
+			servers.rescan(function() return true end)
+			helpers.assert_eq(#servers.order(),4)
+			helpers.assert_eq(calls[5].cancelled,1,"removed source does not lose its original physical debt")
+			helpers.assert_eq(servers.is_current(receipt),false)
+			helpers.assert_nil(servers.apply(receipt,{model="late"},function() return true end))
+			calls[5].callback(models("obsolete"))
+			helpers.assert_nil(servers.result(id))
+			for index=1,4 do calls[index].finish(models("old")) end
+			helpers.assert_eq(#calls,9,"only the four retained catalogue owners can reacquire")
+			for index=6,9 do calls[index].finish(models("fresh")) end
+			helpers.assert_eq(servers.result("omlx").models[1],"fresh")
+			helpers.assert_eq(servers.cancel(),false,"the removed configured owner still carries close debt")
+			calls[5].finish(models("obsolete"))
+			helpers.assert_true(servers.cancel())
+		end)
+	end)
+	helpers.it("preserves foreign private fields and row positions through configured selection (local-configured-view)", function()
+		isolated(function(servers,entries,calls,path)
+			local writer=assert(io.open(path,"wb"))
+			writer:write('{"version":1,"foreign":{"enabled":false},"entries":[{"id":"foreign","provider":"future","token":"foreign-key","label":"Foreign","model":"untouched","base_url":"https://example.invalid/v1","custom":[1,2]},{"id":"personal","provider":"openai_compat","label":"My local","model":"before","token":"","base_url":"http://[::1]:54321/v1","custom":{"null":null,"flag":false}}]}');writer:close()
+			entries._set_path_for_test(path)
+			servers.rescan(function() return true end)
+			helpers.assert_eq(#calls,5)
+			for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
+			calls[5].finish(models("mlx-community/Qwen3-8B-4bit"))
+			local saved=assert(servers.apply(servers.capture("configured:personal"),{model="mlx-community/Qwen3-8B-4bit"},function() return true end))
+			helpers.assert_eq(saved.entry.id,"personal");helpers.assert_eq(saved.entry.provider,"openai_compat")
+			local reader=assert(io.open(path,"rb"));local raw=assert(Json.decode_lossless(reader:read("*a")));reader:close()
+			helpers.assert_eq(raw.foreign.enabled,false);helpers.assert_eq(raw.entries[1].id,"foreign")
+			helpers.assert_eq(raw.entries[1].custom[2],2);helpers.assert_eq(raw.entries[2].id,"personal")
+			helpers.assert_eq(raw.entries[2].custom.flag,false);helpers.assert_true(Json.is_null(raw.entries[2].custom.null))
+			entries._set_path_for_test(path)
+			helpers.assert_eq(entries.active().model,"mlx-community/Qwen3-8B-4bit")
+		end)
+	end)
+	helpers.it("authentication, malformed bodies, pause and changed configured identities refuse models (local-configured-view)", function()
+		isolated(function(servers,entries,calls)
+			local first=assert(entries.add({provider="openai",label="First",model="before",token="",base_url="http://127.0.0.1:54321/v1"}))
+			local second=assert(entries.add({provider="openai_compat",label="Second",model="before",token="key",base_url="http://localhost:54322/v1"}))
+			servers.rescan(function() return true end)
+			helpers.assert_eq(#calls,6)
+			for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
+			calls[5].finish({ok=false,status=401,body='{"error":"key required"}'})
+			calls[6].finish({ok=true,status=200,body='{"data":{}}'})
+			helpers.assert_eq(servers.result("configured:"..first.id).status,"needs_key")
+			helpers.assert_eq(servers.result("configured:"..second.id).status,"down")
+			local receipt=servers.capture("configured:"..first.id)
+			helpers.assert_nil(servers.apply(receipt,{token="new"},function() return false end))
+			helpers.assert_eq(entries.get(first.id).token,"")
+			servers.rescan(function() return true end)
+			helpers.assert_true(entries.remove(first.id))
+			for index=7,12 do calls[index].finish(models("obsolete")) end
+			helpers.assert_nil(servers.apply(receipt,{model="obsolete"},function() return true end))
+			helpers.assert_nil(entries.get(first.id))
+		end)
+	end)
+end)
+
+helpers.describe("Configured native menu publication (local-configured-view)", function()
+	for _, provider in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("selects a checked originating "..provider.." menu row and fences held callbacks (local-configured-view)",function()
+			isolated(function(servers,entries,calls)
+				local entry=assert(entries.add({provider=provider,label="Personal",model="before",token="",
+					base_url="http://127.0.0.1:54321/v1"}))
+				local backend,writes="ollama",0
+				local llm={get_backend=function() return backend end,can_configure_local_servers=function() return true end,
+					set_backend=function(value,admit) if not admit() then return false end;backend=value;writes=writes+1;return true end}
+				local Rows=require("ui.menu.local_server_rows")
+				local context={is_paused=function() return false end}
+				local function build() return Rows.rows(llm,{prompt=function() return nil end,error=function() end},function() end,context) end
+				build()
+				for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
+				calls[5].finish(models("opaque/local-model"))
+				local held=find(build(),"opaque/local-model")
+				helpers.assert_true(held and type(held.action)=="function")
+				local outcome=held.action()
+				helpers.assert_true(outcome.saved);helpers.assert_true(outcome.selected)
+				helpers.assert_eq(backend,"api");helpers.assert_eq(writes,1)
+				helpers.assert_eq(entries.active().id,entry.id);helpers.assert_eq(entries.active().provider,provider)
+				for index=6,9 do calls[index].finish({ok=false,status=0,body=""}) end
+				calls[10].finish(models("opaque/local-model"))
+				local current=find(build(),"opaque/local-model")
+				helpers.assert_true(current.checked)
+				helpers.assert_eq(held.action(),false,"old source receipt cannot repeat a committed selection")
+				servers.cancel()
+				helpers.assert_eq(current.action(),false,"explicit cancellation fences displayed configured choices")
+				helpers.assert_eq(writes,1)
+			end)
+		end)
+	end
+	helpers.it("moves an edited configured address into its canonical view while retaining the same source row (local-configured-view)",function()
+		isolated(function(servers,entries,calls)
+			local entry=assert(entries.add({provider="openai",label="Personal",model="before",token="",
+				base_url="http://127.0.0.1:54321/v1"}))
+			servers.rescan(function() return true end)
+			for _,call in ipairs(calls) do call.finish(models("model")) end
+			local id="configured:"..entry.id
+			local saved=assert(servers.apply(servers.capture(id),{base_url="http://localhost:8000/v1"},function() return true end))
+			helpers.assert_eq(saved.entry.id,entry.id);helpers.assert_eq(saved.entry.provider,"openai")
+			helpers.assert_eq(#servers.order(),4);helpers.assert_eq(servers.target("omlx").entry_id,entry.id)
+			helpers.assert_nil(servers.target(id));helpers.assert_eq(#entries.list(),1)
+		end)
+	end)
+end)
+
+helpers.describe("Native discovery infrastructure receipts (local-probe-unavailable)",function()
+	for _, failure in ipairs({"throw","unsupported","dead_start","observation_false","observation_throw"}) do
+		helpers.it("reports native "..failure.." as unavailable while retaining cleanup ownership (local-probe-unavailable)",function()
+			isolated(function(servers,_,calls)
+				local http=package.loaded["adapters.http_client"]
+				local original=http.get_owned
+				http.get_owned=function(url,headers,options,callback)
+					if failure=="throw" then error("actual native construction refused") end
+					if failure=="unsupported" then return {} end
+					local operation=original(url,headers,options,callback)
+					if failure=="dead_start" then
+						operation.started=false
+						callback({ok=false,status=0,body="",error="native admission refused"})
+					elseif failure=="observation_false" then operation.on_settled=function() return false end
+					elseif failure=="observation_throw" then operation.on_settled=function() error("native settlement registration failed") end end
+					return operation
+				end
+				helpers.assert_true(servers.rescan(function() return true end))
+				helpers.assert_eq(servers.is_sweeping(),false)
+				helpers.assert_eq(servers.result("omlx").status,"unavailable")
+				helpers.assert_eq(#servers.detected(),0)
+				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
+					can_configure_local_servers=function() return true end}, {},function() end,{is_paused=function() return false end})
+				local failed=find(rows,require("infra.i18n").get("healthcheck.status.failed"))
+				helpers.assert_true(failed and failed.disabled,"actual menu exposes infrastructure failure")
+				helpers.assert_eq(#rows,5,"one failure row replaces the no-server summary")
+				local none=require("infra.i18n").get("menu.llm.local_servers.none"):gsub("{1}","oMLX, LM Studio, llama.cpp / LocalAI, Jan")
+				helpers.assert_nil(find(rows,none),"infrastructure refusal cannot become a no-server claim")
+				helpers.assert_eq(servers.cancel(),false,"no flag acknowledges still retained native debt")
+				if failure~="throw" and failure~="unsupported" then
+					for _,call in ipairs(calls) do call.finish(models("obsolete")) end
+					helpers.assert_true(servers.cancel(),"actual settlement, including polling after observer refusal, retires exact owners")
+				end
+			end)
+		end)
+	end
+	helpers.it("keeps ordinary connection refusal, malformed JSON and HTTP authentication distinct (local-probe-unavailable)",function()
+		isolated(function(servers,_,calls)
+			servers.rescan(function() return true end)
+			calls[1].finish({ok=false,status=0,body="",error="connection refused"})
+			calls[2].finish({ok=true,status=200,body='{"error":"constructor failure","probe_error":true,"data":{}}'})
+			calls[3].finish({ok=false,status=401,body='{"error":"key required","probe_error":true}'})
+			calls[4].finish({ok=true,status=200,body='{"data":[{"id":"valid-model"}],"probe_error":true}'})
+			helpers.assert_eq(servers.result("omlx").status,"down")
+			helpers.assert_eq(servers.result("lmstudio").status,"down")
+			helpers.assert_eq(servers.result("llamacpp").status,"needs_key")
+			helpers.assert_eq(servers.result("jan").status,"up")
+			helpers.assert_eq(servers.result("jan").models[1],"valid-model","foreign body flags never become native receipts")
+		end)
+	end)
+end)
+
+helpers.describe("Native synchronous discovery ownership (local-probe-unavailable)",function()
+	helpers.it("acknowledges a zero-resource dead-start refusal without replaying its body (local-probe-unavailable)",function()
+		isolated(function(servers)
+			package.loaded["adapters.http_client"].get_owned=function(_,_,_,callback)
+				local operation={started=false}
+				function operation:is_settled() return true end
+				function operation:cancel() return true end
+				function operation:on_settled(listener) listener();return true end
+				callback(models("never-acquired"))
+				return operation
+			end
+			servers.rescan(function() return true end)
+			helpers.assert_eq(servers.result("omlx").status,"unavailable")
+			helpers.assert_eq(#servers.detected(),0)
+			helpers.assert_true(servers.cancel(),"actual settled receipt acknowledges no native resources")
+		end)
+	end)
+	helpers.it("preserves a synchronously completed valid response before retirement observation (local-probe-unavailable)",function()
+		isolated(function(servers,_,calls)
+			calls.before_return=function(call) call.finish(models("synchronous-model")) end
+			servers.rescan(function() return true end)
+			helpers.assert_eq(servers.is_sweeping(),false)
+			helpers.assert_eq(servers.result("omlx").status,"up")
+			helpers.assert_eq(servers.result("omlx").models[1],"synchronous-model")
+			helpers.assert_true(servers.cancel())
+		end)
+	end)
+	helpers.it("keeps a native dead-start after admission loss as a refused stale source (local-probe-unavailable)",function()
+		isolated(function(servers,_,calls)
+			local allowed=true
+			calls.before_return=function(call)
+				allowed=false;call.operation.started=false
+				call.callback({ok=false,status=0,body="",error="dispatch refused"})
+			end
+			servers.rescan(function() return allowed end)
+			helpers.assert_eq(servers.result("omlx").status,"down","lost scope cannot publish even a native infrastructure verdict")
+			helpers.assert_eq(#calls,1,"lost scope fences later acquisitions")
+			calls[1].finish(models("obsolete"))
+			helpers.assert_true(servers.cancel())
+		end)
+	end)
+end)
+
+helpers.describe("Native empty models presentation (local-empty-models)",function()
+	helpers.it("keeps literal empty OpenAI lists reachable with disabled native no-models rows (local-empty-models)",function()
+		isolated(function(servers,entries,calls)
+			local entry=assert(entries.add({provider="openai_compat",label="Personal",model="before",token="",
+				base_url="http://127.0.0.1:54321/v1"}))
+			local setters=0
+			local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return true end,
+				set_backend=function() setters=setters+1;return true end}
+			local Rows=require("ui.menu.local_server_rows")
+			local function build() return Rows.rows(llm,{},function() end,{is_paused=function() return false end}) end
+			build()
+			for _,call in ipairs(calls) do call.finish({ok=true,status=200,body='{"object":"list","data":[]}'}) end
+			helpers.assert_eq(#servers.detected(),5)
+			for _,id in ipairs(servers.order()) do
+				helpers.assert_eq(servers.result(id).status,"up");helpers.assert_eq(#servers.result(id).models,0)
+				helpers.assert_nil(servers.apply(servers.capture(id),{model="invented"},function() return true end))
+			end
+			local count=0
+			local label=require("infra.i18n").get("menu.llm.local_servers.no_models")
+			for _,row in ipairs(build()) do
+				for _,child in ipairs(row.items or {}) do
+					if child.label==label then
+						count=count+1;helpers.assert_true(child.disabled);helpers.assert_nil(child.action)
+					end
+				end
+			end
+			helpers.assert_eq(count,5);helpers.assert_eq(setters,0)
+			helpers.assert_eq(entries.get(entry.id).model,"before")
+		end)
+	end)
+	for _,control in ipairs({
+		{label="object instead of array",status=200,body='{"object":"list","data":{}}'},
+		{label="array root",status=200,body='[{"object":"list","data":[]}]'},
+		{label="HTTP 404",status=404,body='{"object":"list","data":[]}'},
+	}) do
+		helpers.it("keeps "..control.label.." down without reporting infrastructure failure (local-empty-models)",function()
+			isolated(function(servers,_,calls)
+				servers.rescan(function() return true end)
+				for _,call in ipairs(calls) do call.finish({ok=control.status==200,status=control.status,body=control.body}) end
+				for _,id in ipairs(servers.order()) do helpers.assert_eq(servers.result(id).status,"down") end
+				helpers.assert_eq(#servers.detected(),0)
+				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
+					can_configure_local_servers=function() return true end},{},function() end,{is_paused=function() return false end})
+				helpers.assert_nil(find(rows,require("infra.i18n").get("healthcheck.status.failed")))
+			end)
+		end)
+	end
+end)
