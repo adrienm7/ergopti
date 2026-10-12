@@ -18,75 +18,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 LUA = ROOT / "tests/hardware/run_window_switch_operation.lua"
 
 
-def _visible_search_failure(title, result):
-    """Select closed metadata from the last completed owned visible search only."""
-    titles = {"owned111_active": "active", "owned111_right": "right", "owned111_left": "left"}
-    if type(title) is not str or title not in titles:
-        return None
-    if type(result) is not subprocess.CompletedProcess:
-        return None
-    if type(result.args) is not tuple or len(result.args) != 5:
-        return None
-    if any(type(argument) is not str for argument in result.args):
-        return None
-    if result.args != ("xdotool", "search", "--onlyvisible", "--name", title):
-        return None
-    if type(result.returncode) is not int or not -64 <= result.returncode <= 255:
-        return None
-    if type(result.stdout) is not str or type(result.stderr) is not str:
-        return None
-    diagnostic_text_char_limit = 65536
-    if (
-        len(result.stdout) > diagnostic_text_char_limit
-        or len(result.stderr) > diagnostic_text_char_limit
-    ):
-        return None
-    if result.stdout.strip():
-        return None
-    return {
-        "version": 1,
-        "phase": "owned-xmessage-visible-search",
-        "title": titles[title],
-        "status": result.returncode,
-        "stdout_bytes": len(result.stdout.encode("utf-8")),
-        "stderr_bytes": len(result.stderr.encode("utf-8")),
-    }
-
-
-def _discover_owned_xmessage(title, wait, query):
-    """Retain the original deadline and ID semantics; observe only its failed search."""
-    last_result = None
-
-    def visible():
-        nonlocal last_result
-        last_result = query()
-        return last_result.stdout.strip()
-
-    try:
-        return wait(visible)
-    except AssertionError as original:
-        if (
-            type(original) is AssertionError
-            and type(original.args) is tuple
-            and len(original.args) == 1
-            and type(original.args[0]) is str
-            and original.args[0] == "owned native receipt deadline"
-        ):
-            try:
-                fact = _visible_search_failure(title, last_result)
-                if fact is not None:
-                    print(
-                        "# native_window_visible_search_failure "
-                        + json.dumps(fact, sort_keys=True),
-                        flush=True,
-                    )
-            except Exception:
-                # Optional diagnostics cannot replace the original deadline.
-                # Control-plane BaseExceptions still propagate through mandatory cleanup.
-                pass
-        raise
-
-
 def main():
     with tempfile.TemporaryDirectory(prefix="ergopti111-native-") as directory:
         root = pathlib.Path(directory)
@@ -184,12 +115,10 @@ def main():
                 )
                 children.append(child)
                 ids[name] = int(
-                    _discover_owned_xmessage(
-                        title,
-                        wait,
+                    wait(
                         lambda: command(
                             "xdotool", "search", "--onlyvisible", "--name", title, check=False
-                        ),
+                        ).stdout.strip()
                     )
                 )
 

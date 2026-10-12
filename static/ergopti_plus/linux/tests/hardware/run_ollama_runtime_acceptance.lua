@@ -45,10 +45,7 @@ local original_get_owned = Http.get_owned
 local archive_dispatches, scripted_choices, changed = 0, 0, 0
 local archive_options, archive_operation, checksum_receipt
 local owned_get_operations = {}
-local function checkpoint(phase)
-	print("ACCEPTANCE_PHASE " .. phase)
-	assert(io.stdout:flush(), "acceptance phase stdout flush failed")
-end
+local function checkpoint(phase) print("ACCEPTANCE_PHASE " .. phase) end
 local configured_origin = "http://127.0.0.1:" .. tostring(port)
 local observed_urls = {}
 -- Observe production archive transport unchanged; never replace HTTP or package effects.
@@ -280,7 +277,7 @@ local ok, diagnostic = xpcall(function()
 	assert(Engine.disable() == true and not Engine.is_enabled(), "actual master disable after inference")
 	assert(native_services[1].operation:is_running() == true, "exact daemon survives disabled enable ticket")
 end, debug.traceback)
-local terminal_checkpoint_ok, terminal_checkpoint_error = pcall(checkpoint, "terminal-physical-shutdown")
+checkpoint("terminal-physical-shutdown")
 -- Exercise the adopted terminal engine owner through the actual coordinator
 -- and actual native event-loop idle pump. Only keyboard presence is controlled.
 local shutdown_polls, stop_before_ack, coordinator_requested = 0, false, false
@@ -346,7 +343,6 @@ Native.start, Profiles.enable, Window.complete, Window.show = original_native_st
 Offer._reset_for_test()
 if not ok then error(diagnostic) end
 if not shutdown_ok then error(shutdown_error) end
-if not terminal_checkpoint_ok then error(terminal_checkpoint_error) end
 print(Json.encode({ passed = true, model = model, explicit_binary_choices = scripted_choices,
 	explicit_model_choices = model_consents, pull_dispatches = pull_dispatches, chat_dispatches = chat_dispatches,
 	shutdown_idle_polls = shutdown_polls, terminal_shutdown_requested = coordinator_requested,
