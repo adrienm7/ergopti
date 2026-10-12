@@ -1286,8 +1286,14 @@ class WireFixture:
         pac_server.receiving_kind = "pac"
         self.servers.append(pac_server)
         self.pac_url = f"http://127.0.0.1:{pac_server.server_address[1]}/wpad.dat"
+        # Idle server polling must not consume the original bounded shutdown.
+        server_poll_interval_seconds = 0.05
         for server in self.servers:
-            worker = threading.Thread(target=server.serve_forever, daemon=True)
+            worker = threading.Thread(
+                target=server.serve_forever,
+                kwargs={"poll_interval": server_poll_interval_seconds},
+                daemon=True,
+            )
             self.server_threads.append((server, worker))
             state = {"server": server, "worker": worker, "started": False, "failure": None}
             self.server_starts.append(state)
