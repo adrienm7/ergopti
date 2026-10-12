@@ -92,6 +92,8 @@ const timingDirectory = fs.mkdtempSync(
 );
 const timingPath = path.join(timingDirectory, 'timings.ndjson');
 const milliseconds = (value) => Math.round(value * 1000) / 1000;
+// Keep spawnSync's existing default bound explicit in each captured-output receipt.
+const MAX_CAPTURE_BYTES = 1024 * 1024;
 
 /** Append before proceeding so interruption retains completed work and the active check. */
 function recordTiming(record) {
@@ -141,10 +143,11 @@ for (const check of checks) {
 		r = spawnSync(check.cmd === '$NODE_EXECUTABLE' ? process.execPath : check.cmd, check.args, {
 			cwd: ROOT,
 			encoding: 'utf8',
+			maxBuffer: MAX_CAPTURE_BYTES,
 			shell: true
 		});
 	} catch (error) {
-		r = { status: null, error, stderr: error?.stack || String(error) };
+		r = { status: null, error, spawnThrew: true, stderr: error?.stack || String(error) };
 	}
 	const durationMs = milliseconds(performance.now() - checkStartedAt);
 	const ok = r.status === 0 && !r.error && !r.signal;
@@ -170,11 +173,13 @@ for (const check of checks) {
 		status: r.status,
 		signal: r.signal,
 		errorCode: r.error?.code,
+		spawnError: Boolean(r.error),
+		spawnThrew: r.spawnThrew === true,
 		stdout: r.stdout || '',
 		stderr: r.stderr || ''
 	};
 	results.push(result);
-	if (!ok) reportFailure(result);
+	if (!ok) reportFailure(result, ordinal);
 }
 
 const failed = results.filter((r) => !r.ok);
@@ -210,7 +215,7 @@ for (const f of failed) {
 process.exit(1);
 
 /** Report the bounded failure before starting another potentially slow check. */
-function reportFailure(f) {
+function reportFailure(f, ordinal) {
 	if (process.env?.GITHUB_ACTIONS === 'true') {
 		// Check names remain available through the API when archived log access
 		// fails. Never copy command output, URLs or native receipts here.
@@ -239,4 +244,50 @@ function reportFailure(f) {
 					];
 		console.log(`    ${stream}:\n    ` + excerpt.join('\n    ') + '\n');
 	}
+	retainFailure(f, ordinal);
+}
+
+/** Preserve returned text separately from the strict timing schema and bounded console preview. */
+function retainFailure(f, ordinal) {
+	const directory = path.join(timingDirectory, 'failures', f.id);
+	fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+	const streams = {};
+	for (const stream of ['stdout', 'stderr']) {
+		const file = stream + '.txt';
+		const destination = path.join(directory, file);
+		fs.writeFileSync(destination, f[stream], { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+		streams[stream] = { file, captured_utf8_bytes: fs.statSync(destination).size };
+	}
+	// Publish metadata last: a failed write must not advertise a complete retained capture.
+	const receipt = {
+		schema_version: 1,
+		ordinal,
+		check_id: f.id,
+		global_ordinal: f.ordinal,
+		name: f.name,
+		reproduce: f.repro,
+		status: 'FAIL',
+		exit_code: f.status ?? null,
+		signal: f.signal ?? null,
+		error_code: f.errorCode ?? null,
+		capture: {
+			encoding: 'utf8',
+			max_buffer_bytes: MAX_CAPTURE_BYTES,
+			spawn_error: f.spawnError,
+			spawn_threw: f.spawnThrew,
+			child_output_completeness: 'unknown',
+			...streams
+		}
+	};
+	fs.writeFileSync(path.join(directory, 'receipt.json'), JSON.stringify(receipt) + '\n', {
+		encoding: 'utf8',
+		flag: 'wx',
+		mode: 0o600
+	});
+	console.log('    Captured failure output: ' + directory);
+	console.log(
+		'    Retained returned UTF-8 text or thrown spawn diagnostics only; maxBuffer=' +
+			MAX_CAPTURE_BYTES +
+			' bytes. Uncaptured or child-truncated output is unknown.'
+	);
 }

@@ -28,6 +28,8 @@ function run(failure, options = {}) {
 	let exitCode;
 	let clock = 0;
 	let appendCalls = 0;
+	let writeCalls = 0;
+	let spawnOptions;
 	let thrown;
 	try {
 		vm.runInNewContext(
@@ -38,8 +40,9 @@ function run(failure, options = {}) {
 					if (name === './lib/js-feature-inventory.cjs') return require(name);
 					if (name === 'child_process')
 						return {
-							spawnSync() {
+							spawnSync(_command, _args, settings) {
 								const first = calls++ === 0;
+								if (first) spawnOptions = settings;
 								progressAtSpawn.push({ line: lastCompletedLine, pending: pendingLine });
 								if (calls === 2) outputBeforeSecondSpawn = output.join('\n');
 								if (options.spawnThrows && first) throw options.spawnThrows;
@@ -52,6 +55,12 @@ function run(failure, options = {}) {
 					assert.equal(name, 'node:fs');
 					return {
 						...fs,
+						writeFileSync(...args) {
+							if (++writeCalls === options.failWrite) {
+								throw Object.assign(new Error('synthetic capture disk failure'), { code: 'EIO' });
+							}
+							return fs.writeFileSync(...args);
+						},
 						appendFileSync(...args) {
 							if (++appendCalls === options.failAppend) {
 								throw Object.assign(new Error('synthetic timing disk failure'), { code: 'EIO' });
@@ -99,7 +108,25 @@ function run(failure, options = {}) {
 		const records = reports.length
 			? fs.readFileSync(reports[0], 'utf8').trim().split('\n').map(JSON.parse)
 			: [];
+		const failureRoot = reports.length ? path.join(path.dirname(reports[0]), 'failures') : '';
+		const captures =
+			failureRoot && fs.existsSync(failureRoot)
+				? fs.readdirSync(failureRoot).map((id) => {
+						const directory = path.join(failureRoot, id);
+						return {
+							id,
+							directory,
+							files: Object.fromEntries(
+								fs
+									.readdirSync(directory)
+									.map((name) => [name, fs.readFileSync(path.join(directory, name), 'utf8')])
+							)
+						};
+					})
+				: [];
 		return {
+			captures,
+			spawnOptions,
 			output: output.join('\n'),
 			records,
 			calls,
@@ -124,13 +151,23 @@ function failureOutput(failure) {
 }
 
 const stack = Array.from({ length: 40 }, (_, i) => `    at syntheticFrame${i}`);
-const long = failureOutput({
+const middleCause = 'Error: hidden middle cause é🙂';
+const longFailure = {
 	status: 1,
 	stdout: stack.join('\n'),
-	stderr: ['Error: synthetic native failure ETIMEDOUT', ...stack, 'synthetic-terminal-detail'].join(
-		'\r\n'
-	)
-});
+	stderr: [
+		'Error: synthetic native failure ETIMEDOUT',
+		...stack.slice(0, 20),
+		middleCause,
+		...stack.slice(20),
+		'synthetic-terminal-detail'
+	].join('\r\n')
+};
+const retained = run(longFailure);
+assert.ifError(retained.thrown);
+assert.ok(retained.calls > 1, 'the real runner must execute its registered checks');
+assert.equal(retained.exitCode, 1, 'a child failure must keep the aggregate red');
+const long = retained.output;
 assert.ok(
 	long.includes('Error: synthetic native failure ETIMEDOUT'),
 	'the error headline must survive a long stack'
@@ -138,6 +175,89 @@ assert.ok(
 assert.ok(long.includes('synthetic-terminal-detail'), 'retain the terminal detail');
 assert.ok(long.includes('lines omitted'), 'report truncation explicitly');
 assert.ok(!long.includes('syntheticFrame20'), 'bound the displayed stack');
+assert.ok(!long.includes(middleCause), 'the middle cause lies outside the bounded console preview');
+assert.equal(retained.captures.length, 1, 'only the failed check retains raw output');
+const captured = retained.captures[0];
+assert.ok(
+	captured.files['stderr.txt'].includes(middleCause),
+	'the original hidden exception remains available'
+);
+assert.equal(captured.files['stdout.txt'], longFailure.stdout);
+assert.equal(captured.files['stderr.txt'], longFailure.stderr);
+assert.ok(
+	captured.files['stderr.txt'].includes('syntheticFrame20'),
+	'retain the original missing middle'
+);
+const captureReceipt = JSON.parse(captured.files['receipt.json']);
+const failedTiming = retained.records.find((record) => record.type === 'result');
+for (const field of [
+	'ordinal',
+	'check_id',
+	'global_ordinal',
+	'name',
+	'reproduce',
+	'status',
+	'exit_code',
+	'signal',
+	'error_code'
+])
+	assert.equal(captureReceipt[field], failedTiming[field]);
+assert.equal(
+	captureReceipt.capture.stdout.captured_utf8_bytes,
+	Buffer.byteLength(longFailure.stdout)
+);
+assert.equal(
+	captureReceipt.capture.stderr.captured_utf8_bytes,
+	Buffer.byteLength(longFailure.stderr)
+);
+assert.equal(captureReceipt.capture.max_buffer_bytes, retained.spawnOptions.maxBuffer);
+assert.equal(retained.spawnOptions.maxBuffer, 1024 * 1024, 'preserve the existing capture bound');
+assert.equal(captureReceipt.capture.child_output_completeness, 'unknown');
+assert.equal(captureReceipt.capture.spawn_error, false);
+assert.ok(retained.outputBeforeSecondSpawn.includes(captured.directory));
+assert.ok(
+	!JSON.stringify(retained.records).includes('syntheticFrame20'),
+	'raw text stays out of timings'
+);
+
+const overflow = run({
+	status: null,
+	error: { code: 'ENOBUFS' },
+	stdout: 'captured é🙂 prefix',
+	stderr: ''
+});
+assert.ifError(overflow.thrown);
+assert.equal(overflow.exitCode, 1);
+const overflowReceipt = JSON.parse(overflow.captures[0].files['receipt.json']);
+assert.equal(overflowReceipt.error_code, 'ENOBUFS');
+assert.equal(overflowReceipt.capture.spawn_error, true);
+assert.equal(overflowReceipt.capture.child_output_completeness, 'unknown');
+assert.equal(
+	overflowReceipt.capture.stdout.captured_utf8_bytes,
+	Buffer.byteLength('captured é🙂 prefix')
+);
+assert.equal(overflowReceipt.capture.stderr.captured_utf8_bytes, 0);
+assert.equal(overflow.captures[0].files['stdout.txt'], 'captured é🙂 prefix');
+assert.ok(overflow.output.includes('Uncaptured or child-truncated output is unknown.'));
+
+for (const failWrite of [1, 2, 3]) {
+	const broken = run(
+		{ status: 7, stderr: 'original failure survives capture write refusal' },
+		{ failWrite }
+	);
+	assert.equal(broken.thrown?.code, 'EIO');
+	assert.equal(broken.exitCode, undefined, 'failed retention cannot publish an aggregate verdict');
+	assert.equal(broken.calls, 1, 'stop before starting another check after retention fails');
+	assert.equal(broken.records.at(-1).type, 'result');
+	assert.equal(broken.records.at(-1).status, 'FAIL');
+	assert.ok(broken.output.includes('original failure survives capture write refusal'));
+	assert.equal(
+		broken.captures[0].files['receipt.json'],
+		undefined,
+		'no receipt before both text writes succeed'
+	);
+	assert.equal(Object.keys(broken.captures[0].files).length, failWrite - 1);
+}
 
 const short = failureOutput({ status: 7, stdout: 'synthetic-single-line\n' });
 assert.equal(
@@ -244,6 +364,7 @@ assert.ok(
 	'full mode still enrolls the optional property and mutation suites'
 );
 assert.equal(full.records.at(-1).failed, 0);
+assert.equal(full.captures.length, 0, 'passing checks do not retain raw output');
 assert.ok(full.output.includes(`All ${full.calls} JS check(s) passed.`));
 
 const interrupted = run({ status: 0 }, { failAppend: 4 });
@@ -276,6 +397,7 @@ assert.equal(thrownSpawn.exitCode, 1);
 assert.equal(thrownSpawn.records.find((record) => record.type === 'result').error_code, 'EACCES');
 assert.equal(thrownSpawn.records.at(-1).failed, 1);
 assert.ok(thrownSpawn.output.includes('synthetic spawn throw'), 'retain thrown spawn diagnostics');
+assert.equal(JSON.parse(thrownSpawn.captures[0].files['receipt.json']).capture.spawn_threw, true);
 
 const local = run({ status: 0 }, { local: true, sha: 'not-a-commit' });
 assert.ifError(local.thrown);
@@ -327,5 +449,26 @@ assert.doesNotMatch(
 	/assets-qualification/,
 	'timings are not a native qualification receipt'
 );
+
+const failureStep = pipeline.findStep('Retain captured JS failure output');
+assert.equal(failureStep.file, '.github/workflows/ci-common.yml');
+assert.equal(failureStep.job, 'shared-validation');
+const failureUpload = failureStep.body;
+assert(
+	core.indexOf(failureUpload) > core.indexOf(pipeline.step(core, 'Run shared validation suite'))
+);
+assert.equal(pipeline.stepField(failureUpload, 'if'), "always() && matrix.suite == 'js'");
+assert.equal(pipeline.stepField(failureUpload, 'uses'), 'actions/upload-artifact@v4');
+assert.match(failureUpload, /^ {10}name: core-js-failures-\$\{\{ matrix\.feature \}\}$/m);
+assert.match(
+	failureUpload,
+	/^ {10}path: \$\{\{ runner.temp \}\}\/ergopti-js-suite-\*\/failures\/\*\*$/m
+);
+assert.match(failureUpload, /^ {10}if-no-files-found: ignore$/m);
+assert.match(failureUpload, /^ {10}overwrite: true$/m);
+assert.doesNotMatch(failureUpload, /continue-on-error|core-js-timings|assets-qualification/);
+const download = pipeline.findStep('Download completed feature timings').body;
+assert.match(download, /^ {10}pattern: core-js-timings-\*$/m);
+assert.doesNotMatch(download, /core-js-failures/, 'raw text cannot enter the strict timing union');
 
 console.log('JS suite failure diagnostics: OK');
