@@ -51,6 +51,7 @@ $taskPhase = 'collecting'
 $taskActiveCheck = 'redaction'
 $taskFailure = $null
 $taskResidentReceipt = $null
+$taskEvidenceReceipts = @{}
 $taskIdentity = [ordered]@{
 	schema_version=1; session_id=$taskId; started_at=$taskStarted.ToString('o'); ended_at=$null
 	build_kind='unverified_input'; identity_status='FAIL'; version=$null; source_sha=$null
@@ -197,13 +198,39 @@ public static class ErgoptiDiagnosticUiaProxy {
 	}
 }
 
+function Get-CollectionStreamHash($Stream) {
+	$taskSha = [Security.Cryptography.SHA256]::Create()
+	try { return ([BitConverter]::ToString($taskSha.ComputeHash($Stream))).Replace('-', '').ToLowerInvariant() }
+	finally { $taskSha.Dispose() }
+}
+
+function Write-CollectionText($Name, $Text) {
+	$taskBytes = $taskEncoding.GetBytes($Text)
+	if ($taskBytes.Length -gt $taskContract.max_output_bytes) { throw 'Diagnostic payload limit exceeded.' }
+	$taskTarget = Join-Path $taskRoot $Name
+	if (Test-Path -LiteralPath $taskTarget) {
+		# A previous producer receipt permits replacement only while its bytes still match.
+		if (!$taskEvidenceReceipts.ContainsKey($Name) -or
+			(Get-Item -LiteralPath $taskTarget).Length -ne $taskEvidenceReceipts[$Name].bytes -or
+			(Get-CollectionHash $taskTarget) -cne $taskEvidenceReceipts[$Name].sha256) { throw 'Foreign diagnostic output refused.' }
+	}
+	$taskStaging = $taskTarget + '.tmp'
+	$taskOutput = [IO.File]::Open($taskStaging, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+	try { $taskOutput.Write($taskBytes, 0, $taskBytes.Length); $taskOutput.Flush() } finally { $taskOutput.Dispose() }
+	if (!$taskEvidenceReceipts.ContainsKey($Name)) {
+		# File.Move refuses a first destination created after the earlier census.
+		[IO.File]::Move($taskStaging, $taskTarget)
+	} else {
+		Move-Item -LiteralPath $taskStaging -Destination $taskTarget -Force
+	}
+	$taskExpected = [IO.MemoryStream]::new($taskBytes, $false)
+	try { $taskEvidenceReceipts[$Name] = [ordered]@{bytes=$taskBytes.Length; sha256=(Get-CollectionStreamHash $taskExpected)} }
+	finally { $taskExpected.Dispose() }
+}
+
 function Write-CollectionJson($Name, $Value) {
 	$taskJson = ($Value | ConvertTo-Json -Depth 16 -Compress).Replace("`r`n", "`n") + "`n"
-	if ([Text.Encoding]::UTF8.GetByteCount($taskJson) -gt $taskContract.max_output_bytes) { throw 'Diagnostic payload limit exceeded.' }
-	$taskTarget = Join-Path $taskRoot $Name
-	$taskStaging = $taskTarget + '.tmp'
-	[IO.File]::WriteAllText($taskStaging, $taskJson, $taskEncoding)
-	Move-Item -LiteralPath $taskStaging -Destination $taskTarget -Force
+	Write-CollectionText $Name $taskJson
 }
 
 function Test-CollectionCancelled {
@@ -342,7 +369,13 @@ try {
 			$taskBitmap = New-Object Drawing.Bitmap($taskForm.Width, $taskForm.Height)
 			try {
 				$taskForm.DrawToBitmap($taskBitmap, (New-Object Drawing.Rectangle(0, 0, $taskForm.Width, $taskForm.Height)))
-				$taskBitmap.Save((Join-Path $taskRoot 'synthetic-window.png'), [Drawing.Imaging.ImageFormat]::Png)
+				# CreateNew prevents a failed probe from adopting or overwriting an older image.
+				$taskImage = [IO.File]::Open((Join-Path $taskRoot 'synthetic-window.png'), [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+				try {
+					$taskBitmap.Save($taskImage, [Drawing.Imaging.ImageFormat]::Png)
+					$taskImage.Flush(); $taskImage.Position = 0
+					$taskEvidenceReceipts['synthetic-window.png'] = [ordered]@{bytes=$taskImage.Length; sha256=(Get-CollectionStreamHash $taskImage)}
+				} finally { $taskImage.Dispose() }
 			} finally { $taskBitmap.Dispose() }
 			$taskGraphics = $taskForm.CreateGraphics()
 			try { $taskDpi = $taskGraphics.DpiX } finally { $taskGraphics.Dispose() }
@@ -462,7 +495,7 @@ try {
 		foreach ($taskObservation in $taskResidentReceipt.rows) { $taskSummary += "$($taskObservation.id): $($taskObservation.status) [$($taskObservation.scope)] $($taskObservation.reason)`n" }
 	}
 	$taskSummary += "`nNext action: attach this local ZIP manually. Review FAIL, SKIP and UNRUN with the maintainer. Isolated native input needs an exclusive owner; AI installation and model download require separate consent. macOS and Linux were not executed here.`n"
-	[IO.File]::WriteAllText((Join-Path $taskRoot 'summary.md'), $taskSummary, $taskEncoding)
+	Write-CollectionText 'summary.md' $taskSummary
 	Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 	if(Test-Path -LiteralPath $taskArchive){throw 'Existing archive refused.'}
 	$taskStagingArchive = $taskArchive + '.partial'
@@ -475,14 +508,20 @@ try {
 				$taskEvidenceNames = @('manifest.json','results.json','summary.md','failure.json','synthetic-window.png')
 				if ($null -ne $taskResidentReceipt) { $taskEvidenceNames += 'resident-observations.json' }
 				foreach ($taskEvidence in $taskEvidenceNames) {
+					# A closed name is insufficient: only this worker's acknowledged bytes may enter.
+					if (!$taskEvidenceReceipts.ContainsKey($taskEvidence)) { continue }
 					$taskEvidencePath = Join-Path $taskRoot $taskEvidence
-					if (!(Test-Path -LiteralPath $taskEvidencePath -PathType Leaf)) { continue }
 					$taskFile = Get-Item -LiteralPath $taskEvidencePath
 					if (($taskFile.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $taskFile.Length -gt $taskContract.max_evidence_file_bytes) { throw 'Unsafe evidence file refused.' }
-					$taskEntry = $taskZip.CreateEntry($taskEvidence)
-					$taskEntryStream = $taskEntry.Open()
-					$taskInput = [IO.File]::OpenRead($taskEvidencePath)
-					try { $taskInput.CopyTo($taskEntryStream) } finally { $taskInput.Dispose(); $taskEntryStream.Dispose() }
+					$taskInput = [IO.File]::Open($taskEvidencePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+					try {
+						$taskProduced = $taskEvidenceReceipts[$taskEvidence]
+						if ($taskInput.Length -ne $taskProduced.bytes -or (Get-CollectionStreamHash $taskInput) -cne $taskProduced.sha256) { throw 'Diagnostic evidence changed after production.' }
+						$taskInput.Position = 0
+						$taskEntry = $taskZip.CreateEntry($taskEvidence)
+						$taskEntryStream = $taskEntry.Open()
+						try { $taskInput.CopyTo($taskEntryStream) } finally { $taskEntryStream.Dispose() }
+					} finally { $taskInput.Dispose() }
 				}
 			} finally { $taskZip.Dispose() }
 		} finally { $taskStream.Dispose() }

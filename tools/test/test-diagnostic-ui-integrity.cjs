@@ -400,6 +400,63 @@ report(
 	JSON.stringify(collectionContract.statuses) === JSON.stringify(['PASS', 'FAIL', 'SKIP', 'UNRUN']),
 	'Result statuses drifted'
 );
+// These source controls receive custody boundaries; only the native lane receives PowerShell.
+const collectorSource = read('windows/vendor/ergopti_diagnostics.ps1').replace(/^\s*#.*$/gm, '');
+/** Receives only source custody; stock native PowerShell remains a separate gate. */
+function receiveEvidenceCustody(source) {
+	const archive = source.slice(source.indexOf('$taskStagingArchive ='));
+	return {
+		'producer membership': archive.includes(
+			'if (!$taskEvidenceReceipts.ContainsKey($taskEvidence)) { continue }'
+		),
+		'locked byte identity':
+			archive.includes('[IO.FileShare]::Read)') &&
+			archive.includes('$taskInput.Length -ne $taskProduced.bytes') &&
+			archive.includes('(Get-CollectionStreamHash $taskInput) -cne $taskProduced.sha256') &&
+			archive.includes('$taskInput.Position = 0') &&
+			archive.indexOf('$taskInput.Position = 0') <
+				archive.indexOf('$taskZip.CreateEntry($taskEvidence)'),
+		'same stream copy':
+			archive.includes('$taskInput.CopyTo($taskEntryStream)') &&
+			archive.includes('finally { $taskInput.Dispose() }') &&
+			!archive.includes('[IO.File]::OpenRead('),
+		'private first creation':
+			source.includes(
+				'[IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None'
+			) &&
+			source.includes("$taskEvidenceReceipts['synthetic-window.png'] =") &&
+			source.includes('[IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None') &&
+			source.includes("throw 'Foreign diagnostic output refused.'") &&
+			source.includes('[IO.File]::Move($taskStaging, $taskTarget)'),
+		'all text producers':
+			source.includes('Write-CollectionText $Name $taskJson') &&
+			source.includes("Write-CollectionText 'summary.md' $taskSummary") &&
+			source.includes('$taskEvidenceReceipts[$Name] = [ordered]@{bytes=$taskBytes.Length; sha256=')
+	};
+}
+const evidenceCustody = receiveEvidenceCustody(collectorSource);
+for (const [name, required] of [
+	['producer membership', 'if (!$taskEvidenceReceipts.ContainsKey($taskEvidence)) { continue }'],
+	['locked byte identity', '(Get-CollectionStreamHash $taskInput) -cne $taskProduced.sha256'],
+	['same stream copy', '$taskInput.CopyTo($taskEntryStream)'],
+	[
+		'private first creation',
+		'[IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None'
+	],
+	['all text producers', 'Write-CollectionText $Name $taskJson']
+]) {
+	report(
+		'Collection source: ' + name,
+		evidenceCustody[name],
+		'Produced evidence custody is missing.'
+	);
+	const withdrawn = collectorSource.replace(required, '');
+	report(
+		'Collection source inverse: ' + name,
+		collectorSource.split(required).length === 2 && !receiveEvidenceCustody(withdrawn)[name],
+		'The independently withdrawn actual custody boundary was still admitted.'
+	);
+}
 if (process.argv.includes('--native-collection')) {
 	if (process.platform !== 'win32') throw new Error('Native collection controls require Windows.');
 	const { spawnSync } = require('node:child_process');

@@ -15,7 +15,7 @@ $taskRuntimeVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($Runtime).Prod
 if($taskRuntimeVersion -cnotmatch '^[0-9]+[.][0-9]+[.][0-9]+$'){throw 'The fixture requires its actual runtime identity.'}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $env:PSModulePath="$env:SystemRoot/System32/WindowsPowerShell/v1.0/Modules;"+$env:PSModulePath
-foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout','resident-observed','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason')){
+foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout','resident-observed','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason','approved-name-failure','approved-name-image','produced-evidence-change','foreign-evidence-output','foreign-evidence-stage','first-evidence-publication-race')){
  $taskId='ergopti-diagnostic-'+[Guid]::NewGuid().ToString('N');$taskDirectory=Join-Path $taskRoot $taskId
  [IO.Directory]::CreateDirectory($taskDirectory)|Out-Null
  $taskRunWorker=$taskWorker;$taskRunContract=$taskContract
@@ -24,6 +24,22 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
   if($taskCase -eq 'deadline'){$taskObject.deadline_ms=1}else{$taskObject.max_archive_bytes=1}
   $taskRunContract=Join-Path $taskRoot ($taskCase+'-contract.json')
   [IO.File]::WriteAllText($taskRunContract,($taskObject|ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))
+ }
+ if($taskCase -eq 'produced-evidence-change'){
+  $taskRunWorker=Join-Path $taskRoot 'changed-evidence-control.ps1'
+  $taskSource=[IO.File]::ReadAllText($taskWorker)
+  $taskSeam="$"+'taskStagingArchive = $taskArchive + '+"'.partial'"
+  if(([regex]::Matches($taskSource,[regex]::Escape($taskSeam)).Count) -ne 1){throw 'Evidence change control requires the exact real archive seam.'}
+  $taskSource=$taskSource.Replace($taskSeam,$taskSeam+"`n"+'[IO.File]::WriteAllText((Join-Path $taskRoot '+"'summary.md'), '"+$taskSentinel+"', "+'$taskEncoding)')
+  [IO.File]::WriteAllText($taskRunWorker,$taskSource,[Text.UTF8Encoding]::new($false))
+ }
+ if($taskCase -eq 'first-evidence-publication-race'){
+  $taskRunWorker=Join-Path $taskRoot 'first-evidence-publication-control.ps1'
+  $taskSource=[IO.File]::ReadAllText($taskWorker)
+  $taskSeam="$"+'taskOutput.Dispose() }'
+  if(([regex]::Matches($taskSource,[regex]::Escape($taskSeam)).Count) -ne 1){throw 'First publication control requires the exact closed output seam.'}
+  $taskSource=$taskSource.Replace($taskSeam,$taskSeam+"`n"+'if ($Name -ceq '+"'manifest.json') { [IO.File]::WriteAllText("+'$taskTarget'+", '"+$taskSentinel+"', "+'$taskEncoding) }')
+  [IO.File]::WriteAllText($taskRunWorker,$taskSource,[Text.UTF8Encoding]::new($false))
  }
  if($taskCase -eq 'query-timeout'){
   $taskRunWorker=Join-Path $taskRoot 'bounded-query-control.ps1'
@@ -78,7 +94,14 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
  $taskAck=@{session_id=$taskId;physical_text='SKIP';physical_display='SKIP'}
  if($taskCase -eq 'foreign-physical'){$taskAck.session_id='foreign-session'}
  [IO.File]::WriteAllText((Join-Path $taskDirectory 'physical.json'),($taskAck|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
- if($taskCase -eq 'cancel'){[IO.File]::WriteAllText((Join-Path $taskDirectory 'cancel'),'cancel',[Text.UTF8Encoding]::new($false))}
+ if(@('cancel','approved-name-failure','approved-name-image','produced-evidence-change') -contains $taskCase){[IO.File]::WriteAllText((Join-Path $taskDirectory 'cancel'),'cancel',[Text.UTF8Encoding]::new($false))}
+ $taskForeignName=$null
+ if($taskCase -eq 'approved-name-failure'){$taskForeignName='failure.json'}
+ if($taskCase -eq 'approved-name-image'){$taskForeignName='synthetic-window.png'}
+ if($taskCase -eq 'foreign-evidence-output'){$taskForeignName='manifest.json'}
+ if($taskCase -eq 'foreign-evidence-stage'){$taskForeignName='manifest.json.tmp'}
+ if($taskForeignName){[IO.File]::WriteAllText((Join-Path $taskDirectory $taskForeignName),$taskSentinel,[Text.UTF8Encoding]::new($false))}
+
  if($taskCase -eq 'existing-partial'){[IO.File]::WriteAllText(($taskDirectory+'.zip.partial'),'owned existing partial',[Text.UTF8Encoding]::new($false))}
  $taskInfo=New-Object Diagnostics.ProcessStartInfo
  $taskInfo.FileName=$taskPowerShell;$taskInfo.Arguments='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$taskRunWorker+'" -SessionDirectory "'+$taskDirectory+'"'
@@ -87,7 +110,7 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
  $taskOutput=$taskProcess.StandardOutput.ReadToEndAsync();$taskErrors=$taskProcess.StandardError.ReadToEndAsync()
  $taskExited=$taskProcess.WaitForExit(20000)
  if(!$taskExited){throw ('Collector control retained PID '+$taskProcess.Id+'; no competitor was launched.')}
- $taskRow=[ordered]@{case=$taskCase;scope=$(if($taskCase -eq 'query-timeout'){'injected_query_delay'}else{'actual_worker_control'});worker_sha256=(Get-FileHash -LiteralPath $taskRunWorker -Algorithm SHA256).Hash;exit_code=$taskProcess.ExitCode;stderr_bytes=$taskErrors.Result.Length;archive_created=(Test-Path -LiteralPath ($taskDirectory+'.zip'));path=$taskDirectory;results=@();checks=@()}
+ $taskRow=[ordered]@{case=$taskCase;scope=$(if($taskCase -eq 'query-timeout'){'injected_query_delay'}elseif(@('produced-evidence-change','first-evidence-publication-race') -contains $taskCase){'injected_evidence_change'}else{'actual_worker_control'});worker_sha256=(Get-FileHash -LiteralPath $taskRunWorker -Algorithm SHA256).Hash;exit_code=$taskProcess.ExitCode;stderr_bytes=$taskErrors.Result.Length;archive_created=(Test-Path -LiteralPath ($taskDirectory+'.zip'));path=$taskDirectory;results=@();checks=@()}
  if($taskRow.archive_created){
   $taskCommitted=$taskOutput.Result|ConvertFrom-Json
   if($taskCommitted.schema_version -ne 1 -or $taskCommitted.session_id -cne $taskId -or $taskCommitted.archive_committed -ne $true -or
@@ -114,9 +137,15 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
 }
 $taskExpectedChecks=Get-Content -LiteralPath $taskContract -Raw -Encoding UTF8|ConvertFrom-Json
 foreach($taskProof in $taskProofs){
- if(@('existing-partial','archive-limit') -contains $taskProof.case){
+ if(@('foreign-evidence-output','foreign-evidence-stage','first-evidence-publication-race') -contains $taskProof.case){
+  $taskForeignName=$(if($taskProof.case -ne 'foreign-evidence-stage'){'manifest.json'}else{'manifest.json.tmp'})
+  if($taskProof.exit_code -ne 1 -or $taskProof.archive_created -or [IO.File]::ReadAllText((Join-Path $taskProof.path $taskForeignName)) -cne $taskSentinel){throw 'A foreign evidence output or stage was adopted, changed or archived.'}
+  continue
+ }
+ if(@('existing-partial','archive-limit','produced-evidence-change') -contains $taskProof.case){
   if($taskProof.exit_code -ne 1 -or $taskProof.archive_created){throw 'Existing partial archive control failed.'}
   if($taskProof.case -eq 'existing-partial' -and [IO.File]::ReadAllText($taskProof.path+'.zip.partial') -cne 'owned existing partial'){throw 'Existing partial archive was modified.'}
+  if($taskProof.case -eq 'produced-evidence-change' -and [IO.File]::ReadAllText((Join-Path $taskProof.path 'summary.md')) -cne $taskSentinel){throw 'The changed evidence control did not reach its actual source seam.'}
   $taskArchiveError=Get-Content -LiteralPath (Join-Path $taskProof.path 'archive-error.json') -Raw -Encoding UTF8|ConvertFrom-Json
   if(!$taskArchiveError.partial_retained -or $taskArchiveError.reason -cne 'archive_creation_failed'){throw 'Partial archive cleanup debt disappeared.'}
   continue
@@ -145,6 +174,14 @@ foreach($taskProof in $taskProofs){
  if($taskProof.case -eq 'redaction-refusal' -and $taskById.redaction.status -cne 'FAIL'){throw 'Private identity admitted.'}
  if($taskProof.case -eq 'false-installed-origin' -and $taskById.redaction.status -cne 'FAIL'){throw 'A worker control was admitted as installed product evidence.'}
  if($taskProof.case -eq 'query-timeout' -and $taskById.native_uia.status -cne 'FAIL'){throw 'Timed-out query admitted.'}
+ if(@('approved-name-failure','approved-name-image') -contains $taskProof.case){
+  $taskForeignName=$(if($taskProof.case -eq 'approved-name-failure'){'failure.json'}else{'synthetic-window.png'})
+  if([IO.File]::ReadAllText((Join-Path $taskProof.path $taskForeignName)) -cne $taskSentinel){throw 'Untouched approved-name evidence was changed.'}
+  $taskZip=[IO.Compression.ZipFile]::OpenRead($taskProof.path+'.zip')
+  try{if(@($taskZip.Entries|Where-Object {$_.FullName -ceq $taskForeignName}).Count){throw 'Untouched approved-name private evidence entered the actual archive.'}}
+  finally{$taskZip.Dispose()}
+ }
+
  if($taskProof.case -eq 'owner-observed' -and ($taskById.callbacks.status -cne 'UNRUN' -or $taskById.callbacks.receipt.observation -cne 'PASS' -or
   $taskById.callbacks.receipt.reason -cne 'exclusive_input_session_not_admitted' -or $taskById.callbacks.receipt.isolated_input_allowed)){throw 'Observed host ownership granted an isolated native input session.'}
  if($taskProof.case -eq 'resident-observed'){
