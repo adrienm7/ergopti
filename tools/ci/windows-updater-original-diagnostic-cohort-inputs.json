@@ -47,7 +47,7 @@
 		"static/ergopti_plus/windows/_generated/update_channels.ahk": "67d2977b59553b5a58cc9386dc1a3304e56a3706dc57d7c07a221e7075680a4b",
 		"static/ergopti_plus/windows/_generated/update_schedule.ahk": "d13e790c22ce73d57a6dd7b6ace50d73f3f2b74ca43593a0f9177d0c89decaf7",
 		"static/ergopti_plus/windows/infra/config_io.ahk": "fc1b8ff1b8439cd316985dc3da05691f4938e6f485dba80d2b104012ec1f10e5",
-		"static/ergopti_plus/windows/infra/config_migrate.ahk": "3aec0173e54768adfc16767b01155c2304306160551758bb299a76ee6e907ce1",
+		"static/ergopti_plus/windows/infra/config_migrate.ahk": "20f6e6a02962494989130e8106c45b93a2c58a13b7a9820bba88b84165b4a333",
 		"static/ergopti_plus/windows/infra/config_transition_runtime.ahk": "9129f1f3c390ae80a89e361a33c0902223bd7542b9a0285a48d1af3894f53f33",
 		"static/ergopti_plus/windows/infra/config_write_lease.ahk": "e52ac1cd68145dbc85275c5615438090b75d0bbe89cf15bd3688873efd52499a",
 		"static/ergopti_plus/windows/infra/toml/toml_document.ahk": "011ccb5fcc13fd0a29ed3a63374f46960672db6f05ce726642e52bdbea4ed964",
