@@ -14922,20 +14922,31 @@ optimizations. Afterwards, this workstream owns CI speed, test quality and
 cross-platform convergence; non-native work in groups 2, 4 and 7 is delegated
 separately. Preserve their unfinished native qualification requirements.
 
-- [ ] Publish and verify v1.0.1: actual tag, source, assets, integrity, mandatory
-      installation checks and explicit existing qualification limits. The
-      run `38165477221` on `47e7308da0` exposed one obsolete serial Linux
-      prerequisite assertion among 410 Core checks. Its correction preserves
-      both mandatory suites before packaging. Run `38167194052` on `bd198a6eae`
-      passed all 410 Core checks, all 11,225 canonical AHK cases and the Linux
-      and macOS verdicts. The separate native AltGr cohort then failed four
-      cases: three isolated-runner dependency omissions and one child completion
-      timeout. The dependency fix passes the unchanged five noninteractive
-      callbacks with warning-free stdout matching the TAP receipt; 33 related
-      controls and 70 E2E cases also pass. Failed child evidence now remains in
-      the uploaded directory. The native US-layout observation still requires
-      hosted receiving. Local French-layout refusal is not native qualification.
-      Publication remains pending; the six disclosed macOS deferrals remain open.
+- [x] Publish and verify v1.0.1. The stable release was published on October 11
+      at 23:29:58 UTC from `63cf3d005d371edb4e4093a906da276ced487182`.
+      [Run 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226)
+      completed with 65 successful jobs. The approved macOS native archive
+      qualification and the inapplicable selected-OS verdict were skipped.
+      All 11,227 canonical AHK cases, 26 isolated LLM cases, 11 native input
+      cases and 410 Common JavaScript checks passed. Windows compiled startup,
+      upgrade, full save and 23 programmable hotstring checks passed; Linux
+      completed all 17 installation lanes, and macOS all 26 launch scenarios.
+      The actual tag, latest-stable endpoint, 32 required assets, seven extra
+      full-execution selection records and source-bound publication metadata
+      were verified. The six disclosed macOS native deferrals remain open;
+      Windows signing remains unqualified under the standing unsigned policy.
+      These limits are public in the
+      [release notes](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1).
+
+October 12 local progress: the JS runner now retains incremental monotonic
+timings and reports each failed child before starting the next check. Common
+has its own reusable workflow with the original commands and matrices.
+These changes are local; the complete four-lane graph, native live progress,
+feature lots and folder migration below remain unfinished. The first local
+Windows JS run passed 399 of 409 checks; its ten failures remain recorded and
+are not counted as qualification. The scoped format gate and the subsequent
+Common source, policy and diagnostic controls passed.
+
 - [ ] Record elapsed time by default for every CI step, suite and test,
       including failure and timeout outcomes. Preserve source, OS and
       architecture with machine-readable results and a readable slowest-test
