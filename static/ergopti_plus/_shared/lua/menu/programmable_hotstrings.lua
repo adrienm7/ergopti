@@ -74,6 +74,8 @@ function M.build(ports)
 						local live, interval = ports.get()
 						local selected = ports.prompt(interval * 1000)
 						if selected == nil then return false end
+						local current_enabled, current_interval = ports.get()
+						if current_enabled ~= live or current_interval ~= interval then return refused() end
 						local milliseconds = tonumber(selected)
 						if not milliseconds or milliseconds < 0 or milliseconds ~= milliseconds
 							or milliseconds >= math.huge or milliseconds % 1 ~= 0 then return refused() end

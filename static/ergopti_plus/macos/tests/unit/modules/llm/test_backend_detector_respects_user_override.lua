@@ -25,7 +25,7 @@ local saved_core = package.loaded["modules.llm"]
 --- @return table A stub API module.
 local function make_api_stub()
 	return {
-		get_base_url          = function() return "http://127.0.0.1:18888" end,
+		get_base_url          = function() return "http://127.0.0.1:11434" end,
 		warmup                = function() end,
 		cancel_streaming      = function() end,
 		is_ready              = function() return false end,

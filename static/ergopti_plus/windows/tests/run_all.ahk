@@ -709,6 +709,8 @@ global _LLM_Menu_Loaded := false
 ; Definitions-only chord translation and hotkey identities; registers no hotkey.
 #Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../adapters/llm_nav_event_owner.ahk
+#Include ../adapters/terminal_output_preview.ahk
+#Include ../adapters/terminal_output_custody.ahk
 #Include ../adapters/llm_automation.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
@@ -2035,6 +2037,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_tree_owned.ahk
 #Include unit/test_ollama_install_files_port.ahk
 #Include unit/test_ollama_runtime_owner.ahk
+#Include unit/test_ollama_managed_bootstrap.ahk
 #Include unit/test_run_program_actions.ahk
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk

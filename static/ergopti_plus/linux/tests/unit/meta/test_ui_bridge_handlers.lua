@@ -141,6 +141,9 @@ helpers.describe("ui.bridge_handlers", function()
     assert(file:write('[_meta]\nsections_order = ["english"]\n[english]\n"omw" = { output = "on my way", is_word = true, auto_expand = false, is_case_sensitive = true, is_case_sensitive_strict = true, final_result = false }\n"ty" = { output = "thank you", is_word = true, final_result = false }\n'))
     assert(file:close())
     local old_dir, manager, native_write = state.config.get_config_dir, package.loaded["ui.webview_manager"], writer.write
+    local previous_prepare = writer.prepare_batch
+    -- Preserve the actual planner capability while spying on its publication.
+    writer.prepare_batch = RealWriter.prepare_batch
     state.config.get_config_dir = function() return directory end
     local context = { app_name = "hotstring_editor", epoch = 41 }
     package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
@@ -156,7 +159,7 @@ helpers.describe("ui.bridge_handlers", function()
         fn(h, context)
       end)
     end)
-    writer.write, state.config.get_config_dir, package.loaded["ui.webview_manager"] = native_write, old_dir, manager
+    writer.write, writer.prepare_batch, state.config.get_config_dir, package.loaded["ui.webview_manager"] = native_write, previous_prepare, old_dir, manager
     assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
     if not ok then error(err, 0) end
   end
@@ -2167,7 +2170,7 @@ helpers.describe("ui.bridge_handlers", function()
         -- user deleted is simply absent from the payload. Merging into what is on
         -- disk would bring it back, and the deletion would appear to work until
         -- the next restart.
-        h.on_message({
+        local result = h.on_message({
           action = "save",
           data = {
             sections_order = { "english" },
@@ -2176,6 +2179,7 @@ helpers.describe("ui.bridge_handlers", function()
             } } },
           },
         }, state, context)
+        helpers.assert_true(result.saved, "the genuine writer must acknowledge the displayed model")
         local entries = captured.data.sections.english.entries
         helpers.assert_eq(#entries, 1, "only what the editor sent may be on disk")
         helpers.assert_eq(entries[1].trigger, "ty", "and it must be the entry it sent")
@@ -2184,7 +2188,7 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("'save' drops an entry with no trigger instead of writing it", function()
       local reader, writer, captured = make_spies(true)
       with_opened_spies(reader, writer, state, function(h, context)
-        h.on_message({
+        local result = h.on_message({
           action = "save",
           data = {
             sections_order = { "work" },
@@ -2194,6 +2198,7 @@ helpers.describe("ui.bridge_handlers", function()
             } } },
           },
         }, state, context)
+        helpers.assert_true(result.saved, "the genuine writer must acknowledge the displayed model")
         local entries = captured.data.sections.work.entries
         helpers.assert_eq(#entries, 1,
           "a triggerless entry can never fire, and on disk it is a row nobody can delete from the UI")

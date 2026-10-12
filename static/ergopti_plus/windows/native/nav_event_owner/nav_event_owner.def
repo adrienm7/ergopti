@@ -10,10 +10,22 @@ EXPORTS
 	ErgoptiEditor_Decide
 	ErgoptiEditor_Close
 	ErgoptiNav_Start
+	ErgoptiNav_StartHookTrace
+	ErgoptiNav_ReadHookTrace
+	ErgoptiNav_StopHookTrace
 	ErgoptiNav_Stop
 	ErgoptiNav_PreparePlan
 	ErgoptiNav_CommitPlan
 	ErgoptiNav_SetSuspended
+	ErgoptiNav_RegisterTerminalRoutes
+	ErgoptiNav_ListTerminalHeldRecipes
+	ErgoptiNav_PlanTerminalOutput
+	ErgoptiNav_BeginTerminalOutputAttempt
+	ErgoptiNav_AcknowledgeTerminalOutput
+	ErgoptiNav_ConsumeTerminalOutput
+	ErgoptiNav_CancelTerminalOutput
+	ErgoptiNav_PreviewTerminalOutput
+	ErgoptiNav_PeekTerminalRoute
 	ErgoptiNav_BeginTerminalCapture
 	ErgoptiNav_CommitTerminalCapture
 	ErgoptiNav_AbortTerminalCapture

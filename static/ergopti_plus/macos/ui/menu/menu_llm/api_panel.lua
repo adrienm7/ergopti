@@ -27,6 +27,7 @@ local notifications = require("infra.notifications")
 local ManifestMenu   = require("infra.manifest_menu")
 local ProviderUses   = require("modules.llm.provider_uses")
 local EntryNames     = require("llm.api_entry_names")
+local EntryIdentity  = require("llm.api_entry_identity")
 
 local LOG = "api_panel"
 
@@ -501,11 +502,9 @@ function M.build(ctx)
 						i18n.get("menu.llm.api_prompt_model"))
 					if not model_ok then return false end
 
-					-- Unique id: seq suffix prevents collision when two entries are
-					-- created within the same second (os.time() resolution = 1s).
-					_entry_seq = _entry_seq + 1
-					local id = string.format("%s-%d-%d", pid, os.time(), _entry_seq)
 					local list = api_remote.get_entries() or {}
+					local id
+					id, _entry_seq = EntryIdentity.next(pid, os.time(), _entry_seq, list)
 					local new_entry = {
 						id       = id,
 						provider = pid,
