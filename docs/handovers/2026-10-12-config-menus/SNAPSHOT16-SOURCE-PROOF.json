@@ -1,0 +1,76 @@
+{
+	"status": "SOURCE_ONLY_NO_RUNTIME_FIX",
+	"run": 38319577074,
+	"CI_SHA": "f385e3c7b43604031f857c48046adbf9cd802005",
+	"DEV_SHA": "d5a1fe238163473748b05a9829ae22e5b8b9f255",
+	"exact_tree": "4984f799c76260b0c7a8a9d8bccb077addb15792",
+	"archive": "snapshot16-global-registration-source-proof.tar.gz",
+	"archive_sha256": "43f574b28e905fac6ed348e6b71d524cab11f2d81eeb6353b4ef8c56d91a2fbf",
+	"files": [
+		{
+			"name": "GLOBAL-FOR-TOKEN-WITNESSES.json",
+			"bytes": 63435,
+			"sha256": "96c0d362f65adb267cc2cbcd1e7e6f2f564b3c90808173515db55c99c94cf302"
+		},
+		{
+			"name": "INCLUDE-CLOSURE-SOURCE-INDEX.json",
+			"bytes": 498409,
+			"sha256": "d5bbecd32cb7dfe75394cec42465f655dd1610250769a56bb4aca5838eae444b"
+		},
+		{
+			"name": "ROOT-HANDOFF.json",
+			"bytes": 5953,
+			"sha256": "0edd806fc99bff338e05e0df9523770cd7dc8476a98ea027ce5060f0439ea21f"
+		}
+	],
+	"limits": [
+		"No complete Snapshot16 raw stdout available; only metadata/prefix64/tail4096 received",
+		"15 complete tail warning tuples, not a complete warning inventory",
+		"No exclusive cause/newness claim",
+		"No code, receiver, assertion, clock, test or workflow change",
+		"Root owns test/CI registration coordination; no parallel namespace correction"
+	],
+	"actual_source_facts": {
+		"global_registration_headers": 31,
+		"fixtures": 14,
+		"names": {
+			"Owner": 5,
+			"Name": 15,
+			"Source": 2,
+			"Index": 5,
+			"Count": 1,
+			"Callback": 2,
+			"Command": 1
+		}
+	},
+	"native_receiving_archive": {
+		"path": "integrated-windows-receiving-38319577074.tar.gz",
+		"sha256": "ce43841ecccd6dcd0506a7abc7c8655ae5915a6a551eab2f7b224e2d33f6bdd7",
+		"files": [
+			{
+				"name": "FINAL-ACTUAL-RECEIVING-REVIEW.json",
+				"bytes": 10724,
+				"sha256": "47cb76bb7c18f566c7c891e94f509f745e0c7901f97f4427d4166d6f63d62916"
+			},
+			{
+				"name": "STRICT-DESKTOP-AND-E2E-ACTUAL-RECEIVING.json",
+				"bytes": 3001,
+				"sha256": "ae66193c0c618d8fa7d527c22444d82f76eaa4785b07e34cffedd221d294ecda"
+			},
+			{
+				"name": "SNAPSHOT16-BOUNDED-WARNING-AND-TAP-RECEIVING-V2.json",
+				"bytes": 7146,
+				"sha256": "fb890bb3fa985b25519157c6d4c299d12d57b56bef6d4c34696c0a56ed4a5235"
+			},
+			{
+				"name": "ACTUAL-SNAPSHOT16-CAPTURE-REFUSAL.json",
+				"bytes": 7032,
+				"sha256": "b84d3cbef33f2d9377b30dbbae2cb27ac8a74137b34410a10ef143fba5069cd1"
+			}
+		]
+	},
+	"whole_CI": "FAIL:3PASS/4FAIL/5SKIP/ReleaseSKIP",
+	"strict_desktop": "11PASS",
+	"E2E": "70PASS",
+	"Core": "424PASS/2FAIL"
+}
