@@ -165,6 +165,8 @@ graph TD
         WINDOWS_shell_runner["ShellRunner.ahk"]
         WINDOWS_storage["Storage.ahk"]
         WINDOWS_system_control["SystemControl.ahk"]
+        WINDOWS_terminal_output_custody["TerminalOutputCustody.ahk"]
+        WINDOWS_terminal_output_preview["TerminalOutputPreview.ahk"]
         WINDOWS_text_sender["TextSender.ahk"]
         WINDOWS_timer_scheduler["TimerScheduler.ahk"]
         WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]

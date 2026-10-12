@@ -34,6 +34,7 @@ end
 function M.advance(raw, depth, multiline_quote)
 	local index = 1
 	local length = #raw
+	local comment_offset
 	while index <= length do
 		if multiline_quote then
 			if multiline_quote == '"""' and raw:sub(index, index) == "\\" then
@@ -48,6 +49,7 @@ function M.advance(raw, depth, multiline_quote)
 			local triple = raw:sub(index, index + 2)
 			local char = raw:sub(index, index)
 			if char == "#" then
+				comment_offset = index
 				break
 			elseif triple == '"""' or triple == "'''" then
 				multiline_quote = triple
@@ -79,7 +81,7 @@ function M.advance(raw, depth, multiline_quote)
 			end
 		end
 	end
-	return depth, multiline_quote
+	return depth, multiline_quote, comment_offset
 end
 
 --- Splits source bytes into physical lines, each keeping its exact terminator.

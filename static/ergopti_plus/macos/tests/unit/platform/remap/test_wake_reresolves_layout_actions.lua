@@ -109,7 +109,7 @@ local function load_remap(options)
 			calls.resolve = calls.resolve + 1
 			append("resolve")
 			if options.resolve_raises then error("synthetic layout failure") end
-			return 3
+			return 3, "ansi"
 		end,
 	}
 	package.loaded["platform.remap.generator"] = {

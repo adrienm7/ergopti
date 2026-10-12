@@ -104,6 +104,8 @@ _MSG_InitMenuOnlyReadsSubMenus() {
 			DeclaredStage := false
 			if RegExMatch(Line, "^\s*_MI_StageDeclaredFeature\(Receiver, SubMenus\[")
 				DeclaredStage := _DG_DeclaredBuilderSourceValid(Id, BuilderBody, _DriverFuncBody("_MI_StageDeclaredFeature"))
+			Assert(_MSG_RetainedSubmenuRead(Line, _DriverFuncBody("_MI_StageDeclaredFeature")),
+				"the exact retained child, omitted disposal and reviewed adapter must all match")
 			Assert(DirectStage || DeclaredStage,
 				"initMenu() must only READ a SubMenus entry (hand it to TrayMenuStage_Add) and never call "
 				. "anything that MUTATES one. _Updater_RebuildMenu calls initMenu() alone, so a mutation "
@@ -220,3 +222,82 @@ _MSG_ActualBuildersKeepBorrowedChildren() {
 }
 Test("menu: actual root builders repeatedly stage persistent children without changing their native generation",
 	_MSG_ActualBuildersKeepBorrowedChildren)
+
+
+; Ignore executable spacing while retaining every quoted identity byte.
+_MSG_ExecutableSpacing(Source) {
+	Quote := Chr(34)
+	Pattern := "(?:'(?:``[\s\S]|[^'``])*'|" . Quote
+		. "(?:``[\s\S]|[^" . Quote . "``])*" . Quote . ")(*SKIP)(*F)|\s+"
+	return RegExReplace(Source, Pattern, "")
+}
+
+; A retained child may join only the reviewed non-disposing feature adapter.
+_MSG_RetainedFeatureAdapter(Body) {
+	Expected := '_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {`n'
+		. '	Published := false`n'
+		. '	try {`n'
+		. '		Row := Receiver.Call(Child, Getters)`n'
+		. '		if !(Row is Map) || Row.Get("submenu", false) != Child`n'
+		. '			throw Error("The canonical feature parent changed during native construction.")`n'
+		. '		TrayMenuStage_AddFeature(Row["label"], Child)`n'
+		. '		Published := true`n'
+		. '		if Row.Get("checked", false)`n'
+		. '			TrayMenuStage_Check(Row["label"])`n'
+		. '		return true`n'
+		. '	} finally {`n'
+		. '		if DisposeOnRefusal && !Published {`n'
+		. '			try Child.Delete()`n'
+		. '			finally MenuDispatcher_PruneMenu(Child)`n'
+		. '		}`n'
+		. '	}`n'
+		. '}`n'
+	return _MSG_ExecutableSpacing(_StripFullLineComments(Body))
+		== _MSG_ExecutableSpacing(Expected)
+}
+
+_MSG_RetainedSubmenuRead(Line, Adapter) {
+	Code := _MSG_ExecutableSpacing(Line)
+	; The legacy direct form also passes the original child as its only child use.
+	if RegExMatch(Code, '^TrayMenuStage_Add(?:Feature)?\((?:[A-Za-z_][A-Za-z0-9_]*|t\("[^"\r\n]+"\)),SubMenus\["(?:Shortcuts|TapHolds)"\]\)$')
+		return true
+	if !_MSG_RetainedFeatureAdapter(Adapter)
+		return false
+	for Key, Gate in Map("Shortcuts", "shortcuts_enabled", "TapHolds", "tapholds_enabled") {
+		Expected := '_MI_StageDeclaredFeature(Receiver,SubMenus["' . Key . '"],Map("'
+			. Gate . '",()=>IsCategoryGated("' . Key . '")))'
+		if Code == Expected
+			return true
+	}
+	return false
+}
+
+_MSG_RetainedFeatureRejectsMutation() {
+	Adapter := _DriverFuncBody("_MI_StageDeclaredFeature")
+	AssertTrue(_MSG_RetainedFeatureAdapter(Adapter), "the actual default-false adapter retains its supplied child")
+	for Name in ["_MI_StageShortcuts", "_MI_StageTapHolds"] {
+		Body := _DriverFuncBody(Name), Calls := 0
+		for Line in StrSplit(Body, "`n", "`r") {
+			if !InStr(Line, "SubMenus[")
+				continue
+			Calls += 1
+			AssertTrue(_MSG_RetainedSubmenuRead(Line, Adapter), "the real row retains its child with disposal omitted")
+			AssertFalse(_MSG_RetainedSubmenuRead(SubStr(Line, 1, -1) . ", true)", Adapter), "explicit disposal cannot consume a retained submenu")
+			AssertFalse(_MSG_RetainedSubmenuRead(StrReplace(Line, "SubMenus[", "CloneSubMenus["), Adapter), "a different child authority cannot pass")
+			ChangedKey := StrReplace(StrReplace(Line, '"Shortcuts"', '"Short cuts"'), '"TapHolds"', '"Tap Holds"')
+			AssertFalse(_MSG_RetainedSubmenuRead(ChangedKey, Adapter), "quoted child identities cannot be normalized into another key")
+			AssertFalse(_MSG_RetainedSubmenuRead("; " . Line, Adapter), "a commented staging call is not executable")
+		}
+		AssertEqual(1, Calls, "each actual retained parent is scanned once")
+	}
+	for Mutant in [StrReplace(Adapter, "DisposeOnRefusal := false", "DisposeOnRefusal := true"),
+		StrReplace(Adapter, "if DisposeOnRefusal && !Published", "if !Published"),
+		StrReplace(Adapter, "TrayMenuStage_AddFeature(Row", 'Child.Insert("anchor")' . "`nTrayMenuStage_AddFeature(Row"),
+		StrReplace(Adapter, 'Row.Get("submenu", false) != Child', 'Row.Get("submenu", false) != 0'),
+		StrReplace(Adapter, 'Row.Get("submenu", false) != Child', 'Row.Get("sub menu", false) != Child'),
+		StrReplace(Adapter, 'Row["label"], Child', 'Row["label"], Menu()')] {
+		Assert(Mutant !== Adapter, "every source withdrawal changes the real adapter")
+		AssertFalse(_MSG_RetainedFeatureAdapter(Mutant), "child mutation, substitution and disposal remain refused")
+	}
+}
+Test("menu: retained feature staging refuses child substitution and implicit disposal", _MSG_RetainedFeatureRejectsMutation)

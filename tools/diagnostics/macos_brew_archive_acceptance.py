@@ -960,6 +960,8 @@ class PhaseEvidence:
         self.previous = None
         self.first_timeout = None
         self.first_permission_worker = None
+        self.last_native_ui = None
+        self.last_native_ui_elapsed_seconds = None
         if directory is not None:
             require(
                 hasattr(os, "O_NOFOLLOW"),
@@ -1087,6 +1089,15 @@ class PhaseEvidence:
                     "Automation UI observation cannot claim acceptance or closure",
                 )
                 packet["native_ui"] = _validate_owned_automation_ui_fact(native_ui)
+                # Retain only the most recent already admitted scalar census
+                # after the fixed history limit. It grants no native outcome.
+                self.last_native_ui = {
+                    key: value
+                    for key, value in packet["native_ui"].items()
+                    if key not in ("first_button", "identity")
+                }
+                if "discovery" in self.last_native_ui:
+                    self.last_native_ui["discovery"] = dict(self.last_native_ui["discovery"])
             if sender_failure is not None:
                 require(
                     phase == "appleevent.sender-refusal" and status == "refused" and not closed,
@@ -1109,6 +1120,9 @@ class PhaseEvidence:
                 packet["permission_worker"] = _validate_permission_worker_fact(permission_worker)
                 if getattr(self, "first_permission_worker", None) is None:
                     self.first_permission_worker = dict(packet["permission_worker"])
+            last_native_ui = getattr(self, "last_native_ui", None)
+            if last_native_ui is not None:
+                packet["last_native_ui"] = _validate_owned_automation_ui_fact(last_native_ui)
             first_permission_worker = getattr(self, "first_permission_worker", None)
             if first_permission_worker is not None:
                 packet["first_permission_worker"] = _validate_permission_worker_fact(
@@ -1117,10 +1131,23 @@ class PhaseEvidence:
             first_timeout = getattr(self, "first_timeout", None)
             if first_timeout is not None:
                 packet["first_timeout"] = _validate_command_timeout(first_timeout)
+            # The bounded phase history keeps its first256 events. Carry the last
+            # closed UI observation independently through the terminal checkpoint.
+            last_native_ui = getattr(self, "last_native_ui", None)
+            if native_ui is not None:
+                last_native_ui = json.loads(json.dumps(packet["native_ui"]))
+            if last_native_ui is not None:
+                packet["last_native_ui"] = _validate_owned_automation_ui_fact(last_native_ui)
             semantic = json.dumps(packet, sort_keys=True)
-            if semantic == self.previous:
+            if semantic == self.previous and native_ui is None:
                 return not self.failed
             packet["elapsed_seconds"] = round(time.monotonic() - self.started, 6)
+            if last_native_ui is not None:
+                packet["last_native_ui_elapsed_seconds"] = (
+                    packet["elapsed_seconds"]
+                    if native_ui is not None
+                    else self.last_native_ui_elapsed_seconds
+                )
             packet["history_omitted"] = max(0, self.sequence + 1 - 256)
             data = (json.dumps(packet, sort_keys=True) + "\n").encode()
             require(len(data) <= 4096, "Native phase packet exceeds its safe bound")
@@ -1155,6 +1182,9 @@ class PhaseEvidence:
                     os.unlink(temporary, dir_fd=self.descriptor)
                 except FileNotFoundError:
                     pass
+            self.last_native_ui = last_native_ui
+            if last_native_ui is not None:
+                self.last_native_ui_elapsed_seconds = packet["last_native_ui_elapsed_seconds"]
             self.previous = semantic
             self.sequence += 1
             self.ownership_closed = bool(closed)
@@ -1541,6 +1571,36 @@ class Children:
                     pass  # Preserve this exact primary; native retirement still runs below.
         except BaseException as error:
             failure = error
+            # The real consent observer raises this exact admission refusal,
+            # rather than TimeoutExpired. Observe it without replacing its
+            # identity or granting an API result, consent or process closure.
+            if (
+                timeout_started_ns is not None
+                and request is not None
+                and timeout_stage == "ui-observer"
+                and type(error) is AdmissionError
+                and type(error.args) is tuple
+                and len(error.args) == 1
+                and type(error.args[0]) is str
+                and error.args[0] == "Owned Automation prompt exceeded its deadline"
+            ):
+                try:
+                    expired_ns = time.monotonic_ns()
+                    self.evidence.retain_timeout(
+                        {
+                            "schema": 1,
+                            "command": timeout_command,
+                            "stage": timeout_stage,
+                            "budget_seconds": timeout,
+                            "request_deadline_ns": timeout_deadline_ns,
+                            "started_ns": timeout_started_ns,
+                            "expired_ns": expired_ns,
+                            "spent_ns": expired_ns - timeout_started_ns,
+                        },
+                        groups=[self.groups[child] for child in self.active],
+                    )
+                except BaseException:
+                    pass  # Preserve this exact primary; native retirement still runs below.
         finally:
             try:
                 self.settle(process)

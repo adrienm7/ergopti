@@ -81,6 +81,9 @@ local function with_backend(scenario)
 		assert(type(probe_clients) == "table", "the probe clients must be reachable")
 		for _, id in ipairs(LocalServers.ORDER) do
 			probe_clients[id] = {
+				cancel = function() return true end,
+				isSettled = function() return true end,
+				onSettled = function(callback) callback(); return true end,
 				get = function(url, headers, callback)
 					world.probes[#world.probes + 1] = { id = id, url = url, headers = headers, callback = callback }
 					return true
@@ -502,7 +505,11 @@ local function with_panel(scenario)
 			local ctx = {
 				state = { llm_backend = "ollama", llm_model = "" },
 				paused = false,
-				keymap = { reset_predictions = function() return true end },
+				is_paused = function() return false end,
+				keymap = {
+					reset_predictions = function() return true end,
+					reset_predictions_for_configuration = function() return true end,
+				},
 				update_menu = function() world.menus = world.menus + 1 end,
 				WarmupCtrl = { warmup = function() world.warmups = world.warmups + 1 end },
 				activate_api = function() world.activations = world.activations + 1 end,
@@ -524,6 +531,43 @@ local function row_starting(rows, prefix)
 end
 
 helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backends)", function()
+	helpers.it("(local-server-selection-ack) refuses a backend setter that mutates then returns false", function()
+		with_panel(function(Panel, api, _, world, ctx)
+			ctx.activate_api = function() ctx.state.llm_backend = "api"; return false end
+			local selected
+			helpers.assert_true(Panel.select_model(ctx, "omlx", "model-a", function(value) selected = value end))
+			helpers.assert_eq(world.persists, 1, "entry persistence is independent of backend activation")
+			helpers.assert_eq(api.get_active_entry().model, "model-a")
+			helpers.assert_eq(selected, false, "an unacknowledged setter cannot publish a selected backend")
+		end)
+	end)
+
+	helpers.it("(local-server-selection-ack) rejects a selected model superseded during backend activation", function()
+		with_panel(function(Panel, api, _, _, ctx)
+			ctx.activate_api = function()
+				ctx.state.llm_backend = "api"
+				api.set_entries({ { id = "newer", provider = "openai", token = "fixture", model = "model-b" } })
+				api.set_active_entry_id("newer")
+				return true
+			end
+			local selected
+			helpers.assert_true(Panel.select_model(ctx, "omlx", "model-a", function(value) selected = value end))
+			helpers.assert_eq(api.get_active_entry().id, "newer", "the newer entry remains authoritative")
+			helpers.assert_eq(selected, false, "API mode alone cannot acknowledge the originally selected model")
+		end)
+	end)
+
+	helpers.it("(local-server-selection-ack) acknowledges the exact persisted model after a true backend setter", function()
+		with_panel(function(Panel, api, _, _, ctx)
+			ctx.activate_api = function() ctx.state.llm_backend = "api"; return true end
+			local selected
+			helpers.assert_true(Panel.select_model(ctx, "omlx", "model-a", function(value) selected = value end))
+			helpers.assert_eq(selected, true)
+			helpers.assert_eq(api.get_active_entry().provider, "omlx")
+			helpers.assert_eq(api.get_active_entry().model, "model-a")
+		end)
+	end)
+
 	helpers.it("lists the answering servers and makes a chosen model the backend (local-openai-backends)", function()
 		with_panel(function(Panel, api, LocalServers, world, ctx)
 			local rows = Panel.rows(ctx)
@@ -552,8 +596,11 @@ helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backend
 			helpers.assert_eq(world.persists, 1)
 			helpers.assert_eq(world.activations, 1, "the API backend is selected")
 
-			-- Choosing another model reuses the one entry of the server
+			-- The acknowledged new source needs its own models receipt before reuse.
 			ctx.state.llm_backend = "api"
+			rows = Panel.rows(ctx)
+			helpers.assert_eq(#world.probes, 8, "the stored entry identity starts one fresh joint sweep")
+			answer_sweep(world, { omlx = models_answer({ "Qwen3-8B-4bit", "gemma-3-4b-it" }) })
 			rows = Panel.rows(ctx)
 			omlx = row_starting(rows, "oMLX")
 			helpers.assert_eq(omlx.checked, true)
@@ -832,5 +879,149 @@ helpers.describe("Local discovery: live response identity (local-openai-backends
 				helpers.assert_eq(LocalServers.result("omlx").models, {}, field .. " admits no old models")
 			end)
 		end
+	end)
+end)
+
+helpers.describe("Configured generic local model mutation (local-configured-affinity)", function()
+	for _, provider in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("retains " .. provider .. " identity, foreign metadata and position through model ACK (local-configured-affinity)", function()
+			with_panel(function(Panel, api, _, world, ctx)
+				local before = { id = "before", provider = "openai", token = "fixture", model = "cloud-before" }
+				local configured = { id = "generic", provider = provider, token = "fixture", model = "before",
+					base_url = "http://127.0.0.1:8000/v1", label = "Personal label", foreign = { retained = true } }
+				local after = { id = "after", provider = "openai", token = "fixture", model = "cloud-after" }
+				api.set_entries({ before, configured, after }); api.set_active_entry_id(configured.id)
+				ctx.state.llm_backend = "api"
+				local selected
+				helpers.assert_true(Panel.select_model(ctx, "omlx", "mlx-community/Qwen3-8B-4bit", function(value) selected = value end))
+				local saved = api.get_entries()
+				helpers.assert_eq(#saved, 3)
+				helpers.assert_eq(saved[1], before); helpers.assert_eq(saved[3], after)
+				helpers.assert_eq(saved[2].provider, provider); helpers.assert_eq(saved[2].id, configured.id)
+				helpers.assert_eq(saved[2].label, configured.label); helpers.assert_eq(saved[2].foreign, configured.foreign)
+				helpers.assert_eq(saved[2].base_url, configured.base_url)
+				helpers.assert_eq(saved[2].token, configured.token)
+				helpers.assert_eq(saved[2].model, "mlx-community/Qwen3-8B-4bit")
+				helpers.assert_eq(world.persists, 1); helpers.assert_eq(selected, true)
+				helpers.assert_eq(configured.model, "before", "the old row is not mutated before its publisher ACK")
+			end)
+		end)
+	end
+end)
+
+helpers.describe("Configured local menu leases and native pause (local-configured-views)", function()
+	for _, provider in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("selects configured " .. provider .. " view and acknowledges the exact generic entry (local-configured-views)", function()
+			with_panel(function(Panel, api, LocalServers, world, ctx)
+				local id = "configured:personal"
+				local clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
+				clients[id] = { cancel = function() return true end, isSettled = function() return true end,
+					onSettled = function(callback) callback(); return true end,
+					get = function(url, headers, callback)
+						world.probes[#world.probes + 1] = { id = id, url = url, headers = headers, callback = callback }; return true
+					end }
+				local configured = { id = "personal", provider = provider, token = "", model = "before",
+					base_url = "http://127.0.0.1:19423/v1", label = "Personal label", foreign = { retained = false } }
+				api.set_entries({ configured }); api.set_active_entry_id(configured.id)
+				ctx.state.llm_backend = "api"
+				api.detect_local_servers()
+				world.probe(id).callback(models_answer({ "mlx-community/Qwen3-8B-4bit" }))
+				answer_sweep(world, {})
+				local rows = Panel.rows(ctx)
+				local server = row_starting(rows, api.PROVIDERS[provider].label .. " 🖥️")
+				helpers.assert_true(server ~= nil)
+				helpers.assert_eq(server.checked, true)
+				helpers.assert_true(server.items[1].action())
+				helpers.assert_eq(world.persists, 1)
+				helpers.assert_eq(api.get_active_entry().provider, provider)
+				helpers.assert_eq(api.get_active_entry().id, configured.id)
+				helpers.assert_eq(api.get_active_entry().foreign, configured.foreign)
+				helpers.assert_eq(api.get_active_entry().model, "mlx-community/Qwen3-8B-4bit")
+			end)
+		end)
+	end
+	helpers.it("retained configured model row refuses a replaced private identity (local-configured-views)", function()
+		with_panel(function(Panel, api, _, world, ctx)
+			local configured = { id = "personal", provider = "openai", token = "", model = "before", base_url = "http://localhost:8000/v1" }
+			api.set_entries({ configured }); api.set_active_entry_id(configured.id)
+			api.detect_local_servers(); answer_sweep(world, { omlx = models_answer({ "old-model" }) })
+			local row = row_starting(Panel.rows(ctx), "oMLX 🖥️").items[1]
+			local newer = { id = "personal", provider = "openai_compat", token = "", model = "newer", base_url = configured.base_url }
+			api.set_entries({ newer })
+			helpers.assert_eq(row.action(), false)
+			helpers.assert_eq(world.persists, 0); helpers.assert_eq(api.get_entries(), { newer })
+		end)
+	end)
+	for _, phase in ipairs({ "paused", "missing", "untyped", "throw" }) do
+		helpers.it("retained local rows refuse live pause owner " .. phase .. " (local-configured-views)", function()
+			with_panel(function(Panel, api, _, world, ctx)
+				api.detect_local_servers(); answer_sweep(world, { omlx = models_answer({ "model" }) })
+				local row = row_starting(Panel.rows(ctx), "oMLX 🖥️").items[1]
+				if phase == "missing" then ctx.is_paused = nil
+				elseif phase == "paused" then ctx.is_paused = function() return true end
+				elseif phase == "untyped" then ctx.is_paused = function() return "false" end
+				else ctx.is_paused = function() error("native pause read refused") end end
+				helpers.assert_eq(row.action(), false)
+				helpers.assert_eq(world.persists, 0); helpers.assert_eq(api.get_entries(), {})
+				helpers.assert_eq(Panel.rescan(ctx), false)
+			end)
+		end)
+	end
+	helpers.it("address dialog refuses a source replacement while preserving the newer entry (local-configured-views)", function()
+		with_panel(function(Panel, api, _, world, ctx)
+			local original = { id = "personal", provider = "openai", token = "", model = "before", base_url = "http://localhost:8000/v1" }
+			api.set_entries({ original })
+			local newer = { id = "personal", provider = "openai_compat", token = "", model = "newer", base_url = original.base_url }
+			local dialogs = require("infra.dialog_util")
+			dialogs.text_prompt = function(_, _, _, ok_label)
+				api.set_entries({ newer }); return ok_label, "http://127.0.0.1:8000/v1"
+			end
+			helpers.assert_eq(Panel.prompt_address(ctx, "omlx"), false)
+			helpers.assert_eq(world.persists, 0); helpers.assert_eq(api.get_entries(), { newer })
+		end)
+	end)
+	helpers.it("late refused publication never rolls back a newer configured source (local-configured-views)", function()
+		with_panel(function(Panel, api, _, world, ctx)
+			local configured = { id = "personal", provider = "openai", token = "", model = "before", base_url = "http://localhost:8000/v1" }
+			api.set_entries({ configured }); api.set_active_entry_id(configured.id)
+			local held
+			require("modules.llm").persist_api_entries = function(callback) world.persists = world.persists + 1; held = callback end
+			local selected
+			helpers.assert_true(Panel.select_model(ctx, "omlx", "staged", function(value) selected = value end))
+			local newer = { id = "newer", provider = "openai_compat", token = "", model = "newer", base_url = configured.base_url }
+			api.set_entries({ newer }); api.set_active_entry_id(newer.id)
+			held(false, "source changed", false)
+			helpers.assert_eq(selected, false); helpers.assert_eq(api.get_entries(), { newer })
+			helpers.assert_eq(api.get_active_entry_id(), newer.id)
+			helpers.assert_eq(world.activations, 0)
+		end)
+	end)
+end)
+
+helpers.describe("Local models cache source identity (local-configured-cache)", function()
+	helpers.it("same view membership clears cached models before a changed configured source is shown (local-configured-cache)", function()
+		with_panel(function(Panel, api, LocalServers, world, ctx)
+			local id = "configured:personal"
+			local clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
+			clients[id] = { cancel = function() return true end, isSettled = function() return true end,
+				onSettled = function(callback) callback(); return true end,
+				get = function(url, headers, callback)
+					world.probes[#world.probes + 1] = { id = id, url = url, headers = headers, callback = callback }; return true
+				end }
+			api.set_entries({ { id = "personal", provider = "openai", token = "", model = "before", base_url = "http://localhost:19423/first/v1" } })
+			api.detect_local_servers()
+			world.probe(id).callback(models_answer({ "old-source-model" })); answer_sweep(world, {})
+			helpers.assert_eq(LocalServers.result(id).models, { "old-source-model" })
+			local changed = { id = "personal", provider = "openai_compat", token = "", model = "newer", base_url = "http://localhost:19423/second/v1" }
+			api.set_entries({ changed })
+			local before = #world.probes
+			local rows = Panel.rows(ctx)
+			helpers.assert_eq(LocalServers.result(id), nil, "same view id cannot retain another source's model receipt")
+			helpers.assert_eq(#world.probes - before, 5, "actual rows start one fresh joint sweep before displaying models")
+			helpers.assert_eq(world.probe(id).url, changed.base_url .. "/models")
+			for _, row in ipairs(rows) do
+				for _, item in ipairs(row.items or {}) do helpers.assert_eq(item.label == "old-source-model", false) end
+			end
+		end)
 	end)
 end)

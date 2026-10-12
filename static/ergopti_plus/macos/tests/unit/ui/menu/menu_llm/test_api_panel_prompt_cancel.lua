@@ -114,7 +114,7 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 			paused = false,
 			is_paused = function() return false end,
 			keymap = {
-				reset_predictions = function()
+				reset_predictions_for_configuration = function()
 					reset_calls = reset_calls + 1
 					return true
 				end,
@@ -134,7 +134,7 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 		local entry_labels = {}
 		local _, rows_after = panel.build({
 			state = state, paused = false, is_paused = function() return false end,
-			keymap = { reset_predictions = function() return true end },
+			keymap = { reset_predictions_for_configuration = function() return true end },
 			update_menu = function() end,
 			WarmupCtrl = { warmup = function() end },
 		})

@@ -421,6 +421,92 @@ ConfigTransitionRecoverOwned(PathsFile, Bundle, Port := 0, PauseFn := 0) {
 }
 
 _ConfigTransitionRecoverOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
+	static PendingSettlements := Map()
+	static TerminalIssuer := _ConfigWriteTerminalTryAcquire, StateOwner := _ConfigWriteLeaseState
+	static DataOwner := _ConfigWriteLeaseDataObject, ContainerOwner := _ConfigWriteLeasePlainContainer
+	static StateDataOwner := _ConfigWriteLeaseStateIsData
+	static PortOwner := ConfigTransitionProductionPort, InspectOwner := ConfigTransitionInspect
+	static ResultOwner := ConfigTransitionResultIs, RecoverOwner := ConfigTransitionRecover
+	static SnapshotOwner := _ConfigTransitionReadSnapshot, MatchOwner := _ConfigTransitionSnapshotMatches
+	NativePortLive() {
+		for Owner in [PortOwner, InspectOwner, ResultOwner, RecoverOwner, SnapshotOwner, MatchOwner]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return PortOwner == ConfigTransitionProductionPort && InspectOwner == ConfigTransitionInspect
+			&& ResultOwner == ConfigTransitionResultIs && RecoverOwner == ConfigTransitionRecover
+			&& SnapshotOwner == _ConfigTransitionReadSnapshot && MatchOwner == _ConfigTransitionSnapshotMatches
+	}
+	ActivityOwnerLive() {
+		for Owner in [TerminalIssuer, StateOwner, DataOwner, ContainerOwner, StateDataOwner]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return TerminalIssuer == _ConfigWriteTerminalTryAcquire && StateOwner == _ConfigWriteLeaseState
+			&& DataOwner == _ConfigWriteLeaseDataObject && ContainerOwner == _ConfigWriteLeasePlainContainer
+			&& StateDataOwner == _ConfigWriteLeaseStateIsData
+	}
+	; The closed issuer activity query distinguishes release from a temporarily
+	; malformed/withdrawn live owner. Only genuine retirement drops observations.
+	if PendingSettlements.Count && ActivityOwnerLive() {
+		PreviousCritical := Critical("On")
+		try {
+			if !TerminalIssuer.Call([], 0)
+				PendingSettlements.Clear()
+			else if TerminalIssuer.Call([], Bundle) {
+				Retired := []
+				for ObservedBundle in PendingSettlements
+					if ObservedBundle != Bundle
+						Retired.Push(ObservedBundle)
+				for ObservedBundle in Retired
+					PendingSettlements.Delete(ObservedBundle)
+			}
+		} finally Critical(PreviousCritical)
+	}
+	SettleObservation(Observation) {
+		if !_ConfigWriteTerminalOwnsExact(Bundle, Observation.locator)
+			return false
+		for Target in Observation.targets {
+			if !NativePortLive() || !_ConfigWriteTerminalOwnsExact(Bundle, Target.path)
+				return false
+			NativePort := PortOwner.Call()
+			Snapshot := SnapshotOwner.Call(NativePort, Target.path)
+			if !PortOwner.Call(NativePort) || !ResultOwner.Call(Snapshot, "snapshot")
+					|| !MatchOwner.Call(Snapshot["snapshot"], Target.present, Target.hash)
+					|| !NativePortLive()
+					|| !ConfigSchemaSettleOwnedSource(Target.path, Observation.locator, Bundle, Observation.side,
+						Map("present", Target.present, "hash", Target.hash))
+				return false
+		}
+		if !NativePortLive() || !_ConfigWriteTerminalOwnsExact(Bundle, Observation.locator)
+			return false
+		NativePort := PortOwner.Call()
+		if !PortOwner.Call(NativePort)
+				|| !ResultOwner.Call(InspectOwner.Call(Observation.locator, NativePort), "absent")
+				|| !NativePortLive() || !_ConfigWriteTerminalOwnsExact(Bundle, Observation.locator)
+			return false
+		for Target in Observation.targets {
+			if !_ConfigWriteTerminalOwnsExact(Bundle, Target.path)
+				return false
+			Snapshot := SnapshotOwner.Call(NativePort, Target.path)
+			if !ResultOwner.Call(Snapshot, "snapshot")
+					|| !MatchOwner.Call(Snapshot["snapshot"], Target.present, Target.hash)
+					|| !NativePortLive()
+				return false
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if !NativePortLive() || !ActivityOwnerLive() || !_ConfigWriteTerminalOwnsExact(Bundle, Observation.locator)
+					|| !PendingSettlements.Has(Bundle) || !PendingSettlements[Bundle].Has(Observation.locator)
+					|| PendingSettlements[Bundle][Observation.locator] != Observation
+				return false
+			for Target in Observation.targets
+				if !_ConfigWriteTerminalOwnsExact(Bundle, Target.path)
+					return false
+			PendingSettlements[Bundle].Delete(Observation.locator)
+			if PendingSettlements.Has(Bundle) && PendingSettlements[Bundle].Count == 0
+				PendingSettlements.Delete(Bundle)
+		} finally Critical(PreviousCritical)
+		return true
+	}
 	UseNative := ((Port is Integer) && Port == 0) || ConfigTransitionProductionPort(Port)
 	Port := _ConfigTransitionRuntimePort(Port)
 	NormalizedLocator := _ConfigTransitionNormalizePath(PathsFile)
@@ -431,8 +517,20 @@ _ConfigTransitionRecoverOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
 			"The terminal bundle does not own the stable locator.")
 	}
 	Inspected := ConfigTransitionInspect(NormalizedLocator, Port)
-	if ConfigTransitionResultIs(Inspected, "absent")
+	if ConfigTransitionResultIs(Inspected, "absent") {
+		if UseNative {
+			if PendingSettlements.Has(Bundle) && PendingSettlements[Bundle].Has(NormalizedLocator) {
+				Observation := PendingSettlements[Bundle][NormalizedLocator]
+				return SettleObservation(Observation) ? Inspected
+					: _ConfigTransitionResult("retry", "source_schema_settlement_refused")
+			}
+			for Token in Bundle.tokens {
+				if !ConfigSchemaSettleOwnedSource(Token.key, NormalizedLocator, Bundle, "old")
+					return _ConfigTransitionResult("retry", "source_schema_settlement_refused")
+			}
+		}
 		return Inspected
+	}
 	if !ConfigTransitionResultIs(Inspected, "ready")
 		return Inspected
 	for Target in Inspected["record"]["targets"] {
@@ -456,7 +554,40 @@ _ConfigTransitionRecoverOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
 				return _ConfigTransitionResult("fatal", "guarded_custom_recovery_port_unqualified")
 		}
 	}
-	return ConfigTransitionRecover(NormalizedLocator, Port, PauseFn, NoopFn)
+	if UseNative && !NativePortLive()
+		return _ConfigTransitionResult("retry", "recovery_native_owner_refused", "", Inspected["record"])
+	Recovered := UseNative ? RecoverOwner.Call(NormalizedLocator, Port, PauseFn, NoopFn)
+		: ConfigTransitionRecover(NormalizedLocator, Port, PauseFn, NoopFn)
+	if UseNative && !NativePortLive()
+		return _ConfigTransitionResult("retry", "recovery_native_owner_refused", "", Inspected["record"])
+	if UseNative && (ConfigTransitionResultIs(Recovered, "recovered_old") || ConfigTransitionResultIs(Recovered, "recovered_new")) {
+		Side := ConfigTransitionResultIs(Recovered, "recovered_new") ? "new" : "old"
+		Targets := []
+		for Target in Recovered["record"]["targets"]
+			Targets.Push({ path: Target["path"], present: Target[Side . "_present"], hash: Target[Side . "_hash"] })
+		; This is an outcome observation minted only after real native recovery
+		; verified its side and retired the WAL. It grants no source permission.
+		Observation := { locator: NormalizedLocator, side: Side, targets: Targets }
+		PreviousCritical := Critical("On")
+		try {
+			if !NativePortLive() || !_ConfigWriteTerminalOwnsExact(Bundle, NormalizedLocator)
+				return _ConfigTransitionResult("retry", "recovery_native_owner_refused", "", Inspected["record"])
+			for Target in Targets
+				if !_ConfigWriteTerminalOwnsExact(Bundle, Target.path)
+					return _ConfigTransitionResult("retry", "target_owner_missing", "", Inspected["record"])
+			if !NativePortLive()
+				return _ConfigTransitionResult("retry", "recovery_native_owner_refused", "", Inspected["record"])
+			if !PendingSettlements.Has(Bundle) {
+				Locations := Map()
+				Locations.CaseSense := "Off"
+				PendingSettlements[Bundle] := Locations
+			}
+			PendingSettlements[Bundle][NormalizedLocator] := Observation
+		} finally Critical(PreviousCritical)
+		if !SettleObservation(Observation)
+			return _ConfigTransitionResult("retry", "source_schema_settlement_refused", "", Inspected["record"])
+	}
+	return Recovered
 }
 
 ; Prepares and applies one ordered transition while the caller retains the
@@ -498,8 +629,11 @@ _ConfigTransitionCommitOwnedNonCritical(PathsFile, TargetSpecs, Bundle, Port,
 	NoopFn := 0
 	if UseNative {
 		try NativeOwner := _ConfigTransitionGuardedProductionPort(NormalizedLocator, Bundle, TargetSpecs)
-		catch as Err
-			return _ConfigTransitionResult("retry", "source_schema_admission_refused", Err.Message)
+		catch as Err {
+			Primary := _ConfigTransitionResult("retry", "source_schema_admission_refused", Err.Message)
+			Resolution := _ConfigTransitionRecoverOwnedNonCritical(NormalizedLocator, Bundle, 0, 0)
+			return _ConfigTransitionProtectFailedResolution(Primary, Resolution, Bundle)
+		}
 		Port := NativeOwner.port
 		NoopFn := NativeOwner.noop
 	} else {
@@ -551,7 +685,7 @@ _ConfigTransitionRollbackOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
 		return _ConfigTransitionResult("fatal", "locator_owner_missing")
 	Inspected := ConfigTransitionInspect(NormalizedLocator, Port)
 	if ConfigTransitionResultIs(Inspected, "absent")
-		return Inspected
+		return _ConfigTransitionRecoverOwnedNonCritical(NormalizedLocator, Bundle, UseNative ? 0 : Port, PauseFn)
 	if !ConfigTransitionResultIs(Inspected, "ready")
 		return Inspected
 	Record := Inspected["record"]

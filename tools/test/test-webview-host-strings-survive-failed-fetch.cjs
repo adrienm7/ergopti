@@ -260,6 +260,10 @@ function loadPage(app, bridge, seed) {
 const schema = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
 );
+// The host supplies export labels independently of the active page locale.
+schema.export_strings = Object.fromEntries(
+	Object.entries(en).filter(([key]) => key.startsWith('healthcheck.'))
+);
 const redaction = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
 );
@@ -308,6 +312,11 @@ async function checkPages() {
 			if (!seeded) page.sandbox.i18n_apply(en);
 			await wait(REFUSAL_DELAY_MS * 10);
 			const shown = page.elements.content.innerHTML;
+			const preview = page.elements['preview-text'].textContent;
+			if (!preview.startsWith('# ErgoptiPlus diagnostics\n\n'))
+				fail(`(diagnostics ${mode}) the complete English export preview is missing`);
+			if (!preview.includes(en['healthcheck.export.privacy_notice']))
+				fail(`(diagnostics ${mode}) the English export privacy notice is missing`);
 			const raw = rawKeys(shown);
 			if (!shown.includes(en['healthcheck.section.summary']))
 				fail(`(diagnostics ${mode}) the summary section title is missing from the page`);

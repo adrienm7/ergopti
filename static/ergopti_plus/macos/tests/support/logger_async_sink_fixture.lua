@@ -18,7 +18,7 @@ local function load_policy_logger()
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	return require("infra.logger")
+	return helpers.admit_logger_privacy(require("infra.logger"))
 end
 
 local function load_fixture(config)
@@ -66,6 +66,7 @@ local function load_fixture(config)
 		now_ns = function() return 100000000000 end,
 	}
 	local Logger = require("infra.logger")
+	helpers.admit_logger_privacy(Logger)
 	Logger.set_level("DEBUG")
 	Logger.reset_dedup()
 	Logger.init_log_path("/tmp/ergopti_async_logger_handoff/", 14)
@@ -103,7 +104,7 @@ local function load_fixture(config)
 	local ready, ready_err = Logger.start_async_sink(scheduler, {
 		port = port,
 		token = token,
-		max_batch_records = 1,
+		max_batch_records = config.max_batch_records or 1,
 		bootstrap_socket_factory = bootstrap_socket_factory,
 		clock = config.clock,
 	})
@@ -157,7 +158,7 @@ end
 
 --- Runs the real asynchronous logger fixture and all its callback assertions.
 --- @param callback function Receives the ready fixture.
---- @param config table|nil Optional `clock` function (seconds) for the transport.
+--- @param config table|nil Optional `clock` function (seconds) and `max_batch_records` for the transport.
 --- @return ... Callback results.
 function M.with_fixture(callback, config)
 	return M.with_scope(function() return callback(load_fixture(config)) end)

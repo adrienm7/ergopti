@@ -27,6 +27,8 @@ local notifications = require("infra.notifications")
 local ManifestMenu   = require("infra.manifest_menu")
 local ProviderUses   = require("modules.llm.provider_uses")
 local EntryNames     = require("llm.api_entry_names")
+local EntryIdentity  = require("llm.api_entry_identity")
+local LocalAuth      = require("llm.local_server_auth")
 
 local LOG = "api_panel"
 
@@ -135,16 +137,20 @@ end
 --- @param label string Mutation label for diagnostics.
 --- @return boolean committed
 local function reset_prediction_identity(keymap, label)
-	if type(keymap) ~= "table" or type(keymap.reset_predictions) ~= "function" then
-		Logger.error(LOG, "Cannot %s: keymap.reset_predictions is unavailable.", tostring(label))
+	if type(keymap) ~= "table" or type(keymap.reset_predictions_for_configuration) ~= "function" then
+		Logger.error(LOG, "Cannot %s: keymap.reset_predictions_for_configuration is unavailable.", tostring(label))
+		pcall_log("notify(api configuration unavailable)", notifications.notify,
+			i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
 		return false
 	end
 	local ok, committed = xpcall(function()
-		return keymap.reset_predictions(false)
+		return keymap.reset_predictions_for_configuration()
 	end, debug.traceback)
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Cannot %s: prediction identity reset did not commit (result: %s).",
 			tostring(label), tostring(committed))
+		pcall_log("notify(api configuration reset refusal)", notifications.notify,
+			i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
 		return false
 	end
 	return true
@@ -494,18 +500,23 @@ function M.build(ctx)
 						string.format("API %s — Token", p.label),
 						"",
 						i18n.get("menu.llm.api_prompt_token"))
-					if not token_ok or token == "" then return false end
+					if not token_ok then return false end
+					if not LocalAuth.entry_token_allowed(pid, token, base_url,
+						require("modules.llm.local_servers").SERVERS) then
+						Logger.error(LOG, "API entry creation requires a key for this configured endpoint.")
+						pcall_log("notify(api authentication refusal)", notifications.notify,
+							i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
+						return false
+					end
 					local model_ok, model = prompt_field(
 						string.format("API %s — Model", p.label),
 						p.default_model,
 						i18n.get("menu.llm.api_prompt_model"))
 					if not model_ok then return false end
 
-					-- Unique id: seq suffix prevents collision when two entries are
-					-- created within the same second (os.time() resolution = 1s).
-					_entry_seq = _entry_seq + 1
-					local id = string.format("%s-%d-%d", pid, os.time(), _entry_seq)
 					local list = api_remote.get_entries() or {}
+					local id
+					id, _entry_seq = EntryIdentity.next(pid, os.time(), _entry_seq, list)
 					local new_entry = {
 						id       = id,
 						provider = pid,
@@ -937,21 +948,33 @@ end
 --- @param fields table { base_url = string|nil, token = string|nil, model = string|nil }.
 --- @param on_done function|nil Receives (committed) once settled.
 --- @return boolean started False when another entry change is in flight.
-function M.apply_local_server(ctx, server_id, fields, on_done)
+function M.apply_local_server(ctx, server_id, fields, on_done, admission)
 	local api_remote = llm_mod.api_remote
-	if not api_remote.is_local_server(server_id) or type(fields) ~= "table" then
+	if not api_remote.is_local_server_view(server_id) or type(fields) ~= "table" then
 		error("api_panel.apply_local_server: a local server id and fields are required")
 	end
 	local LocalServers = require("modules.llm.local_servers")
 	local function done(committed)
 		if type(on_done) == "function" then pcall_log("apply_local_server(on_done)", on_done, committed) end
 	end
-	if _mutation_owner ~= nil then return false end
-	local provider = api_remote.PROVIDERS[server_id]
+	local function admitted()
+		if type(ctx.is_paused) ~= "function" or ctx.paused == true then return false end
+		local ok, paused = pcall(ctx.is_paused)
+		if not ok or type(paused) ~= "boolean" or paused ~= false then return false end
+		if admission ~= nil then
+			if type(admission) ~= "function" then return false end
+			local allowed, value = pcall(admission)
+			if not allowed or value ~= true then return false end
+		end
+		return true
+	end
+	if _mutation_owner ~= nil or not admitted() then return false end
+	local original_identity = api_remote.get_identity_generation()
+	local provider = api_remote.local_server_descriptor(server_id)
 	local existing = api_remote.local_server_entry(server_id)
 	fields = { base_url = fields.base_url, token = fields.token, model = fields.model }
 	-- The default address is stored as "", so a catalogue change reaches the entry
-	if fields.base_url == provider.base_url then fields.base_url = "" end
+	if (not existing or existing.provider == server_id) and fields.base_url == provider.base_url then fields.base_url = "" end
 	if not existing and fields.model == nil then
 		LocalServers.set_pending(server_id, fields)
 		done(true)
@@ -959,23 +982,31 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	end
 
 	local pending = LocalServers.pending(server_id)
-	local entry = {
-		id       = existing and existing.id or ("local-" .. server_id),
-		provider = server_id,
-		base_url = existing and existing.base_url or pending.base_url or "",
-		token    = existing and existing.token or pending.token or "",
-		model    = existing and existing.model or "",
-	}
+	local entry = {}
+	-- Existing entries retain their producer's metadata and original row position.
+	for key, value in pairs(existing or {}) do entry[key] = value end
+	entry.id = existing and existing.id or ("local-" .. server_id)
+	entry.provider = existing and existing.provider or server_id
+	entry.base_url = existing and existing.base_url or pending.base_url or ""
+	entry.token = existing and existing.token or pending.token or ""
+	entry.model = existing and existing.model or ""
 	for _, key in ipairs({ "base_url", "token", "model" }) do
 		if fields[key] ~= nil then entry[key] = fields[key] end
+	end
+	local configured = server_id:match("^configured:") ~= nil
+	if not (configured and LocalAuth.entry_token_allowed(entry.provider, "", entry.base_url, {})
+		or not configured and LocalAuth.entry_matches(entry.provider, entry.base_url, server_id, LocalServers.SERVERS)) then
+		Logger.warn(LOG, "Local server entry update refused: configured endpoint affinity changed.")
+		done(false)
+		return false
 	end
 	local previous_entries = {}
 	local staged = {}
 	for _, e in ipairs(api_remote.get_entries() or {}) do
 		previous_entries[#previous_entries + 1] = e
-		if e ~= existing then staged[#staged + 1] = e end
+		staged[#staged + 1] = e == existing and entry or e
 	end
-	staged[#staged + 1] = entry
+	if not existing then staged[#staged + 1] = entry end
 
 	local state = ctx.state
 	local previous_active_id = api_remote.get_active_entry_id()
@@ -988,16 +1019,23 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	if serving and reset_prediction_identity(ctx.keymap, "apply local server entry") ~= true then
 		return false
 	end
+	if not admitted() or api_remote.get_identity_generation() ~= original_identity then return false end
 	local my_generation = begin_mutation()
 	if not my_generation then return false end
 	api_remote.set_entries(staged)
 	if becomes_active then api_remote.set_active_entry_id(entry.id) end
 	if serving and becomes_active then state.llm_model = entry.model end
+	local staged_identity = api_remote.get_identity_generation()
 	-- A key the user removed leaves no Keychain item behind
 	local cleared_key = existing ~= nil and (existing.token or "") ~= "" and entry.token == ""
 	persist_entries("persist_api_entries(local server)", function(ok, reason, durable)
 		if not mutation_is_current(my_generation) then return end
 		finish_mutation(my_generation)
+		if api_remote.get_identity_generation() ~= staged_identity then
+			Logger.warn(LOG, "Local server entry completion discarded after its native identity changed.")
+			done(false)
+			return
+		end
 		if ok == true or durable == true then
 			if ok ~= true then
 				Logger.error(LOG, "Local server entry committed with cleanup debt: %s", tostring(reason))

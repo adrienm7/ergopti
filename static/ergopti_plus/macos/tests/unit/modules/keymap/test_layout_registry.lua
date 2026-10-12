@@ -406,6 +406,74 @@ helpers.describe("layout manager (macOS): uninstalling and selecting", function(
 	end)
 end)
 
+helpers.describe("layout manager: cold input-source conventions (iso-typing-convention)", function()
+	helpers.it("recognizes declared localized and formatted source names before the TIS cache is ready", function()
+		local Layout = helpers.load_with_stubs("modules.keymap.layout")
+		local cases = {
+			{ id = "Ergopti", expected = "ergopti", form = "iso" },
+			{ id = "Ergopti+", expected = "ergopti_plus", form = "iso" },
+			{ id = "Ergopti ANSI", expected = "ergopti_ansi", form = "iso" },
+			{ id = "Ergopti+ ANSI", expected = "ergopti_plus_ansi", form = "iso" },
+			{ id = "Ergopti v2.2.2", expected = "ergopti", form = "iso" },
+			{ id = "Ergo-L", expected = "ergol", form = "ansi" },
+			{ id = "native-opaque-id", name = "Ergopti+", expected = "ergopti_plus", form = "iso" },
+		}
+		for _, source in ipairs(cases) do
+			local LayoutRegistry, deps = manager({ files = shipped_files(), active = {
+				{ id = source.id, name = source.name, selected = true },
+			} })
+			local snapshot = LayoutRegistry.snapshot(deps)
+			helpers.assert_eq(snapshot.active, source.expected, source.id)
+			helpers.assert_nil(snapshot.active_error)
+			helpers.assert_eq(Layout.keyboard_form(snapshot), source.form)
+		end
+	end)
+
+	helpers.it("refuses ambiguous declared display names while giving exact raw identifiers precedence", function()
+		local Layout = helpers.load_with_stubs("modules.keymap.layout")
+		for _, source in ipairs({
+			{ id = "Shared display", selected = true },
+			{ id = "Ergopti_v2_2_2", name = "Shared display", selected = true },
+		}) do
+			local LayoutRegistry, deps = manager({ active = { source } })
+			local index = Json.decode(INDEX_TEXT)
+			for _, entry in ipairs(index.layouts) do
+				if entry.id == "ergopti" or entry.id == "ergopti_plus" then entry.name = "Shared display" end
+			end
+			deps.bundled_index = index
+			local snapshot = LayoutRegistry.snapshot(deps)
+			if source.id == "Shared display" then
+				helpers.assert_eq(snapshot.active, "")
+				helpers.assert_eq(snapshot.active_error, "ambiguous_input_source")
+				helpers.assert_throws(function() Layout.keyboard_form(snapshot) end,
+					"ambiguous known ownership must not masquerade as unregistered ANSI")
+			else
+				helpers.assert_eq(snapshot.active, "ergopti")
+				helpers.assert_nil(snapshot.active_error)
+				helpers.assert_eq(Layout.keyboard_form(snapshot), "iso")
+			end
+		end
+	end)
+
+	helpers.it("keeps genuinely unregistered sources on ANSI and refuses conflicting selected known owners", function()
+		local Layout = helpers.load_with_stubs("modules.keymap.layout")
+		local LayoutRegistry, deps = manager({ files = shipped_files(), active = {
+			{ id = "U.S.", name = "U.S.", selected = true },
+		} })
+		local snapshot = LayoutRegistry.snapshot(deps)
+		helpers.assert_eq(snapshot.active, "")
+		helpers.assert_nil(snapshot.active_error)
+		helpers.assert_eq(Layout.keyboard_form(snapshot), "ansi")
+		LayoutRegistry, deps = manager({ files = shipped_files(), active = {
+			{ id = "Ergopti", selected = true }, { id = "Ergopti+", selected = true },
+		} })
+		snapshot = LayoutRegistry.snapshot(deps)
+		helpers.assert_eq(snapshot.active_error, "ambiguous_input_source")
+		helpers.assert_throws(function() Layout.keyboard_form(snapshot) end)
+	end)
+end)
+
+
 require("test.layout_installed_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,

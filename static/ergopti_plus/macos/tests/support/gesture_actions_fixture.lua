@@ -79,6 +79,7 @@ local OWNERS = {
 	"toml_codec.bom",
 	"toml_codec.key_path",
 	"toml_codec.reader",
+	"toml_codec.record_scanner",
 	"wrap_pair",
 }
 

@@ -550,45 +550,10 @@ def collect_owned_windows(output, executables):
     return receipt
 
 
-def collect(output, state, home, executables):
-    """Retain every early log location and the state tree for the artifact."""
-    errors = []
-    for path in (
-        logs_folder(home) / LAUNCHER_LOG_NAME,
-        home / "Library/Application Support/ErgoptiPlus/paths.toml",
-    ):
-        if path.is_file():
-            shutil.copyfile(path, output / path.name)
-    # Lines logged before the driver re-points its logger land in the default folder.
-    for path in logs_folder(home).glob("ErgoptiPlus_*.log"):
-        if path.is_file() and not (output / path.name).exists():
-            shutil.copyfile(path, output / path.name)
-    logs = state["logs_dir"]
-    if logs.is_dir():
-        shutil.copytree(logs, output / "driver-logs")
-    tree = subprocess.run(
-        ["ls", "-laR", str(home / ".config"), str(home / "gitcfg"), str(home / "Documents/GitHub")],
-        capture_output=True,
-        text=True,
-    )
-    (output / "state-tree.txt").write_text(tree.stdout + tree.stderr, encoding="utf-8")
-    # A screenshot remains useful even when Accessibility cannot qualify UI.
-    subprocess.run(
-        ["screencapture", "-x", str(output / "desktop.png")], capture_output=True, timeout=30
-    )
-    windows = collect_owned_windows(output, executables)
-    # Application-only logs omit the system service handling an AppleEvent
-    # authorization request. Keep its evidence separate on this disposable CI
-    # host, with the system's default privacy redaction and the same time bound.
+def collect_unified_logs(output, specifications):
+    """Retain default-redacted bounded system logs without qualifying a native result."""
     unified_logs = []
-    for filename, predicate in (
-        ("unified.log", 'process == "ErgoptiPlus" OR process == "Hammerspoon"'),
-        (
-            "appleevents-system.log",
-            'process == "tccd" OR process == "appleeventsd" '
-            'OR subsystem == "com.apple.TCC" OR subsystem == "com.apple.appleevents"',
-        ),
-    ):
+    for filename, predicate in specifications:
         receipt = {"file": filename, "status": "unavailable"}
         unified_logs.append(receipt)
         try:
@@ -631,6 +596,69 @@ def collect(output, state, home, executables):
                 receipt["preview_error"] = f"{type(write_error).__name__}: {write_error}"
     (output / "unified-log-collection.json").write_text(
         json.dumps(unified_logs, indent=2) + "\n", encoding="utf-8"
+    )
+    return unified_logs
+
+
+def collect_security_logs(output):
+    """Observe existing CI security failures without running any trust or UI operation."""
+    if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true":
+        raise RuntimeError("Security log observation requires a disposable macOS CI runner")
+    output = Path(output).resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    return collect_unified_logs(
+        output,
+        (
+            (
+                "security-system.log",
+                'process == "security" OR process == "securityd" OR process == "trustd" '
+                'OR process == "authd" OR process == "SecurityAgent" '
+                'OR process == "authorizationhost"',
+            ),
+        ),
+    )
+
+
+def collect(output, state, home, executables):
+    """Retain every early log location and the state tree for the artifact."""
+    errors = []
+    for path in (
+        logs_folder(home) / LAUNCHER_LOG_NAME,
+        home / "Library/Application Support/ErgoptiPlus/paths.toml",
+    ):
+        if path.is_file():
+            shutil.copyfile(path, output / path.name)
+    # Lines logged before the driver re-points its logger land in the default folder.
+    for path in logs_folder(home).glob("ErgoptiPlus_*.log"):
+        if path.is_file() and not (output / path.name).exists():
+            shutil.copyfile(path, output / path.name)
+    logs = state["logs_dir"]
+    if logs.is_dir():
+        shutil.copytree(logs, output / "driver-logs")
+    tree = subprocess.run(
+        ["ls", "-laR", str(home / ".config"), str(home / "gitcfg"), str(home / "Documents/GitHub")],
+        capture_output=True,
+        text=True,
+    )
+    (output / "state-tree.txt").write_text(tree.stdout + tree.stderr, encoding="utf-8")
+    # A screenshot remains useful even when Accessibility cannot qualify UI.
+    subprocess.run(
+        ["screencapture", "-x", str(output / "desktop.png")], capture_output=True, timeout=30
+    )
+    windows = collect_owned_windows(output, executables)
+    # Application-only logs omit the system service handling an AppleEvent
+    # authorization request. Keep its evidence separate on this disposable CI
+    # host, with the system's default privacy redaction and the same time bound.
+    unified_logs = collect_unified_logs(
+        output,
+        (
+            ("unified.log", 'process == "ErgoptiPlus" OR process == "Hammerspoon"'),
+            (
+                "appleevents-system.log",
+                'process == "tccd" OR process == "appleeventsd" '
+                'OR subsystem == "com.apple.TCC" OR subsystem == "com.apple.appleevents"',
+            ),
+        ),
     )
     for folder in (
         home / "Library/Logs/DiagnosticReports",

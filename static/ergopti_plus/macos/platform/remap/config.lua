@@ -298,15 +298,18 @@ local _cached_actions = nil
 ---
 --- @param list table The action list to re-resolve IN PLACE.
 --- @return number How many actions were resolved.
+--- @return string The captured virtual keyboard convention.
 function M.resolve_layout_actions(list)
 	if type(list) ~= "table" then
 		Logger.error(LOG, "resolve_layout_actions(): expected a table — nothing resolved.")
 		return 0
 	end
+	-- One declaration owns every logical character in this generation.
+	local form = Layout.keyboard_form()
 	local resolved = 0
 	for _, action in ipairs(list) do
 		if action.logical_char then
-			local key_code = Layout.key_code_for_char(action.logical_char)
+			local key_code = Layout.key_code_for_char(action.logical_char, form)
 			local mods     = action.karabiner_modifiers
 			local entry    = { key_code = key_code }
 			if type(mods) == "table" and #mods > 0 then
@@ -320,7 +323,7 @@ function M.resolve_layout_actions(list)
 	-- and every layout change re-runs this loop, so per-action lines were 548 log
 	-- writes for a fact the total already conveys.
 	Logger.debug(LOG, "Resolved %d logical-char action(s) to key codes.", resolved)
-	return resolved
+	return resolved, form
 end
 
 function M.load_available_actions(actions_file)

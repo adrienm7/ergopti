@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local Json = require("json")
 local WebviewResult = require("adapters.webview_result")
 local hs     = hs
 local Logger = require("infra.logger")
@@ -454,8 +455,12 @@ local function handle_message(body)
 			if not owner_is_current(owner) then return end
 			Logger.success(LOG, "Folder picker completed.")
 			if picked and picked ~= "" then
-				local encoded_ok, encoded = pcall(hs.json.encode, picked)
-				if not encoded_ok or type(encoded) ~= "string" then
+				-- The native JSON extension accepts tables only; preserve this exact directory string.
+				local encoded_ok, encoded = pcall(function()
+					if type(picked) ~= "string" or not utf8.len(picked) then return nil end
+					return Json.quote(picked)
+				end)
+				if not encoded_ok or type(encoded) ~= "string" or encoded == "" then
 					report_delivery_failure(owner, "encoding failed")
 					return
 				end

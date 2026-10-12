@@ -31,7 +31,8 @@ class TrayStartupCommands {
 		this.Pending := Id
 		try LoggerInfo("BootProfile", Format("Native startup command '{1}' admitted (input_ready={2}).",
 			Id, this.ReadyFn.Call()))
-		if this.ReadyFn.Call()
+		; Reload uses its ordinary guarded owner to recover a stalled startup.
+		if Id = "reload" || this.ReadyFn.Call()
 			this.ScheduleFn.Call(this.DispatchFn, -1)
 		return true
 	}
@@ -45,7 +46,7 @@ class TrayStartupCommands {
 	}
 
 	Dispatch() {
-		if !this.Active || !this.ReadyFn.Call() || this.Pending == ""
+		if !this.Active || (this.Pending != "reload" && !this.ReadyFn.Call()) || this.Pending == ""
 			return false
 		Id := this.Pending
 		this.Pending := ""

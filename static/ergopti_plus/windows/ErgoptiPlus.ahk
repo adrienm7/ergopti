@@ -206,6 +206,8 @@ if !_DriverIsDetachedWorker
 ; are still unset — assigning them here keeps the very first message pump
 ; well-formed.
 global CapsWordEnabled := False
+; Capture genuine hardware intent before any parse-time callback can run.
+global _HardwareCapsLockOn := KS_CapsLockToggleState()
 global LayerEnabled := False
 global TapHold := Map("keys", Map())
 ; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
@@ -385,6 +387,8 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
 #Include adapters/llm_nav_event_owner.ahk
+#Include adapters/terminal_output_preview.ahk
+#Include adapters/terminal_output_custody.ahk
 #Include adapters/llm_automation.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
@@ -1253,8 +1257,10 @@ ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overri
 LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])
-if ConfigFullStateCanPersist() {
-	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
+; This canonicalizer is optional once a terminal transition owns the old boot.
+; Recheck after refusal because schema admission and queue setup can yield.
+if !_ConfigWriteTerminalIsActive() && ConfigFullStateCanPersist() {
+	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false) && !_ConfigWriteTerminalIsActive()
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
 }
 

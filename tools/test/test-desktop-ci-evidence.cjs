@@ -1052,7 +1052,7 @@ console.log(
 /** Requires the actual zero-status assertion, excluding quoted and commented decoys. */
 function checkNativeIdentityStatusAssertion(runtime) {
 	const code = runtime.replace(
-		/\/\/[^\r\n]*|\/\*[\s\S]*?\*\/|\/(?![/*])(?:\\[^\r\n]|\[(?:\\[^\r\n]|[^\]\\])*\]|[^/\\\r\n])+\/[dgimsuvy]*|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|`(?:\\[\s\S]|[^`\\])*`/g,
+		/\/\/[^\r\n]*|\/\*[\s\S]*?\*\/|\/(?![/*])(?:\\[^\r\n]|\[(?:\\[^\r\n]|[^\]\\])*\]|[^/[\\\r\n])+\/[dgimsuvy]*|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|`(?:\\[\s\S]|[^`\\])*`/g,
 		(literal) => literal.replace(/[^\r\n]/g, ' ')
 	);
 	assert.match(
@@ -1067,6 +1067,13 @@ for (const actual of [
 	"assert.equal(\n\tidentity.status,\n\t0,\n\t'native own-image status'\n);"
 ])
 	checkNativeIdentityStatusAssertion(actual);
+
+// An incomplete regex must not stall the guard before the next assertion.
+require('node:vm').runInNewContext(
+	`(${checkNativeIdentityStatusAssertion.toString()})(input)`,
+	{ assert, input: '/' + '[]'.repeat(256) + '\nassert.equal(identity.status, 0);' },
+	{ timeout: 1000 }
+);
 for (const decoy of [
 	'assert.equal(result.status, 0);',
 	'assert.equal(identity.status, 1);',

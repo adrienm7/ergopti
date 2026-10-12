@@ -510,10 +510,13 @@ Test("config full save: collector failure stays pending and visible (config-full
 
 _CFGFS_UnreadySaveIsTypedDeferred() {
 	global _CFGFS_CollectCalls, _CFGFS_WriterCalls, _CFGFS_TimerDelay
-	global CONFIG_SAVE_DEFERRED
+	global CONFIG_SAVE_DEFERRED, _DriverReady, ConfigurationFile
 	Runtime := _CFGFS_CaptureRuntime()
 	try {
-		_CFGFS_Prepare(A_Temp . "\ergopti_full_save_unready.toml", false)
+		; Source admission completes before this independent driver-readiness gate.
+		_CFGFS_Prepare(A_Temp . "\ergopti_full_save_unready.toml")
+		_DriverReady := false
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile))
 		AssertEqual(CONFIG_SAVE_DEFERRED, SaveFullConfig(
 			_CFGFS_Writer, _CFGFS_Timer, true, 0, _CFGFS_Collect))
 		AssertEqual(0, _CFGFS_CollectCalls)

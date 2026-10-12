@@ -46,6 +46,13 @@ using System.Runtime.InteropServices;
 namespace Ergopti.Ollama {
  public static class RuntimeObservation {
   [DllImport("kernel32")] public static extern ulong GetTickCount64();
+  [DllImport("kernel32",SetLastError=true)] static extern bool GetProcessTimes(IntPtr process, out long created, out long ended, out long kernel, out long user);
+  public static long CreationTime(IntPtr retainedProcess) {
+   long created,ended,kernel,user;
+   if(!GetProcessTimes(retainedProcess,out created,out ended,out kernel,out user)) throw new Win32Exception(Marshal.GetLastWin32Error());
+   if(created<=0) throw new InvalidOperationException("Retained child has no creation identity.");
+   return created;
+  }
   [DllImport("kernel32")] static extern IntPtr GetCurrentProcess();
   [DllImport("kernel32",SetLastError=true)] static extern bool IsProcessInJob(IntPtr p, IntPtr job, out bool inside);
   [DllImport("kernel32",SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int kind, byte[] data, uint size, IntPtr length);
@@ -172,6 +179,7 @@ function Invoke-OllamaRuntimeEntry {
 				$receipt = [ordered]@{ runtime_ticket = $request.runtime_ticket; ticket = $request.ticket;
 					root_identity = $root.identity; version_identity = $request.identity; manifest_sha256 = $request.manifest;
 					origin = 'http://127.0.0.1:' + $request.port; launcher_pid = $PID; child_pid = $child.Id;
+					child_created_filetime = [Ergopti.Ollama.RuntimeObservation]::CreationTime($child.Handle);
 					ready_file_identity = $readyIdentity; leases_held = 1 }
 				$bytes = [Text.UTF8Encoding]::new($false, $true).GetBytes(($receipt | ConvertTo-Json -Compress) + "`n")
 				$ready.Write($bytes, 0, $bytes.Length); $ready.Flush($true)

@@ -454,3 +454,27 @@ helpers.describe("sqlite_writer — build_inserts", function()
 			"single quote must be SQL-escaped")
 	end)
 end)
+
+
+helpers.describe("keylogger-device-log-privacy", function()
+	helpers.it("keylogger-device-log-privacy: SQLite initialization retains storage identity without logging it", function()
+		helpers.with_stub_scope({ "infra.logger", "modules.keylogger.sqlite_writer", "modules.keylogger.text_cipher" }, function()
+			local messages = {}
+			local logger = helpers.make_logger_stub()
+			for _, level in ipairs({ "start", "success", "warn", "error" }) do
+				logger[level] = function(_, format, ...)
+					messages[#messages + 1] = string.format(format, ...)
+				end
+			end
+			package.loaded["infra.logger"] = logger
+			local writer = helpers.load_with_stubs("modules.keylogger.sqlite_writer")
+			local identity = "private-device-identity"
+			writer.init({ paths = {}, device_obj = { name = "Private Test Host" }, device_id = identity })
+			helpers.assert_eq(writer.get_device_id(), identity)
+			helpers.assert_eq(#messages, 2)
+			helpers.assert_eq(messages[1], "Initializing…")
+			helpers.assert_eq(messages[2], "Initialized.")
+			helpers.assert_nil(table.concat(messages):find(identity:sub(1, 8), 1, true))
+		end)
+	end)
+end)

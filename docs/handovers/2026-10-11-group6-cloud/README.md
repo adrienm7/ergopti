@@ -4,6 +4,45 @@
 
 This is an incomplete continuation of items 36 and 62. No item is removed,
 including transversal items 16/38. Item 22 remains intentionally excluded.
+
+## Resumed exact native receiving and private compiler directory
+
+The unsigned storage-host probe now reaches Azure directly and the original
+`dbfdcaa652` job logs and ZIPs are received. This proves current access, not
+environment publication or fresh-task restoration. Manual38194299926 remains
+failed: 19 jobs, eight successful, six failed and five skipped; Release skipped.
+The [authentic Core/archive capsule](native-dbfd-core-archive-receiving.tar.gz)
+is408007 bytes/368 safe regular members, SHA256
+`d0e073b9b4ff4f621b44ccd6215d7c638b39272be88b3b0713ac529bef16275c`.
+
+Core is413/414. The original serial admission reaches the later dependency
+check only after all165 receiving tests pass its strict status/count/OK/no-skip
+checks. Individual child closure frames remain omitted in the runner's excerpt.
+The sole failure is the independent compiler include-directory0700 assertion,
+with actual0755. Its builder and test are byte-exact betweena18 anddbfd; the
+failure is not the previous156 timeout or an R2 source regression.
+
+The compiler directory fix creates the same owned `CPOSIXCompatibility` at0700
+and sets its exact mode before the original header loop. Removing three added
+lines restores the entire builder. All test assertions, recipes, commands,
+deadlines, source/image receipts and the held Swift45 factory remain unchanged.
+The [independent regression capsule](compiler-private-directory-regression.tar.gz)
+is3701 bytes/13 safe regular members, SHA256
+`1ee8f86b7338d65f62ed95a2e3c08a31d88139f28dbac0c4f8afaf73386db605`.
+The identical ten tests fail before the change under022/000, pass under077,
+and pass after it under all three. The actual hosted umask is not captured.
+Compiler/Security responses in this portable proof are modeled. This proof
+does not replace selected or native validation of the correction.
+
+Archive25 has24 passes/one owned Automation deadline failure, zero skips.
+All six Brew scenarios remain unexecuted. Exact original407 source pins,
+raw outputs,73 retained UI observations and closed helper/process-group receipts
+are joined; an API-call-starting marker with no returned OSStatus does not
+establish its OS/session failure cause. Package/install were skipped.
+Each native PAC14 has12 passing methods/two failing methods; individual
+assertion-failure totals differ by architecture. Trust/restoration, independent
+HTTP, model and enterprise acceptance remain incomplete. No old native epoch
+supplies new results, and no item or branch is removed.
 The website is outside scope.
 
 ## Source and preparation
@@ -757,3 +796,471 @@ paths. Agree on a movement table covering those joins and generated inventories
 before moving anything. The next coordination checkpoint is the current manual
 run's terminal receiving; the source correction is already published. The local
 session's main v1.0.1 publication is separate and has not been modified.
+
+## Portable receiver failure diagnostics
+
+The actual registered `test-managed-ollama-protocol.cjs` now prints one bounded
+failure fact before its original spawn assertions. It retains the last 8,192
+UTF-16 code units of each captured stream, script, status, signal and error code.
+Diagnostic-sink refusal leaves the original assertion authoritative. The Python
+selector, exact argv, 60,000 ms limit, complete case roster/counts and every original
+success-loop write remain unchanged. No verbose-mode or native-source change is
+included.
+
+The additive same-file control executes the actual loop with results from real
+closed children. Six controls pass on Linux: unchanged success output, nonzero
+exit, POSIX signal, missing executable, callback-flushed bounded tails and actual
+timeout. The private control uses 3,000 ms; a separate real original 60,000 ms timeout
+returns ETIMEDOUT after 60,010.5 ms with its child reaped. The actual predecessor
+fails the new output-loss assertion, with zero writes instead of one. Windows
+retains five mandatory controls and explicitly skips the POSIX signal case;
+Windows/macOS execution is unrun here. Full selected receiving follows adoption.
+
+The [immutable proposal](portable-receiver-failure-output-proposal.tar.gz) is 29,776
+bytes, SHA256 `c019dee3e7af0ddcc8823c9abc6407c5a25788d043639d568e87e4592917447e`.
+All 27 members are safe regular files and 26 inventory joins pass independently.
+Removing the two finite additions recovers the entire original file byte-for-byte.
+Both forward/inverse application and final syntax/format controls pass. This
+repairs missing failure evidence; it does not identify the historical hosted
+Python timeout cause, adopt the separate poll proposal, qualify native trust or
+complete item 62. Existing test locations, fixtures and ordering are preserved
+for the local AHK audit's coordinated migration.
+
+## Published diagnostics and unadopted native successors
+
+Commit `72b29be3999a8666938736e1fb5fc25defb6c263` publishes the portable failure
+diagnostic above. Its final serial gate passes format386 and all412 JavaScript
+checks in676.257 seconds. HEAD, index and91 source hashes agree before and after
+the gate; this is not a claim that drift controls never temporarily change their
+fixtures. The39,390-byte raw log hashes
+`70da6b8cda4782bd6ad20588d0f2611a3151b5048fa0f33b657dbfa4d514d800`.
+Four exact-SHA, all-event censuses find no automatic workflow. The feature is
+pushed; no new Dev integration or native qualification follows from this change.
+
+The [removal successor packet](native-removal-r2-controls-proposal.tar.gz) is
+299,893 bytes, SHA256
+`086876e32237cf8d30e291cf46486f7a580d32811c359aa4eedcea3dfd0eb207`.
+Independent receiving joins43 safe regular members and42 inventory entries.
+It preserves the original positional ADD call and scopes the retained stderr
+projection to REMOVE. All250 original function texts and156 case identities
+remain; nine additive focused controls pass and the original real SIGINT/SIGTERM
+interaction control passes. The original predecessor produces27 assertion
+failures across those nine cases, with no execution error. Full165-case, selected
+JS/Lua and native receiving remain unrun. This is UNADOPTED: Root/G4 ownership of
+the exact native-command spans is still required. Its registry proposal must be
+spliced onto the current diagnostic wrapper, never copied over that wrapper.
+The same exact bytes are publicly recoverable as
+[Git blob957f6bcc91b552b691b4b8d911432d51effa1eaf](https://api.github.com/repos/adrienm7/ergopti/git/blobs/957f6bcc91b552b691b4b8d911432d51effa1eaf).
+
+The [publisher extraction packet](root-cli-receiver-extraction-proposal.tar.gz)
+is257,176 bytes, SHA256
+`e3869596c8e4d7e3b23f29162edf7af01d2ee537f0de7eff843806c225846382`.
+Independent receiving joins30 safe regular members and29 inventory entries.
+It extracts the genuine `f1db72eabfb7960cd78b788ae9adbd2b5f8d1a38` PowerShell
+CLI and embedded JavaScript receiver into two exported modules, with finite
+changes to their two original wrappers. All ten original PowerShell helpers and
+the original complete stage/consumer bodies remain recoverable through explicit
+binding inverses; import does not start the cohort or acquire compiler/evidence
+resources. Software receiving passes21 Node controls and four Linux PowerShell
+7.4.11 controls. These modeled and import checks do not qualify Windows, a
+compiler, the actual producer ZIP or the original23 cohort. Its exact bytes are
+also recoverable as
+[Git blob501ea4cdebfa746f5b7b93330777bdf24ec33630](https://api.github.com/repos/adrienm7/ergopti/git/blobs/501ea4cdebfa746f5b7b93330777bdf24ec33630).
+
+This extraction is UNADOPTED and enrollment is incomplete. Root's historical
+3,262-row profile joins all21 historical updater pins, but only19 of the21
+current pins. The held constructor successor joins the current21; retain both
+`85b7f0f55e` constructor corrections. Do not import the old input profile or
+regenerate an independent oracle. Future composition needs reviewed shared
+publication ownership, a generated and frozen CURRENT source census including
+new module/loader/input/workflow bindings, and the stronger G6 acquired/final-held
+reader. The original committed image and exactly two authenticated producer
+outputs must remain separate; LICENSE and every other source stay exact.
+Ordinary Root hash/read calls cannot substitute for this stronger reader.
+Authentic PREBUILD/POSTBUILD, raw compiled/header/compiler receipts, original23
+child/oracle/budget/retirement and full unit/E2E/package/install receiving remain
+necessary. The old3,259 and F7's2,894 commitments remain distinct.
+
+New official artifacts11714423296 and11715250676 bind the same `f1db` attempt1
+of run38173146839. API sizes/digests are received; the actual ZIP downloads return
+HTTP403 with zero bytes through `productionresultssa4.blob.core.windows.net`.
+No native assertion or PRE/POST proof is independently received from those
+downloads. Network draft12 adds only that exact host and preserves all five
+earlier custom hosts, presets, install/start scripts, repositories, secrets and
+runtime settings. The [safe draft receipt](network-draft12-receiving.json)
+records saved/read-back state, not activation. Environment Settings must save
+and publish the draft before the new allowlist is active. Alternatively, the
+producer owner may provide the exact safe ZIP bytes through immutable Git API
+blobs for official size/digest comparison; no signed URL or credential is shared.
+No unchanged403 retry, CI ref, workflow or release is created by these proposals.
+Items36/62, transversal16/38 and the deliberate exclusion of22 remain unchanged.
+
+## Current Dev composition and additional receiving
+
+The current remote Dev delivery is
+`da74809cd1bfae395ebb0e402bcf3c130a286cab`. Receive it explicitly with
+`git fetch origin refs/heads/dev:refs/remotes/origin/dev`: this container's
+configured fetch map follows only `main`, so `git fetch origin dev` updates
+FETCH_HEAD without updating `origin/dev`. The group6 feature preserves its
+published `72b29be399` diagnostic and `c23982e1cc` preservation commits. Group3's
+official manual38176924058 and lock98c39b47 are separately owned; this feature
+does not modify either. Its local merged-source qualification is separate from
+that official run and from completing items36/62.
+
+The [full portable removal receiving](native-removal-full165-receiving.tar.gz)
+supersedes the earlier full165 UNRUN checkpoint: all165 actual cases pass, zero
+failed/errors/skipped, in45.164 seconds under the unchanged60-second business
+boundary. All29 private/live source hashes agree before/after; no candidate
+bytecode is written, the directly owned child is reaped and its process group is
+absent. The original fixture/capture/debt assertions remain. The packet is137,501
+bytes, SHA256
+`70646defa298f662c8ad67ec6c9ee12154d49f7e00e00ebba828541f0a384402`,
+with40 safe regular members and39 independent inventory joins. The first parent
+single-line parser refusal is preserved: original test47 emits a bounded removal
+diagnostic before its separate `ok`; receiving that actual terminal does not
+change an assertion or oracle. Live fixture/156 registry adoption and normal
+selected gates are still pending. Native trust and historical hosted cause remain
+unqualified.
+
+The [strict library seam](root-receiver-strict-read-proposal.tar.gz) adds only an
+optional source-bound reader to the unadopted extracted CJS module. Default
+behavior and semantic/output predicates remain exact. The strict branch parses
+PRE/POST JSON from the same acquired Buffer that supplies its hash and checks
+Buffer/hash linkage; it never makes the ordinary second JSON read. All21 default
+modeled controls and five new controls pass. The original module produces four
+causal assertion failures, no helper errors. Initial and acquired hardlinks are
+actual POSIX files; the changed-second-read control is explicitly modeled. Its
+271,926 bytes hash
+`d11ff9c3cc1ed56a30a526f72ba6e16f8fd8a756aba92777ce285d93bb80dbe6`,
+with49 safe regular members/48 inventory joins. This is a trusted code seam,
+not caller-JSON authority or whole directory/Git closure. Caller/module/loader
+enrollment, the current full source profile and authentic runtime receiving still
+block activation.
+
+The [authentic f1db producer receiving](f1db-actual-producer-receiving.tar.gz)
+receives both original official ZIPs through the producer's already-published Git
+blobs. Each complete decoded ZIP joins official API size/digest and Git ID; all
+seven members have safe paths/type and valid CRCs. This supported API transfer
+resolves the earlier missing-byte checkpoint without modifying signed URLs or
+claiming network-draft activation. Twenty-two semantic joins verify historical
+PRE's3,262-row commitment, same-run POST/PRE linkage, exactly two generated runtime
+outputs, unchanged LICENSE/all3,260 other rows, actual vendor EXE/manifest and
+static x64 PE32+/mitigations. The authentic RESULT reports12 targeted passes,
+four direct-child close receipts and nine clean cleanup reports. Raw TAP/captures
+and local kernel closure are not independently observed. The2,152,201-byte packet
+hashes `bd8da7a16497ec0858d2a948be9e07f0317371ce92dc9d3f5e43e112ceaa1756`,
+with23 safe regular members/22 inventory joins. It grants neither current21 pin
+admission, our original23 nor complete unit/E2E/package/install acceptance.
+
+The actual raw prepared source receipt, MSVC function, Duktape sources/header,
+generated `pac_generated.h`, command captures and used-compiler trace are absent
+from those seven members. Never invoke the receiver over reconstructed or dummy
+substitutes. The [raw retention proposal](native-pac-raw-retention-r2-proposal.tar.gz)
+adds a separate always upload for already-produced files and observations from
+the original identity/dumpbin commands, without replay or changed compiler/native
+commands. It records decoded stdout lines, not raw byte/stderr or compiler traces.
+Both optional capture refusals now follow all six original native output guards
+and precede artifact/publication IO; those later IOs are unobserved on refusal.
+Actual Linux PowerShell7.4.11 passes three parse/order/helper/real-IO controls;
+the first proposal fails the causal ordering assertion. Whole Windows builder,
+format/full pipeline and native receiving remain UNRUN. Its67,231 bytes hash
+`9472603b16072b08ae3c21ee044e890ae713a2b322b8b466dbbc45b00913c2c4`,
+with20 safe regular members/19 inventory joins. Root/Windows/G3 ownership and
+canonical always-fatal workflow guard/producer-fingerprint enrollment remain
+necessary. Original preimage bytes and full inverses are retained.
+
+The [G5 diagnostic graft](g5-portable-output-graft-proposal.tar.gz) applies only
+the two published72b29 additions to authenticated26e wrapper bytes. Six actual
+same-file portable controls pass, old output-loss assertion is red, syntax/format
+pass and removing both additions restores every G5 byte. All existing60,000 ms
+boundaries, argv/executables/assertions/counts/success writes remain. The actual
+38174614308 Source uses60 seconds, not the reported90; its failed script/cause
+remain unknown while raw job/qualification ZIP access is Forbidden. Whole G5,
+JS/Python/native receiving is unrun on this unadopted graft. Its31,408 bytes hash
+`83210ead3609265de26d7de0cbb370d6d6ba5bd22cf0b649ed72e5b69ca10194`,
+with21 safe regular members/20 inventory joins.
+
+These additional packets are also POST/GET byte-exact immutable Git blobs:
+full165 `00e20a11a7c4de7ecc0d37db6d22e84775a53b13`, strict seam
+`46776f6c0f1706117053573cb2950912c875b653`, actual f1db
+`0732ed3c05af674f0cc3752da9570c2915636364`, raw retention
+`575d13c4ee725a61af26c21f3ee6286cff829546`, and G5 graft
+`8f4d5c0df93d5735015329861a4620f87b5340f1`. They create no ref, workflow or
+release. [Network draft13](network-draft13-receiving.json) adds only the newly
+observed `productionresultssa3.blob.core.windows.net`, preserving all six previous
+custom hosts and all other fields. Saved/read-back confirmation is not activation;
+Review/Save then Publish in Environment Settings is still required. A brief401
+API/Git refusal resolves before the successfulc239 publication; cause is unknown.
+All proposals remain held pending their exact ownership/enrollment/native joins.
+Test locations, independent corpora, fixtures, ordering, all TODO items and the
+local main/v1.0.1 release remain preserved.
+
+## Qualified merged checkpoint and final source preparations
+
+Published feature checkpoint `c3a49a115c21d98d05626d847ad3e416ca77987a`
+preserves parents `c23982e1cc` and current Dev `da74809cd1` without squash.
+Its tree `53d02a1d79d10ebf05c72548759fdd42cff8ffd6` is the tested index.
+The [canonical receiving packet](dev-da748-canonical-receiving.tar.gz) retains
+the original log, the110-path before/after fence, publication and exact
+automatic-run censuses. All110 source hashes,
+HEAD and logical index agree before/after; this permits restored temporary
+drift-guard edits and does not claim continuous immutability. Its six serial
+gates pass in1,554.954 seconds: format388, JS413, Lua18609, virtual Hammerspoon
+E2E101 with one declared host/driver skip, Linux E2E193 and Linux unit13268.
+No test failure remains in those selected gates. Physical X11/Wayland/input and
+native Hammerspoon are not qualified by these virtual or stub checks.
+
+The768,835-byte packet hashes
+`3473afc774b722dce3e96e480cd56c87bd504e042027dd8bd1c542a266f5fbc4`,
+with nine safe regular members/eight independent inventory joins. Its exact
+decompressed6,322,353-byte log hashes
+`f41ae1912e2c8814d20f0a1c320df51f469793924c2a5bd0ba4dff8912b4feaa`.
+Four all-event automatic censuses find zero runs on the exact published SHA.
+The subsequent explicit Dev fetch still receives `da74809cd1`.
+
+The [removal custody receipt](native-removal-custody-receiving.tar.gz) corrects
+the historical Root-pending statement and public handoff6114042540. Authentic
+request6113599499 and Root6113764617 name the exact086876e proposal; Root
+releases the settled removal projection, additive nine-case class and unique
+156-to165 literal. G4 removal custody remains absent in the received cut;
+separate poll grants do not authorize removal. Any actual same-span writer must
+serialize independently. Current fixture/corpus preimages remain exact; the
+current72b wrapper requires only its unique census splice, preserving every
+failure diagnostic, original command/assertion/count and60-second boundary.
+The17,862-byte packet hashes
+`7a32d11aa313dd1a70021dd98c3f762b87f1b9e2289a27da329e26645046571a`,
+with ten regular members/nine joins. No tests ran in this custody review.
+The independently received165 portable passes remain separate from live adoption
+and actual Darwin trust restoration.
+
+The [formatted raw-retention metadata proposal](native-pac-raw-metadata-r2-proposal.tar.gz)
+adds only one FULL_STEPS tuple, one STEP_CONDITIONS tuple and a named guard with
+new omission controls. It binds the immutable R2 producer step's eleven paths,
+exact always condition, action, namespace, fatal missing-file contract and
+position after original PAC retention/before SDK acquisition. All40+262 original
+function bodies,128 existing assertions and71+89 tuple elements remain exact;
+whole-file and formatter-only inverses are retained. Pinned repository-config
+Prettier and syntax pass. Bounded actual-parser controls pass one default positive
+with seven causal refusals, and two named-guard positives with twenty refusals;
+the actual metadata preimage admits those seven broken variants. The initial
+external VM-array error and first formatting refusal remain recorded. Full
+pipeline/JS/source-drift, Windows compiler/builder and native receiving are UNRUN.
+Root/Windows/G3 exact custody and truthful current producer fingerprint/source
+enrollment remain mandatory. Compose these three literal additions with G3
+SourceB and G5 clock metadata on authentic future preimages; never overwrite a
+whole private file or relax the original23/native28 late consumers/retirement.
+The286,634-byte packet hashes
+`12e9d323d6c7208338e5fabbb816850e4103ad9fbca7d369b56180772ff035ef`,
+with42 safe regular members/41 independent joins. Request6114372125 follows the
+separate producer request6114209065; neither grants adoption.
+
+These three packets are also POST/GET byte-exact Git blobs: canonical receiving
+`ca3a9b34086d985dd7b69321f3252a981715aacb`, custody
+`56fea0b22dfc61a7e6663299d290ed2c859ead32`, and metadata
+`250aa643efd1451aa69d1af33c528a07189d4007`. The separate G3 manual38176924058
+on actual Dev `da74809cd1` is terminal FAILURE and does not qualify this feature
+SHA. Its Windows unit manifest is incomplete:1,989 terminal passes, zero terminal
+failures and9,157 cases without terminal results under the original watchdog.
+Reported macOS system-trust and Homebrew failures remain unresolved; no native
+cause or complete acceptance follows from matched source maps. Official CI ref,
+lock/manual, main release and test migration remain untouched. Network draft13
+still needs Environment Settings Review/Save then Publish for activation.
+Items36/62 and transversal16/38 remain open;22 stays deliberately withdrawn.
+
+## Container continuation and local native procedure
+
+2026-10-12 continuation prepares the remaining native work for the maintainer
+while adopting a measured collector optimization. The G3 report6114685288 has
+an original60-second clock32 timeout in its full JS gate, although its direct
+original32 passes. Four actual source-bound private rounds retain identical
+32-control stdout/stderr and the original corpus/budget: baseline17.744s,
+profiled baseline19.990s, candidate11.609s and profiled candidate12.585s.
+Their [bounded receiving packet](clock32-tracking-cost-receiving.tar.gz) retains
+429 source fences, actual child observations, complete forward/inverse and all
+original32 bodies/assertions. Its377,910 bytes hash
+`78a1fbe40ccaf27ef6335c5a3863a2534f3684a263bdbad0a85d51bed9811e5b`,
+with34 safe regular members/33 inventory joins. Git-API POST/GET is byte-exact
+at blob `507b79a1ad7283637b2b0cef5faab8d3f6fd332b`.
+
+The collector now batches the same tracking rosters through unchanged
+`git ls-files --error-unmatch`, with a named64-path tuning constant. Every accepted
+input still undergoes its original per-file acquired-byte/committed-byte/hash
+checks, and the original independent before/final source procedures stay exact.
+It caches no source bytes or Git authority. Profiles measure9,857 to5,164 child
+calls and4,867 to189 tracking calls. A missing builder now refuses its complete
+19-input list earlier, so15 preceding committed-byte reads are unexecuted on
+that refusal; this is not an identical acquisition chronology claim. The final
+named-constant source passes the original32 in11.365s and remains fenced with the
+original test/base procedure/wrapper bytes. Full selected validation is separate.
+The real hosted timeout is not reproduced and its cause stays unknown. HTTP
+server polling is absent from this clock32 execution path; its separate0.05
+proposal cannot be described as this timeout's fix. Native commands, clocks,
+calibration/factory policy and production qualification guards are unchanged.
+
+The [local native procedure](LOCAL-VALIDATION.md) reuses existing execution
+owners and recipe commands. Its [audited source plan](local-native-qualification-plan.tar.gz)
+binds24 committed entry-point/recipe cuts and22 actual workflow step bodies at
+`1f764e33fa`; the instructions describe unexecuted commands, not validation.
+The228,157-byte packet hashes
+`01257a1ff32e4c71481766fc0eca223bdad4582cad60e6a5a64a7a592b9a89e7`,
+with30 regular members/29 joins, also exact Git blob
+`94258e6c2d208bcdaf9e327758039a91cb6fa411`. It adds no competing runner,
+test directory, refreshed oracle or invented GitHub run identity. Existing local
+HTTP receiving supports all three GitHub identity fields absent and explicitly
+records unbound context. That real diagnostic mode does not activate an official
+source/image/clock factory. Bare local commands do not inherit GitHub outer
+supervisor deadlines; their original inner clocks and retained debt still apply.
+
+Root removal custody is resolved. G4 removal/poll overlap, raw producer and
+guard ownership, Root shared-publication/current-source enrollment and the
+strong acquired/final-held receiver remain separate pending coordination.
+Request6114732206 renews those exact finite spans;6114852858 announces the owned
+collector change at a terminal point without modifying a peer gate. Actual
+Windows/macOS source/runtime/GUI/trust/consent/package/install receiving remains
+required. Neither a portable success nor historical Root23 admits this complete
+feature. TODO36/62 and transversal16/38 remain open;22 stays withdrawn.
+
+## Original updater tooling for local Windows execution
+
+The current Devd316 union is preserved by no-ff feature2abea05f32f9bb2fabb05b6a7d92476be52e5fd7. Its serial selected gate passes format, encoding1894, JS413, portable Mac Lua18609 and Linux13268;125 Source/HEAD/logical-index fences join before/final. AutoHotkey unit/parse/E2E are unexecuted here. Whole integrated manual38182346781 is separately terminalFAIL,43jobs29success/8failure/6skip, Release skipped; its Core Python156 receiver timeout is not the separate Node32 process.
+
+Five absent owned sources are adopted from the strict-local updater proposal: original diagnostic CLI, current21 input map, independent label oracle, callable Source module and registered Source test. The original official admission, acquired reader, Git collector and2307-byte child remain exact. A new explicit local mode uses actual Git HEAD/absolute paths/null run IDs and context_bound=false. Its inert six-field metadata copy refuses label/Proxy overrides, and importing the CLI does not start its private main. Ordinary JSON require and predecessor FD-close error masking are retained limitations; caller metadata is not authenticated API/kernel/native authority.
+
+Both author rounds pass22 controls with no failures/errors/skips. Four counterfactuals fail their intended assertions (schema, Proxy spread, local arity and import execution); the earlier two EROFS launches fail before cases and remain distinct. The immutable44-member77645-byte packet is [preserved](updater-strict-local-source-receiving.tar.gz), SHA256d9c942180724ee74c3544e96035af81728e5e96536b1d13111bf68da96b5e98f, independently roundtripped public Git blob71d2364b5ee50397e6565cfb2874a9e8502c4bbe. The two additive registration spans alone have Root handback6115117953; every prior CHECKS object/alias/order is preserved.
+
+The [local procedure](LOCAL-VALIDATION.md) now includes the actual command before tracked PAC publication. No new PAC-output allowance or workflow step is activated. Local23, original full Windows unit/E2E/build/install, current compiled producer receiving, Mac Brew6/trust and final installed/enterprise acceptance remain unexecuted/unqualified on this successor. Items36/62 and16/38 remain open; the feature is retained and no Dev integration or release is claimed by these portable controls.
+
+The final registered test uses private x64/arm64 admission realms, while the four original tools stay byte-exact. Its22 canonical Source controls pass from the actual checkout. The [portable-test successor](updater-arm-portable-test-receiving.tar.gz) retains preimage7cdb/forward/inverse/postimagef16ad5257b28c2848e285473d83eee29dca39db2dc5ceb95327c73c4f7fec886,58 unchanged assertions,22 actual and22 lexical-ARM controls, five actual assertion refusals and independent review. This56-member27035-byte packet has SHA256971194dd2f4fadeb88333961b6f11dede994116167252321157c728150b516af. The first cross-realm harness error and old ARM-incompatible replay remain separate. Lexical ARM simulation retains host argv in some old negative vectors; their refusals alone do not establish the intended argument cause. Normal22 controls use the actual process correctly, and the dedicated private-realm local/official ARM refusals and main acquisition omission are causal. No ARM hardware/native qualification is claimed.
+
+## Original network fixture polling cost
+
+The existing G6 serving-worker span now names its poll interval as50ms rather
+than accepting Python's500ms default. It changes only the existing Thread kwargs
+and its local value/comment. The entire inverse returns the original fixture
+SHA256 `9ce69d62fe7d1807b1df6aeedaab0ac6cb45b5fb5842330f9f0254f94033e289`;
+the candidate is `10c923949060a3fc04a3d596c03c3851efce3815b443f6f40ccafdfd2d13c979`.
+No server/thread/native command or trust/query acquisition is added. Start
+acknowledgement, retained workers, bounded shutdown, physical closure, uncertainty
+and retry/debt laws remain unchanged. All original156 test bodies and assertions,
+the60000ms outer child and15s native command limits remain intact.
+
+Actual current-source Linux receiving runs the original156 controls in13.599s
+with zero failures/errors/skips. Ruff check/format pass. Historical baseline
+45.907s and the literal-only private candidate13.716s are separately retained;
+they do not establish why the hosted child timed out. Native macOS receiving
+of this new fixture is pending; the active a18 manual tests its predecessor.
+The performance change grants no trust, consent, full-suite or package acceptance.
+
+Root6113612093 and Group5 6113461574 release the finite polling span. An
+independent authenticated history identifies the current serving-worker code as
+G6/network909e118370e16a777502f7e7c467e0c9edbdce41. No G4 reservation or declared
+same-span writer was found in actual saved/current coordination; the prior
+G4-pending wording was our conservative blanket request. The own-span change
+proceeds under the maintainer's existing G6 authorization with public notice
+6115804870, without treating silence as a grant or touching G4-owned policy.
+The R2 removal observation and official Windows PAC-safe branch remain separate
+unadopted preparations. Normal selected serial gates must still qualify the
+final source; TODO36/62 and transversal16/38 remain open.
+
+## Removal diagnostic composed with the polling correction
+
+The exact Root6113764617 three cuts are now adopted over published poll
+`df2762ba00c51d56531b2a19d36fa0441b8efbcd`, after its selected serial format,
+414JS and18609MacLua assertions passed with132 before/final Source/HEAD/index
+bindings equal. The removal-only seven fixture hunks preserve the entire named
+polling body; its new source SHA256 is
+`d9cb9fbd0d28a18f2b52aa898c7dfeb714b285af3e0aadb8bb5bc950071c8780`.
+The new owning nine-case class is byte-exact to the frozen reviewed R2 proposal;
+all250 old functions/providers/assertions and156 original case identities remain.
+The current wrapper keeps every previous byte except its single156-to165
+count, including the bounded failure diagnostic and original60000ms child limit.
+
+REMOVE alone projects bounded already-settled original stderr and the same
+retired child/status. ADD retains its original positional adapter. The same
+native trust commands,15s clocks, settlement/primary/cancellation/capture and
+uncertain-close debt laws remain. The observation cannot restore trust, grant
+native acceptance or justify retry. Actual current-source165 controls pass in
+13.192s with zero failures/errors/skips; Ruff check/format and Node syntax pass.
+Historical full16545.164s and original27 assertion/prior-adapter2 assertion
+refusals stay separate. Normal final selected serial gates and exact-source
+Darwin receiving still qualify the new composition independently.
+
+Source histories identify the three spans in G6/network6bf/909/544/0aa/6e4/859/e91
+commits. No actual G4-authored same-span reservation was received; the prior
+blanket G4-pending wording was our conservative request. Root's finite handback,
+maintainer authorization and fresh public notice6116025187 support this own-span
+continuation without inventing a silence grant or changing any G4-owned caller,
+serving policy or assertion. Existing paths and original ordering are retained
+for the coordinated test migration. Shared Root PAC module/profile publication
+and the official updater23 PAC-safe entry remain genuinely reserved and unadopted.
+The callable local updater23 remains available before tracked PAC publication.
+
+The [Source-only composition capsule](native-removal-r2-on-poll-source.tar.gz)
+has16 safe regular members and SHA256
+`0b95d85151ced369151d28b845bfa245b8176da862edb548187f694a42b69c9c`.
+It retains authentic Root custody, source history and complete three-file
+forward/inverse preservation; it contains no new execution/native credit.
+
+## Actual predecessor a18 native result
+
+Manual [38188708204](https://github.com/adrienm7/ergopti/actions/runs/38188708204)
+actually tests `a18f22edd3153884e67a78500417dbea6342e978`, attempt1, Windows+macOS,
+and ends FAIL:23 jobs,8 successful/8 failed/7 skipped/zero cancelled. Release
+actually skips and Linux is unselected. Only the verified owned lock8e68093f
+is released after complete terminal API receiving. This run tests neither the
+new poll nor removal composition.
+
+Core executes413 passing checks/one failure of414: the Python3.12.15/x64 original
+156 child times out at60000ms, with status null/SIGTERM. The new diagnostic
+retains122 dots and three closed fixture frames; these do not prove all156
+methods or all child retirement. New Source22 and standalone clock32 normal
+entries succeed; their individual success stdout is not retained in the Core log.
+Both actual architectures pass SourcePAC10 and execute PAC14 with12 passes/two
+failed methods/no skips. Each independent HTTP cohort attempts two methods,
+zero passes/three errors including teardown; trust-add15s and restoration remain
+unresolved. Native archive25 has24 passes/one failed owned Automation deadline;
+Brew6 is unexecuted. Exact Windows planned11165 starts1984:1983 pass with
+joined durations,zero assertion failures/zero within-plan skips,one started
+nonterminal and9181 unstarted. The watchdog stays1320000ms; current stopping
+case is hotstring-category-owner immediate1 refusal, without a proved hang cause.
+All23 updater names remain unexecuted. Nine interactive exclusions are outside
+the denominator. Forty-four raw names contain replacement characters, while
+genuine manifest names remain unchanged;1939 raw-to-manifest names match exactly.
+
+Both current clock artifacts independently join424 Git inputs,18 recipe and16
+staged inputs, all nine payload hashes and16 raw samples within actual Python
+intervals. Compile/sign/strict verify/clock owners close with status0 and no
+retained group/file/stream debt. Compiler/interpreter/kernel-image authority
+remains explicitly unknown; the Swift45s factory stays held. Numerical/Source
+receiving is distinct from successful HTTP and complete package/install/enterprise
+acceptance. No native success from a historical epoch is carried forward.
+
+The [bounded actual receiving capsule](native-a18-bounded-receiving.tar.gz) is
+2262040 bytes,439 safe regular members, SHA256
+`88f16724dee07d64326e63f945bdff53ef6a241e91c849dea4b8f31ed7707f10`;
+its inventory SHA256 is
+`2a8d0b0b0ed4ef22dc9a072a84c9224dcdcdfda3e12b8b873ff17b334164424f`.
+It preserves actual raw/API/ZIP/inventory/source joins and exact dispositions.
+TODO36/62 and transversal16/38 remain open; no Dev integration or branch deletion.
+
+### Final exact census guard composition
+
+The first selected removal gate retains its actual failure: format and18609
+MacLua pass, JS411/414 with three failures. Two checks refuse because the
+clock selector guard still requires156 while the owning wrapper correctly
+requires165. Its G6-owned expected exact count now also requires165; an added
+mutation in the original selector control proves the obsolete156 row refuses.
+All32 control identities and every old mutation/assertion remain. Current32
+controls pass with the existing admitted temporary root and original60s limit.
+The Source-only capsule above continues to bind its exact three original cuts;
+this additional one-literal guard and refusal vector are separate source changes.
+
+The third initial JS failure is an actual60000ms timeout in the unchanged PAC
+fourteen-case child. Its current same-access direct replay passes all fourteen
+in1.045s, together with66 original portable contract controls. The cause is
+unresolved; no timer, assertion or source is changed to forgive it. An earlier
+clock replay refused EROFS before any case because its existing owned temporary
+root was outside that call's sandbox; the subsequent same-root authorized call
+passes32. These dispositions stay distinct. The full failed raw log and134
+before/final Source/HEAD/index bindings are retained; final selected gates must
+be rerun after the actual count correction before publication.

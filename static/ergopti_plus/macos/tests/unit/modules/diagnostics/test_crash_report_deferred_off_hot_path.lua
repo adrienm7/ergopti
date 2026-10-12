@@ -65,6 +65,7 @@ helpers.describe("logger: a recoverable timer-callback error never reaches the c
 
 		package.loaded["infra.logger"] = nil
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.install_runtime_error_capture()
 
 		local reported = false
