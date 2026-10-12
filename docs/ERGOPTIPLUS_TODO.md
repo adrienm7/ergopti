@@ -179,6 +179,36 @@ emission; physical hooks, modifier delivery, UIA/rendering and full native suite
 are not qualified by these portable/source results. No native qualification flag
 is raised. Full composed JS/macOS gates remain pending at this checkpoint.
 
+#### Terminal Mac suite and pending native modifier correction
+
+The full portable Mac run on published `0cd3c15aa` completed 18,945 passes and
+six failures in 1,576 modules, exit 1. It is not a green suite. Three failures
+are repaired separately: distinct discovery acknowledgement names remove a
+nested-local scanner false positive, and the metrics scope census now preserves
+99 original scenarios plus the eight explicitly listed scalar regressions.
+The unchanged guard passes 7/0, discovery/authentication modules 117/0 and 20/0,
+and scope receiving 2/0 with 214 complete callbacks. Original discovery behavior
+also passed before the naming change; no native nil-global defect is claimed.
+The three unreachable-server offer failures remain open while their stale HTTP
+fixture is corrected; no complete Mac rerun is claimed after these changes.
+
+Item 49 has an implemented pure-C correction retained in the
+[pending modifier patch](handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch).
+The old planner emits redundant natural modifier edges even when another source
+still holds that bit. Eight LR families, both VK/SCAN axes, physical/owned-replay
+separation and an unrelated held modifier cover 64 cohorts and 320 target edges;
+192 checks retain disabled-cohort refusal. Eight matrices pass normally and with
+complete sanitizers; the original and three independent mutations fail. All 124
+original assertions remain, with 33 added. This correction is not yet applied
+to the live native sources: its three recipe inputs require an actual MSVC DLL
+rebuild and matching manifest first. The preceding E4133 artifact remains valid
+only for the preceding live source. Production cohort migration and emission
+remain unfinished. Native or physical acceptance is not inferred from C tests.
+
+The [Windows continuation prompt](handovers/2026-10-12-dev-consolidation/windows-receiving-prompt.md)
+includes the release/one-click receiving route and native prerequisites. Root
+continues to own publication and CI; no release or direct main push is made.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
