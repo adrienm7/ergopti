@@ -10435,6 +10435,13 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   qualify physical buffered input, output or installed delivery; item93 and
   transverse16/38 remain open.
 
+  Linux bundled hotstring routes now preserve exact file identities, including
+  inode values above Lua numeric precision. Safe integer metadata is serialized
+  exactly; unsafe numeric metadata uses the existing native descriptor ledger.
+  Shipped files are neither copied nor materialized. Native input/output,
+  installed-runtime and final-source hosted qualification remain required;
+  item93 and transverse16/38 remain open.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
