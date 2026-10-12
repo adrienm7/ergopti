@@ -1,0 +1,614 @@
+{
+	"schema_version": 1,
+	"feature": "input-and-actions",
+	"checks": [
+		{
+			"id": "js-0419",
+			"ordinal": 4,
+			"name": "Windows navigation portable census retains every native and portable case",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-nav-portable-registration.cjs"],
+			"repro": "node tools/test/test-windows-nav-portable-registration.cjs"
+		},
+		{
+			"id": "js-0420",
+			"ordinal": 5,
+			"name": "Windows navigation executes every portable production C case",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/run-nav-event-owner-portable.cjs"],
+			"repro": "node tools/test/run-nav-event-owner-portable.cjs"
+		},
+		{
+			"id": "js-0421",
+			"ordinal": 6,
+			"name": "Windows captured-event route core executes independent event vectors",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/run-windows-replay-route-core.cjs"],
+			"repro": "node tools/test/run-windows-replay-route-core.cjs"
+		},
+		{
+			"id": "js-0422",
+			"ordinal": 7,
+			"name": "Windows canonical output planner executes independent custody matrices",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/run-windows-terminal-output-plan.cjs"],
+			"repro": "node tools/test/run-windows-terminal-output-plan.cjs"
+		},
+		{
+			"id": "js-0423",
+			"ordinal": 8,
+			"name": "Windows terminal output custody adapter preserves exact native bindings and closed admission",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-terminal-output-custody-adapter.cjs"],
+			"repro": "npm run test:windows-terminal-output-custody-adapter"
+		},
+		{
+			"id": "js-0428",
+			"ordinal": 13,
+			"name": "Windows ordered-pair cohort receiving retains original publisher and retirement",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-key-combination-cohorts.cjs"],
+			"repro": "node tools/test/test-windows-key-combination-cohorts.cjs"
+		},
+		{
+			"id": "js-0014",
+			"ordinal": 26,
+			"name": "native typing consumer retains actual selection and KPI dependencies",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-typing-consumer-closure.cjs"],
+			"repro": "node tools/test/test-linux-typing-consumer-closure.cjs"
+		},
+		{
+			"id": "js-0021",
+			"ordinal": 33,
+			"name": "Windows range stages acknowledge completed reads and failures",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-range-consumption.cjs"],
+			"repro": "npm run test:windows-range-consumption"
+		},
+		{
+			"id": "js-0022",
+			"ordinal": 34,
+			"name": "native WebView receives ranges through a private HTTPS mount",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-range-transport.cjs"],
+			"repro": "npm run test:windows-range-transport"
+		},
+		{
+			"id": "js-0032",
+			"ordinal": 44,
+			"name": "hotstring priority parity (shared JSON ↔ AHK + Lua)",
+			"cmd": "npm",
+			"args": ["run", "--silent", "test:priority-parity"],
+			"repro": "npm run test:priority-parity"
+		},
+		{
+			"id": "js-0072",
+			"ordinal": 84,
+			"name": "one hold picker: the same options in the same order on every driver, from one shared table",
+			"cmd": "node",
+			"args": ["tools/test/test-tap-hold-hold-options-parity.cjs"],
+			"repro": "node tools/test/test-tap-hold-hold-options-parity.cjs"
+		},
+		{
+			"id": "js-0073",
+			"ordinal": 85,
+			"name": "one tap-hold key catalogue: order, hands and labels shared, each column its engine, read by every tray",
+			"cmd": "node",
+			"args": ["tools/test/test-tap-hold-key-catalog-single-source.cjs"],
+			"repro": "node tools/test/test-tap-hold-key-catalog-single-source.cjs"
+		},
+		{
+			"id": "js-0074",
+			"ordinal": 86,
+			"name": "one table for what the one-shot Shift types, read by Windows and Linux",
+			"cmd": "node",
+			"args": ["tools/test/test-tap-hold-one-shot-results-single-source.cjs"],
+			"repro": "node tools/test/test-tap-hold-one-shot-results-single-source.cjs"
+		},
+		{
+			"id": "js-0076",
+			"ordinal": 88,
+			"name": "hotstring language packs are complete data and every section ships disabled",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-language-packs.cjs"],
+			"repro": "node tools/test/test-hotstring-language-packs.cjs"
+		},
+		{
+			"id": "js-0077",
+			"ordinal": 89,
+			"name": "the hotstrings windows are one shared UI, and every driver bridge answers every action it sends",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstrings-bridge-parity.cjs"],
+			"repro": "node tools/test/test-hotstrings-bridge-parity.cjs"
+		},
+		{
+			"id": "js-0086",
+			"ordinal": 98,
+			"name": "every declared action chord is well formed (I4 — an unknown modifier fires the wrong shortcut silently)",
+			"cmd": "node",
+			"args": ["tools/test/test-action-chord-notation.cjs"],
+			"repro": "node tools/test/test-action-chord-notation.cjs"
+		},
+		{
+			"id": "js-0087",
+			"ordinal": 99,
+			"name": "one generated action catalogue per driver (strict schema, pruned headings, localized keys in 21 locales, runtime parity test in every driver suite)",
+			"cmd": "node",
+			"args": ["tools/test/test-action-catalogue-codegen.cjs"],
+			"repro": "npm run test:action-catalogue-codegen"
+		},
+		{
+			"id": "js-0088",
+			"ordinal": 100,
+			"name": "the Karabiner and gesture action namespaces are one (54 tappable reachable, 19 hold-only out, no doubled keystroke)",
+			"cmd": "node",
+			"args": ["tools/test/test-karabiner-namespace-is-merged.cjs"],
+			"repro": "node tools/test/test-karabiner-namespace-is-merged.cjs"
+		},
+		{
+			"id": "js-0089",
+			"ordinal": 101,
+			"name": "Karabiner binary paths declared once (a v16-style rename must not reach 3 of 4 copies)",
+			"cmd": "node",
+			"args": ["tools/test/test-karabiner-binary-paths-single-source.cjs"],
+			"repro": "node tools/test/test-karabiner-binary-paths-single-source.cjs"
+		},
+		{
+			"id": "js-0098",
+			"ordinal": 110,
+			"name": "every registered action resolves a label in all 21 locales",
+			"cmd": "node",
+			"args": ["tools/test/test-action-labels-have-locale-keys.cjs"],
+			"repro": "node tools/test/test-action-labels-have-locale-keys.cjs"
+		},
+		{
+			"id": "js-0112",
+			"ordinal": 124,
+			"name": "macOS remap lease survives private-process SIGKILL through an exact-token LaunchAgent",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-remap-launchagent.cjs"],
+			"repro": "npm run test:macos-remap-launchagent"
+		},
+		{
+			"id": "js-0153",
+			"ordinal": 165,
+			"name": "hotstring buffer-cap parity (shared BUFFER_MAX_CHARS == both Windows mirrors; P0-F)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-buffer-cap-parity.cjs"],
+			"repro": "node tools/test/test-hotstring-buffer-cap-parity.cjs"
+		},
+		{
+			"id": "js-0156",
+			"ordinal": 168,
+			"name": "showcase page lists each catalogue action on exactly its declared drivers",
+			"cmd": "node",
+			"args": ["tools/test/test-showcase-action-platforms.cjs"],
+			"repro": "npm run test:showcase-action-platforms"
+		},
+		{
+			"id": "js-0221",
+			"ordinal": 234,
+			"name": "at-rest encryption envelope parity (marker/cipher/PBKDF2 identical across the three drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-text-crypto-envelope-parity.cjs"],
+			"repro": "node tools/test/test-text-crypto-envelope-parity.cjs"
+		},
+		{
+			"id": "js-0230",
+			"ordinal": 243,
+			"name": "hotstring corpus backspace_count is a logical count, not emitted keystrokes",
+			"cmd": "node",
+			"args": ["tools/test/test-corpus-backspace-count-semantics.cjs"],
+			"repro": "node tools/test/test-corpus-backspace-count-semantics.cjs"
+		},
+		{
+			"id": "js-0232",
+			"ordinal": 245,
+			"name": "is_word means the same thing on all three drivers (no trigger asks for a boundary it carries)",
+			"cmd": "node",
+			"args": ["tools/test/test-is-word-flag-is-honoured-identically.cjs"],
+			"repro": "node tools/test/test-is-word-flag-is-honoured-identically.cjs"
+		},
+		{
+			"id": "js-0235",
+			"ordinal": 248,
+			"name": "tap-hold shared defaults lifecycle (docs match what the three loaders do)",
+			"cmd": "node",
+			"args": ["tools/test/test-tap-hold-defaults-lifecycle.cjs"],
+			"repro": "node tools/test/test-tap-hold-defaults-lifecycle.cjs"
+		},
+		{
+			"id": "js-0243",
+			"ordinal": 256,
+			"name": "action emit rows stay per-OS (13 of 24 keystrokes genuinely differ)",
+			"cmd": "node",
+			"args": ["tools/test/test-action-emit-is-per-os.cjs"],
+			"repro": "node tools/test/test-action-emit-is-per-os.cjs"
+		},
+		{
+			"id": "js-0244",
+			"ordinal": 257,
+			"name": "macOS keyboard-slot config surface is reachable (readers called, writer binds, list entry has a provider)",
+			"cmd": "node",
+			"args": ["tools/test/test-keyboard-slot-surface-is-live.cjs"],
+			"repro": "node tools/test/test-keyboard-slot-surface-is-live.cjs"
+		},
+		{
+			"id": "js-0245",
+			"ordinal": 258,
+			"name": "chord native mappings single source (adapter prefixes/key spellings + both slot vocabularies pinned to modifier_chords.json)",
+			"cmd": "node",
+			"args": ["tools/test/test-chord-native-mapping-single-source.cjs"],
+			"repro": "node tools/test/test-chord-native-mapping-single-source.cjs"
+		},
+		{
+			"id": "js-0247",
+			"ordinal": 260,
+			"name": "hotstring priority parity (priority.json honoured identically by the drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-priority-parity.cjs"],
+			"repro": "node tools/test/test-priority-parity.cjs"
+		},
+		{
+			"id": "js-0257",
+			"ordinal": 270,
+			"name": "tap-hold namespace correspondence ([tap_hold.keys.*] vs [hs_tap_hold] paired by position, divergences named)",
+			"cmd": "node",
+			"args": ["tools/test/test-tap-hold-namespace-correspondence.cjs"],
+			"repro": "node tools/test/test-tap-hold-namespace-correspondence.cjs"
+		},
+		{
+			"id": "js-0258",
+			"ordinal": 271,
+			"name": "hotstring flag support per driver (every corpus flag honoured by all three)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-flag-support-per-driver.cjs"],
+			"repro": "node tools/test/test-hotstring-flag-support-per-driver.cjs"
+		},
+		{
+			"id": "js-0259",
+			"ordinal": 272,
+			"name": "magic key single source (declared once in the feature manifest, no driver copy)",
+			"cmd": "node",
+			"args": ["tools/test/test-magic-key-single-source.cjs"],
+			"repro": "node tools/test/test-magic-key-single-source.cjs"
+		},
+		{
+			"id": "js-0260",
+			"ordinal": 273,
+			"name": "tap-hold threshold parity (macOS global sits inside the per-key range)",
+			"cmd": "node",
+			"args": ["tools/test/test-tap-hold-threshold-parity.cjs"],
+			"repro": "node tools/test/test-tap-hold-threshold-parity.cjs"
+		},
+		{
+			"id": "js-0262",
+			"ordinal": 275,
+			"name": "hotstring telemetry is deferred (no open/write/flush inside the keyDown tap)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-telemetry-is-deferred.cjs"],
+			"repro": "node tools/test/test-hotstring-telemetry-is-deferred.cjs"
+		},
+		{
+			"id": "js-0268",
+			"ordinal": 281,
+			"name": "keyboard-layout registry (index.json in sync, checksums, schema, vendored digests)",
+			"cmd": "node",
+			"args": ["tools/test/test-layouts-registry.cjs"],
+			"repro": "npm run test:layouts-registry"
+		},
+		{
+			"id": "js-0269",
+			"ordinal": 282,
+			"name": "keyboard-layout registry location single source (defaults.json folder; no driver retypes the URL)",
+			"cmd": "node",
+			"args": ["tools/test/test-layouts-defaults-single-source.cjs"],
+			"repro": "npm run test:layouts-defaults-single-source"
+		},
+		{
+			"id": "js-0270",
+			"ordinal": 283,
+			"name": "layout features an emulated layout supersedes (declared in the manifest, reason translated, read by the gate and the menu)",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-supersession-declared.cjs"],
+			"repro": "npm run test:layout-supersession-declared"
+		},
+		{
+			"id": "js-0271",
+			"ordinal": 284,
+			"name": "Linux package ships the .keylayout converter (every data file it reads; packaged and source paths)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-ships-keylayout-converter.cjs"],
+			"repro": "npm run test:linux-ships-keylayout-converter"
+		},
+		{
+			"id": "js-0273",
+			"ordinal": 286,
+			"name": "hotstring editor confirm dialog wiring (delete actually fires)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-confirm-wiring.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-confirm-wiring.cjs"
+		},
+		{
+			"id": "js-0285",
+			"ordinal": 298,
+			"name": "physical magic key single source (manifest candidates, key tables, v5 migration, Ergopti declaration)",
+			"cmd": "node",
+			"args": ["tools/test/test-magic-key-source.cjs"],
+			"repro": "node tools/test/test-magic-key-source.cjs"
+		},
+		{
+			"id": "js-0300",
+			"ordinal": 313,
+			"name": "hotstring editor preserves strict-case state across the shared bridge",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-strict-case.cjs"],
+			"repro": "npm run test:hs-editor-strict-case"
+		},
+		{
+			"id": "js-0302",
+			"ordinal": 315,
+			"name": "input-source Python supervisor enforces one bounded process group",
+			"cmd": "node",
+			"args": ["tools/test/test-input-source-python-supervisor.cjs"],
+			"repro": "npm run test:input-source-python-supervisor"
+		},
+		{
+			"id": "js-0303",
+			"ordinal": 316,
+			"name": "input-source list edit adds and removes exactly the named layout",
+			"cmd": "node",
+			"args": ["tools/test/test-input-source-enabled-list-edit.cjs"],
+			"repro": "npm run test:input-source-enabled-list-edit"
+		},
+		{
+			"id": "js-0304",
+			"ordinal": 317,
+			"name": "layout manager page decides its rows and posts only allowlisted actions",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-manager-page.cjs"],
+			"repro": "npm run test:layout-manager-page"
+		},
+		{
+			"id": "js-0329",
+			"ordinal": 344,
+			"name": "hotstrings config window bridge (shared frontend ↔ Windows host)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstrings-config-window-bridge.cjs"],
+			"repro": "node tools/test/test-hotstrings-config-window-bridge.cjs"
+		},
+		{
+			"id": "js-0332",
+			"ordinal": 347,
+			"name": "hotstrings config window folds (hidden honoured, caret and title, fold kept across a host push)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstrings-config-window-fold.cjs"],
+			"repro": "npm run test:hs-config-fold"
+		},
+		{
+			"id": "js-0335",
+			"ordinal": 350,
+			"name": "action picker bridge (shared frontend ↔ both hosts)",
+			"cmd": "node",
+			"args": ["tools/test/test-action-picker-bridge.cjs"],
+			"repro": "node tools/test/test-action-picker-bridge.cjs"
+		},
+		{
+			"id": "js-0336",
+			"ordinal": 351,
+			"name": "the selection case actions share one text-case corpus that every driver suite replays",
+			"cmd": "node",
+			"args": ["tools/test/test-text-case-vectors-shared.cjs"],
+			"repro": "npm run test:text-case-vectors-shared"
+		},
+		{
+			"id": "js-0337",
+			"ordinal": 352,
+			"name": "the previous/next desktop actions share one desktop-navigation corpus that every driver suite replays",
+			"cmd": "node",
+			"args": ["tools/test/test-desktop-navigation-vectors-shared.cjs"],
+			"repro": "npm run test:desktop-navigation-vectors-shared"
+		},
+		{
+			"id": "js-0338",
+			"ordinal": 353,
+			"name": "the wrap_selection parameter rule is one shared corpus every driver suite replays",
+			"cmd": "node",
+			"args": ["tools/test/test-wrap-pair-vectors-shared.cjs"],
+			"repro": "npm run test:wrap-pair-vectors-shared"
+		},
+		{
+			"id": "js-0345",
+			"ordinal": 360,
+			"name": "Windows script chords belong to the driver only while their slot runs an action",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-script-chords-follow-their-slot.cjs"],
+			"repro": "npm run test:windows-script-chords-follow-their-slot"
+		},
+		{
+			"id": "js-0346",
+			"ordinal": 361,
+			"name": "the three drivers share the script chords, their presets, their defaults and their submenu",
+			"cmd": "node",
+			"args": ["tools/test/test-script-chords-three-os.cjs"],
+			"repro": "npm run test:script-chords-three-os"
+		},
+		{
+			"id": "js-0347",
+			"ordinal": 362,
+			"name": "Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-hotstring-preview-shows.cjs"],
+			"repro": "npm run test:windows-hotstring-preview-shows"
+		},
+		{
+			"id": "js-0348",
+			"ordinal": 363,
+			"name": "the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays",
+			"cmd": "node",
+			"args": ["tools/test/test-send-input-vectors-shared.cjs"],
+			"repro": "npm run test:send-input-vectors-shared"
+		},
+		{
+			"id": "js-0349",
+			"ordinal": 364,
+			"name": "the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys",
+			"cmd": "node",
+			"args": ["tools/test/test-tap-keys-single-source.cjs"],
+			"repro": "npm run test:tap-keys-single-source"
+		},
+		{
+			"id": "js-0351",
+			"ordinal": 366,
+			"name": "keyboard slots keep neutral defaults and independent manifest recommendations across drivers",
+			"cmd": "node",
+			"args": ["tools/test/test-keyboard-slot-recommended-bindings.cjs"],
+			"repro": "npm run test:keyboard-slot-defaults"
+		},
+		{
+			"id": "js-0352",
+			"ordinal": 367,
+			"name": "the number-row key left of 1 recommends an instant capture of every screen on every driver",
+			"cmd": "node",
+			"args": ["tools/test/test-number-row-full-capture.cjs"],
+			"repro": "npm run test:number-row-full-capture"
+		},
+		{
+			"id": "js-0354",
+			"ordinal": 369,
+			"name": "action picker greys a host-disabled row with its reason and never confirms it",
+			"cmd": "node",
+			"args": ["tools/test/test-action-picker-disabled-rows.cjs"],
+			"repro": "npm run test:action-picker-disabled-rows"
+		},
+		{
+			"id": "js-0355",
+			"ordinal": 370,
+			"name": "action picker edits a text, a key or a shortcut and validates it as the drivers do",
+			"cmd": "node",
+			"args": ["tools/test/test-action-picker-parameter-editor.cjs"],
+			"repro": "npm run test:action-picker-parameter-editor"
+		},
+		{
+			"id": "js-0356",
+			"ordinal": 371,
+			"name": "Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider",
+			"cmd": "node",
+			"args": ["tools/test/test-apple-shortcuts-cold-cli-probe.cjs"],
+			"repro": "npm run test:apple-shortcuts-cold-cli"
+		},
+		{
+			"id": "js-0432",
+			"ordinal": 372,
+			"name": "installed Shortcuts target keeps 34 filesystem controls separate from native admission",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-apple-shortcuts-installed-target.cjs"],
+			"repro": "npm run test:apple-shortcuts-installed-target"
+		},
+		{
+			"id": "js-0370",
+			"ordinal": 386,
+			"name": "Windows touchpad registry: one data file, both writers through one backing-up owner, restore row",
+			"cmd": "node",
+			"args": ["tools/test/test-touchpad-registry-single-source.cjs"],
+			"repro": "npm run test:touchpad-registry"
+		},
+		{
+			"id": "js-0386",
+			"ordinal": 402,
+			"name": "keycode data single source (generated JS matches azerty.json, DC-1)",
+			"cmd": "node",
+			"args": ["tools/test/test-keycode-data-js-parity.cjs"],
+			"repro": "node tools/test/test-keycode-data-js-parity.cjs"
+		},
+		{
+			"id": "js-0387",
+			"ordinal": 403,
+			"name": "physical-key registry is complete, unique per driver and agrees with every hand copy (evdev, kVK, SC, Karabiner, kanata)",
+			"cmd": "node",
+			"args": ["tools/test/test-physical-keys-registry.cjs"],
+			"repro": "npm run test:physical-keys-registry"
+		},
+		{
+			"id": "js-0389",
+			"ordinal": 405,
+			"name": "layer-action vocabulary resolves on every OS or says why, and sends what the action catalogue sends",
+			"cmd": "node",
+			"args": ["tools/test/test-layer-actions-vocabulary.cjs"],
+			"repro": "npm run test:layer-actions-vocabulary"
+		},
+		{
+			"id": "js-0390",
+			"ordinal": 406,
+			"name": "layer editor data is generated from the registry, the vocabulary and the preset, with every label translated",
+			"cmd": "node",
+			"args": ["tools/test/test-layer-editor-data.cjs"],
+			"repro": "npm run test:layer-editor-data"
+		},
+		{
+			"id": "js-0391",
+			"ordinal": 407,
+			"name": "layer editor model reads and writes what the loaders read, and an edit on one OS changes no other OS",
+			"cmd": "node",
+			"args": ["tools/test/test-layer-editor-model.cjs"],
+			"repro": "npm run test:layer-editor-model"
+		},
+		{
+			"id": "js-0392",
+			"ordinal": 408,
+			"name": "layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol",
+			"cmd": "node",
+			"args": ["tools/test/test-layer-editor-page.cjs"],
+			"repro": "npm run test:layer-editor-page"
+		},
+		{
+			"id": "js-0393",
+			"ordinal": 409,
+			"name": "layer editor legends: the hosts send the current layout and the layer key by one contract",
+			"cmd": "node",
+			"args": ["tools/test/test-layer-editor-legends.cjs"],
+			"repro": "npm run test:layer-editor-legends"
+		},
+		{
+			"id": "js-0394",
+			"ordinal": 410,
+			"name": "recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS",
+			"cmd": "node",
+			"args": ["tools/test/test-nav-layer-recommended-golden.cjs"],
+			"repro": "npm run test:nav-layer-recommended-golden"
+		},
+		{
+			"id": "js-0395",
+			"ordinal": 411,
+			"name": "layer-file schema corpus replays through the JS loader (every error code, OS and binding form)",
+			"cmd": "node",
+			"args": ["tools/test/test-keymap-layers-corpus.cjs"],
+			"repro": "npm run test:keymap-layers-corpus"
+		},
+		{
+			"id": "js-0401",
+			"ordinal": 417,
+			"name": "gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)",
+			"cmd": "node",
+			"args": ["tools/test/test-gesture-slots-single-source.cjs"],
+			"repro": "node tools/test/test-gesture-slots-single-source.cjs"
+		},
+		{
+			"id": "js-0402",
+			"ordinal": 418,
+			"name": "gesture recommended actions single source (macOS DEFAULT_GESTURES and Windows GESTURE_FACTORY_DEFAULTS built from the manifest)",
+			"cmd": "node",
+			"args": ["tools/test/test-gesture-defaults-single-source.cjs"],
+			"repro": "node tools/test/test-gesture-defaults-single-source.cjs"
+		},
+		{
+			"id": "js-0410",
+			"ordinal": 426,
+			"name": "no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)",
+			"cmd": "node",
+			"args": ["tools/test/test-hardening-c-ahk-scan-code-precedence.cjs"],
+			"repro": "node tools/test/test-hardening-c-ahk-scan-code-precedence.cjs"
+		}
+	]
+}

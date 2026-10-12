@@ -472,7 +472,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const pipeline = require('./ci-pipeline.cjs');
 	const workflows = {
 		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'manual-verdict', 'release'],
-		'ci-common.yml': ['shared-validation'],
+		'ci-common.yml': ['prepare-common', 'shared-validation', 'common-unit-verdict', 'common-e2e'],
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 		'ci-macos.yml': [
 			'item36-native',
@@ -550,8 +550,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			.filter((job) => job.id === 'lease-silence-native').length,
 		1
 	);
-	assert.equal(jobs - 1, 27);
-	assert.equal(jobs, 28);
+	assert.equal(jobs - 1, 30);
+	assert.equal(jobs, 31);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');
@@ -623,7 +623,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			name + ': retired API cannot grant execution authority'
 		);
 	console.log(
-		'Retired fast157: all28 job classes and retained steps use full defaults; actual obsolete CLI refuses without side effects.'
+		'Retired fast157: all27 job classes and retained steps use full defaults; actual obsolete CLI refuses without side effects.'
 	);
 }
 

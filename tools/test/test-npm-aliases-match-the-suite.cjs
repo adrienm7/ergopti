@@ -38,11 +38,12 @@
 
 'use strict';
 
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SUITE = path.join(ROOT, 'tools/test/run-js-suite.cjs');
 const PKG = path.join(ROOT, 'package.json');
 
 // Aliases that name something the suite is not expected to run: the aggregate
@@ -101,16 +102,19 @@ const BASELINE_ALIASLESS = 0;
 
 const errors = [];
 
-const suiteSrc = fs.readFileSync(SUITE, 'utf8');
+const inventory = loadInventory(ROOT);
 const scripts = JSON.parse(fs.readFileSync(PKG, 'utf8')).scripts || {};
 
-// Every `args: ['tools/test/<file>.cjs']` the suite declares.
+// Canonical inventory includes the platform-specific entries hosted CI executes.
 const suitePaths = new Set(
-	[...suiteSrc.matchAll(/args:\s*\[\s*'(tools\/test\/[^']+\.cjs)'/g)].map((m) => m[1])
+	inventory.checks
+		.filter((check) => ['node', '$NODE_EXECUTABLE'].includes(check.cmd))
+		.map((check) => check.args[0])
+		.filter((file) => /^tools\/test\/[^']+\.cjs$/.test(file))
 );
 if (suitePaths.size < 50) {
 	errors.push(
-		`parsed ${suitePaths.size} gate path(s) out of run-js-suite.cjs — expected at least 50. ` +
+		`parsed ${suitePaths.size} gate path(s) out of the canonical feature inventory — expected at least 50. ` +
 			'The parser drifted, and a parity check over nothing passes forever.'
 	);
 }
@@ -145,7 +149,7 @@ for (const [p, name] of aliasPaths) {
 if (dark.length > 0) {
 	errors.push(
 		`${dark.length} npm alias(es) name a gate the suite does not run — a check nobody runs and ` +
-			'everybody believes in. Add it to run-js-suite.cjs, or to NOT_SUITE_ENTRIES with a reason:\n' +
+			'everybody believes in. Add it to its feature inventory, or to NOT_SUITE_ENTRIES with a reason:\n' +
 			dark.map((s) => `      · ${s}`).join('\n')
 	);
 }

@@ -2,6 +2,19 @@
 
 /** Independent mandatory source registration checks; never grants native runtime credit. */
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
+
 const assert = require('node:assert/strict');
 const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const fs = require('node:fs');
@@ -11,7 +24,7 @@ const Planner = require('./verify-change.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
 const scripts = JSON.parse(read('package.json')).scripts;
-const suite = read('tools/test/run-js-suite.cjs');
+const suite = loadInventory(ROOT);
 const exceptions = read('tools/test/test-npm-aliases-match-the-suite.cjs');
 const catalogue = JSON.parse(read('.github/linux-ci-coverage.json'));
 const workflow = read('.github/workflows/ci-linux.yml');
@@ -50,8 +63,12 @@ function registration(aliases, inventory, exempt, planner, floors) {
 		'test-linux-updater-temp-native.cjs',
 		'test-linux-updater-temp-registration.cjs'
 	])
-		assert.equal(inventory.split("args: ['tools/test/" + file + "']").length - 1, 1);
-	assert.ok(!inventory.includes("args: ['tools/test/run-linux-updater-temp-native.cjs']"));
+		assert.ok(ownsCheck(inventory, 'tools/test/' + file));
+	assert.ok(
+		!inventory.checks.some((check) =>
+			check.args.includes('tools/test/run-linux-updater-temp-native.cjs')
+		)
+	);
 	assert.equal(exempt.split("'tools/test/run-linux-updater-temp-native.cjs',").length - 1, 1);
 	assert.equal(
 		planner.GATE_COMMANDS['linux-updater-temp-native']?.npm,
@@ -141,7 +158,12 @@ for (const file of [
 		assert.throws(() =>
 			registration(
 				scripts,
-				suite.replace("args: ['tools/test/" + file + "']", "args: ['missing']"),
+				{
+					...suite,
+					checks: suite.checks.map((check) =>
+						check.args[0] === 'tools/test/' + file ? { ...check, args: ['missing'] } : check
+					)
+				},
 				exceptions,
 				Planner,
 				catalogue
@@ -152,7 +174,13 @@ control('unowned native suite execution refused', () =>
 	assert.throws(() =>
 		registration(
 			scripts,
-			suite + "\nargs: ['tools/test/run-linux-updater-temp-native.cjs']",
+			{
+				...suite,
+				checks: [
+					...suite.checks,
+					{ cmd: 'node', args: ['tools/test/run-linux-updater-temp-native.cjs'] }
+				]
+			},
 			exceptions,
 			Planner,
 			catalogue

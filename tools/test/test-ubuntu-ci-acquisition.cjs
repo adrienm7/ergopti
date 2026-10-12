@@ -68,7 +68,10 @@ for (const [invocation, expected] of [
 }
 
 assert.equal(
-	pipeline.stepField(pipeline.step(coreOwner.body, 'Install shared UI browsers'), 'run'),
+	pipeline.stepField(
+		pipeline.step(pipeline.job('common-e2e'), 'Install shared UI browsers'),
+		'run'
+	),
 	browserCommand
 );
 const unscopedBrowser = coreWorkflow.replace(

@@ -9,6 +9,19 @@
  * ==============================================================================
  */
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
+
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -41,8 +54,12 @@ function validateRegistration(aliases, inventory, planner, coverage) {
 		aliases['test:linux-managed-http-ci-registration'],
 		'node ./tools/test/test-linux-managed-http-ci-registration.cjs'
 	);
-	assert.ok(inventory.includes("args: ['tools/test/test-linux-managed-http-ci-registration.cjs']"));
-	assert.ok(!inventory.includes("args: ['tools/test/run-linux-managed-http-native.cjs']"));
+	assert.ok(ownsCheck(inventory, 'tools/test/test-linux-managed-http-ci-registration.cjs'));
+	assert.ok(
+		!inventory.checks.some((check) =>
+			check.args.includes('tools/test/run-linux-managed-http-native.cjs')
+		)
+	);
 	assert.equal(
 		planner.GATE_COMMANDS['linux-managed-http-native']?.npm,
 		'test:linux:managed-http-native'
@@ -55,7 +72,7 @@ function validateRegistration(aliases, inventory, planner, coverage) {
 	assert.equal(coverage.jobs['e2e-linux'].subjects['managed-http-public'], 30);
 }
 const aliases = JSON.parse(read('package.json')).scripts;
-const inventory = read('tools/test/run-js-suite.cjs');
+const inventory = loadInventory(ROOT);
 const coverage = JSON.parse(read('.github/linux-ci-coverage.json'));
 validateRegistration(aliases, inventory, Planner, coverage);
 passed++;
@@ -70,17 +87,27 @@ for (const mutation of [
 	() =>
 		validateRegistration(
 			aliases,
-			inventory.replace(
-				"args: ['tools/test/test-linux-managed-http-ci-registration.cjs']",
-				"args: ['missing']"
-			),
+			{
+				...inventory,
+				checks: inventory.checks.map((check) =>
+					check.args[0] === 'tools/test/test-linux-managed-http-ci-registration.cjs'
+						? { ...check, args: ['missing'] }
+						: check
+				)
+			},
 			Planner,
 			coverage
 		),
 	() =>
 		validateRegistration(
 			aliases,
-			inventory + "args: ['tools/test/run-linux-managed-http-native.cjs']",
+			{
+				...inventory,
+				checks: [
+					...inventory.checks,
+					{ cmd: 'node', args: ['tools/test/run-linux-managed-http-native.cjs'] }
+				]
+			},
 			Planner,
 			coverage
 		),

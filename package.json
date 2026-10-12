@@ -203,6 +203,8 @@
 		"test:update-check-dialog": "node ./tools/test/test-update-check-dialog.cjs",
 		"test:config-cleanup-page": "node ./tools/test/test-config-cleanup-page.cjs",
 		"test:js-suite-failure-diagnostics": "node ./tools/test/test-js-suite-failure-diagnostics.cjs",
+		"test:js-feature-inventory": "node ./tools/test/test-js-feature-inventory.cjs",
+		"test:js-feature-results": "node ./tools/test/test-js-feature-results.cjs",
 		"verify": "node ./tools/test/verify-change.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
 		"test:hs:e2e": "cd static/ergopti_plus/macos && lua tests/e2e/run_e2e.lua",

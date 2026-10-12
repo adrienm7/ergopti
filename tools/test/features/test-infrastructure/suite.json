@@ -1,0 +1,406 @@
+{
+	"schema_version": 1,
+	"feature": "test-infrastructure",
+	"checks": [
+		{
+			"id": "js-0001",
+			"ordinal": 1,
+			"name": "native qualification JS controls have one default/full and direct CLI owner",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-js-native-qualification-ownership.cjs"],
+			"repro": "node tools/test/test-js-native-qualification-ownership.cjs"
+		},
+		{
+			"id": "js-0016",
+			"ordinal": 28,
+			"name": "JS suite failures preserve error headlines and process status",
+			"cmd": "node",
+			"args": ["tools/test/test-js-suite-failure-diagnostics.cjs"],
+			"repro": "node tools/test/test-js-suite-failure-diagnostics.cjs"
+		},
+		{
+			"id": "js-0017",
+			"ordinal": 29,
+			"name": "Agent Skills canonical tree matches the generated Claude mirror",
+			"cmd": "node",
+			"args": ["tools/test/test-agent-skills-sync.cjs"],
+			"repro": "npm run test:agent-skills"
+		},
+		{
+			"id": "js-0018",
+			"ordinal": 30,
+			"name": "audit manifests and dedicated worktrees obey the portable workflow contract",
+			"cmd": "node",
+			"args": ["tools/test/test-audit-workflow.cjs"],
+			"repro": "npm run test:audit-workflow"
+		},
+		{
+			"id": "js-0019",
+			"ordinal": 31,
+			"name": "verify-change distinguishes current regressions, historical debt, and environment failures",
+			"cmd": "node",
+			"args": ["tools/test/test-verify-change-red-classification.cjs"],
+			"repro": "npm run test:verify-red-classification"
+		},
+		{
+			"id": "js-0020",
+			"ordinal": 32,
+			"name": "native AHK gates report parse failures without dialogs",
+			"cmd": "node",
+			"args": ["tools/test/test-verify-change-ahk-launch.cjs"],
+			"repro": "npm run test:verify-change-ahk-launch"
+		},
+		{
+			"id": "js-0023",
+			"ordinal": 35,
+			"name": "AHK E2E admission requires every pure and native Edit corpus result",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ahk-e2e-manifest.cjs"],
+			"repro": "npm run test:ahk-e2e-manifest"
+		},
+		{
+			"id": "js-0024",
+			"ordinal": 36,
+			"name": "AHK live TAP follower preserves UTF-8 and native receipt authority",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ahk-tap-follower.cjs"],
+			"repro": "node tools/test/test-ahk-tap-follower.cjs"
+		},
+		{
+			"id": "js-0025",
+			"ordinal": 37,
+			"name": "AHK suite manifest rejects early completion before the slow tail",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-suite-manifest.cjs"],
+			"repro": "npm run test:ahk-suite-manifest"
+		},
+		{
+			"id": "js-0026",
+			"ordinal": 38,
+			"name": "repository text resolves to LF on every platform",
+			"cmd": "node",
+			"args": ["tools/test/test-repository-eol-policy.cjs"],
+			"repro": "npm run test:repository-eol-policy"
+		},
+		{
+			"id": "js-0027",
+			"ordinal": 39,
+			"name": "project RTK bootstrap stays pinned and network-free in CI",
+			"cmd": "node",
+			"args": ["tools/test/test-rtk-project-integration.cjs"],
+			"repro": "npm run test:project-rtk"
+		},
+		{
+			"id": "js-0028",
+			"ordinal": 40,
+			"name": "tools spawn the Git for Windows bash through one resolver, never the WSL launcher",
+			"cmd": "node",
+			"args": ["tools/test/test-bash-resolution.cjs"],
+			"repro": "npm run test:bash-resolution"
+		},
+		{
+			"id": "js-0029",
+			"ordinal": 41,
+			"name": "Node runtime is exact and single-sourced across CI and Unicode generation",
+			"cmd": "node",
+			"args": ["tools/test/test-node-runtime-single-source.cjs"],
+			"repro": "node tools/test/test-node-runtime-single-source.cjs"
+		},
+		{
+			"id": "js-0030",
+			"ordinal": 42,
+			"name": "VS Code and Zed format on save with the repository Prettier only",
+			"cmd": "node",
+			"args": ["tools/test/test-editor-format-on-save.cjs"],
+			"repro": "npm run test:editor-format-on-save"
+		},
+		{
+			"id": "js-0034",
+			"ordinal": 46,
+			"name": "convention lint (banners, spacing, section headers — strict)",
+			"cmd": "npm",
+			"args": ["run", "--silent", "lint:conventions:strict"],
+			"repro": "npm run lint:conventions:strict"
+		},
+		{
+			"id": "js-0035",
+			"ordinal": 47,
+			"name": "lint banner-marker safety (no hardcoded-prefix corruption of \"--\"-marker Lua banners)",
+			"cmd": "node",
+			"args": ["tools/test/test-lint-banner-marker-safety.cjs"],
+			"repro": "node tools/test/test-lint-banner-marker-safety.cjs"
+		},
+		{
+			"id": "js-0079",
+			"ordinal": 91,
+			"name": "every skipped conformance case names a ledger row (skips are data, not prose)",
+			"cmd": "node",
+			"args": ["tools/test/test-conformance-skips-declared.cjs"],
+			"repro": "node tools/test/test-conformance-skips-declared.cjs"
+		},
+		{
+			"id": "js-0110",
+			"ordinal": 122,
+			"name": "no new location-pinned source reads in AHK tests (ratchet)",
+			"cmd": "node",
+			"args": ["tools/test/test-no-pinned-source-reads.cjs"],
+			"repro": "node tools/test/test-no-pinned-source-reads.cjs"
+		},
+		{
+			"id": "js-0111",
+			"ordinal": 123,
+			"name": "no new location-pinned source reads in macOS tests (ratchet)",
+			"cmd": "node",
+			"args": ["tools/test/test-no-pinned-source-reads-lua.cjs"],
+			"repro": "node tools/test/test-no-pinned-source-reads-lua.cjs"
+		},
+		{
+			"id": "js-0113",
+			"ordinal": 125,
+			"name": "AHK test coverage (every test_*.ahk reachable from run_all)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-test-coverage.cjs"],
+			"repro": "node tools/test/test-ahk-test-coverage.cjs"
+		},
+		{
+			"id": "js-0114",
+			"ordinal": 126,
+			"name": "AHK changed tests require transitive registration at every depth",
+			"cmd": "node",
+			"args": ["tools/test/test-verify-change-ahk-registration.cjs"],
+			"repro": "node tools/test/test-verify-change-ahk-registration.cjs"
+		},
+		{
+			"id": "js-0115",
+			"ordinal": 127,
+			"name": "e2e gate symmetry (every driver e2e runner is selected by verify-change)",
+			"cmd": "node",
+			"args": ["tools/test/test-e2e-gate-symmetry.cjs"],
+			"repro": "node tools/test/test-e2e-gate-symmetry.cjs"
+		},
+		{
+			"id": "js-0116",
+			"ordinal": 128,
+			"name": "verify-change recognizes multiline AHK definitions without accepting call sites",
+			"cmd": "node",
+			"args": ["tools/test/test-verify-change-ahk-function-definitions.cjs"],
+			"repro": "node tools/test/test-verify-change-ahk-function-definitions.cjs"
+		},
+		{
+			"id": "js-0117",
+			"ordinal": 129,
+			"name": "shared-contract gate coverage (_shared/core + _shared/tests select all three driver suites)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-contract-gate-coverage.cjs"],
+			"repro": "node tools/test/test-shared-contract-gate-coverage.cjs"
+		},
+		{
+			"id": "js-0118",
+			"ordinal": 130,
+			"name": "shared Lua sources select both consumer unit and E2E gates",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-lua-gate-coverage.cjs"],
+			"repro": "node tools/test/test-shared-lua-gate-coverage.cjs"
+		},
+		{
+			"id": "js-0119",
+			"ordinal": 131,
+			"name": "Git change paths preserve filenames and both renamed drivers",
+			"cmd": "node",
+			"args": ["tools/test/test-verify-change-git-paths.cjs"],
+			"repro": "npm run test:verify-change-git-paths"
+		},
+		{
+			"id": "js-0120",
+			"ordinal": 132,
+			"name": "explicit full verification includes every declared gate",
+			"cmd": "node",
+			"args": ["tools/test/test-verify-change-full-plan.cjs"],
+			"repro": "npm run test:verify-change-full-plan"
+		},
+		{
+			"id": "js-0122",
+			"ordinal": 134,
+			"name": "AHK parse coverage (Ahk2Exe compiles the whole #Include graph — Windows only, self-validating)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-parse-coverage.cjs"],
+			"repro": "node tools/test/test-ahk-parse-coverage.cjs"
+		},
+		{
+			"id": "js-0127",
+			"ordinal": 139,
+			"name": "AHK runners are invoked (no run_*/bench_* file referenced by nothing)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-runners-are-invoked.cjs"],
+			"repro": "node tools/test/test-ahk-runners-are-invoked.cjs"
+		},
+		{
+			"id": "js-0128",
+			"ordinal": 140,
+			"name": "AHK runner references stream without retaining the full text corpus",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-runner-scan-streaming.cjs"],
+			"repro": "node tools/test/test-ahk-runner-scan-streaming.cjs"
+		},
+		{
+			"id": "js-0129",
+			"ordinal": 141,
+			"name": "AHK runner rejects malformed filters before loading tests",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-runner-arguments.cjs"],
+			"repro": "npm run test:ahk-runner-arguments"
+		},
+		{
+			"id": "js-0130",
+			"ordinal": 142,
+			"name": "AHK loop capture (no closure over a for-loop variable, no looped Test registration closing over the loop)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-loop-capture.cjs"],
+			"repro": "node tools/test/test-ahk-loop-capture.cjs"
+		},
+		{
+			"id": "js-0134",
+			"ordinal": 146,
+			"name": "source encoding (no double-encoded UTF-8, no repeated BOM, valid UTF-8 — every driver)",
+			"cmd": "node",
+			"args": ["tools/test/test-source-encoding.cjs"],
+			"repro": "node tools/test/test-source-encoding.cjs"
+		},
+		{
+			"id": "js-0139",
+			"ordinal": 151,
+			"name": "Lua test fixtures stay out of the repository (no working-directory fallback)",
+			"cmd": "node",
+			"args": ["tools/test/test-lua-fixtures-stay-out-of-the-repo.cjs"],
+			"repro": "node tools/test/test-lua-fixtures-stay-out-of-the-repo.cjs"
+		},
+		{
+			"id": "js-0242",
+			"ordinal": 255,
+			"name": "stubs intercept something (no package.loaded key naming a missing module)",
+			"cmd": "node",
+			"args": ["tools/test/test-stubs-intercept-something.cjs"],
+			"repro": "node tools/test/test-stubs-intercept-something.cjs"
+		},
+		{
+			"id": "js-0251",
+			"ordinal": 264,
+			"name": "npm alias ⇄ suite parity (no alias names a gate the suite does not run; the aliasless count only falls)",
+			"cmd": "node",
+			"args": ["tools/test/test-npm-aliases-match-the-suite.cjs"],
+			"repro": "node tools/test/test-npm-aliases-match-the-suite.cjs"
+		},
+		{
+			"id": "js-0280",
+			"ordinal": 293,
+			"name": "source-tree scan coverage (no scanner list forgets platform/)",
+			"cmd": "node",
+			"args": ["tools/test/test-source-trees-are-scanned.cjs"],
+			"repro": "node tools/test/test-source-trees-are-scanned.cjs"
+		},
+		{
+			"id": "js-0281",
+			"ordinal": 294,
+			"name": "untracked driver artifacts cannot contaminate commit-candidate gates",
+			"cmd": "node",
+			"args": ["tools/test/test-untracked-driver-artifacts-do-not-affect-gates.cjs"],
+			"repro": "node tools/test/test-untracked-driver-artifacts-do-not-affect-gates.cjs"
+		},
+		{
+			"id": "js-0289",
+			"ordinal": 302,
+			"name": "AHK source encoding (UTF-8 BOM + LF)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-encoding.cjs"],
+			"repro": "npm run test:ahk-encoding"
+		},
+		{
+			"id": "js-0290",
+			"ordinal": 303,
+			"name": "mutation-test harness passes un-mutated (Stryker precondition)",
+			"cmd": "node",
+			"args": ["tools/test/test-mutation-targets.cjs"],
+			"repro": "node tools/test/test-mutation-targets.cjs"
+		},
+		{
+			"id": "js-0296",
+			"ordinal": 309,
+			"name": "formatting gate (hook formats staged files, CI checks the tree with the pinned Ruff, generated files ignored)",
+			"cmd": "node",
+			"args": ["tools/test/test-format-gate.cjs"],
+			"repro": "npm run test:format-gate"
+		},
+		{
+			"id": "js-0325",
+			"ordinal": 340,
+			"name": "CPython resolution refuses configured interpreter substitution",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-python-resolution.cjs"],
+			"repro": "node tools/test/test-python-resolution.cjs"
+		},
+		{
+			"id": "js-0328",
+			"ordinal": 343,
+			"name": "every gate script is actually wired into a runner",
+			"cmd": "node",
+			"args": ["tools/test/test-gate-scripts-are-wired.cjs"],
+			"repro": "node tools/test/test-gate-scripts-are-wired.cjs"
+		},
+		{
+			"id": "js-0357",
+			"ordinal": 373,
+			"name": "file-path headers (convention 3, every source file names itself)",
+			"cmd": "node",
+			"args": ["tools/lint/audit-file-headers.cjs"],
+			"repro": "node tools/lint/audit-file-headers.cjs"
+		},
+		{
+			"id": "js-0362",
+			"ordinal": 378,
+			"name": "git-mv resilience (every path pin in the three suites resolves — macOS + Linux files, AHK dirs)",
+			"cmd": "node",
+			"args": ["tools/test/test-git-mv-resilience.cjs"],
+			"repro": "node tools/test/test-git-mv-resilience.cjs"
+		},
+		{
+			"id": "js-0408",
+			"ordinal": 424,
+			"name": "expected pcall rejection stays distinct from weak success assertions",
+			"cmd": "node",
+			"args": ["tools/test/test-false-green-pcall-rejection.cjs"],
+			"repro": "node tools/test/test-false-green-pcall-rejection.cjs"
+		},
+		{
+			"id": "js-0412",
+			"ordinal": 428,
+			"name": "every Windows meta test census the Linux lane can recompute matches the driver source (hardening-f)",
+			"cmd": "node",
+			"args": ["tools/test/test-hardening-f-ahk-meta-counts.cjs"],
+			"repro": "node tools/test/test-hardening-f-ahk-meta-counts.cjs"
+		},
+		{
+			"id": "js-0414",
+			"ordinal": 430,
+			"name": "tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)",
+			"cmd": "node",
+			"args": ["tools/test/find-false-greens.cjs"],
+			"repro": "node tools/test/find-false-greens.cjs"
+		},
+		{
+			"id": "js-0415",
+			"ordinal": 431,
+			"name": "literal JS feature inventory preserves ordered default projections and refuses invalid plans",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-js-feature-inventory.cjs"],
+			"repro": "node tools/test/test-js-feature-inventory.cjs"
+		},
+		{
+			"id": "js-0416",
+			"ordinal": 432,
+			"name": "JS feature journals require a complete source-bound successful exact union",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-js-feature-results.cjs"],
+			"repro": "node tools/test/test-js-feature-results.cjs"
+		}
+	]
+}

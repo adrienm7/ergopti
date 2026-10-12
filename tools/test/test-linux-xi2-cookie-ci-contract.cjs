@@ -1,6 +1,19 @@
 // tools/test/test-linux-xi2-cookie-ci-contract.cjs
 // Source controls for the isolated non-input native receiving cut; no native runs.
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
+
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -155,7 +168,11 @@ function verify(subject) {
 	for (const literal of DISPLAY_NEED)
 		assert(subject.display.includes(literal), 'original server fence: ' + literal);
 	assert(
-		subject.suite.includes("args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs']"),
+		ownsCheck(
+			subject.suite,
+			'tools/test/test-linux-xi2-cookie-ci-contract.cjs',
+			'$NODE_EXECUTABLE'
+		),
 		'registered guard'
 	);
 }
@@ -166,7 +183,7 @@ const subject = {
 	family: fs.readFileSync(path.join(ROOT, HARDWARE + 'native_fixture_family.py'), 'utf8'),
 	runner: fs.readFileSync(path.join(ROOT, HARDWARE + 'run_xi2_property_cookies.py'), 'utf8'),
 	display: fs.readFileSync(path.join(ROOT, HARDWARE + 'xi2_property_display.py'), 'utf8'),
-	suite: fs.readFileSync(path.join(ROOT, 'tools/test/run-js-suite.cjs'), 'utf8')
+	suite: loadInventory(ROOT)
 };
 verify(subject);
 const mutations = [
@@ -233,14 +250,22 @@ const mutations = [
 	[
 		'guard enrollment omitted',
 		'suite',
-		"args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs']",
-		'args: []'
+		'tools/test/test-linux-xi2-cookie-ci-contract.cjs',
+		'missing'
 	]
 ];
 for (const [name, role, before, after] of mutations) {
 	const altered = { ...subject };
-	assert(altered[role].includes(before), 'control must change actual source: ' + name);
-	altered[role] = altered[role].replace(before, after);
+	if (role === 'suite') {
+		const checks = structuredClone(subject.suite.checks);
+		const selected = checks.filter((check) => check.args[0] === before);
+		assert.equal(selected.length, 1, 'control must change the actual feature owner: ' + name);
+		selected[0].args = [after];
+		altered.suite = { ...subject.suite, checks };
+	} else {
+		assert(altered[role].includes(before), 'control must change actual source: ' + name);
+		altered[role] = altered[role].replace(before, after);
+	}
 	assert.throws(() => verify(altered), undefined, name);
 }
 console.log(

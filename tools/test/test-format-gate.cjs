@@ -67,7 +67,7 @@ function checkCiFormatting(body) {
 }
 
 check('CI installs the pinned Ruff and checks the whole tree', () => {
-	const owner = pipeline.locate('shared-validation');
+	const owner = pipeline.locate('prepare-common');
 	assert.strictEqual(owner.file, '.github/workflows/ci-common.yml');
 	assert.strictEqual(
 		pipeline.field(pipeline.job('core'), 'uses'),

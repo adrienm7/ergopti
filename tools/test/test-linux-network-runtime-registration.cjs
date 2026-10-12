@@ -2,6 +2,19 @@
 
 /** Keeps portable registration separate from mandatory native execution. */
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
+
 const assert = require('node:assert/strict');
 const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const fs = require('node:fs');
@@ -22,11 +35,13 @@ assert.equal(
 	aliases['test:linux-network-runtime-registration'],
 	'node ./tools/test/test-linux-network-runtime-registration.cjs'
 );
-const inventory = read('tools/test/run-js-suite.cjs');
-assert.ok(inventory.includes("args: ['tools/test/test-linux-network-runtime.cjs']"));
-assert.ok(inventory.includes("args: ['tools/test/test-linux-network-runtime-registration.cjs']"));
+const inventory = loadInventory(ROOT);
+assert.ok(ownsCheck(inventory, 'tools/test/test-linux-network-runtime.cjs'));
+assert.ok(ownsCheck(inventory, 'tools/test/test-linux-network-runtime-registration.cjs'));
 assert.ok(
-	!inventory.includes("args: ['tools/test/run-linux-network-runtime.cjs']"),
+	!inventory.checks.some((check) =>
+		check.args.includes('tools/test/run-linux-network-runtime.cjs')
+	),
 	'Native admission must not run in JS inventory'
 );
 const planner = require('./verify-change.cjs');

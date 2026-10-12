@@ -1,6 +1,8 @@
 // tools/test/test-js-native-qualification-ownership.cjs
 'use strict';
 
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+
 /** Records only actual CLI/callsite routing; no control body or child process executes. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -208,43 +210,33 @@ function trace(sources, entry) {
 	return counts;
 }
 function enrolled(sources, full) {
-	const checks = [];
-	walk(parse(sources.runner), (node) => {
-		if (
-			node.type !== 'VariableDeclarator' ||
-			!['CHECKS', ...(full ? ['SLOW_CHECKS'] : [])].includes(node.id.name)
-		)
-			return;
-		assert.equal(node.init.type, 'ArrayExpression');
-		const entries = [];
-		for (const entry of node.init.elements) {
-			if (entry.type === 'ObjectExpression') entries.push(entry);
-			else {
-				assert.equal(entry.type, 'SpreadElement');
-				const conditional = entry.argument;
-				assert.equal(conditional.type, 'ConditionalExpression');
-				assert.equal(source(sources.runner, conditional.test), "process.platform === 'linux'");
-				for (const branch of [conditional.consequent, conditional.alternate]) {
-					assert.equal(branch.type, 'ArrayExpression');
-					for (const row of branch.elements) {
-						assert.equal(row.type, 'ObjectExpression');
-						const args = row.properties.find((property) => property.key.name === 'args')?.value;
-						assert.equal(args?.type, 'ArrayExpression');
-						assert(
-							!['item36', 'pac', 'pipeline'].some((key) => FILES[key] === args.elements[0]?.value),
-							'mandatory owners must never become platform conditional'
-						);
-					}
-				}
+	const entries = [...sources.inventory.checks];
+	if (full) {
+		walk(parse(sources.runner), (node) => {
+			if (node.type !== 'VariableDeclarator' || node.id.name !== 'SLOW_CHECKS') return;
+			assert.equal(node.init.type, 'ArrayExpression');
+			for (const row of node.init.elements) {
+				assert.equal(row.type, 'ObjectExpression');
+				const args = row.properties.find((property) => property.key.name === 'args')?.value;
+				assert.equal(args?.type, 'ArrayExpression');
+				entries.push({
+					args: args.elements.map((argument) => {
+						assert.equal(argument.type, 'Literal');
+						return argument.value;
+					})
+				});
 			}
-		}
-		for (const entry of entries) {
-			const args = entry.properties.find((property) => property.key.name === 'args')?.value;
-			const rel = args?.elements[0]?.value;
-			const name = Object.keys(FILES).find((key) => FILES[key] === rel);
-			if (['item36', 'pac', 'pipeline'].includes(name)) checks.push(name);
-		}
-	});
+		});
+	}
+	const checks = [];
+	for (const entry of entries) {
+		const name = Object.keys(FILES).find((key) => FILES[key] === entry.args[0]);
+		if (!['item36', 'pac', 'pipeline'].includes(name)) continue;
+		assert(!entry.platforms, 'mandatory owners must never become platform conditional');
+		assert.equal(entry.args.length, 1);
+		assert(['node', '$NODE_EXECUTABLE'].includes(entry.cmd));
+		checks.push(name);
+	}
 	assert.deepEqual(
 		checks,
 		['pac', 'item36', 'pipeline'],
@@ -322,6 +314,7 @@ if (require.main === module) {
 			fs.readFileSync(path.join(root, rel), 'utf8')
 		])
 	);
+	sources.inventory = loadInventory(root);
 	checkOwnership(sources);
 	console.log(
 		'PASS: native qualification JS owner union and direct CLI routing; all platform/control bodies UNRUN.'
