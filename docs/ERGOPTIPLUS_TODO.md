@@ -10090,6 +10090,26 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   committed-source metadata is generated and independently received. No native
   AHK, physical AltGr, simultaneous engine or installation proof follows.
 
+  The shared AHK source-image prerequisite is enrolled in the ordinary Windows
+  unit runner with sixteen independent cases. It preserves the original scalar
+  comparison API and observes original Map modes and typed keys, Array order and
+  holes, typed TOML Boolean wrappers, and generated action Fn/Key/Mods facts.
+  Genuine method Call descriptors and same-function own-Call refusal retain the
+  original normal-boot intrinsic custody premise. The authentic gesture factory,
+  generated data, writer, TOML and native text adapter remain the original test
+  dependencies. All sixteen shipped-AHK cases and native parser execution remain
+  unrun at source admission; targeted Windows CI must qualify them. This test-only
+  enrollment changes no production boot, defaults or simultaneous-input availability
+  and issues no input/modifier/output authority. Item91 remains partial.
+
+  The existing Windows `--ahk` CI contract also dry-loads the authentic whole
+  runner, then executes these sixteen independently named cases before the
+  ordinary full suite. Complete TAP/stdout equality, stderr, native exit, timing
+  and committed-source joins remain mandatory under the existing 30-second
+  native-probe budget. Twenty-two portable receiver controls pass; three causal
+  omissions fail as expected. Actual AHK execution remains unrun. This scoped
+  receipt cannot qualify or bypass the original full-suite watchdog.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
