@@ -307,7 +307,7 @@ class WireFixture:
                 errors,
                 output,
             )
-            if trust_operation in ("add", "remove"):
+            if trust_operation == "add":
                 # A timeout still owns its captures until exact native settlement.
                 # Inspect that existing stderr once before its original close.
                 try:
@@ -316,11 +316,7 @@ class WireFixture:
                         and owned is not None
                         and getattr(owned, "reaped", False) is True
                     ):
-                        trust_install_stream = (
-                            self._trust_install_stream(errors, operation="remove")
-                            if trust_operation == "remove"
-                            else self._trust_install_stream(errors)
-                        )
+                        trust_install_stream = self._trust_install_stream(errors)
                 except BaseException as observation_failure:
                     # Preserve the original primary. A fresh control interruption
                     # on success still flows through original file closure below.
@@ -451,7 +447,7 @@ class WireFixture:
                     )
                 ):
                     failure = observation_failure
-        if trust_operation in ("add", "remove"):
+        if trust_operation == "add":
             try:
                 if self.groups:
                     child_settled = (
@@ -462,11 +458,9 @@ class WireFixture:
                     child_status = getattr(process, "returncode", None) if child_settled else None
                     fact = {
                         "version": 1,
-                        "action": "add_trusted_cert"
-                        if trust_operation == "add"
-                        else "remove_trusted_cert",
+                        "action": "add_trusted_cert",
                         "domain": "admin",
-                        "keychain": "owned_private" if trust_operation == "add" else None,
+                        "keychain": "owned_private",
                         "phase": self.command_fact["phase"],
                         "child_settled": child_settled,
                         "child_exit_status": child_status
@@ -478,12 +472,7 @@ class WireFixture:
                         "stderr": trust_install_stream,
                     }
                     print(
-                        (
-                            "# native_http_trust_install "
-                            if trust_operation == "add"
-                            else "# native_http_trust_remove "
-                        )
-                        + json.dumps(fact, sort_keys=True),
+                        "# native_http_trust_install " + json.dumps(fact, sort_keys=True),
                         file=sys.stderr,
                         flush=True,
                     )
@@ -552,7 +541,7 @@ class WireFixture:
         return result
 
     @staticmethod
-    def _trust_install_stream(stream, *, operation="add"):
+    def _trust_install_stream(stream):
         """Project the existing settled capture without retaining private bytes."""
         if stream is None:
             return {"observed": False}
@@ -561,16 +550,11 @@ class WireFixture:
         callee = None
         category = "empty" if not raw else "unknown"
         if type(raw) is bytes and len(raw) <= 1024:
-            names = (
-                (b"SecTrustSettingsRemoveTrustSettings",)
-                if operation == "remove"
-                else (
-                    b"SecTrustSettingsSetTrustSettings",
-                    b"SecKeychainItemImport",
-                    b"SecKeychainUnlock",
-                )
-            )
-            for name in names:
+            for name in (
+                b"SecTrustSettingsSetTrustSettings",
+                b"SecKeychainItemImport",
+                b"SecKeychainUnlock",
+            ):
                 for prefix in (name + b": ", b"security: " + name + b": "):
                     if raw.startswith(prefix):
                         callee = name.decode("ascii")
@@ -1302,14 +1286,8 @@ class WireFixture:
         pac_server.receiving_kind = "pac"
         self.servers.append(pac_server)
         self.pac_url = f"http://127.0.0.1:{pac_server.server_address[1]}/wpad.dat"
-        # Idle server polling must not consume the original bounded shutdown.
-        server_poll_interval_seconds = 0.05
         for server in self.servers:
-            worker = threading.Thread(
-                target=server.serve_forever,
-                kwargs={"poll_interval": server_poll_interval_seconds},
-                daemon=True,
-            )
+            worker = threading.Thread(target=server.serve_forever, daemon=True)
             self.server_threads.append((server, worker))
             state = {"server": server, "worker": worker, "started": False, "failure": None}
             self.server_starts.append(state)

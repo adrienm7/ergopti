@@ -4087,50 +4087,6 @@ and transport assertion remains intact. Native XCTest requalification and
 the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
-      `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
-
-2026-10-12 resumed exact `dbfdcaa652` native receiving confirms 24/25 archive
-controls pass, one owned Automation deadline fails and all six Brew scenarios
-remain unexecuted. Original logs, archive digest, 348 safe members and 407 source
-pins are retained in the [current receiving capsule](handovers/2026-10-11-group6-cloud/native-dbfd-core-archive-receiving.tar.gz).
-Package and installation were skipped; item36 and transversal16/38 remain open.
-
-2026-10-12 the original Windows updater23 diagnostic is now callable from the
-reviewed checkout with an explicit local mode before PAC -Publish. It retains
-original18/4/1 names, the2307-byte child and300000/30000/1320000 clocks, plus
-current21 pins and strict before/final Git receipts. Local output has null run IDs
-and no official context or full-suite/feature qualification. Twenty-two portable
-Source/context controls pass on Linux; all23 native cases, complete Windows
-unit/E2E/build/install, Mac Brew6 and final package/install acceptance remain
-UNEXECUTED on this successor. Item36 and transversal16/38 remain open. See the
-[executable local procedure](handovers/2026-10-11-group6-cloud/LOCAL-VALIDATION.md).
-
-2026-10-12 local native qualification is mapped to the existing source-bound
-Windows/macOS entry points and exact workflow recipes, without adding a competing
-runner or changing any original assertion/clock. The [local procedure](handovers/2026-10-11-group6-cloud/LOCAL-VALIDATION.md)
-records real session/tool/consent requirements, current-source prerequisites and
-separate native/build/install results. Its commands are unexecuted on this Linux
-host; the current Windows receiver/profile still needs coordinated enrollment.
-Item36 remains open until actual package and installation acceptance succeeds.
-
-2026-10-11 current-source portable qualification is preserved at feature
-`c3a49a115c`, merged without squash from current Dev `da74809cd1`. All six
-selected format/JS/Lua/Linux gates pass; virtual E2E is not native desktop or
-installed-package acceptance. The raw PAC retention metadata successor now
-passes formatting, syntax and bounded omission controls without changing any
-original assertion, but shared adoption, producer enrollment and Windows
-receiving remain pending. See the [terminal checkpoint](handovers/2026-10-11-group6-cloud/README.md).
-Item36 stays open; no original23, Brew6 or full-suite qualification is claimed.
-
-2026-10-11 authentic original producer bytes are received through supported Git
-API blobs: historical f1db PRE/POST, actual PAC pair/LICENSE and twelve targeted
-results join official ZIP digests. This is not our original23 or full-suite
-acceptance; Root's map still matches only19 of21 current updater pins. Missing
-raw prepared/MSVC/header/command evidence is explicit. A finite retention proposal
-preserves original commands/guards and passes three Linux PowerShell controls,
-but remains unadopted and Windows/pipeline receiving is unrun. The current Dev
-composition and held packets are documented in the
-[cloud checkpoint](handovers/2026-10-11-group6-cloud/README.md). Item36 stays open.
 
 2026-10-11 held Windows original23 preparation is now durably preserved with
 its actual custody acknowledgment, complete inverses and Root67600 publisher
@@ -4183,6 +4139,8 @@ law. All203 original controls remain exact;205 portable controls pass without
 skips. Both new controls fail against the exact predecessor. Corrected native
 receiving, ordinary consent, Brew6 and full package/install remain required;
 item36 stays open.
+
+      `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
 2026-10-11 typed worker and first-traversal receiving. Exact manual38103825010
 on12fb210c actually compiles and executes25 native archive cases:24 pass,
@@ -5415,6 +5373,45 @@ ACK/refusal subjects, all gesture-marker modes, Tap-Hold negative backup and
 external-edit cases, and the complete unchanged native suite. Source review
 and Linux-host encoding/JS checks do not complete that Windows validation.
 
+The Windows TOML tokenizer uses native forward LF search for positive integer
+cursors in unquoted comments, retaining its original character loop for an
+absent LF, a search stopped by NUL or other cursor types. All original 37
+fixture registrations and 280 assertions remain unchanged; 38 independently
+frozen UTF-16 controls cover cursor domains, quoting, separators, NUL,
+surrogates and exception outcomes. No corpus expectation is generated from
+the candidate. The launcher passes its eleven local checks, including the
+original 66 controls, 20 additive controls and both workflow guards. Manual
+Windows CI 38204598996 completed on exact private source 2abf20a709 with
+SDK 2.0.26. The original/candidate/inverse Native38 gate and strict candidate
+restoration gate passed; the raw artifact download remains refused by GitHub,
+so its individual raw records have not been independently received. The
+unchanged thirteen temporal subjects remain incomplete: four terminal passes,
+one started subject killed at the original shared 600,000 ms budget and eight
+subjects never started. Core JavaScript passed 412 of 413 checks; managed
+Ollama's Swift dependency control failed. Full Windows units, E2E, packaging
+and installation were skipped after the temporal failure. Phase measurement
+and complete native qualification remain required; no performance improvement
+or complete writer qualification is inferred. Installed-device acceptance and
+items 42 and 16/38 remain partial.
+
+Actual bounded Windows receiving on manual run 38209311346, exact private SHA
+5ec8e90b94886c20b01e7a75a0712e5122dfc684, independently reconstructs all
+45 complete host-log streams with exact byte counts and SHA-256 values.
+SDK 2.0.26 runs all 38 unchanged independent controls against the original,
+candidate and inverse sources successfully, then acknowledges the final
+candidate restoration. The unchanged thirteen temporal subjects remain
+incomplete: six pass, the seventh is interrupted by the original 600,000 ms
+shared budget, and six are never started. Commit costs 33.7–37.1 seconds and
+rollback 49.8–54.4 seconds in the six settled cases; WAL hex conversion is
+about 1 ms and their single observed recovery-image attempts cost 0.37–1.65
+seconds. Eight attempts remain the original maximum, not an observed count.
+These phase measurements identify further investigation, not a qualified
+production optimization. Full Windows units, E2E, packaging and installation
+remain skipped. Local selected checks passed 412/413; the unchanged Linux
+uninstall control separately passes when its fixture is outside the managed
+Git ancestors. This is mixed-environment evidence, not one green full run.
+Item 42 and transversal items 16/38 remain partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -5685,8 +5682,13 @@ allocation, native builder observation and result placement. The unchanged
 census owner measures Windows 17 to 16, with macOS 2 and Linux 1 unchanged.
 Actual private Node22 menu guards, reader and inert-publication controls, syntax,
 owning formatting and genuine generation pass. The original ten and four new
-Windows subjects remain native UNRUN; Windows qualification is pending.
-This item remains partial.
+Windows subjects now pass in actual bounded run 38209311346 on exact
+private SHA 5ec8e90b94886c20b01e7a75a0712e5122dfc684 with SDK 2.0.26.
+All six native children exit and dispose; all seventeen cleanup reports retain
+the original construction-refusal then repair sequences and zero secondary
+errors. The unchanged fixture and all 3273 source pins are verified before and
+after. This qualifies the targeted cohort; full-suite, E2E, packaging,
+installation and device acceptance remain pending. This item remains partial.
 
 Current Windows receiving38173146839 on committed9c9d now passes all twelve
 personal-file caption subjects (eight new and four original late controls).
@@ -7079,141 +7081,6 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
-      system proxy for every download child (Ollama installation/server/pull,
-      updater/rollback and remote AI), with translated certificate/proxy/blocked/
-      offline/disk/permission causes and useful recovery actions in all21 locales.
-      Committed source at `b21bea3ee3ed0f3a21b90096ab0e9607a5ac688a` includes
-      Windows/Linux transport, publication and receiving repairs; those changes
-      must be preserved rather than rebuilt from the old interrupted worktree.
-      Complete native, package, installation and enterprise acceptance remains
-      open. macOS system trust and explicit proxy relay code is integrated.
-      Packaged Python/uv/wheel bootstrap and HuggingFace downloads already use
-      native per-request adapters; system-trust/PAC and installed qualification
-      remains incomplete. A manual context without admitted native capabilities
-      refuses automatic proxy routing instead of bypassing it.
-
-2026-10-12 the separate Linux cursor-window fixture now retains only closed
-metadata from the last already-produced visible-window search at its original
-five-second refusal boundary. Thirteen pure controls preserve original exception
-identity, cancellation, query counts and window-ID semantics; older observer
-behavior reproduces three failures and the first proposal one additional failure.
-The production worker, all original commands/deadlines/assertions and cleanup
-remain unchanged under the Group3 bounded fixture handback. This is diagnostic
-receiving, not a window-readiness fix or native qualification. The current host
-refuses native admission before allocation because its exact kernel child census
-is unavailable. Root owns normal-suite enrollment and targeted native receiving;
-item62 and transversal16/38 remain open. No Ollama experiment was relaunched.
-
-2026-10-12 the Linux native-acceptance checkpoint now explicitly flushes its
-phase before continuing, with a fixed refusal if flushing fails. A terminal
-marker refusal is deferred until unchanged cleanup finishes; original work
-and shutdown errors retain precedence. Seven portable controls pass on LuaJIT
-and Lua5.4. The original LuaJIT loses the before-exit marker; the first flush
-proposal fails all three additive cleanup controls. Root delegated this source
-slice while retaining workflow, runner and Common inventory enrollment. No
-native acceptance was relaunched; the original 930-second timeout cause stays
-unknown and every native deadline and qualification assertion is preserved.
-The new portable test is directly verified but awaits normal-suite enrollment;
-item62 and transversal16/38 remain open.
-
-2026-10-12 the authenticated `dbfdcaa652` Core result is 413/414, with all 165
-earlier receiving controls admitted. The remaining failure is the unchanged
-compiler include-directory assertion: observed0755, required0700. The G6-owned
-builder now creates that directory explicitly at0700 before staging its original
-headers. The same independent ten tests fail on old source under022/000 and pass
-on the correction under022/000/077; no assertion, command, source recipe or clock
-changes. This portable proof does not replace selected or native validation.
-Both native PAC cohorts have12 passed methods/two failed methods; trust, HTTP,
-model, package and enterprise acceptance remain incomplete. Item62 stays open.
-
-2026-10-12 the settled removal diagnostic is now composed with the G6 polling
-fix. It records only the original retired child/status and bounded existing stderr;
-original ADD ABI, trust commands,15s deadlines, primary/cancellation and closure/debt
-remain. All156 original tests and250 helpers/providers/assertions are unchanged;
-the nine reviewed regressions raise the strict count to165. The clock selector
-guard requires the same exact165 and rejects obsolete156. Current165 portable
-controls pass in13.192s; native Darwin receiving of this successor remains unrun.
-The authentic predecessor a18 manual has23jobs:8success/8failure/7skipped,
-Release skipped. Its Core413/414 times out the original156 child; bothPAC14
-have12passes/2failures, HTTP trust/restoration refuse, archive24/25 lacks consent,
-and Windows1983/11165 passes before the unchanged watchdog. No updater23,
-full-unit/package/install or enterprise qualification is granted. Root finite
-custody/history and actual own-span continuation are preserved in the
-[checkpoint](handovers/2026-10-11-group6-cloud/README.md); item62 stays open.
-
-2026-10-12 the G6-owned network fixture now uses an explicit50ms serving poll
-instead of the implicit500ms default, reducing idle shutdown cost without changing
-any native command, deadline, cleanup/debt law or original assertion. The unchanged
-156 portable cases pass in13.599s on this successor; prior actual baseline45.907s
-and candidate13.716s remain separate receipts. This is fixture cost reduction,
-not proof of the historical hosted timeout cause or native trust/PAC acceptance.
-Source ownership history and Root/G5 exact no-overlap handbacks were received;
-no G4 same-span reservation was found or approval inferred. Item62 remains open.
-
-2026-10-12 updater Source receiving is isolated in its callable shared tooling
-module. It preserves the original acquired reader/Git collector and rejects
-caller label overrides using a copied six-field context. Explicit local mode
-uses real HEAD and absolute SDK/evidence paths; unknown/mixed modes and hosted
-metadata refuse. Current21, independent oracle and strict two-PAC-output refusals
-remain. Twenty-two real private Git/filesystem and modeled-entry controls pass;
-four predecessor controls fail their intended assertions. These controls are
-portable, native=false and official=false; they do not repair Mac trust, enroll
-the published PAC producer or complete enterprise/installed acceptance. Item62
-and16/38 remain open.
-
-2026-10-12 HTTP-clock source tracking now admits the same complete rosters in
-bounded Git batches. Per-file committed bytes, regular-file checks and original
-before/final source procedures remain; all32 independent controls and the60s
-boundary are unchanged. The exact final source passes32 in11.365s. Earlier actual
-baseline/candidate rounds measure17.744s/11.609s and9,857/5,164 child calls.
-A missing builder now refuses its list before15 earlier reads; no accepted source
-pin is omitted. The hosted timeout is not reproduced or claimed repaired.
-See the [source and local validation checkpoint](handovers/2026-10-11-group6-cloud/README.md).
-Native trust/company/installed acceptance and item62 remain open.
-
-2026-10-11 removal custody correction: Root explicitly released the exact
-fixture projection, additive nine-case class and single156-to165 literal in
-comment6113764617. The later Root-pending statement was stale. G4 removal
-custody, any actual overlapping writer, current-wrapper composition and live
-selected/native receiving still remain necessary. The companion metadata and
-custody packets are [durably preserved](handovers/2026-10-11-group6-cloud/README.md).
-No observation grants restoration, resolves hosted trust failures or completes
-managed-company/installed acceptance. Item62 and transversal16/38 stay open.
-
-2026-10-11 full private removal receiving now passes165 actual cases, zero
-failed/errors/skipped, in45.164s under the original60s boundary, with29 candidate
-and live hashes unchanged before/after. Live fixture/registry adoption and native
-trust remain unqualified. The strict library seam passes21 default plus five
-causal controls; G5's exact diagnostic graft passes six portable controls and
-retains every original60s assertion/command. These are held proposals, not timeout
-cause fixes. Actual producer ZIP bytes are now independently received; missing
-raw source/header/compiler evidence and current-profile ownership remain.
-Saved network draft13 adds only the new exact sa3 host and is not activated.
-See the [additional receiving](handovers/2026-10-11-group6-cloud/README.md).
-No item is removed and native/company/installed acceptance remains pending.
-
-2026-10-11 unadopted native successors are durably preserved. The removal-only
-proposal passes nine additive focused controls while retaining250 original
-function texts and156 case identities; full165/native receiving is unrun.
-The genuine publisher extraction passes21 Node and four Linux PowerShell
-controls but still needs shared ownership, a fresh current source census and
-the stronger acquired/final-held reader. Root's historical profile matches
-only19 of21 current updater pins; retain both constructor corrections.
-Actual new producer ZIP downloads are HTTP403/zero bytes. Saved network draft12
-adds only the new exact storage host and is not activated. See the
-[preserved successor checkpoint](handovers/2026-10-11-group6-cloud/README.md).
-No native trust fix, original23/full-suite acceptance or item closure is claimed.
-
-2026-10-11 portable receiver failure diagnostics. Failed, signalled and timed-out
-Python children now emit bounded captured-output tails before the unchanged
-original assertions. The original executable, argv, case roster, success writes
-and 60,000 ms boundary remain exact. Six registered portable controls pass locally,
-with a genuine old-source output-loss refusal and an independently observed
-60000ms timeout; Windows explicitly skips only the POSIX signal observation.
-The [reviewed packet](handovers/2026-10-11-group6-cloud/portable-receiver-failure-output-proposal.tar.gz)
-retains complete preimages, inverse and physical child receiving. Final selected
-qualification is separate; no historical hosted cause or native trust repair is
-claimed. Item 62 remains open.
 
 2026-10-11 native producer and portable timeout receiving are now durably
 preserved. The strict reader correction589991aeb8 passes final format/412JS with
@@ -7389,6 +7256,19 @@ skipped, none cancelled; Release, package and install actually skip. These compo
 results do not turn the incomplete whole native lane into a pass. The unrelated
 late permission-history correction retains the existing network production
 guards and Windows/macOS continuation steps; item62 remains open.
+
+      system proxy for every download child (Ollama installation/server/pull,
+      updater/rollback and remote AI), with translated certificate/proxy/blocked/
+      offline/disk/permission causes and useful recovery actions in all21 locales.
+      Committed source at `b21bea3ee3ed0f3a21b90096ab0e9607a5ac688a` includes
+      Windows/Linux transport, publication and receiving repairs; those changes
+      must be preserved rather than rebuilt from the old interrupted worktree.
+      Complete native, package, installation and enterprise acceptance remains
+      open. macOS system trust and explicit proxy relay code is integrated.
+      Packaged Python/uv/wheel bootstrap and HuggingFace downloads already use
+      native per-request adapters; system-trust/PAC and installed qualification
+      remains incomplete. A manual context without admitted native capabilities
+      refuses automatic proxy routing instead of bypassing it.
 
 2026-10-11 exact12fb native component receiving. Manual38103825010 finishes
 failed: seven successful jobs, five failed and five skipped, none cancelled;
@@ -9608,8 +9488,13 @@ is committed; one request is one commit with its regression test.
 On 2026-10-12, one genuine Windows shortcut-extension construction and
 placement site moves to the shared recipe: Windows 17 to 16, macOS 2, Linux 1.
 Actual private Node22 owning guards and genuine generation pass with all original
-corpora and assertions retained. The fourteen Windows subjects remain native
-UNRUN; Windows qualification is pending. Items 54 and 81 remain partial.
+corpora and assertions retained. Actual bounded run 38209311346 on exact
+private SHA 5ec8e90b94886c20b01e7a75a0712e5122dfc684 passes all fourteen
+unchanged subjects, six genuine SDK 2.0.26 children and seventeen exact cleanup
+reports, including the intentional refusal/repair sequences. All source pins,
+original corpus, names and order are independently received. Full-suite, E2E,
+packaging, installation and device acceptance remain pending. Items 54 and 81
+remain partial.
 
 Current Windows receiving38173146839 on committed9c9d now passes all twelve
 personal-file caption subjects (eight new and four original late controls).

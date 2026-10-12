@@ -1950,12 +1950,6 @@ const CHECKS = [
 		repro: 'npm run test:native-http-clock-evidence'
 	},
 	{
-		name: 'Windows original updater Source and local context retain frozen native diagnostics',
-		cmd: process.execPath,
-		args: ['tools/test/test-windows-updater-original-source.cjs'],
-		repro: 'npm run test:windows-updater-original-source'
-	},
-	{
 		name: 'managed Ollama catalogue preserves native source and publication admission',
 		cmd: process.execPath,
 		args: ['tools/test/test-macos-managed-ollama-catalogue.cjs'],
