@@ -7092,6 +7092,30 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-12 the separate Linux cursor-window fixture now retains only closed
+metadata from the last already-produced visible-window search at its original
+five-second refusal boundary. Thirteen pure controls preserve original exception
+identity, cancellation, query counts and window-ID semantics; older observer
+behavior reproduces three failures and the first proposal one additional failure.
+The production worker, all original commands/deadlines/assertions and cleanup
+remain unchanged under the Group3 bounded fixture handback. This is diagnostic
+receiving, not a window-readiness fix or native qualification. The current host
+refuses native admission before allocation because its exact kernel child census
+is unavailable. Root owns normal-suite enrollment and targeted native receiving;
+item62 and transversal16/38 remain open. No Ollama experiment was relaunched.
+
+2026-10-12 the Linux native-acceptance checkpoint now explicitly flushes its
+phase before continuing, with a fixed refusal if flushing fails. A terminal
+marker refusal is deferred until unchanged cleanup finishes; original work
+and shutdown errors retain precedence. Seven portable controls pass on LuaJIT
+and Lua5.4. The original LuaJIT loses the before-exit marker; the first flush
+proposal fails all three additive cleanup controls. Root delegated this source
+slice while retaining workflow, runner and Common inventory enrollment. No
+native acceptance was relaunched; the original 930-second timeout cause stays
+unknown and every native deadline and qualification assertion is preserved.
+The new portable test is directly verified but awaits normal-suite enrollment;
+item62 and transversal16/38 remain open.
+
 2026-10-12 the authenticated `dbfdcaa652` Core result is 413/414, with all 165
 earlier receiving controls admitted. The remaining failure is the unchanged
 compiler include-directory assertion: observed0755, required0700. The G6-owned
@@ -11589,6 +11613,13 @@ SDK constants qualify the native Swift Shortcuts product or remote invocation.
   moved cursors, spanning/negative/minimized/closed windows and refused activation.
   Virtual RandR regions and posted-event success cannot prove physical display
   behavior or Dock consumption/modifier retirement.
+
+The received passive Linux window-search diagnostic preserves the original
+five-second deadline, query predicates, window ID and exact refusal/cancellation
+owners. It exposes only fixed title enums, status and UTF-8 byte counts from
+the last completed native search. All thirteen original helper controls pass
+on the joined sources; they execute no hardware main or native GUI. The final
+native source, package and installed window acceptance remains unqualified.
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
