@@ -401,6 +401,30 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-js-feature-results.cjs"],
 			"repro": "node tools/test/test-js-feature-results.cjs"
+		},
+		{
+			"id": "js-0433",
+			"ordinal": 433,
+			"name": "Retained publication plans require every selected lane and exact source/run identity",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-publication-plan.cjs"],
+			"repro": "node tools/test/test-publication-plan.cjs"
+		},
+		{
+			"id": "js-0434",
+			"ordinal": 434,
+			"name": "Adjacent OS scheduler custody preserves strict original verdicts",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ci-stage-status.cjs"],
+			"repro": "node tools/test/test-ci-stage-status.cjs"
+		},
+		{
+			"id": "js-0435",
+			"ordinal": 435,
+			"name": "Mac matrix stage roles preserve complete native qualification custody",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-stage-roles.cjs"],
+			"repro": "node tools/test/test-macos-stage-roles.cjs"
 		}
 	]
 }

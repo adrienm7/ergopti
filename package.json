@@ -3,6 +3,9 @@
 	"version": "3.0.0",
 	"private": true,
 	"scripts": {
+		"test:publication-plan": "node ./tools/test/test-publication-plan.cjs",
+		"test:ci-stage-status": "node ./tools/test/test-ci-stage-status.cjs",
+		"test:macos-stage-roles": "node ./tools/test/test-macos-stage-roles.cjs",
 		"test:windows-key-combination-cohorts": "node ./tools/test/test-windows-key-combination-cohorts.cjs",
 		"test:lease-silence-xctest-evidence": "node ./tools/test/test-lease-silence-xctest-evidence.cjs",
 		"test:web-text-admission": "node ./tools/test/test-web-text-admission.cjs",

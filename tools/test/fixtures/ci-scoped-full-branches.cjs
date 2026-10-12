@@ -144,7 +144,7 @@ function projectScopedSteps(text, rel) {
 				assert.equal(job.id, 'package-macos', 'reviewed duplicate job must remain');
 				assert.ok(Object.hasOwn(siblings, step.name), 'unknown duplicate scoped owner');
 				assert.equal(protocol.scope, siblings[step.name][0], 'duplicate scope family must remain');
-				assert.equal(slot.owner_job, 'managed-ollama-native', 'original scope owner must remain');
+				assert.equal(slot.owner_job, 'e2e-hs', 'original scope owner must remain');
 				assert.equal(slot.owner_step, siblings[step.name][1], 'original scope step must remain');
 				assert.equal(
 					policy.scopes[protocol.scope].args[1],

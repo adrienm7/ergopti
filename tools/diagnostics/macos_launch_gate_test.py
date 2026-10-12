@@ -422,7 +422,7 @@ class VerdictTests(unittest.TestCase):
     def test_security_log_workflow_is_failure_owned_and_retained(self):
         workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci-macos.yml"
         text = workflow.read_text(encoding="utf-8")
-        jobs = re.findall(r"^  managed-ollama-native:\n(.*?)(?=^  [\w-]+:\n|\Z)", text, re.M | re.S)
+        jobs = re.findall(r"^  e2e-hs:\n(.*?)(?=^  [\w-]+:\n|\Z)", text, re.M | re.S)
         self.assertEqual(len(jobs), 1)
         job = jobs[0]
 
@@ -449,7 +449,7 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(
             conditions,
             [
-                "${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}"
+                "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure')) }}"
             ],
         )
         self.assertIn("from macos_launch_gate import collect_security_logs", capture)
@@ -457,7 +457,10 @@ class VerdictTests(unittest.TestCase):
         self.assertIn('"$ERGOPTI_OLLAMA_BUILD_ROOT/security-observation"', capture)
         self.assertIn("        timeout-minutes: 3\n", capture)
         retained = step("Retain actual native producer, catalogue and receiving evidence")
-        self.assertIn("        if: always()\n", retained)
+        self.assertIn(
+            "        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}\n",
+            retained,
+        )
         self.assertIn(
             "            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/security-observation\n", retained
         )
@@ -489,21 +492,29 @@ class VerdictTests(unittest.TestCase):
             "native_http_clock",
             "managed-ollama-model-receiving",
         )
-        self.assertEqual(clauses, [(identifier, "failure") for identifier in identifiers])
+        self.assertEqual(
+            clauses,
+            [("stage-admission", "success")]
+            + [(identifier, "failure") for identifier in identifiers],
+        )
         self.assertEqual(
             condition,
-            "${{ !cancelled() && failure() && ("
+            "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && failure() && ("
             + " || ".join(f"steps.{identifier}.outcome == 'failure'" for identifier in identifiers)
-            + ") }}",
+            + ")) }}",
         )
 
         # Closed GitHub outcome model reads the actual source clauses. This is
         # workflow admission evidence, never native Security service proof.
-        def observes(cancelled, failed, outcomes):
+        def observes(cancelled, failed, outcomes, admitted=True, role="managed-ollama-native"):
             return (
-                not cancelled
+                admitted
+                and role == "managed-ollama-native"
+                and not cancelled
                 and failed
-                and any(outcomes.get(identifier) == expected for identifier, expected in clauses)
+                and any(
+                    outcomes.get(identifier) == expected for identifier, expected in clauses[1:]
+                )
             )
 
         for first in ("success", "skipped", "failure"):
@@ -515,6 +526,8 @@ class VerdictTests(unittest.TestCase):
                         self.assertEqual(observes(False, True, outcomes), "failure" in values)
                         self.assertFalse(observes(True, True, outcomes))
                         self.assertFalse(observes(False, False, outcomes))
+                        self.assertFalse(observes(False, True, outcomes, admitted=False))
+                        self.assertFalse(observes(False, True, outcomes, role="tooltip-canvas"))
         self.assertFalse(observes(False, True, {}))
 
     def test_security_failure_logs_reuse_only_bounded_default_redacted_capture(self):

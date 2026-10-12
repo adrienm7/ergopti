@@ -14963,6 +14963,47 @@ registration identities rather than assuming display names are unique.
 Ordered unit, E2E, build and test-build prerequisites are locally committed,
 with exact dependency refusal controls. Their hosted acceptance, native feature
 lots, test-folder migration and all-phase timing coverage remain unfinished.
+
+The maintainer rejected the first rendered prototype because independent macOS
+jobs and redundant prerequisites still produced crossed branches. The current
+local successor uses five adjacent macOS stages, with native roles inside
+their stage matrices, and adjacent Windows/Linux prerequisites. All 144
+original macOS executable steps are retained. An ordinary publication
+preflight receives the original source/run-bound validation artifact rather
+than relying on reusable workflow outputs during failed-job reruns. Its 74
+bounded controls pass; the old root graph fails the new source guard. The
+Windows/Linux custody controls pass 80 cases and macOS role custody 84 cases.
+These are source/portable receipts, not native or rendered GitHub acceptance.
+Existing graph guards are being transposed without deleting assertions.
+Common currently has inventory preparation, parallel Unit lots, exact union
+and browser E2E; its real Build/Testbuild work remains open. The 32 Windows
+semantic families also remain private pending current-source native receiving.
+
+The first complete source receiving over this graph passed formatting and
+416 of 433 JavaScript checks. Its 17 failures include stale graph guards and
+Windows host restrictions; none is reported as passing. Private successors
+preserve the original predicates, exact matrix producers and native assertion
+bodies. The pipeline owner now initializes its lease fixture before actual
+source-order validation; an extracted-function harness had hidden that defect.
+The shared feature collector accepts complete retained successes from the same
+source/run/static inventory when their producer attempt precedes receiving.
+Its actual owner passes two complete-order controls and all 32 refusal controls;
+a hosted failed-job rerun remains unqualified. The transposed Lua source guard
+passes 11 controls with process actors prohibited. Composed source gates and
+the rendered GitHub graph remain pending.
+
+The next complete JavaScript receiving passes 420 of 433 checks, with every
+owned source and working-tree status unchanged. It exposes later signing and
+release predicates that still expect the previous graph. Their successor
+preserves the original conditions under actual package admission; the complete
+packaging owner then passes its 10 installed-archive and 22 portable native-owner
+controls. The other local failures remain open. Generator execution also reports
+an unproved Windows `UNKNOWN` write error for the architecture document. A stale
+empty index lock in this owned checkout, created in the same interval, is
+retained reversibly after all gates and Git processes terminate; that observation
+does not establish the generator error's cause. No native or whole-CI success
+is inferred from these local receipts.
+
 A locally committed Windows lease selector avoids repeated sibling scans while
 retaining all 48 original controls and 30 new integrity controls. Both complete
 78-case cohorts pass; one bounded transaction comparison improved from 398.025
@@ -14985,7 +15026,7 @@ The actual menu parity owner improved from 279.778 to 219.184 seconds in one
 matched local CPU-profile pair after indexing statement starts per lexical
 unit. Its output is byte-identical and the sparse-query regression fails on
 the original implementation. This single pair does not establish a whole-CI
-speedup; repeated hosted measurements remain required. The latest selected local
+speedup; repeated hosted measurements remain required. An earlier selected local
 source gate passes formatting and 406 of 415 JavaScript checks. Its nine failing
 owners also failed before this change; their exposed failure signatures match,
 but truncated diagnostic output limits cause equivalence. They remain open.
@@ -15032,6 +15073,13 @@ investigation; a timing resemblance to a watchdog is not cause attribution.
       Preserve native platform boundaries while giving corresponding shared
       scenarios consistent names across drivers. Inventory and move tests with
       coverage proof before removing the old entry points.
+- [ ] Qualify failed-job reruns for semantic Unit matrices. Preserve successful
+      earlier-attempt producers only for the exact source/run/plan, with genuine
+      producer attempts and monotonic custody. Refuse future, backward, missing,
+      duplicate and foreign receipts. The current Common feature-journal union
+      requires the receiving attempt for every journal; its reuse of completed
+      earlier successful feature jobs remains unqualified. Do not claim that
+      persisted publication metadata alone fixes the Unit union protocol.
 - [ ] Coordinate the migration with groups 1, 2/4/7, 3, 5 and 6 after their
       current validation checkpoints. Keep feature work at existing paths until
       each owner supplies its final commit and test/runner inventory, then agree

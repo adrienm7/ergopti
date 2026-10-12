@@ -57,6 +57,8 @@
 const fs = require('fs');
 const path = require('path');
 const pipeline = require('./ci-full-default.cjs');
+const macRole = require('./fixtures/macos-stage-source.cjs');
+const macPlans = require('../ci/macos-stage-roles.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
@@ -140,8 +142,7 @@ check(
 );
 // Fail fast: a red Hammerspoon suite spends no macOS minutes.
 check(
-	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) ===
-		JSON.stringify(['test-hs', 'e2e-hs', 'managed-ollama-native']),
+	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['e2e-hs']),
 	`package-macos must need unit/E2E suites and both managed native producers, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
 );
 
@@ -169,7 +170,7 @@ const logCleanup = pipeline.step(
 );
 check(
 	pipeline.stepField(logCleanup, 'run') === 'rm -rf -- "$HOME/Library/Logs/ergopti_plus"' &&
-		pipeline.stepField(logCleanup, 'if') === null,
+		pipeline.stepField(logCleanup, 'if') === macRole.condition('package-macos'),
 	'package-macos must always remove ~/Library/Logs/ergopti_plus, the log the launcher tests write, before the app build'
 );
 check(
@@ -385,7 +386,7 @@ const ownedPolicyStep = pipeline.step(
 check(
 	pipeline.stepField(ownedPolicyStep, 'run') ===
 		'node tools/test/test-owned-program-xctest-notice.cjs' &&
-		pipeline.stepField(ownedPolicyStep, 'if') === null &&
+		pipeline.stepField(ownedPolicyStep, 'if') === macRole.condition('package-macos') &&
 		pipeline.stepField(ownedPolicyStep, 'continue-on-error') === null &&
 		packageStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') >
 			packageStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') &&
@@ -397,7 +398,10 @@ const transcriptUpload = pipeline.step(swiftJob, 'Upload Swift launcher failure 
 check(
 	/uses:\s*actions\/upload-artifact@v4/.test(transcriptUpload) &&
 		pipeline.stepField(transcriptUpload, 'if') ===
-			"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}" &&
+			macRole.condition(
+				'package-macos',
+				"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
+			) &&
 		/path:\s*\$\{\{ runner\.temp \}\}\/swift-launcher-evidence/.test(transcriptUpload) &&
 		/if-no-files-found:\s*error/.test(transcriptUpload) &&
 		packageStepNames.indexOf('Upload Swift launcher failure transcript') >
@@ -494,7 +498,7 @@ function isManualLeaseSilenceQualification(rel, jobId, condition) {
 	return (
 		rel === MACOS_BOX &&
 		jobId === 'lease-silence-native' &&
-		condition === "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
+		condition === macRole.condition('lease-silence-native')
 	);
 }
 
@@ -567,10 +571,34 @@ const LEASE_SILENCE_MANUAL_SCOPE_CASES = [
 ];
 for (const [name, rel, jobId, condition, expected] of LEASE_SILENCE_MANUAL_SCOPE_CASES) {
 	check(
-		isManualLeaseSilenceQualification(rel, jobId, condition) === expected,
+		isManualLeaseSilenceQualification(
+			rel,
+			jobId,
+			condition === null
+				? null
+				: macRole
+						.condition('lease-silence-native')
+						.replace(
+							"github.event_name == 'workflow_dispatch' && !inputs.release",
+							condition.replace(/^\$\{\{\s*/, '').replace(/\s*\}\}$/, '')
+						)
+		) === expected,
 		`(lease-silence-manual-scope) ${name} must retain its exact frozen admission`
 	);
 }
+
+const leaseBody = macRole.body(pipeline.file(MACOS_BOX), 'lease-silence-native');
+check(
+	isManualLeaseSilenceQualification(
+		MACOS_BOX,
+		'lease-silence-native',
+		pipeline.stepField(
+			pipeline.step(leaseBody, 'Execute the actual paired native silence control'),
+			'if'
+		)
+	),
+	'actual lease role retains its closed manual nonrelease admission'
+);
 
 const BOX_FILES = {
 	macos: MACOS_BOX,
@@ -582,7 +610,7 @@ const ALLOWED_JOB_IFS = {
 	'macos-ok': 'always()',
 	'linux-ok': 'always()',
 	'package-linux':
-		"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+		"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 };
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
@@ -669,7 +697,22 @@ for (const mutated of [
 }
 const release = pipeline.job('release');
 const releaseNeeds = pipeline.needsOf(release);
-for (const needed of ['validate', 'core', ...Object.keys(BOX_FILES)]) {
+check(
+	JSON.stringify(releaseNeeds) === JSON.stringify(['publication-plan']),
+	'release waits only on its complete publication admission'
+);
+check(
+	JSON.stringify(pipeline.needsOf(pipeline.job('publication-plan'))) ===
+		JSON.stringify(['core', 'macos', 'windows', 'linux']),
+	'publication admission requires the four actual lane results'
+);
+check(
+	pipeline
+		.step(pipeline.job('publication-plan'), 'Assert every required lane and the original plan')
+		.includes('publication-plan.cjs receive'),
+	'publication admission must consume the retained original plan'
+);
+for (const needed of ['publication-plan']) {
 	check(
 		releaseNeeds.includes(needed),
 		`release must need \`${needed}\`, got [${releaseNeeds.join(', ')}]`
@@ -689,8 +732,8 @@ check(
 	`release.if must hold no status function, got: ${releaseIf}`
 );
 check(
-	releaseIf === "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
-	`release.if must be exactly github.event_name == 'push' && needs.validate.outputs.release == 'true', got: ${releaseIf}`
+	releaseIf === "github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
+	`release.if must be exactly github.event_name == 'push' && needs.publication-plan.outputs.release == 'true', got: ${releaseIf}`
 );
 
 // Forks receive no secrets: without a stand-in key their package opens a
@@ -735,21 +778,34 @@ check(
 	'(symlinked-config-dir) the launch gate must install the assets-macos archive that release publishes'
 );
 check(
-	/^\s+scenario:\s*\$\{\{\s*fromJSON\(needs\.package-macos\.outputs\.scenarios\)\s*\}\}\s*$/m.test(
-		launch
-	),
-	'(symlinked-config-dir) the launch scenarios must come from the profile package-macos resolved'
+	launch.includes('fromJSON(needs.package-macos.outputs.testbuild_matrix)'),
+	'(symlinked-config-dir) launch cells consume the Build-owned test-build plan'
 );
-// Exact, not a shape: a release run launching on Intel only, or a CI run
-// launching nowhere, kept a looser pattern green.
 check(
-	launch
-		.split('\n')
-		.includes(
-			'        runner: ${{ fromJSON(inputs.release && \'["macos-15","macos-15-intel"]\' || \'["macos-15"]\') }}'
-		),
-	'(symlinked-config-dir) a release run must launch on macos-15 and macos-15-intel, any other run on macos-15'
+	pipeline
+		.step(packageJob, 'Resolve exact test-build stage roles')
+		.includes('MACOS_LAUNCH_SCENARIOS: ${{ steps.profile.outputs.scenarios }}'),
+	'(symlinked-config-dir) the plan receives the original canonical scenario profile'
 );
+for (const release of [false, true]) {
+	const scenarios = ['clean', 'upgraded', 'source_logs'];
+	const cells = macPlans
+		.plan('testbuild', {
+			source_sha: 'a'.repeat(40),
+			run_id: '1',
+			event_name: 'push',
+			release,
+			scenarios
+		})
+		.filter((cell) => cell.role === 'launch');
+	const expected = (release ? ['macos-15', 'macos-15-intel'] : ['macos-15']).flatMap((runner) =>
+		scenarios.map((scenario) => [runner, scenario])
+	);
+	check(
+		JSON.stringify(cells.map((cell) => [cell.runner, cell.scenario])) === JSON.stringify(expected),
+		'(symlinked-config-dir) every scenario retains the exact per-profile native runner matrix'
+	);
+}
 // The release profile adds the release-only scenarios (source_logs,
 // symlink_config_documents); a profile stuck on ci drops them from every
 // release without a failure.
@@ -799,7 +855,7 @@ check(
 // app for this leg's scenario, and neither skip nor forgive a red verdict.
 const judge = pipeline.step(launch, 'Launch over the user state and judge it');
 check(
-	pipeline.stepField(judge, 'if') === null &&
+	pipeline.stepField(judge, 'if') === macRole.condition('launch') &&
 		pipeline.stepField(judge, 'continue-on-error') === null,
 	'(symlinked-config-dir) the launch verdict step must set neither if nor continue-on-error'
 );
@@ -829,9 +885,7 @@ check(
 		'SDK_PERMISSION_OBSERVATION caller=native-test-product target=shortcuts-events' +
 		' event_class=core event_id=getd ask_user=0 nonce=19 osstatus=';
 	function admitted(text) {
-		const jobs = [
-			...text.matchAll(/^  item36-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
-		];
+		const jobs = [...text.matchAll(/^  e2e-hs:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)];
 		if (jobs.length !== 1) return false;
 		const steps = [
 			...jobs[0][0].matchAll(
@@ -842,7 +896,7 @@ check(
 		const step = steps[0][0],
 			job = jobs[0][0];
 		const required = [
-			'        if: ${{ !cancelled() }}',
+			'        if: ' + macRole.condition('item36-native', '${{ !cancelled() }}'),
 			'        shell: bash',
 			'          set -euo pipefail',
 			'          node tools/test/test-macos-swift-launcher-ci.cjs',
@@ -881,7 +935,7 @@ check(
 		'the fixed SDK case needs independent !cancelled() enrollment, owned statuses and retained source/verdict/log'
 	);
 	for (const [before, after] of [
-		['if: ${{ !cancelled() }}', 'if: success()'],
+		['if: ' + macRole.condition('item36-native', '${{ !cancelled() }}'), 'if: success()'],
 		['sdk_permission_xctest_evidence.cjs begin', 'sdk_permission_xctest_evidence.cjs omitted'],
 		['sdk_permission_xctest_evidence.cjs judge', 'sdk_permission_xctest_evidence.cjs omitted'],
 		['sdk_statuses=("${PIPESTATUS[@]}")', 'sdk_statuses=(0 0)'],
@@ -898,6 +952,10 @@ check(
 			before === 'sdk-permission-*.json'
 				? mac.replace(before, after)
 				: mac.slice(0, start) + owned.replace(before, after) + mac.slice(end);
+		check(
+			mutated !== mac,
+			`SDK independent enrollment mutation must target actual source: ${before}`
+		);
 		check(!admitted(mutated), `SDK independent enrollment omission must refuse: ${before}`);
 	}
 	const summary = ' Executed 1 test, with 0 failures (0 unexpected) in 0.001 seconds';

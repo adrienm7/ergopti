@@ -166,19 +166,19 @@
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"step": "Qualify actual native PAC and WPAD XCTest controls",
 			"protocol": 1
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"step": "Receive actual independent managed HTTP native clients",
 			"protocol": 2
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"step": "Receive actual native model create, pull, inference and retirement",
 			"protocol": 3
 		},
@@ -1123,7 +1123,7 @@
 			"job": "package-macos",
 			"step": "Receive actual managed HTTP native clients",
 			"protocol": 12,
-			"owner_job": "managed-ollama-native",
+			"owner_job": "e2e-hs",
 			"owner_step": "Receive actual independent managed HTTP native clients"
 		},
 		{
@@ -1131,7 +1131,7 @@
 			"job": "package-macos",
 			"step": "Run Swift launcher tests",
 			"protocol": 13,
-			"owner_job": "managed-ollama-native",
+			"owner_job": "e2e-hs",
 			"owner_step": "Qualify actual native PAC and WPAD XCTest controls"
 		}
 	],
@@ -1156,10 +1156,10 @@
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"name": "Retain source-bound managed-ollama-native qualification receipts",
-			"condition": "always()",
-			"body": "      - name: Retain source-bound managed-ollama-native qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-managed-ollama-native-${{ matrix.architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
+			"condition": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}",
+			"body": "      - name: Retain source-bound managed-ollama-native qualification receipts\n        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'\n        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-managed-ollama-native-${{ matrix.architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
@@ -1172,8 +1172,8 @@
 			"file": ".github/workflows/ci-macos.yml",
 			"job": "e2e-hs",
 			"name": "Retain source-bound e2e-hs qualification receipts",
-			"condition": "always()",
-			"body": "      - name: Retain source-bound e2e-hs qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-e2e-hs-${{ matrix.architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
+			"condition": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' && (always()) }}",
+			"body": "      - name: Retain source-bound e2e-hs qualification receipts\n        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' && (always()) }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-e2e-hs-${{ matrix.architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-windows.yml",

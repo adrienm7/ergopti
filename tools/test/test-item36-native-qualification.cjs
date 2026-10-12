@@ -9,6 +9,7 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	const path = require('node:path');
 	const { execFileSync } = require('node:child_process');
 	const reader = require('../diagnostics/item36_xctest_evidence.cjs');
+	const stageSource = require('./fixtures/macos-stage-source.cjs');
 	const full = require('../diagnostics/swift_xctest_evidence.cjs');
 	const repository = path.resolve(__dirname, '../..');
 	const classes = [
@@ -165,27 +166,27 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	check('scoped-filter-admitted', () => assert.ok(admitItem36Selector(workflow)));
 	for (const [label, token, replacement] of [
 		['wrong-filter', ITEM36_FILTER, "--filter 'HomebrewArchiveAcceptanceTests'"],
-		['foreign-job', '  item36-native:\n', '  unrelated-native:\n'],
+		['foreign-job', '  e2e-hs:\n', '  unrelated-native:\n'],
 		[
 			'foreign-step',
 			'      - name: Qualify scoped item 36 native archive XCTest controls\n',
 			'      - name: Unrelated native tests\n'
 		],
-		['coupled-job', '  item36-native:\n', '  item36-native:\n    needs: package-macos\n'],
+		['coupled-job', '  e2e-hs:\n', '  e2e-hs:\n    needs: package-macos\n'],
 		[
 			'release-admission',
-			"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
-			'    if: always()'
+			'        if: ' + stageSource.condition('item36-native'),
+			'        if: always()'
 		],
-		['forgiven-job', '  item36-native:\n', '  item36-native:\n    continue-on-error: true\n'],
-		[
-			'publish-output',
-			'  item36-native:\n',
-			'  item36-native:\n    outputs:\n      assets: foreign\n'
-		],
+		['forgiven-job', '  e2e-hs:\n', '  e2e-hs:\n    continue-on-error: true\n'],
+		['publish-output', '  e2e-hs:\n', '  e2e-hs:\n    outputs:\n      assets: foreign\n'],
 		['lost-source-begin', 'item36_xctest_evidence.cjs begin', 'item36_xctest_evidence.cjs fake'],
 		['lost-tee-status', '"${item36_statuses[1]}"', '"0"'],
-		['reset-source', 'begin "$GITHUB_SHA"', 'begin "fake"'],
+		[
+			'reset-source',
+			'item36_xctest_evidence.cjs begin "$GITHUB_SHA"',
+			'item36_xctest_evidence.cjs begin "fake"'
+		],
 		[
 			'lost-consent',
 			"ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'",

@@ -23,6 +23,7 @@ const validateTIS = (root, session) =>
 		? loadValidator(root).validate(root, session)
 		: nativeValidateTIS(root, session);
 const pipeline = require('./ci-full-default.cjs');
+const macRole = require('./fixtures/macos-stage-source.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const repository = path.resolve(__dirname, '../..');
@@ -689,13 +690,29 @@ try {
 		pipeline.job('package-macos'),
 		'Retain closed TIS diagnostic session'
 	);
-	assert.equal(
-		pipeline.stepField(uploaded, 'if'),
-		"${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}"
-	);
-	assert.match(uploaded, /steps\.swift-launcher-tests\.outputs\.tis_session_dir/);
-	assert.doesNotMatch(uploaded, /runner\.temp|\/tmp|\*\*/);
-	assert.match(uploaded, /if-no-files-found: error/);
+	function assertTisRetention(step) {
+		assert.equal(
+			pipeline.stepField(step, 'if'),
+			macRole.condition(
+				'package-macos',
+				"always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != ''"
+			)
+		);
+		assert.match(step, /steps\.swift-launcher-tests\.outputs\.tis_session_dir/);
+		assert.doesNotMatch(step, /runner\.temp|\/tmp|\*\*/);
+		assert.match(step, /if-no-files-found: error/);
+	}
+	assertTisRetention(uploaded);
+	for (const [before, after] of [
+		["steps.stage-admission.outcome == 'success'", 'true'],
+		['always()', 'success()'],
+		["steps.swift-launcher-tests.outcome != 'skipped'", 'true'],
+		["steps.swift-launcher-tests.outputs.tis_session_dir != ''", 'true']
+	]) {
+		const changed = uploaded.replace(before, after);
+		assert.notEqual(changed, uploaded, 'TIS retention mutation must change the actual step');
+		assert.throws(() => assertTisRetention(changed), assert.AssertionError, before);
+	}
 	const commands = pipeline
 		.runOf(pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests'))
 		.join('\n');

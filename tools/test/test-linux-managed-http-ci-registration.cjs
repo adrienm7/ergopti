@@ -242,7 +242,7 @@ function validateWorkflow(text, entry) {
 	assert.equal(Pipeline.field(linux, 'uses'), './.github/workflows/ci-linux.yml');
 	assert.equal(
 		Pipeline.field(job(entry, 'release', '.github/workflows/ci.yml'), 'if'),
-		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	);
 }
 const workflow = Pipeline.file('.github/workflows/ci-linux.yml');
@@ -303,7 +303,10 @@ for (const [needle, replacement] of [
 }
 for (const [needle, replacement] of [
 	["if: needs.validate.outputs.lane_linux == 'true'", 'if: true'],
-	["if: github.event_name == 'push' && needs.validate.outputs.release == 'true'", 'if: true']
+	[
+		"if: github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
+		'if: true'
+	]
 ]) {
 	const mutated = uniqueReplace(entry, needle, replacement);
 	assert.throws(() => validateWorkflow(workflow, mutated));

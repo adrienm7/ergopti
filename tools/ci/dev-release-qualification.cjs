@@ -51,10 +51,7 @@ const STABLE_EXTRA_SCOPES = Object.freeze({
 	},
 	'macos-native-model-receiving': {
 		path: '.github/workflows/ci-macos.yml',
-		args: [
-			'managed-ollama-native',
-			'Receive actual native model create, pull, inference and retirement'
-		]
+		args: ['e2e-hs', 'Receive actual native model create, pull, inference and retirement']
 	},
 	'linux-unit-suite': {
 		path: '.github/workflows/ci-linux.yml',
@@ -66,11 +63,11 @@ const STABLE_EXTRA_SCOPES = Object.freeze({
 	},
 	'macos-native-pac': {
 		path: '.github/workflows/ci-macos.yml',
-		args: ['managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls']
+		args: ['e2e-hs', 'Qualify actual native PAC and WPAD XCTest controls']
 	},
 	'macos-native-http': {
 		path: '.github/workflows/ci-macos.yml',
-		args: ['managed-ollama-native', 'Receive actual independent managed HTTP native clients']
+		args: ['e2e-hs', 'Receive actual independent managed HTTP native clients']
 	},
 	'macos-stubbed-unit': {
 		path: '.github/workflows/ci-macos.yml',

@@ -54,7 +54,8 @@ const WORKFLOW_PATH = path.join(ROOT, '.github', 'workflows', 'ci.yml');
 const RELEASE_CHANNEL_TOOL = path.join(ROOT, 'tools', 'build', 'release-channel.cjs');
 // The one expression every release step reads the published channel from.
 const pipeline = require('./ci-pipeline.cjs');
-const RELEASE_CHANNEL_OUTPUT = '${{ needs.validate.outputs.channel }}';
+const CALLER_CHANNEL_OUTPUT = '${{ needs.validate.outputs.channel }}';
+const RELEASE_CHANNEL_OUTPUT = '${{ needs.publication-plan.outputs.channel }}';
 const GENERATOR_PATH = path.join(ROOT, 'tools', 'codegen', 'codegen-update-channels.cjs');
 const VERSION_PATH = path.join(SHARED, 'modules', 'updater', 'version.js');
 const PAGE_DATA_PATH = path.join(SHARED, 'ui', '_generated', 'update_channel_registry.js');
@@ -437,7 +438,7 @@ function checkWorkflowChannelSource() {
 	);
 	for (const caller of ['windows', 'macos']) {
 		expect(
-			pipeline.job(caller).includes('channel: ' + RELEASE_CHANNEL_OUTPUT),
+			pipeline.job(caller).includes('channel: ' + CALLER_CHANNEL_OUTPUT),
 			caller + ' must receive the resolved channel'
 		);
 	}

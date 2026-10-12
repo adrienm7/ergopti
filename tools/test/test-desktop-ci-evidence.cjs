@@ -26,6 +26,77 @@ const crypto = require('node:crypto');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 const pipeline = require('./ci-full-default.cjs');
+const Mac = require('./fixtures/macos-stage-source.cjs');
+const MacRoles = require('../ci/macos-stage-roles.cjs');
+
+/** Checks actual stage metadata and the typed matrix producer used by that stage. */
+function macRoleBody(body, role, expectedCount) {
+	const parent = role === 'cold-bootstrap-native' ? 'package-macos' : 'test-hs';
+	const matrix = role === 'cold-bootstrap-native' ? 'testbuild_matrix' : 'e2e_matrix';
+	assert.equal(pipeline.field(body, 'needs'), '- ' + parent);
+	assert.deepEqual(pipeline.needsOf(body), [parent]);
+	assert.equal(pipeline.field(body, 'runs-on'), '${{ matrix.runner }}');
+	assert.equal(pipeline.field(body, 'timeout-minutes'), '${{ matrix.timeout_minutes }}');
+	assert.equal(pipeline.field(body, 'if'), null);
+	assert.equal(pipeline.field(body, 'continue-on-error'), null);
+	assert.match(body, /fail-fast: false/);
+	assert.ok(body.includes('include: ${{ fromJSON(needs.' + parent + '.outputs.' + matrix + ') }}'));
+	const stage = role === 'cold-bootstrap-native' ? 'testbuild' : 'e2e';
+	const producer = pipeline.job(parent);
+	assert.ok(
+		pipeline
+			.field(producer, 'outputs')
+			.includes(matrix + ': ${{ steps.stage-plan.outputs.' + matrix + ' }}')
+	);
+	const planners = pipeline
+		.steps(producer)
+		.filter((step) => pipeline.stepField(step.body, 'id') === 'stage-plan');
+	assert.equal(planners.length, 1);
+	assert.equal(
+		pipeline.stepField(planners[0].body, 'run'),
+		'node tools/ci/macos-stage-roles.cjs plan ' + stage
+	);
+	assert.equal(pipeline.stepField(planners[0].body, 'continue-on-error'), null);
+	const admission = pipeline.step(body, 'Admit complete successful predecessor stage');
+	assert.match(admission, /^          MACOS_STAGE_NEEDS: \$\{\{ toJSON\(needs\) \}\}$/m);
+	assert.ok(
+		pipeline
+			.stepField(admission, 'run')
+			.startsWith(
+				'node tools/ci/macos-stage-roles.cjs admit ' + (stage === 'e2e' ? 'unit' : 'build') + ' '
+			)
+	);
+	assert.equal(pipeline.stepField(admission, 'if'), null);
+	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
+	const record = pipeline.step(body, 'Record actual stage role outcome');
+	assert.equal(pipeline.stepField(record, 'if'), 'always()');
+	assert.ok(
+		pipeline
+			.stepField(record, 'run')
+			.startsWith('node tools/ci/macos-stage-roles.cjs record ' + stage + ' ')
+	);
+	const rows = MacRoles.plan(role === 'cold-bootstrap-native' ? 'testbuild' : 'e2e', {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'push',
+		release: true,
+		scenarios: ['clean']
+	}).filter((row) => row.role === role);
+	const expected =
+		role === 'cold-bootstrap-native'
+			? [['macos-15', 'arm64', 90]]
+			: [
+					['macos-15', 'arm64', 60],
+					['macos-15-intel', 'amd64', 60]
+				];
+	assert.deepEqual(
+		rows.map((row) => [row.runner, row.architecture, row.timeout_minutes]),
+		expected
+	);
+	const steps = Mac.selected(body, role);
+	assert.equal(steps.length, expectedCount, 'Every original role step retains admission');
+	return '    steps:\n' + steps.map((step) => step.body).join('\n');
+}
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
 const { createMatrix } = require('../ci/js-feature-matrix.cjs');
 const {
@@ -723,23 +794,37 @@ for (const [job, platform] of [
 }
 /** Requires actual native Ollama inputs and receiving before Brew can fail. */
 function checkManagedOllamaNative(body) {
-	assert.equal(pipeline.field(body, 'needs'), '[e2e-hs, tooltip-canvas]');
-	assert.equal(pipeline.field(body, 'if'), null);
-	assert.equal(pipeline.field(body, 'continue-on-error'), null);
-	assert.equal(pipeline.field(body, 'runs-on'), '${{ matrix.runner }}');
-	assert.match(body, /fail-fast: false/);
-	assert.match(body, /runner: macos-15\n\s+architecture: arm64/);
-	assert.match(body, /runner: macos-15-intel\n\s+architecture: amd64/);
-	assert.match(body, /ERGOPTI_RELEASE_TAG: \$\{\{ inputs\.tag \}\}/);
-	assert.match(body, /GOTOOLCHAIN: local/);
-	const acquire = pipeline.step(body, 'Acquire and verify genuine pinned upstream inputs');
+	const role = macRoleBody(body, 'managed-ollama-native', 36);
+	for (const step of Mac.selected(body, 'managed-ollama-native')) {
+		assert.match(step.body, /^          GOTOOLCHAIN: 'local'$/m);
+		assert.match(step.body, /^          ERGOPTI_RELEASE_TAG: '\$\{\{ inputs\.tag \}\}'$/m);
+		assert.match(
+			step.body,
+			/^          ERGOPTI_RELEASE: "\$\{\{ inputs\.release && 'true' \|\| 'false' \}\}"$/m
+		);
+		assert.match(step.body, /^          ERGOPTI_RELEASE_VERSION: '\$\{\{ inputs\.version \}\}'$/m);
+		assert.match(step.body, /^          ERGOPTI_RELEASE_CHANNEL: '\$\{\{ inputs\.channel \}\}'$/m);
+		assert.match(
+			step.body,
+			/^          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '\$\{\{ matrix\.architecture \}\}'$/m
+		);
+	}
+	const acquire = pipeline.step(role, 'Acquire and verify genuine pinned upstream inputs');
+	assert.equal(
+		pipeline.stepField(acquire, 'if'),
+		Mac.condition('managed-ollama-native', '${{ !cancelled() }}')
+	);
 	assert.match(
 		acquire,
 		/git -C "\$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "\$ERGOPTI_OLLAMA_SOURCE_COMMIT"/
 	);
 	assert.match(acquire, /actual == identity\['sha256'\]/);
 	assert.match(acquire, /archive\.stat\(\)\.st_size == identity\['bytes'\]/);
-	const build = pipeline.step(body, 'Build and admit the actual native source asset');
+	const build = pipeline.step(role, 'Build and admit the actual native source asset');
+	assert.equal(
+		pipeline.stepField(build, 'if'),
+		Mac.condition('managed-ollama-native', '${{ !cancelled() }}')
+	);
 	for (const command of [
 		'tools/build/build-macos-managed-ollama.py',
 		'tools/test/macos_managed_ollama_catalogue_test.py --native',
@@ -748,7 +833,7 @@ function checkManagedOllamaNative(body) {
 		assert.ok(build.includes(command));
 	assert.match(build, /--release "\$ERGOPTI_RELEASE" --release-tag "\$ERGOPTI_RELEASE_TAG"/);
 	const listener = pipeline.step(
-		body,
+		role,
 		'Qualify actual SDK accepted-owner and deadline XCTest controls'
 	);
 	assert.match(
@@ -765,8 +850,9 @@ function checkManagedOllamaNative(body) {
 	assert.match(listener, /ManagedNetworkBootstrapTests/);
 	assert.match(listener, /Executed 49 tests, with 0 failures/);
 	assert.equal(pipeline.stepField(listener, 'continue-on-error'), null);
+	assert.equal(pipeline.stepField(listener, 'if'), Mac.condition('managed-ollama-native'));
 	const receive = pipeline.step(
-		body,
+		role,
 		'Receive actual native model create, pull, inference and retirement'
 	);
 	assert.match(receive, /for profile in pac-inline pac-url explicit-proxy/);
@@ -776,49 +862,49 @@ function checkManagedOllamaNative(body) {
 		/--archive "\$ERGOPTI_OLLAMA_ASSET" --catalogue "\$ERGOPTI_OLLAMA_CATALOGUE"/
 	);
 	assert.equal(pipeline.stepField(receive, 'continue-on-error'), null);
-	assert.doesNotMatch(body, /gh release|softprops\/action-gh-release|createRelease|--cross/);
+	assert.equal(
+		pipeline.stepField(receive, 'if'),
+		Mac.condition(
+			'managed-ollama-native',
+			"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+		)
+	);
+	assert.doesNotMatch(role, /gh release|softprops\/action-gh-release|createRelease|--cross/);
 }
-const managedOllamaNative = pipeline.job('managed-ollama-native');
+const managedOllamaNative = pipeline.job(Mac.stage['managed-ollama-native']);
 checkManagedOllamaNative(managedOllamaNative);
-assert.deepEqual(
-	pipeline.needsOf(pipeline.job('macos-ok')).sort(),
-	[
-		'test-hs',
-		'e2e-hs',
-		'package-macos',
-		'launch',
-		'tooltip-canvas',
-		'managed-ollama-native',
-		'cold-bootstrap-native'
-	].sort()
+assert.deepEqual(pipeline.needsOf(pipeline.job('macos-ok')), ['launch']);
+assert.match(
+	pipeline.step(pipeline.job('macos-ok'), 'Require the complete source-bound stage chain'),
+	/node tools\/ci\/macos-stage-roles\.cjs verdict/
 );
 assert.ok(pipeline.job('macos').includes('tag: ${{ needs.validate.outputs.tag }}'));
 for (const [from, to] of [
-	['    needs: [e2e-hs, tooltip-canvas]\n', ''],
-	['needs: [e2e-hs, tooltip-canvas]', 'needs: []'],
-	['needs: [e2e-hs, tooltip-canvas]', 'needs: [e2e-hs]'],
-	['needs: [e2e-hs, tooltip-canvas]', 'needs: [tooltip-canvas]'],
-	['needs: [e2e-hs, tooltip-canvas]', 'needs: [e2e-hs, test-linux]'],
-	['needs: [e2e-hs, tooltip-canvas]', 'needs: [package-macos]'],
+	['    needs:\n      - test-hs\n', ''],
+	['    needs:\n      - test-hs', 'needs: []'],
+	[
+		'include: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}',
+		'include: ${{ fromJSON(needs.test-hs.outputs.foreign_matrix) }}'
+	],
+	['    needs:\n      - test-hs', 'needs: [e2e-hs]'],
+	['    needs:\n      - test-hs', 'needs: [e2e-hs, test-linux]'],
+	['    needs:\n      - test-hs', 'needs: [package-macos]'],
 	['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest'],
 	['fail-fast: false', 'fail-fast: true'],
-	['runner: macos-15-intel', 'runner: macos-15'],
-	['architecture: amd64', 'architecture: arm64'],
-	['GOTOOLCHAIN: local', 'GOTOOLCHAIN: auto'],
+	[
+		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'",
+		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.runner }}'"
+	],
+	["matrix.role == 'managed-ollama-native'", "matrix.role == 'tooltip-canvas'"],
+	["GOTOOLCHAIN: 'local'", "GOTOOLCHAIN: 'auto'"],
 	['fetch --depth=1 --no-tags origin', 'fetch --depth=1 --no-tags other'],
 	["actual == identity['sha256']", 'actual == actual'],
 	['macos_managed_ollama_catalogue_test.py --native', 'macos_managed_ollama_catalogue_test.py'],
 	['for profile in pac-inline pac-url explicit-proxy', 'for profile in pac-inline'],
 	['Executed 12 tests, with 0 failures', 'Executed 0 tests, with 0 failures'],
-	[
-		"    name: 'Managed Ollama native",
-		"    needs: package-macos\n    name: 'Managed Ollama native"
-	],
-	["    name: 'Managed Ollama native", "    if: inputs.release\n    name: 'Managed Ollama native"],
-	[
-		"    name: 'Managed Ollama native",
-		"    continue-on-error: true\n    name: 'Managed Ollama native"
-	]
+	['    name: E2E ·', '    needs: package-macos\n    name: E2E ·'],
+	['    name: E2E ·', '    if: inputs.release\n    name: E2E ·'],
+	['    name: E2E ·', '    continue-on-error: true\n    name: E2E ·']
 ]) {
 	const changed = managedOllamaNative.replace(from, to);
 	assert.notEqual(changed, managedOllamaNative, from);
@@ -2118,18 +2204,14 @@ console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
 
 /** Pins a native arm64 full application job after packaging and without publication. */
 function checkColdJob(body) {
-	assert.equal(pipeline.field(body, 'needs'), '[package-macos]');
-	assert.equal(pipeline.field(body, 'runs-on'), 'macos-15');
-	assert.equal(pipeline.field(body, 'if'), null);
-	assert.equal(pipeline.field(body, 'continue-on-error'), null);
-	assert.ok(Number(pipeline.field(body, 'timeout-minutes')) >= 40);
-	const prerequisites = pipeline.step(body, 'Require actual arm64 cold runtime prerequisites');
+	const role = macRoleBody(body, 'cold-bootstrap-native', 9);
+	const prerequisites = pipeline.step(role, 'Require actual arm64 cold runtime prerequisites');
 	assert.match(prerequisites, /test -x \/usr\/bin\/sandbox-exec/);
 	assert.match(prerequisites, /test \"\$\(uname -m\)\" = arm64/);
-	const build = pipeline.step(body, 'Build independent signed cold application');
-	const receive = pipeline.step(body, 'Receive actual isolated cold native MLX bootstrap');
+	const build = pipeline.step(role, 'Build independent signed cold application');
+	const receive = pipeline.step(role, 'Receive actual isolated cold native MLX bootstrap');
 	for (const step of [prerequisites, build, receive]) {
-		assert.equal(pipeline.stepField(step, 'if'), null);
+		assert.equal(pipeline.stepField(step, 'if'), Mac.condition('cold-bootstrap-native'));
 		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 		assert.equal(pipeline.stepField(step, 'shell'), 'bash');
 	}
@@ -2139,37 +2221,43 @@ function checkColdJob(body) {
 	assert.match(build, /bash tools\/build\/build_macos_app.sh/);
 	assert.match(build, /codesign --verify --deep --strict build\/macos\/ErgoptiPlus.app/);
 	assert.doesNotMatch(
-		body,
+		role,
 		/--native-helper-only|brew install|gh release|TCC\.db|tccutil|continue-on-error|sudo rm|rm -rf.*(?:uv|python)/
 	);
 	assert.match(receive, /python3 tools\/diagnostics\/macos_cold_bootstrap.py/);
 	assert.match(receive, /--app "\$PWD\/build\/macos\/ErgoptiPlus.app"/);
 	assert.match(receive, /record-cold-macos/);
-	const officialUpload = pipeline.step(body, 'Retain official cold Ollama receipt only');
-	assert.equal(pipeline.stepField(officialUpload, 'if'), 'always()');
+	const officialUpload = pipeline.step(role, 'Retain official cold Ollama receipt only');
+	assert.equal(
+		pipeline.stepField(officialUpload, 'if'),
+		Mac.condition('cold-bootstrap-native', 'always()')
+	);
 	assert.match(officialUpload, /if-no-files-found: error/);
 	assert.match(officialUpload, /overwrite: true/);
 	assert.match(
 		officialUpload,
 		/path: \$\{\{ runner.temp \}\}\/native-cold-ollama-bootstrap\/receipt.json$/m
 	);
-	const upload = pipeline.step(body, 'Retain native cold bootstrap evidence');
-	assert.equal(pipeline.stepField(upload, 'if'), 'always()');
+	const upload = pipeline.step(role, 'Retain native cold bootstrap evidence');
+	assert.equal(
+		pipeline.stepField(upload, 'if'),
+		Mac.condition('cold-bootstrap-native', 'always()')
+	);
 	assert.match(upload, /if-no-files-found: error/);
 	assert.match(upload, /overwrite: true/);
 	assert.match(upload, /cold-bootstrap-evidence\.json/);
 }
-const coldJob = pipeline.job('cold-bootstrap-native');
+const coldJob = pipeline.job(Mac.stage['cold-bootstrap-native']);
 checkColdJob(coldJob);
 for (const [from, to] of [
-	['    needs: [package-macos]\n', ''],
-	['needs: [package-macos]', 'needs: []'],
-	['needs: [package-macos]', 'needs: [test-linux]'],
-	['needs: [package-macos]', 'needs: [e2e-hs]'],
-	['needs: [package-macos]', 'needs: [cold-bootstrap-native]'],
-	['runs-on: macos-15', 'runs-on: ubuntu-latest'],
-	['timeout-minutes: 90', 'timeout-minutes: 5'],
-	['runs-on: macos-15', 'needs: package-macos\n    runs-on: macos-15'],
+	['    needs:\n      - package-macos\n', ''],
+	['    needs:\n      - package-macos', 'needs: []'],
+	['    needs:\n      - package-macos', 'needs: [test-linux]'],
+	['    needs:\n      - package-macos', 'needs: [e2e-hs]'],
+	['    needs:\n      - package-macos', 'needs: [cold-bootstrap-native]'],
+	['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest'],
+	['timeout-minutes: ${{ matrix.timeout_minutes }}', 'timeout-minutes: 5'],
+	['runs-on: ${{ matrix.runner }}', 'needs: package-macos\n    runs-on: ${{ matrix.runner }}'],
 	["ERGOPTI_RELEASE: 'false'", "ERGOPTI_RELEASE: 'true'"],
 	[
 		'bash tools/build/build_macos_app.sh',
@@ -2178,14 +2266,28 @@ for (const [from, to] of [
 	['python3 tools/diagnostics/macos_cold_bootstrap.py', 'echo skipped cold receiving'],
 	['record-cold-macos', 'record-macos'],
 	['if-no-files-found: error', 'if-no-files-found: warn'],
-	['if: always()', 'if: success()'],
+	['if: ' + Mac.condition('cold-bootstrap-native', 'always()'), 'if: success()'],
 	['shell: bash', 'if: false\n        shell: bash']
 ]) {
-	const changed = coldJob.replace(from, to);
+	const metadata = /^(?:    )?(?:needs:|runs-on:|timeout-minutes:)/.test(from);
+	const owner = metadata
+		? coldJob
+		: Mac.selected(coldJob, 'cold-bootstrap-native').find((step) => step.body.includes(from))?.body;
+	assert.ok(owner, 'one real cold role source mutation owner');
+	const changed = coldJob.replace(owner, () => owner.replace(from, to));
 	assert.notEqual(changed, coldJob);
 	assert.throws(() => checkColdJob(changed), from);
 }
-assert.ok(pipeline.needsOf(pipeline.job('macos-ok')).includes('cold-bootstrap-native'));
+assert.ok(pipeline.needsOf(pipeline.job('macos-ok')).includes('launch'));
+assert.ok(
+	MacRoles.plan('testbuild', {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'push',
+		release: true,
+		scenarios: ['clean']
+	}).some((row) => row.role === 'cold-bootstrap-native')
+);
 assert.match(
 	pipeline.step(pipeline.job('macos-ok'), 'Download native cold bootstrap evidence'),
 	/cold-bootstrap-native-/
@@ -2227,19 +2329,21 @@ for (const [job, buildName, uploadName, transcript] of [
 		'managed-ollama-producer-build.log'
 	]
 ]) {
-	const body = pipeline.job(job);
+	const body = pipeline.job(Mac.stage[job]);
 	const build = pipeline.step(body, buildName);
 	const upload = pipeline.step(body, uploadName);
 	const check = (step, artifact) => {
 		assert.match(step, /set -euo pipefail/);
 		assert.ok(step.includes('2>&1 | tee "$RUNNER_TEMP/' + transcript + '"'));
-		assert.equal(pipeline.stepField(artifact, 'if'), 'always()');
+		assert.equal(pipeline.stepField(artifact, 'if'), Mac.condition(job, 'always()'));
 		assert.ok(artifact.includes('${{ runner.temp }}/' + transcript));
 	};
 	check(build, upload);
 	assert.throws(() => check(build.replace('2>&1 | tee', '| tee'), upload));
 	assert.throws(() => check(build.replace('set -euo pipefail', 'set -eu'), upload));
-	assert.throws(() => check(build, upload.replace('if: always()', 'if: success()')));
+	assert.throws(() =>
+		check(build, upload.replace('if: ' + Mac.condition(job, 'always()'), 'if: success()'))
+	);
 	assert.throws(() =>
 		check(
 			build,
@@ -2299,7 +2403,7 @@ console.log(
 
 // Surface actual SDK compiler/test refusal before fetching and building Go.
 {
-	const body = pipeline.job('managed-ollama-native');
+	const body = Mac.body(pipeline.file('.github/workflows/ci-macos.yml'), 'managed-ollama-native');
 	const compile = pipeline.step(body, 'Build the actual launcher native transport roles');
 	const listener = pipeline.step(
 		body,
@@ -2314,7 +2418,10 @@ console.log(
 		'Retain independent native SDK XCTest diagnostics'
 	]) {
 		const upload = pipeline.step(body, name);
-		assert.equal(pipeline.stepField(upload, 'if'), 'always()');
+		assert.equal(
+			pipeline.stepField(upload, 'if'),
+			Mac.condition('managed-ollama-native', 'always()')
+		);
 		assert.ok(body.indexOf(upload) < body.indexOf(producer));
 	}
 }
@@ -2457,3 +2564,5 @@ console.log(
 		'an early fresh-profile edit cannot stand in for the installed upgrade boundary'
 	);
 }
+
+require('./test-macos-stage-roles.cjs');

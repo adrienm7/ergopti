@@ -150,7 +150,7 @@ jobs:
 
   common-unit-verdict:
     name: 'Verify complete unit inventory'
-    needs: [prepare-common, shared-validation]
+    needs: [shared-validation]
     runs-on: ubuntu-latest
     env:
       ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}

@@ -1261,12 +1261,18 @@ assert.strictEqual(
 	'always()',
 	'linux-ok must run after a failed or skipped lane to name it'
 );
-// needs decides what the gate waits for, the manifest what it fails on. verify
-// rejects drift between the two at run time; this fails the same drift locally.
+// The immediate Testbuild dependency forwards the genuine complete scheduler
+// chain; the unchanged evidence verifier still requires every manifest job.
+assert.deepStrictEqual(pipeline.needsOf(GATE.body), ['install-linux']);
+assert.match(
+	pipeline
+		.runOf(pipeline.step(GATE.body, 'Assert all mandatory subjects ran and passed'))
+		.join('\n'),
+	/NEEDS="\$\(node tools\/ci\/ci-stage-status\.cjs complete linux\)"/
+);
 assert.deepStrictEqual(
-	[...pipeline.needsOf(GATE.body)].sort(),
 	Object.keys(MANIFEST.jobs).sort(),
-	'linux-ok needs and .github/linux-ci-coverage.json jobs must name the same Linux jobs'
+	['test-linux', 'e2e-linux', 'package-linux', 'install-linux'].sort()
 );
 for (const job of Object.keys(MANIFEST.jobs)) {
 	assert.strictEqual(
@@ -1499,12 +1505,17 @@ assert.deepStrictEqual(
 // Manual diagnostics can qualify packages after failed E2E receiving, while
 // both the mandatory verdict and automatic release admission remain strict.
 const manualPackageJob = pipeline.job('package-linux');
-assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['test-linux', 'e2e-linux']);
+assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['e2e-linux']);
+assert.match(manualPackageJob, /node tools\/ci\/ci-stage-status\.cjs admit-build linux/);
+assert.ok(
+	pipeline.job('e2e-linux').includes('ci_unit_result: ${{ needs.test-linux.result }}'),
+	'Package Unit admission must come from the genuine E2E predecessor output'
+);
 assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['test-linux']);
 assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), null);
 assert.strictEqual(
 	pipeline.field(manualPackageJob, 'if'),
-	"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+	"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
 	'manual packaging must retain unit admission, cancellation and automatic E2E admission'
 );
 // The frozen acceptance table is independent of the workflow expression.
@@ -1522,7 +1533,7 @@ const admittedPackageCases = new Set([
 const diagnosticExpression = pipeline
 	.field(manualPackageJob, 'if')
 	.slice(3, -2)
-	.replaceAll('needs.test-linux.result', "needs['test-linux'].result")
+	.replaceAll('needs.e2e-linux.outputs.ci_unit_result', "needs['e2e-linux'].outputs.ci_unit_result")
 	.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
 let diagnosticCaseCount = 0;
 for (const event of diagnosticEvents) {
@@ -1533,7 +1544,7 @@ for (const event of diagnosticEvents) {
 					diagnosticExpression,
 					{
 						cancelled: () => cancelled,
-						needs: { 'test-linux': { result: unitResult }, 'e2e-linux': { result } },
+						needs: { 'e2e-linux': { result, outputs: { ci_unit_result: unitResult } } },
 						github: { event_name: event }
 					},
 					{ timeout: 100 }
@@ -1551,7 +1562,7 @@ assert.strictEqual(diagnosticCaseCount, 360);
 
 assert.strictEqual(
 	pipeline.field(pipeline.job('release'), 'if'),
-	"github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+	"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
 	'manual package diagnostics must never publish a release'
 );
 rejects(({ needs }) => {
