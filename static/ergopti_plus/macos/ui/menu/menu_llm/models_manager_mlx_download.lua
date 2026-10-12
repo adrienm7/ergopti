@@ -32,10 +32,24 @@ local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local Json = require("json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
 local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", ""):gsub("\\", "/")
 local _native_network_directory = _module_source:match("^(.*)/ui/menu/menu_llm/[^/]+$")
 _native_network_directory = _native_network_directory and (_native_network_directory .. "/platform/network")
+
+--- Quotes the Python import directory without a table-only native JSON encoder.
+--- Invalid UTF-8 and quotation failures refuse before any helper is published.
+--- @return string|nil literal
+local function quote_native_network_directory()
+	if type(_native_network_directory) ~= "string" or _native_network_directory == "" then return nil end
+	local ok, literal = pcall(function()
+		if utf8.len(_native_network_directory) == nil then return nil end
+		return Json.quote(_native_network_directory)
+	end)
+	if ok ~= true or type(literal) ~= "string" or literal == "" then return nil end
+	return literal
+end
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -1122,9 +1136,9 @@ function M.install(ctx)
 
 			local clean_repo = repo:gsub("[%c%s]", "")
 			local network_prelude, network_err = NetworkEnv.managed_http_prelude("MLX")
-			local native_directory_literal = _native_network_directory and JsonCodec.encode(_native_network_directory)
+			local native_directory_literal = quote_native_network_directory()
 			if not network_prelude or type(native_directory_literal) ~= "string" then
-				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err))
+				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err or "MLX native network directory quotation refused"))
 				do_cancel(true, "network_policy_missing")
 				return false
 			end
