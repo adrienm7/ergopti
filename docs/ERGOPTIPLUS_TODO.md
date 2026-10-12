@@ -6014,6 +6014,19 @@ source. Those gates and physical acceptance remain unexecuted;
 the completed run has 3 successful, 4 failed and 5 skipped jobs, with Release
 skipped. Its integration lease is released; the unfinished feature branch stays.
 
+Actual official Windows run
+[38315163515](https://github.com/adrienm7/ergopti/actions/runs/38315163515)
+on private proposed composition `4bf40f3c` passes E2E 70/70 and the first
+console-capture cohort 5/5. The strict desktop receiver correctly refuses its
+216-byte compiler-warning prefix: `_TOML_DocumentToken` named a local variable
+`Run`, shadowing the native global function. Its seven local uses now name
+`QuoteRun`; token semantics, independent corpus, warning policy and receiver
+assertions remain unchanged. Corrected native receiving, remaining desktop
+cohorts, full units and packaging/install remain unexecuted. Core passes
+424/426 with the retained Lua gsub and macOS layout-default source failures;
+the complete workflow fails with 3 successful, 4 failed and 5 skipped jobs,
+including Release skipped. Item 42 and transversal items 16/38 remain partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
