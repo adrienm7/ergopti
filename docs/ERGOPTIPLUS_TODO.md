@@ -6086,6 +6086,24 @@ cohorts, full units and packaging/install remain unexecuted. Core passes
 the complete workflow fails with 3 successful, 4 failed and 5 skipped jobs,
 including Release skipped. Item 42 and transversal items 16/38 remain partial.
 
+Current integrated-tree manual
+[38319577074](https://github.com/adrienm7/ergopti/actions/runs/38319577074),
+private `f385e3c7` with the exact Dev `d5a1fe238` tree, receives the corrected
+TOML source: strict console/AltGr desktop cohorts pass 11/11 with no warning
+prefix, and E2E passes 70/70. Snapshot16 then refuses its dry-selection stdout
+before general units; 16 of 11,627 declarations are selected and none executes.
+The complete 1,484,141-byte stdout is not uploaded; only 15 complete tail warning
+tuples are received, so no complete warning inventory is claimed. A read-only
+source handoff proves 31 script-global registration loop headers in 14 fixtures,
+explaining the corresponding local/global collisions. Root owns the registration
+and receiving correction; no warning/assertion/budget is weakened. See the
+[October 12 handoff](handovers/2026-10-12-config-menus/README.md). Full units,
+transaction cohorts, package/install, startup and device acceptance remain open.
+The whole workflow is terminal FAIL: 3 successful, 4 failed and 5 skipped jobs,
+zero cancelled, with Release skipped. Core passes 424/426; the two retained Lua
+source guards still fail (bare gsub return and macOS layout-default delegation). Item 42 and
+transversal items 16/38 remain partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
