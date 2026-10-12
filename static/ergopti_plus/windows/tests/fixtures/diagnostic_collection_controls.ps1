@@ -15,7 +15,7 @@ $taskRuntimeVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($Runtime).Prod
 if($taskRuntimeVersion -cnotmatch '^[0-9]+[.][0-9]+[.][0-9]+$'){throw 'The fixture requires its actual runtime identity.'}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $env:PSModulePath="$env:SystemRoot/System32/WindowsPowerShell/v1.0/Modules;"+$env:PSModulePath
-foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout')){
+foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout','resident-observed','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason')){
  $taskId='ergopti-diagnostic-'+[Guid]::NewGuid().ToString('N');$taskDirectory=Join-Path $taskRoot $taskId
  [IO.Directory]::CreateDirectory($taskDirectory)|Out-Null
  $taskRunWorker=$taskWorker;$taskRunContract=$taskContract
@@ -40,8 +40,37 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
  if($taskCase -eq 'missing-component'){$taskRequest.components[0].path=Join-Path $taskDirectory 'missing.ahk'}
  if($taskCase -eq 'redaction-refusal'){$taskRequest.version='token='+$taskSentinel}
  if($taskCase -eq 'false-installed-origin'){$taskRequest.compiled=1}
- if($taskCase -eq 'owner-observed'){
+ if(($taskCase -eq 'owner-observed' -or $taskCase -like 'resident-*')){
   $taskRequest.input_owner=@{pid=$PID;created_filetime=[Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToFileTimeUtc();mutex='exempt';mutex_handle_retained=0;dispatcher_started=0;native_started=0;native_quarantined=0}
+ }
+ if($taskCase -like 'resident-*'){
+  # This is a controlled receipt projection, never a resident driver/native qualification.
+  $taskSchema=Get-Content -LiteralPath $taskContract -Raw -Encoding UTF8|ConvertFrom-Json
+  $taskStateRows=@()
+  foreach($taskStateId in $taskSchema.resident_observation_fields.PSObject.Properties.Name){
+   $taskValues=@{};foreach($taskField in $taskSchema.resident_observation_fields.$taskStateId){$taskValues[$taskField]=-1}
+   $taskStateRows+=@{id=$taskStateId;status='UNRUN';scope='unexecuted';reason='resident_owner_unavailable';duration_ms=0
+    scenario_qualified=0;values=$taskValues;evidence_class='automatic';preconditions=@($taskSchema.resident_observation_preconditions);errors=@()}
+  }
+  $taskStateRows[0].status='PASS';$taskStateRows[0].scope='runtime_state';$taskStateRows[0].reason='resident_generations_observed'
+  foreach($taskField in $taskSchema.resident_observation_fields.hotstrings){$taskStateRows[0].values[$taskField]=0}
+  if($taskCase -eq 'resident-private-field'){
+   $taskStateRows[0].values.api_key=$taskSentinel
+   [IO.File]::WriteAllText((Join-Path $taskDirectory 'resident-observations.json'),$taskSentinel,[Text.UTF8Encoding]::new($false))
+  }
+  if($taskCase -eq 'resident-native-forgery'){
+   $taskStateRows[1].status='PASS';$taskStateRows[1].scope='native_readonly';$taskStateRows[1].reason='native_managed_listener_identity_observed'
+   $taskStateRows[1].values.managed_owner_present=1;$taskStateRows[1].values.live_identity=1
+  }
+  $taskRequest.resident_observations=@{schema_version=1;captured_at_filetime=[DateTime]::UtcNow.ToFileTimeUtc();rows=$taskStateRows}
+  switch($taskCase){
+   'resident-stale' {$taskRequest.resident_observations.captured_at_filetime=$taskRequest.input_owner.created_filetime-1}
+   'resident-future' {$taskRequest.resident_observations.captured_at_filetime=[DateTime]::UtcNow.AddDays(1).ToFileTimeUtc()}
+   'resident-phase' {$taskStateRows[2].values.phase=99}
+   'resident-capacity' {$taskStateRows[2].values.queued=$taskSchema.resident_native_abi.capture_capacity+1}
+   'resident-fifo-census' {$taskStateRows[3].values.record_count=0;$taskStateRows[3].values.pending_count=1}
+   'resident-pass-reason' {$taskStateRows[0].reason='resident_owner_unavailable'}
+  }
  }
  [IO.File]::WriteAllText((Join-Path $taskDirectory 'request.json'),($taskRequest|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
  [IO.File]::WriteAllText((Join-Path $taskDirectory 'request.json.tmp'),$taskSentinel,[Text.UTF8Encoding]::new($false))
@@ -70,7 +99,9 @@ foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-
  if($taskRow.archive_created){
   $taskZip=[IO.Compression.ZipFile]::OpenRead($taskDirectory+'.zip')
   try{
-   $taskNames=@($taskZip.Entries|ForEach-Object FullName);$taskRow.checks+=@{id='evidence_allowlist';ok=(@($taskNames|Where-Object{$_ -cnotin @('manifest.json','results.json','summary.md','failure.json','synthetic-window.png')}).Count -eq 0)}
+   $taskAllowed=@('manifest.json','results.json','summary.md','failure.json','synthetic-window.png')
+   if($taskCase -eq 'resident-observed'){$taskAllowed+='resident-observations.json'}
+   $taskNames=@($taskZip.Entries|ForEach-Object FullName);$taskRow.checks+=@{id='evidence_allowlist';ok=(@($taskNames|Where-Object{$_ -cnotin $taskAllowed}).Count -eq 0)}
    $taskRow.checks+=@{id='manifest_present';ok=($taskNames -contains 'manifest.json')}
    $taskSafe=$true
    foreach($taskEntry in $taskZip.Entries){if($taskEntry.Name -eq 'synthetic-window.png'){continue};$taskReader=New-Object IO.StreamReader($taskEntry.Open());try{if($taskReader.ReadToEnd().Contains($taskSentinel)){$taskSafe=$false}}finally{$taskReader.Dispose()}}
@@ -116,5 +147,22 @@ foreach($taskProof in $taskProofs){
  if($taskProof.case -eq 'query-timeout' -and $taskById.native_uia.status -cne 'FAIL'){throw 'Timed-out query admitted.'}
  if($taskProof.case -eq 'owner-observed' -and ($taskById.callbacks.status -cne 'UNRUN' -or $taskById.callbacks.receipt.observation -cne 'PASS' -or
   $taskById.callbacks.receipt.reason -cne 'exclusive_input_session_not_admitted' -or $taskById.callbacks.receipt.isolated_input_allowed)){throw 'Observed host ownership granted an isolated native input session.'}
+ if($taskProof.case -eq 'resident-observed'){
+  $taskState=Get-Content -LiteralPath (Join-Path $taskProof.path 'resident-observations.json') -Raw -Encoding UTF8|ConvertFrom-Json
+  if($taskState.producer -cne 'worker_control' -or $taskState.scenario_qualified -ne $false -or $taskState.rows.Count -ne 4 -or
+   $taskState.rows[0].status -cne 'PASS' -or $taskById.hotstrings.receipt.state_observation.scope -cne 'runtime_state'){throw 'Closed resident projection was lost or promoted.'}
+  foreach($taskStateId in @('hotstrings','ai','capture_replay','callbacks','fifo','modifiers')){
+   if($taskById[$taskStateId].status -cne 'UNRUN'){throw 'Resident state promoted an unexecuted functional scenario.'}
+  }
+  $taskZip=[IO.Compression.ZipFile]::OpenRead($taskProof.path+'.zip')
+  try{if(@($taskZip.Entries|Where-Object {$_.FullName -ceq 'resident-observations.json'}).Count -ne 1){throw 'Approved state receipt missing from the actual archive.'}}
+  finally{$taskZip.Dispose()}
+ }
+ if($taskProof.case -like 'resident-*' -and $taskProof.case -ne 'resident-observed'){
+  if(!(Test-Path -LiteralPath (Join-Path $taskProof.path 'failure.json'))){throw 'Invalid resident observation was silently admitted.'}
+  $taskZip=[IO.Compression.ZipFile]::OpenRead($taskProof.path+'.zip')
+  try{if(@($taskZip.Entries|Where-Object {$_.FullName -ceq 'resident-observations.json'}).Count){throw 'Refused resident evidence entered the archive.'}}
+  finally{$taskZip.Dispose()}
+ }
 }
 Write-Host ('PASS: '+$taskProofs.Count+' actual Windows collection controls. Proof: '+$taskRoot)

@@ -33,6 +33,42 @@ const PAGE = path.join(SHARED, 'ui', 'healthcheck');
 const failures = [];
 const fail = (message) => failures.push(message);
 
+// The published receipt domains must follow the native ABI owner.
+const collectionContract = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'collection.json'), 'utf8')
+);
+const nativeHeader = fs.readFileSync(
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'windows',
+		'native',
+		'nav_event_owner',
+		'nav_event_owner.h'
+	),
+	'utf8'
+);
+for (const [key, name] of [
+	['statuses', 'ErgoptiNav_Status'],
+	['capture_phases', 'ErgoptiNav_TerminalPhase'],
+	['release_kinds', 'ErgoptiNav_TerminalReleaseKind']
+]) {
+	const declaration = nativeHeader.split('typedef enum ' + name + ' {')[1]?.split('} ' + name)[0];
+	if (!declaration) fail('Missing native ABI enum: ' + name);
+	else if (
+		JSON.stringify([...declaration.matchAll(/= (\d+)/g)].map((match) => Number(match[1]))) !==
+		JSON.stringify(collectionContract.resident_native_abi[key])
+	)
+		fail('Resident observation ABI domain drift: ' + key);
+}
+const captureCapacity = nativeHeader.match(/#define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY (\d+)u/);
+if (
+	!captureCapacity ||
+	Number(captureCapacity[1]) !== collectionContract.resident_native_abi.capture_capacity
+)
+	fail('Resident observation capture capacity drift');
+
 // =============================
 // =============================
 // ======= 1/ A Tiny DOM =======
