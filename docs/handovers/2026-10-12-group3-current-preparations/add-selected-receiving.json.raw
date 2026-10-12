@@ -1,0 +1,42 @@
+{
+  "terminal": {
+    "exit": 0,
+    "seconds": 4123.790560163994,
+    "source_index_head_exact": true,
+    "raw_sha256": "fc1e9f996c46d24a395470aaf13023856337a2caa56170e40b7e0093b851d6ec"
+  },
+  "source_files": 9783,
+  "counts": {
+    "format": {
+      "files": 390
+    },
+    "js": {
+      "passed": 414
+    },
+    "hs-e2e": {
+      "PASS_output_lines": 101,
+      "SKIP_output_lines": [
+        "  SKIP  e2e[buffer_cap_trigger_longer_than_window]  (driver-specific: rolling_buffer_cap)"
+      ],
+      "unique_scenario_count": "NOT_INFERRED_FROM_OUTPUT_LINES",
+      "final": "All E2E scenarios passed."
+    },
+    "hs": {
+      "modules": 1571,
+      "passed": 18662,
+      "failed": 0
+    },
+    "linux-e2e": {
+      "PASS_output_lines": 193,
+      "SKIP_output_lines": [],
+      "unique_scenario_count": "NOT_INFERRED_FROM_OUTPUT_LINES",
+      "final": "All E2E scenarios passed."
+    },
+    "linux": {
+      "modules": 520,
+      "passed": 13360,
+      "failed": 0
+    }
+  },
+  "native": "Native GUI/input/output and installed final-source receiving remain independent and UNQUALIFIED."
+}
