@@ -44,6 +44,8 @@ function readSourceFile(file, maximum = 33554432) {
 		file,
 		fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0)
 	);
+	let receivingFailed = false,
+		receivingFailure;
 	try {
 		const acquired = fs.fstatSync(fd, { bigint: true });
 		demand(
@@ -89,8 +91,22 @@ function readSourceFile(file, maximum = 33554432) {
 				size: String(acquired.size)
 			}
 		};
+	} catch (error) {
+		receivingFailed = true;
+		receivingFailure = error;
+		throw error;
 	} finally {
-		fs.closeSync(fd);
+		try {
+			fs.closeSync(fd);
+		} catch (closureFailure) {
+			if (receivingFailed)
+				throw new AggregateError(
+					[receivingFailure, closureFailure],
+					'Source/image receiving and closure refused.',
+					{ cause: receivingFailure }
+				);
+			throw closureFailure;
+		}
 	}
 }
 function candidateSourceReceipt(epoch) {
