@@ -33,6 +33,7 @@ local MODULES = {
 	"ui.menu.menu_llm.activation_pause_owner",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"modules.llm.api_mlx",
+	"modules.llm.ollama_endpoint",
 	"ui.menu.menu_llm.startup_controller",
 	"ui.menu.menu_llm.trigger_orchestrator",
 	"ui.menu.menu_llm.menu_layout",
@@ -56,6 +57,7 @@ local function build_fixture(callback, options)
 		local pending_stop_kind
 		local stop_kinds = {}
 		local current_port = 3460
+		local ollama_port = 11470
 		local last_render_ctx = nil
 		local port_commits = 0
 		local mlx_restarts = {}
@@ -212,6 +214,9 @@ local function build_fixture(callback, options)
 				}
 			end,
 		}
+		package.loaded["modules.llm.ollama_endpoint"] = {
+			get_base_url = function() return "http://127.0.0.1:" .. tostring(ollama_port) end,
+		}
 		package.loaded["modules.llm.api_mlx"] = {
 			get_base_url = function() return "http://127.0.0.1:3460" end,
 			get_port = function() return current_port end,
@@ -362,6 +367,7 @@ local function build_fixture(callback, options)
 				pending_stop_cancel = function() return pending_stop_cancel end,
 				pending_stop_kind = function() return pending_stop_kind end,
 				stop_kinds = stop_kinds,
+				set_ollama_port = function(port) ollama_port = port end,
 				port = function() return current_port end,
 				port_commits = function() return port_commits end,
 				mlx_restarts = mlx_restarts,
@@ -615,6 +621,24 @@ helpers.describe("API active commands: actual native pause context", function()
 			helpers.assert_eq(observed, false)
 			helpers.assert_eq(requests, 0, "a retained native action cannot create a request after real pause")
 		end, { actual_api_panel = true })
+	end)
+end)
+
+
+helpers.describe("LLM health follows the configured endpoint", function()
+	helpers.it("(health-probe-origin) reads the configured Ollama origin and rejects its superseded receipt", function()
+		with_fixture(function(fixture)
+			fixture.state.llm_backend = "ollama"
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 1)
+			helpers.assert_eq(fixture.probes[1].url, "http://127.0.0.1:11470/api/version")
+			fixture.set_ollama_port(11471)
+			local before = fixture.updates()
+			fixture.probes[1].completion(200)
+			helpers.assert_eq(fixture.updates(), before)
+			build_and_assert_red(fixture)
+			helpers.assert_eq(fixture.probes[2].url, "http://127.0.0.1:11471/api/version")
+		end)
 	end)
 end)
 

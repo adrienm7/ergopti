@@ -104,6 +104,7 @@ helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)"
 		local hs_stub = _G.hs
 		local logger  = require("infra.logger")
 
+		helpers.admit_logger_privacy(logger)
 		-- Capture log output via Logger.set_sink. Real signature is
 		-- fn(console_line, sink_variant) — a 2-tuple, not (level, module, msg).
 		local errors_logged = {}

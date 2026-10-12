@@ -69,69 +69,81 @@ _HsCacheRowsEqual(A, B) {
 ; =====================================
 
 TestHsCache_BuildExtractsKnownEntry() {
-	global _SharedDir := _HsCacheTestSharedDir()
-	Rows := _HotstringsCacheBuildRows()
+	global _SharedDir
+	SavedShared := _SharedDir
+	try {
+		_SharedDir := _HsCacheTestSharedDir()
+		Rows := _HotstringsCacheBuildRows()
 
-	Assert(Rows.Count > 0, "cache build must yield at least one section")
-	; Layout-bound categories never enter this cache. The bundled symbol
-	; expansion retains the whitespace and strict-case coverage of this parser.
-	Key := "magickey.text_expansion_symbols"
-	Assert(Rows.Has(Key), "cache build must contain the stable " . Key . " section")
-	SymbolRows := Rows[Key]
-	AssertEqual(140, SymbolRows.Length, "every symbol expansion must reach the cache")
-	Expected := ["*?C", " -> ★", " ➜ ", false, false, true, ""]
-	Assert(_HsCacheRowsEqual(SymbolRows[1], Expected),
-		"the first symbol retains its flags, literal case and absent priority override")
-	Assert(SymbolRows[1][2] == " -> ★" && SymbolRows[1][3] == " ➜ ",
-		"trigger and output retain leading and trailing spaces whole")
+		Assert(Rows.Count > 0, "cache build must yield at least one section")
+		; Layout-bound categories never enter this cache. The bundled symbol
+		; expansion retains the whitespace and strict-case coverage of this parser.
+		Key := "magickey.text_expansion_symbols"
+		Assert(Rows.Has(Key), "cache build must contain the stable " . Key . " section")
+		SymbolRows := Rows[Key]
+		AssertEqual(140, SymbolRows.Length, "every symbol expansion must reach the cache")
+		Expected := ["*?C", " -> ★", " ➜ ", false, false, true, ""]
+		Assert(_HsCacheRowsEqual(SymbolRows[1], Expected),
+			"the first symbol retains its flags, literal case and absent priority override")
+		Assert(SymbolRows[1][2] == " -> ★" && SymbolRows[1][3] == " ➜ ",
+			"trigger and output retain leading and trailing spaces whole")
+	} finally _SharedDir := SavedShared
 }
 
 TestHsCache_BuildCoversEveryBundledCategory() {
-	global _SharedDir := _HsCacheTestSharedDir()
-	Rows := _HotstringsCacheBuildRows()
+	global _SharedDir
+	SavedShared := _SharedDir
+	try {
+		_SharedDir := _HsCacheTestSharedDir()
+		Rows := _HotstringsCacheBuildRows()
 
-	; Sum rows per top-level category and assert each bundled category contributed.
-	Totals := Map()
-	Grand := 0
-	for Key, RowList in Rows {
-		Cat := StrSplit(Key, ".", , 2)[1]
-		Totals[Cat] := (Totals.Has(Cat) ? Totals[Cat] : 0) + RowList.Length
-		Grand += RowList.Length
-	}
-	for Cat in ["autocorrection", "magickey"]
-		Assert(Totals.Has(Cat) and Totals[Cat] > 0, "bundled category '" . Cat . "' must contribute rows")
-	; SFB reduction and rolls are the Ergopti extension's files, loaded from there.
-	for Cat in ["distancesreduction", "sfbsreduction", "rolls"]
-		Assert(!Totals.Has(Cat), "the extension category '" . Cat . "' must not be compiled into the cache")
-	; Floor well below the ~2992 current total: a builder that silently drops most
-	; entries (regex/flag regression) fails here, while legitimate TOML edits pass.
-	Assert(Grand > 2000, "cache build total must stay in the thousands (got " . Grand . ")")
+		; Sum rows per top-level category and assert each bundled category contributed.
+		Totals := Map()
+		Grand := 0
+		for Key, RowList in Rows {
+			Cat := StrSplit(Key, ".", , 2)[1]
+			Totals[Cat] := (Totals.Has(Cat) ? Totals[Cat] : 0) + RowList.Length
+			Grand += RowList.Length
+		}
+		for Cat in ["autocorrection", "magickey"]
+			Assert(Totals.Has(Cat) and Totals[Cat] > 0, "bundled category '" . Cat . "' must contribute rows")
+		; SFB reduction and rolls are the Ergopti extension's files, loaded from there.
+		for Cat in ["distancesreduction", "sfbsreduction", "rolls"]
+			Assert(!Totals.Has(Cat), "the extension category '" . Cat . "' must not be compiled into the cache")
+		; Floor well below the ~2992 current total: a builder that silently drops most
+		; entries (regex/flag regression) fails here, while legitimate TOML edits pass.
+		Assert(Grand > 2000, "cache build total must stay in the thousands (got " . Grand . ")")
+	} finally _SharedDir := SavedShared
 }
 
 TestHsCache_TsvRoundTripIsLossless() {
-	global _SharedDir := _HsCacheTestSharedDir()
-	Rows := _HotstringsCacheBuildRows()
+	global _SharedDir
+	SavedShared := _SharedDir
+	try {
+		_SharedDir := _HsCacheTestSharedDir()
+		Rows := _HotstringsCacheBuildRows()
 
-	TmpTsv := A_Temp . "\ergopti_hscache_test.tsv"
-	_HotstringsCacheWriteTsv(TmpTsv, Rows)
-	Back := _HotstringsCacheReadTsv(FileRead(TmpTsv, "UTF-8"))
-	try FileDelete(TmpTsv)
+		TmpTsv := A_Temp . "\ergopti_hscache_test.tsv"
+		_HotstringsCacheWriteTsv(TmpTsv, Rows)
+		Back := _HotstringsCacheReadTsv(FileRead(TmpTsv, "UTF-8"))
+		try FileDelete(TmpTsv)
 
-	Assert(Back.Count == Rows.Count,
-		"round-trip must preserve every section (" . Back.Count . " vs " . Rows.Count . ")")
-	; Deep-check a section survived byte-for-byte: its outputs carry a trailing
-	; space and non-ASCII letters.
-	Key := "magickey.text_expansion_symbols"
-	Assert(Back.Has(Key), "round-trip must keep " . Key)
-	Orig := Rows[Key]
-	RT := Back[Key]
-	Assert(RT.Length == Orig.Length, Key . " row count must survive round-trip")
-	AllEqual := true
-	for Idx, Row in Orig {
-		if !_HsCacheRowsEqual(Row, RT[Idx])
-			AllEqual := false
-	}
-	Assert(AllEqual, "every " . Key . " row must be identical after a write/read round-trip")
+		Assert(Back.Count == Rows.Count,
+			"round-trip must preserve every section (" . Back.Count . " vs " . Rows.Count . ")")
+		; Deep-check a section survived byte-for-byte: its outputs carry a trailing
+		; space and non-ASCII letters.
+		Key := "magickey.text_expansion_symbols"
+		Assert(Back.Has(Key), "round-trip must keep " . Key)
+		Orig := Rows[Key]
+		RT := Back[Key]
+		Assert(RT.Length == Orig.Length, Key . " row count must survive round-trip")
+		AllEqual := true
+		for Idx, Row in Orig {
+			if !_HsCacheRowsEqual(Row, RT[Idx])
+				AllEqual := false
+		}
+		Assert(AllEqual, "every " . Key . " row must be identical after a write/read round-trip")
+	} finally _SharedDir := SavedShared
 }
 
 TestHsCache_EscapeUnescapeHandlesSpecials() {
@@ -638,3 +650,34 @@ for _hsSplit_Selection in ["all", "names", "abbreviations", "technical_terms"] {
 for _hsSplit_Selection in ["all", "names", "abbreviations", "technical_terms"]
 	Test("common source split: actual native boot registrar " . _hsSplit_Selection . " (common-autocorrection-split)",
 		_HsCacheCommonSplitNative.Bind(_hsSplit_Selection, false, true))
+
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 4/ Shared source custody regression =======
+; ===================================================
+; ===================================================
+
+TestHsCache_SharedSourceCustody() {
+	global _SharedDir
+	SavedShared := _SharedDir
+	State := _LoggerPrivacyState(), SavedPolicy := [State["config"], State["root"]]
+	try {
+		State["config"] := 0, State["root"] := ""
+		Policy := _LoggerPrivacyConfig()
+		AssertTrue(Policy is Map, "The real canonical logger policy is admitted before cache work")
+		for Callback in [TestHsCache_BuildExtractsKnownEntry, TestHsCache_BuildCoversEveryBundledCategory, TestHsCache_TsvRoundTripIsLossless] {
+			Callback.Call()
+			AssertTrue(_SharedDir == SavedShared, "Each cache callback restores the exact inherited shared source")
+			AssertTrue(_LoggerPrivacyConfig() == Policy, "Cache work preserves the actual admitted logger policy owner")
+		}
+	} finally {
+		_SharedDir := SavedShared
+		State["config"] := SavedPolicy[1], State["root"] := SavedPolicy[2]
+	}
+}
+Test("hotstrings cache: callbacks preserve the admitted shared logger source", TestHsCache_SharedSourceCustody)

@@ -24,6 +24,8 @@ local M = {}
 
 local Engine    = require("config_unused_keys")
 local TomlCodec = require("toml_codec")
+-- The cached contract and its Engine must share the same write-refusal owner.
+local TomlWriter = require("toml_codec.writer")
 
 local STAMP = "20990101-000000"
 local _sequence = 0
@@ -134,6 +136,51 @@ local function register_driver_rule(h, opts)
 				h.assert_eq(scan.status, "ok")
 				h.assert_eq(ids(scan.keys), opts.expected,
 					"only keys the driver's readers never take may be offered")
+			end)
+		end)
+
+		h.it("a protected file is never scanned or offered (protected-schema-cleanup)", function()
+			with_config(opts.fixture, function(path)
+				local Writer = TomlWriter
+				local before = read_bytes(path)
+				local ordinary = Engine.find({ path = path, collect = opts.collect })
+				h.assert_eq(ordinary.status, "ok")
+				h.assert_eq(ids(ordinary.keys), opts.expected,
+					"the admitted same source genuinely owns the ordinary unused-key candidates")
+				local reason = "configuration schema is newer than this build"
+				Writer.refuse_writes(path, reason)
+				local reads, collected, offered, failed = 0, 0, 0, 0
+				local request = {
+					path = path,
+					read = function(target)
+						reads = reads + 1
+						h.assert_eq(target, path)
+						return read_bytes(target), "ok"
+					end,
+					collect = function(...)
+						collected = collected + 1
+						return opts.collect(...)
+					end,
+					get_text = function(key) return key end,
+					confirm = function() offered = offered + 1; return false end,
+					inform = function() error("protected source cannot report cleanup success") end,
+					fail = function() failed = failed + 1 end,
+				}
+				local scan = Engine.find(request)
+				h.assert_eq(scan.status, "unsupported")
+				h.assert_eq(scan.keys, {})
+				h.assert_nil(scan.source, "no parsed source may masquerade as an admitted preview")
+				h.assert_eq(Engine.run(request), false)
+				h.assert_eq({ reads, collected, offered, failed }, { 0, 0, 0, 1 })
+				h.assert_eq(read_bytes(path), before)
+				h.assert_nil(read_bytes(Engine.backup_path(path, STAMP)))
+				h.assert_eq(Writer.write_refusal(path), reason, "preview cannot reset the original write fence")
+				with_config(opts.fixture, function(other)
+					h.assert_nil(Writer.write_refusal(other))
+					local unrelated = Engine.find({ path = other, collect = opts.collect })
+					h.assert_eq(unrelated.status, "ok")
+					h.assert_eq(ids(unrelated.keys), opts.expected, "protection remains exact-path owned")
+				end)
 			end)
 		end)
 

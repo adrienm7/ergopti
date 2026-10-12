@@ -69,3 +69,95 @@ LocalServerAuthModelsReceipt(Result) {
 	}
 	return Ids
 }
+
+/**
+ * Matches a configured API identity without inferring a product from its payload.
+ * @param {String} Provider Persisted provider identity.
+ * @param {String} BaseUrl Explicit configured endpoint for generic providers.
+ * @param {String} ServerId Declared local catalogue identity.
+ * @param {Map} Servers Validated local catalogue.
+ * @returns {Boolean} Exact provider ownership or canonical loopback affinity.
+ */
+LocalServerAuthEntryMatches(Provider, BaseUrl, ServerId, Servers) {
+	if !(Provider is String) || !(BaseUrl is String) || !(ServerId is String)
+			|| !(Servers is Map) || !(Servers.Get(ServerId, 0) is Map)
+		return false
+	if Provider == ServerId
+		return true
+	if !(Provider == "openai") && !(Provider == "openai_compat")
+		return false
+	Configured := _LocalServerAuthLoopbackIdentity(BaseUrl)
+	Declared := _LocalServerAuthLoopbackIdentity(Servers[ServerId].Get("base_url", 0))
+	return Configured is Map && Declared is Map
+		&& Configured["scheme"] == Declared["scheme"] && Configured["port"] == Declared["port"]
+		&& Configured["path"] == Declared["path"]
+}
+
+; Only equivalent loopback spellings share affinity. Host aliases do not turn a
+; custom port, alternate path, remote credential or payload into product identity.
+_LocalServerAuthLoopbackIdentity(Url) {
+	if !(Url is String) || RegExMatch(Url, "[[:space:][:cntrl:]]")
+			|| InStr(Url, "\") || InStr(Url, "@") || InStr(Url, "?") || InStr(Url, "#")
+		return false
+	if !RegExMatch(Url, "i)^(https?)://([^/:]+|\[[^]]+\])(?::([0-9]+))?(/.*)?$", &Parts)
+		return false
+	Host := StrLower(Parts[2])
+	if !(Host == "localhost") && !(Host == "127.0.0.1") && !(Host == "[::1]")
+		return false
+	try Port := Parts[3] == "" ? (StrLower(Parts[1]) == "http" ? 80 : 443) : Integer(Parts[3])
+	catch
+		return false
+	if Port < 1 || Port > 65535
+		return false
+	return Map("scheme", StrLower(Parts[1]), "port", Port, "path", RTrim(Parts[4], "/"))
+}
+
+/**
+ * Keeps optional authentication tied to the configured native endpoint.
+ * @param {String} Provider Original provider identity; never rewritten locally.
+ * @param {String} Token Exact configured credential.
+ * @param {String} BaseUrl Explicit configured endpoint.
+ * @param {Map} Servers Validated local catalogue for ordinary provider policy.
+ * @returns {Boolean} Provider authentication or explicitly keyless loopback API.
+ */
+LocalServerAuthEntryTokenAllowed(Provider, Token, BaseUrl, Servers) {
+	if LocalServerAuthTokenAllowed(Provider, Token, Servers)
+		return true
+	return Token is String && Token == "" && Provider is String
+		&& ((Provider == "openai") || (Provider == "openai_compat"))
+		&& _LocalServerAuthLoopbackIdentity(BaseUrl) is Map
+}
+
+/** Returns credential-free configured views, preserving validated entry order. */
+LocalServerAuthConfiguredViews(Entries, Servers, Providers) {
+	Order := [], Views := Map()
+	Views.CaseSense := "On"
+	if !(Entries is Array) || !(Servers is Map) || !(Providers is Map)
+		return Map("order", Order, "views", Views)
+	for Entry in Entries {
+		if !(Entry is Map) || !(Entry.Get("Id", 0) is String) || Entry["Id"] == ""
+				|| !(Entry.Get("Provider", 0) is String) || !(Entry.Get("BaseUrl", 0) is String)
+				|| !(Entry.Get("Token", 0) is String)
+			continue
+		Provider := Entry["Provider"]
+		if !(Provider == "openai") && !(Provider == "openai_compat")
+			continue
+		Descriptor := Providers.Get(Provider, 0)
+		Label := Descriptor is Map ? Descriptor.Get("Label", Descriptor.Get("label", 0)) : 0
+		if !(Label is String) || Label == "" || !(_LocalServerAuthLoopbackIdentity(Entry["BaseUrl"]) is Map)
+			continue
+		Canonical := false
+		for Id, Server in Servers {
+			if LocalServerAuthEntryMatches(Provider, Entry["BaseUrl"], Id, Servers) {
+				Canonical := true
+				break
+			}
+		}
+		Id := "configured:" . Entry["Id"]
+		if Canonical || Views.Has(Id)
+			continue
+		Views[Id] := Map("id", Id, "entry_id", Entry["Id"], "provider", Provider, "label", Label, "base_url", Entry["BaseUrl"])
+		Order.Push(Id)
+	}
+	return Map("order", Order, "views", Views)
+}

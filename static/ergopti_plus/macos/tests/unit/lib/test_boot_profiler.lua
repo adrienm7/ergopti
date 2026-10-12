@@ -36,6 +36,7 @@ package.loaded["infra.logger"] = {
 	debug   = noop, trace = noop, done = noop, error = noop,
 	is_enabled = function() return true end,
 	LEVELS  = { DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 },
+	redact_message = function(text) return text end,
 	FALLBACK_BOOT_LOG_FILE = "/journal/fallback.log",
 }
 

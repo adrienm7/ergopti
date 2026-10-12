@@ -9,6 +9,25 @@
 Never push `dev` or `main` without explicit approval in the current
 conversation. Local commits do not imply release approval.
 
+### development-and-release-branches
+
+Develop on `dev`; advance `main` by fast-forward from `dev` only for a release
+explicitly authorized by the maintainer. Do not develop or commit directly on
+`main`. The October 12 historical consolidation had explicit permission for
+exceptional merges; that permission is not a standing exception for later work.
+Native qualification remains distinct from integration: if the maintainer
+explicitly requests integration before device receiving, preserve the missing
+receiving in TODO and the handover rather than reporting a native pass.
+
+### project-explicit-dev-fetch-tracking
+
+A cloud checkout can have `remote.origin.fetch` limited to main. In that case,
+`git fetch origin dev` downloads FETCH_HEAD but leaves origin/dev stale. Ensure
+an additive `+refs/heads/dev:refs/remotes/origin/dev` mapping and dev upstream
+`refs/heads/dev`, then fetch and compare origin/dev with
+`git ls-remote origin refs/heads/dev` before integration. Preserve other fetch
+mappings; never infer current dev from a main-only upstream.
+
 ### feedback-test-before-merge
 
 Live-driver fixes stay on their branch until the maintainer has exercised them
@@ -249,7 +268,36 @@ the full buffer when range information is unavailable, so new files still
 format without rewriting an ordinary tracked legacy file. Both editors prefer
 LF for new files. Lua and AutoHotkey remain outside automatic formatting.
 
+### project-private-payloads-need-explicit-formatter-config
+
+Prettier resolves configuration from the target file, even when its executable
+comes from the repository. Formatting a payload outside the checkout without
+`--config <checkout>/.prettierrc` therefore changed quotes and indentation across
+otherwise untouched source. Pass the explicit repository configuration for
+private payloads, then compare their diff against the original bytes; AST
+equivalence alone does not detect unrelated formatting churn.
+
 ## Agent context
+
+### project-codeql-last-instance-is-not-the-fixing-commit
+
+GitHub CodeQL keeps `most_recent_instance.commit_sha` at the last detected
+vulnerable source after a finding becomes fixed. Verify the completed analysis
+source separately from each alert's `state` and `fixed_at`; requiring that
+instance field to equal the fixing commit falsely rejects a successful rescan.
+A test-only finding still needs source-to-consumer review before dismissal.
+Bounded original-code oracles can intentionally retain a defective expression;
+prove their input bounds and keep large adversarial inputs on the corrected
+production implementation. Dismiss only the specific reviewed finding with
+its rationale, never the query or an entire test directory.
+
+CodeQL's Go autobuilder can synthesize a repository-root module when it finds
+none. Its `./...` package pattern then ignores directories beginning with `_`,
+including `_shared`, and an apparently successful build can extract zero
+packages. Shared Go code needs a discoverable module at its package root and
+physical `go:embed` inputs before extraction. Generate those inputs from their
+canonical owners and preserve the upstream application's separate module when
+copying the package into a native build.
 
 ### feedback-never-restart-a-running-workflow
 

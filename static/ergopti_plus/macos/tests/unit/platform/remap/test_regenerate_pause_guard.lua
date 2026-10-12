@@ -64,7 +64,7 @@ local function load_karabiner(paused)
 			}
 		end,
 		save_user_config = function() return true end,
-		resolve_layout_actions = function() return 0 end,
+		resolve_layout_actions = function() return 0, "ansi" end,
 	}
 
 	local deploys = { count = 0, phase = "active" }

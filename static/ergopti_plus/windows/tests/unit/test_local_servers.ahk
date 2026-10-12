@@ -470,3 +470,371 @@ _LSO_ReporterFailureStillReplaysLatestCreator() {
 	} finally Fixture.Dispose()
 }
 Test("local server composition: reporting failure releases and replays the latest creator", _LSO_ReporterFailureStillReplaysLatestCreator)
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 3/ Active Queue Observation =======
+; ===========================================
+; ===========================================
+
+_LSO_CountSourceCurrent(Fixture, Source) {
+	Fixture.SourceChecks += 1
+	return _LSO_Fixture.Prototype.SourceCurrent.Call(Fixture, Source)
+}
+
+_LSO_ActivePendingObserver() {
+	Fixture := _LSO_Fixture()
+	try {
+		Fixture.SourceChecks := 0
+		Fixture.DefineProp("SourceCurrent", {Call: _LSO_CountSourceCurrent})
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		AssertEqual("active", Job["phase"])
+		AssertTrue(Fixture.Transport.HasPending("lmstudio"))
+		Fixture.SourceChecks := 0
+		Fixture.Native._Tick(Job)
+		AssertEqual(0, Fixture.SourceChecks, "a pending queue observation must not duplicate the transport's source reads")
+		AssertEqual(1, Fixture.QueueTimers.Count, "the exact settlement observer remains armed")
+		AssertEqual(1, Fixture.Requests.Length, "the observer acquires no successor request")
+		Fixture.Drift()
+		Fixture.Transport.RetryPending()
+		AssertTrue(Fixture.SourceChecks > 0, "the real transport must still check and refuse the changed source")
+		AssertFalse(Fixture.Transport.HasPending("lmstudio"))
+		Fixture.Native.RetryPending()
+		AssertFalse(Fixture.Native.Controller.IsSweeping())
+		AssertEqual(0, Fixture.Native.Jobs.Count)
+		AssertEqual(0, Fixture.QueueTimers.Count)
+		AssertEqual(0, Fixture.Published.Length, "changed-source retirement cannot publish a cache")
+	} finally Fixture.Dispose()
+}
+Test("local active observer: pending tick delegates source cancellation to actual transport", _LSO_ActivePendingObserver)
+
+_LSO_ActivePendingCheapFence(Kind) {
+	Fixture := _LSO_Fixture()
+	try {
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		switch Kind {
+			case "closed": Fixture.Native.Closed := true
+			case "configuration": Fixture.Native.ConfigurationGeneration += 1
+			case "rescan": Fixture.Native.RescanGeneration += 1
+			case "ticket": Fixture.Native.Controller.Invalidate()
+		}
+		Fixture.Native._Tick(Job)
+		AssertEqual(0, Fixture.Native.Jobs.Count, "a cheap ownership refusal must still retire the exact job")
+		AssertFalse(Fixture.Transport.HasPending("lmstudio"))
+		AssertTrue(Fixture.Children[1].Terminations > 0, "refusal must request exact physical child retirement")
+		AssertEqual(0, Fixture.QueueTimers.Count)
+		AssertEqual(0, Fixture.Published.Length)
+	} finally Fixture.Dispose()
+}
+for Kind in ["closed", "configuration", "rescan", "ticket"]
+	Test("local active observer: pending tick retains " Kind " refusal", _LSO_ActivePendingCheapFence.Bind(Kind))
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 4/ Final Job Source Fence =======
+; =========================================
+; =========================================
+
+_LSCJ_MutatingTicket(Fixture, Original) {
+	Fixture.TicketReads += 1
+	if Fixture.TicketReads == 2
+		Fixture.Drift("old-key")
+	return Original.Call()
+}
+
+_LSCJ_LastTicketCannotReplaceSource() {
+	Fixture := _LSO_Fixture()
+	Job := 0, Original := 0
+	try {
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		Original := Job["ticket"]
+		Fixture.TicketReads := 0
+		Job["ticket"] := _LSCJ_MutatingTicket.Bind(Fixture, Original)
+		AssertFalse(Fixture.Native._CurrentJob(Job), "the final callback cannot replace source after its last full check")
+		AssertEqual(2, Fixture.TicketReads, "the source mutation must occur at the real last ticket callback")
+		AssertTrue(Fixture.Transport.HasPending("lmstudio"), "a rejected query cannot infer physical retirement")
+		AssertEqual(0, Fixture.Published.Length)
+	} finally {
+		if Job is Map && HasMethod(Original, "Call")
+			Job["ticket"] := Original
+		Fixture.Dispose()
+	}
+}
+Test("local job final fence: last ticket source replacement is refused", _LSCJ_LastTicketCannotReplaceSource)
+
+_LSCJ_LastSourceInvalidatesLogicalTicket(Fixture, Source) {
+	Fixture.SourceChecks += 1
+	Accepted := _LSO_Fixture.Prototype.SourceCurrent.Call(Fixture, Source)
+	if Fixture.SourceChecks == 2
+		Fixture.Native.Controller.Invalidate()
+	return Accepted
+}
+
+_LSCJ_LastSourceCannotReplaceTicket() {
+	Fixture := _LSO_Fixture()
+	try {
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		Fixture.SourceChecks := 0
+		Fixture.DefineProp("SourceCurrent", {Call: _LSCJ_LastSourceInvalidatesLogicalTicket})
+		AssertFalse(Fixture.Native._CurrentJob(Job), "a final source read cannot retain a replaced logical sweep")
+		AssertEqual(2, Fixture.SourceChecks, "the logical replacement must occur at the actual final source boundary")
+		AssertTrue(Fixture.Transport.HasPending("lmstudio"))
+		AssertEqual(0, Fixture.Published.Length)
+	} finally Fixture.Dispose()
+}
+Test("local job final fence: last source boundary preserves logical refusal", _LSCJ_LastSourceCannotReplaceTicket)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 5/ Batched Job Target Resolution =======
+; ================================================
+; ================================================
+
+_LSCJ_EntriesBound(Fixture, Ids, Source) {
+	if !Fixture.SourceCurrent(Source)
+		return false
+	Entries := Map()
+	for Id in Ids
+		Entries[Id] := Fixture.Entry(Id)
+	return Fixture.SourceCurrent(Source) ? Map("source", Source, "entries", Entries) : false
+}
+
+_LSCJ_EntryBound(Fixture, Id, Source) {
+	if !Fixture.SourceCurrent(Source)
+		return false
+	Entry := Fixture.Entry(Id)
+	return Fixture.SourceCurrent(Source) ? Entry : false
+}
+
+_LSCJ_BatchedTarget(Mode) {
+	Fixture := _LSO_Fixture()
+	try {
+		Fixture.Native.Options["entry_bound"] := _LSCJ_EntryBound.Bind(Fixture)
+		Fixture.Native.Options["entries_bound"] := _LSCJ_EntriesBound.Bind(Fixture)
+		Fixture.SourceChecks := 0
+		Fixture.DefineProp("SourceCurrent", {Call: _LSO_CountSourceCurrent})
+		AssertTrue(Fixture.Native.Rescan())
+		Fixture.SourceChecks := 0
+		if Mode == "entry_drift"
+			Fixture.OnEntry := () => Fixture.Drift("old-key")
+		Current := Fixture.Native._CurrentJob(Fixture.Native.Jobs["lmstudio"])
+		if Mode == "live" {
+			AssertTrue(Current)
+			AssertEqual(3, Fixture.SourceChecks, "the typed target batch and final claim need three full checks")
+		} else {
+			AssertFalse(Current, "a mutation during the real entry port cannot bless the target")
+			AssertTrue(Fixture.SourceChecks >= 2)
+		}
+		AssertEqual(0, Fixture.Published.Length)
+	} finally Fixture.Dispose()
+}
+Test("local job batch: typed target read removes one duplicate full fence", _LSCJ_BatchedTarget.Bind("live"))
+Test("local job batch: entry mutation retains whole source refusal", _LSCJ_BatchedTarget.Bind("entry_drift"))
+
+_LSCJ_ManagedFactory(Fixture, Owner) {
+	State := _ManagedCurlControlState()
+	Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State)))
+	State["request"] := Request
+	Fixture.ManagedStates.Push(State)
+	Fixture.Requests.Push(Request)
+	return Request
+}
+
+_LSCJ_ActualManagedBranch(Mode) {
+	Fixture := _LSO_Fixture()
+	try {
+		Fixture.ManagedStates := []
+		Fixture.Transport.Options.Delete("request")
+		Fixture.Transport.Options["clock"] := (*) => A_TickCount
+		Fixture.Transport.DefineProp("_NativeRequest", {Call: _LSCJ_ManagedFactory.Bind(Fixture)})
+		Fixture.Native.Options["entry_bound"] := _LSCJ_EntryBound.Bind(Fixture)
+		Fixture.Native.Options["entries_bound"] := _LSCJ_EntriesBound.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		AssertEqual(1, Fixture.ManagedStates.Length)
+		State := Fixture.ManagedStates[1], Request := State["request"]
+		AssertFalse(Fixture.Transport.Options.Has("request"), "the production managed-routing branch must remain active")
+		AssertTrue(Request.ManagedRouting && Request.ManagedTransport)
+		AssertEqual(1, State["spawns"])
+		AssertEqual(1, State["starts"])
+		AssertContains(State["executable"], "powershell.exe")
+		AssertEqual(Fixture.Transport.Options["timeout_ms"], Request.DeadlineTimeout)
+		AssertEqual(Request.DeadlineStart, State["input"]["started_tick"])
+		AssertFalse(Request.ManagedPayloadPublished)
+		SetTimer(Request.ManagedAdmissionFn, 0)
+		_ManagedCurlControlAck(State)
+		if Mode == "replaced"
+			Fixture.Drift("old-key")
+		Request._PollManagedAdmission()
+		if Mode == "live" {
+			AssertTrue(Request.ManagedPayloadPublished, "only the actual managed admission may publish provider input")
+			Published := JsonParse(FileRead(State["directory"] . "transport.json", "UTF-8"))
+			AssertEqual(Request.CleanupDebtId, Published["request_id"])
+		} else {
+			AssertTrue(Request.Aborted)
+			AssertFalse(Request.ManagedPayloadPublished)
+			AssertFalse(FileExist(State["directory"] . "transport.json"))
+			AssertTrue(State["terminates"].Length > 0, "source refusal must retire the exact controlled Job")
+		}
+	} finally {
+		try {
+			if Fixture.Transport.HasOwnProp("_NativeRequest")
+				Fixture.Transport.DeleteProp("_NativeRequest")
+			Fixture.Dispose()
+		} finally {
+			for State in Fixture.ManagedStates
+				_ManagedCurlControlRelease(State)
+		}
+	}
+}
+Test("local job managed: production routing and native admission path stay mandatory", _LSCJ_ActualManagedBranch.Bind("live"))
+Test("local job managed: replaced source refuses queued managed payload", _LSCJ_ActualManagedBranch.Bind("replaced"))
+
+_LSO_AffinityFixture() {
+	global LLM_LOCAL_API_SERVERS
+	LLM_Defaults_Load()
+	Fixture := _LSO_Fixture()
+	Fixture.Native.Cancel(true)
+	Fixture.Order := ["omlx"]
+	Fixture.Servers := Map("omlx", LLM_LOCAL_API_SERVERS["omlx"])
+	Fixture.Entries := Map("omlx", Map("Id", "generic-omlx", "Provider", "openai_compat",
+		"BaseUrl", "http://127.0.0.1:8000/v1/", "Token", "configured-loopback-token", "Model", "saved-model"))
+	Fixture.Transport.Options["servers"] := Fixture.Servers
+	Options := Fixture.Native.Options.Clone()
+	Options["order"] := Fixture.Order, Options["servers"] := Fixture.Servers
+	Fixture.Native := LocalServersOwner(Options)
+	return Fixture
+}
+
+_LSO_GenericAffinityOwnsTarget() {
+	global _SharedDir
+	Fixture := _LSO_AffinityFixture()
+	try {
+		Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
+		Target := Fixture.Native.Target("omlx")
+		AssertEqual("generic-omlx", Target["entry_id"])
+		AssertEqual("openai_compat", Target["provider"])
+		AssertEqual("http://127.0.0.1:8000/v1/", Target["base_url"])
+		AssertTrue(Fixture.Native.Rescan())
+		AssertContains(Fixture.Configs[1], "http://127.0.0.1:8000/v1/models")
+		AssertContains(Fixture.Configs[1], "configured-loopback-token")
+		Fixture.Complete(1, 200, Corpus["omlx_models_body"])
+		Verdict := Fixture.Native.Result("omlx")
+		AssertEqual("up", Verdict["status"])
+		AssertEqual(Corpus["omlx_model_ids"].Length, Verdict["models"].Length)
+		for Index, Id in Corpus["omlx_model_ids"]
+			AssertEqual(Id, Verdict["models"][Index])
+		Fixture.Native.BeginView()
+		Receipt := Fixture.Native.Capture("omlx")
+		AssertTrue(Fixture.Native.IsCurrent(Receipt, Corpus["omlx_model_ids"][1]), "a canonical generic target retains its real model provenance")
+		Fixture.Entries["omlx"]["Provider"] := "openai"
+		AssertFalse(Fixture.Native.IsCurrent(Receipt, Corpus["omlx_model_ids"][1]), "changing provider under equal ID, URL and token must revoke the old target")
+	} finally Fixture.Dispose()
+}
+Test("local-server-affinity: actual curl and discovery owners retain generic target identity", _LSO_GenericAffinityOwnsTarget)
+
+
+; Native-dispatch controls exercise production owners without qualifying Windows wire I/O.
+_LSI_RefuseFactory(Fixture, Mode) {
+	if Mode == "stale"
+		Fixture.Drift("same-key")
+	if Mode == "wrong_type"
+		return {}
+	throw Error("controlled native request construction failure")
+}
+
+_LSI_ActualConstructionFailure() {
+	for Mode in ["throw", "wrong_type", "stale"] {
+		Fixture := _LSO_Fixture()
+		try {
+			Fixture.Transport.Options["request"] := _LSI_RefuseFactory.Bind(Fixture, Mode)
+			AssertTrue(Fixture.Native.Rescan())
+			AssertEqual(0, Fixture.Requests.Length)
+			AssertEqual(0, Fixture.Transport.Records.Count)
+			if Mode == "stale" {
+				AssertEqual(0, Fixture.Published.Length, "source drift cannot become a native infrastructure verdict")
+				AssertEqual(0, Fixture.Native.Detected().Length)
+			} else {
+				AssertEqual("unavailable", Fixture.Native.Result("lmstudio")["status"])
+				AssertEqual(0, Fixture.Native.Detected().Length)
+				AssertEqual(0, Fixture.Native.Result("lmstudio")["models"].Length)
+			}
+		} finally Fixture.Dispose()
+	}
+}
+Test("local-server-unavailable: actual constructor refusal remains distinct from stale source", _LSI_ActualConstructionFailure)
+
+_LSI_ActualManagedRefusal(Stale := false) {
+	for Mode in (Stale ? ["foreign"] : ["foreign", "terminal"]) {
+		Fixture := _LSO_Fixture()
+		Fixture.ManagedStates := []
+		try {
+			Fixture.Transport.Options.Delete("request")
+			Fixture.Transport.Options["clock"] := (*) => A_TickCount
+			Fixture.Transport.DefineProp("_NativeRequest", {Call: _LSCJ_ManagedFactory.Bind(Fixture)})
+			AssertTrue(Fixture.Native.Rescan())
+			AssertEqual(1, Fixture.ManagedStates.Length)
+			State := Fixture.ManagedStates[1], Request := State["request"]
+			SetTimer(Request.ManagedAdmissionFn, 0)
+			NativeRecord := Fixture.Transport.Records["lmstudio"]
+			Job := Fixture.Native.Jobs["lmstudio"]
+			if Stale
+				Fixture.Drift("old-key")
+			if Mode == "terminal"
+				Request._OnManagedDone(1, '{"schema_version":1,"child_quiesced":true,"ok":false,"status":0}', "")
+			else {
+				State["retire"] := false
+				_ManagedCurlControlAck(State, "foreign")
+				Request._PollManagedAdmission()
+			}
+			AssertFalse(Request.ManagedPayloadPublished, "refused admission never publishes provider secrets")
+			AssertFalse(FileExist(State["directory"] . "transport.json"))
+			Fixture.Native.RetryPending()
+			if Stale {
+				AssertFalse(Request.HasOwnProp("NativeDispatchRefused"), "lost source ownership cannot manufacture a native infrastructure failure")
+				AssertEqual(0, Fixture.Published.Length)
+			} else {
+				AssertTrue(Request.NativeDispatchRefused)
+				AssertEqual("unavailable", Fixture.Native.Result("lmstudio")["status"])
+				AssertEqual(0, Fixture.Native.Detected().Length)
+			}
+			if Mode == "foreign" {
+				AssertEqual(ObjPtr(NativeRecord), ObjPtr(Fixture.Transport.Records["lmstudio"]), "logical classification retains the exact unsettled request")
+				AssertEqual(ObjPtr(Job), ObjPtr(Fixture.Native.Jobs["lmstudio"]), "logical classification retains the exact native queue debt")
+				AssertEqual(ObjPtr(State["job"]), ObjPtr(Request.Handle))
+				State["retire"] := true
+				Fixture.Native.RetryPending()
+				AssertEqual(0, Fixture.Transport.Records.Count)
+				AssertEqual(0, Fixture.Native.Jobs.Count)
+			}
+		} finally {
+			for State in Fixture.ManagedStates
+				State["retire"] := true
+			try {
+				if Fixture.Transport.HasOwnProp("_NativeRequest")
+					Fixture.Transport.DeleteProp("_NativeRequest")
+				Fixture.Dispose()
+			} finally {
+				for State in Fixture.ManagedStates
+					_ManagedCurlControlRelease(State)
+			}
+		}
+	}
+}
+Test("local-server-unavailable: actual managed admission and pretransport terminal refuse without releasing debt", _LSI_ActualManagedRefusal)
+Test("local-server-unavailable: managed source withdrawal never becomes infrastructure failure", _LSI_ActualManagedRefusal.Bind(true))

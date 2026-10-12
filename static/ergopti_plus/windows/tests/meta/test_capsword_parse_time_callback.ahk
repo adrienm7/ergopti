@@ -34,3 +34,24 @@ _CPTC_CallbackViaStaticAccessor() {
 		"the include-position-dependent _CapsWord_OnMouseDown global must not be reintroduced")
 }
 Test("capsword: mouse-cancel callback resolves via a parse-time-safe static accessor", _CPTC_CallbackViaStaticAccessor)
+
+; A parse-time navigation callback reaches the LED writer before shortcuts load.
+_CPTC_HardwareIntentBeforePump() {
+	PrePump := _HGBS_PrePumpSource()
+	Assert(PrePump != "", "the actual entry and first message-pump boundary must exist")
+	Assert(RegExMatch(PrePump, 'm)^global _HardwareCapsLockOn := KS_CapsLockToggleState\(\)$'),
+		"the entry must capture genuine CapsLock intent before the first message pump")
+	Observation := _DriverFuncBody("KS_CapsLockToggleState")
+	Assert(Observation != "", "the native startup observation must resolve before adapter initialization")
+	Assert(RegExMatch(Observation, 's)^KS_CapsLockToggleState\(\) \{\s*return GetKeyState\("CapsLock", "T"\) \? true : false\s*\}$'),
+		"the adapter must retain native toggle mode, boolean conversion and uncaught read refusal without global dependencies")
+	Source := _DriverSourceNoComments()
+	Count := 0, Offset := 1
+	while Position := RegExMatch(Source, "m)^global _HardwareCapsLockOn :=", &Match, Offset) {
+		Count += 1
+		Offset := Position + StrLen(Match[0])
+	}
+	AssertEqual(1, Count, "late module execution must not reset an early user CapsLock intent")
+}
+Test("capsword: hardware intent is owned before parse-time callbacks (capslock-prepump)",
+	_CPTC_HardwareIntentBeforePump)

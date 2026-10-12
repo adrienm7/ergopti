@@ -82,7 +82,7 @@ helpers.describe("API panel runtime identity transaction", function()
 				paused = false,
 				is_paused = function() return false end,
 				keymap = {
-					reset_predictions = function()
+					reset_predictions_for_configuration = function()
 						events[#events + 1] = "reset"
 						return reset_commits
 					end,
@@ -185,7 +185,7 @@ helpers.describe("API panel runtime identity transaction", function()
 				state = { llm_backend = "api", llm_model = "model-a" },
 				paused = false,
 				is_paused = function() return false end,
-				keymap = { reset_predictions = function() return true end },
+				keymap = { reset_predictions_for_configuration = function() return true end },
 				WarmupCtrl = { warmup = function() end },
 				update_menu = function() end,
 			})

@@ -73,7 +73,7 @@ local function load_remap(options)
 			}
 		end,
 		save_user_config = function() return true end,
-		resolve_layout_actions = function() return 0 end,
+		resolve_layout_actions = function() return 0, "ansi" end,
 	}
 	package.loaded["platform.remap.generator"] = {
 		build_karabiner_json = function() return {} end,

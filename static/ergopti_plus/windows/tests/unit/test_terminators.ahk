@@ -1069,6 +1069,7 @@ _HTRB_RefusedGeneration(ReadRefusal) {
 			; The genuine journal already owns this file; native opening must now fail.
 			ReadLock := FileOpen(RejectedPath, "r-rwd")
 			Assert(IsObject(ReadLock), "the actual reader refusal requires its real exclusive file lock")
+			AssertTrue(ReadLock is File, "the native read refusal requires an acquired exclusive file lock")
 		}
 		ReadFailure := false
 		try {
@@ -1263,3 +1264,101 @@ Test("terminator-records: new parent retains current root metadata and bare owne
 Test("terminator-records: new parent retains current root metadata without a final newline", _HTR_CurrentRootOwners.Bind(false, false))
 Test("terminator-records: new parent retains BOM before current root metadata", _HTR_CurrentRootOwners.Bind(true, true))
 Test("terminator-records: new parent retains BOM and unterminated foreign comment", _HTR_CurrentRootOwners.Bind(true, false))
+
+; Retain the independent release-branch callback-copy and root-owner controls.
+_HTR_ForeignSourceCallbackCopy() {
+	Fixture := _ScopeOwnerFixture(_HTR_Source())
+	NativePort := ConfigTransitionProductionPort(), NativeHash := NativePort["hash"]
+	; A never-issued callback copy models the race without revoking native IO.
+	Port := NativePort.Clone()
+	AssertFalse(ConfigTransitionProductionPort(Port), "the race callback copy grants no native authority")
+	HashCalls := 0, Changed := false, Foreign := Fixture.source . '# independently changed source`n'
+	Hash(Content) {
+		HashCalls += 1
+		Digest := NativeHash.Call(Content)
+		if !Changed && Content == Fixture.source {
+			Changed := true
+			Assert(FSWriteDurable(Fixture.path, Foreign))
+		}
+		return Digest
+	}
+	Port["hash"] := Hash
+	Fixture.options["port"] := Port
+	Bundle := 0, OnRefused := 0, Launches := 0
+	Launch(Success, Borrowed, Refused) {
+		Launches += 1, Bundle := Borrowed, OnRefused := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
+		AssertEqual(0, Launches, "a stale exact-source intent must refuse before reload admission")
+		Assert(HashCalls > 0, "the retained native hash callback must execute before race refusal")
+		Assert(Changed, "the actual native hash boundary must exercise the source race")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Foreign, FSReadUtf8Exact(Fixture.path), "a foreign source wins before any replacement")
+	} finally {
+		if HasMethod(OnRefused, "Call")
+			OnRefused.Call("controlled cleanup")
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		try AssertTrue(ConfigTransitionProductionPort(NativePort), "the race fixture retains the exact canonical native image")
+		finally _ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("terminator-records: injected hash callback copy preserves independent source refusal", _HTR_ForeignSourceCallbackCopy)
+
+; Tampering is refused even for an issued identity; restoration preserves custody.
+_HTR_NativePortMutationCustody() {
+	Port := ConfigTransitionProductionPort(), NativeHash := Port["hash"]
+	try {
+		Port["hash"] := (*) => false
+		AssertFalse(ConfigTransitionProductionPort(Port), "an issued identity cannot authorize a changed callback")
+		AssertThrows(_ConfigTransitionRuntimePort.Bind(Port), "revoked native IO must not become a custom port")
+		AssertThrows(ConfigTransitionProductionPort, "the shared constructor must refuse the changed image")
+	} finally Port["hash"] := NativeHash
+	AssertTrue(ConfigTransitionProductionPort(Port), "restoration retains the original native identity")
+	Assert(Port == ConfigTransitionProductionPort(), "restoration must not mint replacement authority")
+}
+Test("terminator-records: issued native mutation refuses and restores exact custody", _HTR_NativePortMutationCustody)
+
+_HTR_NativePortIntact() {
+	Port := ConfigTransitionProductionPort()
+	AssertTrue(ConfigTransitionProductionPort(Port), "prior terminator fixtures retain the canonical native image")
+	Assert(Port["hash"] == CryptoSha256, "the original native hash callback remains installed")
+	Assert(Port == ConfigTransitionProductionPort(), "the next constructor observes the same admitted identity")
+}
+Test("terminator-records: following fixture observes intact canonical native ownership", _HTR_NativePortIntact)
+
+_HTR_RootOwnerImage() {
+	for Prefix in ["", Chr(0xFEFF)] {
+		Source := Prefix . '_meta.schema_version = 7`nroot_owner = { keep = "exact", nested = { n = 9 } }`n' . _HTR_Source()
+		Before := TOML_ParseDocument(Source)
+		Plan := HotstringsTerminatorRecordPlan(Source, Map("mode", "upsert", "record",
+			Map("key", "section", "char", "§", "label", "Section", "consume", TOML_Bool(false))))
+		After := TOML_ParseDocument(Plan.Content)
+		AssertTrue(TOML_SameValue(Before["_meta"], After["_meta"]), "root schema metadata remains outside the new hotstrings parent")
+		AssertTrue(TOML_SameValue(Before["root_owner"], After["root_owner"]), "an independent root owner retains every typed leaf")
+		AssertTrue(TOML_SameValue(Before["private"], After["private"]))
+		AssertTrue(TOML_SameValue(Before["foreign"], After["foreign"]))
+		AssertEqual(3, After["hotstrings"]["terminators"].Length)
+		AssertEqual(Prefix == "" ? false : true, SubStr(Plan.Content, 1, 1) == Chr(0xFEFF))
+	}
+	Minimal := '[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true'
+	for Source in [Minimal, Minimal . '`n# retained final trivia'] {
+		Removed := HotstringsTerminatorRecordPlan(Source, Map("mode", "remove", "key", "currency"))
+		AssertEqual(0, TOML_ParseDocument(Removed.Content)["hotstrings"]["terminators"].Length,
+			"an empty retained image still admits one explicit empty parent")
+		if InStr(Source, "# retained final trivia")
+			AssertContains(Removed.Content, "# retained final trivia", "retained trivia is not discarded by parent insertion")
+	}
+	RootOnly := 'root_owner = { keep = "exact" }'
+	RootPlan := HotstringsTerminatorRecordPlan(RootOnly, Map("mode", "upsert", "record",
+		Map("key", "section", "char", "§", "label", "Section", "consume", TOML_Bool(false))))
+	RootAfter := TOML_ParseDocument(RootPlan.Content)
+	AssertTrue(TOML_SameValue(TOML_ParseDocument(RootOnly)["root_owner"], RootAfter["root_owner"]),
+		"a root-only image without a terminal newline retains its independent owner")
+	AssertEqual(1, RootAfter["hotstrings"]["terminators"].Length)
+
+}
+Test("terminator-records: a new parent preserves independent root owners and BOM", _HTR_RootOwnerImage)

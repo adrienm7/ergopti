@@ -72,6 +72,7 @@ local LOG            = "llm.api_remote"
 -- module, so a sweep probes every server at once and a newer sweep supersedes
 -- each probe
 local _local_probe_clients = {}
+local _retiring_local_probe_clients = setmetatable({}, { __mode = "k" })
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -336,7 +337,7 @@ end
 local function key_missing(entry)
 	if type(entry) ~= "table" then return true end
 	local servers = M.is_local_server(entry.provider) and LocalServers.SERVERS or {}
-	return not AuthPolicy.token_allowed(entry.provider, entry.token, servers)
+	return not AuthPolicy.entry_token_allowed(entry.provider, entry.token, entry.base_url, servers)
 end
 
 --- Lists the providers that serve one use (modules/llm/provider_uses.lua), in
@@ -2224,11 +2225,25 @@ end
 --- @param provider_id string Server id of local_servers.json.
 --- @return table|nil entry
 function M.local_server_entry(provider_id)
+	if type(provider_id) ~= "string" then return nil end
+	local configured_id = provider_id:match("^configured:(.+)$")
+	if configured_id then
+		for _, entry in ipairs(_entries) do
+			if entry.id == configured_id and M.PROVIDERS[entry.provider] ~= nil
+				and AuthPolicy.entry_token_allowed(entry.provider, "", entry.base_url, {}) then return entry end
+		end
+		return nil
+	end
 	if not M.is_local_server(provider_id) then return nil end
 	local active = find_active_entry()
-	if active and active.provider == provider_id then return active end
-	for _, entry in ipairs(_entries) do
-		if entry.provider == provider_id then return entry end
+	-- A deliberate local-provider selection has priority over generic affinity.
+	for _, exact in ipairs({ true, false }) do
+		local function matches(entry)
+			return entry ~= nil and (entry.provider == provider_id) == exact
+				and AuthPolicy.entry_matches(entry.provider, entry.base_url or "", provider_id, LocalServers.SERVERS)
+		end
+		if matches(active) then return active end
+		for _, entry in ipairs(_entries) do if matches(entry) then return entry end end
 	end
 	return nil
 end
@@ -2839,18 +2854,65 @@ function M.normalize_base_url(raw)
 	return normalize_base_url(raw)
 end
 
+--- Refreshes public configured view membership from the actual native entries.
+--- @return boolean changed
+function M.refresh_local_server_views()
+	local order, views = AuthPolicy.configured_views(_entries, LocalServers.SERVERS, M.PROVIDERS)
+	local changed = LocalServers.configure_views(order, views, _identity_generation)
+	for id, client in pairs(_local_probe_clients) do
+		if id:match("^configured:") and views[id] == nil and not _retiring_local_probe_clients[client] then
+			local function release()
+				if _local_probe_clients[id] == client and LocalServers.view_servers()[id] == nil
+					and client.isSettled() == true then _local_probe_clients[id] = nil end
+				_retiring_local_probe_clients[client] = nil
+			end
+			local ok, registered = xpcall(function()
+				_retiring_local_probe_clients[client] = true
+				client.cancel()
+				if client.isSettled() == true then release(); return true end
+				return client.onSettled(release)
+			end, debug.traceback)
+			if not ok or registered ~= true then
+				_retiring_local_probe_clients[client] = nil
+				Logger.error(LOG, "Removed local discovery HTTP owner retained unresolved native cleanup.")
+			end
+		end
+	end
+	return changed
+end
+
+--- Checks view identity without granting registered provider capability.
+--- @param id any
+--- @return boolean
+function M.is_local_server_view(id)
+	return M.is_local_server(id) or (type(id) == "string" and id:match("^configured:") ~= nil
+		and M.local_server_entry(id) ~= nil)
+end
+
+--- Returns a native catalogue or exact configured entry's public descriptor.
+--- @param id string
+--- @return table|nil
+function M.local_server_descriptor(id)
+	if M.is_local_server(id) then return M.PROVIDERS[id] end
+	local entry = M.local_server_entry(id)
+	if not entry then return nil end
+	local provider = M.PROVIDERS[entry.provider]
+	return { id = id, entry_id = entry.id, provider = entry.provider, label = provider.label, base_url = entry.base_url }
+end
+
 --- Where a local server is probed and with which stored key: its API entry's
 --- address and key, else those typed this session, else its default address.
 --- @param provider_id string Server id of local_servers.json.
 --- @return table target { id, base_url, token } (token "" or a stored reference).
 function M.local_server_target(provider_id)
-	local provider = M.PROVIDERS[provider_id]
+	local provider = M.local_server_descriptor(provider_id)
+	if not provider then return nil end
 	local entry = M.local_server_entry(provider_id)
-	local pending = LocalServers.pending(provider_id)
+	local pending = M.is_local_server(provider_id) and LocalServers.pending(provider_id) or {}
 	local base_url = entry and entry.base_url or ""
 	if base_url == "" then base_url = pending.base_url or provider.base_url end
 	local token = entry and entry.token or pending.token or ""
-	return { id = provider_id, base_url = base_url, token = token }
+	return { id = provider_id, entry_id = entry and entry.id, provider = entry and entry.provider, base_url = base_url, token = token }
 end
 
 --- Sweeps every local server's models endpoint at once, with the rules of the
@@ -2860,9 +2922,11 @@ end
 --- @param on_done function|nil Receives (changed) when every server settled.
 --- @return boolean started
 function M.detect_local_servers(on_done)
+	M.refresh_local_server_views()
 	local targets = {}
-	for _, id in ipairs(LocalServers.ORDER) do
-		if M.is_local_server(id) then targets[#targets + 1] = M.local_server_target(id) end
+	for _, id in ipairs(LocalServers.view_order()) do
+		local target = M.local_server_target(id)
+		if target then targets[#targets + 1] = target end
 	end
 	return LocalServers.sweep(targets, function(target, settle, ticket)
 		local base, reason = normalize_base_url(target.base_url)
@@ -2873,22 +2937,76 @@ function M.detect_local_servers(on_done)
 		local client = _local_probe_clients[target.id]
 		if not client then
 			-- A running server on loopback answers at once: the deadline is short
-			client = _http_adapter.new({ timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms") })
+			local created, value = xpcall(function()
+				return _http_adapter.new({ timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms"), follow_redirects = false })
+			end, debug.traceback)
+			if not created or type(value) ~= "table" then
+				Logger.error(LOG, "Local discovery native HTTP owner construction was refused.")
+				settle({ ok = false, status = 0, body = "", probe_error = true })
+				return true
+			end
+			client = value
 			_local_probe_clients[target.id] = client
 		end
 		-- The ticket fences logical supersession, not native task retirement.
 		-- Compare the live settings owner as well: these are its current in-memory
 		-- entry/pending fields, not a fresh private-file read or a disk lease.
 		local function target_is_current()
-			if ticket.is_current() ~= true or not M.is_local_server(target.id) then return false end
+			if ticket.is_current() ~= true or not M.is_local_server_view(target.id) then return false end
 			local current = M.local_server_target(target.id)
-			return current.id == target.id and current.base_url == target.base_url and current.token == target.token
+			return current ~= nil and current.id == target.id and current.entry_id == target.entry_id and current.provider == target.provider
+				and current.base_url == target.base_url and current.token == target.token
+		end
+		local function native_failure()
+			Logger.error(LOG, "Local discovery native HTTP acquisition was refused for '%s'.", target.id)
+			settle({ ok = false, status = 0, body = "", probe_error = true })
 		end
 		local function probe(token)
 			if not target_is_current() then return false end
-			return dispatch_probe(client, base, "openai", token, function(response)
-				if target_is_current() then settle(response) else settle(nil) end
-			end)
+			if type(client.get) ~= "function" or type(client.cancel) ~= "function"
+				or type(client.isSettled) ~= "function" or type(client.onSettled) ~= "function" then
+				native_failure(); return true
+			end
+			local function dispatch()
+				if not target_is_current() then settle(nil); return end
+				local returned, delivered, buffered = false, false, nil
+				local function deliver(response)
+					if not target_is_current() then settle(nil); return end
+					if type(response) == "table" and response.ok == false and response.status == 0
+						and response.error_kind == "native_dispatch" then
+						settle({ ok = false, status = 0, body = "", probe_error = true })
+					else settle(response) end
+				end
+				local ok, started = xpcall(function()
+					return dispatch_probe(client, base, "openai", token, function(response)
+						if not returned then delivered, buffered = true, response else deliver(response) end
+					end)
+				end, debug.traceback)
+				returned = true
+				if not ok or started ~= true then native_failure()
+				elseif delivered then deliver(buffered) end
+			end
+			local ok, registered = xpcall(function()
+				if client.isSettled() == true then dispatch(); return true end
+				client.cancel()
+				if client.isSettled() == true then dispatch(); return true end
+				-- An accepted cancel never permits replacing an unsettled HTTP owner.
+				local returned, observed = false, false
+				local function resume()
+					local accepted = xpcall(function()
+						if client.isSettled() == true then dispatch() else native_failure() end
+					end, debug.traceback)
+					if not accepted then native_failure() end
+				end
+				local registered = client.onSettled(function()
+					if not returned then observed = true else resume() end
+				end)
+				returned = true
+				if registered == true and observed then resume() end
+				return registered
+			end, debug.traceback)
+			if not ok or registered ~= true then native_failure() end
+			return true
 		end
 		if target.token == "" then return probe("") end
 		TokenCrypto.decrypt_async(target.token, function(decrypted, token, token_reason)

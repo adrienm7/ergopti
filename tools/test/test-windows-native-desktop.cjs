@@ -30,6 +30,7 @@ const expected = [
 function checkRunner(source) {
 	source = source.replace(/^\s*#.*$/gm, '');
 	assert.match(source, /if \(Test-Path -LiteralPath \$evidence\) \{ throw/);
+	assert.match(source, /'static\\ergopti_plus\\windows\\tests\\run_native_desktop\.ahk'/);
 	assert.match(source, /Start-Process -FilePath \$ahk/);
 	assert.match(source, /\$null = \$proc\.Handle/);
 	assert.match(source, /while \(-not \$proc\.HasExited\)/);
@@ -79,9 +80,9 @@ function checkWorkflow(body) {
 	assert.equal(pipeline.stepField(native, 'timeout-minutes'), '25');
 	assert.equal(pipeline.stepField(native, 'if'), null);
 	assert.equal(pipeline.stepField(native, 'continue-on-error'), null);
-	assert.ok(body.indexOf(main) < body.indexOf(native));
 	assert.ok(body.indexOf(native) < body.indexOf(receipt));
 	assert.ok(body.indexOf(receipt) < body.indexOf(upload));
+	assert.ok(body.indexOf(upload) < body.indexOf(main));
 	assert.equal(pipeline.stepField(receipt, 'if'), 'always()');
 	assert.equal(pipeline.stepField(receipt, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(receipt, 'continue-on-error'), null);
@@ -110,9 +111,68 @@ function admittedNativeWorkflow(files) {
 	return jobs[0].body;
 }
 
+/** Keep only the actual desktop modules in the canonical cohort compilation unit. */
+function checkNativeEntry(source) {
+	const code = stripComments(source, '.ahk');
+	assert.deepEqual(code.match(/^#Warn .*$/gm), ['#Warn All, StdOut', '#Warn VarUnset, Off']);
+	assert.match(code, /^#Include test_framework\.ahk$/m);
+	assert.match(code, /^#Include test_stubs\.ahk$/m);
+	// These real owners are used by the isolated AltGr callbacks. Registration
+	// alone succeeds when AHK instead resolves either missing function as unset.
+	for (const owner of ['adapters/text_sender.ahk', 'platform/remap/altgr_criteria.ahk']) {
+		assert.equal(code.split('#Include ../' + owner + '\n').length, 2);
+	}
+	assert.deepEqual(code.match(/^#Include unit\/.*$/gm), [
+		'#Include unit/test_console_window.ahk',
+		'#Include unit/test_key_combinations.ahk'
+	]);
+	assert.doesNotMatch(code, /#Include .*run_all\.ahk|#Include .*ErgoptiPlus\.ahk/);
+	assert.match(code, /Arguments\[1\] != "--interactive"/);
+	assert.match(code, /Arguments\[2\] != "--only"/);
+	assert.match(code, /Arguments\[3\] != "native-console-capture"/);
+	assert.match(code, /Arguments\[3\] != "todo91-altgr-suffix"/);
+	assert.match(code, /global _AHK_INTERACTIVE := true/);
+	assert.match(code, /global _AHK_QUALIFICATION_PROFILE := ""/);
+	assert.match(code, /^RunTests\(\)$/m);
+}
+const nativeEntry = fs.readFileSync(
+	path.join(root, 'static/ergopti_plus/windows/tests/run_native_desktop.ahk'),
+	'utf8'
+);
+checkNativeEntry(nativeEntry);
+for (const [before, after] of [
+	['#Warn All, StdOut', '#Warn All, Off'],
+	['#Warn VarUnset, Off', '#Warn VarUnset, Off\n#Warn LocalSameAsGlobal, Off'],
+	['#Include test_framework.ahk', '#Include unrelated_framework.ahk'],
+	['#Include ../adapters/text_sender.ahk', '; omitted sender owner'],
+	['#Include ../platform/remap/altgr_criteria.ahk', '; omitted AltGr criteria owner'],
+	[
+		'#Include unit/test_console_window.ahk',
+		'#Include unit/test_console_window.ahk\n#Include unit/test_toml_numeric_strings.ahk'
+	],
+	['#Include unit/test_key_combinations.ahk', '#Include unit/missing_key_combinations.ahk'],
+	['Arguments[3] != "todo91-altgr-suffix"', 'false'],
+	['global _AHK_INTERACTIVE := true', 'global _AHK_INTERACTIVE := false'],
+	['RunTests()', 'ExitApp(0)']
+]) {
+	const changed = nativeEntry.replace(before, after);
+	assert.notEqual(changed, nativeEntry);
+	assert.throws(() => checkNativeEntry(changed));
+}
+assert.throws(() =>
+	checkRunner(runner.replace('tests\\run_native_desktop.ahk', 'tests\\run_all.ahk'))
+);
+
 checkRunner(runner);
 const body = admittedNativeWorkflow(pipeline.files());
 checkWorkflow(body);
+for (const stepName of ['Run native desktop AHK cohorts', 'Publish native desktop AHK evidence']) {
+	const early = pipeline.step(body, stepName);
+	const main = pipeline.step(body, 'Run AHK test suite');
+	const late = body.replace(early, '').replace(main, main + early);
+	assert.notEqual(late, body);
+	assert.throws(() => checkWorkflow(late));
+}
 for (const [before, after] of [
 	['  macos:', '  omitted-macos:'],
 	['  core:', '  omitted-core:']

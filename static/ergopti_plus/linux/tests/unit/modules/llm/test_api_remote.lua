@@ -244,20 +244,36 @@ helpers.describe("Local API optional authentication: actual requests (local-api-
 		helpers.assert_eq(Json.decode(calls[1].body).model, "fixture-model")
 	end)
 
-	helpers.it("keeps a provided local key exactly and refuses cloud, generic and unknown empty keys (local-api-optional-auth)", function()
+	helpers.it("keeps a provided local key exactly and refuses remote generic and unknown empty keys (local-api-optional-auth)", function()
 		local remote = load_remote()
 		local request = remote.build_request({ provider = "lmstudio", token = " leading-and-trailing ",
 			model = "fixture-model", base_url = "http://127.0.0.1:19273/v1" }, MESSAGES, {})
 		local refused = {}
 		for _, provider in ipairs({ "openai", "openai_compat", "unknown-provider" }) do
 			refused[#refused + 1] = remote.build_request({ provider = provider, token = "", model = "fixture-model",
-				base_url = "http://127.0.0.1:19273/v1" }, MESSAGES, {}) == nil
+				base_url = "https://remote.fixture.invalid/v1" }, MESSAGES, {}) == nil
 		end
 		unload()
 		helpers.assert_true(request ~= nil)
 		helpers.assert_eq(request.headers.Authorization, "Bearer  leading-and-trailing ")
 		for _, value in ipairs(refused) do helpers.assert_eq(value, true) end
 	end)
+
+	for _, provider in ipairs({ "openai", "openai_compat" }) do
+		helpers.it("constructs an explicit keyless loopback request for " .. provider .. " (local-api-configured-request)", function()
+			local remote = load_remote()
+			local request = remote.build_request({ provider = provider, token = "", model = "fixture-model",
+				base_url = "http://127.0.0.1:19273/v1" }, MESSAGES, {})
+			local unknown = remote.build_request({ provider = "unknown-provider", token = "", model = "fixture-model",
+				base_url = "http://127.0.0.1:19273/v1" }, MESSAGES, {})
+			unload()
+			helpers.assert_true(request ~= nil, "the actual configured loopback consumer accepts its explicit context")
+			helpers.assert_eq(request.url, "http://127.0.0.1:19273/v1/chat/completions")
+			helpers.assert_nil(request.headers.Authorization)
+			helpers.assert_eq(Json.decode(request.body).model, "fixture-model")
+			helpers.assert_nil(unknown, "a loopback address cannot grant an unknown provider capability")
+		end)
+	end
 end)
 
 

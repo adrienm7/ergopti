@@ -348,10 +348,50 @@ KeylayoutEmulation_Press(Sc, Shift, Caps, Option) {
 	global KLE_Model, KLE_State, KLE_KeyCodes, KLE_LevelIndex
 	if !IsObject(KLE_Model) || !KLE_KeyCodes.Has(Sc)
 		return ""
-	Index := KLE_LevelIndex[_KLE_ComboKey(Shift, Caps, Option)]
-	Step := Keylayout_Step(KLE_Model, KLE_State, Index, KLE_KeyCodes[Sc])
+	Recipe := KeylayoutEmulation_CaptureReplayRoute(Sc, Shift, Caps, Option)
+	Step := KeylayoutEmulation_StepReplayRoute(Recipe, KLE_State)
 	KLE_State := Step["Next"]
 	return Step["Output"]
+}
+
+/**
+ * Captures one layout route without consulting live modifiers at replay time.
+ * @param {string} Sc - Physical AHK scan code.
+ * @param {boolean} Shift - Event-time Shift state.
+ * @param {boolean} Caps - Event-time CapsLock state.
+ * @param {boolean} Option - Event-time AltGr state.
+ * @returns {Map} Recipe retaining its admitted model, level and key identity.
+ * @throws {ValueError} If the loaded layout does not own this physical key.
+ */
+KeylayoutEmulation_CaptureReplayRoute(Sc, Shift, Caps, Option) {
+	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_LevelIndex
+	if !(KLE_Model is Map) || !(Sc is String) || !KLE_KeyCodes.Has(Sc)
+		throw ValueError("The current layout does not own the replay key.")
+	; Supported Load/Unload replace the admitted model rather than mutate it.
+	; Retaining that model keeps an accepted recipe valid across a layout swap.
+	return Map("model", KLE_Model, "layout_id", KLE_Id, "scan", Sc,
+		"index", KLE_LevelIndex[_KLE_ComboKey(Shift, Caps, Option)],
+		"keycode", KLE_KeyCodes[Sc])
+}
+
+/**
+ * Steps one accepted route with its explicit event-time dead-key state.
+ * @param {Map} Recipe - Route captured before queued replay or layout changes.
+ * @param {string} State - Composition state owned by the replay event stream.
+ * @returns {Map} The canonical Next and Output transition from the same parser.
+ * @throws {ValueError} If the recipe is incomplete or its state is invalid.
+ */
+KeylayoutEmulation_StepReplayRoute(Recipe, State) {
+	if !(Recipe is Map) || !(State is String)
+		throw ValueError("A replay route and composition state are required.")
+	for Key in ["model", "layout_id", "scan", "index", "keycode"]
+		if !Recipe.Has(Key)
+			throw ValueError("The replay route is incomplete.")
+	if !(Recipe["model"] is Map) || !(Recipe["layout_id"] is String)
+			|| !(Recipe["scan"] is String) || !(Recipe["index"] is Integer)
+			|| !(Recipe["keycode"] is Integer) || Recipe["keycode"] < 0
+		throw ValueError("The replay route contains invalid layout ownership.")
+	return Keylayout_Step(Recipe["model"], State, Recipe["index"], Recipe["keycode"])
 }
 
 /**

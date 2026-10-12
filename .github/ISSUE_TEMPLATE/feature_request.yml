@@ -5,7 +5,7 @@
 # prefilled by their `id` (pinned by tools/test/test-issue-templates.cjs).
 
 name: Feature request
-description: Suggest an idea or an improvement. / Proposer une idée ou une amélioration.
+description: Suggest an idea or an improvement.
 title: '[Feature] '
 labels: ['enhancement']
 body:
@@ -13,14 +13,14 @@ body:
     id: problem
     attributes:
       label: What would it make easier?
-      description: The situation or the problem behind the idea. / La situation ou le problème à l'origine de l'idée.
+      description: The situation or the problem behind the idea.
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
       label: Your proposal
-      description: How you would like ErgoptiPlus to behave. / Comment vous aimeriez qu'ErgoptiPlus se comporte.
+      description: How you would like ErgoptiPlus to behave.
     validations:
       required: true
   - type: input

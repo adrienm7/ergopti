@@ -42,6 +42,20 @@ MenuStartupDiagnosticsReady() {
 		&& IsSet(_DriverMenuReady) && _DriverMenuReady
 }
 
+/** Explicitly declares the one toggle whose unchanged early presentation joins repeated clicks. */
+class MenuStartupRepeatableToggleCommand {
+	__New(Id, Callback) {
+		if !(Id is String) || !(Id == "llm_toggle") || !HasMethod(Callback, "Call")
+			throw TypeError("Repeatable startup selection requires the declared AI toggle")
+		this.Id := Id
+		this.Callback := Callback
+	}
+
+	Call(Args*) {
+		return this.Callback.Call(Args*)
+	}
+}
+
 /** Retains bounded command intents until input initialization genuinely completes. */
 class MenuStartupCommands {
 	__New(ReadyFn, ScheduleFn := 0) {
@@ -66,12 +80,26 @@ class MenuStartupCommands {
 				throw Error("Startup menu selection ownership was canceled")
 			if this.Released
 				return false
-			if this.Pending.Length >= MAX_PENDING
-				throw Error("Startup menu selection capacity was exceeded")
 			Identity := IsObject(Registration)
 				? {ItemId: Registration.ItemId, Token: Registration.Token} : 0
+			RepeatCallback := Callback is MenuStartupRepeatableToggleCommand ? Callback.Callback : 0
+			RepeatId := Callback is MenuStartupRepeatableToggleCommand ? Callback.Id : ""
+			if RepeatId == "llm_toggle" && IsObject(Identity)
+					&& (Identity.ItemId is Integer) && Identity.ItemId > 0
+					&& (Identity.Token is Integer) && Identity.Token > 0 {
+				for Entry in this.Pending {
+					if Entry.HasOwnProp("RepeatId") && Entry.RepeatId == RepeatId
+							&& Entry.RepeatCallback == RepeatCallback && IsObject(Entry.Identity)
+							&& Entry.Identity.ItemId == Identity.ItemId && Entry.Identity.Token == Identity.Token {
+						try LoggerInfo("MenuDispatcher", "Repeated pending AI toggle joined the retained selection.")
+						return true
+					}
+				}
+			}
+			if this.Pending.Length >= MAX_PENDING
+				throw Error("Startup menu selection capacity was exceeded")
 			this.Pending.Push({Callback: Callback, Args: Args.Clone(), Identity: Identity,
-				AcceptedAt: A_TickCount})
+				RepeatId: RepeatId, RepeatCallback: RepeatCallback, AcceptedAt: A_TickCount})
 			try LoggerInfo("MenuDispatcher", "Menu selection retained until input initialization completes; {1} pending.",
 				this.Pending.Length)
 			return true

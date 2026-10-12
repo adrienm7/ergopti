@@ -97,3 +97,101 @@ helpers.describe("foreign sync + local ingest are transaction-safe at source", f
 			"a defensive ROLLBACK must precede the local ingest BEGIN")
 	end)
 end)
+
+
+helpers.describe("keylogger-export-log-privacy", function()
+	for _, phase in ipairs({ "invalid", "partial", "derived", "success", "watermark", "rollback" }) do
+		helpers.it("keylogger-export-log-privacy: " .. phase .. " preserves sync outcome without logging device identity", function()
+			helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keylogger.export" }, function()
+				local previous_open = io.open
+				local ok, err = xpcall(function()
+					local identity = "private-foreign-device"
+					local folder = "/owned-metrics/by_device/" .. identity .. "/"
+					local chunk = phase == "partial" and "BEGIN TRANSACTION;\n" or BATCH
+					local messages, statements, bindings = {}, {}, {}
+					local logger = helpers.make_logger_stub()
+					for _, level in ipairs({ "warn", "debug" }) do
+						logger[level] = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+					end
+					package.loaded["infra.logger"] = logger
+					package.loaded["infra.fs_dir"] = {
+						try_entries = function(path)
+							helpers.assert_eq(path, "/owned-metrics/by_device/")
+							return { "local-device", identity }, true
+						end,
+					}
+					io.open = function(path, mode)
+						helpers.assert_eq(mode, "r")
+						helpers.assert_true(path == folder .. "device.json" or path == folder .. "data.sql")
+						return {
+							read = function()
+								if path == folder .. "data.sql" then return chunk end
+								return phase == "invalid" and "invalid-json" or ('{"device_id":"' .. identity .. '"}')
+							end,
+							seek = function(_, mode, offset) helpers.assert_eq(mode, "set"); helpers.assert_eq(offset, 0) end,
+							close = function() return true end,
+						}
+					end
+					local db = {}
+					function db:prepare(sql)
+						helpers.assert_contains(sql, "INSERT OR IGNORE INTO devices")
+						return { bind_values = function(_, ...) bindings = { ... } end,
+							step = function() return 0 end, finalize = function() return 0 end }
+					end
+					function db:nrows(sql)
+						helpers.assert_contains(sql, "WHERE device_id='" .. identity .. "'")
+						local yielded = false
+						return function()
+							if phase ~= "invalid" and not yielded then yielded = true; return { imported_data_sql_size = 0 } end
+						end
+					end
+					function db:exec(sql)
+						statements[#statements + 1] = sql
+						if phase == "rollback" and sql == BATCH then return 1 end
+						if phase == "watermark" and sql:find("UPDATE devices", 1, true) then return 1 end
+						return 0
+					end
+					function db:errmsg() return "owned SQL refusal" end
+					local export = helpers.load_with_stubs("modules.keylogger.export", {
+						fs = { attributes = function() return { size = #chunk } end },
+					})
+					export.init({ paths = { metrics_dir = "/owned-metrics/" }, device_id = "local-device", get_db = function() return db end })
+					local callbacks = 0
+					local result, detail = export.sync_foreign_data_sql(function(device_id)
+						callbacks = callbacks + 1
+						helpers.assert_eq(device_id, identity)
+						return phase ~= "derived"
+					end)
+					helpers.assert_nil(detail)
+					helpers.assert_eq(result, phase == "success" and { identity } or {})
+					helpers.assert_eq(#messages, 1)
+					local expected = {
+						invalid = "Foreign sync: skipping invalid device.json.",
+						partial = "Foreign sync: no complete batch yet — deferring.",
+						derived = "Foreign sync: derived rebuild failed; watermark deferred.",
+						success = "Foreign sync: applied " .. #BATCH .. " byte(s).",
+						watermark = "Foreign sync: cannot advance watermark: owned SQL refusal.",
+					}
+					if phase == "rollback" then
+						helpers.assert_eq(messages[1]:sub(1, #"Foreign sync rolled back: "), "Foreign sync rolled back: ")
+						helpers.assert_contains(messages[1], "owned SQL refusal.")
+					else helpers.assert_eq(messages[1], expected[phase]) end
+					helpers.assert_nil(messages[1]:find(identity:sub(1, 8), 1, true))
+					if phase ~= "invalid" then helpers.assert_eq(bindings[1], identity) end
+					local advances = 0
+					for _, sql in ipairs(statements) do
+						if sql:find("UPDATE devices", 1, true) then
+							advances = advances + 1
+							helpers.assert_contains(sql, "WHERE device_id='" .. identity .. "'")
+						end
+					end
+					helpers.assert_eq(advances, (phase == "success" or phase == "watermark") and 1 or 0)
+					helpers.assert_eq(callbacks, (phase == "derived" or phase == "success" or phase == "watermark") and 1 or 0)
+					if phase == "rollback" then helpers.assert_eq(statements[#statements], "ROLLBACK;") end
+				end, debug.traceback)
+				io.open = previous_open
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+end)

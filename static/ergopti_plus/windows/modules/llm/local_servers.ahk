@@ -37,12 +37,13 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		for Name in ["entry", "capture_source", "source_current", "admit", "apply", "clock", "max_age"]
 			if !HasMethod(Options.Get(Name, 0), "Call")
 				throw TypeError("Local server native port is unavailable.", -1, Name)
-		for Name in ["timer", "on_publish", "on_error", "entry_bound"]
+		for Name in ["timer", "on_publish", "on_error", "entry_bound", "views_bound"]
 			if Options.Has(Name) && !HasMethod(Options[Name], "Call")
 				throw TypeError("Local server optional port must be callable.", -1, Name)
 		this.Options := Options.Clone()
 		this.Models := Options["models_owner"]
 		this.Order := Options["order"].Clone()
+		this.BaseOrder := this.Order.Clone()
 		this.Servers := Options["servers"]
 		this.Pending := Map()
 		this.Jobs := Map()
@@ -77,18 +78,81 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		if !(Server is Map)
 			return false
 		Entry := this._Entry(Id, Source?)
+		return this._TargetFromEntry(Id, Server, Entry)
+	}
+
+	/** Pure target projection; its caller retains source and final claim ownership. */
+	_TargetFromEntry(Id, Server, Entry) {
+		if !(Server is Map)
+			return false
 		if Entry is Map {
-			if !(Entry.Get("Id", 0) is String) || !(Entry.Get("Provider", "") == Id)
+			if !(Entry.Get("Id", 0) is String) || !this._EntryMatches(Id, Server, Entry)
 					|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
 					|| !(Entry.Get("Model", 0) is String)
 				throw TypeError("Local server entry must come from the validated native API owner.")
-			return Map("id", Id, "entry_id", Entry["Id"],
+			return Map("id", Id, "entry_id", Entry["Id"], "provider", Entry["Provider"],
 				"base_url", Entry["BaseUrl"] == "" ? Server["base_url"] : Entry["BaseUrl"],
 				"token", Entry["Token"])
 		}
 		Fields := this.Pending.Get(Id, Map())
-		return Map("id", Id, "entry_id", "", "base_url", Fields.Get("base_url", Server["base_url"]),
+		return Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields.Get("base_url", Server["base_url"]),
 			"token", Fields.Get("token", ""))
+	}
+
+	_EntryMatches(Id, Server, Entry) {
+		if SubStr(Id, 1, 11) == "configured:"
+			return Entry.Get("Id", "") == Server.Get("entry_id", 0)
+				&& Entry.Get("Provider", "") == Server.Get("provider", 0)
+				&& _LocalServerAuthLoopbackIdentity(Entry.Get("BaseUrl", 0)) is Map
+		return LocalServerAuthEntryMatches(Entry.Get("Provider", ""), Entry.Get("BaseUrl", ""), Id, this.Servers)
+	}
+
+	; One receipt-fenced batch provides both public view membership and private
+	; entry targets. Removed views invalidate tickets while their jobs stay owned.
+	_RefreshViews(Source) {
+		if !this.Options.Has("views_bound")
+			return true
+		Projection := this._Call("views_bound", Source, this.BaseOrder)
+		if !(Projection is Map) || Projection.Get("source", 0) != Source
+				|| !(Projection.Get("order", 0) is Array) || !(Projection.Get("servers", 0) is Map)
+			return false
+		Order := Projection["order"].Clone(), Servers := Projection["servers"]
+		Changed := this.Order.Length != Order.Length
+		if !Changed {
+			for Index, Id in Order {
+				if !(this.Order[Index] == Id) || !this.Servers.Has(Id)
+					Changed := true
+				else {
+					for Key in ["id", "entry_id", "provider", "label", "base_url", "auth"] {
+						if !(this.Servers[Id].Get(Key, "") == Servers[Id].Get(Key, ""))
+							Changed := true
+					}
+				}
+			}
+		}
+		; The already source-fenced batch also detects secret-only target changes.
+		if !Changed && this.Cache is Map {
+			Targets := this._DisplayTargets(Projection["entries"])
+			for Id in Order
+				if !this.Cache["targets"].Has(Id) || !this._SameTarget(this.Cache["targets"][Id], Targets[Id])
+					Changed := true
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || A_IsSuspended
+				return false
+			if Changed {
+				this.Controller.SetOrder(Order, true)
+				this.Order := Order
+				this.Servers := Servers
+				this.Models.Options["servers"] := Servers
+				this.ConfigurationGeneration += 1
+				this.ViewGeneration += 1
+				this.Views := Map()
+				this.Cache := 0
+			}
+		} finally Critical(PreviousCritical)
+		return Projection
 	}
 
 	/** Resolves through the declared receipt port; refusal never falls back to absence. */
@@ -171,9 +235,14 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Source := this._Call("capture_source")
 		if !IsObject(Source)
 			return false
+		Projection := this._RefreshViews(Source)
+		if !Projection
+			return false
+		Configuration := this.ConfigurationGeneration
 		PrivateTargets := Map(), Targets := []
 		for Id in this.Order {
-			Target := this._Target(Id, Source)
+			Target := Projection is Map
+				? this._TargetFromEntry(Id, this.Servers[Id], Projection["entries"][Id]) : this._Target(Id, Source)
 			if !(Target is Map)
 				throw Error("Local discovery catalogue target is unavailable.")
 			PrivateTargets[Id] := Target
@@ -247,21 +316,48 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Ticket := Job["ticket"]
 		Valid := Ticket.Call()
 		if !((Valid is Integer) && Valid == true) || !this._Admitted()
-				|| !this._True("source_current", Job["source"])
 			return false
-		Target := this._Target(Job["id"], Job["source"])
+		if this.Options.Has("entries_bound") {
+			; The existing native batch owner fences private resolution before and
+			; after. The independent final Current below remains mandatory.
+			Batch := this._Call("entries_bound", [Job["id"]], Job["source"])
+			if !(Batch is Map) || Batch.Get("source", 0) != Job["source"]
+					|| !(Batch.Get("entries", 0) is Map) || Batch["entries"].Count != 1
+					|| !Batch["entries"].Has(Job["id"])
+				return false
+			Target := this._TargetFromEntry(Job["id"], this.Servers.Get(Job["id"], 0), Batch["entries"][Job["id"]])
+		} else {
+			if !this._True("source_current", Job["source"])
+				return false
+			Target := this._Target(Job["id"], Job["source"])
+		}
 		if !this._SameTarget(Job["target"], Target)
 			return false
-		if !this._Admitted() || !this._True("source_current", Job["source"])
+		if !this._Admitted()
 			return false
 		Valid := Ticket.Call()
-		if !((Valid is Integer) && Valid == true)
+		; A ticket callback can reenter source replacement. Its result must not
+		; follow the last full source fence before the identity-only claim.
+		if !((Valid is Integer) && Valid == true) || !this._True("source_current", Job["source"])
 			return false
 		; Logical/source admission is current-at-check. The shared Settle
 		; remains the final logical publication claim; only native slot state
 		; is claimed atomically here, with no foreign port inside Critical.
 		PreviousCritical := Critical("On")
 		try return this._OwnsJob(Job) && Job["phase"] != "cancelled" && !this.Closed && !A_IsSuspended
+			&& Job["configuration"] == this.ConfigurationGeneration
+			&& Job["sweep"]["intent"] == this.RescanGeneration
+			&& Job["sweep"]["generation"] == this.Controller.Generation
+		finally Critical(PreviousCritical)
+	}
+
+	/** Checks only this queue observer's exact ownership; grants no source authority. */
+	_PendingJobCurrent(Job) {
+		Ticket := Job["ticket"]
+		Valid := Ticket.Call()
+		PreviousCritical := Critical("On")
+		try return (Valid is Integer) && Valid == true && this._OwnsJob(Job)
+			&& Job["phase"] == "active" && !this.Closed && !A_IsSuspended
 			&& Job["configuration"] == this.ConfigurationGeneration
 			&& Job["sweep"]["intent"] == this.RescanGeneration
 		finally Critical(PreviousCritical)
@@ -289,6 +385,12 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				this._DropJob(Job)
 				return
 			}
+			; Models owns live request source cancellation and its final delivery
+			; fence. This queue observer has no effect while a retained request in
+			; this provider slot is pending; duplicate source reads can starve the creator.
+			if Job["phase"] == "active" && this.Models.HasPending(Job["id"])
+					&& this._PendingJobCurrent(Job)
+				return
 			if !this._CurrentJob(Job) {
 				this._InvalidateSweep(Job["sweep"])
 				return
@@ -396,6 +498,9 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	_DropJob(Job) {
 		if !this._OwnsJob(Job) || Job["busy"]
 			return false
+		; Queue retirement acknowledges the same exact physical request first.
+		if !this._CancelExact(this.Models.Records.Get(Job["id"], 0))
+			return false
 		if !this._Timer(Job["timer"], 0)
 			return false
 		Successor := 0
@@ -461,6 +566,107 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				return Receipt
 			} finally Critical(ClaimCritical)
 		} finally Critical(PreviousCritical)
+	}
+
+	/** Builds detached display data and ordinary action receipts in one fenced read. */
+	CaptureView(Source) {
+		PreviousCritical := Critical("Off")
+		try return this._CaptureViewNonCritical(Source)
+		finally Critical(PreviousCritical)
+	}
+
+	_CaptureViewNonCritical(Source) {
+		if !HasMethod(this.Options.Get("entries_bound", 0), "Call")
+			throw TypeError("A local display view requires the native batch entry owner.")
+		if !this._Admitted()
+			return false
+		Projection := this._RefreshViews(Source)
+		if !Projection
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			Stamp := Map("view", this.ViewGeneration, "configuration", this.ConfigurationGeneration,
+				"models", this.ModelGeneration, "rescan", this.RescanGeneration,
+				"controller", this.Controller.Generation, "cache", this.Cache)
+		} finally Critical(PreviousCritical)
+		Entries := Projection is Map ? Projection : this._Call("entries_bound", this.Order, Source)
+		if !(Entries is Map) || Entries.Get("source", 0) != Source
+			return false
+		Targets := this._DisplayTargets(Entries["entries"])
+		Cache := Stamp["cache"], CacheCurrent := false
+		if Cache is Map {
+			CacheEntries := this._Call("entries_bound", this.Order, Cache["source"])
+			if CacheEntries is Map {
+				CacheTargets := this._DisplayTargets(CacheEntries["entries"])
+				CacheCurrent := Cache["configuration"] == Stamp["configuration"]
+				for Id in this.Order
+					if !this._SameTarget(Cache["targets"][Id], CacheTargets[Id])
+						CacheCurrent := false
+			}
+		}
+		Sweeping := this.Controller.IsSweeping()
+		Stale := !Sweeping && (!CacheCurrent || Cache["generation"] != Stamp["controller"] || this.Controller.IsStale())
+		Results := CacheCurrent ? this._CopyResults(Cache["results"]) : Map()
+		Receipts := Map(), Views := Map(), Detected := []
+		for Id in this.Order {
+			Verdict := Results.Get(Id, 0)
+			Models := Verdict is Map ? Verdict["models"].Clone() : []
+			if Verdict is Map && ((Verdict["status"] == "up") || (Verdict["status"] == "needs_key"))
+				Detected.Push(Id)
+			Receipt := {}
+			Receipts[Id] := Receipt
+			Views[ObjPtr(Receipt)] := Map("receipt", Receipt, "source", Source, "target", Targets[Id],
+				"view", Stamp["view"] + 1, "configuration", Stamp["configuration"],
+				"models_generation", Stamp["models"], "models", Models, "cache", CacheCurrent ? Cache : 0)
+		}
+		; No source permission is cached. Both origins remain fully checked after
+		; every yielding projection/copy, before the short identity-only claim.
+		if !this._Admitted() || !this._True("source_current", Source)
+				|| (CacheCurrent && !this._True("source_current", Cache["source"]))
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || A_IsSuspended || this.ViewGeneration != Stamp["view"]
+					|| this.ConfigurationGeneration != Stamp["configuration"] || this.ModelGeneration != Stamp["models"]
+					|| this.RescanGeneration != Stamp["rescan"] || this.Controller.Generation != Stamp["controller"]
+					|| this.Cache != Cache || this.Controller.IsSweeping() != Sweeping
+				return false
+			CurrentTargets := this._DisplayTargets(Entries["entries"])
+			for Id in this.Order
+				if !this._SameTarget(Targets[Id], CurrentTargets[Id])
+					return false
+			if Stale
+				return Map("stale", true, "order", this.Order.Clone(), "servers", this.Servers)
+			this.ViewGeneration := Stamp["view"] + 1
+			this.Views := Views
+			return Map("stale", false, "order", this.Order.Clone(), "servers", this.Servers,
+				"source", Source, "entries", Entries, "receipts", Receipts,
+				"results", Results, "detected", Detected, "sweeping", Sweeping,
+				"view", this.ViewGeneration, "configuration", Stamp["configuration"], "models", Stamp["models"],
+				"cache", Cache, "rescan", Stamp["rescan"], "controller", Stamp["controller"])
+		} finally Critical(PreviousCritical)
+	}
+
+	_DisplayTargets(Entries) {
+		if !(Entries is Map) || Entries.Count != this.Order.Length
+			throw TypeError("The native display entry batch is incomplete.")
+		Targets := Map()
+		for Id in this.Order {
+			Entry := Entries.Get(Id, -1), Server := this.Servers[Id]
+			if Entry is Map {
+				if !(Entry.Get("Id", 0) is String) || !this._EntryMatches(Id, Server, Entry)
+						|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
+						|| !(Entry.Get("Model", 0) is String)
+					throw TypeError("The native display entry is outside its provider.")
+				Targets[Id] := Map("id", Id, "entry_id", Entry["Id"], "provider", Entry["Provider"],
+					"base_url", Entry["BaseUrl"] == "" ? Server["base_url"] : Entry["BaseUrl"], "token", Entry["Token"])
+			} else if (Entry is Integer) && Entry == 0 {
+				Fields := this.Pending.Get(Id, Map())
+				Targets[Id] := Map("id", Id, "entry_id", "", "provider", Id, "base_url", Fields.Get("base_url", Server["base_url"]),
+					"token", Fields.Get("token", ""))
+			} else throw TypeError("The native display entry lacks a typed absence verdict.")
+		}
+		return Targets
 	}
 
 	/** Rechecks the exact private source, native target and ordered model view. */
@@ -632,7 +838,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Held := this.Views[ObjPtr(Receipt)], Target := Held["target"], Id := Target["id"]
 		if Fields.Has("base_url") && !RegExMatch(Fields["base_url"], "i)^https?://[^[:space:]]+$")
 			return false
-		if Fields.Has("token") && !LocalServerAuthTokenAllowed(Id, Fields["token"], this.Servers)
+		if Fields.Has("token") && !LocalServerAuthEntryTokenAllowed(Target["provider"], Fields["token"], Fields.Get("base_url", Target["base_url"]), this.Servers)
 			return false
 		CapturedTarget := Target.Clone(), CapturedModels := Held["models"].Clone()
 		PendingOwner := this.Pending.Get(Id, 0)
@@ -741,7 +947,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	_SameTarget(Before, After) {
 		if !(Before is Map) || !(After is Map)
 			return false
-		for Key in ["id", "entry_id", "base_url", "token"]
+		for Key in ["id", "entry_id", "provider", "base_url", "token"]
 			if !(Before[Key] == After[Key])
 				return false
 		return true
@@ -799,7 +1005,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				return Ids
 			for Id in this.Order {
 				Verdict := Cache["results"].Get(Id, 0)
-				if Verdict is Map && !(Verdict["status"] == "down")
+				if Verdict is Map && ((Verdict["status"] == "up") || (Verdict["status"] == "needs_key"))
 					Ids.Push(Id)
 			}
 			return Ids

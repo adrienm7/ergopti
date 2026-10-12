@@ -76,10 +76,41 @@ function verify(subject) {
 	assert.strictEqual(pipeline.field(owner.body, 'runs-on'), 'ubuntu-latest');
 	assert.strictEqual(pipeline.field(owner.body, 'if'), null, 'ordinary mandatory owner admission');
 	assert.strictEqual(pipeline.field(owner.body, 'continue-on-error'), null);
-	assert(pipeline.needsOf(owner.body).includes('test-linux'), 'original unit prerequisite');
+	assert.deepStrictEqual(pipeline.needsOf(owner.body), [], 'unit and E2E are independent entries');
+	const build = jobs.find((job) => job.id === 'package-linux');
+	assert.deepStrictEqual(
+		pipeline.needsOf(build.body),
+		['test-linux', 'e2e-linux'],
+		'both original suites remain package prerequisites'
+	);
+	assert.strictEqual(
+		pipeline.field(build.body, 'if'),
+		"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+		'unit success stays mandatory; failed E2E admits package diagnostics only on manual dispatch'
+	);
 	assert.strictEqual(pipeline.field(gate.body, 'if'), 'always()');
 	for (const id of required.filter((id) => id !== 'linux-ok'))
 		assert(pipeline.needsOf(gate.body).includes(id), 'original Linux verdict waits for ' + id);
+	const verdict = pipeline.step(gate.body, 'Assert all mandatory subjects ran and passed');
+	assert.strictEqual(
+		pipeline.stepField(verdict, 'if'),
+		null,
+		'mandatory verdict cannot be skipped'
+	);
+	assert.strictEqual(
+		pipeline.stepField(verdict, 'continue-on-error'),
+		null,
+		'mandatory verdict cannot forgive failure'
+	);
+	assert(
+		verdict.includes('          NEEDS: ${{ toJSON(needs) }}'),
+		'verdict consumes the actual complete predecessor results'
+	);
+	assert.strictEqual(
+		pipeline.runOf(verdict).slice(0, 6).join('\n'),
+		'set -euo pipefail\nnode tools/test/linux-ci-evidence.cjs verify \\\n    --manifest .github/linux-ci-coverage.json \\\n    --needs "$NEEDS" \\\n    --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \\\n    --sha "$GITHUB_SHA"',
+		'same strict source-bound verdict rejects failed manual diagnostics'
+	);
 	assert(owner.body.includes(BLOCK), 'owned block must remain inside the E2E job');
 	const steps = pipeline.steps(owner.body);
 	const uniqueIndex = (name) => {
@@ -508,4 +539,39 @@ assert.match(
 );
 console.log(
 	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals4; ABI29/cookies3 native UNRUN'
+);
+
+// The parallel suites converge before packaging; a manual diagnostic never qualifies release.
+for (const [name, before, replacement] of [
+	['package omits unit', '    needs: [test-linux, e2e-linux]', '    needs: [e2e-linux]'],
+	['package omits E2E', '    needs: [test-linux, e2e-linux]', '    needs: [test-linux]'],
+	['unit success omitted', "needs.test-linux.result == 'success' && ", ''],
+	[
+		'automatic failed E2E admitted',
+		"(github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
+		"(needs.e2e-linux.result == 'failure')"
+	],
+	['E2E success omitted', "needs.e2e-linux.result == 'success' || ", ''],
+	['serial entry restored', '  e2e-linux:\n', '  e2e-linux:\n    needs: [test-linux]\n'],
+	['verdict omits unit', '      - test-linux\n', ''],
+	['verdict omits E2E', '      - e2e-linux\n', ''],
+	[
+		'verdict ignores actual results',
+		'          NEEDS: ${{ toJSON(needs) }}',
+		'          NEEDS: success'
+	]
+]) {
+	assert.strictEqual(
+		subject.workflow.split(before).length,
+		2,
+		'unique prerequisite mutation: ' + name
+	);
+	assert.throws(
+		() => verify({ ...subject, workflow: subject.workflow.replace(before, replacement) }),
+		undefined,
+		name
+	);
+}
+console.log(
+	'PASS parallel XI2 prerequisites: 9 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
 );

@@ -279,3 +279,71 @@ _CMR_VariantJointRecordsCase() {
 }
 Test("config migrate records: every joint variant participant retains its semantic and physical owner (todo96-helper-variant)",
 	_CMR_VariantJointRecordsCase)
+
+
+; Current opaque strings retain their bytes without granting foreign native cells.
+_CMR_CurrentMultilineNativeOwnership() {
+	global FEATURES_MANIFEST
+	AssertTrue(ManifestEnsureLoaded(), "the test starts with the genuine manifest owner loaded")
+	OriginalManifest := FEATURES_MANIFEST
+	Directory := _CMG_NewDir(), Triple := Chr(39) . Chr(39) . Chr(39)
+	Inputs := [
+		'[_meta]`nschema_version = 2`n[source]`nchoice = "physical"`n[future]`ntext = ' . Triple . 'first`nsecond' . Triple . '`n',
+		'[_meta]`nschema_version = 2`n[future]`ntext = ' . Triple . 'first`n[source]`nchoice = "foreign"`n' . Triple . '`n',
+		'[_meta]`nschema_version = 2`n[source]`nchoice = "physical"`n[future]`ntext = ' . Triple . 'first`n[source]`nchoice = "foreign"`n' . Triple . '`n',
+		'[_meta]`nschema_version = 2`n[script]`nlocale = ' . Triple . 'fr`nen' . Triple . '`n',
+		'_meta.schema_version = 2`nlayout = {ergopti_base = true, future = ' . Triple . 'first`nsecond' . Triple . '}`n',
+		'_meta.schema_version = 2`n_private = ' . Triple . 'first`nsecond' . Triple . '`n',
+		'_meta.schema_version = 2`nlayout = {ergopti_base = true, future = ' . Triple . 'first`nsecond' . Triple . '}`n'
+	]
+	AssertEqual("", TomlConfigUnknownKind(ManifestBuildFeaturesMap(), "script", "locale", &ForeignOwner),
+		"the rejected multiline subject has a genuine registered native consumer")
+	Calls := { Backup: 0, Publish: 0 }
+	Backup(Path, Content) {
+		Calls.Backup += 1
+		return 1
+	}
+	Publish(Path, Candidate, Source) {
+		Calls.Publish += 1
+		return ""
+	}
+	try {
+		for Index, Input in Inputs {
+			Path := Directory . "\current" . Index . ".toml"
+			AssertTrue(FSWriteCreateDurable(Path, Input))
+			if Index == 5 {
+				Document := TOML_ParseDocument(Input)
+				AssertTrue(Document.Has("layout"), "the mixed container is genuinely at the consumed root")
+				AssertEqual(1, Document["layout"]["ergopti_base"].Value)
+				AssertEqual("", TomlConfigUnknownKind(ManifestBuildFeaturesMap(), "layout", "ergopti_base", &MixedOwner))
+			}
+			if Index == 6
+				AssertEqual("foreign", TomlConfigSectionSkipKind(TOML_RenderKey("_private")),
+					"root metadata retains the canonical foreign-owner classification")
+			try {
+				if Index == 7 {
+					FEATURES_MANIFEST := unset
+					AssertFalse(ManifestEnsureLoaded(), "the real missing owner exposes its empty-map fallback")
+					AssertEqual(0, ManifestBuildFeaturesMap().Count)
+				}
+				Result := ConfigMigrateRun(Path, _CMR_CopyRegistry(), _CMG_STAMP, Backup, Publish)
+			} finally FEATURES_MANIFEST := OriginalManifest
+			AssertEqual(Index == 1 ? "current" : "failed", Result["status"],
+				"only a current opaque string without native phantom cells is admitted")
+			AssertEqual(Index == 1 ? 0 : 1, Result["read_only"])
+			AssertEqual(0, Calls.Backup)
+			AssertEqual(0, Calls.Publish)
+			AssertTrue(FSUtf8ExactMatches(Path, Input), "classification never rewrites an opaque string")
+			if Index == 1
+				AssertEqual("physical", TOML_Read(Path, "source", "choice", "missing"),
+					"the actual native consumer retains its physical setting")
+			if Index > 1 {
+				AssertContains(Result["detail"], "the physical version owner refused:")
+				AssertFalse(TOML_BatchWrite(Path, [{ Section: "source", Key: "choice", Value: "changed" }]))
+				AssertTrue(FSUtf8ExactMatches(Path, Input))
+			}
+		}
+	} finally DirDelete(Directory, true)
+}
+Test("config migrate records: current multiline strings retain exact native physical ownership (config-current-multiline-owner)",
+	_CMR_CurrentMultilineNativeOwnership)

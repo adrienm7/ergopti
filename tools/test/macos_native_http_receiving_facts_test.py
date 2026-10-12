@@ -166,6 +166,7 @@ def trust_cause_diagnostic_projection(source):
 def historical_pac_ownership_projection(source):
     """Accept the exact legacy source or the complete approved ownership repair."""
     source = trust_cause_diagnostic_projection(source)
+    source = tls_failure_diagnostic_projection(source)
     source = debug_certificate_failure_projection(source)
     source = pac_source_acquisition_projection(source)
     if hashlib.sha256(source.encode("utf-8")).hexdigest() == HISTORICAL_HTTP_RELEASE_SHA256:
@@ -178,6 +179,32 @@ def historical_pac_ownership_projection(source):
     if hashlib.sha256(projected.encode("utf-8")).hexdigest() != HISTORICAL_HTTP_RELEASE_SHA256:
         raise ValueError("Historical HTTP release source refused")
     return projected
+
+
+TLS_FAILURE_DIAGNOSTIC_INVERSE = (
+    (
+        '/// Projects only closed native status facts from the already completed request.\n/// No trust evaluation, certificate text or private NSError payload is acquired.\nfunc managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [String: Any] {\n\tprecondition(additionalAnchorCount >= 0)\n\tlet cfNetworkDomain = kCFErrorDomainCFNetwork as String\n\tvar native = error\n\tvar seen = Set<ObjectIdentifier>()\n\tvar causes: [[String: Any]] = []\n\tvar termination = "complete"\n\twhile true {\n\t\tguard seen.insert(ObjectIdentifier(native)).inserted else { termination = "cycle"; break }\n\t\tguard causes.count < 8 else { termination = "depth"; break }\n\t\tlet domain: String\n\t\tswitch native.domain {\n\t\tcase NSURLErrorDomain: domain = "url"\n\t\tcase NSOSStatusErrorDomain: domain = "security"\n\t\tcase cfNetworkDomain: domain = "cfnetwork"\n\t\tcase NSPOSIXErrorDomain: domain = "posix"\n\t\tdefault: domain = "other"\n\t\t}\n\t\tlet code = domain == "other" ? nil : Int32(exactly: native.code)\n\t\tvar kind = "unknown"\n\t\tif domain == "security", let code {\n\t\t\tswitch code {\n\t\t\tcase errSSLHostNameMismatch: kind = "hostname_mismatch"\n\t\t\tcase errSSLCertExpired: kind = "certificate_expired"\n\t\t\tcase errSSLCertNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase errSSLUnknownRootCert: kind = "unknown_root"\n\t\t\tcase errSSLXCertChainInvalid: kind = "certificate_chain_invalid"\n\t\t\tdefault: break\n\t\t\t}\n\t\t} else if domain == "url", let code {\n\t\t\tswitch Int(code) {\n\t\t\tcase NSURLErrorServerCertificateUntrusted: kind = "certificate_untrusted"\n\t\t\tcase NSURLErrorServerCertificateHasBadDate: kind = "certificate_date_invalid"\n\t\t\tcase NSURLErrorServerCertificateNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase NSURLErrorServerCertificateHasUnknownRoot: kind = "unknown_root"\n\t\t\tdefault: break\n\t\t\t}\n\t\t}\n\t\tvar cause: [String: Any] = ["domain": domain, "code": NSNull(), "kind": kind]\n\t\tif let code { cause["code"] = Int(code) }\n\t\t// These optional integers were delivered with the completed NSError.\n\t\t// No SecTrust getter may trigger a new evaluation for this observation.\n\t\tcause["stream_domain"] = NSNull()\n\t\tcause["stream_code"] = NSNull()\n\t\tif domain == "url" || domain == "cfnetwork" {\n\t\t\tfor (field, key) in [("stream_domain", "_kCFStreamErrorDomainKey"), ("stream_code", "_kCFStreamErrorCodeKey")] {\n\t\t\t\tif let value = native.userInfo[key] as? NSNumber,\n\t\t\t\t\tCFGetTypeID(value) != CFBooleanGetTypeID(),\n\t\t\t\t\tlet integer = Int32(exactly: value.doubleValue) { cause[field] = Int(integer) }\n\t\t\t}\n\t\t}\n\t\tcauses.append(cause)\n\t\tguard let underlying = native.userInfo[NSUnderlyingErrorKey] else { break }\n\t\tguard let next = underlying as? NSError else { termination = "unavailable"; break }\n\t\tnative = next\n\t}\n\treturn ["version": 1, "trust_mode": additionalAnchorCount == 0 ? "native_default" : "added_anchors",\n\t\t"additional_anchor_count": additionalAnchorCount, "causes": causes, "chain_termination": termination]\n}\n\n',
+        "",
+    ),
+    (
+        '\t\t#if DEBUG\n\t\tif failure == "certificate", let error = error as NSError?,\n\t\t\tlet bytes = try? JSONSerialization.data(withJSONObject:\n\t\t\t\tmanagedHTTPTLSDiagnostic(error, additionalAnchorCount: certificates.count), options: [.sortedKeys]),\n\t\t\tlet text = String(data: bytes, encoding: .utf8) {\n\t\t\t_ = fputs("# native_http_tls_failure \\(text)\\n", stderr)\n\t\t}\n\t\t#endif\n',
+        "",
+    ),
+)
+
+
+def tls_failure_diagnostic_projection(source):
+    """Accept an absent observation or its two exact complete reviewed spans."""
+    marker = "func managedHTTPTLSDiagnostic("
+    if marker not in source and "# native_http_tls_failure " not in source:
+        return source
+    if source.count(marker) != 1 or any(
+        source.count(new) != 1 for new, _ in TLS_FAILURE_DIAGNOSTIC_INVERSE
+    ):
+        raise ValueError("TLS diagnostic enrollment refused")
+    for new, old in TLS_FAILURE_DIAGNOSTIC_INVERSE:
+        source = source.replace(new, old, 1)
+    return source
 
 
 class NativeHTTPReceivingFactsTests(unittest.TestCase):
@@ -824,6 +851,16 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
         self.assertIn("defer { lock.unlock() }", fixture)
         self.assertNotIn("lock.lock()", fixture)
         self.assertIn("FixtureHTTPObservation.owner?.mark(stage)", fixture)
+        receiving = (SUPPORT / "native_http_wire_client_receiving.py").read_text(encoding="utf-8")
+        self.assertIn('"native_http_fixture_builder.py"', receiving)
+        self.assertIn("cls.build = builder.OwnedFixtureBuild(cls.fixture)", receiving)
+        self.assertIn("cls.build.build()", receiving)
+        # The source-bound builder now owns compilation; inspect its real argv.
+        compiler = (SUPPORT / "native_http_fixture_builder.py").read_text(encoding="utf-8")
+        self.assertIn(
+            '"-D",\n                "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",',
+            compiler,
+        )
         import ast
 
         compiler = ast.parse(
@@ -1997,6 +2034,15 @@ class HistoricalPACOwnershipProjectionTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         historical_pac_ownership_projection(candidate.replace(before, after, 1))
 
+        # Reject every partial, duplicate or altered approved diagnostic span;
+        # an unrelated release mutation still reaches the original whole pin.
+        for new, old in TLS_FAILURE_DIAGNOSTIC_INVERSE:
+            self.assertEqual(source.count(new), 1)
+            for replacement in (old, new + new, new + "// unapproved\n"):
+                with self.subTest(diagnostic=new[:80], replacement=replacement[:80]):
+                    with self.assertRaises(ValueError):
+                        historical_pac_ownership_projection(source.replace(new, replacement, 1))
+
 
 class PACSourceAcquisitionProjectionTests(unittest.TestCase):
     @staticmethod
@@ -2533,7 +2579,53 @@ class TrustOutcomeDiagnosticTests(unittest.TestCase):
                 with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                     with self.assertRaises(WIRE.FixtureFailure):
                         self.fixture.trust(operation == "add")
-            fact = self.outcome(stderr)
+            outcome_stream = stderr
+            if operation == "remove":
+                # Dev also observes the original cleanup command's milestones.
+                # Admit that exact extra frame, retaining the one-outcome guard.
+                lines = stderr.getvalue().splitlines()
+                self.assertEqual(len(lines), 2)
+                self.assertTrue(lines[0].startswith("# native_http_security_milestones "))
+                milestone = json.loads(lines[0].removeprefix("# native_http_security_milestones "))
+                timing = milestone.pop("timing")
+                self.assertEqual(
+                    milestone,
+                    {
+                        "version": 1,
+                        "action": "security_cleanup",
+                        "phase": "exit",
+                        "failure_phase": "exit",
+                        "status": 9,
+                        "acquisition_entered": True,
+                        "child_acquired": True,
+                        "wait_entered": True,
+                        "wait_returned": True,
+                        "retirement_attempted": True,
+                        "retirement_result": "acknowledged",
+                    },
+                )
+                self.assertEqual(
+                    set(timing),
+                    {
+                        "observed",
+                        "acquisition_elapsed_ms",
+                        "input_close_elapsed_ms",
+                        "wait_budget_ms",
+                        "wait_elapsed_ms",
+                        "retirement_elapsed_ms",
+                    },
+                )
+                self.assertIs(timing["observed"], True)
+                self.assertIsNone(timing["input_close_elapsed_ms"])
+                for name in ("acquisition_elapsed_ms", "wait_elapsed_ms", "retirement_elapsed_ms"):
+                    self.assertIs(type(timing[name]), float)
+                    self.assertGreaterEqual(timing[name], 0)
+                    self.assertLessEqual(timing[name], 15000)
+                self.assertIs(type(timing["wait_budget_ms"]), float)
+                self.assertGreater(timing["wait_budget_ms"], 0)
+                self.assertLessEqual(timing["wait_budget_ms"], 15000)
+                outcome_stream = io.StringIO(lines[1] + "\n")
+            fact = self.outcome(outcome_stream)
             self.assertEqual(
                 fact,
                 {
@@ -2611,7 +2703,7 @@ class TrustCauseDiagnosticEnrollmentTests(unittest.TestCase):
     def test58CompleteDiagnosticInverseKeepsExactPreimageAndHistoricalWholePin(self):
         source = self.source()
         self.assertEqual(len(TRUST_CAUSE_DIAGNOSTIC_INVERSE), 5)
-        original = trust_cause_diagnostic_projection(source)
+        original = trust_cause_diagnostic_projection(tls_failure_diagnostic_projection(source))
         self.assertEqual(
             hashlib.sha256(original.encode()).hexdigest(),
             "761b1a636bfc69d987545a30502db5a7c549e76c9b674630fc27bb4b157febc7",
@@ -3953,6 +4045,563 @@ NATIVE_FIXTURE_CLOCK_CONTROLS = load(
     NativeFixtureClockFrameContractControls,
     NativeFixtureClockContextContractControls,
 ) = NATIVE_FIXTURE_CLOCK_CONTROLS.enrolled_cases()
+
+
+class TrustInstallObservationControls(unittest.TestCase):
+    """Actual trust/command bodies over a recording child; no native acquisition."""
+
+    def receive(self, *, settle=True, timeout=True, raw=b"private output", logging_failure=False):
+        fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+        fixture.native = True
+        fixture.trust_install_observation = True
+        fixture.ca = Path("private-owner/ca.pem")
+        fixture.keychain = Path("private-owner/owned.keychain-db")
+        fixture.command_file_debt = []
+        fixture.command_group_debt = []
+        fixture.trust_attempted = False
+        fixture.trust_query_executable = None
+        child = SimpleNamespace(pid=7729, returncode=None, stdin=io.BytesIO())
+        primary = subprocess.TimeoutExpired("owned native child", 15)
+        owner = SimpleNamespace(process=child, reaped=False, capture_read_attempts=0)
+        calls = []
+
+        class HostileCapture(io.BytesIO):
+            def seek(self, *arguments):
+                if not owner.reaped:
+                    owner.capture_read_attempts += 1
+                    raise AssertionError("Live child still owns the shared capture offset")
+                return super().seek(*arguments)
+
+            def read(self, *arguments):
+                if not owner.reaped:
+                    owner.capture_read_attempts += 1
+                    raise AssertionError("Live child still owns the writable capture")
+                return super().read(*arguments)
+
+        def wait(timeout):
+            calls.append(("wait", timeout))
+            if timeout == 15 and receive_timeout:
+                raise primary
+            child.returncode = 0
+
+        receive_timeout = timeout
+
+        def retire():
+            calls.append(("settle",))
+            owner.reaped = settle
+            if settle and child.returncode is None:
+                child.returncode = -15
+            return settle
+
+        owner.wait_for_exit = wait
+        owner.settle = retire
+
+        def acquire(arguments, native, register, **ports):
+            calls.append(("argv", arguments))
+            register(owner)
+            ports["stdout"].write(b"private-owner/ca.pem personal@example.test")
+            ports["stderr"].write(raw)
+            return owner
+
+        fixture.groups = SimpleNamespace(acquire_owned=acquire)
+        fixture.native_groups = object()
+        output = io.StringIO()
+        protocol_output = io.StringIO()
+        failure = None
+        capture_port = (
+            mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=HostileCapture)
+            if not settle
+            else contextlib.nullcontext()
+        )
+        with (
+            capture_port,
+            contextlib.redirect_stderr(output),
+            contextlib.redirect_stdout(protocol_output),
+        ):
+            with mock.patch.object(WIRE.time, "monotonic", side_effect=[100.0, 115.25]):
+                with (
+                    mock.patch("builtins.print", side_effect=RuntimeError("recording log refusal"))
+                    if logging_failure
+                    else contextlib.nullcontext()
+                ):
+                    try:
+                        fixture.trust(True)
+                    except BaseException as caught:
+                        failure = caught
+        self.assertEqual(
+            protocol_output.getvalue(),
+            "",
+            "Passive facts must not corrupt the Swift JSON reply pipe",
+        )
+        return fixture, child, owner, primary, failure, output.getvalue(), calls
+
+    def testTimeoutPreservesPrimaryDebtAndBoundedPrivateOutput(self):
+        fixture, child, owner, primary, failure, output, calls = self.receive()
+        self.assertIs(failure, primary)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertEqual(fixture.command_fact, {"phase": "deadline", "status": None})
+        self.assertEqual(
+            calls[0][1],
+            [
+                "/usr/bin/sudo",
+                "-n",
+                "/usr/bin/security",
+                "add-trusted-cert",
+                "-d",
+                "-r",
+                "trustRoot",
+                "-k",
+                str(fixture.keychain),
+                str(fixture.ca),
+            ],
+        )
+        self.assertEqual(calls[1:], [("wait", 15), ("settle",)])
+        self.assertTrue(child.stdin.closed)
+        self.assertTrue(owner.reaped)
+        self.assertIn("# native_http_trust_install ", output)
+        fact = json.loads(output.removeprefix("# native_http_trust_install "))
+        self.assertEqual(
+            (fact["action"], fact["domain"], fact["keychain"]),
+            ("add_trusted_cert", "admin", "owned_private"),
+        )
+        self.assertEqual((fact["pid"], fact["exit_status"], fact["elapsed_ms"]), (7729, -15, 15250))
+        self.assertEqual(
+            (fact["child_settled"], fact["streams_closed"], fact["phase"]), (True, True, "deadline")
+        )
+        self.assertEqual(failure.trust_install_output["stderr"], b"private output")
+        self.assertEqual(
+            fact["stderr"]["bounded_sha256"], hashlib.sha256(b"private output").hexdigest()
+        )
+        self.assertEqual(fact["stderr"]["category"], "unknown")
+        for secret in ("private-owner", "personal@example.test", "private output", "ca.pem"):
+            self.assertNotIn(secret, output)
+
+    def testFailedRetirementCannotAdvertiseChildACK(self):
+        fixture, child, owner, primary, failure, output, calls = self.receive(settle=False)
+        self.assertIs(failure, primary)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertFalse(owner.reaped)
+        self.assertEqual(
+            owner.capture_read_attempts, 0, "No capture seek/read before exact child retirement"
+        )
+        self.assertEqual(failure.trust_install_output, {})
+        self.assertIn("# native_http_trust_install ", output)
+        fact = json.loads(output.removeprefix("# native_http_trust_install "))
+        self.assertEqual(fixture.command_fact["phase"], "settle")
+        self.assertFalse(fact["child_settled"])
+        self.assertEqual(fact["stdout"], {"observed": False})
+        self.assertEqual(fact["stderr"], {"observed": False})
+        self.assertFalse(fact["streams_closed"])
+        self.assertIsNone(fact["exit_status"])
+        self.assertEqual(calls[-1], ("settle",))
+
+    def testClosedStderrCategoriesAndTruncationNeverInferCause(self):
+        vectors = [
+            (b"", "empty"),
+            (
+                b"SecTrustSettingsSetTrustSettings: User interaction is not allowed.\n",
+                "user_interaction_required",
+            ),
+            (b"security: SecKeychainUnlock: The keychain is locked.\n", "keychain_locked"),
+            (b"SecKeychainItemImport: Access denied.\n", "access_denied"),
+            (b"SecTrustSettingsSetTrustSettings: Authorization denied.\n", "access_denied"),
+            (b"SecTrustSettingsSetTrustSettings: private-owner personal@example.test\n", "unknown"),
+            (b"personal: Access denied.\n", "unknown"),
+            (b"SecKeychainUnlock: The keychain is locked.\n" + b"X" * 1024, "unknown"),
+        ]
+        for raw, expected in vectors:
+            with self.subTest(category=expected, bytes=len(raw)):
+                fixture, _, _, primary, failure, output, _ = self.receive(raw=raw)
+                self.assertIs(failure, primary)
+                self.assertIn("# native_http_trust_install ", output)
+                fact = json.loads(output.removeprefix("# native_http_trust_install "))["stderr"]
+                self.assertEqual(fact["category"], expected)
+                self.assertEqual(fact["captured_bytes"], min(1024, len(raw)))
+                self.assertEqual(fact["truncated"], len(raw) > 1024)
+                self.assertEqual(failure.trust_install_output["stderr"], raw[:1024])
+                self.assertEqual(fact["bounded_sha256"], hashlib.sha256(raw[:1024]).hexdigest())
+                self.assertTrue(fixture.trust_attempted)
+
+    def testObserverFailureKeepsOriginalTimeoutAndSuccessStaysExact(self):
+        fixture, _, _, primary, failure, _, _ = self.receive(logging_failure=True)
+        self.assertIs(failure, primary)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertEqual(str(failure.__cause__), "recording log refusal")
+        fixture, child, _, _, failure, output, _ = self.receive(timeout=False)
+        self.assertIsNone(failure)
+        self.assertTrue(fixture.trust_attempted)
+        self.assertEqual(fixture.command_fact, {"phase": "complete", "status": 0})
+        self.assertIn("# native_http_trust_install ", output)
+        fact = json.loads(output.removeprefix("# native_http_trust_install "))
+        self.assertEqual(fact["exit_status"], 0)
+        self.assertTrue(fact["child_settled"])
+        # Reuse the existing exact-certificate observer only after a strict add ACK.
+        for available, refused in ((False, False), (True, False), (True, True)):
+            probe = WIRE.WireFixture.__new__(WIRE.WireFixture)
+            probe.native = True
+            probe.trust_install_observation = True
+            probe.ca = Path("owned-fixture/ca.pem")
+            probe.keychain = Path("owned-fixture/owned.keychain-db")
+            probe.trust_query_executable = Path("owned-fixture/worker") if available else None
+            probe.trust_attempted = False
+            events = []
+
+            def add(arguments, **options):
+                self.assertEqual(arguments[-1], str(probe.ca))
+                self.assertTrue(options["trust_install_observation"])
+                events.append("add_ack")
+                probe.command_fact = {"phase": "complete", "status": 0}
+
+            def observe(deadline, **options):
+                self.assertEqual(deadline, 115.0)
+                self.assertEqual(options, {"after_install": True})
+                events.append("lookup")
+                if refused:
+                    raise RuntimeError("owned query remains unsettled")
+
+            with mock.patch.object(WIRE.time, "monotonic", return_value=100.0):
+                with mock.patch.object(probe, "_command", side_effect=add):
+                    with mock.patch.object(probe, "_observe_admin_trust", side_effect=observe):
+                        if refused:
+                            with self.assertRaisesRegex(
+                                RuntimeError, "owned query remains unsettled"
+                            ):
+                                probe.trust(True)
+                        else:
+                            probe.trust(True)
+            self.assertEqual(events, ["add_ack", "lookup"] if available else ["add_ack"])
+            self.assertTrue(probe.trust_attempted)
+
+
+class CleanupCommandMilestoneControls(unittest.TestCase):
+    """Actual command owner over recording children only; no native acquisition."""
+
+    def test_each_cleanup_milestone_preserves_primary_and_private_boundaries(self):
+        modes = [
+            "setup",
+            "acquire",
+            "registered",
+            "input",
+            "wait",
+            "retire",
+            "retire_raise",
+            "retire_only",
+            "success",
+            "observe_success",
+            "observe_wait",
+        ]
+        for mode in modes:
+            with self.subTest(mode=mode):
+                fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+                fixture.command_file_debt = []
+                fixture.command_group_debt = []
+                fixture.native_groups = object()
+                primary = subprocess.TimeoutExpired("private-marker", 15)
+                calls = []
+
+                class Input(io.BytesIO):
+                    def write(self, value):
+                        if mode == "input":
+                            raise primary
+                        return super().write(value)
+
+                child = SimpleNamespace(pid=7781, returncode=None, stdin=Input())
+                owner = SimpleNamespace(process=child, reaped=False)
+
+                def wait(timeout):
+                    calls.append("wait")
+                    if mode in {"wait", "retire", "retire_raise", "observe_wait"}:
+                        raise primary
+                    child.returncode = 0
+
+                def retire():
+                    calls.append("retire")
+                    if mode == "retire_raise":
+                        raise RuntimeError("private-retirement-detail")
+                    owner.reaped = mode not in {"retire", "retire_only"}
+                    return owner.reaped
+
+                owner.wait_for_exit, owner.settle = wait, retire
+
+                def acquire(arguments, native, register, **ports):
+                    self.assertEqual(arguments, ["private-marker"])
+                    self.assertIs(native, fixture.native_groups)
+                    calls.append("acquire")
+                    if mode == "acquire":
+                        raise primary
+                    register(owner)
+                    if mode == "registered":
+                        raise primary
+                    return owner
+
+                fixture.groups = SimpleNamespace(acquire_owned=acquire)
+                stderr, stdout = io.StringIO(), io.StringIO()
+                failure = result = None
+                with (
+                    mock.patch.object(
+                        WIRE.tempfile,
+                        "TemporaryFile",
+                        side_effect=primary if mode == "setup" else io.BytesIO,
+                    ),
+                    contextlib.redirect_stderr(stderr),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    observer = (
+                        mock.patch(
+                            "builtins.print", side_effect=RuntimeError("private-observer-detail")
+                        )
+                        if mode.startswith("observe_")
+                        else contextlib.nullcontext()
+                    )
+                    with observer:
+                        try:
+                            result = fixture._command(
+                                ["private-marker"], security_failure_observation=True
+                            )
+                        except BaseException as caught:
+                            failure = caught
+                success = mode in {"success", "observe_success"}
+                if success:
+                    self.assertIsNone(failure)
+                    self.assertEqual(result, (0, b""))
+                elif mode == "retire_only":
+                    self.assertIs(type(failure), WIRE.FixtureFailure)
+                else:
+                    self.assertIs(
+                        failure, primary, "retirement cannot replace the original failure"
+                    )
+                self.assertEqual(stdout.getvalue(), "")
+                raw = stderr.getvalue()
+                self.assertNotIn("private-marker", raw)
+                self.assertNotIn("private-retirement-detail", raw)
+                self.assertEqual(len(raw.splitlines()), 0 if mode.startswith("observe_") else 1)
+                fact = (
+                    fixture.command_milestone_fact
+                    if mode.startswith("observe_")
+                    else json.loads(raw.removeprefix("# native_http_security_milestones "))
+                )
+                self.assertEqual(fact, fixture.command_milestone_fact)
+                acquired = mode not in {"setup", "acquire"}
+                waited = mode not in {"setup", "acquire", "registered", "input"}
+                self.assertEqual(fact["acquisition_entered"], mode != "setup")
+                self.assertEqual(fact["child_acquired"], acquired)
+                self.assertEqual(fact["wait_entered"], waited)
+                self.assertEqual(fact["wait_returned"], success or mode == "retire_only")
+                self.assertEqual(fact["retirement_attempted"], acquired)
+                self.assertEqual(
+                    fact["retirement_result"],
+                    "not_acquired"
+                    if not acquired
+                    else "refused"
+                    if mode in {"retire", "retire_raise", "retire_only"}
+                    else "acknowledged",
+                )
+                self.assertEqual(
+                    fact["failure_phase"],
+                    None
+                    if success
+                    else "setup"
+                    if mode == "setup"
+                    else "acquire"
+                    if mode in {"acquire", "registered"}
+                    else "input"
+                    if mode == "input"
+                    else "settle"
+                    if mode == "retire_only"
+                    else "wait",
+                )
+                self.assertEqual(calls.count("acquire"), int(mode != "setup"))
+                self.assertEqual(calls.count("wait"), int(waited))
+                self.assertEqual(calls.count("retire"), int(acquired))
+                self.assertEqual(fact["version"], 1)
+                self.assertEqual(fact["action"], "security_cleanup")
+
+    def test_cleanup_elapsed_clock_is_passive_and_deadline_clock_is_unchanged(self):
+        modes = (
+            "success",
+            "timeout",
+            "clock_refused",
+            "timeout_clock_refused",
+            "clock_regressed",
+            "print_refused",
+            "acquire_refused",
+            "timeout_retirement_refused",
+            "disabled",
+        )
+        for mode in modes:
+            with self.subTest(mode=mode):
+                fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+                fixture.command_file_debt = []
+                fixture.command_group_debt = []
+                fixture.native_groups = object()
+                primary = subprocess.TimeoutExpired("private-timing-marker", 15)
+                process = SimpleNamespace(stdin=io.BytesIO(), returncode=None)
+                owner = SimpleNamespace(process=process, reaped=False)
+                events = []
+
+                def acquire(arguments, native, register, **ports):
+                    events.append("acquire")
+                    self.assertIs(native, fixture.native_groups)
+                    if mode == "acquire_refused":
+                        raise primary
+                    register(owner)
+                    return owner
+
+                def wait(budget):
+                    events.append("wait")
+                    self.assertTrue(process.stdin.closed)
+                    self.assertEqual(budget, 12.0)
+                    if mode.startswith("timeout"):
+                        raise primary
+
+                def retire():
+                    events.append("retire")
+                    if mode == "timeout_retirement_refused":
+                        return False
+                    owner.reaped = True
+                    process.returncode = 0
+                    return True
+
+                owner.wait_for_exit, owner.settle = wait, retire
+                fixture.groups = SimpleNamespace(acquire_owned=acquire)
+                samples = [index * 10_000_000 for index in range(8)]
+                if "clock_refused" in mode:
+                    samples[2] = RuntimeError("private-clock-detail")
+                elif mode == "clock_regressed":
+                    samples[3] = samples[2] - 1
+                observed = io.StringIO()
+                failure = result = None
+                with (
+                    mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=io.BytesIO),
+                    mock.patch.object(
+                        WIRE.time, "monotonic", side_effect=[100.0, 103.0]
+                    ) as deadline,
+                    mock.patch.object(WIRE.time, "perf_counter_ns", side_effect=samples) as clock,
+                    mock.patch.object(
+                        WIRE.subprocess, "Popen", side_effect=AssertionError("No child")
+                    ) as popen,
+                    contextlib.redirect_stderr(observed),
+                ):
+                    printer = (
+                        mock.patch(
+                            "builtins.print", side_effect=RuntimeError("private-print-detail")
+                        )
+                        if mode == "print_refused"
+                        else contextlib.nullcontext()
+                    )
+                    with printer:
+                        try:
+                            result = fixture._command(
+                                ["private-timing-marker"],
+                                deadline=115.0,
+                                security_failure_observation=mode != "disabled",
+                            )
+                        except BaseException as caught:
+                            failure = caught
+                    self.assertEqual(deadline.call_count, 1 if mode == "acquire_refused" else 2)
+                    popen.assert_not_called()
+                    if mode == "disabled":
+                        clock.assert_not_called()
+                refused = mode.startswith("timeout") or mode == "acquire_refused"
+                if refused:
+                    self.assertIs(failure, primary)
+                    self.assertIsNone(result)
+                else:
+                    self.assertIsNone(failure)
+                    self.assertEqual(result, (0, b""))
+                self.assertEqual(fixture.command_file_debt, [])
+                self.assertEqual(
+                    events,
+                    ["acquire"] if mode == "acquire_refused" else ["acquire", "wait", "retire"],
+                )
+                if mode == "disabled":
+                    self.assertIsNone(fixture.command_milestone_fact)
+                    continue
+                fact = fixture.command_milestone_fact
+                self.assertIn("timing", fact)
+                timing = fact["timing"]
+                invalid_clock = "clock_refused" in mode or mode == "clock_regressed"
+                self.assertEqual(timing["observed"], not invalid_clock)
+                for stage in ("acquisition", "input_close", "wait", "retirement"):
+                    self.assertEqual(
+                        timing[stage + "_elapsed_ms"],
+                        None
+                        if invalid_clock or (mode == "acquire_refused" and stage != "acquisition")
+                        else 10.0,
+                    )
+                self.assertEqual(
+                    timing["wait_budget_ms"],
+                    None if invalid_clock or mode == "acquire_refused" else 12000.0,
+                )
+                self.assertEqual(
+                    fact["phase"],
+                    "settle"
+                    if mode == "timeout_retirement_refused"
+                    else "deadline"
+                    if refused
+                    else "complete",
+                )
+                self.assertEqual(
+                    fact["failure_phase"],
+                    "acquire" if mode == "acquire_refused" else "wait" if refused else None,
+                )
+                self.assertEqual(
+                    fact["retirement_result"],
+                    "not_acquired"
+                    if mode == "acquire_refused"
+                    else "refused"
+                    if mode == "timeout_retirement_refused"
+                    else "acknowledged",
+                )
+                self.assertNotIn("private-", observed.getvalue())
+                if mode != "print_refused":
+                    self.assertEqual(
+                        json.loads(
+                            observed.getvalue().removeprefix("# native_http_security_milestones ")
+                        ),
+                        fact,
+                    )
+
+    def test_cleanup_clock_control_interrupt_preserves_cancellation_before_acquisition(self):
+        for interrupt in (KeyboardInterrupt("private-control"), SystemExit(19)):
+            with self.subTest(kind=type(interrupt).__name__):
+                fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+                fixture.command_file_debt = []
+                fixture.command_group_debt = []
+                fixture.native_groups = object()
+                acquire = mock.Mock(side_effect=AssertionError("No child after cancellation"))
+                fixture.groups = SimpleNamespace(acquire_owned=acquire)
+                streams = [io.BytesIO(), io.BytesIO()]
+                observed = io.StringIO()
+                with (
+                    mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=streams),
+                    mock.patch.object(WIRE.time, "monotonic", return_value=100.0) as deadline,
+                    mock.patch.object(WIRE.time, "perf_counter_ns", side_effect=interrupt) as clock,
+                    mock.patch.object(
+                        WIRE.subprocess, "Popen", side_effect=AssertionError("No child")
+                    ) as popen,
+                    contextlib.redirect_stderr(observed),
+                ):
+                    with self.assertRaises(type(interrupt)) as caught:
+                        fixture._command(
+                            ["private-control"],
+                            deadline=115.0,
+                            security_failure_observation=True,
+                        )
+                    self.assertIs(caught.exception, interrupt)
+                    acquire.assert_not_called()
+                    popen.assert_not_called()
+                    self.assertEqual(clock.call_count, 1)
+                    self.assertEqual(deadline.call_count, 1)
+                self.assertTrue(all(stream.closed for stream in streams))
+                self.assertEqual(fixture.command_file_debt, [])
+                fact = fixture.command_milestone_fact
+                self.assertEqual(fact["phase"], "acquire")
+                self.assertEqual(fact["failure_phase"], "acquire")
+                self.assertFalse(fact["child_acquired"])
+                self.assertFalse(fact["wait_entered"])
+                self.assertEqual(fact["retirement_result"], "not_acquired")
+                self.assertNotIn("private-control", observed.getvalue())
 
 
 class NativeTimedRemovalCaptureObservationTests(unittest.TestCase):

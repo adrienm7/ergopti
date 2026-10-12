@@ -21,6 +21,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../support/altgr_probe_ordinary_owner.ahk
 
 
 
@@ -451,36 +452,43 @@ Test("key combinations: the first key's own tap is cancelled, once (key-combinat
 ; ====================================
 
 _KCT_SlotsAreWrittenToTheConfiguration() {
+	global ConfigurationFile
+	SavedConfigurationFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
 	Fixture := _ScopeOwnerFixture()
+	; The real picker writes the selected configuration, not a generic data file.
+	ConfigurationFile := Fixture.path
 	Reloads := []
-	Reload := () => (Reloads.Push("reload"), true)
+	ReloadFn := () => (Reloads.Push("reload"), true)
 	Section() {
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		return Parsed.Has("shortcuts.key_combination_holds") ? Parsed["shortcuts.key_combination_holds"] : Map()
 	}
 	try {
-		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "ctrl+shift", Fixture.path, Reload))
+		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "ctrl+shift", Fixture.path, ReloadFn))
 		AssertEqual("ctrl+shift", Section().Get("left_alt_then_caps_lock", ""), "the hold slot is written")
 		AssertEqual(1, Reloads.Length, "the driver reloads so the pair hotkeys read it")
-		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "none", Fixture.path, Reload))
+		AssertTrue(SetKeyCombinationHold("left_alt_then_caps_lock", "none", Fixture.path, ReloadFn))
 		AssertFalse(Section().Has("left_alt_then_caps_lock"), "an empty hold slot leaves no key")
-		AssertThrows(() => SetKeyCombinationHold("left_alt_then_caps_lock", "hyper", Fixture.path, Reload),
+		AssertThrows(() => SetKeyCombinationHold("left_alt_then_caps_lock", "hyper", Fixture.path, ReloadFn),
 			"a hold the picker does not offer is refused")
-		AssertThrows(() => SetKeyCombinationHold("left_alt_then_left_alt", "ctrl", Fixture.path, Reload),
+		AssertThrows(() => SetKeyCombinationHold("left_alt_then_left_alt", "ctrl", Fixture.path, ReloadFn),
 			"a pair of one key twice is refused")
-		Assert(FSWriteDurable(Fixture.path, '[shortcuts.key_combination_taps]`nspace_then_enter = "caps_word"`n'
-			. 'left_alt_then_caps_lock = "caps_lock"`n[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`n'))
-		AssertTrue(ClearKeyCombination("space_then_enter", Fixture.path, Reload))
+		Assert(FSWriteDurable(Fixture.path, _CMJFixtureCurrentSource('[shortcuts.key_combination_taps]`nspace_then_enter = "caps_word"`n'
+			. 'left_alt_then_caps_lock = "caps_lock"`n[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`n')))
+		AssertTrue(ClearKeyCombination("space_then_enter", Fixture.path, ReloadFn))
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		Taps := Parsed.Has("shortcuts.key_combination_taps") ? Parsed["shortcuts.key_combination_taps"] : Map()
 		AssertFalse(Taps.Has("space_then_enter"), "the clear row empties the tap slot")
 		AssertEqual("caps_lock", Taps.Get("left_alt_then_caps_lock", ""), "and leaves the other pairs")
 		AssertFalse(Section().Has("space_then_enter"), "the clear row empties the hold slot")
-		AssertTrue(ClearKeyCombination("left_alt_then_caps_lock", Fixture.path, Reload))
+		AssertTrue(ClearKeyCombination("left_alt_then_caps_lock", Fixture.path, ReloadFn))
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		Taps := Parsed.Has("shortcuts.key_combination_taps") ? Parsed["shortcuts.key_combination_taps"] : Map()
 		AssertFalse(Taps.Has("left_alt_then_caps_lock"), "a declared pair goes back to its empty default")
-	} finally _ScopeOwnerCleanup(Fixture)
+	} finally {
+		ConfigurationFile := IsSet(SavedConfigurationFile) ? SavedConfigurationFile : unset
+		_ScopeOwnerCleanup(Fixture)
+	}
 }
 Test("key combinations: the slots are written to config.toml and reload the driver (key-combinations-2026-10-01)",
 	_KCT_SlotsAreWrittenToTheConfiguration)
@@ -709,12 +717,13 @@ _KCT_RegisterPairClearAvailability()
 ; Fresh disk slots deliberately differ from the runtime maps in the fixture.
 _KCT_GroupScope(Mode) {
 	global _MenuDispatchCallbacks
-	Fixture := _ScopeOwnerFixture()
 	Source := '[shortcuts.key_combination_taps]`nleft_alt_then_caps_lock = "open_url"`nspace_then_enter = "caps_word"`nfuture_pair = "keep"`n'
 		. '[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`nfuture_pair = "keep"`n'
 		. '[shortcuts.keyboard]`nwin_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
 		. '[action_parameters]`ncombination__left_alt_then_caps_lock__open_url = "https://pair.test"`n'
 		. 'combination__future_pair__open_url = "keep"`nkeyboard__win_b__open_url = "keep"`n'
+	Fixture := _ScopeOwnerFixture(Source)
+	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {
@@ -910,8 +919,26 @@ _KCT_AltGrChildDone(Capture, Code, Stdout, Stderr) {
 	Capture["stderr"] := Stderr
 }
 
+; Keep failed child diagnostics inside the runner's uploaded receipt directory.
+_KCT_AltGrEvidenceParent() {
+	Requested := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	if Requested == ""
+		return A_Temp
+	SplitPath(Requested, , &Parent)
+	if Parent == "" || !DirExist(Parent)
+		throw ValueError("Native hook evidence requires an existing receipt directory.")
+	return Parent
+}
+
+_KCT_AltGrWriteDiagnostics(Root, Mode, Capture, ChildPid, Cleaned) {
+	FileAppend("exit=" . Capture["exit"] . " completions=" . Capture["count"]
+		. " pid=" . ChildPid . " closed=" . Cleaned . "`n"
+		. Capture["stdout"] . "`n" . Capture["stderr"] . "`n" . Capture["cleanup"],
+		Root . "\" . Mode . "-diagnostics.txt", "UTF-8-RAW")
+}
+
 _KCT_AltGrNativePriority() {
-	Root := A_Temp . "\ergopti-kct-hook-" . DllCall("GetCurrentProcessId", "uint")
+	Root := _KCT_AltGrEvidenceParent() . "\ergopti-kct-hook-" . DllCall("GetCurrentProcessId", "uint")
 		. "-" . A_TickCount . "-" . Random(100000, 999999)
 	AssertTrue(DllCall("CreateDirectoryW", "str", Root, "ptr", 0, "int"),
 		"the parent must exclusively own native hook evidence")
@@ -942,10 +969,7 @@ _KCT_AltGrNativePriority() {
 					Capture["cleanup"] := Err.Message
 				if !Cleaned
 					CleanupDebt := true
-				FileAppend("exit=" . Capture["exit"] . " completions=" . Capture["count"]
-					. " pid=" . ChildPid . " closed=" . Cleaned . "`n"
-					. Capture["stdout"] . "`n" . Capture["stderr"] . "`n" . Capture["cleanup"],
-					Root . "\" . Mode . "-diagnostics.txt", "UTF-8-RAW")
+				_KCT_AltGrWriteDiagnostics(Root, Mode, Capture, ChildPid, Cleaned)
 			}
 			AssertTrue(Cleaned, "native child cleanup debt retains evidence at " . Root)
 			AssertEqual(1, Capture["count"], "one exact native child completion; evidence=" . Root)
@@ -1358,3 +1382,62 @@ Test("key combinations: actual multi-modifier resolver log rejoins category befo
 	_KCT_RevokedAtNativeEnrollment.Bind("ctrl+shift"))
 Test("key combinations: actual duration fallback log rejoins category before layer acquisition (pair-category-revocation)",
 	_KCT_RevokedAtNativeEnrollment.Bind("nav"))
+
+; This file-only control retains failed-child diagnostics without launching a child.
+_KCT_AltGrFailedDiagnosticsRemainWithReceipt() {
+	Base := A_Temp . "\ergopti-kct-evidence-" . DllCall("GetCurrentProcessId", "uint")
+		. "-" . A_TickCount . "-" . Random(100000, 999999)
+	AssertTrue(DllCall("CreateDirectoryW", "str", Base, "ptr", 0, "int"))
+	Previous := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	try {
+		Receipt := Base . "\cohort.txt"
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", Receipt)
+		AssertEqual(Base, _KCT_AltGrEvidenceParent(), "child evidence shares the actual cohort receipt directory")
+		Root := _KCT_AltGrEvidenceParent() . "\failed-child"
+		AssertTrue(DllCall("CreateDirectoryW", "str", Root, "ptr", 0, "int"))
+		Capture := Map("exit", 124, "count", 0, "stdout", "owned child stdout",
+			"stderr", "owned child stderr", "cleanup", "retirement refused")
+		_KCT_AltGrWriteDiagnostics(Root, "candidate", Capture, 123, false)
+		Expected := "exit=124 completions=0 pid=123 closed=0`nowned child stdout`nowned child stderr`nretirement refused"
+		AssertEqual(Expected, FileRead(Root . "\candidate-diagnostics.txt", "UTF-8-RAW"),
+			"failed child status and every retained diagnostic are actual file bytes")
+		AssertTrue(InStr(FileExist(Root), "D"), "a failed observation retains its owned evidence directory")
+		AssertFalse(FileExist(Receipt), "diagnostic capture cannot manufacture a completed cohort receipt")
+		Source := FileRead(A_LineFile, "UTF-8")
+		Body := _DriverExtractFunctionBody(&Source, "_KCT_AltGrNativePriority")
+		Assert(Body != "", "the actual child owner must exist")
+		AssertContains(Body, "_KCT_AltGrEvidenceParent()", "the real child uses the exercised evidence selector")
+		AssertContains(Body, "_KCT_AltGrWriteDiagnostics(Root, Mode, Capture, ChildPid, Cleaned)",
+			"the native finally uses the exercised diagnostic writer")
+		AssertContains(Body, "if Passed && !CleanupDebt", "failed child evidence cannot enter successful cleanup")
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", "cohort.txt")
+		AssertThrows(_KCT_AltGrEvidenceParent, "a configured receipt without a directory refuses")
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", Base . "\absent\cohort.txt")
+		AssertThrows(_KCT_AltGrEvidenceParent, "a configured missing directory cannot fall back to ambient temp")
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", "")
+		AssertEqual(A_Temp, _KCT_AltGrEvidenceParent(), "ordinary manual execution keeps its temporary-directory fallback")
+	} finally {
+		try EnvSet("ERGOPTI_AHK_RESULTS_FILE", Previous)
+		finally DirDelete(Base, true)
+	}
+}
+Test("key combinations: failed child diagnostics remain with the cohort receipt (altgr-child-evidence)",
+	_KCT_AltGrFailedDiagnosticsRemainWithReceipt)
+
+
+_KCT_AltGrOrdinaryOwnerIsOnlyItsAssertedSuffix() {
+	for _, HotkeyName in ["SC01D", "*SC01D", "SC001", "SC11D", "~SC01D & ~SC138"]
+		AssertFalse(_KCT_ProbeOrdinaryOwner(HotkeyName, true),
+			"focused " . HotkeyName . " cannot claim the unobserved ordinary owner")
+	for _, HotkeyName in ["SC138", "*SC138", "sc138"] {
+		AssertTrue(_KCT_ProbeOrdinaryOwner(HotkeyName, true), "the actual ordinary suffix remains independently eligible")
+		AssertFalse(_KCT_ProbeOrdinaryOwner(HotkeyName, false), "an unfocused suffix cannot own input")
+	}
+	Source := FileRead(A_ScriptDir . "\fixtures\key_combination_altgr_suffix_probe.ahk", "UTF-8")
+	Body := _DriverExtractFunctionBody(&Source, "KeyCombinationOwnsHotkey")
+	Assert(Body != "", "the actual hook fixture criterion must exist")
+	AssertContains(Body, "_KCT_ProbeOrdinaryOwner(A_ThisHotkey, ProbeHasFocus())",
+		"the actual fixture uses the exercised suffix predicate and current focus fence")
+}
+Test("key combinations: the hook probe ordinary owner admits only its asserted suffix (altgr-probe-ordinary-owner)",
+	_KCT_AltGrOrdinaryOwnerIsOnlyItsAssertedSuffix)

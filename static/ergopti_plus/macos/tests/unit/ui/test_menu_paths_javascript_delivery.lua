@@ -184,3 +184,65 @@ helpers.describe("paths JavaScript delivery", function()
 		end
 	end
 end)
+
+
+helpers.describe("paths editor scalar native JSON boundary", function()
+	helpers.it("(hs-scalar-json-paths) actual browse keeps control and Unicode bytes with native table-only JSON", function()
+		with_editor(function(_, calls, _, evaluations, pending)
+			local Json = require("json")
+			local picked = '/PRIVATE/é漢😀/\r\n\t"\\");globalThis.__injected=true;//'
+			local native_tables = 0
+			-- Explicit native boundary double; the selected directory is a string.
+			hs.json.encode = function(value)
+				helpers.assert_eq(type(value), "table", "Hammerspoon 1.1.1 JSON requires a table")
+				native_tables = native_tables + 1
+				return Json.encode(value)
+			end
+			hs.osascript.applescript = function() return true, picked end
+			calls.bridge_callback({ body = { action = "browse", target = "logs" } })
+			pending[1]()
+			helpers.assert_eq(#pending, 2, "the accepted exact string schedules its original browse result")
+			pending[2]()
+			helpers.assert_eq(#evaluations, 1, "a selected directory reaches the original page")
+			local quoted = assert(evaluations[1].code:match('^window%.applyBrowseResult%((.*), "logs"%)$'))
+			helpers.assert_eq(Json.decode(quoted), picked)
+			helpers.assert_eq(quoted:find("[%z\1-\31]"), nil)
+			helpers.assert_eq(native_tables, 0)
+			helpers.assert_eq(#calls.errors, 0)
+		end)
+	end)
+	for _, mode in ipairs({ "nil", "false", "throw" }) do
+		helpers.it("(hs-scalar-json-paths) selected path quotation " .. mode .. " refuses privately", function()
+			with_editor(function(_, calls, _, evaluations, pending)
+				local Json = require("json")
+				local original = Json.quote
+				local ok, err = xpcall(function()
+					Json.quote = function()
+						if mode == "throw" then error("PRIVATE_SELECTED_DIRECTORY") end
+						if mode == "false" then return false end
+					end
+					calls.bridge_callback({ body = { action = "browse" } })
+					pending[1]()
+					helpers.assert_eq(#pending, 1, "refused encoding cannot schedule a browse-result callback")
+					helpers.assert_eq(#evaluations, 0)
+					helpers.assert_eq(#calls.errors, 1)
+					helpers.assert_nil(calls.errors[1]:find("PRIVATE_SELECTED_DIRECTORY", 1, true))
+				end, debug.traceback)
+				Json.quote = original
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+end)
+
+helpers.it("(hs-scalar-json-paths) invalid UTF-8 directory bytes retain the existing page", function()
+	with_editor(function(_, calls, _, evaluations, pending)
+		hs.osascript.applescript = function() return true, "/PRIVATE/" .. string.char(0xC0, 0xAF) end
+		calls.bridge_callback({ body = { action = "browse" } })
+		pending[1]()
+		helpers.assert_eq(#pending, 1)
+		helpers.assert_eq(#evaluations, 0)
+		helpers.assert_eq(#calls.errors, 1)
+		helpers.assert_nil(calls.errors[1]:find("PRIVATE", 1, true))
+	end)
+end)

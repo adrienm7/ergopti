@@ -322,11 +322,13 @@ end
 --- Lists the unused keys of a config file. A missing file is "ok" with no
 --- keys: there is nothing to clean.
 --- @param opts table `{ path, collect, file_adapter?, read? }`.
---- @return table scan `{ status = "ok"|"unreadable"|"malformed", keys }`.
+--- @return table scan `{ status = "ok"|"unreadable"|"malformed"|"unsupported", keys }`.
 function M.find(opts)
 	if type(opts) ~= "table" or type(opts.path) ~= "string" or opts.path == "" then
 		error("config_unused_keys.find needs a path", 2)
 	end
+	-- A refused schema owner cannot classify future settings for removal.
+	if TomlWriter.write_refusal(opts.path) then return { status = "unsupported", keys = {} } end
 	local content, status = read_file(opts, opts.path)
 	if status == "absent" then return { status = "ok", keys = {} } end
 	if status ~= "ok" or type(content) ~= "string" then

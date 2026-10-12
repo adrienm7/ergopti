@@ -4037,9 +4037,10 @@ id = "llm_toggle"
 i18n = "menu.llm.enable"
 checked_when = ["llm_enabled"]
 # Greyed, never absent, while the switch cannot run its activation transaction:
-# during a pause on every driver, and on macOS before the activation owner exists.
+# during a pause, a protected configuration, or before activation is ready.
 # The row used to vanish in those states, leaving the IA submenu without a switch.
 disabled_when = ["llm_toggle_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
 category = "LLM"
 
 # The restore alone: the maintainer retired the AI menu's « Tout effacer » on
