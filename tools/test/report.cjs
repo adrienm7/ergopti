@@ -194,7 +194,7 @@ function failureNotice(failures) {
 	return omitted ? text + footer(omitted) : text;
 }
 
-function emit(opts, res, code) {
+function emit(opts, res, code, signal = null) {
 	const counts = res.counts_available
 		? `${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`
 		: 'terminal counts unavailable';
@@ -233,6 +233,7 @@ function emit(opts, res, code) {
 			passed: res.passed,
 			failed: res.failed,
 			exit_code: code,
+			...(signal ? { signal } : {}),
 			failures: res.failures,
 			...(res.timings.length || res.timing_errors.length
 				? { timings: res.timings, timing_errors: res.timing_errors }
@@ -300,14 +301,16 @@ function main() {
 		buf += stderrDecoder.write(d);
 		process.stderr.write(d);
 	});
-	child.on('close', (code) => {
+	child.on('close', (code, signal) => {
 		if (spawnFailed) return;
 		const stdoutEnd = stdoutDecoder.end();
 		buf += stdoutEnd + stderrDecoder.end();
 		timingOutput += stdoutEnd;
 		const res = parseResults(buf, timingOutput);
-		const finalCode = code || (res.timing_errors.length ? 1 : 0);
-		emit(opts, res, finalCode);
+		const finalCode = code === null ? 1 : code || (res.timing_errors.length ? 1 : 0);
+		if (signal)
+			process.stderr.write(`[report:${opts.name}] child terminated by signal ${signal}\n`);
+		emit(opts, res, finalCode, signal);
 		// Natural shutdown drains both forwarded streams and final annotations.
 		// An immediate exit discards pending pipe writes despite a valid JSON file.
 		process.exitCode = finalCode;
