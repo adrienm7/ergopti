@@ -49,6 +49,9 @@ local function load_active_remap(options)
 		build_phases = {},
 		deploy_phases = {},
 		classifier_phases = {},
+		saved_bindings = {},
+		built_bindings = {},
+		errors = {},
 	}
 
 	local function noop() end
@@ -60,7 +63,10 @@ local function load_active_remap(options)
 
 	package.loaded["infra.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
-		error = noop, success = noop, done = noop,
+		error = function(_, message, ...)
+			calls.errors[#calls.errors + 1] = string.format(message, ...)
+		end,
+		success = noop, done = noop,
 	}
 	package.loaded["platform.remap.defaults"] = {
 		tap_hold_timeout_ms = 200,
@@ -69,7 +75,7 @@ local function load_active_remap(options)
 		combo_symmetric = false,
 	}
 	package.loaded["platform.remap.config"] = {
-		load_available_actions = function() return { { id = "none" } } end,
+		load_available_actions = function() return options.actions or { { id = "none" } } end,
 		load_tap_hold_keys = function() return { { id = "left_shift" } } end,
 		load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
 		compute_non_canonical_combos = function() return {} end,
@@ -84,7 +90,11 @@ local function load_active_remap(options)
 				combo_symmetric = false,
 			}
 		end,
-		save_user_config = function() return true end,
+		save_user_config = function(state)
+			local binding = state.tap_hold_config.left_shift or {}
+			calls.saved_bindings[#calls.saved_bindings + 1] = { tap = binding.tap, hold = binding.hold }
+			return true
+		end,
 		resolve_layout_actions = function()
 			calls.resolves = calls.resolves + 1
 			calls.resolve_phases[#calls.resolve_phases + 1] = calls.phase
@@ -94,6 +104,8 @@ local function load_active_remap(options)
 	}
 	package.loaded["platform.remap.generator"] = {
 		build_karabiner_json = function(...)
+			local binding = (select(1, ...)).tap_hold_config.left_shift or {}
+			calls.built_bindings[#calls.built_bindings + 1] = { tap = binding.tap, hold = binding.hold }
 			calls.builds = calls.builds + 1
 			calls.build_phases[#calls.build_phases + 1] = calls.phase
 			calls.build_tokens[#calls.build_tokens + 1] = select(7, ...)
@@ -253,6 +265,9 @@ local function load_active_remap(options)
 	calls.build_phases = {}
 	calls.deploy_phases = {}
 	calls.classifier_phases = {}
+	calls.saved_bindings = {}
+	calls.built_bindings = {}
+	calls.errors = {}
 
 	function calls.record_result(ok, reason)
 		calls.results[#calls.results + 1] = { ok = ok, reason = reason }
@@ -260,6 +275,99 @@ local function load_active_remap(options)
 
 	return remap, calls
 end
+
+--- Runs the actual action-picker callbacks over one exact active remap facade.
+--- The deployment port records its input; it does not acknowledge native reload.
+--- @param run function Receives remap, protocol observations and a menu pick function.
+local function with_live_picker(run)
+	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "ui.menu.menu_utils" }, function()
+		local remap, calls = load_active_remap({ actions = {
+			{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
+			{ id = "escape", label = "Escape", category = "Spécial", holdable = false, tappable = true },
+			{ id = "shift", label = "Shift", category = "Spécial", holdable = true, tappable = true },
+		} })
+		local menu = require("ui.menu.menu_tap_holds")
+		local refreshes = 0
+		local update = function() refreshes = refreshes + 1 end
+		local function pick(slot, title)
+			local trees = menu._build_picker_trees(remap, update, true)
+			local key = assert(trees.left[1], "the active fixture key must be offered")
+			local slot_title = "menu.tapholds." .. slot .. "_arrow"
+			for _, row in ipairs(key.items) do
+				if row.label == slot_title then
+					for _, choice in ipairs(row.items) do
+						if choice.label == title then
+							helpers.assert_eq(type(choice.action), "function")
+							return choice.action()
+						end
+					end
+				end
+			end
+			error("the actual menu did not offer " .. slot .. ": " .. title)
+		end
+		run(remap, calls, pick, function() return refreshes end)
+	end)
+end
+
+helpers.describe("live menu mutations during exact lease transitions", function()
+	for _, phase in ipairs({ "recovering", "resuming", "pausing", "fencing", "stopping" }) do
+		helpers.it("(live-tap-hold-transition) preserves the old choice during " .. phase .. " and retries ACTIVE", function()
+			with_live_picker(function(remap, calls, pick, refreshes)
+				calls.phase = phase
+				helpers.assert_eq(pick("hold", "Shift"), false)
+				helpers.assert_eq(remap.get_hold_action("left_shift"), "none",
+					"a rejected live choice must not remain saved until reload")
+				helpers.assert_eq(#calls.saved_bindings, 0, "the refusal must precede persistence")
+				helpers.assert_eq(calls.builds, 0)
+				helpers.assert_eq(calls.deploys, 0)
+				helpers.assert_eq(refreshes(), 0, "a refused choice does not publish a menu refresh")
+				helpers.assert_true(#calls.errors > 0, "the refusal must be visible through the central logger")
+				calls.phase = "active"
+				helpers.assert_true(pick("hold", "Shift"))
+				helpers.assert_true(pick("tap", "Escape"))
+				helpers.assert_eq(calls.saved_bindings[2].hold, "shift")
+				helpers.assert_eq(calls.saved_bindings[2].tap, "escape")
+				helpers.assert_eq(calls.built_bindings[2].hold, "shift")
+				helpers.assert_eq(calls.built_bindings[2].tap, "escape")
+				helpers.assert_eq(calls.builds, 2)
+				helpers.assert_eq(calls.deploys, 2)
+				helpers.assert_eq(calls.pause_requests, 0)
+				helpers.assert_eq(calls.resume_requests, 0)
+				helpers.assert_eq(calls.stop_exact_requests, 0, "no personal or managed process restart is needed")
+			end)
+		end)
+	end
+
+	helpers.it("(live-tap-hold-transition) refuses a pending Stop before saving into the still ACTIVE lease", function()
+		with_live_picker(function(remap, calls, pick)
+			-- Retain the phase while the exact controller has already accepted Stop.
+			local controller = package.loaded["platform.remap.lease_controller"]
+			local status = controller.status
+			controller.status = function()
+				local phase, snapshot = status()
+				snapshot.activation_blocked = true
+				return phase, snapshot
+			end
+			helpers.assert_eq(pick("tap", "Escape"), false)
+			helpers.assert_eq(remap.get_tap_action("left_shift"), "none")
+			helpers.assert_eq(#calls.saved_bindings, 0)
+			helpers.assert_eq(calls.deploys, 0)
+		end)
+	end)
+
+	helpers.it("(live-tap-hold-transition) refuses an unavailable exact lease status before saving", function()
+		with_live_picker(function(remap, calls, pick)
+			package.loaded["platform.remap.lease_controller"].status = function()
+				error("the actual status port is unavailable")
+			end
+			helpers.assert_eq(pick("tap", "Escape"), false)
+			helpers.assert_eq(remap.get_tap_action("left_shift"), "none")
+			helpers.assert_eq(#calls.saved_bindings, 0)
+			helpers.assert_eq(calls.builds, 0)
+			helpers.assert_true(#calls.errors > 0)
+		end)
+	end)
+end)
 
 helpers.describe("karabiner active-lease regeneration", function()
 	helpers.it("keeps the exact generation ACTIVE through atomic replacement", function()
