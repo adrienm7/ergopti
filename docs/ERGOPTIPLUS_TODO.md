@@ -5306,6 +5306,19 @@ once into an explicit String initializer before the switch and matches that
 local without a cast-pattern. All25 native cases, original permission/consent
 laws and archive/package/install requirements remain unchanged and unqualified.
 
+Group6 regular delivery integrates atomic `2688661e837d069056df17c2101330c892108f4d`
+through no-ff Dev `d91baccc8eaac1577827c47d0bc6b646e925efc0`; received Dev
+`08c7886ba6f48d272cfd2768e5750c3282add211` retains it. The feature is preserved.
+Portable projection controls pass, but no new macOS native acceptance is claimed.
+Read-only analysis of the authentic94fe archive receipt proves that the27.64ms
+observer budget belongs to the final polling child: the first observer starts
+285.296ms after the permission request. Three existing deadline/readiness
+controls pass. Seventy-three retained UI observations have no matching prompt;
+278 omitted phases prevent a whole-period absence claim. Permission API return,
+worker closure, no-prompt requery, both positive deliveries, policy denial and
+all six Brew operations still require native receiving. No initial-budget, TCC
+or main-thread cause is proved, and no timeout or assertion is changed.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -10144,6 +10157,27 @@ Its successor moves conversion into an explicit String initializer outside the
 case pattern. All63 portable method bodies, all14 native PAC cases, the exact
 five-span inverse and historical whole-source pin remain unchanged. Corrected
 native compilation/receiving remains required; items62,16 and38 stay open.
+
+Group6 next receiving is based on fresh Dev
+`08c7886ba6f48d272cfd2768e5750c3282add211`. Root receives the exact original
+Windows updater launcher blob `82b6946fd66e94ecd0e8893c1fe4df73eab2b4a1`
+(SHA256 `e7572508bc7bacc8d0db3afe2c8693aa2b6cc4458c9ae2af5ca39e95fa979541`)
+and its frozen23-label inventory:18 channel-replacement,4 global-config-barrier,
+1 inherited-critical. All21 current pins match; runtime remains UNRUN. The
+existing collector is absent from workflows and needs Root-owned enrollment on
+a fresh clean Windows checkout or before tracked PAC publication. Its original
+300000ms selection/execution and30000ms disposal clocks, immutable oracle and
+full Unit/E2E/build/install obligations remain. Source22 is not native23. No
+stopped CA/PAC/curl/account experiment is retried, and no dirty-source exception
+is introduced.
+
+The current Swift wire fixture still lacks same-call post-add trust facts. Its
+held native factory cannot be activated from historical94fe clock numbers:
+16 staged-source hashes have no retained original payloads, and compiler,
+interpreter and kernel execution identity remain unqualified. A passive evidence
+completion is prepared separately for ownership review; it changes no trust,
+clock, acceptance or factory admission. Native managed-network delivery and
+trust restoration remain required.
 
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
