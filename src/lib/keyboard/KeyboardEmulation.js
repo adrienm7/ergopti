@@ -1,6 +1,8 @@
 import * as stores_infos from '$lib/stores_infos.js';
 import { get } from 'svelte/store';
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
+import { base } from '$app/paths';
+import { getMagicKeyUrls } from '$lib/js/hotstringDataUrls.js';
 let magic = {};
 
 function unescapeTomlString(s) {
@@ -68,10 +70,9 @@ function parseTomlMagic(toml) {
 
 // Load magic dynamically via HTTP request (public static directory)
 if (typeof window !== 'undefined') {
-	fetch('/hotstrings/magickey.toml')
-		.then((response) => response.text())
-		.then((text) => {
-			const parsed = parseTomlMagic(text);
+	Promise.all(getMagicKeyUrls(base).map((url) => fetch(url).then((response) => response.text())))
+		.then((texts) => {
+			const parsed = Object.assign({}, ...texts.map(parseTomlMagic));
 			// Normalize keys: remove ★ and store as lowercase for lookup
 			magic = {};
 			for (const [k, v] of Object.entries(parsed)) {
