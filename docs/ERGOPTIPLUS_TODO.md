@@ -4089,6 +4089,14 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-12 the Brew fixture now retains the exact observed Automation prompt
+deadline through its existing closed timeout channel and the last validated UI
+census after the unchanged256-phase history limit. Private error objects and
+string subclasses cannot participate in matching. Twelve additional portable
+controls preserve the original primary, cleanup, permissions and all deadlines;
+the original collector fails six assertions. This repairs diagnostic omission,
+not Automation admission. Native cause and all six Brew scenarios remain open.
+
 2026-10-12 official run38214117862 on211e66051 passes Linux packaging and all17
 installation/launch jobs. macOS archive qualification still has24 passes and
 one owned Automation deadline failure; all six Brew operations are unexecuted,
