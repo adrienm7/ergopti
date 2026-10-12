@@ -2971,7 +2971,7 @@ for (const line of [
 	}
 }
 
-/** Checks the names GitHub renders after flattening each OS workflow. */
+/** Checks the names GitHub renders after flattening all four workflows. */
 function namingProblems(files) {
 	const problems = [];
 	for (const entry of files) {
@@ -2981,10 +2981,13 @@ function namingProblems(files) {
 			const valid =
 				entry.rel === ENTRY
 					? caller
-						? ['macOS', 'Windows', 'Linux'].includes(name)
-						: name === 'Core / ${{ matrix.suite }}' ||
-							/^(Validate|Release) \/ [A-Z][^/]+$/.test(name)
-					: /^[A-Z]/.test(name) && !name.includes(' / ');
+						? { core: 'Common', macos: 'macOS', windows: 'Windows', linux: 'Linux' }[
+								candidate.id
+							] === name
+						: /^(Validate|Release) \/ [A-Z][^/]+$/.test(name)
+					: entry.rel === COMMON_BOX && candidate.id === 'shared-validation'
+						? name === '${{ matrix.suite }}'
+						: /^[A-Z]/.test(name) && !name.includes(' / ');
 			if (!valid)
 				problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
 			for (const found of pipeline.steps(candidate.body)) {
@@ -3038,6 +3041,19 @@ for (const [before, after] of [
 	mustCatch('qualification owner ' + before, ENTRY, before, after, rootProblems);
 errors.push(...namingProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
+	['an incorrect Common caller name', ENTRY, "name: 'Common'", "name: 'Linux'"],
+	[
+		'an incorrect Common matrix name',
+		COMMON_BOX,
+		"name: '${{ matrix.suite }}'",
+		"name: '${{ matrix.unknown }}'"
+	],
+	[
+		'a matrix display name on an unknown Common job',
+		COMMON_BOX,
+		'  shared-validation:\n',
+		'  unknown-validation:\n'
+	],
 	['an unqualified root name', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate'"],
 	['a lowercase lane job', WINDOWS_BOX, "name: 'Unit tests'", "name: 'unit tests'"],
 	['a repeated lane prefix', MACOS_BOX, "name: 'Package'", "name: 'macOS / Package'"],

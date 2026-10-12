@@ -636,21 +636,40 @@ for (const [name, value] of Object.entries(ALLOWED_STEP_CONTINUE_ON_ERROR)) {
 	);
 }
 
-// ci.yml calls each lane by its file, and release waits on all three and on
-// the root, where it reads the plan.
-const callers = pipeline.calls();
-check(
-	JSON.stringify(callers.map((call) => [call.id, call.uses]).sort()) ===
+/** Keeps the Common caller separate from native OS qualification owners. */
+function rootCallersMatch(callers) {
+	return (
+		JSON.stringify(callers.map((call) => [call.id, call.uses]).sort()) ===
 		JSON.stringify(
-			Object.entries(BOX_FILES)
+			Object.entries({ core: '.github/workflows/ci-common.yml', ...BOX_FILES })
 				.map(([id, rel]) => [id, `./${rel}`])
 				.sort()
-		),
-	`ci.yml must call exactly the three OS lanes, got ${JSON.stringify(callers)}`
+		)
+	);
+}
+
+// Release requires all four lanes and the root's canonical publication plan.
+const callers = pipeline.calls();
+check(
+	rootCallersMatch(callers),
+	`ci.yml must call exactly Common and the three OS lanes, got ${JSON.stringify(callers)}`
 );
+for (const mutated of [
+	callers.filter((call) => call.id !== 'core'),
+	[...callers, { id: 'extra', uses: './.github/workflows/ci-common.yml' }],
+	callers.map((call) => (call.id === 'core' ? { ...call, id: 'unknown' } : call)),
+	callers.map((call) =>
+		call.id === 'core' ? { ...call, uses: './.github/workflows/ci-linux.yml' } : call
+	)
+]) {
+	check(
+		!rootCallersMatch(mutated),
+		'the root lane inventory must reject missing or forged callers'
+	);
+}
 const release = pipeline.job('release');
 const releaseNeeds = pipeline.needsOf(release);
-for (const needed of ['validate', ...Object.keys(BOX_FILES)]) {
+for (const needed of ['validate', 'core', ...Object.keys(BOX_FILES)]) {
 	check(
 		releaseNeeds.includes(needed),
 		`release must need \`${needed}\`, got [${releaseNeeds.join(', ')}]`
@@ -661,8 +680,8 @@ for (const needed of ['validate', ...Object.keys(BOX_FILES)]) {
 		`release's need \`${needed}\` must be a job of ${pipeline.ENTRY_REL}`
 	);
 }
-// No status function: the implicit success() over needs is the "all three OS
-// are green" gate. The event test keeps a regression in the plan script alone
+// No status function: implicit success() requires Common and all three OSes.
+// The event test keeps a regression in the plan script alone
 // from publishing a pull request or a dispatch run, where PAT_ERGOPTI is read.
 const releaseIf = pipeline.field(release, 'if');
 check(
