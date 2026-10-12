@@ -656,3 +656,23 @@ capability alone does not establish compatibility. Preserve qualification flags,
 consent and deadlines. These checks need native software; no physical keyboard,
 screen or trackpad is required for this diagnostic lot. The installation cause
 in the historical report remains unresolved until native receiving.
+
+### Published diagnostic checkpoint and preserved native output candidates
+
+Native HTTP diagnostic correction `e94153e87b698b24de86133239319bde4be12a90`
+is verified published on dev after receiving G6 source-reader checkpoint
+`80d4588f8eb6fbd66f2f420c843faa395a466620`. Post-rebase source-reader,
+bootstrap HTTP and release-rerun checks have actual status0/signalnull;
+the last takes27,301ms. No workflow or runner was modified. The shared
+publication fixture and its release-test copy inventory each gained one literal
+source dependency; Root should preserve both during CI composition.
+
+The [native continuation](pending-native-output-receiving.md) preserves the
+additional captured-clock and retained-output serializer corrections, their
+regressions and source inventories. Both were implemented and executed in
+Linux C projections, remain unapplied to the live DLL, and need a coordinated
+real MSVC/SDK rebuild before receiving their source union. The expected combined
+eleven output matrices are not an executed result. The bridge, emitter and
+remaining cohort conversion are still software work; native and physical
+acceptance remain separate. No compiled private artifact, full log or diagnostic
+archive is included in Git. Item49 remains open.

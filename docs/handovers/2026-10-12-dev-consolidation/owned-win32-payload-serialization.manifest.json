@@ -1,0 +1,87 @@
+{
+	"base": "60001d60f99aaf30ed5e8a345972d671f47ea2f1",
+	"paths": {
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c": {
+			"before_sha256": "14508fe4a4bde47f71ba5659121c87cad508de59df0f344b853b14affa27e4d8",
+			"after_sha256": "1018442271bd9445f3436b81c98890e5705bb9ecd461efa31c01320ae0e69544",
+			"strict_utf8_lf": true
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h": {
+			"before_sha256": "d358cddf27ab6993bdc2d71dc02b31f139f102b0d0ed8892a2b401a063623476",
+			"after_sha256": "e2cec5b79af346baa245a4be06fd3c903ef90384ef0f76ba46bf98d6bb656404",
+			"strict_utf8_lf": true
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c": {
+			"before_sha256": "ba651227681c94ac47b28c3c9a1bc0fb08eb26bf698038fe8e099272b1b4bf8a",
+			"after_sha256": "a5b7631a4926668bc4f7b972b78dcb2b2a914cf409b02ecbb983b8ab59924151",
+			"strict_utf8_lf": true
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c": {
+			"before_sha256": "f95841224e04c1de6677159c27e78fbd859cc9074122493a84c7d40bb189f967",
+			"after_sha256": "0806f6cc1bd4ac64675d2ed439307f7a75e3d421b588728ec404f90a18711bbd",
+			"strict_utf8_lf": true
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h": {
+			"before_sha256": "330485f3a7fcacec44f4f70f007036a0b1ee380947666f189b1742b6514ce741",
+			"after_sha256": "08acd0b8a5109ce1520ab7134375b025ec8296f02747b8a45c36d58b8f6a4487",
+			"strict_utf8_lf": true
+		}
+	},
+	"proof": {
+		"original_test_bytes_preserved_except_additive_helpers_main_calls_footer": true,
+		"old_assert_occurrences": 124,
+		"new_assert_occurrences": 190,
+		"new_matrices": 3,
+		"matrices_total": 10,
+		"unicode_prefix_cohorts": 26,
+		"natural_edge_cohorts": 32,
+		"original_c_cases": 43,
+		"actual_windows_sdk": "UNRUN",
+		"native_emission": "UNRUN",
+		"production_admission": false,
+		"exports_changed": false,
+		"unsupported_architecture_branch": {
+			"exit": 0,
+			"method": "Host headers preloaded; supported architecture compile macros undefined; actual unsupported branch executes. No foreign CPU or Windows execution.",
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-unsupported-host.log"
+		}
+	},
+	"negative_controls": {
+		"original-missing-api": {
+			"compile_exit": 1,
+			"execution_exit": null,
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-negative-original-missing-api.log"
+		},
+		"restart-accepted-prefix": {
+			"compile_exit": 0,
+			"execution_exit": -6,
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-negative-restart-accepted-prefix.log"
+		},
+		"foreign-marker": {
+			"compile_exit": 0,
+			"execution_exit": -6,
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-negative-foreign-marker.log"
+		},
+		"lose-extended-scan": {
+			"compile_exit": 0,
+			"execution_exit": -6,
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-negative-lose-extended-scan.log"
+		},
+		"omit-unicode-up": {
+			"compile_exit": 0,
+			"execution_exit": -6,
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-negative-omit-unicode-up.log"
+		},
+		"ignore-attempt-identity": {
+			"compile_exit": 0,
+			"execution_exit": -6,
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-negative-ignore-attempt-identity.log"
+		},
+		"write-before-full-validation": {
+			"compile_exit": 0,
+			"execution_exit": -6,
+			"log": "/tmp/ergopti247-todo49-modifier-plan/serializer-negative-write-before-full-validation.log"
+		}
+	},
+	"patch_sha256": "c34435adcce905b74019fad3792f8b4a8ef6cdbda94ec8c1a78d640d808ee7ff"
+}

@@ -253,6 +253,19 @@ patch is not applied to the live DLL; official Windows MSVC/SDK rebuild and
 matching provenance remain UNRUN. Observer conversion and output emission are
 still software work, and item 49 remains open.
 
+Item 49 additionally retains the [owned Win32 serialization correction](handovers/2026-10-12-dev-consolidation/pending-owned-win32-payload-serialization.patch)
+and [combined native receiving instructions](handovers/2026-10-12-dev-consolidation/pending-native-output-receiving.md).
+The pure serializer validates the retained attempt before copying its exact
+Unicode/VK/scan suffix into fixed owned Win32 packets. It changes no send,
+acknowledgement, export or cohort admission. All 124 original assertions remain,
+with 66 additions; ten matrices pass with full sanitizers and six compiled
+mutations fail. Native SDK, DLL and AHK receiving remain UNRUN. The union with
+the paired modifier corrections expects eleven matrices, not executed together;
+preserve both additive test bodies when composing the shared footer. The
+lock-held DLL/consumer bridge, emitter orchestration and full nonhook
+handler/observer conversion remain software work. No SendEvent/SendInput choice
+or physical acceptance is inferred.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
