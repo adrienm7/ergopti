@@ -10585,6 +10585,15 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   or packaged acceptance. The remaining native source/collision/output work stays
   required.
 
+  Window closure now requires the original Editor's literal acknowledgement
+  before the captured native page is closed. Cancellation refusal retains the
+  exact observation for retry; native refusal after Editor closure retries only
+  the original native port. Reentry and external page retirement cannot borrow
+  either acknowledgement. All 37 previous and 14 additional controlled cases
+  pass on LuaJIT and Lua 5.4; the original fails all 14 additions and five guard
+  omissions fail. Native GUI, capture and output qualification remain open;
+  this optional session contract does not enable physical delivery.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -10599,6 +10608,9 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
   star-migration authority; native capture and the software work below remain.
   The same acknowledged-draft boundary from item 97 also protects this
   editor; it adds no position, collision, migration or output authority.
+
+  Item 97's closure acknowledgements also protect this editor. Native GUI,
+  source/modifier/output custody and acknowledged star migration remain open.
 
   Remaining software: complete item 97's native capture/source/collision/output
   owners and prove acknowledged star-setting migration while preserving occupied

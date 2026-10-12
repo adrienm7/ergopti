@@ -637,4 +637,146 @@ return function(helpers, Editor, Window, Model)
 			eq(s.owner.close(), true); eq(s.original_calls, 1)
 		end)
 	end)
+
+	helpers.describe("Shared Window original retirement acknowledgements", function()
+		-- These are controlled session-port observations, not native input or page evidence.
+		local function fixture()
+			local s = { canonical = {}, active = nil, page = true, cancel_mode = true,
+				native_mode = true, cancel_calls = 0, native_calls = 0, editor_calls = 0,
+				picker_calls = 0, writes = 0, foreign_calls = 0 }
+			local function answer(mode)
+				if mode == "throw" then error("Controlled original retirement refusal") end
+				if mode == "nil" then return nil end
+				if mode == "nonboolean" then return 1 end
+				return mode
+			end
+			local actions = { is_assignable = function(action) return action == "none" end,
+				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+				split_action_parameter_key = function() end }
+			local options = { model = Model, catalogue = actions, parameter_section = "gesture_parameters",
+				positions = {}, label = function(action) return action end,
+				capture = function() return { assignments = {}, parameters = {} }, s.canonical end,
+				current = function(receipt) return rawequal(receipt, s.canonical) end,
+				commit = function() s.writes = s.writes + 1; return true end,
+				picker = function() s.picker_calls = s.picker_calls + 1; return true end,
+				emit = function() return true end, send = function() return true end,
+				translate = function(key) return key end, position_field = "evdev",
+				position_available = function() return true end,
+				page_current = function()
+					if s.on_page then s.on_page(s) end
+					return s.page
+				end,
+				capture_position = function(_, receive)
+					s.active, s.receive = {}, receive
+					return s.active
+				end,
+				cancel_position = function(token)
+					eq(rawequal(token, s.active), true, "cancel carries the original observation token")
+					s.cancel_calls = s.cancel_calls + 1
+					if s.on_cancel then s.on_cancel(s) end
+					local acknowledged = answer(s.cancel_mode)
+					if acknowledged == true then s.active = nil end
+					return acknowledged
+				end,
+				close = function()
+					s.native_calls = s.native_calls + 1
+					if s.on_native then s.on_native(s) end
+					local acknowledged = answer(s.native_mode)
+					if acknowledged == true then s.page = false end
+					return acknowledged
+				end }
+			-- Count the actual Editor close body without replacing any of its outcomes.
+			-- Restore the constructor even if the real Window constructor refuses.
+			local original_new = Editor.new
+			Editor.new = function(ports)
+				local owner = original_new(ports)
+				local original_close = owner.close
+				owner.close = function() s.editor_calls = s.editor_calls + 1; return original_close() end
+				return owner
+			end
+			local called, window = pcall(Window.new, options)
+			Editor.new = original_new
+			eq(called, true, "real Window constructor accepts the complete controlled ports")
+			s.window, s.options = window, options
+			eq(window.receive({ action = "ready" }), true)
+			eq(window.receive({ action = "capture_position", request = { request_id = 1 } }), true)
+			eq(type(s.active), "table")
+			return s
+		end
+		for _, mode in ipairs({ false, "throw", "nil", "nonboolean" }) do
+			helpers.it("(physical-window-close) original cancellation refusal retains both owners: " .. tostring(mode), function()
+				local s = fixture(); local token = s.active; s.cancel_mode = mode
+				eq(s.window.close(), false, "unacknowledged observation cannot report a closed Window")
+				eq(s.editor_calls, 1); eq(s.cancel_calls, 1); eq(s.native_calls, 0)
+				eq(rawequal(s.active, token), true); eq(s.page, true)
+				eq(s.receive({ native_code = 36, mods = {} }), false, "closing observation cannot emit after refusal")
+				eq(s.window.receive({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 2 } }), false)
+				s.cancel_mode = true
+				eq(s.window.receive({ action = "close" }), true, "close channel retries its exact retained observation")
+				eq(s.editor_calls, 2); eq(s.cancel_calls, 2); eq(s.native_calls, 1); eq(s.active, nil)
+				eq(s.window.close(), false, "completed native page is not closed twice")
+				eq(s.picker_calls, 0); eq(s.writes, 0)
+			end)
+		end
+		for _, mode in ipairs({ false, "throw", "nil", "nonboolean" }) do
+			helpers.it("(physical-window-close) native refusal retains prior Editor acknowledgement: " .. tostring(mode), function()
+				local s = fixture(); s.native_mode = mode
+				eq(s.window.close(), false)
+				eq(s.editor_calls, 1); eq(s.cancel_calls, 1); eq(s.native_calls, 1); eq(s.active, nil)
+				eq(s.window.receive({ action = "save", token = 1 }), false, "retired draft cannot publish during native debt")
+				eq(s.window.receive({ action = "capture_position", request = { request_id = 2 } }), false)
+				s.native_mode = true
+				eq(s.window.receive({ action = "close" }), true)
+				eq(s.editor_calls, 1, "positive Editor acknowledgement is never repeated")
+				eq(s.cancel_calls, 1); eq(s.native_calls, 2); eq(s.picker_calls, 0); eq(s.writes, 0)
+			end)
+		end
+		helpers.it("(physical-window-close) native recursive retirement cannot repeat Editor or native close", function()
+			local s = fixture(); local retired, recursive, routed
+			s.on_native = function()
+				retired = s.window.retire(); recursive = s.window.close()
+				routed = s.window.receive({ action = "close" })
+			end
+			eq(s.window.close(), true); eq(retired, true); eq(recursive, false); eq(routed, false)
+			eq(s.editor_calls, 1); eq(s.cancel_calls, 1); eq(s.native_calls, 1); eq(s.active, nil)
+		end)
+		helpers.it("(physical-window-close) cancellation callback cannot borrow a close or retire acknowledgement", function()
+			local s = fixture(); local retired, recursive, routed
+			s.on_cancel = function()
+				retired = s.window.retire(); recursive = s.window.close()
+				routed = s.window.receive({ action = "capture_position", request = { request_id = 2 } })
+			end
+			eq(s.window.close(), true); eq(retired, false); eq(recursive, false); eq(routed, false)
+			eq(s.editor_calls, 1); eq(s.cancel_calls, 1); eq(s.native_calls, 1)
+		end)
+		helpers.it("(physical-window-close) first page getter is reserved before recursive close", function()
+			local s = fixture(); local recursive
+			s.on_page = function() s.on_page = nil; recursive = s.window.close() end
+			eq(s.window.close(), true); eq(recursive, false)
+			eq(s.editor_calls, 1); eq(s.cancel_calls, 1); eq(s.native_calls, 1)
+		end)
+		helpers.it("(physical-window-close) terminal getter retirement refuses native acquisition", function()
+			local s = fixture()
+			s.on_page = function() s.on_page = nil; eq(s.window.retire(), true) end
+			eq(s.window.close(), false)
+			eq(s.editor_calls, 1); eq(s.cancel_calls, 1); eq(s.native_calls, 0)
+		end)
+		helpers.it("(physical-window-close) native refusal retries only the original captured close port", function()
+			local s = fixture(); s.native_mode = false
+			eq(s.window.close(), false)
+			s.options.close = function() s.foreign_calls = s.foreign_calls + 1; return true end
+			s.native_mode = true
+			eq(s.window.close(), true)
+			eq(s.foreign_calls, 0); eq(s.native_calls, 2); eq(s.editor_calls, 1); eq(s.cancel_calls, 1)
+		end)
+		helpers.it("(physical-window-close) external page retirement retries observation without granting native acknowledgement", function()
+			local s = fixture(); local token = s.active; s.cancel_mode = false
+			eq(s.window.retire(), false); eq(rawequal(s.active, token), true)
+			eq(s.window.receive({ action = "save", token = 1 }), false)
+			s.cancel_mode = true
+			eq(s.window.retire(), true); eq(s.window.retire(), true)
+			eq(s.editor_calls, 2); eq(s.cancel_calls, 2); eq(s.native_calls, 0); eq(s.active, nil)
+			eq(s.window.close(), false, "external page revocation is not a close-request capability")
+		end)
+	end)
 end
