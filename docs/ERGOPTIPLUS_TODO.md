@@ -10904,8 +10904,15 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   the Group 3 handover partial receipt. No qualification or item completion
   is claimed from this saved source checkpoint.
 
-  The current updater source seal is generated from authenticated snapshot
-  `50863919e29095c78a5b1a18b55aadbfee5b8c8f` under the finite Group 6 source grant.
+  The latest Dev composition passes 18,998 simulated macOS units, 101
+  simulated macOS E2E cases, 13,544 Linux units and 193 Linux E2E cases.
+  Actual Linux HTTP checks pass; full source/index/HEAD receiving is exact.
+  Two inherited JS guards remain red (424/426) and Root owns their correction.
+  Windows, native Darwin, package/install and device receiving remain open;
+  the Group 3 handover retains the exact partial result.
+
+  The current updater source seal is generated from published feature source
+  `0ec756d467fbf81b501baebb2aed1737b7aa609d` under the finite Group 6 source grant.
   All 21 source images, protected 18/4/1/UNRUN fields and the independent
   oracle are retained. This supplies no native Snapshot, whole-suite or
   updater outcome; the later Group 3 handover retains exact receiving.
