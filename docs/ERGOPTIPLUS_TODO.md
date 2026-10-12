@@ -266,6 +266,18 @@ lock-held DLL/consumer bridge, emitter orchestration and full nonhook
 handler/observer conversion remain software work. No SendEvent/SendInput choice
 or physical acceptance is inferred.
 
+Item 49 also retains the [replay writable-output correction](handovers/2026-10-12-dev-consolidation/pending-replay-output-protection.patch)
+with [receiving commands and source inventory](handovers/2026-10-12-dev-consolidation/replay-output-receiving.md).
+An aliased output formerly erased live state before ownership refusal; exact
+span/overflow protection now preserves it. An independent actual C caller is
+red on the original (state erased, exit 1) and green on the correction (every
+state byte retained, exit 0). All 108 original assertions remain, with 32 added;
+8/8 core, 43/43 production-C/POSIX cases, 7/7 neighboring output matrices and
+full sanitizer checks pass. Five compiled guard mutants fail. This pending
+source patch leaves active C/DLL provenance intact until an actual official
+Windows MSVC rebuild; native SDK/DLL/desktop/hooks are UNRUN. Production observer
+conversion and emission remain software work; item 49 is not closed.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)

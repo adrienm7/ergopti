@@ -1,0 +1,94 @@
+{
+	"base_sha": "702db4560bcf9b974dcc5302213beffb7b83b104",
+	"patch_sha256": "2bac10100c655c415c692e567a6f11914a13141de835882a56113854bdaa9c35",
+	"changed_files": {
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c": {
+			"before_sha256": "4432710663d7f61735d47ea84e559790edc02a1ba97be4d5c27352f4df383fb8",
+			"after_sha256": "fd9bc88c792be85c99d7f7ee5b68c2e32c09912197f28207229f56a3ceeb81b6"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h": {
+			"before_sha256": "6dc352785f5bfdede4ca7371fd0af34b43bda310cb3b2afbbc3a6d057853eda2",
+			"after_sha256": "8eefa480dbc6b5e995e29cd7781a8ff80044de6b3cb9d141e32a5ce0f2fa0661"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c": {
+			"before_sha256": "931daec1ed74b9988a0ebe8fe0a6fa5822c6098764d72d014ebda902a7b42e6d",
+			"after_sha256": "6a67809ea0bb6afa8ea3e31e76f2b345c19a4188ed2427f261d4406352fad6ae"
+		}
+	},
+	"preservation": {
+		"original_test_after_block_removal_byte_identical": true,
+		"assert_call_sites_before": 108,
+		"assert_call_sites_after": 140,
+		"added_assert_call_sites": 32,
+		"pure_matrices": 8,
+		"native_census": 44,
+		"portable_native_cases": 43,
+		"ABI_fields_exports_changed": false,
+		"cohort_or_runner_changed": false,
+		"native_vendor_modified": false
+	},
+	"qualification": "Actual Linux-host pure C and POSIX-shim execution; Windows MSVC/DLL/SDK/hooks/physical qualification UNRUN.",
+	"independent_of_other_pending_patches": true,
+	"patch": "pending-replay-output-protection.patch",
+	"verification": {
+		"original_behavioral_red_signal": "SIGABRT",
+		"pure_core_green": "8/8",
+		"production_C_shim_green": "43/43",
+		"neighbor_output_plan_green": "7/7",
+		"pure_ASan_UBSan_green": "8/8",
+		"production_C_shim_ASan_UBSan_green": "43/43 plus runtime",
+		"sanitizer_assertion_leak_checks": "active; exact compiled binaries executed outside ptrace sandbox",
+		"patch_apply_strict_whitespace": true,
+		"compiled_mutants": [
+			{
+				"name": "original",
+				"compile_exit": 0,
+				"test_exit": -6
+			},
+			{
+				"name": "step-state-protection",
+				"compile_exit": 0,
+				"test_exit": -6
+			},
+			{
+				"name": "prepare-state-protection",
+				"compile_exit": 0,
+				"test_exit": -6
+			},
+			{
+				"name": "prepare-snapshot-protection",
+				"compile_exit": 0,
+				"test_exit": -6
+			},
+			{
+				"name": "output-address-wrap",
+				"compile_exit": 0,
+				"test_exit": -11
+			},
+			{
+				"name": "start-boundary-overlap",
+				"compile_exit": 0,
+				"test_exit": -6
+			}
+		]
+	},
+	"independent_behavioral_receipt": {
+		"original": {
+			"exit": 1,
+			"status": -2,
+			"state_preserved": false,
+			"initialized": 0,
+			"owner": 0
+		},
+		"corrected": {
+			"exit": 0,
+			"status": -1,
+			"state_preserved": true,
+			"initialized": 1,
+			"owner": 85
+		},
+		"corrected_eight_matrices_exit": 0,
+		"postimages_exact": 3,
+		"target": "Linux/x64 pure C; Windows SDK/DLL/hooks UNRUN"
+	}
+}
