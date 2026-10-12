@@ -1026,7 +1026,20 @@ if (ahkIndex !== -1) {
 			assert.equal(head, process.env.GITHUB_SHA, 'snapshot16 exact official tested commit');
 		}
 		const tracked = new Map();
-		for (const entry of snapshot16Git(['ls-tree', '-r', '-z', head]).split('\0').filter(Boolean)) {
+		const trackedEntries = snapshot16Git([
+			'ls-tree',
+			'-r',
+			'-z',
+			head,
+			'--',
+			'static/ergopti_plus/windows/',
+			'static/ergopti_plus/_shared/',
+			'tools/test/test-ahk-suite-manifest.cjs',
+			'tools/test/support/file-backed-native-runner.cjs',
+			'tools/test/validate-ahk-suite-manifest.cjs',
+			'tools/test/test-ahk-test-coverage.cjs'
+		]);
+		for (const entry of trackedEntries.split('\0').filter(Boolean)) {
 			const match = /^(100644|100755) blob ([a-f0-9]{40})\t(.+)$/.exec(entry);
 			if (match) tracked.set(match[3], match[2]);
 		}
