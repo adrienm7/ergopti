@@ -51,6 +51,12 @@ const LLM_PROMPT_CORPUS = path.join(
 const VISION_CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'llm', 'vision_vectors.json');
 const VOCABULARY = path.join(SP, '_shared', 'modules', 'actions', 'send_keys.json');
 
+/** Admits only the exact canonical scope record and one host line terminator. */
+function sdkScopeRecordMatches(output, scope) {
+	const record = 'Shortcuts SDK filesystem scope: ' + JSON.stringify(scope);
+	return output === record + '\n' || output === record + '\r\n';
+}
+
 /** A DOM element with just what the page script touches. */
 class FakeElement {
 	constructor(tag, id) {
@@ -1077,8 +1083,36 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 			native: 'UNRUN',
 			status: 'UNRUN_UNSUPPORTED'
 		};
+		const scopeRecord = 'Shortcuts SDK filesystem scope: ' + JSON.stringify(expectedScope);
+		for (const [output, admitted] of [
+			[scopeRecord + '\n', true],
+			[scopeRecord + '\r\n', true],
+			[scopeRecord, false],
+			[scopeRecord + '\r', false],
+			[scopeRecord + '\n\n', false],
+			[scopeRecord + '\r\n\r\n', false],
+			[scopeRecord + '\n' + scopeRecord + '\n', false],
+			['extra record\n' + scopeRecord + '\n', false],
+			[scopeRecord.replace('"collected":16', '"collected": 16') + '\n', false],
+			[scopeRecord.replace('"executed":0', '"executed":0,"executed":0') + '\n', false],
+			[scopeRecord.replace('"native":"UNRUN",', '') + '\n', false],
+			[
+				scopeRecord.replace(
+					'"status":"UNRUN_UNSUPPORTED"',
+					'"status":"UNRUN_UNSUPPORTED","foreign":true'
+				) + '\n',
+				false
+			],
+			[scopeRecord.replace('"collected":16', '"collected":17') + '\n', false],
+			[scopeRecord.replace(sdkFilesystemCases[0], 'ForeignControl.test_wrong') + '\n', false],
+			['\uFEFF' + scopeRecord + '\n', false]
+		])
+			check(
+				sdkScopeRecordMatches(output, expectedScope) === admitted,
+				'SDK scope transport admits one canonical record only'
+			);
 		check(
-			parser.stdout === 'Shortcuts SDK filesystem scope: ' + JSON.stringify(expectedScope) + '\n',
+			sdkScopeRecordMatches(parser.stdout, expectedScope),
 			'Windows collects all sixteen exact SDK filesystem cases as explicitly UNRUN_UNSUPPORTED'
 		);
 		console.log(
