@@ -853,20 +853,52 @@ for (const [key, value] of planOutputs) {
 		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which never writes ${key}`);
 	}
 }
-for (const match of pipeline
-	.text()
-	.matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/g)) {
-	// Only the root publishes a plan; a lane's own jobs read their scenarios
-	// from package-macos, which test-macos-swift-launcher-ci.cjs pins.
-	if (match[1] === 'package-macos') continue;
-	if (match[1] !== ROOT) {
-		errors.push(
-			`needs.${match[1]}.outputs.${match[2]} is read, but the plan lives in ${ROOT} alone`
-		);
-	} else if (!planOutputs.has(match[2])) {
-		errors.push(`needs.${ROOT}.outputs.${match[2]} is read but ${ROOT} declares no such output`);
+const COMMON_MATRIX = '${{ fromJSON(needs.prepare-common.outputs.matrix) }}';
+
+/** Keep release-plan outputs at validate and the feature matrix at its exact Common consumer. */
+function planReferenceProblems(files) {
+	const problems = [];
+	for (const file of files) {
+		const consumers =
+			file.rel === COMMON_BOX
+				? pipeline.jobsOfText(file.text, file.rel).filter((job) => job.id === 'shared-validation')
+				: [];
+		const consumer = consumers.length === 1 ? consumers[0] : null;
+		const consumerStart = consumer
+			? file.text.split('\n').slice(0, consumer.line).join('\n').length + 1
+			: -1;
+		const strategy =
+			consumer && /^ {4}strategy:\n((?: {6}[^\n]*(?:\n|$)|\n)*)/m.exec(consumer.body);
+		const matrixField = strategy && /^ {6}matrix: ([^\n]+)$/m.exec(strategy[0]);
+		const matrixStart =
+			matrixField && matrixField[1] === COMMON_MATRIX
+				? consumerStart + strategy.index + matrixField.index + '      matrix: '.length
+				: -1;
+		for (const match of file.text.matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/g)) {
+			// Native macOS scenarios remain owned by their existing separate guard.
+			if (match[1] === 'package-macos') continue;
+			if (
+				match[1] === 'prepare-common' &&
+				match[2] === 'matrix' &&
+				matrixStart >= 0 &&
+				match.index >= matrixStart &&
+				match.index + match[0].length <= matrixStart + COMMON_MATRIX.length
+			)
+				continue;
+			if (match[1] !== ROOT) {
+				problems.push(
+					`needs.${match[1]}.outputs.${match[2]} is read, but the plan lives in ${ROOT} alone`
+				);
+			} else if (!planOutputs.has(match[2])) {
+				problems.push(
+					`needs.${ROOT}.outputs.${match[2]} is read but ${ROOT} declares no such output`
+				);
+			}
+		}
 	}
+	return problems;
 }
+errors.push(...planReferenceProblems(pipeline.files()));
 
 /**
  * Lists how the root could stop running its checks as written, or plan from a
@@ -1103,7 +1135,6 @@ if (/^\s*secrets:\s*inherit\b/m.test(pipeline.text())) {
 	);
 }
 
-const COMMON_MATRIX = '${{ fromJSON(needs.prepare-common.outputs.matrix) }}';
 const COMMON_INPUTS = ['release', 'version', 'tag', 'prerelease', 'channel'];
 const COMMON_DISPATCH = [
 	'case "$SUITE" in',
@@ -1272,6 +1303,59 @@ function commonProblems(files) {
 	return problems;
 }
 errors.push(...commonProblems(pipeline.files()));
+assert.deepEqual(
+	planReferenceProblems(pipeline.files()),
+	[],
+	'actual prepared matrix keeps its exact Common consumer'
+);
+for (const [label, from, to] of [
+	['foreign matrix producer', COMMON_MATRIX, '${{ fromJSON(needs.foreign.outputs.matrix) }}'],
+	[
+		'unknown prepared output',
+		COMMON_MATRIX,
+		'${{ fromJSON(needs.prepare-common.outputs.foreign) }}'
+	],
+	['unknown root output', COMMON_MATRIX, '${{ fromJSON(needs.validate.outputs.foreign) }}'],
+	[
+		'noncanonical matrix expression',
+		COMMON_MATRIX,
+		'${{ fromJSON(needs.prepare-common.outputs.matrix) || false }}'
+	],
+	[
+		'arbitrary step script in the legitimate consumer',
+		'      - name: Run shared validation suite\n',
+		'      - name: Foreign prepared output reader\n        run: echo "${{ needs.prepare-common.outputs.matrix }}"\n\n      - name: Run shared validation suite\n'
+	],
+	[
+		'arbitrary job field in the legitimate consumer',
+		"    name: 'Unit — ${{ matrix.feature }}'\n",
+		"    name: 'Unit — ${{ matrix.feature }} ${{ needs.prepare-common.outputs.matrix }}'\n"
+	],
+	[
+		'foreign Common consumer',
+		'  common-e2e:\n',
+		'  common-e2e:\n    env:\n      FORGED_MATRIX: ${{ needs.prepare-common.outputs.matrix }}\n'
+	],
+	[
+		'prepared output outside a job',
+		'jobs:\n',
+		'env:\n  FORGED_MATRIX: ${{ needs.prepare-common.outputs.matrix }}\njobs:\n'
+	],
+	[
+		'duplicate Common consumer',
+		'  shared-validation:\n',
+		'  shared-validation:\n    runs-on: ubuntu-latest\n    env:\n      FORGED_MATRIX: ${{ needs.prepare-common.outputs.matrix }}\n  shared-validation:\n'
+	]
+]) {
+	mustCatch(label, COMMON_BOX, from, to, planReferenceProblems);
+}
+mustCatch(
+	'prepared matrix cannot become a release caller input',
+	ENTRY,
+	"    uses: ./.github/workflows/ci-common.yml\n    with:\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.validate.outputs.tag }}\n",
+	"    uses: ./.github/workflows/ci-common.yml\n    with:\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.prepare-common.outputs.matrix }}\n",
+	planReferenceProblems
+);
 for (const [what, file, from, to] of [
 	['missing Common workflow call', ENTRY, '    uses: ./.github/workflows/ci-common.yml\n', ''],
 	[
