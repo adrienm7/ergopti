@@ -8,6 +8,7 @@ local MODULES = {
 	"modules.llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.startup_controller",
+	"ui.menu.menu_llm.requirement_operation_registry",
 }
 
 local function with_fixture(callback)
@@ -114,6 +115,7 @@ local function with_fixture(callback)
 				return true
 			end,
 		}
+		fixture.manager = models_mgr
 		local Startup = helpers.load_with_stubs("ui.menu.menu_llm.startup_controller", {
 			timer = timer_stub,
 			json = {
@@ -164,7 +166,10 @@ local function with_fixture(callback)
 			prediction_locks = {
 				apply_preference = function() return true end,
 				acquire = function() return true end,
-				release = function() return true end,
+				release = function()
+					fixture.lock_releases = (fixture.lock_releases or 0) + 1
+					return true
+				end,
 				ensure_locked = function() return true end,
 			},
 		})
@@ -430,6 +435,220 @@ helpers.describe("LLM scope startup admission", function()
 			helpers.assert_eq(fixture.scope_idle(), false)
 			for _, timer in ipairs(fixture.timers) do fixture.deliver(timer) end
 			helpers.assert_eq(fixture.scope_idle(), true)
+		end)
+	end)
+end)
+
+local function with_late_requirement_fixture(callback)
+	with_fixture(function(f)
+		local Registry = require("ui.menu.menu_llm.requirement_operation_registry")
+		local registry = Registry.new({ backend = "mlx", require_owned = true })
+		local capability = registry.create_owner("startup:mlx")
+		local public
+		f.manager.force_mlx_check = function(_, _, on_fail, opts)
+			public = opts.requirement_owner
+			f.operation = assert(registry.begin(capability))
+			f.child = {}
+			assert(f.operation.lifecycle.adopt(f.child, function()
+				if f.cleanup_mode == "throw" then error("exact native cleanup refused") end
+				if f.cleanup_mode == "nil" then return nil end
+				return false
+			end))
+			f.failed = on_fail
+			return true
+		end
+		f.manager.pause_requirements = function(owner)
+			helpers.assert_eq(owner, public)
+			return registry.pause(capability)
+		end
+		f.manager.when_requirements_settled = function(owner, on_retired)
+			helpers.assert_eq(owner, public)
+			f.observation_calls = (f.observation_calls or 0) + 1
+			f.retired = on_retired
+			if f.observation_mode == "throw" then error("observation refused") end
+			if f.observation_mode == "false" then return nil, false end
+			if f.pause_on_observation == true then f.pause() end
+			local lease, committed = registry.when_settled(capability, on_retired)
+			local cancel = lease.cancel
+			lease.cancel = function()
+				if f.unregister_mode == "false" then return false end
+				return cancel()
+			end
+			return lease, committed
+		end
+		f.state.llm_enabled = true
+		f.state.llm_model = "fixture-model"
+		f.installed_models = { ["fixture-model"] = true }
+		function f.begin_failure()
+			helpers.assert_true(f.check_startup())
+			for _, timer in ipairs(f.timers) do
+				if timer.delay == 1 then f.deliver(timer); break end
+			end
+			helpers.assert_eq(f.operation.finish(f.failed, "original failure", "fixture failure"), false)
+		end
+		function f.deliver_settlement()
+			for _, timer in ipairs(f.timers) do
+				if timer.delay == 0 then f.deliver(timer) end
+			end
+		end
+		callback(f)
+	end)
+end
+
+helpers.describe("startup late original requirement settlement (issue94)", function()
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("automatically completes the retained failure after " .. mode .. " cleanup" .. " (issue94)", function()
+			with_late_requirement_fixture(function(f)
+				f.cleanup_mode = mode
+				f.begin_failure()
+				helpers.assert_eq(f.scope_idle(), false)
+				helpers.assert_eq(f.save_calls or 0, 0)
+				helpers.assert_eq(f.lock_releases or 0, 0)
+				helpers.assert_true(f.operation.lifecycle.settle(f.child))
+				helpers.assert_eq(f.save_calls or 0, 0, "leave the native terminal stack before writing")
+				f.deliver_settlement()
+				helpers.assert_true(f.scope_idle(), "exact retirement must finish without a separate resume")
+				helpers.assert_eq(f.save_calls, 1)
+				helpers.assert_eq(f.lock_releases, 1)
+				helpers.assert_eq(f.state.llm_enabled, false)
+				helpers.assert_eq(f.operation.lifecycle.settle(f.child), false)
+				f.retired()
+				f.deliver_settlement()
+				helpers.assert_eq(f.save_calls, 1)
+			end)
+		end)
+	end
+
+	helpers.it("keeps terminal publication pending while paused and fences a stale listener" .. " (issue94)", function()
+		with_late_requirement_fixture(function(f)
+			f.begin_failure()
+			local retired = f.retired
+			helpers.assert_eq(f.pause(), false)
+			helpers.assert_true(f.operation.lifecycle.settle(f.child))
+			retired()
+			f.deliver_settlement()
+			helpers.assert_eq(f.save_calls or 0, 0)
+			f.paused = false
+			helpers.assert_true(f.pause_owner.resume())
+			helpers.assert_true(f.scope_idle())
+			helpers.assert_eq(f.save_calls, 1)
+			retired()
+			f.deliver_settlement()
+			helpers.assert_eq(f.save_calls, 1)
+		end)
+	end)
+
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("reports observation " .. mode .. " and keeps exact debt for an explicit retry" .. " (issue94)", function()
+			with_late_requirement_fixture(function(f)
+				f.observation_mode = mode
+				f.begin_failure()
+				helpers.assert_true(f.operation.lifecycle.settle(f.child))
+				f.deliver_settlement()
+				helpers.assert_eq(f.scope_idle(), false)
+				helpers.assert_eq(f.save_calls or 0, 0)
+				helpers.assert_true(f.pause_owner.resume())
+				helpers.assert_true(f.scope_idle())
+				helpers.assert_eq(f.save_calls, 1)
+			end)
+		end)
+	end
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains the exact deferred handoff after native stop " .. mode .. " (issue94)", function()
+			with_late_requirement_fixture(function(f)
+				f.begin_failure()
+				helpers.assert_true(f.operation.lifecycle.settle(f.child))
+				f.stop_mode = mode
+				f.deliver_settlement()
+				helpers.assert_eq(f.save_calls or 0, 0)
+				helpers.assert_eq(f.scope_idle(), false)
+				f.stop_mode = "success"
+				f.deliver_settlement()
+				helpers.assert_true(f.scope_idle())
+				helpers.assert_eq(f.save_calls, 1)
+			end)
+		end)
+	end
+
+	helpers.it("retains a refused passive unregistration without paying native ownership" .. " (issue94)", function()
+		with_late_requirement_fixture(function(f)
+			f.begin_failure()
+			f.unregister_mode = "false"
+			helpers.assert_true(f.operation.lifecycle.settle(f.child))
+			f.deliver_settlement()
+			helpers.assert_eq(f.scope_idle(), false)
+			helpers.assert_eq(f.save_calls or 0, 0)
+			f.unregister_mode = nil
+			helpers.assert_true(f.pause_owner.resume())
+			helpers.assert_true(f.scope_idle())
+			helpers.assert_eq(f.save_calls, 1)
+		end)
+	end)
+
+	helpers.it("compensates a PAUSE reentrant observation acquisition" .. " (issue94)", function()
+		with_late_requirement_fixture(function(f)
+			f.pause_on_observation = true
+			f.begin_failure()
+			helpers.assert_true(f.operation.lifecycle.settle(f.child))
+			f.deliver_settlement()
+			helpers.assert_eq(f.save_calls or 0, 0)
+			f.paused = false
+			helpers.assert_true(f.pause_owner.resume())
+			helpers.assert_true(f.scope_idle())
+			helpers.assert_eq(f.save_calls, 1)
+		end)
+	end)
+
+	helpers.it("does not poll an idle snapshot to bypass a different refusal" .. " (issue94)", function()
+		with_late_requirement_fixture(function(f)
+			f.begin_failure()
+			helpers.assert_true(f.operation.lifecycle.settle(f.child))
+			local pause = f.manager.pause_requirements
+			f.manager.pause_requirements = function() return false end
+			f.deliver_settlement()
+			local handoffs = 0
+			for _, timer in ipairs(f.timers) do if timer.delay == 0 then handoffs = handoffs + 1 end end
+			helpers.assert_eq(handoffs, 1, "a real retirement event permits one handoff, never a poll loop")
+			helpers.assert_eq(f.save_calls or 0, 0)
+			helpers.assert_eq(f.scope_idle(), false)
+			f.manager.pause_requirements = pause
+			helpers.assert_true(f.pause_owner.resume())
+			helpers.assert_true(f.scope_idle())
+		end)
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("keeps the original terminal after handoff start " .. mode .. " (issue94)", function()
+			with_late_requirement_fixture(function(f)
+				f.begin_failure()
+				f.start_mode = mode
+				helpers.assert_true(f.operation.lifecycle.settle(f.child))
+				f.deliver_settlement()
+				helpers.assert_eq(f.save_calls or 0, 0)
+				helpers.assert_eq(f.scope_idle(), false)
+				f.start_mode = "success"
+				helpers.assert_true(f.pause_owner.resume())
+				helpers.assert_true(f.scope_idle())
+				helpers.assert_eq(f.save_calls, 1)
+			end)
+		end)
+	end
+
+	helpers.it("cannot let a late original callback settle a successor cycle" .. " (issue94)", function()
+		with_late_requirement_fixture(function(f)
+			f.begin_failure()
+			local retired = f.retired
+			helpers.assert_true(f.operation.lifecycle.settle(f.child))
+			f.deliver_settlement()
+			helpers.assert_true(f.scope_idle())
+			f.state.llm_enabled = true
+			helpers.assert_true(f.check_startup())
+			retired()
+			f.deliver_settlement()
+			helpers.assert_eq(f.scope_idle(), false)
+			helpers.assert_eq(f.save_calls, 1)
+			helpers.assert_eq(f.state.llm_enabled, true)
 		end)
 	end)
 end)
