@@ -620,10 +620,13 @@ function M.build(ctx)
 						"MLX No Model successor", disable_model) then
 						return false
 					end
-					return true
+					return publish_backend_menu(debt)
 				end)
 				if committed and state.llm_enabled ~= false then
-					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+					local ApiOllama = require("modules.llm.api_ollama")
+					if not invoke_backend_boundary("Owned Ollama retirement", ApiOllama.stop_owned_server) then
+						Logger.warn(LOG, "The prior owned Ollama daemon retains retirement debt.")
+					end
 				end
 				return committed
 			end
@@ -671,7 +674,7 @@ function M.build(ctx)
 						"Ollama No Model successor", disable_model) then
 						return false
 					end
-					return true
+					return publish_backend_menu(debt)
 				end
 				if state.llm_backend == "mlx" then
 					return leave_mlx("ollama", finish_ollama_switch)
@@ -726,7 +729,10 @@ function M.build(ctx)
 				-- The old local server is expendable only after every exact target
 				-- successor has committed.
 				if state.llm_enabled ~= false then
-					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+					local ApiOllama = require("modules.llm.api_ollama")
+					if not invoke_backend_boundary("Owned Ollama retirement", ApiOllama.stop_owned_server) then
+						Logger.warn(LOG, "The prior owned Ollama daemon retains retirement debt.")
+					end
 				end
 				return true
 			end

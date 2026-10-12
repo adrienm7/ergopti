@@ -25,7 +25,7 @@ local saved_core = package.loaded["modules.llm"]
 --- @return table A stub API module.
 local function make_api_stub()
 	return {
-		get_base_url          = function() return "http://127.0.0.1:18888" end,
+		get_base_url          = function() return "http://127.0.0.1:11434" end,
 		warmup                = function() end,
 		cancel_streaming      = function() end,
 		is_ready              = function() return false end,
@@ -454,6 +454,7 @@ helpers.describe("llm.init — auto-detect callback failures are visible (HS-016
 			404, ""
 		)
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		Logger.ring_buffer_clear()
 		local calls = 0
 		LLM.auto_detect_backend(function()

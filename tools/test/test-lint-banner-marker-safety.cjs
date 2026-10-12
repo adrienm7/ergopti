@@ -32,11 +32,41 @@ const { spawnSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const LINT_SCRIPT = path.join(REPO_ROOT, 'tools/lint/lint-conventions.js');
-// Placed inside the actual scanned tree (static/ergopti_plus/macos/infra/) so the
-// CLI's hardcoded scan roots pick it up — lint-conventions.js has no directory
-// override flag, so an isolated fixture directory would never be walked.
-const FIXTURE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/macos/infra');
+// The fixer must only see an owned miniature tree; a gate must never rewrite
+// unrelated source files in the checkout it is validating.
+const assert = require('node:assert/strict');
+const os = require('node:os');
+const FIXTURE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-banner-owner-'));
+const FIXTURE_DIR = path.join(FIXTURE_ROOT, 'static/ergopti_plus/macos/infra');
 const FIXTURE_PATH = path.join(FIXTURE_DIR, '_zzz_lint_banner_marker_safety_fixture.lua');
+const FIXTURE_LINT = path.join(FIXTURE_ROOT, 'tools/lint/lint-conventions.js');
+
+/** Runs the unchanged CLI against small, explicit language scan roots. */
+function prepareLintFixture() {
+	for (const relative of ['tools/lint/lint-conventions.js', 'tools/lib/paths.cjs']) {
+		const target = path.join(FIXTURE_ROOT, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.copyFileSync(path.join(REPO_ROOT, relative), target);
+	}
+	fs.writeFileSync(path.join(FIXTURE_ROOT, 'package.json'), '{"type":"module"}\n');
+	for (const driver of ['macos', 'linux']) {
+		for (const directory of ['adapters', 'infra', 'modules', 'ui', 'tests', 'platform']) {
+			const target = path.join(
+				FIXTURE_ROOT,
+				'static/ergopti_plus',
+				driver,
+				directory,
+				'fixture.lua'
+			);
+			fs.mkdirSync(path.dirname(target), { recursive: true });
+			fs.writeFileSync(target, `-- ${directory}/fixture.lua\nreturn {}\n`);
+		}
+	}
+	const shared = path.join(FIXTURE_ROOT, 'static/ergopti_plus/_shared');
+	fs.mkdirSync(path.join(shared, 'lua'), { recursive: true });
+	fs.writeFileSync(path.join(shared, 'lua/fixture.lua'), '-- lua/fixture.lua\nreturn {}\n');
+	fs.writeFileSync(path.join(shared, 'fixture.toml'), 'enabled = true\n');
+}
 
 /**
  * Builds a genuinely self-consistent 5-line major-section banner using the
@@ -85,8 +115,13 @@ function report() {
 }
 
 function runLint(extraArgs) {
-	return spawnSync('node', [LINT_SCRIPT, '--warn-only', ...extraArgs], {
-		cwd: REPO_ROOT,
+	assert.equal(
+		path.relative(FIXTURE_ROOT, FIXTURE_LINT).replace(/\\/g, '/'),
+		'tools/lint/lint-conventions.js',
+		'the fixer executable belongs to the isolated tree'
+	);
+	return spawnSync(process.execPath, [FIXTURE_LINT, '--warn-only', ...extraArgs], {
+		cwd: FIXTURE_ROOT,
 		encoding: 'utf8'
 	});
 }
@@ -157,15 +192,21 @@ function checkPublishedCommitBoundaries() {
 	}
 }
 
-checkPublishedCommitBoundaries();
-
 try {
+	checkPublishedCommitBoundaries();
+	prepareLintFixture();
 	fs.writeFileSync(FIXTURE_PATH, FIXTURE_CONTENT, 'utf8');
 
 	// 1) The checker must not flag an already-aligned "--"-marker banner.
 	const checkResult = runLint([]);
-	const fixtureRel = path.relative(REPO_ROOT, FIXTURE_PATH).replace(/\\/g, '/');
-	const flaggedThisFixture = checkResult.stdout
+	const fixtureRel = path.relative(FIXTURE_ROOT, FIXTURE_PATH).replace(/\\/g, '/');
+	assert.equal(checkResult.status, 0, checkResult.stderr);
+	assert.match(
+		checkResult.stdout,
+		/Lua files\s*:\s*14/,
+		'every declared Lua scan root was exercised'
+	);
+	const flaggedThisFixture = (checkResult.stdout + checkResult.stderr)
 		.split('\n')
 		.some((line) => line.includes(fixtureRel) && line.includes('Banner'));
 	test(
@@ -180,7 +221,8 @@ try {
 	);
 
 	// 2) --fix-banners must be a byte-identical no-op on an already-aligned banner.
-	runLint(['--fix-banners']);
+	const fixed = runLint(['--fix-banners']);
+	assert.equal(fixed.status, 0, fixed.stderr);
 	const afterFix = fs.readFileSync(FIXTURE_PATH, 'utf8');
 	test(
 		'fix-banners leaves an aligned "--"-marker banner byte-identical',
@@ -207,7 +249,9 @@ try {
 			: `banner block:\n${lines.slice(titleIdx - 2, titleIdx + 3).join('\n')}`
 	);
 } finally {
-	fs.rmSync(FIXTURE_PATH, { force: true });
+	assert.equal(path.dirname(FIXTURE_ROOT), path.resolve(os.tmpdir()));
+	assert.ok(path.basename(FIXTURE_ROOT).startsWith('ergopti-banner-owner-'));
+	fs.rmSync(FIXTURE_ROOT, { recursive: true, force: true });
 }
 
 report();

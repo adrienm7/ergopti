@@ -2,10 +2,11 @@
 
 /**
  * ==============================================================================
- * MODULE: One-candidate Windows Signature Disclosure
+ * MODULE: Stable Windows Signature Disclosure
  * DESCRIPTION:
- * Admits only the human-authorized unsigned stable artifact. This is signature
- * metadata, not a test deferral or execution authority. Every test remains full.
+ * Admits human-authorized unsigned stable artifacts until signing is
+ * implemented. This is signature metadata, not a test deferral or execution
+ * authority. Every test remains full.
  * ==============================================================================
  */
 
@@ -21,7 +22,7 @@ const POLICY = parseClosedJson(
 );
 const RECEIPT = 'windows-signing-qualification.json';
 const QUOTE =
-	'ok pour release pour le moment pas de signature. et mets en todo de faire avec signpath foundation';
+	"le exe non signé est autorisé tant qu'on n’a pas implémenté la signature, qui est un élément de la todo";
 function refuse() {
 	throw new Error('Unsigned stable Windows signature exception is not admitted.');
 }
@@ -41,33 +42,29 @@ function validatePolicy(value) {
 		'authorized',
 		'authorization_date',
 		'authorization_quote',
-		'expires_at',
 		'repository',
 		'event_name',
 		'ref',
 		'release',
 		'prerelease',
 		'channel',
-		'tag',
-		'version',
 		'purpose',
-		'qualified'
+		'qualified',
+		'until'
 	]);
 	if (
-		value.schema !== 1 ||
-		value.id !== 'stable-v1-20261009-windows-unsigned' ||
+		value.schema !== 2 ||
+		value.id !== 'stable-windows-unsigned-until-signing' ||
 		typeof value.authorized !== 'boolean' ||
-		value.authorization_date !== '2026-10-09' ||
+		value.authorization_date !== '2026-10-11' ||
 		value.authorization_quote !== QUOTE ||
-		value.expires_at !== '2026-10-10T02:00:00Z' ||
+		value.until !== 'windows-signing-implemented' ||
 		value.repository !== 'adrienm7/ergopti' ||
 		value.event_name !== 'push' ||
 		value.ref !== 'refs/heads/main' ||
 		value.release !== true ||
 		value.prerelease !== 'false' ||
 		value.channel !== 'main' ||
-		value.tag !== 'v1.0.0' ||
-		value.version !== '1.0.0' ||
 		value.purpose !== 'windows-authenticode-only' ||
 		value.qualified !== false
 	)
@@ -91,22 +88,17 @@ function admit(context, source, checkout, now = new Date(), policy = POLICY) {
 	if (
 		!policy.authorized ||
 		context.github_actions !== 'true' ||
-		![
-			'repository',
-			'event_name',
-			'ref',
-			'release',
-			'prerelease',
-			'channel',
-			'tag',
-			'version'
-		].every((key) => context[key] === policy[key]) ||
+		!['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel'].every(
+			(key) => context[key] === policy[key]
+		) ||
+		typeof context.version !== 'string' ||
+		!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(context.version) ||
+		context.tag !== 'v' + context.version ||
 		!/^[0-9a-f]{40}$/.test(source) ||
 		checkout !== source ||
 		!(now instanceof Date) ||
 		!Number.isFinite(now.getTime()) ||
-		now.getTime() < Date.parse(policy.authorization_date + 'T00:00:00Z') ||
-		now.getTime() >= Date.parse(policy.expires_at)
+		now.getTime() < Date.parse(policy.authorization_date + 'T00:00:00Z')
 	)
 		refuse();
 }
@@ -123,7 +115,7 @@ function receipt(context, source, checkout, sha256, now = new Date(), policy = P
 		sha256,
 		signature: 'NotSigned',
 		qualified: false,
-		tests: 'mandatory-outside-published-native-desktop-scope'
+		tests: 'mandatory'
 	};
 }
 function validateReceipt(
@@ -150,14 +142,23 @@ function validateReceipt(
 	const expected = receipt(context, source, checkout, observedHash, now, policy);
 	for (const key of Object.keys(expected)) if (value[key] !== expected[key]) refuse();
 }
-function notice(source) {
-	if (!/^[0-9a-f]{40}$/.test(source)) refuse();
+function notice(source, tag) {
+	if (
+		!/^[0-9a-f]{40}$/.test(source) ||
+		typeof tag !== 'string' ||
+		!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)
+	)
+		refuse();
 	return (
 		'WINDOWS AUTHENTICODE UNSIGNED / qualified:false (source ' +
 		source +
-		'): ErgoptiPlus.exe has no Windows code-signing certificate for this v1.0.0 release. ' +
-		'All Windows checks outside the separately published native-desktop scope, source and asset integrity checks remain mandatory. ' +
-		'Windows may show an unknown-publisher warning. [Signature evidence](https://github.com/adrienm7/ergopti/releases/download/v1.0.0/windows-signing-qualification.json). ' +
+		'): ErgoptiPlus.exe has no Windows code-signing certificate for this ' +
+		tag +
+		' release. ' +
+		'All tests, build, package, source and asset integrity, and installation checks remain mandatory. ' +
+		'Windows may show an unknown-publisher warning. [Signature evidence](https://github.com/adrienm7/ergopti/releases/download/' +
+		tag +
+		'/windows-signing-qualification.json). ' +
 		'Future signing requires SignPath Foundation enrollment and qualified GitHub integration.'
 	);
 }
@@ -181,7 +182,7 @@ function main(args, env = process.env) {
 	if (args.length === 1 && args[0] === '--publication-admit') {
 		const directory = path.join(ROOT, 'release-assets');
 		const filename = path.join(directory, RECEIPT);
-		if (context.tag !== POLICY.tag || context.channel !== POLICY.channel) {
+		if (context.channel !== POLICY.channel) {
 			if (fs.existsSync(filename)) refuse();
 			console.log('ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE=');
 			return;
@@ -191,6 +192,7 @@ function main(args, env = process.env) {
 			console.log('ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE=');
 			return;
 		}
+		if (env.ERGOPTI_WINDOWS_SIGNING_CONFIGURED === 'true') refuse();
 		requireFreshUnsigned(env.ERGOPTI_WINDOWS_CREATE_RELEASE);
 		const value = parseClosedJson(fs.readFileSync(filename, 'utf8'));
 		const image = fs.readFileSync(path.join(directory, 'ErgoptiPlus.exe'));
@@ -201,7 +203,7 @@ function main(args, env = process.env) {
 			checkout,
 			crypto.createHash('sha256').update(image).digest('hex')
 		);
-		console.log('ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE=' + notice(source));
+		console.log('ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE=' + notice(source, context.tag));
 		return;
 	}
 	refuse();

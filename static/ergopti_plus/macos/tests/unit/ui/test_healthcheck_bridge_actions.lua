@@ -231,13 +231,14 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 
 	-- The report was also saved and revealed in Finder, which finished after
 	-- the browser opened and took the focus from the form (report-focus)
-	helpers.it("report copies, then opens the prefilled form last, with no Finder (report-focus)", function()
+	helpers.it("report completes its attachment, then opens the stable-metadata form last (report-focus)", function()
 		as_jdoe(function()
 			local core, context = load_window()
 			core.show_window()
 			local focused_at_open = context.focused
 			context.effects = {}
 			-- /usr/bin/open: what revealing a file in Finder would run
+			local previous_shell = package.loaded["adapters.shell_runner"]
 			package.loaded["adapters.shell_runner"] = {
 				spawn = function(bin, args)
 					context.spawned[#context.spawned + 1] = { bin = bin, args = args }
@@ -245,20 +246,40 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 					return { start = function() return true end }
 				end,
 			}
+			local previous_open, previous_attributes = io.open, hs.fs.attributes
+			local written, closed = {}, 0
+			hs.fs.attributes = function() return "directory" end
+			io.open = function(path, mode)
+				if mode == "wb" then
+					assert(path:sub(1, #HOME) == HOME and path:find("/diagnostics/", 1, true), "only the modeled attachment write is admitted")
+					return {
+						write = function(_, value) written[#written + 1] = value; context.effects[#context.effects + 1] = "write"; return true end,
+						close = function() closed = closed + 1; context.effects[#context.effects + 1] = "close"; return true end,
+					}
+				end
+				assert(mode == nil or mode == "r" or mode == "rb", "foreign filesystem writes forbidden")
+				return previous_open(path, mode)
+			end
 			local ok, approved = pcall(share_action, context, { action = "report",
 				text = "log at /Users/jdoe/Library/Logs by jdoe",
 				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } })
-			package.loaded["adapters.shell_runner"] = nil
+			io.open, hs.fs.attributes = previous_open, previous_attributes
+			package.loaded["adapters.shell_runner"] = previous_shell
 			helpers.assert_true(ok, tostring(approved))
 			helpers.assert_eq(context.copied, { approved })
 			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
 			helpers.assert_eq(#context.opened_urls, 1, "the bug form opens once")
+			local repo = core.config().repository
+			helpers.assert_eq(context.opened_urls[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=unknown&os=macos&driver=macos")
 			local encoded = context.opened_urls[1]:match("[?&]diagnostics=([^&]*)")
 			local diagnostics = encoded and encoded:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
-			helpers.assert_eq(diagnostics, context.copied[1], "the form holds the report the clipboard holds")
-			helpers.assert_eq(context.spawned, {}, "nothing is revealed in Finder")
+			helpers.assert_nil(diagnostics, "no query default can reset an edit")
+			helpers.assert_eq(#context.spawned, 1, "the completed attachment is revealed before the browser")
+			helpers.assert_eq(context.spawned[1].args[1], "-R")
+			helpers.assert_eq(written, { approved }, "the real save owner receives the complete approved report")
+			helpers.assert_eq(closed, 1)
 			helpers.assert_eq(context.focused, focused_at_open, "the window is not brought back to the front")
-			helpers.assert_eq(context.effects, { "copy", "open_url" }, "the browser opens last")
+			helpers.assert_eq(context.effects, { "copy", "write", "close", "spawn", "open_url" }, "the browser opens last after write and close ACK")
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].action, "report")
 			helpers.assert_eq(messages[#messages].ok, true)

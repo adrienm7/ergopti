@@ -172,7 +172,7 @@ local function with_remap(options, body)
 			resolve_layout_actions = function()
 				calls.resolve_count = calls.resolve_count + 1
 				calls.resolved_revision = calls.layout_revision
-				return 1
+				return 1, "ansi"
 			end,
 		}
 		package.loaded["platform.remap.generator"] = {

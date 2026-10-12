@@ -79,7 +79,7 @@ for (const job of ['managed-ollama-native', 'cold-bootstrap-native']) {
 }
 
 const canvas = pipeline.job('tooltip-canvas');
-assert.deepEqual(pipeline.needsOf(canvas), ['e2e-hs']);
+assert.deepEqual(pipeline.needsOf(canvas), ['test-hs', 'e2e-hs']);
 assert.equal(pipeline.field(canvas, 'runs-on'), 'macos-15');
 assert.equal(pipeline.field(canvas, 'if'), null);
 assert.equal(pipeline.field(canvas, 'continue-on-error'), null);

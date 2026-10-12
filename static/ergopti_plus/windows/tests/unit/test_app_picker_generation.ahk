@@ -224,6 +224,9 @@ _APG_MetricsDelayedOwnerCannotOverwriteNewerCommit() {
 		_APG_ResetOwners()
 		_APG_ResetEffects()
 		ConfigurationFile := A_Temp . "\ergopti_app_picker_generation.toml"
+		AssertFalse(FSStrictExists(ConfigurationFile))
+		AssertEqual("absent", ConfigMigrateBoot(ConfigurationFile)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile))
 		_SaveFullConfigReady := true
 		MetricsFilters.disabled_apps := Map()
 		_APG_ReloadResult := 0
@@ -262,6 +265,9 @@ _APG_MetricsExternalAbaInvalidatesOpenPicker() {
 		_APG_ResetOwners()
 		_APG_ResetEffects()
 		ConfigurationFile := A_Temp . "\ergopti_app_picker_external_aba.toml"
+		AssertFalse(FSStrictExists(ConfigurationFile))
+		AssertEqual("absent", ConfigMigrateBoot(ConfigurationFile)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile))
 		_SaveFullConfigReady := true
 		MetricsFilters.disabled_apps := Map()
 		ReceiptA := AppPicker_IssueReceipt("metrics:disabled_apps", [])

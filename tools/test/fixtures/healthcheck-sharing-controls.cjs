@@ -12,6 +12,9 @@ exports.run = function run(root) {
 	const schema = JSON.parse(
 		fs.readFileSync(path.join(shared, 'modules/diagnostics/schema.json'), 'utf8')
 	);
+	schema.export_strings = JSON.parse(
+		fs.readFileSync(path.join(shared, 'data/locales/en.json'), 'utf8')
+	);
 	const corpus = JSON.parse(
 		fs.readFileSync(path.join(shared, 'tests/corpus/healthcheck/share_vectors.json'), 'utf8')
 	);
@@ -26,14 +29,22 @@ exports.run = function run(root) {
 	const outputs = [];
 	for (const vector of corpus.vectors) {
 		const safe = model.shareSnapshot(vector.snapshot, schema);
-		const text = model.formatShareable(vector.snapshot, schema, (key) => key);
+		const text = model.formatShareable(
+			vector.snapshot,
+			schema,
+			(key) => 'LOCALIZED-EXPORT-CANARY:' + key
+		);
 		for (const canary of vector.canaries)
 			assert.ok(!text.includes(canary), vector.name + ': ' + canary);
 
+		assert.ok(
+			!text.includes('LOCALIZED-EXPORT-CANARY:'),
+			'Sharing must use canonical English without consulting UI locale'
+		);
 		const readable = text.split('```json')[0];
 		for (const id of ['versions', 'hardware', 'system', 'input', 'ai', 'permissions', 'issues'])
 			assert.ok(
-				readable.includes('## healthcheck.section.' + id),
+				readable.includes('## ' + schema.export_strings['healthcheck.section.' + id]),
 				'readable section omitted: ' + id
 			);
 		assert.ok(readable.includes('| probes.appleevent_transport.native_status | -1744 |'));
@@ -75,6 +86,28 @@ exports.run = function run(root) {
 			'projection must not mutate the collector'
 		);
 		outputs.push({ name: vector.name, snapshot: JSON.parse(JSON.stringify(safe)) });
+	}
+
+	const facts = JSON.parse(
+		fs.readFileSync(
+			path.join(shared, 'tests/corpus/healthcheck/recent_error_fact_vectors.json'),
+			'utf8'
+		)
+	);
+	for (const vector of facts.vectors) {
+		const original = JSON.stringify(vector.snapshot);
+		const document = model.formatShareable(vector.snapshot, schema, () => 'PRIVATE_LOCALE');
+		const safe = model.shareSnapshot(vector.snapshot, schema);
+		assert.deepEqual(
+			JSON.parse(JSON.stringify(safe.sections.issues.recent_error_facts)),
+			vector.expected
+		);
+		for (const canary of facts.canaries) assert.ok(!document.includes(canary), canary);
+		assert.ok(
+			document.includes('lease_watchdog_exit') && document.includes('log_observation_only')
+		);
+		assert.ok(document.includes('excluded_entries'));
+		assert.equal(JSON.stringify(vector.snapshot), original);
 	}
 	assert.throws(() => model.shareSnapshot({ driver: 'foreign' }, schema));
 	assert.throws(() => model.shareSnapshot(corpus.vectors[0].snapshot, {}));

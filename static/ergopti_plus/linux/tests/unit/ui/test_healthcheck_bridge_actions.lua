@@ -53,10 +53,17 @@ local function load_bridge(controls)
 	}
 	package.loaded["infra.config_paths"] = setmetatable({ home = function() return HOME end },
 		{ __index = require("infra.config_paths") })
+	local sink = require("infra.logger_sink")
+	local previous_log_dir = sink.log_dir
+	if controls.logs_dir ~= nil then
+		assert(type(controls.logs_dir) == "string" and controls.logs_dir:sub(1, #HOME) == HOME)
+		sink.log_dir = function() return controls.logs_dir end
+	end
 	local bridge = helpers.load_module("ui.healthcheck.bridge")
 	local logger = require("logger.shim")
 	local warn = logger.warn
 	context.restore = function()
+		sink.log_dir = previous_log_dir
 		logger.warn = warn
 		package.loaded["ui.webview_manager"] = nil
 		package.loaded["adapters.clipboard"] = nil
@@ -299,6 +306,42 @@ helpers.describe("diagnostics bridge (linux): sharing preview admission", functi
 			local accepted = bridge.on_message({ action = "copy", text = current.share_text }, {}, page(context))
 			helpers.assert_eq(accepted.ok, true)
 			helpers.assert_eq(context.copied, { current.share_text })
+		end)
+	end)
+end)
+
+helpers.describe("diagnostics bridge stable-metadata report", function()
+	helpers.it("completes the actual attachment before opening a form without editable query defaults", function()
+		with_bridge({ logs_dir = HOME .. "/.local/state/ergopti_plus" }, function(bridge, context)
+			local ready = bridge.on_message("ready", {}, page(context))
+			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 77 }, {}, page(context))
+			local fs = require("adapters.file_system")
+			local old_write, old_shell = fs.write, package.loaded["adapters.shell_runner"]
+			local calls, written = {}, {}
+			fs.write = function(path, value)
+				assert(path:sub(1, #HOME) == HOME and path:find("/diagnostics/", 1, true))
+				written[#written + 1] = value; calls[#calls + 1] = "write"; return true
+			end
+			package.loaded["adapters.shell_runner"] = {
+				quote = function(value) return string.format("%q", value) end,
+				run = function(command) calls[#calls + 1] = command; return true end,
+			}
+			local ok, err = xpcall(function()
+				local answer = bridge.on_message({ action = "report", text = exported.share_text,
+					fields = { version = "2.4.0", driver = "foreign" } }, {}, page(context))
+				helpers.assert_eq(answer.ok, true)
+				helpers.assert_eq(context.copied, { exported.share_text })
+				helpers.assert_eq(written, { exported.share_text })
+				helpers.assert_eq(#calls, 4, "mkdir, completed write, reveal, then browser")
+				helpers.assert_true(calls[1]:find("mkdir -p", 1, true) == 1)
+				helpers.assert_eq(calls[2], "write")
+				local repo = bridge.config().repository
+				local stable = require("healthcheck.share").document(exported.snapshot, bridge.config().schema, "ignored").fields
+				local url = require("diagnostics.issue_link").build_url(bridge.config().templates, repo, "bug", stable)
+				helpers.assert_eq(calls[4], "xdg-open " .. string.format("%q", url) .. " >/dev/null 2>&1 &")
+			end, debug.traceback)
+			fs.write, package.loaded["adapters.shell_runner"] = old_write, old_shell
+			if not ok then error(err, 0) end
 		end)
 	end)
 end)

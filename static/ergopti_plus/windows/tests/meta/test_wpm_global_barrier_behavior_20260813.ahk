@@ -175,6 +175,7 @@ _WPMGB_SaveState() {
 	global ConfigurationFile
 	return {
 		path: ConfigurationFile,
+		fixture: 0,
 		visible: WPMWidget.visible,
 		colors: WPMWidget.use_colors,
 		graph: WPMWidget.show_graph,
@@ -191,6 +192,8 @@ _WPMGB_RestoreState(Saved) {
 	WPMWidget.show_graph := Saved.graph
 	WPMWidget.pos_x := Saved.x
 	WPMWidget.pos_y := Saved.y
+	if Saved.fixture is Object
+		_ScopeOwnerCleanup(Saved.fixture)
 }
 
 
@@ -207,7 +210,8 @@ _WPMGB_PublishesOnlyAfterWriter() {
 	global ConfigurationFile, _WPMGB_WriteCalls, _WPMGB_ObservedState
 	Saved := _WPMGB_SaveState()
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_gateway_order.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.use_colors := false
 		WPMWidget.show_graph := false
 		WPMWidget.pos_x := 10
@@ -240,7 +244,8 @@ _WPMGB_TerminalBarrierRefusesBeforeWriter() {
 	Saved := _WPMGB_SaveState()
 	Barrier := false
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_terminal_barrier.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.use_colors := false
 		WPMWidget.show_graph := false
 		WPMWidget.pos_x := 50
@@ -277,7 +282,8 @@ _WPMGB_CloseRefusalKeepsSurfaceVisible() {
 	Saved := _WPMGB_SaveState()
 	Barrier := false
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_close_refusal.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.visible := true
 		_WPMGB_ResetFakes()
 		Barrier := _ConfigWriteTerminalTryAcquire(ConfigurationFile)
@@ -307,7 +313,8 @@ _WPMGB_CloseSuccessPublishesBeforeHide() {
 	global _WPMGB_HideCalls, _WPMGB_VisibleAtHide, _WPMGB_ObservedState
 	Saved := _WPMGB_SaveState()
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_close_success.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.visible := true
 		_WPMGB_ResetFakes()
 		AssertTrue(WPMWidget_Close(0, _WPMGB_Writer, _WPMGB_Notify,
@@ -332,7 +339,8 @@ _WPMGB_CloseHideFailureUsesGuiFallback() {
 	global ConfigurationFile, _WPMGB_WriteCalls
 	Saved := _WPMGB_SaveState()
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_close_hide_fallback.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.visible := true
 		_WPMGB_ResetFakes()
 		GuiRef := _WPMGB_CloseGui()
@@ -363,7 +371,8 @@ _WPMGB_RejectedDragRestoresPhysicalWindow() {
 		SavedGraphGui := WPMWidget._graph_gui
 	Barrier := false
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_rejected_drag.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.show_graph := false
 		WPMWidget.pos_x := 90
 		WPMWidget.pos_y := 100
@@ -408,7 +417,8 @@ _WPMGB_MalformedSuccessStatusCannotPublish() {
 	global ConfigurationFile, _WPMGB_WriteCalls
 	Saved := _WPMGB_SaveState()
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_strict_status.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.visible := false
 		_WPMGB_ResetFakes("1")
 		AssertFalse(WPMWidget_SaveVisible(true, _WPMGB_Writer, _WPMGB_Notify),
@@ -445,7 +455,8 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 		SavedLblUnit := WPMWidget._lbl_unit
 	Barrier := false
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_inherited_critical.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.visible := true
 		WPMWidget.show_graph := false
 		WPMWidget.pos_x := 10
@@ -590,7 +601,8 @@ _WPMGB_MenuRefusalDoesNotPublish() {
 	global _WPMGB_HideCritical, _WPMGB_ShowCritical
 	Saved := _WPMGB_SaveState()
 	try {
-		ConfigurationFile := A_Temp . "\ergopti_wpm_menu_refusal.toml"
+		Saved.fixture := _ScopeOwnerFixture()
+		ConfigurationFile := Saved.fixture.path
 		WPMWidget.use_colors := false
 		WPMWidget.show_graph := false
 		WPMWidget.pos_x := 14

@@ -163,6 +163,73 @@ _KLT_VectorsCase() {
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
 }
 
+Test("keylayout emulation: captured routes retain layout and modifiers after unload (todo49-captured-kle)",
+	() => _KLT_WithEmulation(_KLT_CapturedReplayVectorsCase))
+
+_KLT_CaptureReplayPress(Press) {
+	Parts := StrSplit(Press, " ")
+	Shift := false
+	Caps := false
+	Option := false
+	Loop Parts.Length - 1 {
+		switch Parts[A_Index] {
+			case "shift": Shift := true
+			case "caps": Caps := true
+			case "altgr": Option := true
+			default: throw ValueError("Unknown modifier in a captured keylayout vector.")
+		}
+	}
+	return KeylayoutEmulation_CaptureReplayRoute(Parts[Parts.Length], Shift, Caps, Option)
+}
+
+_KLT_CapturedReplayVectorsCase() {
+	global KLE_State, KEYLAYOUT_NEUTRAL_STATE
+	Doc := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\keylayout_vectors.json", "UTF-8"))
+	Captured := 0
+	for Vector in Doc["vectors"] {
+		if !Vector.Has("press")
+			continue
+		_KLT_Load(Vector["layout"])
+		Recipes := []
+		for Press in Vector["press"]
+			Recipes.Push(_KLT_CaptureReplayPress(Press))
+		KeylayoutEmulation_Unload()
+		KLE_State := "unrelated-live-state"
+		State := KEYLAYOUT_NEUTRAL_STATE
+		Output := ""
+		for Recipe in Recipes {
+			AssertEqual(Vector["layout"], Recipe["layout_id"], "the event retains its accepted layout")
+			Step := KeylayoutEmulation_StepReplayRoute(Recipe, State)
+			State := Step["Next"]
+			Output .= Step["Output"]
+		}
+		AssertEqual(Vector["types"], Output, Vector["id"] . " must replay the independent corpus after unload")
+		AssertEqual("unrelated-live-state", KLE_State, "queued stepping cannot mutate the current live composition")
+		Captured += 1
+	}
+	Assert(Captured >= 25, "captured replay must cover base, modifiers, digits and dead-key corpus vectors")
+}
+
+Test("keylayout emulation: captured route refuses unowned and malformed input (todo49-captured-kle)",
+	() => _KLT_WithEmulation(_KLT_CapturedReplayRefusalCase))
+
+_KLT_CapturedReplayRefusalCase() {
+	_KLT_Load("ergol")
+	AssertThrows(() => KeylayoutEmulation_CaptureReplayRoute("SC777", false, false, false),
+		"an unregistered physical key cannot acquire a route")
+	AssertThrows(() => KeylayoutEmulation_StepReplayRoute(Map(), "none"),
+		"an incomplete recipe cannot run")
+	Recipe := KeylayoutEmulation_CaptureReplayRoute("SC010", false, false, false)
+	AssertThrows(() => KeylayoutEmulation_StepReplayRoute(Recipe, 0),
+		"the replay stream must provide an explicit composition state")
+	KeylayoutEmulation_Unload()
+	AssertThrows(() => KeylayoutEmulation_CaptureReplayRoute("SC010", false, false, false),
+		"an unloaded layout cannot admit new recipes")
+	_KLT_Load("ergopti")
+	AssertEqual("q", KeylayoutEmulation_StepReplayRoute(Recipe, "none")["Output"],
+		"a live layout swap cannot replace the admitted Ergo-L source")
+}
+
 ; The registry emulation and the Ergopti emulation read the same .keylayout
 ; through two readers (keylayout_emulation.ahk steps the model per key,
 ; keylayout_tables.ahk flattens it into tables). The golden file records what

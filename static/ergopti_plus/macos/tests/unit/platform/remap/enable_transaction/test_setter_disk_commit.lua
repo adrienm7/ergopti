@@ -10,6 +10,29 @@ local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.remap_transaction_fixture")
 
 helpers.describe("karabiner synchronous setters commit disk before live state", function()
+	for _, mode in ipairs({ "disabled", "paused" }) do
+		helpers.it("(live-tap-hold-transition) preserves intentional " .. mode .. " settings-only edits", function()
+			with_fixture(function(fixture)
+				local remap, calls = fixture.load_enabled_remap({
+					initially_enabled = mode ~= "disabled", paused = mode == "paused",
+				})
+				package.loaded["platform.remap.lease_controller"].status = function()
+					error("an intentional settings-only edit must not require a live lease")
+				end
+				helpers.assert_true(remap.set_hold_action("left_shift", "shift"))
+				helpers.assert_true(remap.set_tap_action("left_shift", "escape"))
+				helpers.assert_eq(remap.get_hold_action("left_shift"), "shift")
+				helpers.assert_eq(remap.get_tap_action("left_shift"), "escape")
+				helpers.assert_eq(calls.save, 2)
+				helpers.assert_eq(calls.saved_payloads[2].tap_hold_config.left_shift.hold, "shift")
+				helpers.assert_eq(calls.saved_payloads[2].tap_hold_config.left_shift.tap, "escape")
+				helpers.assert_eq(calls.build, 0)
+				helpers.assert_eq(calls.deploy, 0)
+				helpers.assert_eq(calls.stop, 0)
+			end)
+		end)
+	end
+
 	helpers.it("rolls back every setter class when persistence returns false", function()
 		with_fixture(function(fixture)
 			local remap = fixture.load_enabled_remap({ save_succeeds = false })

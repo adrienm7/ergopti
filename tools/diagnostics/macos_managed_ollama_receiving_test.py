@@ -688,5 +688,471 @@ class FatalFailureObservationControls(unittest.TestCase):
         self.assertNotIn("prepare_phase", result)
 
 
+class PayloadDependencyControls(unittest.TestCase):
+    def test_original_redirect_policy_is_copied_and_hash_bound_before_bootstrap_download(self):
+        with tempfile.TemporaryDirectory(prefix="ergopti-ollama-payload-") as directory:
+            root = Path(directory)
+            catalogue = root / "fixture-catalogue.json"
+            catalogue.write_text('{"fixture":"payload-only-no-install"}\n', encoding="utf-8")
+            subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+            subject.root = ROOT
+            subject.source_hashes = {}
+            subject.options = SimpleNamespace(catalogue=catalogue)
+            # This existing prerequisite checks only source copying, not release admission.
+            subject.receiving_catalogue = Mock(
+                side_effect=lambda destination, _: destination.write_bytes(catalogue.read_bytes())
+            )
+            payload = subject.payload(root / "OwnedPayload.app")
+            relative = "static/ergopti_plus/_shared/data/http/redirect_policy.json"
+            original = ROOT / relative
+            copied = payload / "_shared/data/http/redirect_policy.json"
+            self.assertEqual(copied.read_bytes(), original.read_bytes())
+            self.assertEqual(
+                subject.source_hashes[relative], hashlib.sha256(original.read_bytes()).hexdigest()
+            )
+            runtime = RECEIVING.load(
+                "payload_only_ollama_runtime",
+                payload / "macos/modules/llm/managed_ollama_runtime.py",
+            )
+            self.assertEqual(runtime.BOOTSTRAP.REDIRECT_POLICY, copied)
+            request = Mock(side_effect=AssertionError("payload prerequisite cannot reach network"))
+            output = root / "must-not-be-created"
+            # A deliberately invalid digest reaches the real policy read, then
+            # refuses before file acquisition or any native request constructor.
+            with self.assertRaises(runtime.BOOTSTRAP.BootstrapFailure) as refused:
+                runtime.BOOTSTRAP.download(
+                    "https://payload.invalid/input", output, "invalid", 1, 10, 1, request=request
+                )
+            self.assertEqual(refused.exception.reason, "integrity")
+            request.assert_not_called()
+            self.assertFalse(output.exists())
+
+
+class TerminalFailureObservationControls(unittest.TestCase):
+    """Exercise the real CLI catches and receipt writer with recording owners."""
+
+    def receive(self, primary=None, cleanup=None):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            owner = SimpleNamespace(
+                class_failure_observation=True,
+                stage="prepare",
+                output=output,
+                receipt={
+                    "version": 1,
+                    "profile": "pac-inline",
+                    "success": False,
+                    "private_children_retired": False,
+                    "native_trust_restored": False,
+                },
+                run=Mock(side_effect=primary),
+                close=Mock(side_effect=cleanup),
+            )
+            arguments = [
+                "receiving",
+                "--archive",
+                "private-archive",
+                "--catalogue",
+                "private-catalogue",
+                "--launcher",
+                "private-launcher",
+                "--framework",
+                "private-framework",
+                "--output",
+                str(output),
+                "--profile",
+                "pac-inline",
+            ]
+            with (
+                patch.object(RECEIVING.sys, "argv", arguments),
+                patch.object(RECEIVING.sys, "platform", "darwin"),
+                patch.object(RECEIVING, "Receiver", return_value=owner),
+            ):
+                status = RECEIVING.main()
+            owner.run.assert_called_once_with()
+            owner.close.assert_called_once_with()
+            return status, (output / "native-receiving.json").read_text()
+
+    def test_primary_and_cleanup_failure_retain_both_closed_facts(self):
+        status, raw = self.receive(
+            RuntimeError("actual_archive_name"), OSError("private-path/token")
+        )
+        value = json.loads(raw)
+        self.assertEqual(status, 1)
+        self.assertFalse(value["success"])
+        self.assertEqual(value["reason"], "native_receiving_cleanup_failed")
+        self.assertEqual(value["failed_stage"], "prepare")
+        self.assertEqual(
+            value["primary_failure"],
+            {"exception_class": "RuntimeError", "code": "actual_archive_name"},
+        )
+        self.assertEqual(value["cleanup_failure"], {"exception_class": "OSError", "code": None})
+        self.assertFalse(value["native_trust_restored"])
+        self.assertNotIn("private-path", raw)
+        self.assertNotIn("token", raw)
+
+    def test_cleanup_only_failure_never_claims_success_or_primary_failure(self):
+        class PrivateExceptionName(Exception):
+            pass
+
+        status, raw = self.receive(cleanup=PrivateExceptionName("https://private.invalid/secret"))
+        value = json.loads(raw)
+        self.assertEqual(status, 1)
+        self.assertFalse(value["success"])
+        self.assertEqual(value["reason"], "native_receiving_cleanup_failed")
+        self.assertEqual(value["cleanup_failure"], {"exception_class": "unknown", "code": None})
+        self.assertNotIn("primary_failure", value)
+        self.assertNotIn("failed_stage", value)
+        self.assertNotIn("private.invalid", raw)
+        self.assertNotIn("PrivateExceptionName", raw)
+
+    def test_success_and_primary_only_failure_preserve_original_outcomes(self):
+        status, raw = self.receive()
+        value = json.loads(raw)
+        self.assertEqual(status, 0)
+        self.assertTrue(value["success"])
+        self.assertEqual(value["reason"], "complete")
+        self.assertNotIn("primary_failure", value)
+        self.assertNotIn("cleanup_failure", value)
+        status, raw = self.receive(primary=FileNotFoundError("private-input-name"))
+        value = json.loads(raw)
+        self.assertEqual(status, 1)
+        self.assertFalse(value["success"])
+        self.assertEqual(value["reason"], "native_receiving_failed")
+        self.assertEqual(
+            value["primary_failure"], {"exception_class": "FileNotFoundError", "code": None}
+        )
+        self.assertNotIn("cleanup_failure", value)
+        self.assertNotIn("private-input-name", raw)
+
+    def test_prepare_phase_preserves_existing_runtime_and_cleanup_failure_facts(self):
+        policy = RECEIVING.load(
+            "milestone_actual_runtime_policy",
+            ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+        )
+        namespace = SimpleNamespace
+        for phase in [*sorted(RECEIVING.PREPARE_PHASES), None, 4, "private-marker"]:
+            with self.subTest(phase=phase):
+
+                def observed_owner(**values):
+                    return namespace(**values, prepare_phase=phase)
+
+                with patch.dict(self.receive.__globals__, {"SimpleNamespace": observed_owner}):
+                    status, raw = self.receive(
+                        policy.RuntimeRefusal("unavailable"),
+                        RuntimeError("actual_source_close_debt"),
+                    )
+                value = json.loads(raw)
+                self.assertEqual(status, 1)
+                self.assertFalse(value["success"])
+                self.assertEqual(value["reason"], "native_receiving_cleanup_failed")
+                self.assertEqual(
+                    value["primary_failure"],
+                    {"exception_class": "RuntimeRefusal", "code": "unavailable"},
+                )
+                self.assertEqual(
+                    value["cleanup_failure"],
+                    {"exception_class": "RuntimeError", "code": "actual_source_close_debt"},
+                )
+                self.assertEqual(
+                    value["prepare_phase"],
+                    phase
+                    if type(phase) is str and phase in RECEIVING.PREPARE_PHASES
+                    else "unknown",
+                )
+                self.assertNotIn("private-marker", raw)
+
+
+class ReceivingCatalogueControls(unittest.TestCase):
+    """Pure catalogue/install admission only; no native request or installer runs."""
+
+    def catalogue(self):
+        contract_bytes = (
+            ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
+        ).read_bytes()
+        contract = json.loads(contract_bytes)
+        binding = contract["assets"]["macos-arm64"]
+        asset = {name: binding[name] for name in ("os", "architecture", "filename")}
+        asset.update(
+            url="https://github.com/adrienm7/ergopti/releases/download/v1.0.1/"
+            + binding["filename"],
+            sha256="a" * 64,
+            binary_sha256="b" * 64,
+            provenance_sha256="c" * 64,
+            bytes=123,
+            runtime_libraries_sha256={"lib/fixture.dylib": "d" * 64},
+        )
+        for field in ("version", "source_commit", "capability", "native_http_capability"):
+            asset[field] = contract[field]
+        return {
+            "schema_version": 1,
+            **{
+                field: contract[field]
+                for field in ("version", "source_commit", "capability", "native_http_capability")
+            },
+            "runtime_contract_sha256": hashlib.sha256(contract_bytes).hexdigest(),
+            "repository_commit": "e" * 40,
+            "repository_source_sha256": {
+                name: "f" * 64 for name in contract["source_fingerprint_paths"]
+            },
+            "publication": {
+                "mode": "planned-release",
+                "repository": "adrienm7/ergopti",
+                "tag": "v1.0.1",
+                "version": "1.0.1",
+                "channel": "main",
+            },
+            "assets": {"macos-arm64": asset},
+        }
+
+    def test_planned_release_receiving_projects_only_private_publication_before_install(self):
+        with tempfile.TemporaryDirectory(prefix="ergopti-receiving-catalogue-") as directory:
+            root = Path(directory)
+            input_path = root / "original.json"
+            original = self.catalogue()
+            original_bytes = json.dumps(original, sort_keys=True).encode()
+            input_path.write_bytes(original_bytes)
+            subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+            subject.root, subject.source_hashes, subject.receipt = ROOT, {}, {}
+            subject.options = SimpleNamespace(catalogue=input_path)
+            subject.input_hashes = {
+                "catalogue": hashlib.sha256(input_path.read_bytes()).hexdigest()
+            }
+            payload = subject.payload(root / "OwnedPayload.app")
+            private_path = payload / "_shared/modules/llm/managed_ollama_release.json"
+            private_bytes = private_path.read_bytes()
+            private = json.loads(private_bytes)
+            self.assertEqual(input_path.read_bytes(), original_bytes)
+            self.assertEqual(private["publication"]["mode"], "unpublished-ci")
+            self.assertEqual(private["publication"]["tag"], "")
+            self.assertEqual(private["publication"]["version"], "")
+            self.assertEqual(
+                private["publication"]["repository"], original["publication"]["repository"]
+            )
+            expected = json.loads(original_bytes)
+            expected["publication"] = private["publication"]
+            expected["assets"]["macos-arm64"]["url"] = ""
+            self.assertEqual(private, expected)
+            self.assertEqual(
+                subject.receipt["receiving_catalogue"],
+                {
+                    "purpose": "owned-loopback-fixture",
+                    "original_sha256": hashlib.sha256(original_bytes).hexdigest(),
+                    "original_publication": original["publication"],
+                    "projected_sha256": hashlib.sha256(private_bytes).hexdigest(),
+                },
+            )
+            runtime = RECEIVING.load(
+                "planned_receiving_runtime", payload / "macos/modules/llm/managed_ollama_runtime.py"
+            )
+            contract_bytes = (
+                payload / "_shared/modules/llm/managed_ollama_runtime.json"
+            ).read_bytes()
+
+            class OwnedBoundary(Exception):
+                pass
+
+            for data, admitted in [(original_bytes, False), (private_bytes, True)]:
+                contract, asset = runtime.POLICY.select_asset(contract_bytes, data, "macos-arm64")
+                with (
+                    patch.object(
+                        runtime,
+                        "inputs",
+                        return_value=(contract_bytes, data, "macos-arm64", contract, asset),
+                    ),
+                    patch.object(runtime, "owned_directory", side_effect=OwnedBoundary) as owned,
+                ):
+                    expected_error = OwnedBoundary if admitted else runtime.POLICY.RuntimeRefusal
+                    with self.assertRaises(expected_error) as error:
+                        runtime.install(
+                            10, 1, fixture_url="http://127.0.0.1:12345/" + asset["filename"]
+                        )
+                    if admitted:
+                        owned.assert_called_once_with()
+                    else:
+                        self.assertEqual(str(error.exception), "unavailable")
+                        owned.assert_not_called()
+            for url in [
+                "https://127.0.0.1:12345/" + asset["filename"],
+                "http://foreign.invalid:12345/" + asset["filename"],
+                "http://user:password@127.0.0.1:12345/" + asset["filename"],
+                "http://127.0.0.1:12345/foreign.tgz",
+            ]:
+                with (
+                    patch.object(
+                        runtime,
+                        "inputs",
+                        return_value=(
+                            contract_bytes,
+                            private_bytes,
+                            "macos-arm64",
+                            contract,
+                            asset,
+                        ),
+                    ),
+                    patch.object(runtime, "owned_directory") as owned,
+                ):
+                    with self.assertRaises(runtime.POLICY.RuntimeRefusal) as error:
+                        runtime.install(10, 1, fixture_url=url)
+                    self.assertEqual(str(error.exception), "unavailable")
+                    owned.assert_not_called()
+            for relative, fingerprint in subject.source_hashes.items():
+                self.assertEqual(
+                    hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(), fingerprint
+                )
+
+    def test_invalid_original_catalogue_is_refused_before_projection_write(self):
+        for mutation, reason in [
+            (lambda value: value.update(runtime_contract_sha256="0" * 64), "unavailable"),
+            (
+                lambda value: value["publication"].update(repository="foreign/repository"),
+                "receiving_catalogue_publication",
+            ),
+            (
+                lambda value: value["assets"]["macos-arm64"].update(
+                    url="https://foreign.invalid/input.tgz"
+                ),
+                "metadata",
+            ),
+            (lambda value: value["publication"].update(tag="v1.0.2"), None),
+            (lambda value: None, "receiving_catalogue_input"),
+            (lambda value: value.update(assets={}), "receiving_catalogue_assets"),
+        ]:
+            with (
+                self.subTest(reason=reason),
+                tempfile.TemporaryDirectory(prefix="ergopti-receiving-refusal-") as directory,
+            ):
+                root = Path(directory)
+                input_path = root / "original.json"
+                bad = self.catalogue()
+                mutation(bad)
+                encoded = json.dumps(bad).encode()
+                input_path.write_bytes(encoded)
+                subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+                subject.root, subject.source_hashes, subject.receipt = ROOT, {}, {}
+                subject.options = SimpleNamespace(catalogue=input_path)
+                subject.input_hashes = {
+                    "catalogue": hashlib.sha256(input_path.read_bytes()).hexdigest()
+                }
+                if reason == "receiving_catalogue_input":
+                    subject.input_hashes["catalogue"] = "0" * 64
+                with self.assertRaises(Exception) as refused:
+                    subject.payload(root / "OwnedPayload.app")
+                self.assertIn(
+                    type(refused.exception).__name__,
+                    ("RuntimeRefusal", "RuntimeError", "ValueError"),
+                )
+                if reason is not None:
+                    self.assertEqual(str(refused.exception), reason)
+                self.assertEqual(input_path.read_bytes(), encoded)
+                self.assertNotIn("receiving_catalogue", subject.receipt)
+                self.assertFalse(
+                    (
+                        root
+                        / "OwnedPayload.app/Contents/Resources/static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
+                    ).exists()
+                )
+
+
+class NativeCommandExitControls(unittest.TestCase):
+    def test_reserved_exit_status_requires_retirement_before_verdict(self):
+        groups = load("command_wnowait_owner", ROOT / "tools/diagnostics/macos_owned_process.py")
+        for status, timeout, refusal in [(0, 1, False), (7, 1, False), (0, 0, False), (0, 1, True)]:
+            with self.subTest(status=status, timeout=timeout, retirement_refusal=refusal):
+                events = []
+
+                class Process:
+                    pid = 12345
+                    returncode = None
+                    wait_calls = 0
+
+                    def wait(self, *, timeout):
+                        events.append("reap")
+                        self.wait_calls += 1
+                        self.returncode = status
+
+                process = Process()
+
+                class Native:
+                    observed = 0
+
+                    def observe_exit(self, child):
+                        self_test.assertIs(child, process)
+                        self_test.assertIsNone(child.returncode)
+                        events.append("reserved_observation")
+                        self.observed += 1
+                        if timeout == 0 and self.observed == 1:
+                            return None
+                        if refusal:
+                            operation.reservation_lost = True
+                        return SimpleNamespace(si_pid=child.pid)
+
+                    def live_members(self, group, leader):
+                        self_test.assertEqual((group, leader), (process.pid, process.pid))
+                        return []
+
+                self_test = self
+                operation = groups.OwnedProcessGroup(process, Native())
+
+                class Acquisition:
+                    def acquire_owned(self, arguments, native, register, **ports):
+                        self_test.assertEqual(arguments, ["owned-recording-command"])
+                        self_test.assertIs(native, operation.native)
+                        self_test.assertIs(ports["stdin"], RECEIVING.subprocess.DEVNULL)
+                        self_test.assertIs(ports["stdout"], ports["stderr"])
+                        self_test.assertEqual(ports["env"], {"OWNED": "recording"})
+                        ports["stdout"].write(b"owned-command-output")
+                        register(operation)
+
+                subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+                subject.fixture = SimpleNamespace(
+                    groups=Acquisition(), native_groups=operation.native
+                )
+                # A recording PID can never authorize a real signal in this control.
+                with (
+                    patch.object(
+                        groups,
+                        "signal",
+                        SimpleNamespace(SIGTERM="recording_term", SIGKILL="recording_kill"),
+                    ),
+                    patch.object(
+                        groups.os,
+                        "killpg",
+                        side_effect=AssertionError("unexpected native signal"),
+                        create=True,
+                    ),
+                ):
+                    if refusal:
+                        with self.assertRaisesRegex(RuntimeError, "native_command_retirement"):
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            )
+                        self.assertFalse(operation.reaped)
+                        self.assertIsNone(process.returncode)
+                    elif timeout == 0:
+                        with self.assertRaises(RECEIVING.subprocess.TimeoutExpired):
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            )
+                    elif status != 0:
+                        with self.assertRaisesRegex(RuntimeError, "actual_native_command"):
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            )
+                    else:
+                        self.assertEqual(
+                            subject.own_command(
+                                ["owned-recording-command"], {"OWNED": "recording"}, timeout
+                            ),
+                            b"owned-command-output",
+                        )
+                if not refusal:
+                    self.assertTrue(operation.reaped)
+                    self.assertEqual(process.returncode, status)
+                    self.assertEqual(process.wait_calls, 1)
+                    self.assertLess(events.index("reserved_observation"), events.index("reap"))
+                self.assertEqual(operation.signals, [])
+
+
 if __name__ == "__main__":
     unittest.main()

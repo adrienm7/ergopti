@@ -51,9 +51,6 @@ global TEST_REGISTRY := []
 global TEST_PASS_COUNT := 0
 global TEST_FAIL_COUNT := 0
 
-; Results file for CI live tailing (same pattern as E2E to guarantee progress logs even
-; when stdout is buffered or the process has no console handle).
-global _TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 ; Including assertion helpers does not acquire or reset a runner receipt.
 
 ; Default false when no runner pre-declares it (run_all sets true for --dry-run).
@@ -98,8 +95,7 @@ Assert(Condition, Message := "assertion failed") {
 
 ; Append a line to the results file (for CI tailing) and also to stdout when possible.
 _TestAppendProgress(line) {
-	try FileAppend(line . "`r`n", _TEST_RESULTS_FILE)
-	try FileAppend(line . "`r`n", "*")
+	_TestPrint(line)
 }
 
 ; ``!==`` and not ``!=``: AHK v2's ``!=`` compares strings CASE-INSENSITIVELY, so

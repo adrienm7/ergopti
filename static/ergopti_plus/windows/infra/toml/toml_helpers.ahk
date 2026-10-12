@@ -803,8 +803,9 @@ TOML_BuildConfigUpdatedContent(Path, Updates, ExactSectionPrefixes := []) {
 	return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)
 }
 
-/** Publishes semantic configuration effects through the existing guarded stage. */
-TOML_ConfigBatchWrite(Path, Updates, ExactSectionPrefixes := [], AdmissionFn := 0) {
+/** Publishes semantic configuration effects, optionally bound to an exact held image. */
+TOML_ConfigBatchWrite(Path, Updates, ExactSectionPrefixes := [], AdmissionFn := 0,
+		ProvidedContent := unset, ProvidedPresence := unset) {
 	Owner := _ConfigWriteLeaseCurrent(Path)
 	Borrowed := _ConfigWriteLeaseOwns(Owner, Path)
 	if !Borrowed
@@ -812,7 +813,8 @@ TOML_ConfigBatchWrite(Path, Updates, ExactSectionPrefixes := [], AdmissionFn := 
 	if !(Owner is Object)
 		return false
 	NativeAdmission := () => _ConfigWriteLeaseOwns(Owner, Path) && _FSNativeAdmissionAccepted(AdmissionFn)
-	try return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true, NativeAdmission)
+	try return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write",
+		ProvidedContent?, ProvidedPresence?, true, NativeAdmission)
 	finally {
 		if !Borrowed
 			_ConfigWriteLeaseRelease(Owner)

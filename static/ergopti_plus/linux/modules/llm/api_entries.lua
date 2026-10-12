@@ -30,6 +30,7 @@ local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local AuthPolicy = require("llm.local_server_auth")
 local SourceWriter = require("toml_codec.writer")
 local ProviderConfig = require("llm.provider_config_policy")
+local EntryIdentity = require("llm.api_entry_identity")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -155,7 +156,7 @@ local function valid_entry(raw, stored)
 	-- Candidate admission keeps its existing strict authentication owner.
 	if identity ~= "unpublished" then
 		local _, servers = LocalCatalogue.load({})
-		if not AuthPolicy.token_allowed(raw.provider, raw.token, servers) then return nil end
+		if not AuthPolicy.entry_token_allowed(raw.provider, raw.token, raw.base_url, servers) then return nil end
 	end
 	return {
 		id = raw.id,
@@ -348,13 +349,17 @@ function M.active()
 	return id ~= "" and M.get(id) or nil
 end
 
---- Adds an entry and makes it active.
+--- Adds an entry, optionally selecting it in the same private publication.
 --- @param fields table { provider, token, label, model?, base_url? }
+--- @param select boolean|nil Defaults to true; false preserves the prediction selection.
 --- @return table|nil entry, string|nil err
-function M.add(fields)
-	_sequence = _sequence + 1
+function M.add(fields, select)
+	if select ~= nil and type(select) ~= "boolean" then return nil, "selection must be a boolean" end
+	local current = state()
+	local id
+	id, _sequence = EntryIdentity.next(tostring(fields.provider), os.time(), _sequence, current.entries)
 	local entry = valid_entry({
-		id = string.format("%s-%d-%d", tostring(fields.provider), os.time(), _sequence),
+		id = id,
 		provider = fields.provider,
 		label = fields.label,
 		token = fields.token,
@@ -362,18 +367,19 @@ function M.add(fields)
 		base_url = fields.base_url,
 	})
 	if not entry then return nil, "provider, label and key are required" end
-	local current = state()
 	current.entries[#current.entries + 1] = entry
 	local previous = current.active_id
-	current.active_id = entry.id
+	if select ~= false then current.active_id = entry.id end
 	if not persist() then
 		table.remove(current.entries)
 		current.active_id = previous
 		return nil, "the entry could not be saved"
 	end
-	-- The user chose an entry: a stored selection nothing matched is replaced.
-	current.dangling_active_id = nil
-	Logger.info(LOG, "API entry '%s' (%s) added and selected.", entry.id, entry.provider)
+	if select ~= false then
+		-- The user chose an entry: a stored selection nothing matched is replaced.
+		current.dangling_active_id = nil
+	end
+	Logger.info(LOG, "API entry '%s' (%s) added; selected=%s.", entry.id, entry.provider, tostring(select ~= false))
 	return entry
 end
 
@@ -441,18 +447,26 @@ end
 --- Publishes an acknowledged local model/configuration selection in its original
 --- row position. Unknown rows, root data and entry fields remain owned by their
 --- original producer. The independent backend preference is selected separately.
---- @param provider string Catalogue-owned local provider.
+--- @param provider string Catalogue provider or exact configured discovery view.
 --- @param fields table Closed model/base_url/token updates.
 --- @param source table Opaque physical source receipt.
 --- @param admit function Actual current pause/scope admission.
 --- @param select boolean|nil True for a model choice; false retains the existing active entry.
+--- @param entry_id string|nil Exact configured source row captured by discovery.
 --- @return table|nil entry
 --- @return string|nil reason
-function M.upsert_local(provider, fields, source, admit, select)
+function M.upsert_local(provider, fields, source, admit, select, entry_id)
 	local _, servers = LocalCatalogue.load({})
-	local server = servers[provider]
+	local dynamic = type(provider) == "string" and provider:sub(1, 11) == "configured:"
+	local _, configured = AuthPolicy.configured_views(M.list(), servers, {
+		openai = require("modules.llm.api_remote").provider("openai"),
+		openai_compat = require("modules.llm.api_remote").provider("openai_compat"),
+	})
+	local server = dynamic and configured[provider] or servers[provider]
+	if dynamic and (not server or server.entry_id ~= entry_id) then return nil, "configured API identity is not current" end
 	if not server or type(fields) ~= "table" or type(admit) ~= "function"
 		or (select ~= nil and type(select) ~= "boolean")
+		or (entry_id ~= nil and type(entry_id) ~= "string")
 		or not M.source_is_current(source) then return nil, "local API source is not current" end
 	for key, value in pairs(fields) do
 		if (key ~= "model" and key ~= "base_url" and key ~= "token") or type(value) ~= "string" then
@@ -463,9 +477,21 @@ function M.upsert_local(provider, fields, source, admit, select)
 	if not accepted or allowed ~= true then return nil, "local API mutation is not admitted" end
 	if not M.source_is_current(source) then return nil, "local API source changed during admission" end
 	local current, index, previous_entry = state(), nil, nil
-	for position, entry in ipairs(current.entries) do
-		if entry.provider == provider then index, previous_entry = position, entry; break end
+	local active = M.active()
+	for _, exact in ipairs({ true, false }) do
+		for position, entry in ipairs(current.entries) do
+			if (dynamic and entry.id == entry_id and entry.provider == server.provider and entry.base_url == server.base_url)
+				or (not dynamic and (entry.provider == provider) == exact
+					and AuthPolicy.entry_matches(entry.provider, entry.base_url, provider, servers)
+					and (entry_id == nil or entry.id == entry_id)) then
+				if not previous_entry or (active and active.id == entry.id) then
+					index, previous_entry = position, entry
+				end
+			end
+		end
+		if previous_entry then break end
 	end
+	if entry_id ~= nil and not previous_entry then return nil, "local API entry identity is not current" end
 	local token = fields.token
 	if token == nil then token = previous_entry and previous_entry.token or "" end
 	local model = fields.model
@@ -474,7 +500,12 @@ function M.upsert_local(provider, fields, source, admit, select)
 	if base_url == nil then
 		base_url = previous_entry and previous_entry.base_url ~= "" and previous_entry.base_url or server.base_url
 	end
-	if model == "" or not AuthPolicy.token_allowed(provider, token, servers)
+	local entry_provider = previous_entry and previous_entry.provider or provider
+	local dynamic_addresses = dynamic and AuthPolicy.configured_views({ { id = entry_id, provider = entry_provider,
+		base_url = base_url, token = token } }, {}, { [entry_provider] = require("modules.llm.api_remote").provider(entry_provider) }) or nil
+	if model == "" or not AuthPolicy.entry_token_allowed(entry_provider, token, base_url, servers)
+		or (not dynamic and not AuthPolicy.entry_matches(entry_provider, base_url, provider, servers))
+		or (dynamic and #dynamic_addresses ~= 1)
 		or not require("modules.llm.api_remote").normalize_base_url(base_url) then
 		return nil, "local API model, address or authentication is not supported"
 	end
@@ -490,7 +521,7 @@ function M.upsert_local(provider, fields, source, admit, select)
 			id = string.format("%s-%d-%d", provider, os.time(), _sequence)
 		until not used[id]
 	end
-	local entry = valid_entry({ id = id, provider = provider, label = previous_entry and previous_entry.label or (provider .. "/" .. model),
+	local entry = valid_entry({ id = id, provider = entry_provider, label = previous_entry and previous_entry.label or (provider .. "/" .. model),
 		model = model, token = token, base_url = base_url })
 	if not entry then return nil, "local API entry is not supported" end
 	local previous_active = current.active_id

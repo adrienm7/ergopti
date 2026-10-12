@@ -48,7 +48,8 @@ local EXISTING_WITH_TWIN_PROFILES = [[{
 --- @param json_codec table|nil Replacement adapters.json_codec.
 --- @param run function Receives the actual generator, catalogues and owned private source.
 --- @param locale_code string|nil Use the actual locale owner instead of unresolved test labels.
-local function with_generator(existing, json_codec, run, locale_code)
+--- @param layout_id string|nil Explicit registered input source; fixtures normally select Ergopti.
+local function with_generator(existing, json_codec, run, locale_code, layout_id)
 	helpers.with_fresh_modules({
 		"adapters.file_system",
 		"adapters.json_codec",
@@ -58,6 +59,7 @@ local function with_generator(existing, json_codec, run, locale_code)
 		"infra.toml.codec",
 		"platform.remap.config",
 		"platform.remap.generator",
+		"modules.keymap.layout_registry",
 		"infra.i18n",
 		"infra.locale",
 		"locale.core",
@@ -100,6 +102,9 @@ local function with_generator(existing, json_codec, run, locale_code)
 			end,
 		}
 		if json_codec then package.loaded["adapters.json_codec"] = json_codec end
+
+		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new(
+			layout_id or "ergopti", layout_id == "ergol" and "ansi" or "iso")
 
 		local Config    = helpers.load_with_stubs("platform.remap.config")
 		local config_i18n = require("infra.i18n")
@@ -233,5 +238,54 @@ helpers.describe("the shipped rule graph deploys (json-shared-tables)", function
 			helpers.assert_true(tostring(err):find("shares a table with an earlier manipulator", 1, true) ~= nil,
 				"the error names the shared table: " .. tostring(err))
 		end)
+	end)
+end)
+
+--- Reads the actual base character of one of the two independently expected
+--- Carbon positions. This receiving model does not exercise native HID/Quartz.
+--- @param xml string Actual installed-source producer input.
+--- @param code integer Carbon virtual code.
+--- @return string character
+local function base_character(xml, code)
+	local base = assert(xml:match('<keyMap%s+index="0"[^>]*>(.-)</keyMap>'))
+	local key = assert(base:match('<key%s+code="' .. code .. '"%s+(.-)/>'))
+	local output = key:match('output="([^"]*)"')
+	if output == nil then
+		local action = assert(key:match('action="([^"]+)"'))
+		local body = assert(xml:match('<action%s+id="' .. action .. '"%s*>(.-)</action>'))
+		output = assert(body:match('<when%s+state="none"%s+output="([^"]*)"'))
+	end
+	return output:gsub("&#x003c;", "<")
+end
+
+helpers.describe("Shipped graph declared input-source convention (iso-consumer-metadata)", function()
+	for _, scenario in ipairs({
+		{ id = "ergopti", form = "iso", extra = "ê", top = "$" },
+		{ id = "ergol", form = "ansi", extra = "<", top = "`" },
+	}) do
+		helpers.it("(iso-consumer-metadata) receives actual shipped characters with " .. scenario.id, function()
+			with_generator(nil, nil, function(env)
+				local graph, err = build(env, "recommended", true, true)
+				helpers.assert_not_nil(graph, err)
+				local virtual = graph.profiles[1].virtual_hid_keyboard.keyboard_type_v2
+				helpers.assert_eq(virtual, scenario.form)
+				local snapshot = require("modules.keymap.layout_registry").snapshot()
+				local entry = assert(require("layouts.registry").find_entry(snapshot.index, scenario.id))
+				local xml = SourceFile.read(helpers.shared("../../layouts/registry/" .. entry.file))
+				-- Independently authored USB usage to Carbon positions, never the
+				-- production registry's hs or Karabiner translation table.
+				local receiving = { iso = { extra = 50, top = 10 }, ansi = { extra = 10, top = 50 } }
+				helpers.assert_eq(base_character(xml, receiving[virtual].extra), scenario.extra)
+				helpers.assert_eq(base_character(xml, receiving[virtual].top), scenario.top)
+				local other = virtual == "iso" and "ansi" or "iso"
+				helpers.assert_true(base_character(xml, receiving[other].extra) ~= scenario.extra,
+					"the swapped-form receiving control must actually change the character")
+			end, nil, scenario.id)
+		end)
+	end
+	helpers.it("(iso-consumer-metadata) refuses undeclared or contradictory source fixtures", function()
+		local fixture = require("tests.support.active_layout_registry_fixture")
+		helpers.assert_throws(function() fixture.new("missing-source", "ansi") end)
+		helpers.assert_throws(function() fixture.new("ergopti", "ansi") end)
 	end)
 end)

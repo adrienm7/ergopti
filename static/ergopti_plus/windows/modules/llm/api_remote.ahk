@@ -1291,7 +1291,7 @@ _LLMRemoteResolveEntry(Entry) {
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteEntryGet(Entry, "Token", "")
-    if !LocalServerAuthTokenAllowed(ProviderId, Token, LLM_LOCAL_API_SERVERS)
+    if !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
         return ""
     Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
     if (Model == "")
@@ -1373,7 +1373,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     Token    := _LLMRemoteEntryGet(Entry, "Token", "")
     if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
             || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
-            || !LocalServerAuthTokenAllowed(ProviderId, Token, LLM_LOCAL_API_SERVERS)
+            || !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
             || !_LLMRemote_ConfigScalarIsSafe(Token) {
         _LLMRemote_CompleteReady(Owner, on_result, false)
         return Owner
@@ -1383,7 +1383,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     Owner["network_timeout_ms"] := NetworkTimeout
     LLM_AuxSchedule(Owner, _LLMRemote_ReadyDeadline.Bind(Owner, on_result),
         -Owner["network_timeout_ms"])
-    Owner["local_server"] := LocalServerAuthTokenAllowed(ProviderId, "", LLM_LOCAL_API_SERVERS)
+    Owner["local_server"] := LocalServerAuthEntryTokenAllowed(ProviderId, "", BaseUrl, LLM_LOCAL_API_SERVERS)
     ProvFmt := Provider["Format"]
     PingUrl := ""
     if (ProvFmt == "openai" or ProvFmt == "anthropic") {

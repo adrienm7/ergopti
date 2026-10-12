@@ -161,9 +161,9 @@ const PAC_STEP_NAME = 'Qualify actual native PAC and WPAD XCTest controls';
 const PAC_FILTER =
 	"--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'";
 const PAC_STEP_SOURCE =
-	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n          pac_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n        timeout-minutes: 10\n';
+	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        id: managed-ollama-pac-receiving\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n          pac_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n        timeout-minutes: 10\n';
 const PAC_RAW_STEP_SOURCE =
-	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"\n          mkdir -p "$(dirname "$receipt")"\n          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"\n          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"\n          if [ "$mode" = deferred ]; then\n              echo "[DEFERRED] macos-native-pac: qualified=false; original command not executed."\n          elif [ "$mode" = full ]; then\n              set -euo pipefail\n              test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n              set +e\n              swift test --package-path static/ergopti_plus/macos/launcher \\\n                --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n                --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n              pac_statuses=("${PIPESTATUS[@]}")\n              set -e\n              node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 10\n\n';
+	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        id: managed-ollama-pac-receiving\n        shell: bash\n        run: |\n          set -euo pipefail\n          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"\n          mkdir -p "$(dirname "$receipt")"\n          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"\n          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"\n          profile="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt-profile "$receipt")"\n          native_pac_skip_args=()\n          pac_evidence_args=()\n          if [ "$mode" = deferred ]; then\n              if [ "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes ]; then\n                  native_pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$receipt")")\n                  pac_evidence_args=(--pac-qualification-receipt "$receipt")\n                  echo "[DEFERRED] macos-native-pac: only exact native wire methods omitted; Worker controls remain mandatory; qualified=false."\n              elif [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then\n                  echo "[DEFERRED] macos-native-pac: legacy cohort not executed; qualified=false."\n                  exit 0\n              else\n                  exit 1\n              fi\n          elif [ "$mode" = full ]; then\n              test -z "$profile"\n          else\n              exit 1\n          fi\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' ${native_pac_skip_args[@]+"${native_pac_skip_args[@]}"} 2>&1 | tee "$transcript"\n          pac_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json" ${pac_evidence_args[@]+"${pac_evidence_args[@]}"}\n        timeout-minutes: 10\n\n';
 function admitNativePacSelector(mac) {
 	if (mac.split(PAC_FILTER).length !== 2) return null;
 	const jobs = [
@@ -819,7 +819,8 @@ const reader = workflow
 	.split('\n')
 	.map((line) => line.slice(10))
 	.join('\n');
-function receive(receipt, env) {
+const receiverTemp = path.join(ROOT, 'recording-shortcuts-reader-output');
+function receive(receipt, env, observation = { attempts: [], published: [], output: '' }) {
 	let output = '';
 	const actualClockPort = {
 		environmentContext: () => policy.environmentContext(env),
@@ -828,14 +829,28 @@ function receive(receipt, env) {
 			policy.validateQualificationReceipt(r, s, h, c, clock)
 	};
 	vm.runInNewContext(reader, {
-		require: (name) =>
-			name === 'node:fs' ? { readFileSync: () => JSON.stringify(receipt) } : actualClockPort,
+		require: (name) => {
+			if (name === 'node:path') return path;
+			if (name === 'node:fs')
+				return {
+					readFileSync: () => JSON.stringify(receipt),
+					writeFileSync: (target, content, options) => {
+						const record = { target, content, options };
+						observation.attempts.push(record);
+						if (observation.writeError) throw observation.writeError;
+						observation.published.push(record);
+					}
+				};
+			assert.equal(name, './tools/ci/dev-release-qualification.cjs');
+			return actualClockPort;
+		},
 		process: {
 			argv: ['node', '-', 'owned-receipt.json'],
-			env,
+			env: { ...env, RUNNER_TEMP: receiverTemp },
 			stdout: {
 				write: (value) => {
 					output += value;
+					observation.output = output;
 				}
 			}
 		}
@@ -1076,7 +1091,7 @@ for (const [name, from, to] of [
 	['PAC receipt generation', '--receipt "$receipt"', '--receipt "foreign"'],
 	[
 		'PAC deferred status',
-		'qualified=false; original command not executed.',
+		'Worker controls remain mandatory; qualified=false.',
 		'qualified=true; command passed.'
 	],
 	['PAC full disposition', 'elif [ "$mode" = full ]; then', 'elif [ "$mode" = deferred ]; then'],
@@ -1099,6 +1114,58 @@ for (const [name, from, to] of [
 assert.equal(passed, 79);
 console.log(
 	'PASS: Mac qualification deferral source/typed-receipt controls=79; Swift/native execution unqualified.'
+);
+
+// Keep the original source/receipt census separate from public emission controls.
+let publicReceiptChecks = 0;
+function publicReceiptCheck(action) {
+	action();
+	publicReceiptChecks++;
+}
+publicReceiptCheck(() => {
+	for (const [receipt, env] of [
+		[deferred, environment],
+		[full, { ...environment, GITHUB_REF: 'refs/heads/main' }]
+	]) {
+		const observation = { attempts: [], published: [], output: '' };
+		assert.equal(receive(receipt, env, observation), receipt.status);
+		assert.equal(observation.attempts.length, 1);
+		assert.equal(observation.published.length, 1);
+		const record = observation.published[0];
+		assert.equal(record, observation.attempts[0]);
+		assert.equal(record.target, path.join(receiverTemp, 'stable-macos-shortcuts-discovery.json'));
+		assert.equal(record.content, JSON.stringify(receipt) + '\n');
+		assert.deepEqual(Object.keys(record.options), ['flag']);
+		assert.equal(record.options.flag, 'wx');
+		assert.equal(observation.output, receipt.status);
+	}
+});
+publicReceiptCheck(() => {
+	for (const [receipt, env] of [
+		[full, environment],
+		[deferred, { ...environment, GITHUB_EVENT_NAME: 'pull_request' }],
+		[{ ...deferred, source_sha: 'f'.repeat(40) }, environment],
+		[{ ...deferred, qualified: true }, environment]
+	]) {
+		const observation = { attempts: [], published: [], output: '' };
+		assert.throws(() => receive(receipt, env, observation));
+		assert.equal(observation.attempts.length, 0);
+		assert.equal(observation.published.length, 0);
+		assert.equal(observation.output, '');
+	}
+	const writeError = new Error('Recording exclusive publication refused');
+	const observation = { attempts: [], published: [], output: '', writeError };
+	assert.throws(
+		() => receive(deferred, environment, observation),
+		(error) => error === writeError
+	);
+	assert.equal(observation.attempts.length, 1);
+	assert.equal(observation.published.length, 0);
+	assert.equal(observation.output, '');
+});
+assert.equal(publicReceiptChecks, 2);
+console.log(
+	'PASS: Shortcuts public receipt emission controls=2; filesystem/native execution unrun.'
 );
 
 require('./test-item36-native-qualification.cjs')({

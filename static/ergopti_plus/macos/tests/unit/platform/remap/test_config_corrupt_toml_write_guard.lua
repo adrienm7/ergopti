@@ -28,6 +28,7 @@ local FileSystem = require("adapters.file_system")
 local Config = helpers.load_with_stubs("platform.remap.config")
 local Logger = require("infra.logger")
 
+helpers.admit_logger_privacy(Logger)
 -- Unclosed table header plus a bare unquoted value: the shared codec returns a
 -- non-table for this input, which is exactly the "exists but cannot be decoded"
 -- case the read path already refuses to reset.

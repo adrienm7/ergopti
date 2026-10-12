@@ -196,7 +196,7 @@ return function(run)
 						combo_symmetric = false,
 					}
 				end,
-				resolve_layout_actions = function() return 0 end,
+				resolve_layout_actions = function() return 0, "ansi" end,
 			}
 			-- Controlled source port for the shared copy planner. The original save
 			-- callback and its failure/counter contract remain the publication port.

@@ -605,3 +605,64 @@ _LSM_NativeTimerStop() {
 	}
 }
 Test("local models native timer: zero stops the exact pending callback", _LSM_NativeTimerStop)
+
+
+class _LSI_StartRefusedChild extends _LSM_ChildReceipt {
+	start() {
+		this.Starts += 1
+		return false
+	}
+}
+
+_LSI_StartRefusedSpawn(*) {
+	Child := _LSI_StartRefusedChild()
+	Child.TerminateAllowed := false
+	return Child
+}
+
+_LSI_ActualStartFailure() {
+	Fixture := _LSM_Fixture()
+	try {
+		Fixture.NativeSpawn := _LSI_StartRefusedSpawn
+		AssertFalse(Fixture.Probe())
+		AssertEqual(1, Fixture.Children[1].Starts)
+		AssertEqual(1, Fixture.Results.Length)
+		AssertTrue(Fixture.Results[1]["probe_error"])
+		AssertEqual("unavailable", LocalServerDiscoveryController.Classify(Fixture.Results[1])["status"])
+		Record := Fixture.Owner.Records["lmstudio"]
+		AssertEqual(ObjPtr(Fixture.Requests[1]), ObjPtr(Record["request"]))
+		Fixture.Owner.RetryPending()
+		AssertEqual(ObjPtr(Record), ObjPtr(Fixture.Owner.Records["lmstudio"]), "a refused child termination remains exact debt")
+		AssertEqual(1, Fixture.Results.Length, "resource retries cannot redeliver an unavailable result")
+		Fixture.Children[1].TerminateAllowed := true
+		AssertTrue(Fixture.Owner.RetryPending())
+		AssertEqual(0, Fixture.Owner.Records.Count)
+	} finally Fixture.Dispose()
+}
+Test("local-server-unavailable: actual native child start failure retains exact cancellation debt", _LSI_ActualStartFailure)
+
+_LSI_OrdinaryNetworkReceipts() {
+	for Scenario in [Map("status", 0, "body", "", "expected", "down"),
+		Map("status", 401, "body", '{"probe_error":true}', "expected", "needs_key"),
+		Map("status", 200, "body", '{"data":[],"probe_error":true}', "expected", "up"),
+		Map("status", 404, "body", '{"probe_error":true}', "expected", "down"),
+		Map("status", 200, "body", '{"probe_error":true}', "expected", "down")] {
+		Fixture := _LSM_Fixture()
+		try {
+			AssertTrue(Fixture.Probe())
+			Fixture.Complete(1, Scenario["status"], Scenario["body"])
+			AssertEqual(1, Fixture.Results.Length)
+			Receipt := Fixture.Results[1]
+			AssertFalse(Receipt.Has("probe_error"), "remote body fields never become native producer metadata")
+			AssertFalse(Fixture.Requests[1].HasOwnProp("NativeDispatchRefused"))
+			Verdict := LocalServerDiscoveryController.Classify(Receipt)
+			AssertEqual(Scenario["expected"], Verdict["status"])
+			AssertEqual(0, Verdict["models"].Length, "a valid empty list stays UP without inventing selectable models")
+		} finally Fixture.Dispose()
+	}
+	for Flag in ["true", "1", {}] {
+		Verdict := LocalServerDiscoveryController.Classify(Map("ok", false, "status", 0, "probe_error", Flag))
+		AssertEqual("down", Verdict["status"], "untyped producer metadata cannot acquire unavailable")
+	}
+}
+Test("local-server-unavailable: actual HTTP receipts preserve connection, authentication and body schema semantics", _LSI_OrdinaryNetworkReceipts)

@@ -361,11 +361,29 @@ Test("Gestures: GestureReleaseLeftClick is safe when already released",
 ; ====================================
 
 TestGestures_SaveAssignmentUpdatesMap() {
+    global ConfigurationFile, GestureAssignments, GestureActionParameters
+    OriginalConfig := ConfigurationFile
+    OriginalAssignments := GestureAssignments
+    OriginalParameters := GestureActionParameters
     OldValue := GestureAssignments["tap_4"]
-    GestureSaveAssignment("tap_4", "copy")
-    AssertEqual("copy", GestureAssignments["tap_4"], "assignment should be updated")
-    ; Restore original value
-    GestureAssignments["tap_4"] := OldValue
+    Dir := _CMG_NewDir()
+    Path := Dir . "\config.toml"
+    try {
+        ConfigurationFile := Path
+        AssertFalse(FSStrictExists(Path))
+        AssertEqual("absent", ConfigMigrateBoot(Path)["status"])
+        AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+        AssertTrue(GestureSaveAssignment("tap_4", "copy"), "the actual assignment writer must acknowledge")
+        AssertEqual("copy", GestureAssignments["tap_4"], "assignment should be updated")
+    } finally {
+        GestureAssignments["tap_4"] := OldValue
+        GestureAssignments := OriginalAssignments
+        GestureActionParameters := OriginalParameters
+        ConfigurationFile := OriginalConfig
+        _CMJ_Cleanup(Dir, Path)
+    }
+    AssertTrue(GestureAssignments == OriginalAssignments, "the fixture restores the original assignment map identity")
+    AssertTrue(GestureActionParameters == OriginalParameters, "the fixture restores the original parameter map identity")
 }
 Test("Gestures: GestureSaveAssignment updates map", TestGestures_SaveAssignmentUpdatesMap)
 
@@ -407,13 +425,18 @@ TestGestures_ParameterizedActionValuesPersistToUserToml() {
     ConfigurationFile := TempConfig
     GestureActionParameters := Map()
     try {
-        GestureSetActionParameter("gesture__tap_3", "open_url", "https://saved.example/path")
+        AssertFalse(FSStrictExists(TempConfig))
+        AssertEqual("absent", ConfigMigrateBoot(TempConfig)["status"])
+        AssertTrue(ConfigSchemaCanPrepareWrite(TempConfig))
+        AssertTrue(GestureSetActionParameter("gesture__tap_3", "open_url", "https://saved.example/path"),
+            "the actual parameter writer must acknowledge")
 
         ; Exercise a real search template too: % and & must survive TOML
         ; serialization verbatim rather than becoming a generic/global setting.
         SearchKey := GestureActionParameterKey("keyboard__cmd_k", "search_web")
         SearchTemplate := "https://search.example/?q=%s&source=ergopti"
-        GestureSetActionParameter("keyboard__cmd_k", "search_web", SearchTemplate)
+        AssertTrue(GestureSetActionParameter("keyboard__cmd_k", "search_web", SearchTemplate),
+            "the second parameter write must acknowledge")
         Parsed := ParseTomlFile(TempConfig)
         AssertTrue(Parsed.Has("action_parameters"), "action parameter section must be persisted")
         Key := GestureActionParameterKey("gesture__tap_3", "open_url")

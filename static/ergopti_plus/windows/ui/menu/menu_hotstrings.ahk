@@ -1162,6 +1162,13 @@ _HS_PersonalFileControlRows(Owner, Section, Options := unset) {
 			continue
 		if Values.Has(Id)
 			Row["label"] .= " : " . Values[Id]
+		Field := Id == "personal_file_tooltip" ? "show_tooltip"
+			: (Id == "personal_file_delay" ? "delay" : (Id == "personal_file_priority" ? "priority"
+				: (Id == "personal_file_color" ? "color" : "")))
+		if Field != "" && !Owner.MetadataAvailable(Section, Field) {
+			Row["disabled"] := true
+			Row["label"] .= " — " . t("menu.hotstrings.personal_metadata_unavailable")
+		}
 		Rows.Push(Row)
 	}
 	return Rows

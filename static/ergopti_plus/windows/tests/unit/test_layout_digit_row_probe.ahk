@@ -583,7 +583,7 @@ _NRP_MenuWriter(Mode, Seen, Path, Updates, Content, Presence) {
 		Seen["changed"] := StrCompare(Content, Foreign, true) != 0
 		FileDelete(Path)
 		FileAppend(Foreign, Path, "UTF-8-RAW")
-		return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+		return TOML_ConfigBatchWrite(Path, Updates, [], 0, Content, Presence)
 	}
 	if Mode == "throw"
 		throw Error("owned number-row writer refusal")
@@ -597,7 +597,7 @@ _NRP_MenuWriter(Mode, Seen, Path, Updates, Content, Presence) {
 		return "1"
 	if Mode == "float"
 		return 1.0
-	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+	return TOML_ConfigBatchWrite(Path, Updates, [], 0, Content, Presence)
 }
 
 _NRP_MenuFixture(Path, Mode := "native") {
@@ -615,9 +615,16 @@ _NRP_MenuFixture(Path, Mode := "native") {
 	if Mode != "native"
 		Image .= 'direct_access_digits = "' . Mode . '"`n'
 	Image .= '`n[category_enabled]`nlayout = true`n'
+	Image := _CMJFixtureCurrentSource(Image)
 	if FileExist(Path)
 		FileDelete(Path)
 	FileAppend(Image, Path, "UTF-8-RAW")
+	; Each independently authored subject reaches the real owner before its callback.
+	Boot := ConfigMigrateBoot(Path)
+	AssertEqual("current", Boot["status"])
+	AssertEqual(0, Boot["read_only"])
+	AssertTrue(FSUtf8ExactMatches(Path, Image))
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path), "the number-row writer starts from genuine source admission")
 	return Image
 }
 
@@ -631,6 +638,8 @@ _NRP_MenuNativeOwners() {
 		if A_IsSuspended
 			Suspend(false)
 		for Mode in ["ack", "false", "nil", "two", "string", "float", "throw", "source-race"] {
+			; Independent native subjects keep their exact original startup owners.
+			ConfigurationFile := Dir . "ack-" . Mode . ".toml"
 			Before := _NRP_MenuFixture(ConfigurationFile)
 			Seen := Map("calls", 0, "refresh", 0, "changed", false)
 			Rows := _LAY_NumberRowRows(_NRP_MenuWriter.Bind(Mode, Seen), (*) => Seen["refresh"] += 1, (*) => true)
@@ -659,6 +668,7 @@ _NRP_MenuNativeOwners() {
 			}
 		}
 		for Condition in ["source", "external-mode", "model", "pause", "master", "configuration", "lifecycle", "native-source"] {
+			ConfigurationFile := Dir . "stale-" . Condition . ".toml"
 			Before := _NRP_MenuFixture(ConfigurationFile)
 			Seen := Map("calls", 0, "refresh", 0)
 			Rows := _LAY_NumberRowRows(_NRP_MenuWriter.Bind("ack", Seen), (*) => Seen["refresh"] += 1, (*) => true)

@@ -1,6 +1,6 @@
 --- tests/unit/modules/llm/test_mlx_discovery_backoff_persists.lua
 
---- ==============================================================================
+--- ===============================================================================
 --- MODULE: Regression — the discovery backoff must survive a failed cycle
 --- DESCRIPTION:
 --- The inter-probe delay doubles on each miss, capped, which is the whole point
@@ -14,7 +14,7 @@
 --- State that must outlive a call, scoped inside it. The reset belongs on the
 --- SUCCESS path, where "the server answered" is the fact that justifies probing
 --- eagerly again.
---- ==============================================================================
+--- ===============================================================================
 
 local helpers = require("tests.helpers")
 
@@ -49,28 +49,32 @@ end)
 
 
 
--- ==================================================================
--- ==================================================================
--- ======= The ollama serve wrapper is reaped on quit ===============
--- ==================================================================
--- ==================================================================
 
---- stop_mlx_server only terminates the in-process wrapper; the same is true of
---- the `ollama serve` pipeline this driver launches through /bin/sh. It was not
---- on the helper-teardown list at all, so it survived every quit path and kept
---- appending to the Ergopti log after Hammerspoon was gone.
-helpers.describe("quit: the ollama serve wrapper is terminated with the other helpers", function()
+-- ===================================================================
+-- ===================================================================
+-- ======= The original managed Ollama owner is joined on quit =======
+-- ===================================================================
+-- ===================================================================
 
-	helpers.it("terminate_helper_processes reaps it", function()
+--- The foreground managed daemon has an exact retained task owner. Quit must
+--- request retirement through that owner and retain its receipt/completion debt;
+--- a global process-name sweep could kill an independently started user server.
+--- MLX retains its separate original stop primitive and orphan sweeps.
+helpers.describe("quit: the original managed Ollama daemon remains owned", function()
+
+	helpers.it("terminate_helper_processes requests exact retirement and retains its acknowledgement", function()
 		local src = helpers.read_driver_source("terminate_helper_processes")
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the menu_llm source must be readable or this asserts nothing")
 		local at = src:find("function M.terminate_helper_processes", 1, true)
 		helpers.assert_not_nil(at, "the teardown must exist")
 		local body = src:sub(at, at + 900)
-		helpers.assert_true(body:find("ollama serve", 1, true) ~= nil,
-			"the wrapper is a /bin/sh pipeline, so terminating the hs.task reaps only the "
-			.. "shell; without an explicit kill the server outlives every quit path")
+		helpers.assert_true(body:find("ApiOllama.stop_owned_server", 1, true) ~= nil,
+			"Quit must retain the exact original foreground daemon, not kill by process name")
+		helpers.assert_true(body:find("ok == true and settled == true", 1, true) ~= nil,
+			"an accepted EOF request cannot acknowledge RETIRED plus native task completion")
+		helpers.assert_true(body:find("[o]llama serve", 1, true) == nil,
+			"independently started user servers must remain outside the Quit owner's authority")
 	end)
 
 end)

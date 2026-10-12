@@ -156,15 +156,28 @@ function render(bootstrapBytes, proxyBytes) {
 	);
 }
 
+function renderOutputs(bootstrapBytes, proxyBytes) {
+	// Standalone Go extraction needs the same physical embed inputs as the
+	// native producer. Keep their bytes owned by the canonical JSON policies.
+	const go = path.join(root, 'static/ergopti_plus/_shared/go/native_http');
+	return new Map([
+		[output, Buffer.from(render(bootstrapBytes, proxyBytes))],
+		[path.join(go, 'managed_ollama_bootstrap.json'), bootstrapBytes],
+		[path.join(go, 'proxy_policy.json'), proxyBytes]
+	]);
+}
+
 function generate() {
-	const text = render(
+	const outputs = renderOutputs(
 		fs.readFileSync(path.join(shared, 'llm/managed_ollama_bootstrap.json')),
 		fs.readFileSync(path.join(shared, 'network/proxy_policy.json'))
 	);
-	if (process.argv.includes('--check')) {
-		if (fs.readFileSync(output, 'utf8') !== text) throw new Error('Bootstrap policy drift.');
-	} else fs.writeFileSync(output, text);
+	for (const [file, bytes] of outputs) {
+		if (process.argv.includes('--check')) {
+			if (!fs.readFileSync(file).equals(bytes)) throw new Error('Bootstrap policy drift.');
+		} else fs.writeFileSync(file, bytes);
+	}
 }
 
 if (require.main === module) generate();
-module.exports = { render };
+module.exports = { render, renderOutputs };

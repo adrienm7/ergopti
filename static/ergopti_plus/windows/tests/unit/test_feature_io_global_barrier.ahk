@@ -96,7 +96,8 @@ _FIGB_SingleWriterRefusesSiblingTerminalBarrier() {
 	OriginalPath := ConfigurationFile
 	Target := _FIGB_Fixture()
 	_FIGB_Reset(Target)
-	ConfigurationFile := "C:\ergopti-tests\feature-io-single.toml"
+	Fixture := _ScopeOwnerFixture()
+	ConfigurationFile := Fixture.path
 	Bundle := _ConfigWriteTerminalTryAcquire(
 		["C:\ergopti-tests\unrelated-paths.toml"])
 	AssertTrue(Bundle is Object)
@@ -113,6 +114,7 @@ _FIGB_SingleWriterRefusesSiblingTerminalBarrier() {
 	} finally {
 		_ConfigWriteTerminalRelease(Bundle)
 		ConfigurationFile := OriginalPath
+		_ScopeOwnerCleanup(Fixture)
 	}
 }
 Test("feature_io gateway: sibling terminal barrier refuses the single writer "
@@ -124,7 +126,8 @@ _FIGB_BatchRefusalDoesNotEnumerateEntries() {
 	OriginalPath := ConfigurationFile
 	Target := _FIGB_Fixture()
 	_FIGB_Reset(Target)
-	ConfigurationFile := "C:\ergopti-tests\feature-io-batch.toml"
+	Fixture := _ScopeOwnerFixture()
+	ConfigurationFile := Fixture.path
 	Bundle := _ConfigWriteTerminalTryAcquire(
 		["C:\ergopti-tests\unrelated-paths.toml"])
 	AssertTrue(Bundle is Object)
@@ -140,6 +143,7 @@ _FIGB_BatchRefusalDoesNotEnumerateEntries() {
 	} finally {
 		_ConfigWriteTerminalRelease(Bundle)
 		ConfigurationFile := OriginalPath
+		_ScopeOwnerCleanup(Fixture)
 	}
 }
 Test("feature_io gateway: terminal refusal precedes batch enumeration "
@@ -162,7 +166,8 @@ _FIGB_DurableSuccessPublishesExplicitTargetAfterWrite() {
 	OriginalPath := ConfigurationFile
 	Target := _FIGB_Fixture()
 	_FIGB_Reset(Target)
-	ConfigurationFile := "C:\ergopti-tests\feature-io-order.toml"
+	Fixture := _ScopeOwnerFixture()
+	ConfigurationFile := Fixture.path
 	try {
 		AssertTrue(WriteFeatureV2(Target, "layout.ergopti_base", true, "",
 			_FIGB_Writer, _FIGB_Notify))
@@ -191,7 +196,10 @@ _FIGB_DurableSuccessPublishesExplicitTargetAfterWrite() {
 		AssertTrue(Target["layout"]["ergopti_base"])
 		AssertTrue(Target["shortcuts"]["microsoft_bold"])
 		AssertEqual(0, _FIGB_NotifyCalls)
-	} finally ConfigurationFile := OriginalPath
+	} finally {
+		try ConfigurationFile := OriginalPath
+		finally _ScopeOwnerCleanup(Fixture)
+	}
 }
 Test("feature_io gateway: durable success publishes detached explicit candidates "
 	. "(feature-io-global-barrier-publish-order)",
@@ -202,7 +210,8 @@ _FIGB_DurableFailurePublishesNothing() {
 	OriginalPath := ConfigurationFile
 	Target := _FIGB_Fixture()
 	_FIGB_Reset(Target)
-	ConfigurationFile := "C:\ergopti-tests\feature-io-failure.toml"
+	Fixture := _ScopeOwnerFixture()
+	ConfigurationFile := Fixture.path
 	Entries := [
 		Map("path", "layout.ergopti_base", "value", true),
 		Map("path", "shortcuts.microsoft_bold", "value", true)
@@ -214,7 +223,10 @@ _FIGB_DurableFailurePublishesNothing() {
 		AssertFalse(Target["layout"]["ergopti_base"])
 		AssertFalse(Target["shortcuts"]["microsoft_bold"],
 			"a refused durable batch must publish no live leaf")
-	} finally ConfigurationFile := OriginalPath
+	} finally {
+		try ConfigurationFile := OriginalPath
+		finally _ScopeOwnerCleanup(Fixture)
+	}
 }
 Test("feature_io gateway: refused durable batch publishes nothing "
 	. "(feature-io-global-barrier-write-failure)",

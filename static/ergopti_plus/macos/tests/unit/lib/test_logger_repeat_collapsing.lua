@@ -19,6 +19,7 @@
 
 local helpers = require("tests.helpers")
 local Logger  = require("infra.logger")
+helpers.admit_logger_privacy(Logger)
 local Timings = require("infra.timings")
 
 

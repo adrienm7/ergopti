@@ -49,12 +49,33 @@ _CUK_NewDir() {
 	return Dir
 }
 
+; Independently authored writable subjects exist before their one native Boot.
+; A cleanup test cannot borrow an unknown or unversioned destination's authority.
+_CUK_CurrentMetadata() {
+	return "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
+}
+
+_CUK_AdmitCurrentSource(Path) {
+	Before := FSReadUtf8Exact(Path)
+	AssertEqual(ConfigMigrateCurrentVersion(), TOML_ParseDocument(Before)["_meta"]["schema_version"],
+		"the independently authored cleanup subject already owns its current stamp")
+	Boot := ConfigMigrateBoot(Path)
+	AssertEqual("current", Boot["status"])
+	AssertEqual(0, Boot["read_only"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	AssertEqual("", TOML_WriteRefusal(Path))
+	AssertTrue(FSUtf8ExactMatches(Path, Before), "native Boot preserves every source byte before preview and backup")
+}
+
 _CUK_WriteFixture(Dir) {
 	global _CUK_FIXTURE
 	Path := Dir . "\config.toml"
-	AssertTrue(FSWriteDurable(Path, _CMJFixtureCurrentSource(StrReplace(_CUK_FIXTURE, "`r`n", "`n"))),
+	Source := StrReplace(_CUK_FIXTURE, "`r`n", "`n")
+	; Extend the existing metadata table rather than defining its namespace twice.
+	Source := StrReplace(Source, "[_meta]`n", _CUK_CurrentMetadata())
+	AssertTrue(FSWriteDurable(Path, Source),
 		"the fixture config must be written")
-	ConfigMigrateBoot(Path)
+	_CUK_AdmitCurrentSource(Path)
 	return Path
 }
 
@@ -615,6 +636,11 @@ _CUK_ActionParameterRoundTrip() {
 	Dir := _CUK_NewDir()
 	try {
 		ConfigurationFile := Dir . "\config.toml"
+		Boot := ConfigMigrateBoot(ConfigurationFile)
+		AssertEqual("absent", Boot["status"])
+		AssertEqual(0, Boot["read_only"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile))
+		AssertFalse(FileExist(ConfigurationFile))
 		GestureActionParameters := Map()
 		AssertTrue(GestureSaveAssignment("tap_4", "open_url"))
 		AssertTrue(GestureSetActionParameter("gesture__tap_4", "open_url", "https://apple.com"))
@@ -696,7 +722,7 @@ _CUK_RetiredPrefixActualCleanup() {
 		. "[ahk.layout]`nflag = true`n`n"
 		. "[ahk.layout.deep]`n" . 'label = "retain until cleanup"' . "`n`n"
 		. "[ahk.empty]`n`n"
-	Kept := "[_meta]`nschema_version = 11`n`n"
+	Kept := _CUK_CurrentMetadata() . "`n"
 		. "[updater]`n" . 'channel = "stable"' . "`n`n"
 		. "[hotstrings.personal.mine]`nenabled = true`n`n"
 		. '["ahk.foo"]' . "`n" . 'keep = "literal"' . "`n`n"
@@ -706,6 +732,7 @@ _CUK_RetiredPrefixActualCleanup() {
 	Expected := Chr(0xFEFF) . "# Retired namespace preview.`n`n`n`n`n" . Kept
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		_CUK_AssertIds("ahk.=section|ahk.layout.flag=section|ahk.layout.deep.label=section|ahk.empty.=section",
 			Rows)
@@ -728,7 +755,7 @@ _CUK_RetiredPrefixActualCleanup() {
 		AssertEqual("literal", Document["ahk.foo"]["keep"])
 		AssertEqual("case", Document["AHK"]["layout"]["keep"])
 		AssertEqual("stable", Document["updater"]["channel"])
-		AssertEqual(11, Document["_meta"]["schema_version"])
+		AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
 		AssertTrue(Document["hotstrings"]["personal"]["mine"]["enabled"] is TOML_Bool)
 		AssertEqual(true, Document["hotstrings"]["personal"]["mine"]["enabled"].Value)
 		AssertEqual(42, Document["future_extension"]["keep"])
@@ -741,10 +768,11 @@ Test("config cleanup: actual retired prefix removal preserves reserved literal a
 _CUK_RetiredEmptyTablesActualCleanup() {
 	Folder := _CUK_RetiredNewDir()
 	Path := Folder . "\config.toml"
-	Source := "[ahk]`n`n[ahk.empty]`n`n[updater]`n" . 'channel = "stable"' . "`n"
-	Expected := Chr(0xFEFF) . "`n`n[updater]`n" . 'channel = "stable"' . "`n"
+	Source := "[ahk]`n`n[ahk.empty]`n`n[updater]`n" . 'channel = "stable"' . "`n" . _CUK_CurrentMetadata()
+	Expected := Chr(0xFEFF) . "`n`n[updater]`n" . 'channel = "stable"' . "`n" . _CUK_CurrentMetadata()
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual("ahk.=section|ahk.empty.=section", _CUK_Join(_CUK_Ids(Rows)))
 		AssertEqual("{}", Rows[1]["value"])
@@ -774,10 +802,11 @@ Test("config cleanup: empty retired tables use real preview backup and semantic 
 _CUK_RetiredEmptyTableCannotOwnLateChild(ChildSource) {
 	Folder := _CUK_RetiredNewDir()
 	Path := Folder . "\config.toml"
-	Source := "[ahk]`n`n[updater]`n" . 'channel = "stable"' . "`n"
+	Source := "[ahk]`n`n[updater]`n" . 'channel = "stable"' . "`n" . _CUK_CurrentMetadata()
 	Concurrent := Source . ChildSource
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		AssertTrue(_ConfigUnusedKeysSectionOnly(Rows[1]))
@@ -804,8 +833,8 @@ Test("config cleanup: retired empty-table preview cannot own an unlisted empty c
 _CUK_RetiredBackupRaceUsesExactSource() {
 	Folder := _CUK_RetiredNewDir()
 	Path := Folder . "\config.toml"
-	Source := "[ahk.layout]`nflag = true`n`n[future_extension]`nkeep = 42`n"
-	Concurrent := "[ahk.layout]`nflag = true`n`n[future_extension]`nkeep = 43`n"
+	Source := "[ahk.layout]`nflag = true`n`n[future_extension]`nkeep = 42`n" . _CUK_CurrentMetadata()
+	Concurrent := "[ahk.layout]`nflag = true`n`n[future_extension]`nkeep = 43`n" . _CUK_CurrentMetadata()
 	Seen := Map("backup_calls", 0, "lease_blocked", false)
 	Backup(Target, Content) {
 		Seen["backup_calls"] += 1
@@ -823,6 +852,7 @@ _CUK_RetiredBackupRaceUsesExactSource() {
 	}
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000204", Backup, 0, Source)
@@ -848,8 +878,10 @@ Test("config cleanup: actual default writer binds the exact verified backup gene
 _CUK_RetiredUnsupportedProjection(Source, Mode) {
 	Folder := _CUK_RetiredNewDir()
 	Path := Folder . "\config.toml"
+	Source .= _CUK_CurrentMetadata()
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		; These requests have no privately captured whole-root capability. Actual
 		; typed producers are qualified separately; metadata cannot substitute.
 		switch Mode {
@@ -945,7 +977,7 @@ _CUK_RetiredRootVector(Kind) {
 	}
 	Root := "# exact root neighbors`n" . '"ahk.literal" = {keep = "literal", empty = []} # root comment' . "`n"
 		. 'AHK = {keep = "case", flag = false}' . "`n`n"
-	Tables := "[_meta]`nschema_version = 11`n`n[updater]`n" . 'channel = "stable" # updater comment' . "`n`n"
+	Tables := _CUK_CurrentMetadata() . "`n[updater]`n" . 'channel = "stable" # updater comment' . "`n`n"
 		. "[hotstrings.personal.mine]`nenabled = true`ntime_activation_seconds = 0.75`n`n"
 		. "[_future]`nflag = false`nzero = 0`nvalues = [1, 2]`nempty = []`n"
 		. "stamp = 2026-10-05T10:20:30Z`n" . '"literal.dot" = "keep" # exact future comment' . "`n"
@@ -961,7 +993,7 @@ _CUK_RetiredRootTypedNeighbors(Document) {
 	AssertEqual("case", Document["AHK"]["keep"])
 	AssertTrue(Document["AHK"]["flag"] is TOML_Bool)
 	AssertEqual(false, Document["AHK"]["flag"].Value)
-	AssertEqual(11, Document["_meta"]["schema_version"])
+	AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
 	AssertEqual("stable", Document["updater"]["channel"])
 	AssertTrue(Document["hotstrings"]["personal"]["mine"]["enabled"] is TOML_Bool)
 	AssertEqual(true, Document["hotstrings"]["personal"]["mine"]["enabled"].Value)
@@ -990,6 +1022,7 @@ _CUK_RetiredRootActualCleanup(Kind) {
 	Vector := _CUK_RetiredRootVector(Kind), Source := Vector["source"]
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length, "the complete retired namespace is one explicit native preview")
 		if Rows.Length != 1
@@ -1022,6 +1055,7 @@ _CUK_RetiredRootPrivatePage() {
 	Vector := _CUK_RetiredRootVector("array")
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Vector["source"]))
+		_CUK_AdmitCurrentSource(Path)
 		Session := ConfigCleanupSession(Path)
 		try {
 			Status := Session.Handle("ready")["status"]
@@ -1054,6 +1088,7 @@ _CUK_RetiredRootRefusesMutation(Field, Replacement) {
 	Vector := _CUK_RetiredRootVector("inline"), Source := Vector["source"]
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		if Rows.Length != 1
@@ -1101,6 +1136,7 @@ _CUK_RetiredRootRefusesBorrowedRecord(Mode) {
 	Vector := _CUK_RetiredRootVector("array"), Source := Vector["source"]
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		if Rows.Length != 1
@@ -1131,6 +1167,7 @@ _CUK_RetiredRootRefusesStaleSource() {
 	Concurrent := StrReplace(Source, '"literal.dot" = "keep"', '"literal.dot" = "later"')
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		if Rows.Length != 1
@@ -1156,6 +1193,7 @@ _CUK_RetiredRootRefusesReuse() {
 	Vector := _CUK_RetiredRootVector("inline"), Source := Vector["source"]
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		if Rows.Length != 1
@@ -1191,6 +1229,7 @@ _CUK_RetiredRootMutationDuringBackup(Mode) {
 	}
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		if Rows.Length != 1
@@ -1232,6 +1271,7 @@ _CUK_RetiredRootBackupSourceRace() {
 	}
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
 		AssertEqual(1, Rows.Length)
 		if Rows.Length != 1
@@ -1711,3 +1751,35 @@ _CUK_RetiredTapWarningReason() {
 }
 Test("config: retired tap warnings name the actual number-row domain (tap-binding-identity-warning)",
 	_CUK_RetiredTapWarningReason)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 4/ Session Protected Source Preview =======
+; ===================================================
+; ===================================================
+
+_CUK_ProtectedSourceHasNoCleanupOffer() {
+	Dir := _CUK_NewDir()
+	Path := Dir . "\protected-config.toml"
+	Source := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)
+		. '`n[layout]`nfuture_layout_owner = "retain exactly"`n'
+	Reason := "Controlled newer schema refusal."
+	Offers := []
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		TOML_RefuseWrites(Path, Reason)
+		Scan := ConfigUnusedKeysFind(Path, Map("layout", Map()))
+		AssertEqual("unsupported", Scan["status"], "a protected schema has no admitted cleanup ownership")
+		AssertEqual(0, Scan["keys"].Length, "future-owned keys are never disposable rows")
+		AssertFalse(ConfigUnusedKeysOffer(Path, ConfigUnusedKeysFind, (Target) => Offers.Push(Target)))
+		AssertEqual(0, Offers.Length, "startup cannot offer an unsafe protected-source cleanup")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "preview preserves the exact newer source")
+		AssertEqual(Reason, TOML_WriteRefusal(Path), "preview never lifts session protection")
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: protected schema refuses preview and startup offer (protected-schema-cleanup)",
+	_CUK_ProtectedSourceHasNoCleanupOffer)

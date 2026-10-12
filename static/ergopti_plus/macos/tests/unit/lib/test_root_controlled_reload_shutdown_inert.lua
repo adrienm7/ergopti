@@ -118,6 +118,13 @@ local function run_isolated(options, assertions)
 		for _, name in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 			Logger[name] = log
 		end
+		function Logger.initialize_privacy(raw)
+			helpers.assert_type(raw, "string", "The root owns a complete canonical policy read before logging")
+			helpers.assert_eq(state.privacy_policy_reads, 1, "Privacy uses the actual adapter reader once")
+			helpers.assert_eq(state.privacy_policy_read_complete, true, "Read and close commit before privacy initialization")
+			helpers.assert_eq(#state.logs, 0, "Bootstrap admits privacy before publishing a logger message")
+			state.privacy_initializations = (state.privacy_initializations or 0) + 1
+		end
 		function Logger.set_level() return true end
 		function Logger.init_log_path() return true end
 		function Logger.logs_dir() return "/virtual/logs/" end
@@ -205,6 +212,19 @@ local function run_isolated(options, assertions)
 			terminate_orphan_mlx_server = function() return true end,
 		}
 
+		-- Use the real adapter reader without importing another logger owner or
+		-- admitting native journal writes in this controlled root fixture.
+		local journal_source, journal_err = helpers.read_driver_unit("function M.read_privacy_policy(shared_root)")
+		helpers.assert_not_nil(journal_source, tostring(journal_err))
+		local journal_factory, journal_load_err = load(journal_source, "owned boot journal", "t", setmetatable({
+			require = function(name)
+				helpers.assert_eq(name, "infra.logger", "The bootstrap reader imports only this captured logger")
+				return Logger
+			end,
+		}, { __index = _G }))
+		helpers.assert_not_nil(journal_factory, tostring(journal_load_err))
+		local JournalReader = journal_factory()
+
 		local fakes = {
 			["infra.logger"] = Logger,
 			["adapters.timer_scheduler"] = {
@@ -230,6 +250,12 @@ local function run_isolated(options, assertions)
 				is_complete = function() return false end,
 			},
 			["adapters.boot_journal"] = {
+				read_privacy_policy = function(shared_root)
+					state.privacy_policy_reads = (state.privacy_policy_reads or 0) + 1
+					local raw = JournalReader.read_privacy_policy(shared_root)
+					state.privacy_policy_read_complete = true
+					return raw
+				end,
 				append = function(_, message)
 					state.boot_journal_messages = state.boot_journal_messages or {}
 					state.boot_journal_messages[#state.boot_journal_messages + 1] = message
@@ -385,6 +411,9 @@ local function run_isolated(options, assertions)
 		)
 		helpers.assert_not_nil(chunk, tostring(load_err))
 		chunk()
+		helpers.assert_eq(state.privacy_policy_reads, 1)
+		helpers.assert_eq(state.privacy_initializations, 1)
+		helpers.assert_eq(state.fatal_exit_calls, 0, "The fixture must not accidentally take the privacy-abort route")
 		helpers.assert_eq(state.onboarding_runs, 1,
 			"the fixture must stop root boot before any input subsystem starts")
 		helpers.assert_type(hs_stub.shutdownCallback, "function")
