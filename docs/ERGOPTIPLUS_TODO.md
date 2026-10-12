@@ -7051,6 +7051,21 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-12 the settled removal diagnostic is now composed with the G6 polling
+fix. It records only the original retired child/status and bounded existing stderr;
+original ADD ABI, trust commands,15s deadlines, primary/cancellation and closure/debt
+remain. All156 original tests and250 helpers/providers/assertions are unchanged;
+the nine reviewed regressions raise the strict count to165. The clock selector
+guard requires the same exact165 and rejects obsolete156. Current165 portable
+controls pass in13.192s; native Darwin receiving of this successor remains unrun.
+The authentic predecessor a18 manual has23jobs:8success/8failure/7skipped,
+Release skipped. Its Core413/414 times out the original156 child; bothPAC14
+have12passes/2failures, HTTP trust/restoration refuse, archive24/25 lacks consent,
+and Windows1983/11165 passes before the unchanged watchdog. No updater23,
+full-unit/package/install or enterprise qualification is granted. Root finite
+custody/history and actual own-span continuation are preserved in the
+[checkpoint](handovers/2026-10-11-group6-cloud/README.md); item62 stays open.
+
 2026-10-12 the G6-owned network fixture now uses an explicit50ms serving poll
 instead of the implicit500ms default, reducing idle shutdown cost without changing
 any native command, deadline, cleanup/debt law or original assertion. The unchanged

@@ -355,7 +355,7 @@ if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
 	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 20]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 156]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 165]);
 	cases.push(['tools/test/macos_native_http_clock_passive_receiving_controls.py', 21]);
 	const clockResult = spawnSync(
 		process.execPath,
