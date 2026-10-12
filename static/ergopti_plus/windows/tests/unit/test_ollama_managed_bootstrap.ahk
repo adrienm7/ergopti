@@ -534,9 +534,14 @@ _G4B_EnableOwner(State) {
 		F.Flow.MenuIntent := _G4B_LiveMenuIntent()
 		F.Flow.AuxGeneration := LLM_AuxGeneration()
 		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready, "Managed readiness must precede enable admission.")
+		AssertFalse(F.Flow.MenuIntent["enabled"], "The fixture must capture an OFF enable intent.")
 		_LLM_ManagedBootstrap := F.Flow
+		State["port"]["writer"] := _G4B_EnableWriter.Bind(State, F.Flow)
+		State["port"]["persistence_notify"] := _G4B_EnableNotify.Bind(State)
 		AssertTrue(LLM_Menu_OnToggle(State["port"]), "The actual tray enable owner starts its fresh origin probe.")
 		_LEA_Answer(State, Map("ok", true, "status", 200, "body", '{"version":"0.24.0"}'))
+		AssertTrue(State.Get("handoff_bytes_match", false), "The prepared handoff equals the actual complete writer image. " . State.Get("refusal", ""))
 		AssertEqual(State["writes"], 1)
 		AssertEqual(State["applies"], 1, "The actual durable source handoff precedes live application.")
 		F.Flow._Tick()
@@ -550,6 +555,32 @@ _G4B_EnableOwner(State) {
 		F.Close()
 		_LLM_ManagedBootstrap := Saved
 	}
+}
+
+/** Observes exact bytes independently at the actual publication boundary. */
+_G4B_EnableWriter(State, Flow, Path, Updates) {
+	global _LLM_ManagedBootstrap
+	AssertTrue(IsObject(_LLM_ManagedBootstrap) && _LLM_ManagedBootstrap == Flow, "The managed flow still owns writer admission.")
+	AssertTrue(Flow.Ready, "Managed readiness survives until writer dispatch.")
+	AssertTrue(Flow.EnableHandoff is Map, "Managed writer dispatch requires the prepared handoff.")
+	Token := Flow.EnableHandoff
+	Written := _LEA_Write(State, Path, Updates)
+	State["handoff_bytes_match"] := Token is Map
+		&& _LLM_Menu_EnableSourceMatches(Token["source"], _LLM_Menu_EnableReadSource())
+	if Token is Map {
+		Observed := _LLM_Menu_EnableReadSource()
+		AssertEqual(Token["source"]["bytes"].Size, Observed["bytes"].Size, "Complete publication byte sizes agree.")
+	}
+	return Written
+}
+
+/** Retains only this fixture's synthetic transaction refusal for failed assertions. */
+_G4B_EnableNotify(State, Message, Options) {
+	State["refusal"] := Message
+	for Line in LoggerRingBufferSnapshot()
+		if InStr(Line, "Could not persist the confirmed LLM enabled-state change")
+			State["refusal"] := Line
+	return true
 }
 _G4B_EnableOwnerCase() {
 	_LEA_WithFixture(_G4B_EnableOwner)
