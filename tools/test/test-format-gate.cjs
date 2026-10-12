@@ -27,6 +27,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const pipeline = require('./ci-pipeline.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
@@ -54,14 +55,36 @@ check('the pre-commit hook formats the staged files before the convention lint',
 	assert.ok(format < hook.indexOf('node tools/lint/lint-conventions.js'));
 });
 
+/** Pin the genuine reusable Common step, including its unsuppressed exit status. */
+function checkCiFormatting(body) {
+	const step = pipeline.step(body, 'Check formatting');
+	assert.strictEqual(pipeline.stepField(step, 'if'), null);
+	assert.strictEqual(pipeline.stepField(step, 'continue-on-error'), null);
+	assert.deepStrictEqual(pipeline.runOf(step), [
+		'python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"',
+		'node tools/lint/format.cjs --check'
+	]);
+}
+
 check('CI installs the pinned Ruff and checks the whole tree', () => {
-	const workflow = read('.github/workflows/ci.yml');
-	assert.ok(
-		workflow.includes(
-			'python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"'
-		)
+	const owner = pipeline.locate('shared-validation');
+	assert.strictEqual(owner.file, '.github/workflows/ci-common.yml');
+	assert.strictEqual(
+		pipeline.field(pipeline.job('core'), 'uses'),
+		'./.github/workflows/ci-common.yml'
 	);
-	assert.ok(workflow.includes('node tools/lint/format.cjs --check'));
+	checkCiFormatting(owner.body);
+	for (const [from, to] of [
+		['node tools/lint/format.cjs --check', 'node tools/lint/format.cjs --write'],
+		['ruff==$(node tools/lint/format.cjs --ruff-version)', 'ruff==0.0.0'],
+		['name: Check formatting', 'name: Omitted formatting'],
+		['name: Check formatting', 'name: Check formatting\n        if: false'],
+		['name: Check formatting', 'name: Check formatting\n        continue-on-error: true']
+	]) {
+		const changed = owner.body.replace(from, to);
+		assert.notStrictEqual(changed, owner.body);
+		assert.throws(() => checkCiFormatting(changed));
+	}
 	assert.match(Format.RUFF_VERSION, /^\d+\.\d+\.\d+$/);
 });
 
