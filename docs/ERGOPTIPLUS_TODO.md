@@ -14938,14 +14938,64 @@ separately. Preserve their unfinished native qualification requirements.
       These limits are public in the
       [release notes](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1).
 
-October 12 local progress: the JS runner now retains incremental monotonic
+October 12 optimization progress: the JS runner retains incremental monotonic
 timings and reports each failed child before starting the next check. Common
-has its own reusable workflow with the original commands and matrices.
-These changes are local; the complete four-lane graph, native live progress,
-feature lots and folder migration below remain unfinished. The first local
-Windows JS run passed 399 of 409 checks; its ten failures remain recorded and
-are not counted as qualification. The scoped format gate and the subsequent
-Common source, policy and diagnostic controls passed.
+now uses nine feature inventories and parallel unit jobs. On
+[run 38204639380](https://github.com/adrienm7/ergopti/actions/runs/38204639380),
+all 416 JavaScript checks, properties, exact inventory aggregation and browser
+E2E passed on source `52ac0a5f5ed4158f9d057eb992f966a05a677440`. Aggregation
+also correctly refused the previous run's failed feature journal. These
+optimization commits are on a feature branch; they are not in v1.0.1.
+
+Windows timings still require work. The published workload took 71.219 minutes
+of measured callback time; the same 11,227 passing callbacks in
+[run 38199391953](https://github.com/adrienm7/ergopti/actions/runs/38199391953)
+took 77.238 minutes. This is not a measured overall speedup. That later job
+failed its fresh-clone startup observer after the unit suite. The locally
+committed polling fix now observes an available acknowledgment before rejecting
+a resumed timer deadline; its original fails two real timer regressions that
+the fix passes. Attribution of the hosted timeout remains open. A separate native
+registration capture identifies 1,397 test owners and preserves the original
+nine interactive exclusions. One runtime-generated PID label prevents an
+exact name-only timing join; inventories must use source-bound owner and
+registration identities rather than assuming display names are unique.
+
+Ordered unit, E2E, build and test-build prerequisites are locally committed,
+with exact dependency refusal controls. Their hosted acceptance, native feature
+lots, test-folder migration and all-phase timing coverage remain unfinished.
+A locally committed Windows lease selector avoids repeated sibling scans while
+retaining all 48 original controls and 30 new integrity controls. Both complete
+78-case cohorts pass; one bounded transaction comparison improved from 398.025
+to 245.498 seconds, but this variable single pair does not establish a full CI
+gain. A separate slow configuration test attributes 41.141 seconds to commit
+and 66.039 seconds to rollback; their internal costs still require profiling.
+
+The full proposed Windows inventory has 1,397 explicit owners across 32
+semantic families. Its three mixed-owner decisions are now resolved; the
+selector and exact coverage aggregation are being checked in private fixtures;
+fresh registration counts and native receiving remain required before enabling
+the matrix. Shared Lua unit wall timings are locally committed after portable
+clock, failure identity and output controls on both actual helper
+implementations. Deliberate module failures use an isolated helper and private
+timing sink so they cannot contaminate the outer report. Native provider
+admission on Linux and macOS, full entry-point integration and E2E timing remain
+unqualified.
+
+The actual menu parity owner improved from 279.778 to 219.184 seconds in one
+matched local CPU-profile pair after indexing statement starts per lexical
+unit. Its output is byte-identical and the sparse-query regression fails on
+the original implementation. This single pair does not establish a whole-CI
+speedup; repeated hosted measurements remain required. The latest selected local
+source gate passes formatting and 406 of 415 JavaScript checks. Its nine failing
+owners also failed before this change; their exposed failure signatures match,
+but truncated diagnostic output limits cause equivalence. They remain open.
+
+Linux window-switch qualification failed in run `38203012985`; its native
+receipt deadline must be diagnosed without treating packaging success as lane
+success. Run `38204639380` also failed the official Ollama runtime/model
+acceptance before receiving a qualified terminal native receipt. The recorded
+interval is 930.449 seconds and process closure is unproved. Group 6 owns this
+investigation; a timing resemblance to a watchdog is not cause attribution.
 
 - [ ] Record elapsed time by default for every CI step, suite and test,
       including failure and timeout outcomes. Preserve source, OS and
