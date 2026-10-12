@@ -278,6 +278,20 @@ source patch leaves active C/DLL provenance intact until an actual official
 Windows MSVC rebuild; native SDK/DLL/desktop/hooks are UNRUN. Production observer
 conversion and emission remain software work; item 49 is not closed.
 
+Item 49 now retains the implemented [lock-held native serializer bridge](handovers/2026-10-12-dev-consolidation/native-serializer-bridge.patch)
+and [strict companion source guard](handovers/2026-10-12-dev-consolidation/native-serializer-source-binding.patch),
+with [receiving instructions](handovers/2026-10-12-dev-consolidation/native-serializer-bridge-receiving.md).
+The API authenticates the current FIFO and retained attempt under one lock,
+protects the whole owner from writable aliases, and copies owned packets without
+sending, ACKing or consuming. Existing FAULTED debt remains settleable. All
+1,352 original native assertions remain, with 102 added. The independently
+composed five C cuts now pass 8 core / 11 output matrices / 43 owner cases and
+full sanitizers, actual exit 0; no combined-count expectation is presented as
+proof. The 41-export source guard retains all original assertions and adds
+14 inverse controls. Native SDK/MSVC/DLL/AHK and physical receiving remain UNRUN;
+live source/DLL provenance and closed admission are unchanged. Backend delivery
+and complete observer conversion remain software work, so item 49 stays open.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)

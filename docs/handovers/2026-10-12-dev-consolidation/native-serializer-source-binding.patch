@@ -1,0 +1,233 @@
+--- a/tools/test/test-windows-hook-trace-source.cjs
++++ b/tools/test/test-windows-hook-trace-source.cjs
+@@ -56,9 +56,96 @@
+ 	'ErgoptiNav_StopHookTrace'
+ ];
+ 
++const SERIALIZATION = ['ErgoptiNav_SerializeTerminalOutputAttempt'];
++
+ /** @param {string} relative Repository path. @returns {string} Exact UTF-8 source. */
+ function read(relative) {
+ 	return fs.readFileSync(path.join(ROOT, relative), 'utf8');
++}
++
++/**
++ * Pins the guarded serializer's actual declaration, body, loader and FFI widths.
++ * @param {object} source Exact production C/header/AHK source bundle.
++ * @returns {void}
++ */
++function checkSerializationBinding(source) {
++	const name = SERIALIZATION[0];
++	const parameters =
++		'uint64_t owner, const ErgoptiOutput_Key *key, uint64_t attempt, ' +
++		'ErgoptiOutput_Win32Input *out_inputs, uint32_t capacity, uint32_t *out_count';
++	const normalize = (text) => text.replace(/\s+/g, ' ').trim();
++	const withoutComments = (text) =>
++		text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
++	for (const [kind, terminator] of [
++		['c', '\\{'],
++		['h', ';']
++	]) {
++		const declarations = [
++			...withoutComments(source[kind]).matchAll(
++				new RegExp(
++					`ERGOPTI_NAV_API\\s+int32_t\\s+ERGOPTI_NAV_CALL\\s+${name}\\s*\\(([^)]*)\\)\\s*${terminator}`,
++					'g'
++				)
++			)
++		];
++		assert.equal(
++			declarations.length,
++			1,
++			'Exactly one actual serializer C/header declaration is required.'
++		);
++		assert.equal(
++			normalize(declarations[0][1]),
++			parameters,
++			'The serializer native parameter widths changed.'
++		);
++	}
++	const bodyMatch = withoutComments(source.c).match(
++		new RegExp(`ERGOPTI_NAV_CALL\\s+${name}\\s*\\([^)]*\\)\\s*\\{([^{}]+)\\}`)
++	);
++	assert(bodyMatch && bodyMatch[1].trim(), 'The actual serializer helper body must exist.');
++	const body = bodyMatch[1];
++	const aliases = body.indexOf('NavTerminalOutputAliasesState(out_inputs,');
++	const countAlias = body.indexOf('NavTerminalOutputAliasesState(out_count, sizeof(*out_count))');
++	const lock = body.indexOf('EnterCriticalSection(&g_nav_state.lock)');
++	const head = body.indexOf('NavCheckTerminalOutputLocked(&g_nav_state, owner, key)');
++	const dispatch = body.indexOf('ErgoptiOutput_SerializeAttempt(');
++	const unlock = body.indexOf('LeaveCriticalSection(&g_nav_state.lock)');
++	assert(
++		aliases >= 0 &&
++			countAlias > aliases &&
++			lock > countAlias &&
++			head > lock &&
++			dispatch > head &&
++			unlock > dispatch,
++		'Whole-owner preflight and FIFO authentication must retain the same lock through serialization.'
++	);
++	assert(
++		body.includes(
++			'&g_nav_state.terminal_output, owner, key, attempt, out_inputs, capacity, out_count'
++		),
++		'The bridge must serialize its authoritative retained attempt and exact caller outputs.'
++	);
++	const loader = source.adapter.match(
++		/_LLM_NavEventOwnerNativeEnsureLoaded\(\)\s*\{[\s\S]*?\bNames\s*:=\s*\[([^\]]+)\]/
++	);
++	assert(loader, 'The actual native loader export list must exist.');
++	const required = [...loader[1].matchAll(/"(Ergopti\w+)"/g)].map((match) => match[1]);
++	assert.deepEqual(
++		required.sort(),
++		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION].sort(),
++		'The real loader must require all original, diagnostic and serializer exports exactly once.'
++	);
++	const binding = source.custodyAdapter.match(
++		/_LLM_TerminalOutputNativeSerialize\(([^)]*)\)\s*\{([^{}]+)\}/
++	);
++	assert(binding && binding[2].trim(), 'The actual AHK serializer helper body must exist.');
++	assert.equal(normalize(binding[1]), 'Owner, Key, Attempt, Packets, Count');
++	assert(
++		normalize(binding[2]).includes(
++			`return DllCall(_LLM_NavEventOwnerNativeExport("${name}"), "UInt64", Owner, "Ptr", Key, "UInt64", Attempt, "Ptr", Packets, "UInt", 2048, "Ptr", Count, "Int")`
++		),
++		'The actual AHK binding must preserve all six arguments and exact return width.'
++	);
+ }
+ 
+ /** @param {object} source Production source bundle. @returns {void} */
+@@ -66,9 +153,10 @@
+ 	const exports = [...source.def.matchAll(/^\s*(Ergopti\w+)\s*$/gm)].map((match) => match[1]);
+ 	assert.deepEqual(
+ 		exports.sort(),
+-		[...EXISTING, ...DIAGNOSTIC].sort(),
++		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION].sort(),
+ 		'The 37 original exports must survive the diagnostic ABI.'
+ 	);
++	checkSerializationBinding(source);
+ 	for (const name of DIAGNOSTIC) {
+ 		assert.match(source.c, new RegExp(`ERGOPTI_NAV_CALL ${name}\\(`));
+ 		assert.match(source.h, new RegExp(`ERGOPTI_NAV_CALL ${name}\\(`));
+@@ -180,6 +268,7 @@
+ 	def: read(NATIVE + 'nav_event_owner.def'),
+ 	cmake: read(NATIVE + 'CMakeLists.txt'),
+ 	adapter: read('static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk'),
++	custodyAdapter: read('static/ergopti_plus/windows/adapters/terminal_output_custody.ahk'),
+ 	builder: read('tools/build/build_windows_nav_owner.ps1'),
+ 	runner: read('tools/test/run-nav-event-owner-portable.cjs'),
+ 	harness: read('static/ergopti_plus/windows/tests/hardware/group7_hook_trace.ahk'),
+@@ -254,7 +343,112 @@
+ ];
+ for (const [name, mutate] of mutations)
+ 	assert.throws(() => check({ ...source, [name]: mutate(source[name]) }));
++const serializationMutations = [
++	['def', (text) => text.replace('\tErgoptiNav_SerializeTerminalOutputAttempt\n', '')],
++	['def', (text) => text + '\tErgoptiNav_ForeignSerializer\n'],
++	[
++		'c',
++		(text) =>
++			text.replace(
++				'ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt(',
++				'ERGOPTI_NAV_CALL ErgoptiNav_MissingSerializeTerminalOutputAttempt('
++			)
++	],
++	[
++		'h',
++		(text) =>
++			text.replace(
++				'ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt(',
++				'ERGOPTI_NAV_CALL ErgoptiNav_MissingSerializeTerminalOutputAttempt('
++			)
++	],
++	[
++		'h',
++		(text) =>
++			text.replace(
++				'uint64_t attempt,\n\tErgoptiOutput_Win32Input *out_inputs',
++				'uint32_t attempt,\n\tErgoptiOutput_Win32Input *out_inputs'
++			)
++	],
++	[
++		'c',
++		(text) =>
++			text.replace(
++				'ErgoptiOutput_Win32Input *out_inputs, uint32_t capacity',
++				'ErgoptiOutput_Win32Input *out_inputs, uint64_t capacity'
++			)
++	],
++	['adapter', (text) => text.replace('"ErgoptiNav_SerializeTerminalOutputAttempt",', '')],
++	[
++		'adapter',
++		(text) =>
++			text.replace(
++				'"ErgoptiNav_SerializeTerminalOutputAttempt",',
++				'"ErgoptiNav_SerializeTerminalOutputAttempt", "ErgoptiNav_ForeignSerializer",'
++			)
++	],
++	[
++		'custodyAdapter',
++		(text) =>
++			text.replace(
++				'_LLM_TerminalOutputNativeSerialize(Owner, Key, Attempt, Packets, Count) {',
++				'_LLM_TerminalOutputMissingSerialize(Owner, Key, Attempt, Packets, Count) {'
++			)
++	],
++	[
++		'custodyAdapter',
++		(text) =>
++			text.replace(
++				'"UInt64", Attempt, "Ptr", Packets, "UInt", 2048,',
++				'"UInt", Attempt, "Ptr", Packets, "UInt", 2048,'
++			)
++	],
++	[
++		'custodyAdapter',
++		(text) => text.replace('"Ptr", Packets, "UInt", 2048,', '"Ptr", Packets, "UShort", 2048,')
++	],
++	[
++		'c',
++		(text) =>
++			text.replace(
++				'status = NavTerminalOutputStatus(ErgoptiOutput_SerializeAttempt(',
++				'status = NavTerminalOutputStatus(ErgoptiOutput_MissingSerializeAttempt('
++			)
++	],
++	[
++		'c',
++		(text) =>
++			text.replace('|| NavTerminalOutputAliasesState(out_count, sizeof(*out_count))', '|| false')
++	],
++	[
++		'c',
++		(text) => {
++			const start = text.indexOf(
++				'ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt('
++			);
++			const end = text.indexOf('/** Commits only the reported exact accepted prefix', start);
++			assert(start >= 0 && end > start, 'The early-unlock inverse needs the actual bridge body.');
++			const body = text.slice(start, end);
++			const changed = body
++				.replace('\tLeaveCriticalSection(&g_nav_state.lock);\n', '')
++				.replace(
++					'\tif (status == ERGOPTI_NAV_STATUS_OK)\n',
++					'\tLeaveCriticalSection(&g_nav_state.lock);\n\tif (status == ERGOPTI_NAV_STATUS_OK)\n'
++				);
++			return text.slice(0, start) + changed + text.slice(end);
++		}
++	]
++];
++for (const [name, mutate] of serializationMutations) {
++	const changed = mutate(source[name]);
++	assert.notEqual(
++		changed,
++		source[name],
++		'A serializer inverse must change its actual source seam.'
++	);
++	assert.throws(() => check({ ...source, [name]: changed }));
++}
+ console.log(
+-	`Hook trace source bindings: 40 preserved exports and ${mutations.length} negative controls passed.`
++	`Hook trace source bindings: 37 original + 3 diagnostic + 1 serializer exports and ${mutations.length} original + ${serializationMutations.length} additive negative controls passed.`
+ );
+ console.log('Source binding only; native Windows callback execution remains UNRUN.');
