@@ -77,6 +77,7 @@ helpers.with_fresh_modules({
 	"infra.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
+	"modules.keymap.layout_registry",
 	"toml_codec",
 	"modules.keymap.control_sentinels",
 	"adapters.synthetic_input",
@@ -110,6 +111,8 @@ helpers.with_fresh_modules({
 		read = read_once,
 		read_with_status = function(path) return read_once(path), "ok" end,
 	}
+
+	package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 
 	local Config    = helpers.load_with_stubs("platform.remap.config")
 	local Generator = helpers.load_with_stubs("platform.remap.generator")

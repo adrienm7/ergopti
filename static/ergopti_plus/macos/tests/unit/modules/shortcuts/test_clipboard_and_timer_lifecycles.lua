@@ -51,11 +51,27 @@ local function load_wrap_fixture(restore_outcomes)
 	}
 	local clipboard = clone(original)
 	local timers = {}
+	local clock_ns = 0
 	local snapshots = 0
 	local restore_calls = 0
 
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.synthetic_input"] = {
+		begin = function() return {} end,
+		on_dispatched = function(tx, callback) tx.dispatched_callback = callback end,
+		on_complete = function(tx, callback) tx.callback = callback end,
+		seal = function(tx)
+			tx.completed = true
+			tx.dispatched_callback(tx, nil, "dispatched")
+			tx.callback(tx, "complete")
+			return true
+		end,
+		cancel = function(tx)
+			if tx.completed then return false end
+			tx.completed = true
+			if tx.callback then tx.callback(tx, "cancelled") end
+			return true
+		end,
 		emit_key_stroke = function(_mods, key)
 			helpers.assert_eq(key, "v", "wrap_selection may emit only Cmd+V")
 			return true
@@ -87,8 +103,9 @@ local function load_wrap_fixture(restore_outcomes)
 		getContents = function() return clipboard["public.utf8-plain-text"] end,
 	}
 	local timer = {
-		new = function(_delay, callback)
-			local handle = { running_state = false, callback = callback }
+		absoluteTime = function() return clock_ns end,
+		new = function(delay, callback)
+			local handle = { running_state = false, callback = callback, delay = delay }
 			function handle:start()
 				self.running_state = true
 				return self
@@ -115,7 +132,10 @@ local function load_wrap_fixture(restore_outcomes)
 		clipboard = function() return clone(clipboard) end,
 		snapshots = function() return snapshots end,
 		wrap = function() return text.wrap_selection("selected", "(", ")") end,
-		fire = function(handle) handle.callback() end,
+		fire = function(handle)
+			clock_ns = clock_ns + math.floor(handle.delay * 1e9)
+			handle.callback()
+		end,
 		restore = function()
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["infra.logger"] = saved.logger

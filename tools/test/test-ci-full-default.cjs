@@ -3,6 +3,8 @@
 /** Raw full-default controls; source models never qualify skipped native work. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const Full = require('./ci-full-default.cjs');
@@ -68,7 +70,10 @@ function receiveClockWorkflow(files) {
 	const actual = files.find((entry) => entry.rel === MAC);
 	assert.ok(actual, 'Actual macOS workflow source must be present.');
 	const expected = YAML.parse(
-		fs.readFileSync(`${Raw.ROOT}/tools/test/fixtures/native_http_clock_workflow.yml`, 'utf8')
+		fs.readFileSync(
+			`${Raw.ROOT}/tools/test/fixtures/native_http_clock_profile_workflow.yml`,
+			'utf8'
+		)
 	);
 	assertNativeHTTPClockWorkflow(YAML.parse(actual.text), expected);
 }
@@ -116,14 +121,53 @@ for (const [name, before, after] of [
 	],
 	[
 		'Package first-two commands remain outside duplicate wire deferral',
-		'          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n',
-		'          true omitted_package_owned_process\n'
+		'      - name: Receive actual managed HTTP native clients\n        run: |\n          set -euo pipefail\n          status=0\n          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n',
+		'      - name: Receive actual managed HTTP native clients\n        run: |\n          set -euo pipefail\n          status=0\n          true omitted_package_owned_process\n'
 	]
 ]) {
 	check(name + ' is refused by actual live equality', () => {
 		assert.throws(() => receiveClockWorkflow(changed(MAC, before, after)), /clock|Clock|Package/);
 	});
 }
+check('profile wrapper retains the original immutable full clock body byte for byte', () => {
+	const YAML = require('yaml');
+	const original = YAML.parse(
+		fs.readFileSync(`${Raw.ROOT}/tools/test/fixtures/native_http_clock_workflow.yml`, 'utf8')
+	).jobs['managed-ollama-native'].steps[0].run;
+	const profile = YAML.parse(
+		fs.readFileSync(
+			`${Raw.ROOT}/tools/test/fixtures/native_http_clock_profile_workflow.yml`,
+			'utf8'
+		)
+	).jobs['managed-ollama-native'].steps[0].run;
+	const seam = 'elif [ "$mode" = full ]; then\n';
+	const refusal =
+		'else\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
+	assert.equal(original.split(seam).length, 2, 'one original full branch');
+	assert.ok(original.endsWith(refusal), 'original refusal remains closed');
+	const originalBody = original
+		.slice(original.indexOf(seam) + seam.length, -refusal.length)
+		.split('\n')
+		.map((line) => {
+			if (line === '') return line;
+			assert.ok(line.startsWith('    '), 'original full branch indentation');
+			return line.slice(4);
+		})
+		.join('\n');
+	const full = Scoped.unwrap(profile.trimEnd(), Scoped.contract.protocols[2]) + '\n';
+	assert.equal(
+		full,
+		originalBody,
+		'profile publication cannot rewrite the reviewed full clock body'
+	);
+	assert.notEqual(full.replace('client_status=("${PIPESTATUS[@]}")', 'client_status=(0 0)'), full);
+	assert.notEqual(full.replace('if [ "$clock_status" -ne 0 ]; then status=1; fi', 'true'), full);
+	for (const mutant of [
+		full.replace('client_status=("${PIPESTATUS[@]}")', 'client_status=(0 0)'),
+		full.replace('if [ "$clock_status" -ne 0 ]; then status=1; fi', 'true')
+	])
+		assert.throws(() => assert.equal(mutant, originalBody));
+});
 check('raw loader and full view retain every exact source byte', () => {
 	const view = Full.fromFiles(source);
 	assert.deepEqual(view.rawFiles(), source);
@@ -148,11 +192,12 @@ check('every scoped full body remains owned; all other product scripts remain ex
 	for (const entry of source)
 		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
 			jobs++;
-			assert.equal(Full.field(Full.job(job.id), 'if'), Raw.field(job.body, 'if'));
+			const retainedJob = Full.job(job.id);
+			assert.equal(Full.field(retainedJob, 'if'), Raw.field(job.body, 'if'));
 			for (const step of Raw.steps(job.body)) {
 				if (!step.name) continue;
 				steps++;
-				const retained = Full.step(Full.job(job.id), step.name);
+				const retained = Full.step(retainedJob, step.name);
 				const slot = Scoped.contract.slots.find(
 					(slot) => slot.file === entry.rel && slot.job === job.id && slot.step === step.name
 				);
@@ -521,20 +566,34 @@ check('release keeps real full predicates and implicit successful dependency adm
 check('full Linux package retains cancellation and manual receiving allowance', () => {
 	const expression = Raw.field(Raw.job('package-linux'), 'if')
 		.slice(3, -2)
+		.replaceAll('needs.test-linux.result', "needs['test-linux'].result")
 		.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
 	const evaluate = new Function('needs', 'github', 'cancelled', `return (${expression});`);
+	const accepted = new Set([
+		'push:success:success:false',
+		'pull_request:success:success:false',
+		'workflow_dispatch:success:success:false',
+		'workflow_dispatch:success:failure:false',
+		'schedule:success:success:false',
+		'unknown:success:success:false',
+		'null:success:success:false'
+	]);
 	let cases = 0;
 	for (const event of ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown', null])
-		for (const result of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
-			for (const cancelled of [false, true]) {
-				assert.equal(
-					evaluate({ 'e2e-linux': { result } }, { event_name: event }, () => cancelled),
-					!cancelled &&
-						(result === 'success' || (event === 'workflow_dispatch' && result === 'failure'))
-				);
-				cases++;
-			}
-	assert.equal(cases, 72);
+		for (const unitResult of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
+			for (const result of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
+				for (const cancelled of [false, true]) {
+					assert.equal(
+						evaluate(
+							{ 'test-linux': { result: unitResult }, 'e2e-linux': { result } },
+							{ event_name: event },
+							() => cancelled
+						),
+						accepted.has(`${event}:${unitResult}:${result}:${cancelled}`)
+					);
+					cases++;
+				}
+	assert.equal(cases, 432);
 });
 check('package duplicate HTTP receiving scopes only the native wire command', () => {
 	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
@@ -805,6 +864,341 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 		});
 	}
 }
+
+check(
+	'v101 scope admission is exact main push before expiry and all foreign contexts stay full',
+	() => {
+		const stable = JSON.parse(fs.readFileSync(Policy.STABLE_V101_POLICY_PATH, 'utf8'));
+		assert.equal(stable.id, 'stable-v1-0-1-20261011-four-macos-native-scopes');
+		assert.equal(stable.expires_at, '2026-10-12T07:00:00Z');
+		assert.deepEqual(Object.keys(stable.scopes), [
+			'macos-native-pac',
+			'macos-native-http',
+			'macos-brew-archive',
+			'macos-native-model-receiving',
+			'macos-shortcuts-discovery',
+			'macos-launch-appleevents'
+		]);
+		const context = Object.fromEntries(
+			['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(
+				(key) => [key, stable[key]]
+			)
+		);
+		context.github_actions = 'true';
+		const clock = new Date('2026-10-12T06:59:59.999Z');
+		for (const scope of Object.keys(stable.scopes)) {
+			assert.equal(Policy.resolveQualificationProfile(context, clock, scope).id, stable.id);
+			assert.equal(
+				Policy.resolveQualificationProfile(context, new Date(stable.expires_at), scope),
+				null
+			);
+			for (const [key, value] of [
+				['github_actions', 'false'],
+				['repository', 'foreign/ergopti'],
+				['event_name', 'workflow_dispatch'],
+				['event_name', 'pull_request'],
+				['ref', 'refs/heads/dev'],
+				['release', false],
+				['prerelease', 'true'],
+				['channel', 'dev'],
+				['tag', 'v1.0.2'],
+				['version', '1.0.2']
+			])
+				assert.equal(
+					Policy.resolveQualificationProfile({ ...context, [key]: value }, clock, scope),
+					null
+				);
+		}
+		for (const scope of [
+			'macos-native-model-receiving-unadmitted',
+			'core-js-suite',
+			'linux-unit-suite',
+			'windows-native-desktop'
+		])
+			assert.equal(Policy.resolveQualificationProfile(context, clock, scope), null);
+	}
+);
+check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const item = Raw.jobsOfText(entry.text, MAC).find((job) => job.id === 'item36-native');
+	assert.equal(
+		Raw.field(item.body, 'if'),
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	);
+	const itemCode = Raw.runOf(
+		Raw.step(item.body, 'Qualify scoped item 36 native archive XCTest controls')
+	).join('\n');
+	assert.equal(itemCode.includes('--skip'), false);
+	assert.ok(itemCode.includes('HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests'));
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const prepare = Raw.runOf(Raw.step(job.body, 'Prepare scoped native qualification profile')).join(
+		'\n'
+	);
+	assert.ok(prepare.includes('--scope macos-brew-archive --github-env "$GITHUB_ENV"'));
+	assert.ok(
+		prepare.includes(
+			'cp "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json" "$RUNNER_TEMP/stable-macos-brew-archive.json"'
+		)
+	);
+	const retain = Raw.step(job.body, 'Retain source-bound package native qualification receipt');
+	assert.equal(Raw.stepField(retain, 'if'), 'always()');
+	assert.ok(retain.includes('name: assets-qualification-package-macos'));
+	assert.ok(retain.includes('path: ${{ runner.temp }}/stable-macos-brew-archive.json'));
+	assert.match(retain, /^ {10}if-no-files-found: error$/m);
+});
+check('v101 managed PAC admission retains Worker filter and exact collector authority', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'managed-ollama-native');
+	const step = Raw.step(job.body, 'Qualify actual native PAC and WPAD XCTest controls');
+	const code = Raw.runOf(step).join('\n');
+	assert.ok(code.includes('--validate-scope-receipt-profile "$receipt"'));
+	assert.ok(code.includes('test -z "$profile"'));
+	assert.ok(
+		code.includes("--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'")
+	);
+	assert.ok(code.includes('pac_evidence_args=(--pac-qualification-receipt "$receipt")'));
+	for (const token of [
+		'--validate-scope-receipt-profile',
+		'pac_evidence_args=(--pac-qualification-receipt',
+		'ManagedHTTPWorkerTests|'
+	]) {
+		const mutant = step.replace(token, token.slice(0, -1) + 'x');
+		assert.notEqual(mutant, step);
+		assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+	}
+	const marker = 'set -euo pipefail\ntest -n "$ERGOPTI_NATIVE_HTTP_PYTHON"';
+	assert.equal(code.split(marker).length, 2);
+	const admission = code
+		.slice(0, code.indexOf(marker))
+		.replaceAll('${{ matrix.architecture }}', 'arm64');
+	for (const mode of ['full', 'deferred']) {
+		const shell =
+			`set -euo pipefail
+RUNNER_TEMP="/owned path"
+mkdir() { :; }
+node() {
+    case "$*" in
+        *--validate-scope-receipt-profile*) printf '%s' "$PROFILE" ;;
+        *--validate-scope-receipt*) printf '%s' "$MODE" ;;
+        *--pac-skip-pattern*) printf '%s' '^exact-owned-pattern$' ;;
+        *) : ;;
+    esac
+}
+` +
+			admission +
+			'\nargv() { printf "%s\\0" "$#"; for arg in "$@"; do printf "%s\\0" "$arg"; done; }\nargv ${native_pac_skip_args[@]+"${native_pac_skip_args[@]}"} ${pac_evidence_args[@]+"${pac_evidence_args[@]}"}';
+		const result = spawnSync(bashExecutable(), ['--noprofile', '--norc', '-c', shell], {
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				MODE: mode,
+				PROFILE: mode === 'full' ? '' : 'stable-v1-0-1-20261011-four-macos-native-scopes'
+			}
+		});
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stderr, '');
+		if (mode === 'deferred') {
+			assert.ok(
+				result.stdout.endsWith(
+					'4\0--skip\0^exact-owned-pattern$\0--pac-qualification-receipt\0/owned path/stable-macos-native-pac-arm64.json\0'
+				)
+			);
+		} else assert.equal(result.stdout, '0\0');
+	}
+});
+check('v101 HTTP receiver defers only wire and preserves both mandatory statuses', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	for (const [id, name] of [
+		['managed-ollama-native', 'Receive actual independent managed HTTP native clients'],
+		['package-macos', 'Receive actual managed HTTP native clients']
+	]) {
+		const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === id);
+		const step = Raw.step(job.body, name);
+		const code = Raw.runOf(step)
+			.join('\n')
+			.replaceAll('${{ matrix.architecture }}', 'arm64')
+			.replaceAll('${{ github.sha }}', 'a'.repeat(40))
+			.replaceAll('${{ github.run_id }}', '123')
+			.replaceAll('${{ github.run_attempt }}', '2');
+		assert.doesNotMatch(code, /\$\{\{/, 'every fixture-only workflow input is explicitly bound');
+		for (const [mode, profile, refused, failedCommand, expected] of [
+			['full', '', false, '', 0],
+			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, '', 0],
+			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, 'owned', 1],
+			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, 'client', 1],
+			['full', '', true, '', 17],
+			['full', '', false, 'owned', 1],
+			['full', '', false, 'client', 1],
+			['full', '', false, 'wire', 1],
+			['full', '', false, 'owned-capture', 1],
+			['full', '', false, 'client-capture', 1],
+			['full', '', false, 'wire-capture', 1]
+		]) {
+			if (id === 'package-macos' && failedCommand.endsWith('-capture')) continue;
+			const shell =
+				`
+set -euo pipefail
+RUNNER_TEMP="$1"
+GITHUB_OUTPUT="$RUNNER_TEMP/github-output"
+ERGOPTI_NATIVE_HTTP_PYTHON=owned_python
+tee() {
+    command tee "$@" || return $?
+    case "$*" in
+        *owned-process.log*) test "$FAILED" != owned-capture ;;
+        *public-native.log*) test "$FAILED" != client-capture ;;
+        *independent-client.log*) test "$FAILED" != wire-capture ;;
+        *) return 91 ;;
+    esac
+}
+node() {
+    case "$*" in
+        *--validate-scope-receipt-profile*) printf '%s' "$PROFILE" ;;
+        *--validate-scope-receipt*) if [ "$REFUSED" = true ]; then return 17; fi; printf '%s' "$MODE" ;;
+        *) : ;;
+    esac
+}
+owned_python() {
+    case "$*" in
+        *macos_owned_process_native_test.py*) printf 'owned\\n'; test "$FAILED" != owned ;;
+        *native_http_receiving_test.py*) printf 'client\\n'; test "$FAILED" != client ;;
+        *native_http_wire_client_receiving.py*) printf 'wire\\n'; test "$FAILED" != wire ;;
+        *) return 91 ;;
+    esac
+}
+` + code;
+			const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-http-profile-'));
+			let result;
+			try {
+				result = spawnSync(
+					bashExecutable(),
+					['--noprofile', '--norc', '-c', shell, 'owned-http', owned],
+					{
+						encoding: 'utf8',
+						env: {
+							...process.env,
+							MODE: mode,
+							PROFILE: profile,
+							REFUSED: String(refused),
+							FAILED: failedCommand
+						}
+					}
+				);
+			} finally {
+				fs.rmSync(owned, { recursive: true, force: true });
+			}
+			assert.equal(result.error, undefined);
+			assert.equal(result.status, expected, result.stderr);
+			assert.equal(result.stderr, '');
+			const lines = result.stdout.split('\n');
+			assert.equal(
+				lines.filter((line) => line === 'owned').length,
+				refused && id === 'managed-ollama-native' ? 0 : 1
+			);
+			assert.equal(
+				lines.filter((line) => line === 'client').length,
+				refused && id === 'managed-ollama-native' ? 0 : 1
+			);
+			assert.equal(
+				lines.filter((line) => line === 'wire').length,
+				mode === 'full' && !refused ? 1 : 0
+			);
+		}
+		for (const token of [
+			'macos_owned_process_native_test.py || status=1',
+			'native_http_receiving_test.py --client-only || status=1'
+		]) {
+			const mutant = step.replace(token, token.replace('status=1', 'true'));
+			assert.notEqual(mutant, step);
+			assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+		}
+	}
+});
+check('v101 package joins only validated PAC and Brew identities', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const step = Raw.step(job.body, 'Run Swift launcher tests');
+	const code = Raw.runOf(step).join('\n');
+	for (const token of [
+		'test "$brew_mode" = deferred',
+		'test "$brew_profile" = "$profile"',
+		'test "$brew_mode" = full',
+		'test -z "$brew_profile"'
+	]) {
+		assert.ok(code.includes(token));
+		const mutant = step.replace(token, ': # removed');
+		assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+	}
+	assert.equal(code.split(' ${brew_evidence_args[@]+"${brew_evidence_args[@]}"}').length, 3);
+	assert.ok(
+		code.includes('--pac-skip-pattern "$pac_receipt" --brew-qualification-receipt "$brew_receipt"')
+	);
+	const full = Full.runOf(Full.step(Full.job('package-macos'), 'Run Swift launcher tests')).join(
+		'\n'
+	);
+	assert.equal(full.includes('brew_evidence_args'), false);
+	assert.equal(full.includes('--brew-qualification-receipt'), false);
+});
+
+check('v101 Shortcuts keeps portable/full work and publishes its validated exact receipt', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'package-macos');
+	const probe = Raw.step(job.body, 'Observe native Apple Shortcuts discovery');
+	const code = Raw.runOf(probe).join('\n');
+	const portable = code.indexOf(
+		'python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe'
+	);
+	const jxa = code.indexOf('node tools/diagnostics/apple_shortcuts_probe/test_probe.cjs');
+	const admission = code.indexOf(
+		"policy.validateQualificationReceipt(receipt, 'macos-shortcuts-discovery'"
+	);
+	const emission = code.indexOf('fs.writeFileSync(');
+	const full = code.indexOf('if [ "$shortcuts_mode" = full ]; then');
+	assert(
+		portable >= 0 && jxa > portable && admission > jxa && emission > admission && full > emission
+	);
+	assert(code.includes("{ flag: 'wx' }"));
+	assert(code.includes('python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py'));
+	const upload = Raw.step(job.body, 'Retain source-bound Shortcuts native qualification receipt');
+	assert.equal(Raw.stepField(upload, 'if'), null);
+	assert(upload.includes('name: assets-qualification-shortcuts-macos'));
+	assert(upload.includes('path: ${{ runner.temp }}/stable-macos-shortcuts-discovery.json'));
+	assert(upload.includes('if-no-files-found: error'));
+});
+
+check('v101 AppleEvents records only exact transport rows and preserves installed launch', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'launch');
+	const code = Raw.runOf(Raw.step(job.body, 'Record the launch qualification scope')).join('\n');
+	assert(
+		code.includes(
+			'policy.validateLaunchQualificationReceipt(receipt, scenario, runner, process.env.GITHUB_SHA, policy.environmentContext())'
+		)
+	);
+	assert(
+		code.indexOf('policy.validateLaunchQualificationReceipt') < code.indexOf('fs.writeFileSync')
+	);
+	assert(code.includes("{ flag: 'wx' }"));
+	const upload = Raw.step(job.body, 'Retain source-bound AppleEvent launch qualification receipt');
+	assert.equal(
+		Raw.stepField(upload, 'if'),
+		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+	);
+	assert(
+		upload.includes(
+			'name: assets-qualification-launch-macos-${{ matrix.runner }}-${{ matrix.scenario }}'
+		)
+	);
+	assert(upload.includes('if-no-files-found: error'));
+	const launch = Raw.runOf(Raw.step(job.body, 'Launch over the user state and judge it')).join(
+		'\n'
+	);
+	assert(
+		launch.includes('python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app')
+	);
+	assert(launch.includes('--qualification-receipt "$RUNNER_TEMP/launch-qualification.json"'));
+	assert(entry.text.includes('node tools/build/macos-release-archives.cjs --ci-install'));
+});
+
 console.log(
 	`PASS: raw full-default and retired-route source controls=${passed}; native execution UNRUN.`
 );

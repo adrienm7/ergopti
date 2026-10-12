@@ -56,6 +56,8 @@ local CANONICAL_CHANGES = {
 	["g|standard"] = "to=f12",
 	-- Maximize is a keystroke like every other: sent on key down.
 	["n"] = "to=y[command,control,fn]",
+	-- Virtual ISO itself maps the canonical HID Backquote target to Carbon 10.
+	["tab"] = "to=grave_accent_and_tilde[command]",
 }
 -- Floor: the hand-written layer had 59 manipulators on 47 keys.
 local MIN_ENTRIES = 50
@@ -403,5 +405,29 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 		helpers.assert_eq(presets.left_command[2], NavLayer.HOLD_ACTION_ID, "the shipped preset's layer key")
 		helpers.assert_true(NavLayer.recommendation_enters_layer({ "caps_lock", "left_command" }, presets))
 		helpers.assert_eq(NavLayer.recommendation_enters_layer({ "caps_lock", "tab" }, presets), false)
+	end)
+end)
+
+helpers.describe("navigation physical inputs and virtual outputs (iso-typing-convention)", function()
+	helpers.it("keeps the physical ISO input domain but sends each target's canonical HID position", function()
+		local bindings = bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n'
+			.. '"IntlBackslash" = "keystroke:Backquote"\n"Backquote" = "keystroke:IntlBackslash"\n')
+		local rule = NavLayer.build_rule(bindings, ctx.registry)
+		local actual = normalise(rule)
+		helpers.assert_eq(actual.grave_accent_and_tilde, "to=grave_accent_and_tilde",
+			"the ISO extra source sends the target left of 1 through the ISO virtual keyboard")
+		helpers.assert_eq(actual.non_us_backslash, "to=non_us_backslash",
+			"the source left of 1 sends the ISO extra target through the ISO virtual keyboard")
+	end)
+
+	helpers.it("wheel Quartz strokes use the captured layout convention, without changing ordinary keys", function()
+		local bindings = bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n'
+			.. '"WheelUp" = "keystroke:IntlBackslash"\n"WheelDown" = "keystroke:Backquote"\n"WheelLeft" = "keystroke:KeyA"\n')
+		for _, case in ipairs({ { "iso", 50, 10 }, { "ansi", 10, 50 } }) do
+			local slots = NavLayer.wheel_slots(bindings, ctx.registry, case[1])
+			helpers.assert_eq(slots.vertical[1].strokes[1].keycode, case[2], "extra-key output " .. case[1])
+			helpers.assert_eq(slots.vertical[-1].strokes[1].keycode, case[3], "left-of-one output " .. case[1])
+			helpers.assert_eq(slots.horizontal[-1].strokes[1].keycode, 0, "ordinary KeyA remains unchanged")
+		end
 	end)
 end)

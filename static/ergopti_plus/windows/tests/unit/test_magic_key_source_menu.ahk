@@ -250,6 +250,8 @@ _MKS_EditorCase() {
 		CategoryEnabled := Map("Layout", false, "Shortcuts", false, "Hotstrings", false,
 			"TapHolds", false, "Rolls", false)
 		ConfigurationFile := A_Temp . "\ergopti_magic_key_source_" . A_TickCount . ".toml"
+		AssertEqual("absent", ConfigMigrateBoot(ConfigurationFile)["status"],
+			"The real editor fixture admits its exact new private configuration before publication")
 		MasterGateInitialize(Features, TapHold, IsCategoryGated)
 		AssertTrue(ModifyMagicKeySource("KeyJ", (*) => true, (*) => 0, (*) => true))
 		AssertEqual("KeyJ", MasterGateDesiredFeatures(Features)["hotstrings"]["magic_key_source"],

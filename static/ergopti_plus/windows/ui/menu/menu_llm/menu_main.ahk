@@ -66,10 +66,22 @@ LLM_Menu_ServiceBuilds() {
 ; built by InitSubMenus. The generic root worker invalidates and rebuilds those
 ; siblings, including a recursive personal/extensions scan that the LLM state
 ; cannot affect.
-_LLM_Menu_PublishRoot(PublishAuthorizeFn) {
+_LLM_Menu_PublishRoot(Submenu, PublishAuthorizeFn) {
+	global _LLM_Menu_Handle
+	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu
+		return false
 	try LoggerDebug("LLM",
 		"Publishing IA submenu through retained root projection.")
-	return initMenu(PublishAuthorizeFn)
+	return initMenu(_LLM_Menu_PreparedRootCurrent.Bind(Submenu, PublishAuthorizeFn), false, Submenu)
+}
+
+/** Preserves the original root ticket and the exact candidate at its final claim. */
+_LLM_Menu_PreparedRootCurrent(Submenu, PublishAuthorizeFn) {
+	global _LLM_Menu_Handle
+	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu || !HasMethod(PublishAuthorizeFn, "Call")
+		return false
+	Authorized := PublishAuthorizeFn.Call()
+	return (Authorized is Integer) && Authorized == 1 && _LLM_Menu_Handle == Submenu
 }
 
 /**
@@ -116,8 +128,7 @@ LLM_Menu_BuildSubmenu() {
 
 	Commands := _LLM_ScopeCommands()
 	Commands["llm_toggle"] := LLM_Menu_OnToggle
-	StateGetters := Map("llm_enabled", () => _LLM_Menu["enabled"],
-		"llm_toggle_ready", () => !A_IsSuspended)
+	StateGetters := _LLM_Menu_StateGetters()
 	WarningRows := []
 	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {
 		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
@@ -168,6 +179,13 @@ LLM_Menu_BuildSubmenu() {
 	return StagedHandle
 }
 
+/** Captures readers; backend availability never grants configuration write readiness. */
+_LLM_Menu_StateGetters() {
+	global _LLM_Menu
+	return Map("llm_enabled", () => _LLM_Menu["enabled"],
+		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist())
+}
+
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.
 _LLM_Menu_EmitCapturedRow(Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
 	global _LLM_Menu_Handle
@@ -206,7 +224,7 @@ LLM_Menu_Build() {
 	; The LLM builder owns only a detached child. The root coordinator attaches
 	; it while publishing a complete root, so an asynchronous LLM rebuild can
 	; never expose an IA-only tray or mutate a root currently being staged.
-	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot, true, true)
+	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)
 		throw Error("tray root coordinator refused the LLM subtree")
 	MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
 	_LLM_Menu_InTray := true

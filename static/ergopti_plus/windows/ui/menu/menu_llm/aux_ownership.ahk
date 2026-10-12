@@ -14,7 +14,7 @@ _LLM_Menu_BeginOllamaAux(Kind, Identity := "") {
 	global LLM_OLLAMA_BASE_URL
 	return LLM_AuxBegin(Kind, Map(
 		"backend", "ollama",
-		"endpoint", LLM_OLLAMA_BASE_URL,
+		"endpoint", LLM_OllamaRequestOrigin(),
 		"identity", Identity))
 }
 

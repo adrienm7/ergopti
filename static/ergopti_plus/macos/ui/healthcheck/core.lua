@@ -754,6 +754,7 @@ end
 --- @return table
 local function init_message(session)
 	local documents = M.config()
+	session.snapshot.export_revision = session.snapshot.export_revision or 1
 	return {
 		type = "init",
 		config = {
@@ -773,6 +774,10 @@ end
 local function perform_action(session, action, documents)
 	Cleanup.refresh(session)
 	if action.action == "export_snapshot" then
+		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
+			send(session, { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence })
+			return
+		end
 		send(session, { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
@@ -785,7 +790,9 @@ local function perform_action(session, action, documents)
 	elseif action.action == "refresh" then
 		Cleanup.archive(session)
 		session.detailed = action.detailed
+		local revision = (session.snapshot.export_revision or 1) + 1
 		session.snapshot = M.run({ detailed = action.detailed, extensive = action.extensive })
+		session.snapshot.export_revision = revision
 		Cleanup.refresh(session)
 		send(session, { type = "snapshot", snapshot = session.snapshot })
 		start_probes(session)

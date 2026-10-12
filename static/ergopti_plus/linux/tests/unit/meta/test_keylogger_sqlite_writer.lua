@@ -1049,3 +1049,35 @@ helpers.describe("linux-sqlite-ngram-group-transaction", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("keylogger-device-log-privacy", function()
+	helpers.it("keylogger-device-log-privacy: native registration receipt keeps identity only in SQL", function()
+		local previous_logger, previous_writer = package.loaded["logger.shim"], package.loaded["modules.keylogger.sqlite_writer"]
+		local messages, registration_requests = {}, 0
+		local logger = {}
+		for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
+			logger[level] = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		end
+		package.loaded["logger.shim"] = logger
+		local ok, err = xpcall(function()
+			with_writer_read_receipts(function(command)
+				if command:find("INSERT INTO devices", 1, true) then
+					registration_requests = registration_requests + 1
+					helpers.assert_contains(command, "private-host-identity")
+					helpers.assert_contains(command, "Private Test Host")
+				end
+				return ""
+			end, 0, function(writer)
+				messages = {}
+				helpers.assert_eq(writer.register_device("private-host-identity", "Private Test Host", "linux", "test-kernel", "test-signature"), true)
+				helpers.assert_eq(registration_requests, 1)
+				helpers.assert_eq(#messages, 1)
+				helpers.assert_eq(messages[1], "Device registered.")
+				helpers.assert_nil(messages[1]:find("private-host-identity", 1, true))
+			end)
+		end, debug.traceback)
+		package.loaded["logger.shim"], package.loaded["modules.keylogger.sqlite_writer"] = previous_logger, previous_writer
+		if not ok then error(err, 0) end
+	end)
+end)

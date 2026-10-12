@@ -5,13 +5,10 @@ let magic = {};
 
 function unescapeTomlString(s) {
 	if (!s && s !== '') return s;
+	// Decode each source escape once; a decoded backslash is literal data.
+	const escapes = { '\\': '\\', n: '\n', r: '\r', t: '\t', '"': '"', "'": "'" };
 	return s
-		.replace(/\\\\/g, '\\')
-		.replace(/\\n/g, '\n')
-		.replace(/\\r/g, '\r')
-		.replace(/\\t/g, '\t')
-		.replace(/\\"/g, '"')
-		.replace(/\\'/g, "'")
+		.replace(/\\(\\|n|r|t|"|')/g, (_match, escape) => escapes[escape])
 		.replace(/\r\n/g, '\n')
 		.replace(/\r/g, '\n');
 }
@@ -47,7 +44,7 @@ function parseTomlMagic(toml) {
 		if (objLineMatch) {
 			const key = objLineMatch[1];
 			const body = objLineMatch[2];
-			const outMatch = body.match(/output\s*=\s*("(?:\\.|[^\"])*")/);
+			const outMatch = body.match(/output\s*=\s*("(?:\\.|[^"\\])*")/);
 			if (outMatch) {
 				let val = outMatch[1].slice(1, -1);
 				val = unescapeTomlString(val);
@@ -57,7 +54,7 @@ function parseTomlMagic(toml) {
 		}
 
 		// Try simple key = "value" lines (unquoted key)
-		const kvMatch = line.match(/^([A-Za-z0-9_\-]+)\s*=\s*("(?:\\.|[^\"])*")\s*$/);
+		const kvMatch = line.match(/^([A-Za-z0-9_\-]+)\s*=\s*("(?:\\.|[^"\\])*")\s*$/);
 		if (kvMatch) {
 			const key = kvMatch[1];
 			let val = kvMatch[2].slice(1, -1);

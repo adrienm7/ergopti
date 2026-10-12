@@ -15,6 +15,7 @@ local AuthPolicy = require("llm.local_server_auth")
 M.STATUS_UP = "up"
 M.STATUS_NEEDS_KEY = "needs_key"
 M.STATUS_DOWN = "down"
+M.STATUS_UNAVAILABLE = "unavailable"
 
 --- Classifies one models response using the catalogue's shared typed codec.
 --- @param response table|nil Actual HTTP adapter response.
@@ -24,6 +25,9 @@ function M.classify(response)
 	if type(response) ~= "table" then return M.STATUS_DOWN, nil end
 	local status = tonumber(response.status) or 0
 	if status == 401 or status == 403 then return M.STATUS_NEEDS_KEY, nil end
+	if response.ok == false and response.status == 0 and response.probe_error == true then
+		return M.STATUS_UNAVAILABLE, nil
+	end
 	if response.ok ~= true then return M.STATUS_DOWN, nil end
 	local models = AuthPolicy.models_receipt(response)
 	if not models then return M.STATUS_DOWN, nil end
@@ -71,6 +75,30 @@ function M.new(options)
 	local function observe(callback, changed)
 		local ok, err = xpcall(function() callback(changed) end, debug.traceback)
 		if not ok then report("observer", err) end
+	end
+
+	--- Rebinds logical view membership without acknowledging any native cleanup.
+	--- Older waiters remain captured for the next complete current sweep.
+	--- @param next_order table Ordered unique public view identifiers.
+	--- @param refresh boolean|nil Forces a fresh captured source with unchanged membership.
+	--- @return boolean changed
+	function controller.set_order(next_order, refresh)
+		assert(refresh == nil or type(refresh) == "boolean", "local discovery refresh must be boolean")
+		assert(type(next_order) == "table", "local discovery view order is required")
+		local captured, seen, count = {}, {}, 0
+		for key, id in pairs(next_order) do
+			assert(type(key) == "number" and key % 1 == 0 and key >= 1 and key <= #next_order,
+				"local discovery view order must be an array")
+			assert(type(id) == "string" and id ~= "" and not seen[id], "local discovery view identifiers must be unique")
+			captured[key], seen[id], count = id, true, count + 1
+		end
+		assert(count == #next_order, "local discovery view order must be complete")
+		local changed = refresh == true or #order ~= #captured
+		for index, id in ipairs(captured) do if order[index] ~= id then changed = true end end
+		if not changed then return false end
+		order = captured
+		generation, active, checked_at, results = generation + 1, false, nil, {}
+		return true
 	end
 
 	--- Starts a logical sweep; the producer retains its physical lifecycle owner.
@@ -158,7 +186,7 @@ function M.new(options)
 		local ids = {}
 		for _, id in ipairs(order) do
 			local verdict = results[id]
-			if verdict and verdict.status ~= M.STATUS_DOWN then ids[#ids + 1] = id end
+			if verdict and (verdict.status == M.STATUS_UP or verdict.status == M.STATUS_NEEDS_KEY) then ids[#ids + 1] = id end
 		end
 		return ids
 	end

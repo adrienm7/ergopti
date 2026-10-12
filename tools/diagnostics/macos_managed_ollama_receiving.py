@@ -161,9 +161,14 @@ def closed_failure_code(failure):
     return {"family": "unknown", "code": "unknown"}
 
 
-def observe_failure(receipt, field, failure, prepare_owner=None):
+def observe_failure(receipt, field, failure, prepare_owner=None, class_observation=False):
     """Best-effort finite projection cannot replace the original fatal verdict."""
     try:
+        if class_observation is True:
+            receipt[field] = _failure_observation(failure)
+            if field == "primary_failure" and prepare_owner is not None:
+                _observe_prepare_phase(prepare_owner)
+            return
         fact = closed_failure_code(failure)
         if type(failure) is QUALIFIED.QualificationRefusal and fact["code"] == "operation":
             fact["operation_primary"] = closed_failure_code(failure.primary)
@@ -461,6 +466,8 @@ class Receiver:
                     env=environment,
                 )
                 owner.wait_for_exit(timeout)
+                # WNOWAIT retains the PID; only exact retirement publishes status.
+                require(owner.settle(), "native_command_retirement")
                 require(owner.process.returncode == 0, "actual_native_command")
                 output.seek(0)
                 return output.read(65536)
@@ -474,9 +481,88 @@ class Receiver:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
 
+    def receiving_catalogue(self, destination, payload):
+        """Project only publication routing for this private owned loopback fixture.
+
+        The original release catalogue remains retained and source-bound; actual
+        asset hashes, byte sizes and native provenance never change here.
+        """
+        owner_path = "tools/build/stage-macos-managed-ollama-catalogue.py"
+        owner_hash = digest(self.root / owner_path)
+        owner = load("ollama_receiving_catalogue_owner", self.root / owner_path)
+        inputs = owner.Inputs()
+        inputs.admit(self.root / owner_path)
+        original = inputs.read_json(self.options.catalogue)
+        require(
+            isinstance(original.get("assets"), dict) and bool(original["assets"]),
+            "receiving_catalogue_assets",
+        )
+        policy_path = "static/ergopti_plus/_shared/python/managed_ollama_runtime.py"
+        policy = load("ollama_receiving_catalogue_policy", self.root / policy_path)
+        inputs.admit(self.root / policy_path)
+        contract = (payload / "_shared/modules/llm/managed_ollama_runtime.json").read_bytes()
+        original_bytes = self.options.catalogue.read_bytes()
+        require(
+            hashlib.sha256(original_bytes).hexdigest() == self.input_hashes["catalogue"],
+            "receiving_catalogue_input",
+        )
+        for host in original["assets"]:
+            policy.select_asset(contract, original_bytes, host)
+        channel = inputs.read_json(owner.source_file(self.root, owner.CHANNELS))[
+            "unreleased_build_channel"
+        ]
+        plan = original["publication"]
+        require(
+            plan.get("mode") in ("planned-release", "unpublished-ci"),
+            "receiving_catalogue_publication",
+        )
+        expected_plan = owner.publication(
+            self.root,
+            inputs,
+            release=plan["mode"] == "planned-release",
+            tag=plan.get("tag"),
+            version=plan.get("version"),
+            channel=plan.get("channel"),
+        )
+        require(plan == expected_plan, "receiving_catalogue_publication")
+        for asset in original["assets"].values():
+            expected_url = (
+                "https://github.com/"
+                + expected_plan["repository"]
+                + "/releases/download/"
+                + expected_plan["tag"]
+                + "/"
+                + asset["filename"]
+                if expected_plan["mode"] == "planned-release"
+                else ""
+            )
+            require(asset["url"] == expected_url, "receiving_catalogue_publication")
+        projected = json.loads(original_bytes)
+        projected["publication"] = owner.publication(
+            self.root, inputs, release=False, tag="", version="", channel=channel
+        )
+        for asset in projected["assets"].values():
+            asset["url"] = ""
+        encoded = (json.dumps(projected, indent="\t", sort_keys=True) + "\n").encode("utf-8")
+        for host in projected["assets"]:
+            policy.select_asset(contract, encoded, host)
+        inputs.current()
+        require(digest(self.root / owner_path) == owner_hash, "receiving_catalogue_source")
+        for path, (_, fingerprint) in inputs.files.items():
+            if path.is_relative_to(self.root):
+                self.source_hashes[path.relative_to(self.root).as_posix()] = fingerprint
+        destination.write_bytes(encoded)
+        self.receipt["receiving_catalogue"] = {
+            "purpose": "owned-loopback-fixture",
+            "original_sha256": hashlib.sha256(original_bytes).hexdigest(),
+            "original_publication": original["publication"],
+            "projected_sha256": hashlib.sha256(encoded).hexdigest(),
+        }
+
     def payload(self, app):
         payload = app / "Contents/Resources/static/ergopti_plus"
         relatives = [
+            "_shared/data/http/redirect_policy.json",
             "_shared/modules/network/proxy_policy.json",
             "_shared/python/network_proxy_policy.py",
             "_shared/modules/llm/managed_ollama_runtime.json",
@@ -496,7 +582,7 @@ class Receiver:
         for relative in relatives:
             self.copy_source("static/ergopti_plus/" + relative, payload / relative)
         catalogue = payload / "_shared/modules/llm/managed_ollama_release.json"
-        shutil.copy2(self.options.catalogue, catalogue)
+        self.receiving_catalogue(catalogue, payload)
         return payload
 
     @staticmethod
@@ -754,6 +840,8 @@ class Receiver:
         self.receipt["source_hashes"] = self.source_hashes
         self.receipt["outgoing_worker_sha256"] = digest(http_binary)
         self.receipt["listener_worker_sha256"] = digest(api_binary)
+        self.prepare_phase = "complete"
+
         self.prepare_phase = "complete"
 
     def make_empty_session(self, deadline, port):
@@ -1107,6 +1195,132 @@ class Receiver:
         shutil.rmtree(self.work)
 
 
+PREPARE_PHASES = frozenset(
+    (
+        "receiver_admission",
+        "peer_load",
+        "peer_acquisition",
+        "peer_registry",
+        "payload_copy",
+        "outgoing_sources",
+        "outgoing_qualification",
+        "listener_copy",
+        "listener_sign",
+        "listener_verify",
+        "trust_add",
+        "post_trust",
+        "environment",
+        "archive_admission",
+        "asset_peer",
+        "runtime_install",
+        "api_load",
+        "complete",
+    )
+)
+
+
+def _observe_prepare_phase(owner):
+    """Best-effort closed checkpoint adds no native action or success authority."""
+    try:
+        if owner.stage == "prepare":
+            phase = getattr(owner, "prepare_phase", None)
+            owner.receipt["prepare_phase"] = (
+                phase if type(phase) is str and phase in PREPARE_PHASES else "unknown"
+            )
+    except BaseException:
+        pass
+
+
+def _failure_observation(error):
+    """Preserve closed failure facts without private paths, output or traceback."""
+    public_classes = {
+        "RuntimeError",
+        "RuntimeRefusal",
+        "MissingReleaseCatalogue",
+        "BootstrapFailure",
+        "FixtureFailure",
+        "TimeoutExpired",
+        "CalledProcessError",
+        "FileNotFoundError",
+        "PermissionError",
+        "OSError",
+        "ValueError",
+        "TypeError",
+        "KeyError",
+        "ImportError",
+        "AttributeError",
+        "AssertionError",
+        "JSONDecodeError",
+    }
+    public_codes = {
+        "independent_gguf_vector",
+        "actual_full_query_reached_origin",
+        "http_exit_is_not_daemon_ack",
+        "actual_daemon_version",
+        "identity",
+        "source",
+        "actual_native_command",
+        "actual_owned_daemon_listener",
+        "actual_pull_success",
+        "native_receiving_input_changed",
+        "publish",
+        "unavailable",
+        "actual_origin_and_proxy_sockets_retired",
+        "actual_retained_source_identity",
+        "actual_archive_name",
+        "session",
+        "actual_daemon_retirement",
+        "actual_native_inference",
+        "actual_receiver_duplicate_prepare",
+        "actual_pull_retired",
+        "architecture",
+        "archive",
+        "peer_model_not_ready",
+        "signature",
+        "digest",
+        "actual_model_bytes",
+        "capability",
+        "compatibility_source_copy",
+        "actual_daemon_readiness",
+        "deadline",
+        "connect",
+        "actual_listener_worker_changed",
+        "exact_manifest_publication",
+        "actual_daemon_retirement_acknowledgement",
+        "actual_receiver_start_state",
+        "actual_model_layer",
+        "actual_cancelled_body",
+        "actual_acquired_daemon_listener",
+        "actual_created_blob",
+        "actual_daemon_start",
+        "actual_full_url_route_selection",
+        "actual_cancelled_tls_peer_closed",
+        "exact_blob_publication",
+        "actual_operation_retirement",
+        "actual_retained_source_bytes",
+        "cancel_does_not_publish_partial_model",
+        "actual_source_close_debt",
+        "genuine_macos_required",
+        "native_receiving_source_changed",
+        "protocol",
+        "runtime",
+        "actual_source_admission_deadline",
+        "cancelled",
+        "actual_cancelled_operation_retired",
+        "metadata",
+        "missing-catalogue",
+        "native_command_retirement",
+        "actual_created_manifest",
+        "empty_default_receiving_store",
+    }
+    observed = type(error).__name__
+    code = error.args[0] if len(error.args) == 1 and type(error.args[0]) is str else None
+    return {
+        "exception_class": observed if observed in public_classes else "unknown",
+        "code": code if code in public_codes else None,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
@@ -1132,12 +1346,18 @@ def main():
             "primary_failure",
             primary,
             prepare_owner=owner,
+            class_observation=getattr(owner, "class_failure_observation", False),
         )
     try:
         owner.close()
     except BaseException as cleanup:
         failure = "native_receiving_cleanup_failed"
-        observe_failure(owner.receipt, "cleanup_failure", cleanup)
+        observe_failure(
+            owner.receipt,
+            "cleanup_failure",
+            cleanup,
+            class_observation=getattr(owner, "class_failure_observation", False),
+        )
     owner.receipt["success"] = failure is None
     owner.receipt["reason"] = failure or "complete"
     with (owner.output / "native-receiving.json").open("x", encoding="utf-8") as output:

@@ -51,6 +51,7 @@ global HSE_RepeatEnabled := true
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\tap_keys.ahk
 #Include ..\..\infra\config_io.ahk
+#Include ..\..\infra\config_scope.ahk
 ; Real journal dependencies; no test-only native issuer or READY metadata.
 #Include ..\..\infra\config_transition.ahk
 #Include ..\..\infra\config_transition_runtime.ahk
@@ -60,11 +61,14 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
-			&& !(A_Args.Length == 2 && A_Args[1] == "persisted_semantic"))
+			&& !(A_Args.Length == 2 && A_Args[1] == "persisted_semantic")
+			&& !(A_Args.Length == 4 && A_Args[1] == "onboarding_recovery"))
         throw Error("expected exactly one startup fixture name")
     switch A_Args[1] {
 		case "tap_binding_publication":
 			_FeatureStateSmokeTapBindingPublication()
+		case "onboarding_recovery":
+			_FeatureStateSmokeOnboardingRecovery(A_Args[2], A_Args[3], A_Args[4])
 		case "persisted_semantic":
 			_FeatureStateSmokePersistedSemantic(A_Args[2])
         case "distance_gate":
@@ -361,6 +365,31 @@ _FeatureStateSmokeSemanticConfig(Root) {
 	} finally {
 		try FileDelete(TempConfig)
 	}
+}
+
+
+; A successful reload replaces the process before the committed wizard image is read.
+_FeatureStateSmokeOnboardingRecovery(Path, PathsFile, Receipt) {
+	global _ConfigBootReadFailed
+	Before := FSReadUtf8Exact(Path)
+	Recovered := ConfigTransitionRecoverAtBoot(PathsFile)
+	if !ConfigTransitionResultIs(Recovered, "recovered_new")
+		throw Error("The cold wizard replacement did not recover its committed image")
+	if FSStrictExists(ConfigTransitionWalPath(PathsFile))
+		throw Error("The cold wizard replacement retained recovery debt")
+	ConfigSchemaPrepareSource(Path)
+	Boot := ConfigMigrateBoot(Path)
+	if Boot["status"] != "current" || !ConfigSchemaCanPrepareWrite(Path)
+		throw Error("The cold wizard replacement did not reach genuine READY")
+	Cache := ParseConfigTomlFile(Path)
+	if _ConfigBootReadFailed
+		throw Error("The cold wizard semantic source was refused")
+	_FeatureStateSmokeAssert("fr", IniCacheGet(Cache, "script", "locale"), "durable wizard locale")
+	_FeatureStateSmokeAssert("retain", IniCacheGet(Cache, "script", "future"), "durable wizard foreign child")
+	if StrCompare(Before, FSReadUtf8Exact(Path), true) != 0
+		throw Error("The cold wizard replacement changed the published source")
+	if FSStrictExists(Receipt) || !FSWriteCreateDurable(Receipt, "recovered_new`nfr`nretain`n")
+		throw Error("The cold wizard replacement could not publish its owned receipt")
 }
 
 

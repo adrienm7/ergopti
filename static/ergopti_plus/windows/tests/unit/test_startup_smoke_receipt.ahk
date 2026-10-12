@@ -116,7 +116,11 @@ _SSRT_FullSaveGeneration() {
 	Path := Root . "\config.toml"
 	Nonce := "abcdef0123456789abcdef0123456789"
 	try {
+		Legacy := '# retained installed dashboard bindings`n[metrics]`nmetrics_shortcut_typing = "Ctrl+Alt+M" # retained typing`nmetrics_shortcut_apps = "Ctrl+Alt+A" # retained apps`nfuture_dashboard = { keep = 9, enabled = false } # retained foreign extension`n'
+		Source := _CMJFixtureCurrentSource(Legacy)
+		AssertTrue(FSWriteDurable(Path, Source), "the current source is independently authored before native startup")
 		_CFGFS_Prepare(Path)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
 		_DriverMenuReady := true
 		_DriverBootPhase := "ready"
 		Features := ManifestBuildFeaturesMap()
@@ -125,8 +129,6 @@ _SSRT_FullSaveGeneration() {
 		_LLM_Menu["app_profile_overrides"] := Map()
 		_LLM_Menu["user_profiles"] := []
 		_LLM_Menu_Loaded := true
-		Legacy := '# retained installed dashboard bindings`n[metrics]`nmetrics_shortcut_typing = "Ctrl+Alt+M" # retained typing`nmetrics_shortcut_apps = "Ctrl+Alt+A" # retained apps`nfuture_dashboard = { keep = 9, enabled = false } # retained foreign extension`n'
-		AssertTrue(FSWrite(Path, Legacy), "the native old profile is independently authored")
 		Caught := 0
 		try StartupSmokePublishFullSave(Root, Nonce)
 		catch as Err

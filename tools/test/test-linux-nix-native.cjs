@@ -59,7 +59,9 @@ check('ambient host routes and loader/config discarded', () => {
 			NIX_PATH: 'foreign',
 			PKG_CONFIG_PATH: '/host',
 			HTTP_PROXY: 'http://dummy-user:dummy-pass@proxy.invalid',
-			GITHUB_TOKEN: 'dummy-token'
+			GITHUB_TOKEN: 'dummy-token',
+			USER: 'foreign-account',
+			LOGNAME: 'foreign-account'
 		},
 		'/owned/home',
 		'/owned/config',
@@ -74,10 +76,14 @@ check('ambient host routes and loader/config discarded', () => {
 			'PATH',
 			'PYTHONDONTWRITEBYTECODE',
 			'TMPDIR',
+			'USER',
 			'XDG_CACHE_HOME',
 			'XDG_CONFIG_HOME'
 		].sort()
 	);
+	assert.equal(env.USER, 'ergopti-nix-native');
+	assert.equal(env.HOME, '/owned/home');
+	assert.equal(env.LOGNAME, undefined);
 	assert.equal(env.NIX_CONF_DIR, '/owned/config');
 	assert.equal(env.TMPDIR, '/owned/tmp');
 });

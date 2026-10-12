@@ -191,7 +191,7 @@ local function tail_for_error(s)
 	local n = #s
 	local start = n > FAILURE_TAIL_CHARS and (n - FAILURE_TAIL_CHARS + 1) or 1
 	local tail = s:sub(start)
-	tail = tail:gsub("^[^\n]*\n", "")
+	if start > 1 then tail = tail:gsub("^[^\n]*\n", "") end
 	for marker, _ in pairs(KNOWN_MARKERS) do
 		tail = tail:gsub(marker .. "\n?", "")
 	end
@@ -741,14 +741,14 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	Logger.start(LOG, "Bootstrapping Ollama backend…")
 	local project_root = resolve_project_root()
 	if not project_root then
-		Logger.error(LOG, "Project root introuvable depuis ollama_deps_checker.lua — bootstrap aborted.")
+		Logger.error(LOG, "Cannot locate the project root from ollama_deps_checker.lua — bootstrap aborted.")
 		return settle_preflight_failure("Project root introuvable.")
 	end
 
 	local script_path = project_root .. "/static/ergopti_plus/macos/modules/llm/"
 		.. (native_choice and "ensure-ollama-native-deps.sh" or "ensure-ollama-deps.sh")
 	if not hs.fs.attributes(script_path, "mode") then
-		Logger.error(LOG, "Script ensure-ollama-deps.sh introuvable à %s — bootstrap aborted.", script_path)
+		Logger.error(LOG, "The ensure-ollama-deps.sh script is absent at %s — bootstrap aborted.", script_path)
 		return settle_preflight_failure("Script ensure-ollama-deps.sh introuvable.")
 	end
 
@@ -895,9 +895,17 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 			and owner.token == token and token.cancelled ~= true
 			and token.authorized == true and token.authorization == owner.authorization
 	end
-	local consume_stream = make_streaming_handler(owner_is_current)
+	local diagnostic_tail = require("modules.llm.mlx_bootstrap_diagnosis").new_tail({ markers = KNOWN_MARKERS })
+	local forward_stream = make_streaming_handler(owner_is_current)
+	local function consume_stream(native_task, stdout, stderr)
+		if not owner_is_current() then return false end
+		diagnostic_tail.push(stdout, "stdout")
+		diagnostic_tail.push(stderr, "stderr")
+		return forward_stream(native_task, stdout, stderr)
+	end
 	local function process_terminal(exit_code, stdout, stderr)
-		local combined = (stdout or "") .. (stderr or "")
+		diagnostic_tail.push(stdout, "stdout")
+		diagnostic_tail.push(stderr, "stderr")
 		if not forward_chunk(stdout or "", owner_is_current, owns_window) then return false end
 		if not forward_chunk(stderr or "", owner_is_current, owns_window) then return false end
 
@@ -948,9 +956,9 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		if exit_code ~= 0 then
 			local failure_key = FAILURE_MESSAGES[_observed_failure_marker or ""]
 			if failure_key then return publish_failure(i18n.get(failure_key), exit_code) end
-			local tail = tail_for_error(combined)
+			local tail = tail_for_error(table.concat(diagnostic_tail.lines(), "\n"))
 			if tail == "" then
-				tail = "Cause inconnue. Consultez " .. Logger.today_log_path() .. "."
+				tail = i18n.get("download_window.error_unknown")
 			end
 			return publish_failure(tail, exit_code)
 		end
