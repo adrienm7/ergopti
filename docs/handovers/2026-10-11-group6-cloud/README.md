@@ -4,6 +4,45 @@
 
 This is an incomplete continuation of items 36 and 62. No item is removed,
 including transversal items 16/38. Item 22 remains intentionally excluded.
+
+## Resumed exact native receiving and private compiler directory
+
+The unsigned storage-host probe now reaches Azure directly and the original
+`dbfdcaa652` job logs and ZIPs are received. This proves current access, not
+environment publication or fresh-task restoration. Manual38194299926 remains
+failed: 19 jobs, eight successful, six failed and five skipped; Release skipped.
+The [authentic Core/archive capsule](native-dbfd-core-archive-receiving.tar.gz)
+is408007 bytes/368 safe regular members, SHA256
+`d0e073b9b4ff4f621b44ccd6215d7c638b39272be88b3b0713ac529bef16275c`.
+
+Core is413/414. The original serial admission reaches the later dependency
+check only after all165 receiving tests pass its strict status/count/OK/no-skip
+checks. Individual child closure frames remain omitted in the runner's excerpt.
+The sole failure is the independent compiler include-directory0700 assertion,
+with actual0755. Its builder and test are byte-exact betweena18 anddbfd; the
+failure is not the previous156 timeout or an R2 source regression.
+
+The compiler directory fix creates the same owned `CPOSIXCompatibility` at0700
+and sets its exact mode before the original header loop. Removing three added
+lines restores the entire builder. All test assertions, recipes, commands,
+deadlines, source/image receipts and the held Swift45 factory remain unchanged.
+The [independent regression capsule](compiler-private-directory-regression.tar.gz)
+is3701 bytes/13 safe regular members, SHA256
+`1ee8f86b7338d65f62ed95a2e3c08a31d88139f28dbac0c4f8afaf73386db605`.
+The identical ten tests fail before the change under022/000, pass under077,
+and pass after it under all three. The actual hosted umask is not captured.
+Compiler/Security responses in this portable proof are modeled. This proof
+does not replace selected or native validation of the correction.
+
+Archive25 has24 passes/one owned Automation deadline failure, zero skips.
+All six Brew scenarios remain unexecuted. Exact original407 source pins,
+raw outputs,73 retained UI observations and closed helper/process-group receipts
+are joined; an API-call-starting marker with no returned OSStatus does not
+establish its OS/session failure cause. Package/install were skipped.
+Each native PAC14 has12 passing methods/two failing methods; individual
+assertion-failure totals differ by architecture. Trust/restoration, independent
+HTTP, model and enterprise acceptance remain incomplete. No old native epoch
+supplies new results, and no item or branch is removed.
 The website is outside scope.
 
 ## Source and preparation
