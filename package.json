@@ -63,6 +63,7 @@
 		"test:hardening-g-fixable-errors-offer-an-action": "node ./tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs",
 		"test:ahk-suite-manifest": "node ./tools/test/test-ahk-suite-manifest.cjs",
 		"test:menu-reader-line-snapshot": "node ./tools/test/test-menu-reader-line-snapshot.cjs",
+		"test:js-native-qualification-ownership": "node ./tools/test/test-js-native-qualification-ownership.cjs",
 		"test:click-lock": "node ./tools/test/test-click-lock-fix.cjs",
 		"test:ui-focus": "node ./tools/test/test-ui-focus-fix.cjs",
 		"test:hs-integrity": "node ./tools/test/test-hammerspoon-integrity.cjs",
