@@ -454,10 +454,12 @@ function luaPublicationParser() {
 				closes.set(block.at, at);
 			}
 		}
-		return stack.length ? null : { text, tokens, scopes, closes };
+		return stack.length ? null : { text, tokens, scopes, closes, statementPositions: new Map() };
 	};
 	const positions = (unit, statement) => {
 		if (!unit) return [];
+		const retained = unit.statementPositions.get(statement);
+		if (retained) return retained.slice();
 		const wanted = scriptTokens(statement, '.lua'),
 			found = [];
 		for (let at = 0; at < unit.tokens.length; at++) {
@@ -475,7 +477,8 @@ function luaPublicationParser() {
 			)
 				found.push(at);
 		}
-		return found;
+		unit.statementPositions.set(statement, found);
+		return found.slice();
 	};
 	const rootPositions = (unit, text) => positions(unit, text).filter((at) => unit.scopes[at] === 0);
 	const body = (unit, signature) => {
