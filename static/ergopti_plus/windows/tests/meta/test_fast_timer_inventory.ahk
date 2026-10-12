@@ -78,6 +78,7 @@ _FTI_Inventory() {
 		"_LLM_NavEventOwnerServiceFn",  "100",   ; native receipt/fault drain, disarmed on Stop
 		"_SpotlightTick",               "100",   ; only armed while spotlight is open
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
+		"this.Timer",                    "150",   ; exact managed Ollama session/debt/READY custody; canceled on retirement
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
 		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing
 		"KLHook.flush_timer",           "200",   ; keylogger buffer flush

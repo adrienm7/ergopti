@@ -30,6 +30,7 @@ local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local AuthPolicy = require("llm.local_server_auth")
 local SourceWriter = require("toml_codec.writer")
 local ProviderConfig = require("llm.provider_config_policy")
+local EntryIdentity = require("llm.api_entry_identity")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -348,13 +349,17 @@ function M.active()
 	return id ~= "" and M.get(id) or nil
 end
 
---- Adds an entry and makes it active.
+--- Adds an entry, optionally selecting it in the same private publication.
 --- @param fields table { provider, token, label, model?, base_url? }
+--- @param select boolean|nil Defaults to true; false preserves the prediction selection.
 --- @return table|nil entry, string|nil err
-function M.add(fields)
-	_sequence = _sequence + 1
+function M.add(fields, select)
+	if select ~= nil and type(select) ~= "boolean" then return nil, "selection must be a boolean" end
+	local current = state()
+	local id
+	id, _sequence = EntryIdentity.next(tostring(fields.provider), os.time(), _sequence, current.entries)
 	local entry = valid_entry({
-		id = string.format("%s-%d-%d", tostring(fields.provider), os.time(), _sequence),
+		id = id,
 		provider = fields.provider,
 		label = fields.label,
 		token = fields.token,
@@ -362,18 +367,19 @@ function M.add(fields)
 		base_url = fields.base_url,
 	})
 	if not entry then return nil, "provider, label and key are required" end
-	local current = state()
 	current.entries[#current.entries + 1] = entry
 	local previous = current.active_id
-	current.active_id = entry.id
+	if select ~= false then current.active_id = entry.id end
 	if not persist() then
 		table.remove(current.entries)
 		current.active_id = previous
 		return nil, "the entry could not be saved"
 	end
-	-- The user chose an entry: a stored selection nothing matched is replaced.
-	current.dangling_active_id = nil
-	Logger.info(LOG, "API entry '%s' (%s) added and selected.", entry.id, entry.provider)
+	if select ~= false then
+		-- The user chose an entry: a stored selection nothing matched is replaced.
+		current.dangling_active_id = nil
+	end
+	Logger.info(LOG, "API entry '%s' (%s) added; selected=%s.", entry.id, entry.provider, tostring(select ~= false))
 	return entry
 end
 

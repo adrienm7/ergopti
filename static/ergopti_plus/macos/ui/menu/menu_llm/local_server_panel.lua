@@ -128,11 +128,15 @@ end
 function M.select_model(ctx, id, model, on_selected)
 	Logger.info(LOG, "Local server '%s' model '%s' chosen.", id, model)
 	return ApiPanel.apply_local_server(ctx, id, { model = model }, function(committed)
-		if committed and ctx.state.llm_backend ~= "api" and type(ctx.activate_api) == "function" then
-			ctx.activate_api()
+		local activated = ctx.state.llm_backend == "api"
+		if committed == true and not activated and type(ctx.activate_api) == "function" then
+			local ok, accepted = Logger.callback(LOG, "Local server backend selection", ctx.activate_api)
+			activated = ok == true and accepted == true
 		end
 		if type(on_selected) == "function" then
-			local selected = committed == true and ctx.state.llm_backend == "api"
+			local active = remote().get_active_entry()
+			local selected = committed == true and activated and ctx.state.llm_backend == "api"
+				and type(active) == "table" and active.provider == id and active.model == model
 			if committed == true and not selected then
 				-- Leaving MLX waits for its server to stop: the switch lands later
 				Logger.warn(LOG, "Local server '%s' is stored; the API backend is not selected yet.", id)

@@ -314,49 +314,79 @@ class PersonalFileAdoptedOwner {
 		return Config
 	}
 
-	/** Losslessly patch only the admitted metadata zone, quoting arbitrary section names. */
-	PatchMetadata(Section, Field, Value, Content) {
+	/** Refuse source metadata whose exact spelling aliases a folded native owner. */
+	MetadataAvailable(Section, Field, Content := unset) {
+		Source := IsSet(Content) ? Content : this.content
 		Target := Section == "" ? ["_meta"] : ["_meta", "sections", Section]
-		Header := Section == "" ? "[_meta]" : "[_meta.sections." . TOML_RenderKey(Section) . "]"
-		Out := [], InTarget := false, Found := false, Done := false
-		for LineNumber, Line in StrSplit(Content, "`n", "`r") {
-			; The physical BOM belongs to the exact source/output receipt, but
-			; cannot hide the first owned metadata header from lexical recognition.
-			Recognition := LineNumber == 1 ? PersonalFileControls.ParseContent(Line) : Line
-			Trimmed := Trim(TOML_StripInlineComment(Recognition))
-			if RegExMatch(Trimmed, "^\[+([^\[\]]+)\]+$", &Match) {
-				if InTarget && !Done
-					Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
-				try Parts := TOML_ParseKeyPath(Match[1], true)
-				catch
-					Parts := []
-				InTarget := Parts.Length == Target.Length
-				if InTarget {
-					for Index, Part in Target {
-						if !(Parts[Index] == Part)
-							InTarget := false
-					}
-				}
-				if InTarget
-					Found := true, Done := false
+		try {
+			Document := TOML_ParseDocument(Source, &Records, &Physical)
+			for Record in Physical {
+				if Record.Kind != "header"
+					continue
+				Parts := TOML_ParseKeyPath(Record.Section, true)
+				if this.FoldedPath(Parts, Target) && !this.ExactPath(Parts, Target)
+					return false
 			}
-			if InTarget && RegExMatch(Trimmed, "^" . Field . "\s*=") {
-				if !Done
-					Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
-				Done := true
-			} else
-				Out.Push(Line)
+			Target.Push(Field)
+			Stored := _TOML_DocumentLookup(Document, Target)
+			if Stored["blocked"] || (Stored["found"] && !this.MetadataValueValid(Field, Stored["value"]))
+				return false
+			for Record in Records {
+				if this.FoldedPath(Record.Path, Target) && !this.ExactPath(Record.Path, Target)
+					return false
+			}
+			return true
+		} catch {
+			return false
 		}
-		if InTarget && !Done
-			Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
-		if !Found {
-			Out.Push("")
-			Out.Push(Header)
-			Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
+	}
+
+	/** Classify stored values before allowing a field's native editor to replace them. */
+	MetadataValueValid(Field, Value) {
+		if Field == "delay"
+			return TickTryDurationMsFromSeconds(Value, &DelayMs)
+		if Field == "priority"
+			return HotstringsTryPriority(Value, &Priority)
+		if Field == "show_tooltip"
+			return Value is TOML_Bool
+		return Field == "color" && Value is String && RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$")
+	}
+
+	/** Compare semantic segments without granting a case-folded writer authority. */
+	FoldedPath(Parts, Target) {
+		if Parts.Length != Target.Length
+			return false
+		for Index, Part in Target {
+			if StrLower(Parts[Index]) != StrLower(Part)
+				return false
 		}
-		Result := ""
-		for Index, Line in Out
-			Result .= (Index > 1 ? "`n" : "") . Line
+		return true
+	}
+
+	/** Preserve the original spelling of every owned semantic path segment. */
+	ExactPath(Parts, Target) {
+		if Parts.Length != Target.Length
+			return false
+		for Index, Part in Target {
+			if !(Parts[Index] == Part)
+				return false
+		}
+		return true
+	}
+
+	/** Patch one semantic leaf through the existing lossless document owner. */
+	PatchMetadata(Section, Field, Value, Content) {
+		if !this.MetadataAvailable(Section, Field, Content)
+			throw ValueError("The personal metadata field has an ambiguous source owner.")
+		Header := Section == "" ? "_meta" : "_meta.sections." . TOML_RenderKey(Section)
+		StoredValue := Field == "show_tooltip" ? TOML_Bool(Value) : Value
+		Candidate := TOML_BuildConfigDocumentCandidate(Content,
+			[{ Section: Header, Key: Field, Value: StoredValue }], [])
+		Result := Candidate["content"]
+		; The generic configuration owner emits a BOM. Personal sources retain
+		; their captured physical encoding posture instead of acquiring one.
+		if SubStr(Content, 1, 1) != Chr(0xFEFF) && SubStr(Result, 1, 1) == Chr(0xFEFF)
+			Result := SubStr(Result, 2)
 		return Result
 	}
 
