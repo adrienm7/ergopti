@@ -236,6 +236,32 @@ branch is retained, no TODO is removed and no Group6 Dev integration occurs.
 No Windows local test, duplicate native dispatch or peer interruption is made.
 Root's workflow, runner and feature inventory custody remains unchanged.
 
+## Regular Dev delivery source preparation
+
+The maintainer now authorizes regular coherent Dev delivery before the whole
+group is complete. Main remains a publication checkpoint owned by Root.
+Fresh API and explicit Git fetch agree on
+`0fc9aacf7dbba840b3cbfc00c561b833b748b454`. This checkout originally tracked only
+Main; the additive Dev tracking rule prevents an ordinary fetch from leaving
+`origin/dev` stale. No force, reset, stash or source loss is used.
+
+Source mergec2171f854f789c08ee047c0edd52782495a8c7be preserves the incoming
+complete captured-source comparison and all other groups' TODO blocks. The
+reviewed generator correctly refuses the stale updater seal, then refreshes only
+the config_migrate.ahk hash and explicit source base. All21 inputs,23 labels,
+18/4/1 cohorts and the frozen independent oracle remain unchanged. No original
+updater test expectation is regenerated and no Windows native code executes.
+
+The composed change selects format, JS, simulated Hammerspoon, Linux unit and
+actual Linux window qualification. Unit gates run serially. Actual window
+qualification belongs to the official Linux runner; previously stopped local
+native experiments are not repeated. Root retains workflows, runner and feature
+inventories. The incoming/own path overlap is only the TODO; only36/62 are
+updated here. Historical package aliases and updater CHECK registration remain
+part of the published slice for Root's future inventory reconciliation.
+Items36/62 and16/38 stay open; regular diagnostic delivery does not mark the
+archive, enterprise network or original Windows updater scopes complete.
+
 ## Verified obsolete branch cleanup
 
 The following3 remote refs had no open PR or active CI, were integrated in
