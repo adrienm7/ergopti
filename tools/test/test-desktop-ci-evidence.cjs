@@ -573,8 +573,11 @@ try {
 }
 
 /** Pins a fresh shallow checkout and the exact independently gated core suites. */
-function checkCore(body) {
-	assert.deepEqual(pipeline.needsOf(body), ['validate']);
+function checkCore(caller, body) {
+	assert.deepEqual(pipeline.needsOf(caller), ['validate']);
+	assert.equal(pipeline.field(caller, 'if'), null);
+	assert.equal(pipeline.field(caller, 'uses'), './.github/workflows/ci-common.yml');
+	assert.deepEqual(pipeline.needsOf(body), []);
 	assert.equal(pipeline.field(body, 'if'), null);
 	assert.match(body, /^      fail-fast: false$/m);
 	assert.ok(
@@ -610,14 +613,23 @@ function checkCore(body) {
 	}
 }
 
-const core = pipeline.job('core');
-checkCore(core);
+const coreCaller = pipeline.job('core');
+const core = pipeline.job('shared-validation');
+assert.equal(pipeline.locate('shared-validation').file, '.github/workflows/ci-common.yml');
+checkCore(coreCaller, core);
+for (const [from, to] of [
+	['needs: [validate]', 'needs: [macos]'],
+	['./.github/workflows/ci-common.yml', './.github/workflows/foreign.yml']
+]) {
+	const changed = coreCaller.replace(from, to);
+	assert.notEqual(changed, coreCaller, from + ' must mutate the actual Common caller');
+	assert.throws(() => checkCore(changed, core), from);
+}
 for (const [from, to] of [
 	['refs/heads/main', 'refs/heads/never'],
 	['"js","properties","mutation"', '"js","properties"'],
 	['"js","properties"', '"js"'],
 	['fail-fast: false', 'fail-fast: true'],
-	['needs: [validate]', 'needs: [macos]'],
 	['run: npm run test:${{ matrix.suite }}', 'run: npm run test:${{ matrix.suite }} -- --only lint'],
 	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
 	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
@@ -634,7 +646,7 @@ for (const [from, to] of [
 ]) {
 	const changed = core.replace(from, to);
 	assert.notEqual(changed, core, from + ' must actually mutate the shared gate');
-	assert.throws(() => checkCore(changed), from);
+	assert.throws(() => checkCore(coreCaller, changed), from);
 }
 
 for (const [job, platform] of [
