@@ -1388,6 +1388,540 @@ const COMMON_DISPATCH = [
 ].join('\n');
 
 /** Preserve the reusable Common caller, literal inventory, exact union and browser custody. */
+/** Keep production output custody separate from the existing source-rendering E2Es. */
+function commonSiteProblems(source) {
+	const errors = [];
+	try {
+		const doc = require('yaml').parse(source);
+		const same = (a, b, label) => {
+			if (JSON.stringify(a) !== JSON.stringify(b)) errors.push(label);
+		};
+		const command = (job, name, run) => {
+			const rows = job.steps.filter((s) => s.name === name);
+			if (
+				rows.length !== 1 ||
+				rows[0].run !== run ||
+				rows[0].if !== undefined ||
+				rows[0]['continue-on-error'] !== undefined
+			)
+				errors.push(name);
+		};
+		const build = doc.jobs['common-build'],
+			test = doc.jobs['common-testbuild'];
+		for (const [job, previous, name, timeout] of [
+			[build, 'common-e2e', 'Build site — ${{ matrix.target }}', 60],
+			[test, 'common-build', 'Testbuild site — ${{ matrix.target }}', 30]
+		]) {
+			same(job.needs, [previous], 'adjacent production stage');
+			same(job.name, name, 'actual API stage name');
+			same(job['runs-on'], 'ubuntu-latest', 'production runner');
+			same(job['timeout-minutes'], timeout, 'bounded production stage');
+			same(
+				job.strategy,
+				{
+					'fail-fast': false,
+					matrix: {
+						include: [
+							{ target: 'main', base_path: '' },
+							{ target: 'dev', base_path: '/dev' }
+						]
+					}
+				},
+				'two exact independent production targets'
+			);
+			same(
+				job.env,
+				{
+					ERGOPTI_SITE_TARGET: '${{ matrix.target }}',
+					BASE_PATH: '${{ matrix.base_path }}',
+					ERGOPTI_SITE_SOURCE_SHA: '${{ github.sha }}'
+				},
+				'actual source and separate target'
+			);
+			for (const key of ['if', 'continue-on-error', 'permissions', 'outputs'])
+				if (job[key] !== undefined) errors.push('production job ' + key);
+			for (const step of job.steps)
+				for (const key of ['if', 'continue-on-error'])
+					if (step[key] !== undefined) errors.push('production step ' + key);
+			same(
+				job.steps.slice(0, 3),
+				[
+					{ uses: 'actions/checkout@v4' },
+					{
+						uses: 'actions/setup-node@v4',
+						with: { 'node-version-file': '.node-version', cache: 'npm' }
+					},
+					{ run: 'npm ci' }
+				],
+				'actual production dependencies'
+			);
+		}
+		same(build.steps.length, 5, 'closed production build steps');
+		command(
+			build,
+			'Build and seal production site',
+			'set -euo pipefail\nbundle="$RUNNER_TEMP/common-site-$ERGOPTI_SITE_TARGET"\nmkdir "$bundle"\nnpm run build\ncmp -- static/CNAME build/CNAME\nmv build "$bundle/site"\nnode tools/ci/site-artifact.cjs seal "$bundle/site" "$bundle/build.json"\n'
+		);
+		same(
+			build.steps[4],
+			{
+				name: 'Retain exact production site',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: 'common-site-build-${{ matrix.target }}',
+					path: '${{ runner.temp }}/common-site-${{ matrix.target }}/',
+					'include-hidden-files': true,
+					'if-no-files-found': 'error',
+					overwrite: true
+				}
+			},
+			'retain complete sealed output'
+		);
+		same(test.steps.length, 7, 'closed production receiving steps');
+		same(
+			test.steps[3],
+			{
+				name: 'Install production site browsers',
+				run: 'node tools/ci/install-playwright.cjs chromium webkit'
+			},
+			'both production browser engines'
+		);
+		same(
+			test.steps[4],
+			{
+				name: 'Receive exact production site',
+				uses: 'actions/download-artifact@v4',
+				with: {
+					name: 'common-site-build-${{ matrix.target }}',
+					path: '${{ runner.temp }}/received-site'
+				}
+			},
+			'receive the actual target build'
+		);
+		command(
+			test,
+			'Test received production site',
+			'set -euo pipefail\nnode tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"\n'
+		);
+		same(
+			test.steps[6],
+			{
+				name: 'Retain production browser proof',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: 'common-site-testbuild-${{ matrix.target }}',
+					path: '${{ runner.temp }}/site-testbuild.json',
+					'if-no-files-found': 'error',
+					overwrite: true
+				}
+			},
+			'retain actual production proof'
+		);
+	} catch (error) {
+		errors.push(error.message);
+	}
+	return errors;
+}
+
+/** Publication gets write permission only after receiving the exact tested artifact. */
+function siteDeploymentProblems(source) {
+	const errors = [];
+	try {
+		const doc = require('yaml').parse(source);
+		const same = (a, b, label) => {
+			if (JSON.stringify(a) !== JSON.stringify(b)) errors.push(label);
+		};
+		same(
+			doc.on,
+			{
+				workflow_run: { workflows: ['CI'], types: ['completed'], branches: ['main', 'dev'] },
+				workflow_dispatch: {
+					inputs: {
+						run_id: {
+							description: 'Exact successful canonical CI run containing the tested site',
+							required: true,
+							type: 'string'
+						}
+					}
+				}
+			},
+			'all completed source changes and exact manual run'
+		);
+		same(doc.permissions, { contents: 'read', actions: 'read' }, 'read-only before preflight');
+		same(Object.keys(doc.jobs), ['preflight', 'deploy'], 'closed publication chain');
+		const pre = doc.jobs.preflight,
+			deploy = doc.jobs.deploy;
+		same(pre.needs, undefined, 'preflight entry');
+		same(pre.permissions, undefined, 'preflight cannot gain write permission');
+		same(deploy.needs, ['preflight'], 'write job awaits completed byte verification');
+		same(
+			deploy.permissions,
+			{ contents: 'write', actions: 'read' },
+			'write permission only after preflight'
+		);
+		same(
+			deploy.concurrency,
+			{ group: 'deploy-site-gh-pages', 'cancel-in-progress': false },
+			'serialize shared publication branch'
+		);
+		same(
+			deploy.env,
+			{
+				SITE_TARGET: '${{ needs.preflight.outputs.target }}',
+				SITE_SOURCE_SHA: '${{ needs.preflight.outputs.source_sha }}'
+			},
+			'publish admitted source and target'
+		);
+		same(
+			pre.outputs,
+			Object.fromEntries(
+				['source_sha', 'target', 'run_id', 'build_artifact_id', 'testbuild_artifact_id'].map(
+					(key) => [key, '${{ steps.admit.outputs.' + key + ' }}']
+				)
+			),
+			'forward actual admission'
+		);
+		for (const job of [pre, deploy]) {
+			same(job['runs-on'], 'ubuntu-latest', 'publication runner');
+			same(job['timeout-minutes'], 20, 'bounded publication');
+			for (const key of ['if', 'continue-on-error', 'strategy', 'uses'])
+				if (job[key] !== undefined) errors.push('publication job ' + key);
+			for (const step of job.steps)
+				for (const key of ['if', 'continue-on-error'])
+					if (step[key] !== undefined) errors.push('publication step ' + key);
+			same(
+				job.steps[0],
+				{
+					name: 'Checkout trusted receiver',
+					uses: 'actions/checkout@v4',
+					with: { 'persist-credentials': false }
+				},
+				'trusted receiver without stored token'
+			);
+			same(
+				job.steps[1],
+				{ uses: 'actions/setup-node@v4', with: { 'node-version-file': '.node-version' } },
+				'canonical receiver runtime'
+			);
+		}
+		same(pre.steps.length, 8, 'closed preflight steps');
+		same(deploy.steps.length, 8, 'closed publication steps');
+		same(
+			pre.steps[2],
+			{
+				name: 'Admit exact completed producer',
+				id: 'admit',
+				env: { GH_TOKEN: '${{ github.token }}' },
+				run: 'node tools/ci/site-deploy-admission.cjs admit "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/site-admission.json"'
+			},
+			'actual metadata admission'
+		);
+		const downloaded = (prefix, key, directory, name) => ({
+			name,
+			uses: 'actions/download-artifact@v4',
+			with: {
+				'artifact-ids': '${{ ' + prefix + '.' + key + ' }}',
+				'merge-multiple': true,
+				'run-id': '${{ ' + prefix + '.run_id }}',
+				'github-token': '${{ github.token }}',
+				path: '${{ runner.temp }}/' + directory
+			}
+		});
+		same(
+			pre.steps[3],
+			{
+				name: 'Checkout exact producer source',
+				uses: 'actions/checkout@v4',
+				with: {
+					ref: '${{ steps.admit.outputs.source_sha }}',
+					path: 'producer-source',
+					'persist-credentials': false
+				}
+			},
+			'exact read-only source checkout'
+		);
+		same(
+			pre.steps[4],
+			downloaded(
+				'steps.admit.outputs',
+				'build_artifact_id',
+				'received-site',
+				'Receive selected build artifact'
+			),
+			'preflight exact build ID'
+		);
+		same(
+			pre.steps[5],
+			downloaded(
+				'steps.admit.outputs',
+				'testbuild_artifact_id',
+				'received-testbuild',
+				'Receive selected browser proof'
+			),
+			'preflight exact proof ID'
+		);
+		const verify = (admission) =>
+			'node tools/ci/site-deploy-admission.cjs verify "$RUNNER_TEMP/' +
+			admission +
+			'/site-admission.json" "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/received-testbuild/site-testbuild.json" "$GITHUB_WORKSPACE/producer-source"';
+		same(
+			pre.steps[6],
+			{
+				name: 'Verify tested bytes and source',
+				env: { GH_TOKEN: '${{ github.token }}' },
+				run: verify('').replace('$RUNNER_TEMP//', '$RUNNER_TEMP/')
+			},
+			'preflight actual byte and proof receiving'
+		);
+		same(
+			pre.steps[7],
+			{
+				name: 'Retain admitted producer identity',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: 'site-deployment-admission',
+					path: '${{ runner.temp }}/site-admission.json',
+					'if-no-files-found': 'error',
+					overwrite: true
+				}
+			},
+			'retain validated admission'
+		);
+		same(
+			deploy.steps[2],
+			{
+				name: 'Checkout exact publication source',
+				uses: 'actions/checkout@v4',
+				with: { ref: '${{ needs.preflight.outputs.source_sha }}', path: 'producer-source' }
+			},
+			'exact publication source'
+		);
+		same(
+			deploy.steps[3],
+			{
+				name: 'Receive admitted producer identity',
+				uses: 'actions/download-artifact@v4',
+				with: { name: 'site-deployment-admission', path: '${{ runner.temp }}/admission' }
+			},
+			'receive admitted identity'
+		);
+		same(
+			deploy.steps[4],
+			downloaded(
+				'needs.preflight.outputs',
+				'build_artifact_id',
+				'received-site',
+				'Receive selected build artifact'
+			),
+			'publication exact build ID'
+		);
+		same(
+			deploy.steps[5],
+			downloaded(
+				'needs.preflight.outputs',
+				'testbuild_artifact_id',
+				'received-testbuild',
+				'Receive selected browser proof'
+			),
+			'publication exact proof ID'
+		);
+		same(
+			deploy.steps[6],
+			{
+				name: 'Verify tested bytes and source again',
+				env: { GH_TOKEN: '${{ github.token }}' },
+				run: verify('admission')
+			},
+			'repeat actual receiving before mutation'
+		);
+		const publish = deploy.steps[7];
+		same(publish.name, 'Deploy to GitHub Pages', 'terminal publication owner');
+		same(publish['working-directory'], 'producer-source', 'isolated admitted source checkout');
+		same(
+			publish.env,
+			{ GH_TOKEN: '${{ github.token }}' },
+			'read API token for final source freshness'
+		);
+		for (const line of [
+			'set -euo pipefail',
+			'test "$(git rev-parse HEAD)" = "$SITE_SOURCE_SHA"',
+			'case "$SITE_TARGET" in',
+			'main) DEPLOY_DIR=.; LABEL=ergopti.fr/ ;;',
+			'dev) DEPLOY_DIR=dev; LABEL=ergopti.fr/dev/ ;;',
+			'*) exit 1 ;;',
+			'SITE="$RUNNER_TEMP/received-site/site"',
+			'cmp -- static/CNAME "$SITE/CNAME"',
+			'if [[ "$SITE_TARGET" == main ]]; then',
+			'test ! -e "$SITE/dev"',
+			'node "$GITHUB_WORKSPACE/tools/ci/site-deploy-admission.cjs" current "$RUNNER_TEMP/admission/site-admission.json"',
+			'GHP="$RUNNER_TEMP/gh-pages"',
+			'test ! -e "$GHP"',
+			'git worktree add -b gh-pages "$GHP" FETCH_HEAD',
+			'git worktree add --orphan -b gh-pages "$GHP"',
+			"! -name '.git'",
+			"! -name 'dev'",
+			'cp -r "$SITE"/. "$GHP"/',
+			'rm -rf "${GHP:?}/$DEPLOY_DIR"',
+			'cp -r "$SITE"/. "$GHP/$DEPLOY_DIR/"',
+			'cmp -- static/CNAME "$GHP/$DEPLOY_DIR/CNAME"',
+			'touch "$GHP/.nojekyll"',
+			'git -C "$GHP" add -A',
+			'if git -C "$GHP" diff --cached --quiet; then',
+			'exit 0',
+			'git -C "$GHP" commit -m "deploy: ${LABEL} from ${SITE_SOURCE_SHA} (${SITE_TARGET})"',
+			'git -C "$GHP" push origin gh-pages'
+		]) {
+			if (!publish.run.split('\n').some((row) => row.trim().replace(/\s+\\$/, '') === line))
+				errors.push('publication must retain ' + line);
+		}
+		if (
+			/npm|build\/|github\.sha|github\.ref_name|GITHUB_REF_NAME|continue-on-error|\|\| true/.test(
+				publish.run
+			)
+		)
+			errors.push('no source rebuild or default event identity fallback');
+		if (
+			publish.run.indexOf('cmp -- static/CNAME "$SITE/CNAME"') > publish.run.indexOf('git config')
+		)
+			errors.push('domain before mutation');
+		if (publish.run.indexOf('test ! -e "$SITE/dev"') > publish.run.indexOf('git config'))
+			errors.push('received main cannot overwrite dev');
+		if (
+			!publish.run.includes(
+				'node "$GITHUB_WORKSPACE/tools/ci/site-deploy-admission.cjs" current "$RUNNER_TEMP/admission/site-admission.json"\ngit -C "$GHP" push origin gh-pages'
+			)
+		)
+			errors.push('current target tip immediately before push');
+	} catch (error) {
+		errors.push(error.message);
+	}
+	return errors;
+}
+
+const SITE_BUILD_REFUSALS = [
+	['missing production build', '  common-build:\n', '  foreign-build:\n'],
+	['missing production testbuild', '  common-testbuild:\n', '  foreign-testbuild:\n'],
+	['crossed Build dependency', '    needs: [common-e2e]\n', '    needs: [common-unit-verdict]\n'],
+	['crossed Testbuild dependency', '    needs: [common-build]\n', '    needs: [common-e2e]\n'],
+	[
+		'forgiven production build',
+		'  common-build:\n',
+		'  common-build:\n    continue-on-error: true\n'
+	],
+	[
+		'skipped production browser',
+		'      - name: Test received production site\n',
+		'      - name: Test received production site\n        if: false\n'
+	],
+	['unverified domain', '          cmp -- static/CNAME build/CNAME\n', ''],
+	[
+		'unsealed output',
+		'          node tools/ci/site-artifact.cjs seal "$bundle/site" "$bundle/build.json"\n',
+		''
+	],
+	[
+		'hidden output omitted',
+		'          include-hidden-files: true\n',
+		'          include-hidden-files: false\n'
+	],
+	[
+		'Testbuild rebuild fallback',
+		'      - name: Test received production site\n',
+		'      - run: npm run build\n\n      - name: Test received production site\n'
+	],
+	[
+		'wrong downloaded target',
+		'          name: common-site-build-${{ matrix.target }}\n          path: ${{ runner.temp }}/received-site',
+		'          name: common-site-build-main\n          path: ${{ runner.temp }}/received-site'
+	],
+	[
+		'missing browser proof',
+		'          path: ${{ runner.temp }}/site-testbuild.json\n',
+		'          path: missing.json\n'
+	],
+	[
+		'false stable base',
+		"          - target: main\n            base_path: ''\n          - target: dev\n            base_path: '/dev'\n    env:\n      ERGOPTI_SITE_TARGET: ${{ matrix.target }}\n      BASE_PATH: ${{ matrix.base_path }}\n      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}\n    steps:\n      - uses: actions/checkout@v4\n\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n          cache: 'npm'\n\n      - run: npm ci\n\n      - name: Build and seal production site",
+		"          - target: main\n            base_path: '/dev'\n          - target: dev\n            base_path: '/dev'\n    env:\n      ERGOPTI_SITE_TARGET: ${{ matrix.target }}\n      BASE_PATH: ${{ matrix.base_path }}\n      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}\n    steps:\n      - uses: actions/checkout@v4\n\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n          cache: 'npm'\n\n      - run: npm ci\n\n      - name: Build and seal production site"
+	]
+];
+const SITE_DEPLOY_REFUSALS = [
+	[
+		'steps.admit.outputs build_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ steps.admit.outputs.build_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ steps.admit.outputs.build_artifact_id }}\n'
+	],
+	[
+		'steps.admit.outputs testbuild_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ steps.admit.outputs.testbuild_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ steps.admit.outputs.testbuild_artifact_id }}\n'
+	],
+	[
+		'needs.preflight.outputs build_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ needs.preflight.outputs.build_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ needs.preflight.outputs.build_artifact_id }}\n'
+	],
+	[
+		'needs.preflight.outputs testbuild_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ needs.preflight.outputs.testbuild_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ needs.preflight.outputs.testbuild_artifact_id }}\n'
+	],
+	['main artifact overwrites dev', '              test ! -e "$SITE/dev"\n', ''],
+	[
+		'missing final source freshness',
+		'          node "$GITHUB_WORKSPACE/tools/ci/site-deploy-admission.cjs" current "$RUNNER_TEMP/admission/site-admission.json"\n',
+		''
+	],
+	[
+		'premature write permission',
+		'permissions:\n  contents: read\n',
+		'permissions:\n  contents: write\n'
+	],
+	['missing preflight edge', '    needs: [preflight]\n', '    needs: []\n'],
+	['forgiven preflight', '  preflight:\n', '  preflight:\n    continue-on-error: true\n'],
+	['domain-only changes excluded', '    branches: [main, dev]\n', '    branches: [dev]\n'],
+	['missing exact manual identity', '      run_id:\n', '      latest:\n'],
+	[
+		'wrong source checkout',
+		'          ref: ${{ steps.admit.outputs.source_sha }}\n',
+		'          ref: main\n'
+	],
+	[
+		'wrong selected build ID',
+		'          artifact-ids: ${{ steps.admit.outputs.build_artifact_id }}\n',
+		'          artifact-ids: 1\n'
+	],
+	[
+		'wrong selected proof ID',
+		'          artifact-ids: ${{ needs.preflight.outputs.testbuild_artifact_id }}\n',
+		'          artifact-ids: 1\n'
+	],
+	[
+		'missing preflight verification',
+		'      - name: Verify tested bytes and source\n',
+		'      - name: Missing byte verification\n'
+	],
+	[
+		'missing publication verification',
+		'      - name: Verify tested bytes and source again\n',
+		'      - name: Missing repeated verification\n'
+	],
+	[
+		'root copy from source',
+		'              cp -r "$SITE"/. "$GHP"/\n',
+		'              cp -r build/. "$GHP"/\n'
+	],
+	[
+		'development overwrite root',
+		'              cp -r "$SITE"/. "$GHP/$DEPLOY_DIR/"\n',
+		'              cp -r "$SITE"/. "$GHP"/\n'
+	],
+	['main erases dev', "                     ! -name 'dev' \\\n", ''],
+	['missing root nojekyll', '          touch "$GHP/.nojekyll"\n', ''],
+	['missing copied domain check', '          cmp -- static/CNAME "$GHP/$DEPLOY_DIR/CNAME"\n', ''],
+	['wrong commit source', 'from ${SITE_SOURCE_SHA}', 'from ${GITHUB_SHA}']
+];
+
 function commonProblems(files) {
 	const problems = [];
 	const entry = files.find((file) => file.rel === ENTRY);
@@ -1423,13 +1957,15 @@ function commonProblems(files) {
 		'prepare-common': [],
 		'shared-validation': ['prepare-common'],
 		'common-unit-verdict': ['shared-validation'],
-		'common-e2e': ['common-unit-verdict']
+		'common-e2e': ['common-unit-verdict'],
+		'common-build': ['common-e2e'],
+		'common-testbuild': ['common-build']
 	};
 	if (
 		JSON.stringify(children.map((job) => job.id).sort()) !==
 		JSON.stringify(Object.keys(dependencies).sort())
 	)
-		problems.push('Common must retain exactly its four mandatory stages');
+		problems.push('Common must retain its complete Unit, E2E, Build and Testbuild chain');
 	for (const [id, needs] of Object.entries(dependencies)) {
 		const job = byId.get(id);
 		if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(needs))
@@ -1542,9 +2078,16 @@ function commonProblems(files) {
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
 	])
 		exactStep(browser, name, command);
+	if (common) problems.push(...commonSiteProblems(common.text));
 	return problems;
 }
 errors.push(...commonProblems(pipeline.files()));
+for (const [label, from, to] of SITE_BUILD_REFUSALS) {
+	const source = pipeline.file(COMMON_BOX);
+	assert.equal(source.split(from).length, 2, label + ' has one real source seam');
+	assert.ok(commonSiteProblems(source.replace(from, () => to)).length > 0, label);
+}
+
 assert.deepEqual(
 	planReferenceProblems(pipeline.files()),
 	[],
@@ -1629,8 +2172,8 @@ for (const [what, file, from, to] of [
 	[
 		'Common serializes fail-fast',
 		COMMON_BOX,
-		'      fail-fast: false\n',
-		'      fail-fast: true\n'
+		'      fail-fast: false\n      matrix: ' + COMMON_MATRIX,
+		'      fail-fast: true\n      matrix: ' + COMMON_MATRIX
 	],
 	[
 		'Common withdraws canonical matrix',
@@ -3403,7 +3946,9 @@ function namingProblems(files) {
 								'prepare-common': 'Prepare feature inventory',
 								'shared-validation': 'Unit — ${{ matrix.feature }}',
 								'common-unit-verdict': 'Verify complete unit inventory',
-								'common-e2e': 'E2E browser rendering'
+								'common-e2e': 'E2E browser rendering',
+								'common-build': 'Build site — ${{ matrix.target }}',
+								'common-testbuild': 'Testbuild site — ${{ matrix.target }}'
 							}[candidate.id] === name
 						: /^[A-Z]/.test(name) && !name.includes(' / ');
 			if (!valid)
@@ -5493,19 +6038,35 @@ const siteWorkflow = fs.readFileSync(
 	path.join(siteRoot, '.github/workflows/deploy-site.yml'),
 	'utf8'
 );
-assert.match(siteWorkflow, /^      - 'static\/CNAME'$/m, 'a domain-only change must deploy');
-assert.match(
-	siteWorkflow,
-	/        run: \|\n          npm run build\n          cmp -- static\/CNAME build\/CNAME\n/,
-	'the exact built domain must be verified before destructive deployment'
+assert.deepEqual(
+	siteDeploymentProblems(siteWorkflow),
+	[],
+	'only tested production bytes reach Pages'
 );
-assert.ok(
-	siteWorkflow.indexOf('cmp -- static/CNAME build/CNAME') <
-		siteWorkflow.indexOf('- name: Deploy to GitHub Pages'),
-	'the domain guard precedes the deployment step'
-);
-assert.match(siteWorkflow, /cp -r build\/\. "\$GHP"\//, 'main deploy retains built static assets');
-assert.match(siteWorkflow, /cp -r build\/\. "\$GHP\/\$DEPLOY_DIR\/"/, 'dev deploy remains scoped');
+// actions/download-artifact v4/src/download-artifact.ts:42,162–165.
+// ID selection does not set the named single-artifact flag.
+for (const job of Object.values(YAML.parse(siteWorkflow).jobs)) {
+	for (const step of job.steps.filter((row) => row.with?.['artifact-ids'])) {
+		const inputs = { name: step.with.name, mergeMultiple: step.with['merge-multiple'] };
+		const resolvedPath = step.with.path;
+		const artifact = { name: 'selected-artifact' };
+		const isSingleArtifactDownload = !!inputs.name;
+		const destination =
+			isSingleArtifactDownload || inputs.mergeMultiple
+				? resolvedPath
+				: path.join(resolvedPath, artifact.name);
+		assert.equal(
+			destination,
+			resolvedPath,
+			'one admitted ID must extract exactly where verify reads'
+		);
+		assert.notEqual(path.join(resolvedPath, artifact.name), resolvedPath);
+	}
+}
+for (const [label, from, to] of SITE_DEPLOY_REFUSALS) {
+	assert.equal(siteWorkflow.split(from).length, 2, label + ' has one real source seam');
+	assert.ok(siteDeploymentProblems(siteWorkflow.replace(from, () => to)).length > 0, label);
+}
 
 // Current read-only number-row cohort is mandatory independently of full package prerequisites.
 const NUMBER_ROW_NATIVE_STEP = retainedManagedStep(

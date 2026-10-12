@@ -218,3 +218,98 @@ jobs:
 
       - name: Test shared Versions installation rendering
         run: npm run test:browser:changelog-install
+
+  common-build:
+    name: 'Build site — ${{ matrix.target }}'
+    needs: [common-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: main
+            base_path: ''
+          - target: dev
+            base_path: '/dev'
+    env:
+      ERGOPTI_SITE_TARGET: ${{ matrix.target }}
+      BASE_PATH: ${{ matrix.base_path }}
+      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build and seal production site
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/common-site-$ERGOPTI_SITE_TARGET"
+          mkdir "$bundle"
+          npm run build
+          cmp -- static/CNAME build/CNAME
+          mv build "$bundle/site"
+          node tools/ci/site-artifact.cjs seal "$bundle/site" "$bundle/build.json"
+
+      - name: Retain exact production site
+        uses: actions/upload-artifact@v4
+        with:
+          name: common-site-build-${{ matrix.target }}
+          path: ${{ runner.temp }}/common-site-${{ matrix.target }}/
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+
+  common-testbuild:
+    name: 'Testbuild site — ${{ matrix.target }}'
+    needs: [common-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: main
+            base_path: ''
+          - target: dev
+            base_path: '/dev'
+    env:
+      ERGOPTI_SITE_TARGET: ${{ matrix.target }}
+      BASE_PATH: ${{ matrix.base_path }}
+      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Install production site browsers
+        run: node tools/ci/install-playwright.cjs chromium webkit
+
+      - name: Receive exact production site
+        uses: actions/download-artifact@v4
+        with:
+          name: common-site-build-${{ matrix.target }}
+          path: ${{ runner.temp }}/received-site
+
+      - name: Test received production site
+        run: |
+          set -euo pipefail
+          node tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"
+
+      - name: Retain production browser proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: common-site-testbuild-${{ matrix.target }}
+          path: ${{ runner.temp }}/site-testbuild.json
+          if-no-files-found: error
+          overwrite: true
