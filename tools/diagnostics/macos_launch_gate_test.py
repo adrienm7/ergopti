@@ -439,7 +439,7 @@ class VerdictTests(unittest.TestCase):
             ("Qualify actual native PAC and WPAD XCTest controls", "managed-ollama-pac-receiving"),
             (
                 "Receive actual independent managed HTTP native clients",
-                "managed-ollama-http-receiving",
+                "native_http_clock",
             ),
         ):
             with self.subTest(receiver=name):
@@ -449,7 +449,7 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(
             conditions,
             [
-                "${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.managed-ollama-http-receiving.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}"
+                "${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}"
             ],
         )
         self.assertIn("from macos_launch_gate import collect_security_logs", capture)
@@ -486,7 +486,7 @@ class VerdictTests(unittest.TestCase):
         clauses = re.findall(r"steps\.([\w-]+)\.outcome == '([^']+)'", condition)
         identifiers = (
             "managed-ollama-pac-receiving",
-            "managed-ollama-http-receiving",
+            "native_http_clock",
             "managed-ollama-model-receiving",
         )
         self.assertEqual(clauses, [(identifier, "failure") for identifier in identifiers])
