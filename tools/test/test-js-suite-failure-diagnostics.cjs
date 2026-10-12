@@ -13,6 +13,14 @@ const source = fs.readFileSync(path.join(__dirname, 'run-js-suite.cjs'), 'utf8')
 
 function run(failure, options = {}) {
 	const output = [];
+	const progressAtSpawn = [];
+	let pendingLine = '';
+	let lastCompletedLine = '';
+	function captureBytes(bytes) {
+		const lines = (pendingLine + bytes).split('\n');
+		pendingLine = lines.pop();
+		if (lines.length) lastCompletedLine = lines.at(-1);
+	}
 	const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-js-timing-test-'));
 	const stopped = {};
 	let calls = 0;
@@ -31,6 +39,7 @@ function run(failure, options = {}) {
 						return {
 							spawnSync() {
 								const first = calls++ === 0;
+								progressAtSpawn.push({ line: lastCompletedLine, pending: pendingLine });
 								if (calls === 2) outputBeforeSecondSpawn = output.join('\n');
 								if (options.spawnThrows && first) throw options.spawnThrows;
 								return first ? failure : { status: 0 };
@@ -50,14 +59,25 @@ function run(failure, options = {}) {
 						}
 					};
 				},
-				console: { log: (...args) => output.push(args.join(' ')) },
+				console: {
+					log: (...args) => {
+						const line = args.join(' ');
+						output.push(line);
+						captureBytes(line + '\n');
+					}
+				},
 				process: {
 					argv: options.full ? ['node', 'run-js-suite.cjs', '--full'] : [],
 					env: { RUNNER_TEMP: options.local ? undefined : temporaryRoot, GITHUB_SHA: options.sha },
 					platform: process.platform,
 					arch: process.arch,
 					version: process.version,
-					stdout: { write: (value) => output.push(value) },
+					stdout: {
+						write: (value) => {
+							output.push(value);
+							captureBytes(value);
+						}
+					},
 					exit: (code) => {
 						exitCode = code;
 						throw stopped;
@@ -77,7 +97,15 @@ function run(failure, options = {}) {
 		const records = reports.length
 			? fs.readFileSync(reports[0], 'utf8').trim().split('\n').map(JSON.parse)
 			: [];
-		return { output: output.join('\n'), records, calls, exitCode, thrown, outputBeforeSecondSpawn };
+		return {
+			output: output.join('\n'),
+			records,
+			calls,
+			exitCode,
+			thrown,
+			outputBeforeSecondSpawn,
+			progressAtSpawn
+		};
 	} finally {
 		assert.equal(fs.realpathSync(path.dirname(temporaryRoot)), fs.realpathSync(os.tmpdir()));
 		assert.ok(path.basename(temporaryRoot).startsWith('ergopti-js-timing-test-'));
@@ -167,7 +195,23 @@ cases.forEach((result, index) => {
 	assert.equal(result.ordinal, index + 1);
 	assert.equal(result.duration_ms, 7.25, 'use the elapsed monotonic child clock');
 	assert.equal(result.name, starts[index].name);
+	assert.equal(
+		measured.progressAtSpawn[index].pending,
+		'',
+		'complete the progress line before launching the child'
+	);
+	assert.equal(
+		measured.progressAtSpawn[index].line,
+		`  RUNNING ${index + 1}/${measured.calls} — ${result.name}`,
+		'the last completed line identifies the child that is about to run'
+	);
 	assert.equal(result.ordinal, starts[index].ordinal);
+	assert.ok(
+		measured.output
+			.split('\n')
+			.includes(`  ${result.status} ${index + 1}/${measured.calls} — ${result.name}`),
+		'the completed result line preserves verdict, ordinal and child identity'
+	);
 	assert.ok(result.reproduce.length > 0, 'each measurement identifies its reproduction command');
 });
 assert.equal(cases[0].status, 'FAIL');
