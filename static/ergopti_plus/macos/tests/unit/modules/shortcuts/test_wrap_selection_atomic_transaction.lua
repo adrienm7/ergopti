@@ -47,6 +47,7 @@ local function load_fixture(options)
 	})
 	local clipboard_data = clone(initial)
 	local timers = {}
+	local clock_ns = 0
 	local deferred = {}
 	local logs = {}
 	local calls = {
@@ -82,6 +83,21 @@ local function load_fixture(options)
 	package.loaded["infra.logger"] = logger
 
 	local synthetic = {
+		begin = function() return {} end,
+		on_dispatched = function(tx, callback) tx.dispatched_callback = callback end,
+		on_complete = function(tx, callback) tx.callback = callback end,
+		seal = function(tx)
+			tx.completed = true
+			tx.dispatched_callback(tx, nil, "dispatched")
+			tx.callback(tx, "complete")
+			return true
+		end,
+		cancel = function(tx)
+			if tx.completed then return false end
+			tx.completed = true
+			if tx.callback then tx.callback(tx, "cancelled") end
+			return true
+		end,
 		emit_key_stroke = function(_mods, key, _delay)
 			helpers.assert_eq(key, "v", "wrap_selection may emit only Cmd+V")
 			calls.emit_attempts = calls.emit_attempts + 1
@@ -142,6 +158,7 @@ local function load_fixture(options)
 	}
 
 	local timer = {
+		absoluteTime = function() return clock_ns end,
 		new = function(delay, callback)
 			calls.timer = calls.timer + 1
 			local outcome = next_outcome(timer_outcomes, calls.timer)
@@ -187,6 +204,7 @@ local function load_fixture(options)
 		clipboard = function() return clone(clipboard_data) end,
 		wrap = function() return Text.wrap_selection("selected", "(", ")") end,
 		fire = function(handle)
+			clock_ns = clock_ns + math.floor(handle.delay * 1e9)
 			return handle.callback()
 		end,
 		drain_deferred = function()
