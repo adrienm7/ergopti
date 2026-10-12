@@ -17,6 +17,9 @@ fs.mkdirSync(seed);
 const collectorPath = 'tools/ci/run-windows-updater-original-diagnostic-cohort.cjs';
 const modulePath = 'tools/ci/windows-updater-original-source.cjs';
 const sealerPath = 'tools/ci/seal-windows-updater-original-source.cjs';
+const sdkPath = 'tools/ci/windows-updater-sdk-auth.cjs';
+const sdkContractPath =
+	'static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json';
 const inputPath = 'tools/ci/windows-updater-original-diagnostic-cohort-inputs.json';
 const oraclePath = 'tools/ci/windows-updater-original-label-oracle.json';
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
@@ -30,6 +33,8 @@ const templateFiles = new Set([
 	collectorPath,
 	modulePath,
 	sealerPath,
+	sdkPath,
+	sdkContractPath,
 	inputPath,
 	oraclePath,
 	'tools/ci/manual-ci-lanes.cjs',
@@ -66,6 +71,49 @@ const git = (where, args) =>
 		encoding: 'utf8',
 		stdio: 'pipe'
 	});
+// Independent Python struct/zipfile-authored inert fixtures; no interpreter is executed.
+const syntheticSdkArchive = Buffer.from(
+	'UEsDBBQAAAAAANGwTF1pnYssAAIAAAACAAAQAAAAQXV0b0hvdGtleTY0LmV4ZU1aAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABQRQAAZIYBAAAAAAAAAAAAAAAAAHAAAgALAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUEsDBBQAAAAAANGwTF00AvzIJAAAACQAAAAQAAAAQXV0b0hvdGtleTMyLmV4ZUluZGVwZW5kZW50IGlycmVsZXZhbnQgMzItYml0IG1lbWJlclBLAQIUAxQAAAAAANGwTF1pnYssAAIAAAACAAAQAAAAAAAAAAAAAACAAQAAAABBdXRvSG90a2V5NjQuZXhlUEsBAhQDFAAAAAAA0bBMXTQC/MgkAAAAJAAAABAAAAAAAAAAAAAAAIABLgIAAEF1dG9Ib3RrZXkzMi5leGVQSwUGAAAAAAIAAgB8AAAAgAIAAAAA',
+	'base64'
+);
+const syntheticSdkImage = Buffer.from(
+	'TVoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAFBFAABkhgEAAAAAAAAAAAAAAAAAcAACAAsCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+	'base64'
+);
+const syntheticSdkAliasArchive = Buffer.from(
+	'UEsDBBQAAAAAANGwTF1pnYssAAIAAAACAAAQAAAAQXV0b0hvdGtleTY0LmV4ZU1aAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABQRQAAZIYBAAAAAAAAAAAAAAAAAHAAAgALAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUEsDBBQAAAAAANGwTF023CoYGgAAABoAAAAXAAAAQXV0b0hvdGtleTY0LmV4ZTo6JERBVEFJbmRlcGVuZGVudCBhbGlhcyBzZW50aW5lbFBLAQIUAxQAAAAAANGwTF1pnYssAAIAAAACAAAQAAAAAAAAAAAAAACAAQAAAABBdXRvSG90a2V5NjQuZXhlUEsBAhQDFAAAAAAA0bBMXTbcKhgaAAAAGgAAABcAAAAAAAAAAAAAAIABLgIAAEF1dG9Ib3RrZXk2NC5leGU6OiREQVRBUEsFBgAAAAACAAIAgwAAAH0CAAAAAA==',
+	'base64'
+);
+function prepareSyntheticSdk(directory, change = () => {}) {
+	fs.writeFileSync(path.join(directory, 'source-sdk.zip'), syntheticSdkArchive);
+	fs.writeFileSync(path.join(directory, 'source-sdk-image.bin'), syntheticSdkImage);
+	const contract = {
+		runtime: { version: '9.8.7', asset: 'AutoHotkey_9.8.7.zip', sha256: sha(syntheticSdkArchive) }
+	};
+	fs.writeFileSync(path.join(directory, sdkContractPath), JSON.stringify(contract));
+	change(directory);
+}
+function sdkCase(change = () => {}) {
+	return fixture((directory) =>
+		prepareSyntheticSdk(directory, () => {
+			change(directory);
+			const archive = fs.readFileSync(path.join(directory, 'source-sdk.zip'));
+			fs.writeFileSync(
+				path.join(directory, sdkContractPath),
+				JSON.stringify({
+					runtime: { version: '9.8.7', asset: 'AutoHotkey_9.8.7.zip', sha256: sha(archive) }
+				})
+			);
+		})
+	);
+}
+function sdkModel(f) {
+	return architectureModel(f, 'x64', {
+		process: {
+			env: { ...env, ERGOPTI_WINDOWS_AHK_ARCHIVE: path.join(f.directory, 'source-sdk.zip') }
+		}
+	}).sdk;
+}
 const records = [];
 function fixture(change = () => {}) {
 	const directory = fs.mkdtempSync(path.join(temporary, 'fixture-'));
@@ -152,9 +200,20 @@ function architectureModel(f, architecture, overrides = {}) {
 		clearTimeout,
 		console: overrides.console || console
 	});
-	let api;
+	let api, sdk;
 	const required = (name) => {
-		if (name === './windows-updater-original-source.cjs') return api;
+		if (name === './windows-updater-original-source.cjs') {
+			if (!overrides.afterRead) return api;
+			return {
+				...api,
+				readSourceFile: (...args) => {
+					const result = api.readSourceFile(...args);
+					overrides.afterRead(args[0]);
+					return result;
+				}
+			};
+		}
+		if (name === './windows-updater-sdk-auth.cjs') return sdk;
 		if (name === 'node:child_process' && overrides.childProcess) return overrides.childProcess;
 		return f.required(name);
 	};
@@ -171,7 +230,8 @@ function architectureModel(f, architecture, overrides = {}) {
 		return ownedModule.exports;
 	}
 	api = load(modulePath);
-	return { api, cli: load(collectorPath), context, required };
+	sdk = load(sdkPath);
+	return { api, sdk, cli: load(collectorPath), context, required };
 }
 // Test-only realm calls the actual generator main against the owning private Git fixture.
 function sealWriteFault(f, vector) {
@@ -378,16 +438,27 @@ function sourceSealCLIControls(f) {
 	);
 }
 const passiveCopy = (value) => JSON.parse(JSON.stringify(value));
-async function modelMain(f, code) {
+async function modelMain(f, code, options = {}) {
 	const evidence = path.join(f.directory, 'local-evidence');
 	fs.mkdirSync(evidence);
-	const ahk = path.join(f.directory, 'ahk-vector.exe');
-	fs.writeFileSync(ahk, 'independent inert image vector');
+	const ahk = path.join(f.directory, 'source-sdk-image.bin');
+	const sdkEnvironment = {
+		...env,
+		ERGOPTI_WINDOWS_AHK_ARCHIVE: path.join(f.directory, 'source-sdk.zip')
+	};
+	if (options.missingArchive) delete sdkEnvironment.ERGOPTI_WINDOWS_AHK_ARCHIVE;
+	let imageReads = 0;
 	const calls = [],
 		stdout = [],
 		stderr = [],
 		exits = [];
 	const model = architectureModel(f, 'x64', {
+		afterRead: (file) => {
+			if (file === ahk && ++imageReads === 2 && options.replaceBeforeChild) {
+				fs.renameSync(ahk, ahk + '.before-sdk');
+				fs.writeFileSync(ahk, syntheticSdkImage);
+			}
+		},
 		childProcess: {
 			...cp,
 			spawn: (...args) => {
@@ -402,7 +473,7 @@ async function modelMain(f, code) {
 		process: {
 			platform: 'win32',
 			argv: [process.execPath, 'collector.cjs', '--local', ahk, '2.0.0.0', evidence],
-			env,
+			env: sdkEnvironment,
 			exit: (x) => exits.push(x)
 		}
 	});
@@ -726,6 +797,49 @@ async function modelMain(f, code) {
 			} else assert.equal(outcome.failure, vector.phase ? vector.value : vector.closure);
 		}
 		sourceSealCLIControls(f);
+		const sdkFixture = sdkCase();
+		const binding = sdkModel(sdkFixture);
+		const image = path.join(sdkFixture.directory, 'source-sdk-image.bin');
+		const before = binding.receiveSdk(image, 'CALLER_METADATA_NOT_BOUND');
+		assert.equal(before.runtime_version, '9.8.7');
+		assert.equal(before.member.sha256, sha(syntheticSdkImage));
+		assert.equal(before.archive.sha256, sha(syntheticSdkArchive));
+		assert.equal(before.pe.machine, 0x8664);
+		assert.equal(before.pe.headers_only, true);
+		assert.equal(before.pe.loader_validated, false);
+		assert.equal(before.reported_file_version_qualified, false);
+		binding.requireSameSdk(before, binding.receiveSdk(image, 'CALLER_METADATA_NOT_BOUND'));
+		fs.renameSync(image, image + '.prior');
+		fs.writeFileSync(image, syntheticSdkImage);
+		refuses(
+			() => binding.requireSameSdk(before, binding.receiveSdk(image, 'CALLER_METADATA_NOT_BOUND')),
+			/receipt changed/
+		);
+		for (const [label, change, reason] of [
+			[
+				'Unix directory',
+				(directory) => {
+					const archive = Buffer.from(syntheticSdkArchive);
+					const central = archive.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+					archive.writeUInt32LE(0x40000000, central + 38);
+					fs.writeFileSync(path.join(directory, 'source-sdk.zip'), archive);
+				},
+				/file type/
+			],
+			[
+				'Windows default stream alias',
+				(directory) =>
+					fs.writeFileSync(path.join(directory, 'source-sdk.zip'), syntheticSdkAliasArchive),
+				/alias/
+			]
+		]) {
+			const subject = sdkCase(change);
+			refuses(
+				() =>
+					sdkModel(subject).receiveSdk(path.join(subject.directory, 'source-sdk-image.bin'), label),
+				reason
+			);
+		}
 	});
 	control('real hardlink and symlink reader aliases refuse', () => {
 		const f = fixture(),
@@ -773,7 +887,7 @@ async function modelMain(f, code) {
 		name: 'actual local main reaches modeled acquisition with real Source and honest metadata',
 		status: 'RUNNING'
 	});
-	const f = fixture();
+	const f = fixture(prepareSyntheticSdk);
 	const code = fs.readFileSync(path.join(f.directory, collectorPath), 'utf8');
 	const modeled = await withEnvironment({}, () => modelMain(f, code));
 	assert.equal(modeled.calls.length, 3);
@@ -801,6 +915,68 @@ async function modelMain(f, code) {
 		path.basename(modeled.receipt.output_directory),
 		/^windows-updater-original-diagnostic-local-[0-9a-f]{40}-[A-Za-z0-9]+$/
 	);
+	for (const vector of [
+		{ label: 'missing archive', missingArchive: true, change: () => {}, reason: /absolute pinned/ },
+		{
+			label: 'SDK image replacement before first child',
+			replaceBeforeChild: true,
+			change: () => {},
+			reason: /receipt changed/
+		},
+		{
+			label: 'foreign digest',
+			change: (directory) =>
+				fs.writeFileSync(path.join(directory, 'source-sdk.zip'), 'foreign ZIP'),
+			reason: /digest refused before parsing/
+		},
+		{
+			label: 'foreign image',
+			change: (directory) =>
+				fs.writeFileSync(path.join(directory, 'source-sdk-image.bin'), 'independent foreign image'),
+			reason: /member differs/
+		},
+		{
+			label: 'Unix directory image member',
+			seal: true,
+			change: (directory) => {
+				const archive = Buffer.from(syntheticSdkArchive);
+				const central = archive.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+				archive.writeUInt32LE(0x40000000, central + 38);
+				fs.writeFileSync(path.join(directory, 'source-sdk.zip'), archive);
+			},
+			reason: /file type/
+		},
+		{
+			label: 'Windows stream alias',
+			seal: true,
+			change: (directory) =>
+				fs.writeFileSync(path.join(directory, 'source-sdk.zip'), syntheticSdkAliasArchive),
+			reason: /alias/
+		}
+	]) {
+		const subject = vector.seal
+			? sdkCase(vector.change)
+			: fixture((directory) => prepareSyntheticSdk(directory, vector.change));
+		const refusal = await modelMain(subject, code, vector);
+		assert.equal(refusal.calls.length, 0, vector.label + ': no native child before SDK refusal');
+		assert.equal(refusal.receipt.status, 'FAIL');
+		assert.equal(refusal.receipt.context_bound, false);
+		assert.equal(refusal.receipt.context.run_id, null);
+		assert.match(refusal.receipt.errors.join(' '), vector.reason);
+		assert.deepEqual(refusal.exits, [1]);
+	}
+	assert.equal(modeled.receipt.ahk.file_version_qualified, false);
+	assert.equal(modeled.receipt.ahk.file_version_source, 'caller_provided_metadata');
+	assert.equal(modeled.receipt.sdk_before.runtime_version, '9.8.7');
+	assert.equal(modeled.receipt.sdk_before.native_executed, false);
+	assert.equal(modeled.receipt.sdk_before.reported_file_version_qualified, false);
+	assert.equal(modeled.receipt.sdk_before.pe.machine, 0x8664);
+	assert.equal(modeled.receipt.sdk_before.pe.headers_only, true);
+	assert.equal(modeled.receipt.sdk_before.pe.loader_validated, false);
+	assert.equal(modeled.receipt.sdk_before.member.name, 'AutoHotkey64.exe');
+	assert.equal(modeled.receipt.sdk_before.member.bytes, 512);
+	assert.equal(modeled.receipt.sdk_before.image.sha256, sha(syntheticSdkImage));
+	assert.deepEqual(modeled.receipt.sdk_after, modeled.receipt.sdk_before);
 	records.at(-1).status = 'PASS';
 	process.stdout.write('PASS ' + records.at(-1).name + '\n');
 	control('original child commands clocks and independent oracle remain frozen', () => {

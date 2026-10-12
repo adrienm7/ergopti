@@ -27,9 +27,12 @@ Set ERGOPTI_AHK_RESULTS_FILE to a fresh owned capture path before invocation. Th
 
 The original23 updater collector is now available at `tools/ci/run-windows-updater-original-diagnostic-cohort.cjs`, with its frozen independent18/4/1 oracle and exact2307-byte child. Run its explicit local mode on a clean reviewed checkout **before** PAC -Publish or another tracked build-output replacement. Static review finds no PAC worker/build invocation in those selected case bodies; genuine Windows include/load/execution remains required. The collector receives current21 and all declared tracked inputs before/final, preserves300000ms selection/execution and30000ms disposal, and retains raw TAP/stdout/stderr plus manifests. Its local context uses actual HEAD, null run IDs and context_bound=false. It never grants full-suite, fresh PAC build, feature or official CI qualification.
 
-With `$ahk` verified against the original pinned runtime contract, use a fresh evidence root outside the checkout:
+The collector requires an existing absolute archive path in `ERGOPTI_WINDOWS_AHK_ARCHIVE` on cache hits as well as fresh acquisitions. It authenticates the archive against the canonical `windows_release_toolchain.json` SHA before decoding, binds the exact unique `AutoHotkey64.exe` member bytes to the acquired interpreter and checks AMD64/PE32+ executable header flags. Archive, image and contract identities/digests are repeated before/final. The supplied FileVersion stays explicitly unqualified caller metadata. Header checks do not establish Windows loader admission, actual launched-image identity or process-tree retirement. No cache guess, arbitrary SDK receipt or missing-archive fallback is admitted.
+
+With `$runtimeArchive` the existing canonical pinned ZIP and `$ahk` its independently received interpreter, use a fresh evidence root outside the checkout:
 
 ```powershell
+$env:ERGOPTI_WINDOWS_AHK_ARCHIVE = (Resolve-Path -LiteralPath $runtimeArchive -ErrorAction Stop).Path
 $fileVersion = (Get-Item -LiteralPath $ahk).VersionInfo.FileVersion
 $g6Evidence = Join-Path ([System.IO.Path]::GetTempPath()) ('ergopti-group6-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Path $g6Evidence -ErrorAction Stop
@@ -37,7 +40,7 @@ node tools/ci/run-windows-updater-original-diagnostic-cohort.cjs --local $ahk $f
 if ($LASTEXITCODE -ne 0) { throw 'Original updater diagnostics refused; retain their evidence.' }
 ```
 
-Local mode refuses hosted GitHub context, relative SDK/evidence paths and mixed/unknown arguments. An authentication binding alone grants no run identity. Retain the actual newly created local child directory and its RESULT/source/manifest/raw files; do not invent GITHUB_SHA/RUN_ID/RUN_ATTEMPT or RUNNER_TEMP to bypass admission. All23 native cases remain UNEXECUTED here. The registered `npm run test:windows-updater-original-source` instead covers22 portable private-Git/filesystem/context/model controls; native=false and official=false.
+Local mode refuses hosted GitHub context, relative SDK/evidence paths and mixed/unknown arguments. An authentication binding alone grants no run identity. Retain the actual newly created local child directory and its RESULT/source/manifest/raw files; do not invent GITHUB_SHA/RUN_ID/RUN_ATTEMPT or RUNNER_TEMP to bypass admission. Source-only SDK controls use independent synthetic ZIP/PE fixtures and a finite private committed test contract; they do not qualify native Windows. Genuine pinned2.0.26 archive/image format compatibility was checked as inert data only. All23 native cases remain UNEXECUTED here. The registered `npm run test:windows-updater-original-source` instead covers22 portable private-Git/filesystem/context/model controls; native=false and official=false.
 
 The two shared PAC receiver modules and authenticated two-runtime-output branch remain unadopted. Activation after -Publish still requires current complete producer/profile/source_receipt/MSVC/prepared/header/command and late-consumer receiving. Strict tracked-Git refusal remains; no historical producer map, arbitrary binary or successful subset can authorize fresh published PAC bytes. Preserve the full original unit suite and1320000ms watchdog. The supplemental23 cannot replace it.
 
