@@ -353,10 +353,21 @@ positive, and the exact scope census includes 99 original plus eight explicitly
 named scalar scenarios. Its two success/failure tests replay 214 complete
 callbacks and pass 2/0. Actual root discovery/authentication owners pass 117/0
 and 20/0; original discovery also passed, so this is not a native callback bug
-claim. The three unreachable-backend offer fixture failures are still open.
-The full suite has not been rerun after these two corrections. An incorrect
+claim. A subsequent correction of the four unreachable-offer HTTP doubles keeps
+all six original scenarios and adds held-cancellation, stale/duplicate reply and
+carried-caller custody. Its actual canonical cohort passes 7/0 after the original
+3/3 failure. The fixture now models get/cancel/isSettled/onSettled; production
+correctly refuses missing native infrastructure. All six full-run failures now
+have targeted passing successors. The full suite has not been rerun after these
+three corrections. An incorrect
 module filter was rejected with zero cases; that invocation is not evidence.
 Fresh dev `2bfcf853c` was integrated at this terminal checkpoint, preserving G6.
+
+The complete Linux suite on `08c7886ba6f48d272cfd2768e5750c3282add211` passes
+13,452/13,452 across 521 modules, with subprocess status 0, signal null and
+elapsed time 572,293 ms. The structured receipt and exact log remain private
+outside Git. This is actual Linux LuaJIT/native-ABI software execution; real
+keyboard/touchpad input and interactive desktop receiving remain separate.
 
 [The pending modifier correction](pending-modifier-custody.patch) has SHA256
 `7e5990669183cf953f31660e881f6bf62baf4026d2b5f68f2378954559d0bfcf`.

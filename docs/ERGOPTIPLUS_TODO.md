@@ -189,8 +189,13 @@ nested-local scanner false positive, and the metrics scope census now preserves
 The unchanged guard passes 7/0, discovery/authentication modules 117/0 and 20/0,
 and scope receiving 2/0 with 214 complete callbacks. Original discovery behavior
 also passed before the naming change; no native nil-global defect is claimed.
-The three unreachable-server offer failures remain open while their stale HTTP
-fixture is corrected; no complete Mac rerun is claimed after these changes.
+The subsequent unreachable-server fixture correction preserves all six original
+scenarios and adds held-cancellation/late-receipt custody: 3/3 becomes 7/0.
+Its four HTTP doubles now model the required native settlement interface instead
+of manufacturing unavailable acquisition. All six observed failures have targeted
+passing successors; no complete Mac rerun is claimed after these changes.
+The complete Linux suite on `08c7886ba6f48d272cfd2768e5750c3282add211`
+passes 13,452/13,452 in 521 modules, actual subprocess exit 0 in 572,293 ms.
 
 Item 49 has an implemented pure-C correction retained in the
 [pending modifier patch](handovers/2026-10-12-dev-consolidation/pending-modifier-custody.patch).
