@@ -5526,6 +5526,23 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+
+  Windows registry string fields and raw-image memo keys now compare complete,
+  case-sensitive strings, including embedded NUL suffixes. Actual bounded
+  [run 38306795892](https://github.com/adrienm7/ergopti/actions/runs/38306795892)
+  on private `ad6b2e2e6f6b555516d670bf3169f4763673554e` receives two dry
+  selections, two candidate passes, two exact original-code causal failures and
+  two restored-candidate passes. All eight SDK 2.0.26 children retire; source
+  restoration is acknowledged and the complete parent takes 64,911 ms within
+  180,000 ms. The original 79 test declarations and 696 assertions remain
+  intact; the two additive API cases use actual boot/native owners and keep
+  NUL data in memory. This is the frozen `f6057f4` control context. Later
+  runner/Snapshot/source-helper changes on `80d4588` require fresh current-source
+  receiving; full unit, E2E, packaging, installation and device acceptance remain
+  pending. The 6,164 original warnings are retained, without a clean-warning
+  claim. Source-pin resealing follows the actual correction commit through its
+  owning generator and preserves the independent behavior oracle.
+
   Windows direct full-save intent is now recorded before the unchanged unsafe
   serializer refusal. The existing safe path resolver refuses absent or empty
   paths without creating a generation; implicit drains remain separate.
