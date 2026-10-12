@@ -24,6 +24,9 @@
 
 const { spawnSync } = require('child_process');
 const path = require('path');
+const fs = require('node:fs');
+const os = require('node:os');
+const { performance } = require('node:perf_hooks');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const FULL = process.argv.includes('--full');
@@ -2622,27 +2625,90 @@ const SLOW_CHECKS = [
 ];
 
 const checks = FULL ? [...CHECKS, ...SLOW_CHECKS] : CHECKS;
+const startedAt = performance.now();
+const timingDirectory = fs.mkdtempSync(
+	path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'ergopti-js-suite-')
+);
+const timingPath = path.join(timingDirectory, 'timings.ndjson');
+const milliseconds = (value) => Math.round(value * 1000) / 1000;
+
+/** Append before proceeding so interruption retains completed work and the active check. */
+function recordTiming(record) {
+	fs.appendFileSync(timingPath, JSON.stringify(record) + '\n', { encoding: 'utf8', mode: 0o600 });
+}
+
+recordTiming({
+	type: 'suite',
+	schema_version: 1,
+	suite: 'js',
+	mode: FULL ? 'full' : 'default',
+	planned_count: checks.length,
+	platform: process.platform,
+	architecture: process.arch,
+	node_version: process.version,
+	// This identifies a CI invocation, not a claim that a local working tree is clean.
+	ci_source_sha: /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA || '') ? process.env.GITHUB_SHA : null
+});
 
 console.log('\nErgopti+ JS validation suite' + (FULL ? ' (full)' : '') + '\n' + '='.repeat(50));
+console.log(`Timing journal: ${timingPath}\n`);
 
 const results = [];
 for (const check of checks) {
+	const ordinal = results.length + 1;
+	recordTiming({ type: 'start', ordinal, name: check.name });
 	process.stdout.write(`  • ${check.name} … `);
-	const r = spawnSync(check.cmd, check.args, { cwd: ROOT, encoding: 'utf8', shell: true });
-	const ok = r.status === 0;
+	const checkStartedAt = performance.now();
+	let r;
+	try {
+		r = spawnSync(check.cmd, check.args, { cwd: ROOT, encoding: 'utf8', shell: true });
+	} catch (error) {
+		r = { status: null, error, stderr: error?.stack || String(error) };
+	}
+	const durationMs = milliseconds(performance.now() - checkStartedAt);
+	const ok = r.status === 0 && !r.error && !r.signal;
+	recordTiming({
+		type: 'result',
+		ordinal,
+		name: check.name,
+		reproduce: check.repro,
+		status: ok ? 'PASS' : 'FAIL',
+		exit_code: r.status ?? null,
+		signal: r.signal ?? null,
+		error_code: r.error?.code ?? null,
+		duration_ms: durationMs
+	});
 	console.log(ok ? 'OK' : 'FAIL');
-	results.push({
+	console.log(`    duration: ${durationMs.toFixed(3)} ms (${ordinal}/${checks.length})`);
+	const result = {
 		...check,
 		ok,
+		durationMs,
 		status: r.status,
 		signal: r.signal,
 		errorCode: r.error?.code,
 		stdout: r.stdout || '',
 		stderr: r.stderr || ''
-	});
+	};
+	results.push(result);
+	if (!ok) reportFailure(result);
 }
 
 const failed = results.filter((r) => !r.ok);
+recordTiming({
+	type: 'complete',
+	executed_count: results.length,
+	passed: results.length - failed.length,
+	failed: failed.length,
+	child_duration_ms: milliseconds(results.reduce((total, result) => total + result.durationMs, 0)),
+	duration_ms: milliseconds(performance.now() - startedAt)
+});
+
+console.log('\nSlowest JS checks (child wall time):');
+for (const result of [...results].sort((a, b) => b.durationMs - a.durationMs).slice(0, 10)) {
+	console.log(`  ${result.durationMs.toFixed(3)} ms — ${result.name}`);
+	console.log(`    reproduce: ${result.repro}`);
+}
 
 console.log('\n' + '-'.repeat(50));
 if (failed.length === 0) {
@@ -2655,6 +2721,13 @@ if (failed.length === 0) {
 
 console.log(`❌  ${failed.length}/${results.length} JS check(s) FAILED:\n`);
 for (const f of failed) {
+	console.log(`  ✗ ${f.name}`);
+	console.log(`    reproduce: ${f.repro}`);
+}
+process.exit(1);
+
+/** Report the bounded failure before starting another potentially slow check. */
+function reportFailure(f) {
 	if (process.env?.GITHUB_ACTIONS === 'true') {
 		// Check names remain available through the API when archived log access
 		// fails. Never copy command output, URLs or native receipts here.
@@ -2684,4 +2757,3 @@ for (const f of failed) {
 		console.log(`    ${stream}:\n    ` + excerpt.join('\n    ') + '\n');
 	}
 }
-process.exit(1);
