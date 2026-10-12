@@ -774,6 +774,10 @@ _LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/window_cycle.ahk
 #Include ../modules/gestures/virtual_desktops.ahk
 #Include ../modules/gestures/config.ahk
+; Genuine gestures factory/registry and generated rows are already loaded.
+; These source-image cases do not invoke actions or native output.
+#Include ../../_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk
+#Include unit/test_buffered_data_snapshot_owner.ahk
 ; Load the definitions-only onboarding worker owner so its elevated-launch
 ; reservation can be exercised without constructing the wizard UI.
 #Include ../ui/onboarding/gesture_registration.ahk
