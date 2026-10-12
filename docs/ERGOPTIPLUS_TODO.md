@@ -7051,6 +7051,15 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-12 the G6-owned network fixture now uses an explicit50ms serving poll
+instead of the implicit500ms default, reducing idle shutdown cost without changing
+any native command, deadline, cleanup/debt law or original assertion. The unchanged
+156 portable cases pass in13.599s on this successor; prior actual baseline45.907s
+and candidate13.716s remain separate receipts. This is fixture cost reduction,
+not proof of the historical hosted timeout cause or native trust/PAC acceptance.
+Source ownership history and Root/G5 exact no-overlap handbacks were received;
+no G4 same-span reservation was found or approval inferred. Item62 remains open.
+
 2026-10-12 updater Source receiving is isolated in its callable shared tooling
 module. It preserves the original acquired reader/Git collector and rejects
 caller label overrides using a copied six-field context. Explicit local mode

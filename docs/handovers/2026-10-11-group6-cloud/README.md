@@ -1092,3 +1092,33 @@ Both author rounds pass22 controls with no failures/errors/skips. Four counterfa
 The [local procedure](LOCAL-VALIDATION.md) now includes the actual command before tracked PAC publication. No new PAC-output allowance or workflow step is activated. Local23, original full Windows unit/E2E/build/install, current compiled producer receiving, Mac Brew6/trust and final installed/enterprise acceptance remain unexecuted/unqualified on this successor. Items36/62 and16/38 remain open; the feature is retained and no Dev integration or release is claimed by these portable controls.
 
 The final registered test uses private x64/arm64 admission realms, while the four original tools stay byte-exact. Its22 canonical Source controls pass from the actual checkout. The [portable-test successor](updater-arm-portable-test-receiving.tar.gz) retains preimage7cdb/forward/inverse/postimagef16ad5257b28c2848e285473d83eee29dca39db2dc5ceb95327c73c4f7fec886,58 unchanged assertions,22 actual and22 lexical-ARM controls, five actual assertion refusals and independent review. This56-member27035-byte packet has SHA256971194dd2f4fadeb88333961b6f11dede994116167252321157c728150b516af. The first cross-realm harness error and old ARM-incompatible replay remain separate. Lexical ARM simulation retains host argv in some old negative vectors; their refusals alone do not establish the intended argument cause. Normal22 controls use the actual process correctly, and the dedicated private-realm local/official ARM refusals and main acquisition omission are causal. No ARM hardware/native qualification is claimed.
+
+## Original network fixture polling cost
+
+The existing G6 serving-worker span now names its poll interval as50ms rather
+than accepting Python's500ms default. It changes only the existing Thread kwargs
+and its local value/comment. The entire inverse returns the original fixture
+SHA256 `9ce69d62fe7d1807b1df6aeedaab0ac6cb45b5fb5842330f9f0254f94033e289`;
+the candidate is `10c923949060a3fc04a3d596c03c3851efce3815b443f6f40ccafdfd2d13c979`.
+No server/thread/native command or trust/query acquisition is added. Start
+acknowledgement, retained workers, bounded shutdown, physical closure, uncertainty
+and retry/debt laws remain unchanged. All original156 test bodies and assertions,
+the60000ms outer child and15s native command limits remain intact.
+
+Actual current-source Linux receiving runs the original156 controls in13.599s
+with zero failures/errors/skips. Ruff check/format pass. Historical baseline
+45.907s and the literal-only private candidate13.716s are separately retained;
+they do not establish why the hosted child timed out. Native macOS receiving
+of this new fixture is pending; the active a18 manual tests its predecessor.
+The performance change grants no trust, consent, full-suite or package acceptance.
+
+Root6113612093 and Group5 6113461574 release the finite polling span. An
+independent authenticated history identifies the current serving-worker code as
+G6/network909e118370e16a777502f7e7c467e0c9edbdce41. No G4 reservation or declared
+same-span writer was found in actual saved/current coordination; the prior
+G4-pending wording was our conservative blanket request. The own-span change
+proceeds under the maintainer's existing G6 authorization with public notice
+6115804870, without treating silence as a grant or touching G4-owned policy.
+The R2 removal observation and official Windows PAC-safe branch remain separate
+unadopted preparations. Normal selected serial gates must still qualify the
+final source; TODO36/62 and transversal16/38 remain open.
