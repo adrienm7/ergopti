@@ -1102,6 +1102,24 @@ set -euo pipefail
 RUNNER_TEMP="$1"
 GITHUB_OUTPUT="$RUNNER_TEMP/github-output"
 ERGOPTI_NATIVE_HTTP_PYTHON=owned_python
+mkdir() {
+    if [ "$#" -eq 2 ] && [ "$1" = -p ] && [ "$2" = "$RUNNER_TEMP" ]; then
+        printf '%s\\0' "$@" >> "$RUNNER_TEMP/mkdir-requests"
+        command mkdir "$@"
+    elif [ "$#" -eq 4 ] && [ "$1" = -m ] && [ "$2" = 700 ] &&
+        [ "$3" = "$RUNNER_TEMP/native-http-clock-arm64-123-2" ] &&
+        [ "$4" = "$3/private-cache" ]; then
+        printf '%s\\0' "$@" >> "$RUNNER_TEMP/mkdir-requests"
+        # Windows records the requested POSIX mode; native hosts still apply it.
+        if [ "$ERGOPTI_HTTP_FIXTURE_HOST" = win32 ]; then
+            command mkdir "$3" "$4"
+        else
+            command mkdir "$@"
+        fi
+    else
+        return 91
+    fi
+}
 tee() {
     command tee "$@" || return $?
     case "$*" in
@@ -1127,7 +1145,7 @@ owned_python() {
     esac
 }
 ` + code;
-			const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-http-profile-'));
+			const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-http-profile with space-'));
 			let result;
 			try {
 				result = spawnSync(
@@ -1137,6 +1155,7 @@ owned_python() {
 						encoding: 'utf8',
 						env: {
 							...process.env,
+							ERGOPTI_HTTP_FIXTURE_HOST: process.platform,
 							MODE: mode,
 							PROFILE: profile,
 							REFUSED: String(refused),
@@ -1144,6 +1163,29 @@ owned_python() {
 						}
 					}
 				);
+				if (result.status === expected) {
+					const clockRoot = owned + '/native-http-clock-arm64-123-2';
+					const expectedRequests = ['-p', owned];
+					if (id === 'e2e-hs' && mode === 'full' && !refused) {
+						expectedRequests.push('-m', '700', clockRoot, clockRoot + '/private-cache');
+						for (const [file, text] of [
+							['owned-process.log', 'owned\n'],
+							['public-native.log', 'client\n'],
+							['independent-client.log', 'wire\n']
+						]) {
+							assert.equal(
+								fs.readFileSync(path.join(clockRoot, file), 'utf8'),
+								text,
+								'recorded command output remains in the actual owned directory'
+							);
+						}
+					}
+					assert.deepEqual(
+						fs.readFileSync(path.join(owned, 'mkdir-requests'), 'utf8').split('\0'),
+						[...expectedRequests, ''],
+						'only the intended setup paths and mode are requested'
+					);
+				}
 			} finally {
 				fs.rmSync(owned, { recursive: true, force: true });
 			}
