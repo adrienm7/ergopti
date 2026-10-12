@@ -4074,6 +4074,17 @@ and transport assertion remains intact. Native XCTest requalification and
 the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
+      `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
+
+2026-10-12 the original Windows updater23 diagnostic is now callable from the
+reviewed checkout with an explicit local mode before PAC -Publish. It retains
+original18/4/1 names, the2307-byte child and300000/30000/1320000 clocks, plus
+current21 pins and strict before/final Git receipts. Local output has null run IDs
+and no official context or full-suite/feature qualification. Twenty-two portable
+Source/context controls pass on Linux; all23 native cases, complete Windows
+unit/E2E/build/install, Mac Brew6 and final package/install acceptance remain
+UNEXECUTED on this successor. Item36 and transversal16/38 remain open. See the
+[executable local procedure](handovers/2026-10-11-group6-cloud/LOCAL-VALIDATION.md).
 
 2026-10-12 local native qualification is mapped to the existing source-bound
 Windows/macOS entry points and exact workflow recipes, without adding a competing
@@ -4153,8 +4164,6 @@ law. All203 original controls remain exact;205 portable controls pass without
 skips. Both new controls fail against the exact predecessor. Corrected native
 receiving, ordinary consent, Brew6 and full package/install remain required;
 item36 stays open.
-
-      `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
 2026-10-11 typed worker and first-traversal receiving. Exact manual38103825010
 on12fb210c actually compiles and executes25 native archive cases:24 pass,
@@ -7029,6 +7038,29 @@ The macOS personal-hotstring section enable control now consumes its own shared 
 The shortcut extension owner now reports its genuinely observed missing, failed, empty or populated builder outcome to one shared conditional result frame. The existing native builder invocation, short-circuit count, logging, callbacks and cleanup remain; the independent marker corpus is unchanged. Ten additive native cases cover declaration withdrawal, inverted marker selection, late refusal, repair and owned cleanup while retaining the complete original unit prefix and assertions. Genuine generators lower the remaining census to Windows 17, macOS 2 and Linux 1. Native execution of these new cases, complete suite, E2E, packaging and installed acceptance remain pending; this source tranche does not complete items 54/81.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
+      system proxy for every download child (Ollama installation/server/pull,
+      updater/rollback and remote AI), with translated certificate/proxy/blocked/
+      offline/disk/permission causes and useful recovery actions in all21 locales.
+      Committed source at `b21bea3ee3ed0f3a21b90096ab0e9607a5ac688a` includes
+      Windows/Linux transport, publication and receiving repairs; those changes
+      must be preserved rather than rebuilt from the old interrupted worktree.
+      Complete native, package, installation and enterprise acceptance remains
+      open. macOS system trust and explicit proxy relay code is integrated.
+      Packaged Python/uv/wheel bootstrap and HuggingFace downloads already use
+      native per-request adapters; system-trust/PAC and installed qualification
+      remains incomplete. A manual context without admitted native capabilities
+      refuses automatic proxy routing instead of bypassing it.
+
+2026-10-12 updater Source receiving is isolated in its callable shared tooling
+module. It preserves the original acquired reader/Git collector and rejects
+caller label overrides using a copied six-field context. Explicit local mode
+uses real HEAD and absolute SDK/evidence paths; unknown/mixed modes and hosted
+metadata refuse. Current21, independent oracle and strict two-PAC-output refusals
+remain. Twenty-two real private Git/filesystem and modeled-entry controls pass;
+four predecessor controls fail their intended assertions. These controls are
+portable, native=false and official=false; they do not repair Mac trust, enroll
+the published PAC producer or complete enterprise/installed acceptance. Item62
+and16/38 remain open.
 
 2026-10-12 HTTP-clock source tracking now admits the same complete rosters in
 bounded Git batches. Per-file committed bytes, regular-file checks and original
@@ -7258,19 +7290,6 @@ skipped, none cancelled; Release, package and install actually skip. These compo
 results do not turn the incomplete whole native lane into a pass. The unrelated
 late permission-history correction retains the existing network production
 guards and Windows/macOS continuation steps; item62 remains open.
-
-      system proxy for every download child (Ollama installation/server/pull,
-      updater/rollback and remote AI), with translated certificate/proxy/blocked/
-      offline/disk/permission causes and useful recovery actions in all21 locales.
-      Committed source at `b21bea3ee3ed0f3a21b90096ab0e9607a5ac688a` includes
-      Windows/Linux transport, publication and receiving repairs; those changes
-      must be preserved rather than rebuilt from the old interrupted worktree.
-      Complete native, package, installation and enterprise acceptance remains
-      open. macOS system trust and explicit proxy relay code is integrated.
-      Packaged Python/uv/wheel bootstrap and HuggingFace downloads already use
-      native per-request adapters; system-trust/PAC and installed qualification
-      remains incomplete. A manual context without admitted native capabilities
-      refuses automatic proxy routing instead of bypassing it.
 
 2026-10-11 exact12fb native component receiving. Manual38103825010 finishes
 failed: seven successful jobs, five failed and five skipped, none cancelled;

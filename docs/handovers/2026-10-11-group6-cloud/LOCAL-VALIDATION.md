@@ -1,6 +1,6 @@
 # Group6 existing local native qualification procedure
 
-Source-bound to 1f764e33fa9711787b54fb4718a8e1575ac12df4. This is an inventory/design, not an executed qualification. source-binding.json records24 actual committed entry-point/recipe cuts; canonical-steps.json records22 exact workflow step bodies including their env/conditions/step and job budgets. The source copies contain the original code and assertions. They introduce no alternative test tree or expectation corpus.
+The unchanged recipe inventory is source-bound to 1f764e33fa9711787b54fb4718a8e1575ac12df4; the original updater local command below is added after feature2abea05f32f9bb2fabb05b6a7d92476be52e5fd7. This procedure is not an executed native qualification. source-binding.json records24 actual committed entry-point/recipe cuts; canonical-steps.json records22 exact workflow step bodies including their env/conditions/step and job budgets. The source copies contain the original code and assertions. They introduce no alternative test tree or expectation corpus.
 
 ## Common receiving order
 
@@ -25,7 +25,21 @@ node tools/test/validate-ahk-suite-manifest.cjs --input $env:ERGOPTI_AHK_RESULTS
 
 Set ERGOPTI_AHK_RESULTS_FILE to a fresh owned capture path before invocation. The actual workflow uses Start-Process/retained native handle/WaitForExit; reuse that exact receiving body from canonical-steps.json when collecting exit and file receipts. The runner preserves its1320000ms maximum watchdog and count-derived budget. The existing25minute step boundary is a separate supervisor obligation; a new wrapper must not renew it or claim it exists in a bare local command. verify-change already runs the existing unit/E2E entry points and rejects incomplete manifests, but its temporary TAP cleanup is not durable release evidence.
 
-The supplemental original23 runner and both shared native PAC receiver modules are absent from canonical source at this commit. Their held preparation remains UNADOPTED. Activation requires exact current-source/loader ownership, strict held-reader composition, genuine source_receipt/MSVC/prepared/header/command evidence, original18/4/1 oracle and exact2307-byte child, unchanged300000ms shared budget/30000ms disposal and late-consumer receiving. Do not create a new cohort or narrow full-unit coverage to avoid its earlier Root configuration-restoration failure.
+The original23 updater collector is now available at `tools/ci/run-windows-updater-original-diagnostic-cohort.cjs`, with its frozen independent18/4/1 oracle and exact2307-byte child. Run its explicit local mode on a clean reviewed checkout **before** PAC -Publish or another tracked build-output replacement. Static review finds no PAC worker/build invocation in those selected case bodies; genuine Windows include/load/execution remains required. The collector receives current21 and all declared tracked inputs before/final, preserves300000ms selection/execution and30000ms disposal, and retains raw TAP/stdout/stderr plus manifests. Its local context uses actual HEAD, null run IDs and context_bound=false. It never grants full-suite, fresh PAC build, feature or official CI qualification.
+
+With `$ahk` verified against the original pinned runtime contract, use a fresh evidence root outside the checkout:
+
+```powershell
+$fileVersion = (Get-Item -LiteralPath $ahk).VersionInfo.FileVersion
+$g6Evidence = Join-Path ([System.IO.Path]::GetTempPath()) ('ergopti-group6-' + [Guid]::NewGuid().ToString('N'))
+$null = New-Item -ItemType Directory -Path $g6Evidence -ErrorAction Stop
+node tools/ci/run-windows-updater-original-diagnostic-cohort.cjs --local $ahk $fileVersion $g6Evidence
+if ($LASTEXITCODE -ne 0) { throw 'Original updater diagnostics refused; retain their evidence.' }
+```
+
+Local mode refuses hosted GitHub context, relative SDK/evidence paths and mixed/unknown arguments. An authentication binding alone grants no run identity. Retain the actual newly created local child directory and its RESULT/source/manifest/raw files; do not invent GITHUB_SHA/RUN_ID/RUN_ATTEMPT or RUNNER_TEMP to bypass admission. All23 native cases remain UNEXECUTED here. The registered `npm run test:windows-updater-original-source` instead covers22 portable private-Git/filesystem/context/model controls; native=false and official=false.
+
+The two shared PAC receiver modules and authenticated two-runtime-output branch remain unadopted. Activation after -Publish still requires current complete producer/profile/source_receipt/MSVC/prepared/header/command and late-consumer receiving. Strict tracked-Git refusal remains; no historical producer map, arbitrary binary or successful subset can authorize fresh published PAC bytes. Preserve the full original unit suite and1320000ms watchdog. The supplemental23 cannot replace it.
 
 Existing E2E commands use the same shipped interpreter:
 
@@ -92,6 +106,6 @@ python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app 
 
 Respect the original `test ! -e /Applications/ErgoptiPlus.app` precondition and preserve existing user applications. The actual installed-state launch matrix uses macos_launch_gate.py with original scenario/seed-tag/qualification receipt. Use those existing scenarios and full package receipt rather than a new smoke stub; do not invoke appcast/release publication scripts. Packaging/installation/upgrade are distinct results with their original outer and internal bounds.
 
-## Smallest remaining implementation decision
+## Remaining native receiving
 
-Existing native entry points and package/install owners already cover execution. The missing reusable layer is fresh source/receipt enrollment and explicit local-vs-official receiving, not another executor. No new CLI is authored here: it would currently duplicate existing owners or manufacture local official identity. After Root/Windows/G3 admission, the smallest useful own documentation slice is this source-bound local command/prerequisite/evidence map; any later local summary tool should only consume existing original receipts and distinguish scope/status, never launch duplicate native owners or generate expectations. All commands above remain UNEXECUTED in this Linux container. Only source inventory was performed.
+The explicit local updater command reuses the original diagnostic child and independent oracle; it creates no alternative native test tree. Its22 portable controls and four causal predecessor refusals do not execute Windows. All Windows/macOS commands in this document remain UNEXECUTED on this Linux host. Original full-unit/E2E/build/install, Brew6, trust/restoration, both native Mac architectures, fresh producer enrollment and enterprise/device acceptance remain separate required results. Keep items36/62 and transversal16/38 open until their actual scope is qualified.
