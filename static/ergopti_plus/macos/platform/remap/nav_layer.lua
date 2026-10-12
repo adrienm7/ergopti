@@ -14,9 +14,10 @@
 --- 1. The layer_active contract is unchanged: every manipulator fires only while
 ---    the layer variable is 1, whatever modifier is held, and the generator
 ---    scopes the variable to the lease like every other rule.
---- 2. Keys resolve through the physical-key registry for Ergopti's ISO board
----    (KEYBOARD_FORM), the board the hand-written layer was written on: on it
----    Karabiner swaps the key left of 1 and the key left of Z.
+--- 2. Physical inputs keep the registry's ISO projection (KEYBOARD_FORM).
+---    Virtual outputs use canonical HID positions: the selected virtual
+---    keyboard convention performs its own Carbon swap. Sharing the input
+---    override with output would swap the two keys twice.
 --- 3. F1-F12 reach the function keys in either top-row mode: sent plain while
 ---    macOS uses them as standard keys, with Fn added while it treats the row as
 ---    media keys (Karabiner's system.use_fkeys_as_standard_function_keys).
@@ -39,6 +40,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local Layout = require("modules.keymap.layout")
 
 local LOG = "karabiner.nav_layer"
 
@@ -113,12 +115,14 @@ local HS_MODIFIERS = { ctrl = "ctrl", alt = "alt", shift = "shift", meta = "cmd"
 --- The Karabiner event of one physical key on Ergopti's board, as a fresh table.
 --- @param code string A registry key code.
 --- @param registry table Decoded physical_keys.json.
+--- @param physical_input boolean|nil True for a hardware input, not a virtual HID target.
 --- @return table event { key_code | consumer_key_code | pointing_button = name }
-local function karabiner_event(code, registry)
+local function karabiner_event(code, registry, physical_input)
 	local entry = registry.keys[code]
 	if type(entry) ~= "table" then error("nav_layer: " .. tostring(code) .. " is not in the physical-key registry", 3) end
 	local source = entry.karabiner
-	local override = type(entry["macos_" .. KEYBOARD_FORM]) == "table" and entry["macos_" .. KEYBOARD_FORM].karabiner
+	local override = physical_input == true and type(entry["macos_" .. KEYBOARD_FORM]) == "table"
+		and entry["macos_" .. KEYBOARD_FORM].karabiner
 	if type(override) == "table" then source = override end
 	-- json.lua decodes a JSON null to a sentinel table, so check for a real field.
 	if type(source) == "table" then
@@ -207,7 +211,7 @@ M.CALL_HANDLERS = CALL_HANDLERS
 
 --- A manipulator firing on one key while the layer is held.
 local function base_manipulator(code, registry, description, extra_condition)
-	local from = karabiner_event(code, registry)
+	local from = karabiner_event(code, registry, true)
 	from.modifiers = { optional = { "any" } }
 	local conditions = { { type = "variable_if", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE } }
 	if extra_condition then conditions[#conditions + 1] = extra_condition end
@@ -305,7 +309,7 @@ end
 --- @return table|nil strokes Array of { system = "SOUND_UP" } or
 ---   { mods = { "cmd", … }, keycode = n }; empty for `none`.
 --- @return string|nil problem Why the binding cannot run on the wheel.
-local function wheel_strokes(code, resolution, registry)
+local function wheel_strokes(code, resolution, registry, form)
 	if resolution.kind == "none" then return {} end
 	if resolution.kind == "call" and Brightness.actions[resolution.handler] then
 		return { { system = Brightness.actions[resolution.handler].macos_system } }
@@ -320,7 +324,7 @@ local function wheel_strokes(code, resolution, registry)
 			strokes[#strokes + 1] = { system = system }
 		else
 			local entry = registry.keys[chord.key]
-			local override = type(entry) == "table" and entry["macos_" .. KEYBOARD_FORM]
+			local override = type(entry) == "table" and entry["macos_" .. form]
 			local keycode = type(override) == "table" and override.hs or (type(entry) == "table" and entry.hs)
 			if type(keycode) ~= "number" then
 				return nil, tostring(chord.key) .. " has no macOS keycode to send for " .. code
@@ -336,15 +340,20 @@ end
 --- The wheel bindings of a layer, by axis and direction.
 --- @param bindings table Key code -> resolution, resolved for macOS.
 --- @param registry table Decoded physical_keys.json.
+--- @param form string|nil Captured active layout convention for Quartz output.
 --- @return table slots { vertical = { [1] = slot, [-1] = slot }, horizontal = … },
 ---   a slot being { code, strokes }; a direction the layer leaves unbound, or
 ---   binds to what a wheel turn cannot send (logged), has none.
-function M.wheel_slots(bindings, registry)
+function M.wheel_slots(bindings, registry, form)
+	if form ~= nil then
+		assert(form == "ansi" or form == "iso", "wheel output requires the declared virtual keyboard convention")
+	end
 	local slots = { vertical = {}, horizontal = {} }
 	for code, resolution in pairs(bindings) do
 		local entry = registry.keys[code]
 		if type(entry) == "table" and entry.kind == WHEEL_KIND then
-			local strokes, problem = wheel_strokes(code, resolution, registry)
+			form = form or Layout.keyboard_form()
+			local strokes, problem = wheel_strokes(code, resolution, registry, form)
 			if strokes and slots[entry.axis] then
 				slots[entry.axis][entry.direction] = { code = code, strokes = strokes }
 			else
