@@ -4097,6 +4097,15 @@ controls preserve the original primary, cleanup, permissions and all deadlines;
 the original collector fails six assertions. This repairs diagnostic omission,
 not Automation admission. Native cause and all six Brew scenarios remain open.
 
+2026-10-12 exact94fe8e1451d6 manual38256370073 confirms the diagnostic paths
+on macOS. Actual Sparkle XZ wrong-key refusal, retry, installation and relaunch
+pass in30.294s; native archive/signature/CI-install controls also pass. Archive
+qualification remains24/25: Brew refuses at consent-observer exit-wait with
+27.64ms remaining on the original deadline. The latest UI census survives the
+history cap; no returned permission API status or qualified consent is received.
+Both reported owner closures hold, but all six Brew operations are UNEXECUTED.
+Package/install are skipped. Item36 and transversal16/38 remain open.
+
 2026-10-12 official run38214117862 on211e66051 passes Linux packaging and all17
 installation/launch jobs. macOS archive qualification still has24 passes and
 one owned Automation deadline failure; all six Brew operations are unexecuted,
@@ -7166,10 +7175,24 @@ The source-only sealer refreshes those hashes from an explicit reviewed commit;
 the23 independent labels,18/4/1 cohorts, UNRUN dispositions and frozen oracle
 remain byte-equivalent. The original22 source controls pass after refusing the
 stale TOML hash;15 independent generator controls pass. Existing Group1 manual
-38218957837 tested identical Windows/shared/build sources and failed; its1976
-terminal annotations do not supply updater outcomes. Detailed receiving is
-blocked at productionresultssa14; no duplicate native run or success is inferred.
+38218957837 tested identical Windows/shared/build sources and failed. Authentic
+attempt1 logs now establish1976 passes, zero assertion failures and case1977
+started2.6506969s before the unchanged1320000ms global watchdog. All23 original
+updater registrations are authenticated but UNSTARTED/nativeUNEXECUTED. This
+proves budget exhaustion, not an intrinsic last-case hang; no duplicate native
+run or deadline increase is inferred. Core412/413 fails the original156-control
+portable Python suite at60000ms; the existing bounded failure-output correction
+already preserves its streams without changing that clock or its assertions.
 Root still owns clean original23 enrollment; item62 remains open.
+
+2026-10-12 exact94fe8e1451d6 macOS-only manual38256370073 ends with9 successful,
+5 failed and5 skipped jobs; Release is skipped. Core414 and stub Unit18616/0
+pass. Both PAC architectures retain12/14 passes and two failures, with409
+source inputs joined to Git per architecture. WPAD add exits0, but effective
+trust is unproved and TLS fails-1202/-9813 before payload/routes; removal times
+out. The separate wire add times out and removal exits1 with restoration debt.
+Independent ARM HTTP has two method errors plus a teardown error. Native model
+and installed enterprise acceptance remain unqualified; item62 stays open.
 
 2026-10-12 the Linux acceptance collector now projects ordered, closed build and
 guardian milestones separately from acceptance and physical-closure evidence.
