@@ -139,6 +139,15 @@ jobs:
           if-no-files-found: warn
           overwrite: true
 
+      - name: Retain captured JS failure output
+        if: always() && matrix.suite == 'js'
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-js-failures-${{ matrix.feature }}
+          path: ${{ runner.temp }}/ergopti-js-suite-*/failures/**
+          if-no-files-found: ignore
+          overwrite: true
+
   common-unit-verdict:
     name: 'Verify complete unit inventory'
     needs: [prepare-common, shared-validation]
