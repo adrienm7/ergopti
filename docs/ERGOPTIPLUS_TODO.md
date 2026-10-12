@@ -12058,6 +12058,27 @@ omissions fail independently. Discovery, native availability and the 20-second
 fence remain unchanged. Full selected and native/installed qualification remain
 required; these component receipts do not complete item 106.
 
+The query owner retains construction until the transport start acknowledgement.
+An already retired failed startup still delivers the original single closed
+query_refused notification after that acknowledgement resolves; it cannot publish
+a catalogue even if a refused transport supplied a valid packet. Cancellation
+retains late cleanup debt, and settlement rechecks the exact active owner before
+clearing it. All 77 original cases, original native fixtures and invocation code
+remain unchanged. Controlled Lua 5.4 receiving passes 93/93; original source
+receives 83 passed / 10 failed, and the first correction receives 85/8. Three
+single-span omissions receive 91/2, 86/7 and 92/1 respectively. The first full
+selected gate's 19,008 passes / 2 original native-fixture failures remain recorded;
+Corrected selected receiving passes formatting (392 files), all 19,014 Lua unit
+tests and 101 simulated E2E checks, with one original host skip. JavaScript receives
+423 passes / 3 failures: two retained Root-owned source guards and an uninstall
+fixture placed beneath the protected /tmp Git checkout. The unchanged uninstall
+test reproduces that refusal under /tmp and passes in the owned temporary root
+outside Git; both source/index/HEAD frames and fixture cleanup remain exact.
+The whole selected gate remains failed; this isolated receiving does not replace
+a final CI verdict. Current helpers require table.pack, so the new cases remain
+unexecuted under LuaJIT without a shim. Native discovery, invocation, permissions
+and installed reception remain open.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
