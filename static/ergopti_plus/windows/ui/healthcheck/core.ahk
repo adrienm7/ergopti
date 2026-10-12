@@ -738,7 +738,7 @@ _HC_NativeCollectionUpdate(G) {
 	Value := IsObject(_HC_Collection) ? _HC_Collection.Result : Map("phase", "idle")
 	Controls := G.NativeCollection
 	Phase := Value.Get("phase", "idle")
-	Active := Phase != "idle" && Phase != "completed" && Phase != "failed"
+	Active := Value.Get("owner_pending", false) || (Phase != "idle" && Phase != "completed" && Phase != "failed")
 	Controls["start"].Enabled := !Active
 	Controls["cancel"].Enabled := Active
 	Controls["open"].Enabled := Value.Get("archive_created", false) || Value.Get("folder_available", false)

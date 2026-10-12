@@ -639,6 +639,15 @@ _TestHC_CollectionState(TestCase) {
 				AssertThrows(() => D.AcceptProgress(Bad), "An unexecuted check must never become PASS.")
 				Bad["results"][1]["status"] := "UNRUN"
 				AssertTrue(D.AcceptProgress(Bad))
+				Pending := Value.Clone(), Pending["phase"] := "completed", Pending["archive_created"] := true
+				Pending["results"] := []
+				for Id in D.Contract["checks"]
+					Pending["results"].Push(Map("id", Id, "status", "UNRUN", "evidence_class", "unexecuted"))
+				Pending["completed"] := Pending["results"].Length
+				AssertTrue(D.AcceptProgress(Pending))
+				AssertEqual("retiring", D.Result["phase"], "Worker progress cannot attest to native task retirement.")
+				AssertFalse(D.Result["archive_created"], "Only the exact terminal acknowledgement may expose the archive action.")
+				AssertTrue(D.Result["owner_pending"])
 				D.Completed(1, "", "")
 				AssertFalse(D.AcceptProgress(Value), "Stale progress cannot resurrect a retired session.")
 				AssertEqual("failed", D.Result["phase"])

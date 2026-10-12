@@ -920,6 +920,15 @@ for (const driver of ['linux', 'macos', 'windows']) {
 		page.elements['btn-collect-windows'].disabled
 	)
 		fail('failed collection cannot be retried or advertises a nonexistent archive');
+	page.sandbox.receiveDiagnostics({
+		type: 'collection',
+		collection: { phase: 'failed', owner_pending: true, archive_created: false }
+	});
+	if (
+		!page.elements['btn-collect-windows'].disabled ||
+		page.elements['btn-collection-cancel'].hidden
+	)
+		fail('a failed worker with native cleanup pending enabled a replacement collection');
 }
 
 if (failures.length > 0) {
