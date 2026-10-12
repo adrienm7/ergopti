@@ -54,9 +54,9 @@
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases and one final verdict. Linux and Windows start their
- *    two suites independently. macOS has five entries: the scoped native
- *    archive, independent unit/E2E tests, managed Ollama and cold bootstrap.
+ *    phases and one final verdict. Every E2E suite follows its unit gate.
+ *    macOS retains unit tests and the scoped manual archive entry. Native
+ *    canvas E2E gates the managed build; cold bootstrap follows the package.
  *    Its native tooltip canvas still waits for both suites.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
@@ -1682,20 +1682,23 @@ function graphProblems(files) {
 							? MACOS_VERDICT_NEEDS
 							: sequence.slice(0, 4)
 						: rel === WINDOWS_BOX && id === 'e2e-ahk'
-							? []
+							? ['test-ahk']
 							: rel === WINDOWS_BOX && id === 'package-windows'
 								? ['test-ahk', 'e2e-ahk']
 								: rel === MACOS_BOX && id === 'e2e-hs'
-									? []
+									? ['test-hs']
 									: rel === MACOS_BOX && id === 'package-macos'
 										? ['test-hs', 'e2e-hs', 'managed-ollama-native']
 										: rel === LINUX_BOX && id === 'e2e-linux'
-											? []
+											? ['test-linux']
 											: rel === LINUX_BOX && id === 'package-linux'
 												? ['test-linux', 'e2e-linux']
 												: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
+			}
+			if (job && pipeline.field(job.body, 'continue-on-error') !== null) {
+				problems.push(`${rel} ${id} must remain a mandatory phase`);
 			}
 			const expectedCondition =
 				index === 4
@@ -1730,8 +1733,13 @@ function graphProblems(files) {
 				);
 			for (const id of MACOS_NATIVE_ENTRIES) {
 				const native = jobs.find((candidate) => candidate.id === id);
-				if (!native || pipeline.needsOf(native.body).length !== 0) {
-					problems.push(`${rel} ${id} must remain an independent entry`);
+				const expectedNativeNeeds =
+					id === 'managed-ollama-native' ? ['e2e-hs', 'tooltip-canvas'] : ['package-macos'];
+				if (
+					!native ||
+					JSON.stringify(pipeline.needsOf(native.body)) !== JSON.stringify(expectedNativeNeeds)
+				) {
+					problems.push(`${rel} ${id} must need exactly ${expectedNativeNeeds.join(', ')}`);
 				}
 				for (const key of ['if', 'continue-on-error']) {
 					if (native && pipeline.field(native.body, key) !== null) {
@@ -1761,24 +1769,16 @@ function graphProblems(files) {
 			.filter((candidate) => !needed.has(candidate.id))
 			.map((candidate) => candidate.id);
 		if (rel === MACOS_BOX) {
-			const expectedEntries = [
-				'item36-native',
-				'lease-silence-native',
-				'managed-ollama-native',
-				'test-hs',
-				'e2e-hs',
-				'cold-bootstrap-native'
-			];
+			const expectedEntries = ['item36-native', 'lease-silence-native', 'test-hs'];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
 				problems.push(
-					`${rel} must have exactly the five declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
+					`${rel} must have exactly the declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
 		} else {
-			const expectedEntries =
-				rel === WINDOWS_BOX ? ['test-ahk', 'e2e-ahk'] : ['test-linux', 'e2e-linux'];
+			const expectedEntries = rel === WINDOWS_BOX ? ['test-ahk'] : ['test-linux'];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries))
-				problems.push(`${rel} must retain exactly the independent unit and E2E entries`);
+				problems.push(`${rel} must retain exactly the unit entry before E2E`);
 		}
 		const expectedExits =
 			rel === MACOS_BOX ? ['item36-native', 'lease-silence-native', 'macos-ok'] : [sequence[4]];
@@ -1822,18 +1822,35 @@ mustCatch(
 	graphProblems
 );
 
-// Both independent native entries must feed the verdict and must never become optional.
+// Native build/test-build nodes retain their mandatory verdict subjects.
 for (const id of MACOS_NATIVE_ENTRIES) {
 	for (const [what, from, to] of [
 		['missing native graph node', `  ${id}:\n`, `  omitted-${id}:\n`],
 		['native job bypassed by verdict', `      - ${id}\n`, ''],
 		['conditional native job', `  ${id}:\n`, `  ${id}:\n    if: false\n`],
 		['forgiven native job', `  ${id}:\n`, `  ${id}:\n    continue-on-error: true\n`],
-		['native job coupled to packaging', `  ${id}:\n`, `  ${id}:\n    needs: package-macos\n`]
+		[
+			'native job gains a cross-lane prerequisite',
+			`  ${id}:\n`,
+			`  ${id}:\n    needs: test-linux\n`
+		]
 	]) {
 		mustCatch(`${id}: ${what}`, MACOS_BOX, from, to, graphProblems);
 	}
 }
+// Exact phase edges reject omissions, serial cycles and cross-lane coupling.
+for (const [id, expected, rejected] of [
+	[
+		'managed-ollama-native',
+		'    needs: [e2e-hs, tooltip-canvas]\n',
+		['', '    needs: [e2e-hs]\n', '    needs: [tooltip-canvas]\n', '    needs: [package-macos]\n']
+	],
+	['cold-bootstrap-native', '    needs: [package-macos]\n', ['', '    needs: [e2e-hs]\n']]
+]) {
+	for (const replacement of rejected)
+		mustCatch(`${id}: exact stage prerequisite`, MACOS_BOX, expected, replacement, graphProblems);
+}
+
 for (const [what, from, to] of [
 	['missing scoped item36 node', '  item36-native:\n', '  omitted-item36-native:\n'],
 	[
@@ -1919,11 +1936,12 @@ for (const [label, before, after] of [
 }
 
 // Independent Linux suites still gate packaging and the mandatory verdict.
+// Ordered Linux suites still gate packaging and the mandatory verdict.
 for (const [what, from, to] of [
 	[
-		'Linux E2E is coupled to units again',
-		"  e2e-linux:\n    name: 'E2E tests'\n",
-		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n"
+		'Linux E2E omits its unit prerequisite',
+		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n",
+		"  e2e-linux:\n    name: 'E2E tests'\n"
 	],
 	['Linux package omits units', '    needs: [test-linux, e2e-linux]\n', '    needs: [e2e-linux]\n'],
 	['Linux package omits E2E', '    needs: [test-linux, e2e-linux]\n', '    needs: [test-linux]\n'],
@@ -1940,6 +1958,25 @@ for (const [what, from, to] of [
 	]
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, graphProblems);
+}
+
+// Unit completion precedes E2E, and neither conditions nor forgiveness may
+// turn any required phase into a silent success.
+for (const [rel, id, unit] of [
+	[WINDOWS_BOX, 'e2e-ahk', 'test-ahk'],
+	[MACOS_BOX, 'e2e-hs', 'test-hs'],
+	[LINUX_BOX, 'e2e-linux', 'test-linux']
+]) {
+	const prerequisite = `    needs: [${unit}]\n`;
+	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
+		mustCatch(
+			`${id} must remain mandatory`,
+			rel,
+			prerequisite,
+			prerequisite + suffix,
+			graphProblems
+		);
+	}
 }
 
 errors.push(...graphProblems(pipeline.files()));
@@ -2000,10 +2037,10 @@ for (const [what, rel, from, to] of [
 		'    needs: test-hs\n'
 	],
 	[
-		'macOS E2E is coupled to units again',
+		'macOS E2E omits its unit prerequisite',
 		MACOS_BOX,
-		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n",
-		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n    needs: test-hs\n"
+		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n    needs: [test-hs]\n",
+		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n"
 	],
 	[
 		'a third entry in the Linux lane',
@@ -2025,10 +2062,10 @@ for (const [what, rel, from, to] of [
 		'    needs: [test-ahk]\n'
 	],
 	[
-		'Windows E2E is coupled to unit tests again',
+		'Windows E2E omits its unit prerequisite',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n",
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n"
+		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n",
+		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n"
 	],
 	[
 		'a second exit in the macOS lane',

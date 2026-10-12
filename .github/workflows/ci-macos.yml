@@ -216,6 +216,7 @@ jobs:
   # Both advertised architectures are mandatory even for unpublished manual CI.
   managed-ollama-native:
     name: 'Managed Ollama native · ${{ matrix.architecture }}'
+    needs: [e2e-hs, tooltip-canvas]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -1124,6 +1125,7 @@ jobs:
 
   e2e-hs:
     name: 'E2E tests (stubbed)'
+    needs: [test-hs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -2084,10 +2086,11 @@ jobs:
           path: ${{ runner.temp }}/launch-gate
           if-no-files-found: warn
 
-  # A fresh signed app receives the cold runtime even when unrelated package
-  # or Homebrew tests fail. This job never publishes a release.
+  # Test-build acceptance follows the mandatory package gate. A fresh signed
+  # app receives the cold runtime; this job never publishes a release.
   cold-bootstrap-native:
     name: 'Native cold MLX bootstrap · macos-15 arm64'
+    needs: [package-macos]
     runs-on: macos-15
     timeout-minutes: 90
     steps:
