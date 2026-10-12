@@ -36,14 +36,46 @@ three reported macOS symptoms have portable regressions and software corrections
 
 These Linux-host Lua checks do not qualify actual Hammerspoon, Karabiner,
 application paste consumption or physical ISO typing. Issue 94 remains pending
-native acceptance. Its issue body was retrieved; the attached diagnostic logs
-remain unread because their download host refused access. Exact reproduction,
+native acceptance. The three complete sanitized diagnostic files were received
+through the coordinating session and their transport/file hashes verified;
+they remain private outside Git. Exact reproduction,
 results and native commands are in the
 [dev consolidation handover](handovers/2026-10-12-dev-consolidation/README.md).
 The existing groups 2/4/7 native checklists remain actionable; their TODO items
 stay open. Item 49 additionally retains unfinished production cohort migration,
 not merely native validation; its disabled cohort and stale native DLL are not
 presented as complete.
+
+#### First verified dev consolidation checkpoint
+
+Source through `d59feeab4fae6a12b4d4970f0c70c43809800d46` contains the published
+`main`, original 34 groups 2/4/7 commits and fresh `dev 0fc9aacf` histories.
+It also fixes API Add cleanup during macOS quarantine and preserves configured
+OpenAI/OpenAI-compatible loopback URLs, optional local credentials, entry IDs,
+foreign metadata and acknowledged persistence across all three drivers.
+Remote generic APIs still require credentials. Source changes during Windows
+modal forms refuse without overwriting the successor.
+
+The macOS portable full suite passes 18,858/18,858 across 1,576 modules.
+Linux E2E passes 193/193 plus six actual native digest checks; actual curl/libuv
+streaming and local API receiving pass 262 and 72 checks. Linux full units
+passed 13,413 and failed one obsolete generic-local authentication premise;
+the corrected remote-refusal and explicit-loopback consumer cohorts pass
+68 and two cases, with both new cases failing against genuine pre-fix source.
+The complete Linux rerun and full JS integration gate remain pending for the
+next checkpoint. Windows source/encoding/registration gates pass; 82 new
+API form/readiness cases and eight affinity cases remain natively UNRUN.
+No native macOS, Windows, real oMLX installation or physical typing pass is
+claimed, and no qualification flag is raised.
+
+Private logs prompted additional software work still outside this checkpoint:
+macOS native scalar JSON encoding in statistics and other UI callers, automatic
+final startup settlement after the original requirement child retires, and
+configured discovery/cache ownership for nondefault endpoints across three
+OS. Karabiner watchdog/recovery failures require coordination with group 5;
+logger stalls are not treated as a proved cause. These fixes and their
+regressions continue in a second atomic delivery. Root retains CI/test migration
+and `windows/tests/unit/test_hotstrings_config.ahk` fixture isolation.
 
 ### Historical v1.0.0 publication checkpoint
 

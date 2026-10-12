@@ -19,6 +19,15 @@ Native qualification remains distinct from integration: if the maintainer
 explicitly requests integration before device receiving, preserve the missing
 receiving in TODO and the handover rather than reporting a native pass.
 
+### project-explicit-dev-fetch-tracking
+
+A cloud checkout can have `remote.origin.fetch` limited to main. In that case,
+`git fetch origin dev` downloads FETCH_HEAD but leaves origin/dev stale. Ensure
+an additive `+refs/heads/dev:refs/remotes/origin/dev` mapping and dev upstream
+`refs/heads/dev`, then fetch and compare origin/dev with
+`git ls-remote origin refs/heads/dev` before integration. Preserve other fetch
+mappings; never infer current dev from a main-only upstream.
+
 ### feedback-test-before-merge
 
 Live-driver fixes stay on their branch until the maintainer has exercised them
