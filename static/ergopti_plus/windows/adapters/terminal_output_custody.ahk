@@ -14,6 +14,80 @@ global _LLM_TerminalOutputRecords := Map()
 global _LLM_TerminalOutputCreating := false
 global _LLM_TerminalOutputUnknown := 0
 
+/** Services one retained FIFO head with at most one exact emission per call. */
+class TerminalOutputConsumer {
+	__New(Token, State, Port := 0, Emitter := 0) {
+		if IsObject(Emitter) && !(Port is Map)
+			throw ValueError("An injected output emitter requires an explicit protocol test port.")
+		this.Handle := LLM_NavEventOwner_PlanTerminalOutput(Token, State, Port)
+		this.Emitter := Emitter
+		this.Attempt := 0
+		this.Accepted := 0
+		this.Busy := false
+		this.Blocked := false
+		this.Retired := false
+	}
+
+	/** Refusal or uncertain delivery retains ownership; no unsent suffix is guessed. */
+	Service() {
+		if this.Busy || this.Blocked || this.Retired || !(this.Handle is Map)
+			return false
+		this.Busy := true
+		try {
+			Status := LLM_NavEventOwner_TerminalOutputCustodyStatus(this.Handle)
+			if !(Status is Map) || Status["unknown"] {
+				this.Blocked := true
+				return false
+			}
+			if Status["accepted"] == Status["unit_count"] && !Status["pending"] {
+				this.Retired := LLM_NavEventOwner_ConsumeTerminalOutput(this.Handle)
+				return this.Retired
+			}
+			if !IsObject(this.Attempt) {
+				; Production cannot choose a backend before the complete cohort is admitted.
+				if !HasMethod(this.Emitter, "Call")
+					return false
+				this.Attempt := LLM_NavEventOwner_BeginTerminalOutputAttempt(this.Handle)
+				if !(this.Attempt is Map)
+					return false
+				try this.Accepted := this.Emitter.Call(this.Attempt)
+				catch as Err {
+					this.Blocked := true
+					throw Err
+				}
+				if !(this.Accepted is Integer) || this.Accepted < 0 || this.Accepted > this.Attempt["unit_count"] {
+					this.Blocked := true
+					throw ValueError("The emitter did not return an exact accepted prefix.")
+				}
+			}
+			if !LLM_NavEventOwner_AcknowledgeTerminalOutput(this.Handle, this.Attempt, this.Accepted)
+				return false
+			this.Attempt := 0
+			Status := LLM_NavEventOwner_TerminalOutputCustodyStatus(this.Handle)
+			if Status["accepted"] == Status["unit_count"] {
+				this.Retired := LLM_NavEventOwner_ConsumeTerminalOutput(this.Handle)
+				return this.Retired
+			}
+			return false
+		} catch as Err {
+			Status := LLM_NavEventOwner_TerminalOutputCustodyStatus(this.Handle)
+			if Status is Map && Status["unknown"]
+				this.Blocked := true
+			throw Err
+		} finally {
+			this.Busy := false
+		}
+	}
+
+	/** Accepted or uncertain output can never release the raw edge for replay. */
+	Cancel() {
+		if this.Busy || this.Blocked || this.Retired || !(this.Handle is Map) || IsObject(this.Attempt)
+			return false
+		this.Retired := LLM_NavEventOwner_CancelTerminalOutput(this.Handle)
+		return this.Retired
+	}
+}
+
 /** Resolves and retains the exact native FIFO head; native refusal returns zero. */
 LLM_NavEventOwner_PlanTerminalOutput(Token, State, Port := 0) {
 	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputCreating
