@@ -53,7 +53,7 @@ function parseArgs(argv) {
 /**
  * Parses failures + counts from combined runner output, format-agnostic.
  * @param {string} out The runner's full stdout/stderr.
- * @returns {{failures: string[], passed: number, failed: number, format: string}}
+ * @returns {{failures: string[], passed: number|null, failed: number|null, format: string, counts_available: boolean}}
  */
 function parseResults(out, timingOutput = out) {
 	const lines = out.split(/\r?\n/);
@@ -130,7 +130,17 @@ function parseResults(out, timingOutput = out) {
 	const seen = new Set();
 	const uniqueFailures = failures.filter((f) => (seen.has(f) ? false : (seen.add(f), true)));
 
-	return { failures: uniqueFailures, passed, failed, format, timings, timing_errors };
+	// Terminal counts support this auxiliary summary; they do not qualify the native suite.
+	const counts_available = Boolean(tapPlan || (luaPassed && luaFailed));
+	return {
+		failures: uniqueFailures,
+		passed: counts_available ? passed : null,
+		failed: counts_available ? failed : null,
+		format,
+		counts_available,
+		timings,
+		timing_errors
+	};
 }
 
 // =====================================
@@ -185,6 +195,9 @@ function failureNotice(failures) {
 }
 
 function emit(opts, res, code) {
+	const counts = res.counts_available
+		? `${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`
+		: 'terminal counts unavailable';
 	const onGitHub = !!process.env.GITHUB_ACTIONS;
 	if (onGitHub) {
 		for (const f of res.failures) {
@@ -194,11 +207,13 @@ function emit(opts, res, code) {
 			process.stdout.write(
 				`::notice title=${ghEscape(opts.name)} all failures::${ghEscape(failureNotice(res.failures))}\n`
 			);
-		const summary = `${opts.name}: ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`;
+		const summary = `${opts.name}: ${res.counts_available ? counts : 'INCOMPLETE — ' + counts}`;
 		process.stdout.write(`::notice title=${ghEscape(opts.name)}::${ghEscape(summary)}\n`);
 		if (process.env.GITHUB_STEP_SUMMARY) {
 			const md =
-				`### ${opts.name}\n\n- ✅ ${formatCount(res.passed)} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${formatCount(res.failed)} failed\n` +
+				(res.counts_available
+					? `### ${opts.name}\n\n- ✅ ${formatCount(res.passed)} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${formatCount(res.failed)} failed\n`
+					: `### ${opts.name}\n\n- INCOMPLETE: terminal counts unavailable (exit ${code}).\n`) +
 				(res.failures.length
 					? `\n<details><summary>Failures</summary>\n\n${res.failures.map((f) => `- ${f}`).join('\n')}\n</details>\n`
 					: '');
@@ -214,6 +229,7 @@ function emit(opts, res, code) {
 		const payload = {
 			name: opts.name,
 			format: res.format,
+			counts_available: res.counts_available,
 			passed: res.passed,
 			failed: res.failed,
 			exit_code: code,
@@ -229,9 +245,14 @@ function emit(opts, res, code) {
 		}
 	}
 
-	const tag = res.failed > 0 || code !== 0 ? '\x1b[31mFAIL\x1b[0m' : '\x1b[32mPASS\x1b[0m';
+	const tag =
+		res.failed > 0 || res.failures.length > 0 || code !== 0
+			? '\x1b[31mFAIL\x1b[0m'
+			: res.counts_available
+				? '\x1b[32mPASS\x1b[0m'
+				: '\x1b[33mINCOMPLETE\x1b[0m';
 	process.stdout.write(
-		`\n[report:${opts.name}] ${tag} — ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed (exit ${code}, format ${res.format}).\n`
+		`\n[report:${opts.name}] ${tag} — ${counts} (exit ${code}, format ${res.format}).\n`
 	);
 }
 
@@ -254,8 +275,12 @@ function main() {
 	if (opts.cmd[0] === 'PARSE_FILE') {
 		const out = fs.readFileSync(opts.cmd[1], 'utf8');
 		const res = parseResults(out);
-		emit(opts, res, res.failed > 0 || res.timing_errors.length ? 1 : 0);
-		process.exitCode = res.failed > 0 || res.timing_errors.length ? 1 : 0;
+		const code =
+			!res.counts_available || res.failed > 0 || res.failures.length || res.timing_errors.length
+				? 1
+				: 0;
+		emit(opts, res, code);
+		process.exitCode = code;
 		return;
 	}
 
