@@ -3318,3 +3318,145 @@ _MR_FrameNativeConstructorCurrent(Constructor) {
 	NativeFactoryName := NameGetter.Call(NativeFactory)
 	return SourceLive() && NativeFactoryName == "Menu.Call"
 }
+
+
+/**
+ * Executes one declared construction around the genuine native extension port.
+ * @param {String} RecipeKey Exact Windows construction declaration.
+ * @param {String} ExtId Original physical extension identity.
+ * @param {String} ExtName Original observed extension display name.
+ * @param {Func} ObserveNative Original builder, count and logging owner.
+ * @param {Array} OwnedMenus Existing caller's exact top-level ownership ledger.
+ * @returns {Menu|false} The original native Menu, or refusal before handoff.
+ */
+MenuRenderer_ConstructObservedMenu(RecipeKey, ExtId, ExtName, ObserveNative, OwnedMenus) {
+	static Entry := MenuRenderer_ConstructObservedMenu, Guard := _MR_DeclaredParentCallable
+	static RootReader := _MR_GetManifestRoot, Loader := _MM_GetManifestRoot, Snapshot := _MR_ReasonedGroupSnapshot
+	static SourceCurrent := _MR_ReasonedGroupCurrent, TemplateOwner := MenuRenderer_TemplateRows
+	static Admission := _MR_AppendTemplateRowsAdmitted, Append := MenuRenderer_AppendTemplate
+	static Constructor := Menu, ConstructorOwner := _MR_FrameNativeConstructorCurrent
+	static NativeObserver := _SC_ObserveExtensionMenu
+	if RecipeKey != "shortcut_extension_construction_ahk" || !(OwnedMenus is Array)
+		|| ObserveNative != NativeObserver || NativeObserver != _SC_ObserveExtensionMenu
+		|| Object.Prototype.HasOwnProp.Call(Guard, "Call") || !_MR_DeclaredParentCallable(ObserveNative)
+		return false
+	OwnersLive() {
+		if Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, "Call")
+			return false
+		for Pair in [[Entry, MenuRenderer_ConstructObservedMenu], [RootReader, _MR_GetManifestRoot], [Loader, _MM_GetManifestRoot],
+			[Snapshot, _MR_ReasonedGroupSnapshot], [SourceCurrent, _MR_ReasonedGroupCurrent],
+			[ConstructorOwner, _MR_FrameNativeConstructorCurrent]]
+			if Pair[1] != Pair[2] || !Guard.Call(Pair[1])
+				return false
+		return ObserveNative == NativeObserver && NativeObserver == _SC_ObserveExtensionMenu && Guard.Call(ObserveNative)
+	}
+	if !OwnersLive()
+		return false
+	Root := RootReader.Call()
+	if !(Root is Map) || ObjGetBase(Root) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Root)
+		return false
+	if !Root.Has(RecipeKey)
+		return false
+	Recipe := Root[RecipeKey]
+	if !(Recipe is Map) || ObjGetBase(Recipe) != Map.Prototype
+		return false
+	for Name in ObjOwnProps(Recipe)
+		return false
+	if Recipe.Count != 5 || Recipe.Get("kind", "") != "owned_native_menu"
+		|| Recipe.Get("platform", "") != "ahk" || !(Recipe.Get("program", false) is Array)
+		|| Type(Recipe.Get("result_frame", false)) != "String" || Recipe["result_frame"] == ""
+		|| !(Recipe.Get("append_outcomes", false) is Array)
+		return false
+	Program := Recipe["program"], Outcomes := Recipe["append_outcomes"]
+	if ObjGetBase(Program) != Array.Prototype || ObjGetBase(Outcomes) != Array.Prototype
+		|| ObjGetBase(OwnedMenus) != Array.Prototype
+		return false
+	for Container in [Program, Outcomes, OwnedMenus]
+		for Name in ObjOwnProps(Container)
+			return false
+	if Program.Length != 4
+		return false
+	Fields := Map("kind", true, "platform", true, "program", true, "result_frame", true, "append_outcomes", true)
+	for Field in Recipe
+		if !Fields.Has(Field)
+			return false
+	Steps := Map("admit_markers", true, "allocate_owned_menu", true, "observe_native_builder", true, "place_observed_result", true)
+	Results := Map("failed", true, "empty", true, "missing", true, "populated", true)
+	Positions := Map()
+	for Index, Step in Program {
+		if Type(Step) != "String" || !Steps.Has(Step) || Positions.Has(Step)
+			return false
+		Positions[Step] := Index
+	}
+	if Positions.Count != 4 || Positions["admit_markers"] > Positions["allocate_owned_menu"]
+		|| Positions["allocate_owned_menu"] > Positions["observe_native_builder"]
+		|| Positions["observe_native_builder"] > Positions["place_observed_result"]
+		return false
+	Eligible := Map()
+	for Outcome in Outcomes {
+		if Type(Outcome) != "String" || !Results.Has(Outcome) || Outcome == "populated" || Eligible.Has(Outcome)
+			return false
+		Eligible[Outcome] := true
+	}
+	RecipeSource := Snapshot.Call(Recipe)
+	if !RecipeSource || !OwnersLive()
+		return false
+	Current() {
+		if !OwnersLive() || RootReader.Call() != Root || ObjGetBase(Root) != Map.Prototype
+			return false
+		for Name in ObjOwnProps(Root)
+			return false
+		return Root.Has(RecipeKey) && Root[RecipeKey] == Recipe && SourceCurrent.Call(RecipeSource)
+	}
+	Observed := "populated", Native := false
+	State := Map("shortcut_extension_name", (*) => ExtId,
+		"shortcut_extension_builder_failed", (*) => Observed == "failed",
+		"shortcut_extension_builder_empty", (*) => Observed == "empty",
+		"shortcut_extension_builder_missing", (*) => Observed == "missing")
+	for Step in Program {
+		if !Current()
+			throw Error("Shortcut extension construction source was withdrawn")
+		switch Step {
+		case "admit_markers":
+			if TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted
+				|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)
+				return false
+			ErrorRows := TemplateOwner.Call("shortcut_extension_error_frame", Map(), State, Map())
+			if !Current() || !Guard.Call(TemplateOwner) || !Guard.Call(Admission)
+				return false
+			EmptyRows := TemplateOwner.Call("shortcut_extension_empty_frame", Map(), Map(), Map())
+			if !Current() || TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted
+				|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)
+				return false
+			if !(ErrorRows is Array) || ErrorRows.Length == 0 || !Admission.Call(ErrorRows, 1, Map())
+				|| !(EmptyRows is Array) || EmptyRows.Length == 0 || !Admission.Call(EmptyRows, 1, Map())
+				return false
+			if !Current() || TemplateOwner != MenuRenderer_TemplateRows || !Guard.Call(TemplateOwner)
+				return false
+			ResultRows := TemplateOwner.Call(Recipe["result_frame"], Map(), State, Map())
+			if !(ResultRows is Array) || ResultRows.Length != 0 || !Current()
+				return false
+		case "allocate_owned_menu":
+			if !ConstructorOwner.Call(Constructor)
+				return false
+			Native := Constructor.Call()
+			OwnedMenus.Push(Native)
+		case "observe_native_builder":
+			Observed := ObserveNative.Call(ExtId, ExtName, Native)
+			if Type(Observed) != "String" || !Results.Has(Observed)
+				throw Error("Shortcut extension native observation was refused")
+		case "place_observed_result":
+			if Eligible.Has(Observed) {
+				if Append != MenuRenderer_AppendTemplate || !Guard.Call(Append)
+					throw Error("Shortcut extension result placement owner was withdrawn")
+				if Append.Call(Native, Recipe["result_frame"], Map(), State, Map()) == 0
+					throw Error(Observed == "missing"
+						? "Shortcut extension empty marker was withdrawn before publication"
+						: "Shortcut extension error marker was withdrawn during its native builder")
+			}
+		}
+	}
+	return Native
+}

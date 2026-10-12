@@ -935,6 +935,9 @@ function M.run(config_path)
 		Logger.error(LOG, "M.run() called with missing config_path.")
 		return false
 	end
+	-- Retained cleanup authority cannot retarget its captured configuration.
+	-- Same-source reuse keeps the existing singleton acknowledgment and revoked page.
+	if _webview and _focus_owner == nil and config_path ~= _config_path then return false end
 	_config_path = config_path
 
 	-- Bring the existing window to front if the wizard is already open
@@ -1047,7 +1050,7 @@ function M.run(config_path)
 			end,
 		})
 	end, debug.traceback)
-	webview = candidate
+	webview = show_ok and candidate or nil
 	if show_ok ~= true or webview == nil or webview == false or closed then
 		if _focus_owner == focus_owner then _focus_owner = nil end
 		if webview and not closed then
@@ -1062,7 +1065,7 @@ function M.run(config_path)
 		end
 		if not release_usercontent(uc) then _usercontent = uc end
 		Logger.error(LOG, "Onboarding webview creation failed: %s.",
-			tostring(webview))
+			tostring(candidate))
 		return false
 	end
 	_usercontent = uc

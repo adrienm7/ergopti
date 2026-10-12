@@ -45,7 +45,10 @@ const {
 
 const { scriptTokens } = require('../lib/script-source.cjs');
 
-const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+const {
+	validateChildTemplates,
+	shortcutConstructionReaderEvidence
+} = require('../lib/menu-row-availability.cjs');
 
 // Independent native count-format controls call the genuine exported compiler validator.
 {
@@ -611,12 +614,27 @@ function nativeCaptionBinding(source, extension, root, getter) {
 function reachedInertTemplateRows(nativeSources, extension, definitions, platform, captionFormat) {
 	const reached = new Set();
 	if (EXT[platform] !== extension) return reached;
+	const construction =
+		platform === 'ahk'
+			? shortcutConstructionReaderEvidence(
+					definitions,
+					nativeSources.find(
+						(native) => native.rel === path.join(SP, 'windows/ui/menu/menu_shortcuts.ahk')
+					)?.src,
+					nativeSources.find(
+						(native) => native.rel === path.join(SP, 'windows/infra/manifest_menu.ahk')
+					)?.src
+				)
+			: null;
+	const constructionRoots = new Set(construction?.presentWhen.length ? construction.sections : []);
 	for (const [root, declaration] of Object.entries(definitions)) {
 		if (
 			!Array.isArray(declaration) ||
-			!nativeSources.some(
-				(native) => native.src.includes(root) && publishesMenuTemplate(native.src, extension, root)
-			)
+			(!constructionRoots.has(root) &&
+				!nativeSources.some(
+					(native) =>
+						native.src.includes(root) && publishesMenuTemplate(native.src, extension, root)
+				))
 		)
 			continue;
 		const graph = Object.create(null);
@@ -652,10 +670,19 @@ function reachedInertTemplateRows(nativeSources, extension, definitions, platfor
 		function visit(key, rowId) {
 			for (const row of graph[key]) {
 				if ((rowId !== undefined && row.id !== rowId) || !visible(row, platform)) continue;
-				if (row.type === 'include') visit(row.section, row.row_id);
-				else if (
+				if (row.type === 'include') {
+					if (
+						constructionRoots.has(root) &&
+						row.present_when !== undefined &&
+						!construction.presentWhen.includes(row.present_when)
+					)
+						continue;
+					visit(row.section, row.row_id);
+				} else if (
 					inertTemplateRow(row, captionFormat) &&
 					(!Object.hasOwn(row, 'caption_getter') ||
+						(constructionRoots.has(root) &&
+							construction.captionGetters.includes(row.caption_getter)) ||
 						nativeSources.some(
 							(native) =>
 								publishesMenuTemplate(native.src, extension, root) &&
@@ -1589,6 +1616,78 @@ const startupOwnedRows = require('../lib/menu-native-startup-binding.cjs').nativ
 	require('../lib/menu-native-startup-binding.cjs').startupInputs(ROOT, manifest),
 	'ahk'
 );
+
+// The same authenticated finite construction supplies real inert publication,
+// while the original declaration/visibility/caption validators remain in force.
+const shortcutMarkerIds = (definitions, nativeSources = src.ahk.nativeSources) =>
+	[...reachedInertTemplateRows(nativeSources, '.ahk', definitions, 'ahk', canonicalCaption)]
+		.map((row) => row.id)
+		.filter((id) => ['shortcut_extension_empty_ahk', 'shortcut_extension_error_ahk'].includes(id))
+		.sort();
+assert.deepEqual(
+	shortcutMarkerIds(manifest),
+	['shortcut_extension_empty_ahk', 'shortcut_extension_error_ahk'],
+	'both original Windows marker identities have the real declared construction'
+);
+for (const [outcomes, expected] of [
+	[[], []],
+	[['missing'], ['shortcut_extension_empty_ahk']],
+	[['failed'], ['shortcut_extension_error_ahk']],
+	[['empty'], ['shortcut_extension_error_ahk']]
+]) {
+	const candidate = structuredClone(manifest);
+	candidate.shortcut_extension_construction_ahk.append_outcomes = outcomes;
+	assert.deepEqual(
+		shortcutMarkerIds(candidate),
+		expected,
+		'only actually selected original inert marker branches get publication evidence'
+	);
+}
+for (const mutate of [
+	(m) => {
+		m.shortcut_extension_result_frame[0].section = 'missing_real_child';
+	},
+	(m) => {
+		m.shortcut_extension_error_frame[0].caption_getter = 'foreign_caption';
+	},
+	(m) => {
+		m.shortcut_extension_error_frame[0].command = 'foreign_action';
+	},
+	(m) => {
+		m.shortcut_extension_empty_frame[0].type = 'command';
+	}
+]) {
+	const candidate = structuredClone(manifest);
+	mutate(candidate);
+	assert.notDeepEqual(
+		shortcutMarkerIds(candidate),
+		['shortcut_extension_empty_ahk', 'shortcut_extension_error_ahk'],
+		'missing, foreign-caption or behavior-bearing rows cannot borrow inert publication'
+	);
+}
+for (const ownerPath of ['windows/ui/menu/menu_shortcuts.ahk', 'windows/infra/manifest_menu.ahk']) {
+	const target = path.join(SP, ownerPath);
+	const original = src.ahk.nativeSources.find((native) => native.rel === target);
+	assert(original && original.src !== '', 'the actual production Source owner exists');
+	const withdrawn = src.ahk.nativeSources.map((native) =>
+		native.rel === target ? { ...native, src: '' } : native
+	);
+	assert.deepEqual(
+		shortcutMarkerIds(manifest, withdrawn),
+		[],
+		'withdrawing either real owned route leaves both original obligations uncredited'
+	);
+	const repaired = withdrawn.map((native) => (native.rel === target ? original : native));
+	assert.deepEqual(
+		repaired,
+		src.ahk.nativeSources,
+		'exact Source owner restoration preserves all siblings'
+	);
+	assert.deepEqual(shortcutMarkerIds(manifest, repaired), [
+		'shortcut_extension_empty_ahk',
+		'shortcut_extension_error_ahk'
+	]);
+}
 
 const reachedInert = Object.fromEntries(
 	PLATFORMS.map((platform) => [
