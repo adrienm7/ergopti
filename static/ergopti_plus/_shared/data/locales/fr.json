@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "Autre démarrage configuré : Le démarrage est configuré pour une autre commande ou installation. Son réglage est conservé.",
 	"menu.llm.model_parent_with_health": "%sModèle sélectionné : %s",
 	"config.read_only.newer_schema": "Cette configuration a été enregistrée par une version plus récente d’ErgoptiPlus. Vos réglages ont été préservés. Mettez ErgoptiPlus à jour, puis rechargez-le avant de modifier les réglages.",
-	"menu.llm.save_unavailable": "Indisponible : reprenez ErgoptiPlus s’il est en pause, ou ouvrez les diagnostics pour savoir pourquoi les réglages ne peuvent pas être enregistrés."
+	"menu.llm.save_unavailable": "Indisponible : reprenez ErgoptiPlus s’il est en pause, ou ouvrez les diagnostics pour savoir pourquoi les réglages ne peuvent pas être enregistrés.",
+	"healthcheck.collection.start": "Collecter le diagnostic Windows",
+	"healthcheck.collection.guided": "Étapes guidées au clavier et à l’écran",
+	"healthcheck.collection.skip": "Ignorer les étapes physiques",
+	"healthcheck.collection.open": "Ouvrir le dossier",
+	"healthcheck.collection.complete": "Archive créée. Joignez manuellement le ZIP à la conversation.",
+	"healthcheck.collection.unavailable": "Ce collecteur Windows est indisponible sur macOS et Linux.",
+	"healthcheck.collection.guide": "Tapez le texte synthétique ci-dessous. Maintenez puis relâchez Ctrl, puis Shift, séparément, avec le champ de texte actif.",
+	"healthcheck.collection.visual": "Je peux lire clairement le texte synthétique.",
+	"healthcheck.collection.failed": "La collecte a échoué. Consultez le dossier local pour les opérations inachevées."
 }

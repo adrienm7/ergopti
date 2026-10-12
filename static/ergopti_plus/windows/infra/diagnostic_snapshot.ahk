@@ -42,6 +42,43 @@ DiagSnapshot_Fields() {
 	return Fields
 }
 
+/** Produces closed collector identity fields without paths or personal state. */
+DiagSnapshot_CollectionIdentity() {
+	global _SharedDir, BUNDLE_COMMIT
+	if A_IsCompiled {
+		if !IsSet(BUNDLE_COMMIT) || !RegExMatch(BUNDLE_COMMIT, "i)^[0-9a-f]{40}$")
+			throw Error("Installed diagnostic collection requires its complete source build stamp.")
+		SourceSha := StrLower(BUNDLE_COMMIT)
+	} else {
+		SourceSha := DiagSnapshot_GitCommit(A_ScriptDir, true)
+		if SourceSha == ""
+			SourceSha := "unknown"
+	}
+	Identity := Map("compiled", A_IsCompiled ? 1 : 0, "version", Updater_CurrentVersion(),
+		"source_sha", SourceSha, "architecture", A_PtrSize == 8 ? "x64" : "x86",
+		"runtime", A_AhkVersion, "receiver_title", t("healthcheck.collection.start"))
+	Rules := JsonParse(FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8"))
+	Context := HealthCheck_RedactionContext()
+	for Key in ["version", "source_sha", "architecture", "runtime", "receiver_title"] {
+		if Redact_Apply(Identity[Key], Rules, Context) != Identity[Key]
+			throw Error("Diagnostic technical identity failed redaction admission.")
+	}
+	Identity["redaction_verified"] := true
+	Times := Buffer(32, 0)
+	if !DllCall("GetProcessTimes", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "Ptr", Times,
+		"Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24, "Int")
+		throw OSError(A_LastError, "GetProcessTimes", "Diagnostic host identity could not be observed.")
+	global _DriverMutexDecision, _DriverMutexHandle, _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
+	Identity["input_owner"] := Map("pid", DllCall("GetCurrentProcessId", "UInt"),
+		"created_filetime", NumGet(Times, 0, "Int64"),
+		"mutex", IsSet(_DriverMutexDecision) ? _DriverMutexDecision : "unavailable",
+		"mutex_handle_retained", IsSet(_DriverMutexHandle) && _DriverMutexHandle != 0 ? 1 : 0,
+		"dispatcher_started", HookDispatcher._started ? 1 : 0,
+		"native_started", _LLM_NavEventOwnerStarted ? 1 : 0,
+		"native_quarantined", _LLM_NavEventOwnerQuarantined ? 1 : 0)
+	return Identity
+}
+
 ; Log tag of the snapshot line, shared with the other drivers.
 ; @returns {String}
 DiagSnapshot_Module() {
@@ -123,8 +160,9 @@ _DiagSnapshot_ReadTrimmed(Path) {
 ; first question of every bug report, so HEAD is read directly instead of
 ; spawning git after boot.
 ; @param StartDir {String}
-; @returns {String} Abbreviated commit id, or "" outside a repository.
-DiagSnapshot_GitCommit(StartDir) {
+; @param Full {Boolean} Preserve the complete id for a versioned collection manifest.
+; @returns {String} Commit id, or "" outside a repository.
+DiagSnapshot_GitCommit(StartDir, Full := false) {
 	static SHORT_SHA_LENGTH := 9
 	static MAX_WALK_DEPTH := 40
 	Dir := RTrim(StartDir, "\/")
@@ -153,7 +191,7 @@ DiagSnapshot_GitCommit(StartDir) {
 		return ""
 	Head := _DiagSnapshot_ReadTrimmed(GitDir . "\HEAD")
 	if RegExMatch(Head, "^[0-9a-f]{40}$")
-		return SubStr(Head, 1, SHORT_SHA_LENGTH)
+		return Full ? Head : SubStr(Head, 1, SHORT_SHA_LENGTH)
 	if !RegExMatch(Head, "^ref:\s*(\S+)$", &RefMatch)
 		return ""
 	Ref := RefMatch[1]
@@ -170,7 +208,7 @@ DiagSnapshot_GitCommit(StartDir) {
 		if RegExMatch(Packed, "m)^([0-9a-f]{40}) \Q" . Ref . "\E$", &PackedMatch)
 			Sha := PackedMatch[1]
 	}
-	return RegExMatch(Sha, "^[0-9a-f]{40}$") ? SubStr(Sha, 1, SHORT_SHA_LENGTH) : ""
+	return RegExMatch(Sha, "^[0-9a-f]{40}$") ? (Full ? Sha : SubStr(Sha, 1, SHORT_SHA_LENGTH)) : ""
 }
 
 ; The commit a compiled release was stamped with (CI replaces the placeholder in

@@ -371,5 +371,73 @@ report(
 	);
 }
 
+const collectionContract = JSON.parse(read('_shared/modules/diagnostics/collection.json'));
+for (const id of [
+	'hotstrings',
+	'ai',
+	'capture_replay',
+	'callbacks',
+	'fifo',
+	'modifiers',
+	'native_render',
+	'native_uia',
+	'cleanup'
+]) {
+	report(
+		`Collection: ${id} has an explicit result slot`,
+		collectionContract.checks.includes(id),
+		`${id} cannot disappear from incomplete collection`
+	);
+}
+report(
+	'Collection: every platform uses the same evidence classes',
+	JSON.stringify(collectionContract.evidence_classes) ===
+		JSON.stringify(['automatic', 'native_synthetic', 'physical', 'unexecuted']),
+	'Evidence classes drifted'
+);
+report(
+	'Collection: statuses preserve cancellation and nonexecution',
+	JSON.stringify(collectionContract.statuses) === JSON.stringify(['PASS', 'FAIL', 'SKIP', 'UNRUN']),
+	'Result statuses drifted'
+);
+if (process.argv.includes('--native-collection')) {
+	if (process.platform !== 'win32') throw new Error('Native collection controls require Windows.');
+	const { spawnSync } = require('node:child_process');
+	const runtime = process.env.ERGOPTI_AHK_RUNTIME;
+	if (!runtime || !fs.existsSync(runtime))
+		throw new Error('Native collection controls require an explicit actual AHK runtime.');
+	const powershell = path.join(
+		process.env.SystemRoot,
+		'System32/WindowsPowerShell/v1.0/powershell.exe'
+	);
+	const fixture = path.join(
+		DRIVER_ROOT,
+		'windows/tests/fixtures/diagnostic_collection_controls.ps1'
+	);
+	const result = spawnSync(
+		powershell,
+		[
+			'-NoLogo',
+			'-NoProfile',
+			'-NonInteractive',
+			'-ExecutionPolicy',
+			'Bypass',
+			'-File',
+			fixture,
+			'-Checkout',
+			REPO_ROOT,
+			'-Runtime',
+			runtime
+		],
+		{ encoding: 'utf8', windowsHide: true }
+	);
+	if (result.stdout) console.log(result.stdout);
+	if (result.stderr) console.error(result.stderr);
+	report(
+		'Collection: actual stock Windows PowerShell archive controls',
+		result.status === 0 && !result.error,
+		`Native process exit ${result.status}: ${result.error || ''}`
+	);
+}
 console.log(`\nResults: ${totalPass} passed, ${totalFail} failed.`);
 if (totalFail > 0) process.exit(1);

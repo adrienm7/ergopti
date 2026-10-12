@@ -853,6 +853,75 @@ for (const mutation of [
 	} else if (copies.length !== 0) fail('An altered host observation was accepted: ' + mutation);
 }
 
+// Collection messages carry state and action names, never a browser-supplied archive path.
+for (const driver of ['linux', 'macos', 'windows']) {
+	const page = loadPage();
+	const value = snapshot(false);
+	value.driver = driver;
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: value
+	});
+	if (page.elements['btn-collect-windows'].disabled !== (driver !== 'windows'))
+		fail(driver + ' collection availability is incorrect');
+	if (driver !== 'windows' && !page.elements['collection-progress'].textContent)
+		fail(driver + ' collection has no unavailable reason');
+	if (driver !== 'windows') continue;
+	page.elements['btn-collect-windows'].dispatch('click');
+	if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collect_windows' }))
+		fail('collection did not request the closed host action');
+	const collecting = {
+		phase: 'guided',
+		completed: 9,
+		total: 12,
+		results: [{ id: 'callbacks', status: 'UNRUN' }]
+	};
+	page.sandbox.receiveDiagnostics({ type: 'collection', collection: collecting });
+	if (
+		!page.elements['btn-collect-windows'].disabled ||
+		page.elements['btn-collection-cancel'].hidden ||
+		page.elements['btn-collection-guided'].hidden
+	)
+		fail('active collection lost its cancellation or guided action');
+	for (const id of ['cancel', 'guided', 'skip']) {
+		page.elements['btn-collection-' + id].dispatch('click');
+		if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collection_' + id }))
+			fail('collection ' + id + ' accepted unexpected fields');
+	}
+	if (collecting.results[0].status !== 'UNRUN')
+		fail('collection page fabricated an execution result');
+	const completed = {
+		phase: 'completed',
+		archive_created: true,
+		results: [{ id: 'physical_text', status: 'SKIP' }]
+	};
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: value,
+		collection: completed
+	});
+	if (
+		page.elements['btn-collect-windows'].disabled ||
+		page.elements['btn-collection-open'].hidden ||
+		!page.elements['btn-collection-cancel'].hidden
+	)
+		fail('reopened Diagnostics lost its terminal archive action');
+	page.elements['btn-collection-open'].dispatch('click');
+	if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collection_open' }))
+		fail('opening the archive accepted a page-supplied path');
+	page.sandbox.receiveDiagnostics({
+		type: 'collection',
+		collection: { phase: 'failed', archive_created: false }
+	});
+	if (
+		page.elements['btn-collection-open'].hidden !== true ||
+		page.elements['btn-collect-windows'].disabled
+	)
+		fail('failed collection cannot be retried or advertises a nonexistent archive');
+}
+
 if (failures.length > 0) {
 	console.error(`[FAIL] diagnostics page behaviour: ${failures.length} failure(s)`);
 	for (const failure of failures) console.error(`  - ${failure}`);

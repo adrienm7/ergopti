@@ -90,6 +90,16 @@ body {
 	justify-content: flex-end;
 }
 
+#collection-controls {
+	grid-column: 1 / -1;
+	grid-row: 2;
+	padding-top: 6px;
+}
+
+#collection-progress {
+	margin: 6px 0;
+}
+
 @media (max-width: 800px) {
 	.toolbar .buttons {
 		grid-template-columns: 1fr 1fr;

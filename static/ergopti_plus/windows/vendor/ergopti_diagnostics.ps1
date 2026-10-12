@@ -1,0 +1,392 @@
+# vendor/ergopti_diagnostics.ps1
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+Collects a bounded local diagnostic archive without developer dependencies.
+.DESCRIPTION
+Only closed technical host fields and synthetic owned-window evidence are
+exported. No network, personal files, clipboard or ambient input are collected.
+Missing native qualification remains UNRUN, including resident-owner conflicts.
+#>
+[CmdletBinding()]
+param(
+	[Parameter(Mandatory = $true)][string]$SessionDirectory,
+	[switch]$UiaChild
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$taskRoot = [IO.Path]::GetFullPath($SessionDirectory)
+$taskId = [IO.Path]::GetFileName($taskRoot)
+if ($taskId -cnotmatch '^ergopti-diagnostic-[0-9a-f]{32}$') { throw 'Invalid diagnostic session identity.' }
+if (!(Test-Path -LiteralPath $taskRoot -PathType Container)) { throw 'Missing owned diagnostic session.' }
+if ((Get-Item -LiteralPath $taskRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+	throw 'Reparse session refused.'
+}
+$taskEncoding = [Text.UTF8Encoding]::new($false, $true)
+
+function Read-CollectionJson($Path, $Limit) {
+	$taskInput = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+	try {
+		if ($taskInput.Length -gt $Limit) { throw 'Diagnostic input limit exceeded.' }
+		$taskReader = New-Object IO.StreamReader($taskInput, $taskEncoding, $true)
+		try { return $taskReader.ReadToEnd() | ConvertFrom-Json } finally { $taskReader.Dispose() }
+	} finally { $taskInput.Dispose() }
+}
+
+function Get-CollectionHash($Path) {
+	$taskHashStream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+	$taskSha = [Security.Cryptography.SHA256]::Create()
+	try { return ([BitConverter]::ToString($taskSha.ComputeHash($taskHashStream))).Replace('-', '').ToLowerInvariant() }
+	finally { $taskSha.Dispose(); $taskHashStream.Dispose() }
+}
+$taskStarted = [DateTime]::UtcNow
+$taskWatch = [Diagnostics.Stopwatch]::StartNew()
+$taskRows = New-Object Collections.Generic.List[object]
+$taskForm = $null
+$taskChild = $null
+$taskCleanupErrors = New-Object Collections.Generic.List[object]
+$taskUnfinished = New-Object Collections.Generic.List[object]
+$taskPhase = 'collecting'
+$taskActiveCheck = 'redaction'
+$taskFailure = $null
+$taskIdentity = [ordered]@{
+	schema_version=1; session_id=$taskId; started_at=$taskStarted.ToString('o'); ended_at=$null
+	build_kind='unverified_input'; identity_status='FAIL'; version=$null; source_sha=$null
+	architecture=$null; windows=[Environment]::OSVersion.Version.ToString(); runtime=$null
+	components=@(); qualified_production=$false; physical_qualified=$false
+}
+$taskArchive = [IO.Path]::Combine([IO.Path]::GetDirectoryName($taskRoot), $taskId + '.zip')
+$taskRequest = Read-CollectionJson (Join-Path $taskRoot 'request.json') 262144
+$taskContract = Read-CollectionJson $taskRequest.contract_path 262144
+if ($taskContract.schema_version -ne 1 -or $taskRequest.schema_version -ne 1) { throw 'Unsupported collection contract.' }
+
+if ($UiaChild) {
+	$taskChildStage = 'assemblies'
+	try {
+		Add-Type -AssemblyName System.Windows.Forms
+		$taskWpf = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'WPF'
+		Add-Type -Path (Join-Path $taskWpf 'UIAutomationClient.dll'), (Join-Path $taskWpf 'UIAutomationTypes.dll')
+		$taskProxy = [Reflection.Assembly]::LoadFrom((Join-Path $taskWpf 'UIAutomationClientsideProviders.dll'))
+		# A real declaring type prevents .NET UIA's proxy stack scan from reaching a dynamic PowerShell frame.
+		Add-Type -ReferencedAssemblies (Join-Path $taskWpf 'UIAutomationClient.dll'), (Join-Path $taskWpf 'UIAutomationTypes.dll') -TypeDefinition @"
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Windows.Automation;
+public static class ErgoptiDiagnosticUiaProxy {
+ [MethodImpl(MethodImplOptions.NoInlining)]
+ public static void Register(AssemblyName assembly) {
+  ClientSettings.RegisterClientSideProviderAssembly(assembly);
+ }
+}
+"@
+		$taskChildStage = 'proxy_registration'
+		[ErgoptiDiagnosticUiaProxy]::Register($taskProxy.GetName())
+		$taskChildStage = 'target_receipt'
+		$taskTarget = Read-CollectionJson (Join-Path $taskRoot 'uia-target.json') $taskContract.max_output_bytes
+		$taskChildStage = 'owner_binding'
+		$taskParent = [Diagnostics.Process]::GetProcessById($taskTarget.owner_pid)
+		if ($taskParent.HasExited -or $taskParent.StartTime.ToUniversalTime().ToFileTimeUtc() -ne $taskTarget.created_filetime) { throw 'UIA owner changed.' }
+		$taskChildStage = 'receiver_binding'
+		$taskElement = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$taskTarget.hwnd)
+		if ($taskElement.Current.ProcessId -ne $taskTarget.owner_pid -or $taskElement.Current.IsPassword) { throw 'Foreign UIA target refused.' }
+		$taskPatterns = @($taskElement.GetSupportedPatterns() | ForEach-Object { $_.Id })
+		$taskChildStage = 'text_pattern'
+		$taskPatternId = 0
+		if ($taskPatterns -contains [Windows.Automation.ValuePattern]::Pattern.Id) {
+			$taskPatternId = [Windows.Automation.ValuePattern]::Pattern.Id
+			$taskText = $taskElement.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value
+		} elseif ($taskPatterns -contains [Windows.Automation.TextPattern]::Pattern.Id) {
+			$taskPatternId = [Windows.Automation.TextPattern]::Pattern.Id
+			$taskText = $taskElement.GetCurrentPattern([Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText($taskContract.fixture.Length + 2).TrimEnd([char]13, [char]10)
+		} elseif ($taskPatterns -contains [Windows.Automation.LegacyIAccessiblePattern]::Pattern.Id) {
+			$taskPatternId = [Windows.Automation.LegacyIAccessiblePattern]::Pattern.Id
+			$taskText = $taskElement.GetCurrentPattern([Windows.Automation.LegacyIAccessiblePattern]::Pattern).Current.Value
+		} else { throw 'The owned receiver exposes no text-capable UIA pattern.' }
+		$taskMatched = $taskText -ceq $taskContract.fixture -and !$taskParent.HasExited
+		[ordered]@{ok=$taskMatched; owner_pid=$taskTarget.owner_pid; pattern_id=$taskPatternId; value_matches_fixture=$taskMatched} | ConvertTo-Json -Compress
+		exit $(if($taskMatched){0}else{1})
+	} catch {
+		[ordered]@{ok=$false; reason='uia_probe_refused'; stage=$taskChildStage; error_code=$_.Exception.HResult; exception_type=$_.Exception.GetType().FullName} | ConvertTo-Json -Compress
+		exit 1
+	}
+}
+
+function Write-CollectionJson($Name, $Value) {
+	$taskJson = ($Value | ConvertTo-Json -Depth 16 -Compress).Replace("`r`n", "`n") + "`n"
+	if ([Text.Encoding]::UTF8.GetByteCount($taskJson) -gt $taskContract.max_output_bytes) { throw 'Diagnostic payload limit exceeded.' }
+	$taskTarget = Join-Path $taskRoot $Name
+	$taskStaging = $taskTarget + '.tmp'
+	[IO.File]::WriteAllText($taskStaging, $taskJson, $taskEncoding)
+	Move-Item -LiteralPath $taskStaging -Destination $taskTarget -Force
+}
+
+function Test-CollectionCancelled {
+	return (Test-Path -LiteralPath (Join-Path $taskRoot 'cancel')) -or $taskWatch.ElapsedMilliseconds -ge $taskContract.deadline_ms
+}
+
+function Close-CollectionChild {
+	if ($null -eq $script:taskChild) { return }
+	try {
+		if (!$script:taskChild.HasExited) {
+			# This exact retained process only queries the synthetic UIA receiver; it never owns input.
+			$script:taskChild.Kill()
+			if (!$script:taskChild.WaitForExit(2000)) { throw 'Owned UIA query retirement was not acknowledged.' }
+		}
+		$script:taskChild.Dispose()
+		$script:taskChild = $null
+	} catch {
+		$taskCleanupErrors.Add([ordered]@{operation='uia_query_retirement'; error_code=$_.Exception.HResult})
+		$taskUnfinished.Add([ordered]@{operation='uia_query'; pid=$script:taskChild.Id})
+	}
+}
+
+function Add-CollectionResult($Id, $Status, $Evidence, $Reason, $Duration = 0, $Receipt = $null, $ErrorCode = 0) {
+	if ($taskContract.checks -cnotcontains $Id -or $taskContract.statuses -cnotcontains $Status -or
+		$taskContract.evidence_classes -cnotcontains $Evidence -or $Reason -cnotmatch '^[a-z0-9_]+$') {
+		throw 'Invalid collection result.'
+	}
+	if (@($taskRows | Where-Object { $_.id -ceq $Id }).Count) { throw 'Duplicate collection result.' }
+	$taskRows.Add([ordered]@{
+		id=$Id; status=$Status; evidence_class=$Evidence; duration_ms=$Duration
+		preconditions=@('exact_component_identity', 'owned_session'); reason=$Reason
+		error_code=$ErrorCode; receipt=$Receipt
+	})
+	Write-CollectionJson 'progress.json' ([ordered]@{
+		schema_version=1; session_id=$taskId; phase=$taskPhase; completed=$taskRows.Count
+		total=$taskContract.checks.Count; results=@($taskRows.ToArray())
+	})
+}
+
+try {
+	if ($taskRequest.redaction_verified -ne $true -or @('0','1') -cnotcontains [string]$taskRequest.compiled) { throw 'Host redaction admission is missing.' }
+	$taskComponents = New-Object Collections.Generic.List[object]
+	$taskComponentPaths = @{}
+	# The request contains only a host-side closed projection; never copy request paths or arbitrary logs.
+	$taskCandidateIdentity = [ordered]@{
+		schema_version=1; session_id=$taskId; started_at=$taskStarted.ToString('o'); ended_at=$null
+		build_kind=$(if($taskRequest.compiled -eq 1){'installed_binary'}else{'interpreted_source'})
+		version=$taskRequest.version; source_sha=$taskRequest.source_sha
+		architecture=$taskRequest.architecture; windows=[Environment]::OSVersion.Version.ToString()
+		runtime=$taskRequest.runtime; components=@($taskComponents.ToArray())
+		qualified_production=$false; physical_qualified=$false; identity_status='PASS'
+	}
+	$taskIdentityPatterns = @{
+		version='^(?:v?[0-9]+[.][0-9]+[.][0-9]+(?:-[0-9A-Za-z.-]+)?|local)$'
+		source_sha='^(?:[0-9a-f]{7,40}|unknown)$'; architecture='^(?:x64|x86)$'; runtime='^[0-9]+[.][0-9]+[.][0-9]+$'
+	}
+	foreach ($taskName in $taskIdentityPatterns.Keys) {
+		$taskValue = [string]$taskCandidateIdentity[$taskName]
+		if ($taskValue.Length -gt 100 -or $taskValue -cnotmatch $taskIdentityPatterns[$taskName]) { throw 'Nontechnical identity field refused.' }
+	}
+	$taskIdentity = $taskCandidateIdentity
+	Write-CollectionJson 'manifest.json' $taskIdentity
+	Add-CollectionResult 'redaction' 'PASS' 'automatic' 'closed_technical_projection' 0 ([ordered]@{raw_logs_exported=$false; personal_data_exported=$false; clipboard_exported=$false})
+
+	$taskComponentWatch = [Diagnostics.Stopwatch]::StartNew()
+	$taskActiveCheck = 'components'
+	foreach ($taskComponent in $taskRequest.components) {
+		if (Test-CollectionCancelled) { break }
+		if ($taskContract.component_ids -cnotcontains $taskComponent.id -or $taskComponentPaths.ContainsKey($taskComponent.id)) { throw 'Invalid component identity.' }
+		$taskComponentPaths[$taskComponent.id] = $taskComponent.path
+		$taskHash = Get-CollectionHash $taskComponent.path
+		$taskComponents.Add([ordered]@{id=$taskComponent.id; sha256=$taskHash; bytes=(Get-Item -LiteralPath $taskComponent.path).Length})
+	}
+	$taskComponentOk = $taskComponents.Count -eq $taskContract.component_ids.Count
+	$taskNativeBinding = $null
+	if ($taskComponentOk) {
+		$taskNativeManifest = Read-CollectionJson $taskComponentPaths['native_manifest'] $taskContract.max_output_bytes
+		$taskNativeHash = @($taskComponents | Where-Object {$_.id -ceq 'native_owner'})[0].sha256
+		$taskComponentOk = $taskNativeManifest.schema_version -eq 1 -and $taskNativeManifest.dll_sha256.ToLowerInvariant() -ceq $taskNativeHash -and $taskNativeManifest.source_fingerprint_sha256 -cmatch '^[A-F0-9]{64}$'
+		if ($taskComponentOk) { $taskNativeBinding = [ordered]@{dll_sha256=$taskNativeHash; source_fingerprint_sha256=$taskNativeManifest.source_fingerprint_sha256.ToLowerInvariant()} }
+	}
+	Add-CollectionResult 'components' $(if(Test-CollectionCancelled){'SKIP'}elseif($taskComponentOk){'PASS'}else{'FAIL'}) 'automatic' $(if($taskComponentOk){'component_hashes_and_native_binding_observed'}else{'component_provenance_incomplete'}) $taskComponentWatch.ElapsedMilliseconds $taskNativeBinding
+	$taskIdentity.components=@($taskComponents.ToArray())
+	Write-CollectionJson 'manifest.json' $taskIdentity
+	$taskActiveCheck = ''
+
+	if (!(Test-CollectionCancelled)) {
+		$taskNativeWatch = [Diagnostics.Stopwatch]::StartNew()
+		try {
+			Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+			$taskWpf = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'WPF'
+			Add-Type -Path (Join-Path $taskWpf 'UIAutomationClient.dll'), (Join-Path $taskWpf 'UIAutomationTypes.dll')
+			$taskForm = New-Object Windows.Forms.Form
+			$taskTitle = $taskContract.fixture
+			if ($taskRequest.PSObject.Properties.Name -contains 'receiver_title') {
+				$taskTitle = [string]$taskRequest.receiver_title
+				if ([Text.Encoding]::UTF8.GetByteCount($taskTitle) -gt 512 -or $taskTitle -match '[\x00-\x1f]') { throw 'Invalid translated receiver title.' }
+			}
+			$taskForm.Text = $taskTitle
+			$taskForm.Size = New-Object Drawing.Size(640, 220)
+			$taskEdit = New-Object Windows.Forms.TextBox
+			$taskEdit.Multiline = $true
+			$taskEdit.ReadOnly = $true
+			$taskEdit.Dock = [Windows.Forms.DockStyle]::Fill
+			$taskEdit.Text = $taskContract.fixture
+			$taskForm.Controls.Add($taskEdit)
+			# The read-only synthetic window is the only UIA/render target; no input is injected.
+			$taskForm.Show()
+			[Windows.Forms.Application]::DoEvents()
+			$taskHandle = $taskEdit.Handle
+			Write-CollectionJson 'uia-target.json' ([ordered]@{hwnd=$taskHandle.ToInt64(); owner_pid=$PID; created_filetime=[Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToFileTimeUtc()})
+			# The owning GUI thread pumps while a separate native UIA client observes its receiver.
+			$taskInfo = New-Object Diagnostics.ProcessStartInfo
+			$taskInfo.FileName = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+			$taskInfo.Arguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $PSCommandPath + '" -SessionDirectory "' + $taskRoot + '" -UiaChild'
+			$taskInfo.UseShellExecute = $false
+			$taskInfo.CreateNoWindow = $true
+			$taskInfo.RedirectStandardOutput = $true
+			$taskInfo.RedirectStandardError = $true
+			$taskChild = [Diagnostics.Process]::Start($taskInfo)
+			$taskChildHandle = $taskChild.Handle
+			$taskOutput = $taskChild.StandardOutput.ReadToEndAsync()
+			$taskErrors = $taskChild.StandardError.ReadToEndAsync()
+			while (!$taskChild.HasExited -and $taskNativeWatch.ElapsedMilliseconds -lt 8000 -and !(Test-CollectionCancelled)) {
+				[Windows.Forms.Application]::DoEvents()
+				Start-Sleep -Milliseconds 10
+			}
+			if (!$taskChild.HasExited) { throw 'UIA child retirement remains pending.' }
+			$taskUia = $taskOutput.Result | ConvertFrom-Json
+			$taskUiaOk = $taskChild.ExitCode -eq 0 -and $taskUia.ok -eq $true -and $taskErrors.Result.Length -eq 0
+			$taskChild.Dispose()
+			$taskChild = $null
+			Add-CollectionResult 'native_uia' $(if($taskUiaOk){'PASS'}else{'FAIL'}) 'native_synthetic' 'owned_synthetic_edit_value' $taskNativeWatch.ElapsedMilliseconds $taskUia
+			$taskBitmap = New-Object Drawing.Bitmap($taskForm.Width, $taskForm.Height)
+			try {
+				$taskForm.DrawToBitmap($taskBitmap, (New-Object Drawing.Rectangle(0, 0, $taskForm.Width, $taskForm.Height)))
+				$taskBitmap.Save((Join-Path $taskRoot 'synthetic-window.png'), [Drawing.Imaging.ImageFormat]::Png)
+			} finally { $taskBitmap.Dispose() }
+			$taskGraphics = $taskForm.CreateGraphics()
+			try { $taskDpi = $taskGraphics.DpiX } finally { $taskGraphics.Dispose() }
+			Add-CollectionResult 'native_render' 'PASS' 'native_synthetic' 'synthetic_window_rendered' $taskNativeWatch.ElapsedMilliseconds ([ordered]@{width=$taskForm.Width; height=$taskForm.Height; dpi=$taskDpi; actual_tooltip_qualified=$false; physical_visual_qualified=$false})
+		} catch {
+			foreach ($taskNativeId in @('native_uia','native_render')) {
+				if (!@($taskRows | Where-Object {$_.id -ceq $taskNativeId}).Count) {
+					Add-CollectionResult $taskNativeId 'FAIL' 'native_synthetic' 'native_probe_error' $taskNativeWatch.ElapsedMilliseconds $null $_.Exception.HResult
+				}
+			}
+		} finally {
+			Close-CollectionChild
+			if($null -ne $taskForm){$taskForm.Dispose(); $taskForm=$null}
+		}
+	}
+	$taskOwnerReceipt = [ordered]@{observation='UNRUN'; reason='host_owner_observation_unavailable'; isolated_input_allowed=$false}
+	if ($taskRequest.PSObject.Properties.Name -contains 'input_owner') {
+		$taskOwner = $taskRequest.input_owner
+		if ($taskOwner.pid -isnot [int] -or $taskOwner.pid -le 0 -or $taskOwner.created_filetime -le 0 -or
+			@('acquired','exempt','unavailable') -cnotcontains $taskOwner.mutex) { throw 'Invalid input owner identity.' }
+		foreach ($taskFlag in @('mutex_handle_retained','dispatcher_started','native_started','native_quarantined')) {
+			if (@('0','1') -cnotcontains [string]$taskOwner.$taskFlag) { throw 'Invalid input owner custody flag.' }
+		}
+		$taskHost = [Diagnostics.Process]::GetProcessById($taskOwner.pid)
+		try {
+			if ($taskHost.HasExited -or $taskHost.StartTime.ToUniversalTime().ToFileTimeUtc() -ne $taskOwner.created_filetime) { throw 'Diagnostic host identity changed.' }
+			$taskOwnerReceipt = [ordered]@{observation='PASS'; pid=$taskOwner.pid; created_filetime=$taskOwner.created_filetime
+				mutex=$taskOwner.mutex; mutex_handle_retained=($taskOwner.mutex_handle_retained -eq 1)
+				dispatcher_started=($taskOwner.dispatcher_started -eq 1); native_started=($taskOwner.native_started -eq 1)
+				native_quarantined=($taskOwner.native_quarantined -eq 1); isolated_input_allowed=$false
+				reason=$(if($taskOwner.mutex -ceq 'acquired' -and $taskOwner.dispatcher_started -eq 1){'resident_input_owner_observed'}else{'exclusive_input_session_not_admitted'})}
+		} finally { $taskHost.Dispose() }
+	}
+	foreach ($taskNativeId in @('hotstrings','ai','capture_replay','callbacks','fifo','modifiers')) {
+		# No isolated input owner is launched beside the collecting resident driver.
+		Add-CollectionResult $taskNativeId 'UNRUN' 'unexecuted' $(if($taskNativeId -eq 'ai'){'dedicated_install_start_model_consent_required'}else{'native_collector_not_implemented'}) 0 $taskOwnerReceipt
+	}
+	$taskPhase = 'guided'
+	Write-CollectionJson 'progress.json' ([ordered]@{schema_version=1; session_id=$taskId; phase=$taskPhase; completed=$taskRows.Count; total=$taskContract.checks.Count; results=@($taskRows.ToArray())})
+	while (!(Test-CollectionCancelled) -and !(Test-Path -LiteralPath (Join-Path $taskRoot 'physical.json'))) {
+		Start-Sleep -Milliseconds 100
+	}
+	$taskPhysical = $null
+	if (Test-Path -LiteralPath (Join-Path $taskRoot 'physical.json')) {
+		$taskPhysical = Read-CollectionJson (Join-Path $taskRoot 'physical.json') $taskContract.max_output_bytes
+		if ($taskPhysical.session_id -cne $taskId) { throw 'Foreign physical acknowledgement refused.' }
+	}
+	foreach ($taskPhysicalId in @('physical_text','physical_display')) {
+		$taskPhysicalStatus = 'UNRUN'; $taskReason = 'physical_step_not_executed'
+		if (Test-CollectionCancelled) { $taskPhysicalStatus='SKIP'; $taskReason='cancelled_or_deadline' }
+		elseif ($null -ne $taskPhysical) {
+			$taskPhysicalStatus = [string]$taskPhysical.$taskPhysicalId
+			$taskReason = 'explicit_guided_observation'
+			if (@('PASS','FAIL','SKIP') -cnotcontains $taskPhysicalStatus) { throw 'Invalid physical acknowledgement.' }
+		}
+		Add-CollectionResult $taskPhysicalId $taskPhysicalStatus 'physical' $taskReason
+	}
+} catch {
+	$taskPhase = 'failed'
+	$taskFailure = [ordered]@{schema_version=1; session_id=$taskId; reason='collector_error'; error_code=$_.Exception.HResult}
+	if ($taskActiveCheck -ne '' -and !@($taskRows | Where-Object {$_.id -ceq $taskActiveCheck}).Count) {
+		Add-CollectionResult $taskActiveCheck 'FAIL' 'automatic' 'collector_error' $taskWatch.ElapsedMilliseconds $null $_.Exception.HResult
+	}
+	Write-CollectionJson 'failure.json' $taskFailure
+} finally {
+	Close-CollectionChild
+	if($null -ne $taskForm){$taskForm.Dispose(); $taskForm=$null}
+	if ($taskIdentity.identity_status -ceq 'PASS' -and $taskComponents.Count -eq $taskContract.component_ids.Count) {
+		$taskStabilityWatch = [Diagnostics.Stopwatch]::StartNew()
+		try {
+			$taskStable = $true
+			foreach ($taskComponent in $taskComponents) {
+				if ((Get-CollectionHash $taskComponentPaths[$taskComponent.id]) -cne $taskComponent.sha256) { $taskStable = $false }
+			}
+			Add-CollectionResult 'component_stability' $(if($taskStable){'PASS'}else{'FAIL'}) 'automatic' $(if($taskStable){'components_unchanged_during_collection'}else{'component_changed_during_collection'}) $taskStabilityWatch.ElapsedMilliseconds
+		} catch {
+			Add-CollectionResult 'component_stability' 'FAIL' 'automatic' 'component_stability_probe_failed' $taskStabilityWatch.ElapsedMilliseconds $null $_.Exception.HResult
+		}
+	}
+	foreach ($taskPendingId in $taskContract.checks) {
+		if ($taskPendingId -ceq 'cleanup') { continue }
+		if (!@($taskRows | Where-Object {$_.id -ceq $taskPendingId}).Count) {
+			Add-CollectionResult $taskPendingId 'UNRUN' 'unexecuted' 'collector_did_not_execute'
+		}
+	}
+	# Session control files carry paths needed locally; they never enter the archive.
+	foreach ($taskControlName in @('request.json','cancel','physical.json','uia-target.json','request.json.tmp','cancel.tmp','physical.json.tmp','uia-target.json.tmp')) {
+		$taskControlPath = Join-Path $taskRoot $taskControlName
+		try {
+			if(Test-Path -LiteralPath $taskControlPath){Remove-Item -LiteralPath $taskControlPath}
+		} catch {
+			$taskCleanupErrors.Add([ordered]@{operation='control_file_retirement'; error_code=$_.Exception.HResult})
+			$taskUnfinished.Add([ordered]@{operation='control_file'; name=$taskControlName})
+		}
+	}
+	Add-CollectionResult 'cleanup' $(if($taskCleanupErrors.Count){'FAIL'}else{'PASS'}) 'automatic' $(if($taskCleanupErrors.Count){'owned_cleanup_debt'}else{'owned_window_and_control_files_retired'}) 0 ([ordered]@{window_retired=($null -eq $taskForm); operations_unfinished=@($taskUnfinished.ToArray()); errors=@($taskCleanupErrors.ToArray()); user_configuration_touched=$false; clipboard_touched=$false; external_servers_touched=$false})
+	Write-CollectionJson 'results.json' ([ordered]@{schema_version=1; session_id=$taskId; results=@($taskRows.ToArray())})
+	$taskIdentity.ended_at=[DateTime]::UtcNow.ToString('o')
+	Write-CollectionJson 'manifest.json' $taskIdentity
+	$taskSummary = "# Ergopti Windows diagnostic`n`nSession: $taskId`nInstalled binary evidence: $($taskRequest.compiled -eq 1)`nNo production or physical cohort qualification is granted by collection.`n`n"
+	if ($null -ne $taskFailure) { $taskSummary += "Collection failed: $($taskFailure.reason) (HRESULT $($taskFailure.error_code)). Review failure.json before using any partial evidence.`n`n" }
+	foreach($taskRow in $taskRows){$taskSummary += "$($taskRow.id): $($taskRow.status) [$($taskRow.evidence_class)] $($taskRow.reason)`n"}
+	$taskSummary += "`nNext action: attach this local ZIP manually. Review FAIL, SKIP and UNRUN with the maintainer. Isolated native input needs an exclusive owner; AI installation and model download require separate consent. macOS and Linux were not executed here.`n"
+	[IO.File]::WriteAllText((Join-Path $taskRoot 'summary.md'), $taskSummary, $taskEncoding)
+	Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+	if(Test-Path -LiteralPath $taskArchive){throw 'Existing archive refused.'}
+	$taskStagingArchive = $taskArchive + '.partial'
+	try {
+		# Only named, closed evidence enters the ZIP; control paths and unexpected files cannot escape.
+		$taskStream = [IO.File]::Open($taskStagingArchive, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+		try {
+			$taskZip = New-Object IO.Compression.ZipArchive($taskStream, [IO.Compression.ZipArchiveMode]::Create, $true)
+			try {
+				foreach ($taskEvidence in @('manifest.json','results.json','summary.md','failure.json','synthetic-window.png')) {
+					$taskEvidencePath = Join-Path $taskRoot $taskEvidence
+					if (!(Test-Path -LiteralPath $taskEvidencePath -PathType Leaf)) { continue }
+					$taskFile = Get-Item -LiteralPath $taskEvidencePath
+					if (($taskFile.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $taskFile.Length -gt $taskContract.max_evidence_file_bytes) { throw 'Unsafe evidence file refused.' }
+					$taskEntry = $taskZip.CreateEntry($taskEvidence)
+					$taskEntryStream = $taskEntry.Open()
+					$taskInput = [IO.File]::OpenRead($taskEvidencePath)
+					try { $taskInput.CopyTo($taskEntryStream) } finally { $taskInput.Dispose(); $taskEntryStream.Dispose() }
+				}
+			} finally { $taskZip.Dispose() }
+		} finally { $taskStream.Dispose() }
+		if ((Get-Item -LiteralPath $taskStagingArchive).Length -gt $taskContract.max_archive_bytes) { throw 'Diagnostic archive exceeds its bound.' }
+		Move-Item -LiteralPath $taskStagingArchive -Destination $taskArchive
+	} catch {
+		Write-CollectionJson 'archive-error.json' ([ordered]@{schema_version=1; session_id=$taskId; reason='archive_creation_failed'; error_code=$_.Exception.HResult; partial_retained=(Test-Path -LiteralPath $taskStagingArchive)})
+		throw
+	}
+	[ordered]@{schema_version=1; session_id=$taskId; archive_committed=$true; bytes=(Get-Item -LiteralPath $taskArchive).Length; sha256=(Get-CollectionHash $taskArchive)} | ConvertTo-Json -Compress
+	Write-CollectionJson 'progress.json' ([ordered]@{schema_version=1; session_id=$taskId; phase='completed'; completed=$taskRows.Count; total=$taskContract.checks.Count; archive_created=$true; results=@($taskRows.ToArray())})
+}

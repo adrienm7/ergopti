@@ -451,7 +451,7 @@ global HC_WIDTH  := 1060
 global HC_HEIGHT := 720
 
 ; The fallback export row is reserved below the structured tree.
-global HC_NATIVE_EXPORT_ROW := 38
+global HC_NATIVE_EXPORT_ROW := 102
 global HC_NATIVE_EXPORT_MARGIN := 6
 
 ; Virtual host for the shared page — maps _SharedDir so relative assets
@@ -672,8 +672,10 @@ _HC_ShowNativeSnapshot(G, Snapshot) {
 	global HC_WIDTH, HC_HEIGHT, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
 	Tree := G.Add("TreeView", "x0 y0 w" . HC_WIDTH . " h" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW) . " +HScroll")
 	G.NativeDiagnostics := Tree
-	NativeSave := G.Add("Button", "x8 y" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN)
-		. " w160", t("healthcheck.toolbar.save"))
+	_HC_NativeCollectionControls(G)
+	NativeSave := G.Add("Button", "x452 y" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN + 32)
+		. " w170", t("healthcheck.toolbar.save"))
+	G.NativeCollection["save"] := NativeSave
 	NativeSave.OnEvent("Click", _HC_NativeSaveSnapshot.Bind(Snapshot))
 	Summary := Tree.Add(t("healthcheck.section.summary"), 0, "Bold Expand")
 	_HC_NativeAddValue(Tree, t("healthcheck.export.driver"), Snapshot["driver"], Summary)
@@ -696,6 +698,57 @@ _HC_ShowNativeSnapshot(G, Snapshot) {
 		}
 	}
 	return Tree
+}
+
+/** Keeps collection available when the browser runtime cannot create a page. */
+_HC_NativeCollectionControls(G) {
+	global HC_WIDTH, HC_HEIGHT, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
+	Top := HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN
+	Controls := Map()
+	for Row in [
+		["start", "collect_windows", "healthcheck.collection.start", 8, 0, 300],
+		["cancel", "collection_cancel", "common.cancel", 320, 0, 120],
+		["open", "collection_open", "healthcheck.collection.open", 452, 0, 170],
+		["guided", "collection_guided", "healthcheck.collection.guided", 8, 32, 300],
+		["skip", "collection_skip", "healthcheck.collection.skip", 320, 32, 120]] {
+		Button := G.AddButton("x" . Row[4] . " y" . (Top + Row[5]) . " w" . Row[6], t(Row[3]))
+		Button.OnEvent("Click", _HC_NativeCollectionAction.Bind(Row[2]))
+		Controls[Row[1]] := Button
+	}
+	Controls["progress"] := G.AddText("x8 y" . (Top + 64) . " w" . (HC_WIDTH - 16) . " h24")
+	G.NativeCollection := Controls
+	_HC_NativeCollectionUpdate(G)
+}
+
+_HC_NativeCollectionAction(Action, *) {
+	global _HC_Gui
+	try _HC_PerformPageAction(0, Map("action", Action), HealthCheck_Config())
+	catch as Err {
+		LoggerError("DiagnosticsCollection", "The native diagnostic collection action failed.")
+		if IsSet(_HC_Gui) && _HC_Gui.HasProp("NativeCollection")
+			_HC_Gui.NativeCollection["progress"].Text := t("healthcheck.collection.failed")
+		return false
+	}
+	return true
+}
+
+/** Projects the retained owner; closing this view never abandons cleanup. */
+_HC_NativeCollectionUpdate(G) {
+	global _HC_Collection
+	Value := IsObject(_HC_Collection) ? _HC_Collection.Result : Map("phase", "idle")
+	Controls := G.NativeCollection
+	Phase := Value.Get("phase", "idle")
+	Active := Phase != "idle" && Phase != "completed" && Phase != "failed"
+	Controls["start"].Enabled := !Active
+	Controls["cancel"].Enabled := Active
+	Controls["open"].Enabled := Value.Get("archive_created", false) || Value.Get("folder_available", false)
+	Controls["guided"].Enabled := Phase == "guided"
+	Controls["skip"].Enabled := Phase == "guided"
+	Progress := StrReplace(t("healthcheck.deep_tests.progress"), "%s", Value.Get("completed", 0), , , 1)
+	Progress := StrReplace(Progress, "%s", Value.Get("total", 0), , , 1)
+	Controls["progress"].Text := Phase == "idle" ? "" : Phase == "completed" ? t("healthcheck.collection.complete")
+		: Phase == "failed" ? t("healthcheck.collection.failed")
+		: Progress
 }
 
 /** Formats the quick native report with an explicit unexecuted-test status. */
@@ -734,12 +787,20 @@ _HC_NativeAddValue(Tree, Label, Value, Parent) {
 ; Keeps the page filling the window when it is resized.
 ; @param ContentCtl {Gui.Text} The WebView2 host control.
 _HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
-	global _HC_Controller, _HC_ResetDone
+	global _HC_Controller, _HC_ResetDone, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
 	if (MinMax == -1)
 		return
 	ContentCtl.Move(0, 0, Width, Height)
-	if GuiObj.HasProp("NativeDiagnostics")
-		GuiObj.NativeDiagnostics.Move(0, 0, Width, Height)
+	if GuiObj.HasProp("NativeDiagnostics") {
+		GuiObj.NativeDiagnostics.Move(0, 0, Width, Height - HC_NATIVE_EXPORT_ROW)
+		if GuiObj.HasProp("NativeCollection") {
+			for Name, Control in GuiObj.NativeCollection {
+				Offset := Name == "progress" ? 64 : Name == "guided" || Name == "skip" || Name == "save" ? 32 : 0
+				Control.Move(, Height - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN + Offset)
+			}
+			GuiObj.NativeCollection["progress"].Move(, , Width - 16)
+		}
+	}
 	if !_HC_ResetDone && IsSet(_HC_Controller)
 		try _HC_Controller.Fill()
 }
@@ -875,6 +936,18 @@ _HC_ArchiveCleanupMetadata(Session) {
 _HC_PerformPageAction(WindowEpoch, Action, Config) {
 	global _HC_Session
 	switch Action["action"] {
+		case "collect_windows":
+			HealthCheck_CollectWindows()
+		case "collection_cancel", "collection_guided", "collection_skip", "collection_open":
+			global _HC_Collection
+			if IsObject(_HC_Collection) {
+				switch Action["action"] {
+					case "collection_cancel": _HC_Collection.Cancel()
+					case "collection_guided": _HC_Collection.Guided()
+					case "collection_skip": _HC_Collection.SkipGuided()
+					case "collection_open": _HC_Collection.OpenFolder()
+				}
+			}
 		case "close":
 			global _HC_Gui
 			_HealthCheck_CloseGui(_HC_Gui)
@@ -926,7 +999,9 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 _HC_InitJson(Session) {
 	Config := HealthCheck_Config()
 	Context := HealthCheck_RedactionContext()
-	return '{"type":"init","config":{"schema":' . Config["raw_schema"]
+	global _HC_Collection
+	Collection := IsObject(_HC_Collection) ? _HC_Collection.Result : Map("phase", "idle")
+	return '{"type":"init","collection":' . _HC_ValueToJson(Collection) . ',"config":{"schema":' . Config["raw_schema"]
 		. ',"redaction":' . Config["raw_redaction"]
 		. ',"context":{"home":' . _HC_JsStr(Context["home"]) . ',"user":' . _HC_JsStr(Context["user"])
 		. ',"case_insensitive":true},"mode":' . _HC_JsStr(Session["mode"])

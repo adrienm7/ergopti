@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "Другая команда запуска: Автозапуск настроен для другой команды или установки. Существующая настройка сохраняется.",
 	"menu.llm.model_parent_with_health": "%sВыбранная модель: %s",
 	"config.read_only.newer_schema": "Эта конфигурация сохранена более новой версией ErgoptiPlus. Ваши настройки сохранены без изменений. Перед изменением настроек обновите ErgoptiPlus и перезагрузите его.",
-	"menu.llm.save_unavailable": "Недоступно: возобновите работу ErgoptiPlus, если она приостановлена, или откройте диагностику, чтобы узнать, почему настройки не сохраняются."
+	"menu.llm.save_unavailable": "Недоступно: возобновите работу ErgoptiPlus, если она приостановлена, или откройте диагностику, чтобы узнать, почему настройки не сохраняются.",
+	"healthcheck.collection.start": "Собрать диагностику Windows",
+	"healthcheck.collection.guided": "Проверки клавиатуры и экрана",
+	"healthcheck.collection.skip": "Пропустить физические проверки",
+	"healthcheck.collection.open": "Открыть папку",
+	"healthcheck.collection.complete": "Архив создан. Вручную прикрепите ZIP к разговору.",
+	"healthcheck.collection.unavailable": "Этот сборщик Windows недоступен в macOS и Linux.",
+	"healthcheck.collection.guide": "Введите тестовый текст ниже. В активном поле текста отдельно удержите и отпустите Ctrl, затем Shift.",
+	"healthcheck.collection.visual": "Я могу чётко прочитать тестовый текст.",
+	"healthcheck.collection.failed": "Сбор завершился ошибкой. Проверьте незавершённые операции в локальной папке."
 }
