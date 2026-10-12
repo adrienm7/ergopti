@@ -122,6 +122,38 @@ assert.equal(result.physical_qualified, false);
 assert.equal(result.production_qualified, false);
 assert.equal(result.ahk_attribution_semantics, 'owned-case-and-qpc-window');
 
+// Native SendInput can bypass AHK's removed hook; never turn absent callbacks into PASS.
+const unobservedInput = fixture().filter(
+	(row) => !(row.type === 'ahk' && row.case_id.startsWith('SendInput-'))
+);
+const inputAbsent = readTrace(encode(unobservedInput), expected);
+assert(
+	inputAbsent.cases
+		.filter((item) => item.backend === 'SendEvent')
+		.every((item) => item.ahk_callback_status === 'PASS')
+);
+assert(
+	inputAbsent.cases
+		.filter((item) => item.backend === 'SendInput')
+		.every((item) => item.ahk_callback_status === 'UNRUN')
+);
+assert(inputAbsent.cases.every((item) => item.native_edges.length === 2));
+assert.equal(inputAbsent.production_qualified, false);
+for (const channel of ['hotif', 'hotkey', 'down', 'char', 'up']) {
+	const partial = fixture().filter(
+		(row) => !(row.type === 'ahk' && row.case_id === 'SendInput-1' && row.channel === channel)
+	);
+	let sequence = 0;
+	for (const row of partial) if (row.type === 'ahk') row.sequence = String(++sequence);
+	assert.throws(() => readTrace(encode(partial), expected), /Missing actual/);
+}
+for (const type of ['native', 'receiving', 'complete']) {
+	const partial = unobservedInput.filter(
+		(row, index) => index !== unobservedInput.findIndex((item) => item.type === type)
+	);
+	assert.throws(() => readTrace(encode(partial), expected));
+}
+
 // Reentrant completion order can reverse entry-QPC order. Preserve both honestly.
 const reentered = fixture();
 const nativeOffset = reentered.findIndex((row) => row.type === 'native');
@@ -287,6 +319,6 @@ assert.throws(
 	/Noncanonical/
 );
 console.log(
-	`Hook trace protocol: 2 independent positive receipts and ${mutations.length + 4} negative controls passed.`
+	`Hook trace protocol: 3 independent positive receipts and ${mutations.length + 12} negative controls passed.`
 );
 console.log('Protocol fixtures only; native callbacks, AHK and physical capture remain UNRUN.');

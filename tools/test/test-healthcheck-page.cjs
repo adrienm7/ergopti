@@ -33,6 +33,42 @@ const PAGE = path.join(SHARED, 'ui', 'healthcheck');
 const failures = [];
 const fail = (message) => failures.push(message);
 
+// The published receipt domains must follow the native ABI owner.
+const collectionContract = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'collection.json'), 'utf8')
+);
+const nativeHeader = fs.readFileSync(
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'windows',
+		'native',
+		'nav_event_owner',
+		'nav_event_owner.h'
+	),
+	'utf8'
+);
+for (const [key, name] of [
+	['statuses', 'ErgoptiNav_Status'],
+	['capture_phases', 'ErgoptiNav_TerminalPhase'],
+	['release_kinds', 'ErgoptiNav_TerminalReleaseKind']
+]) {
+	const declaration = nativeHeader.split('typedef enum ' + name + ' {')[1]?.split('} ' + name)[0];
+	if (!declaration) fail('Missing native ABI enum: ' + name);
+	else if (
+		JSON.stringify([...declaration.matchAll(/= (\d+)/g)].map((match) => Number(match[1]))) !==
+		JSON.stringify(collectionContract.resident_native_abi[key])
+	)
+		fail('Resident observation ABI domain drift: ' + key);
+}
+const captureCapacity = nativeHeader.match(/#define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY (\d+)u/);
+if (
+	!captureCapacity ||
+	Number(captureCapacity[1]) !== collectionContract.resident_native_abi.capture_capacity
+)
+	fail('Resident observation capture capacity drift');
+
 // =============================
 // =============================
 // ======= 1/ A Tiny DOM =======
@@ -851,6 +887,107 @@ for (const mutation of [
 		if (copies.length !== 1 || copies[0].text !== text)
 			fail('Equivalent recursively reordered host results refused their exact document');
 	} else if (copies.length !== 0) fail('An altered host observation was accepted: ' + mutation);
+}
+
+// Collection messages carry state and action names, never a browser-supplied archive path.
+for (const driver of ['linux', 'macos', 'windows']) {
+	const page = loadPage();
+	const value = snapshot(false);
+	value.driver = driver;
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: value
+	});
+	if (page.elements['btn-collect-windows'].disabled !== (driver !== 'windows'))
+		fail(driver + ' collection availability is incorrect');
+	if (driver !== 'windows' && !page.elements['collection-progress'].textContent)
+		fail(driver + ' collection has no unavailable reason');
+	if (driver !== 'windows') continue;
+	page.elements['btn-collect-windows'].dispatch('click');
+	if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collect_windows' }))
+		fail('collection did not request the closed host action');
+	const collecting = {
+		phase: 'guided',
+		completed: 9,
+		total: 12,
+		results: [{ id: 'callbacks', status: 'UNRUN' }]
+	};
+	page.sandbox.receiveDiagnostics({ type: 'collection', collection: collecting });
+	if (
+		!page.elements['btn-collect-windows'].disabled ||
+		page.elements['btn-collection-cancel'].hidden ||
+		page.elements['btn-collection-guided'].hidden
+	)
+		fail('active collection lost its cancellation or guided action');
+	for (const id of ['cancel', 'guided', 'skip']) {
+		page.elements['btn-collection-' + id].dispatch('click');
+		if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collection_' + id }))
+			fail('collection ' + id + ' accepted unexpected fields');
+	}
+	if (collecting.results[0].status !== 'UNRUN')
+		fail('collection page fabricated an execution result');
+	const completed = {
+		phase: 'completed',
+		archive_created: true,
+		results: [{ id: 'physical_text', status: 'SKIP' }]
+	};
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: value,
+		collection: completed
+	});
+	if (
+		page.elements['btn-collect-windows'].disabled ||
+		page.elements['btn-collection-open'].hidden ||
+		!page.elements['btn-collection-cancel'].hidden
+	)
+		fail('reopened Diagnostics lost its terminal archive action');
+	page.elements['btn-collection-open'].dispatch('click');
+	if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collection_open' }))
+		fail('opening the archive accepted a page-supplied path');
+	page.sandbox.receiveDiagnostics({
+		type: 'collection',
+		collection: {
+			phase: 'failed',
+			archive_created: true,
+			folder_available: true,
+			owner_pending: false
+		}
+	});
+	const strings = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8')
+	);
+	if (
+		page.elements['collection-progress'].textContent !== strings['healthcheck.collection.failed'] ||
+		page.elements['btn-collection-open'].hidden ||
+		page.elements['btn-collect-windows'].disabled ||
+		!page.elements['btn-collection-cancel'].hidden
+	)
+		fail('a primary failure lost its honest caption, retained archive action or terminal custody');
+	page.elements['btn-collection-open'].dispatch('click');
+	if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collection_open' }))
+		fail('a retained failure archive did not use the closed host action');
+
+	page.sandbox.receiveDiagnostics({
+		type: 'collection',
+		collection: { phase: 'failed', archive_created: false }
+	});
+	if (
+		page.elements['btn-collection-open'].hidden !== true ||
+		page.elements['btn-collect-windows'].disabled
+	)
+		fail('failed collection cannot be retried or advertises a nonexistent archive');
+	page.sandbox.receiveDiagnostics({
+		type: 'collection',
+		collection: { phase: 'failed', owner_pending: true, archive_created: false }
+	});
+	if (
+		!page.elements['btn-collect-windows'].disabled ||
+		page.elements['btn-collection-cancel'].hidden
+	)
+		fail('a failed worker with native cleanup pending enabled a replacement collection');
 }
 
 if (failures.length > 0) {

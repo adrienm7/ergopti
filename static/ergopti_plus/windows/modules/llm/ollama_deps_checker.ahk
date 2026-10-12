@@ -150,7 +150,7 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
 	; Defer everything to a timer so the menu can close and the message loop
 	; can process pending paint events before any blocking call (WinHTTP, WebView2).
 	LoggerInfo("LLM", "Scheduling async Ollama reachability check…")
-	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed,
+	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready?, on_failed?,
 		show_ui, captured_epoch), -50)
 }
 
@@ -161,15 +161,15 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
  * For the silent auto-boot path (show_ui=false) the UI is skipped and the
  * HTTP check runs immediately (no window to paint anyway).
  */
-LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui,
-		captured_epoch) {
+LLM_Deps_AsyncCheck(default_model, on_ready?, on_failed?, show_ui := true,
+		captured_epoch := 0) {
 	global _LLM_Deps_Epoch
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
 
 	; Check the configured endpoint before offering a managed installation.
 	; A responding external server is never acquired, migrated or terminated.
-	LLM_Deps_DoCheck(default_model, captured_epoch, on_ready, on_failed, show_ui)
+	LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui)
 	return true
 }
 
@@ -376,7 +376,7 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?, Port := 0) {
 		} catch as err {
 			LoggerError("LLM", "Could not open the download page: " err.Message ".")
 			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"),
-				on_failed, captured_epoch)
+				on_failed?, captured_epoch)
 			return
 		}
 		; Surface a tray tip so the user knows what to do — without it,
@@ -511,13 +511,13 @@ LLM_Deps_PrepareShutdown() {
  * @param {string} msg - Human-readable failure reason.
  * @param {Func} on_failed - Optional callback.
  */
-LLM_Deps_Fail(msg, on_failed, captured_epoch := 0) {
+LLM_Deps_Fail(msg, on_failed?, captured_epoch := 0) {
 	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
 		return false
 	if !_LLM_Deps_CancelInstallerOwner()
 		LoggerError("LLM", "Dependency failure could not confirm installer-tree termination; ownership was retained.")
-	return _LLM_Deps_PublishFailure(msg, on_failed, captured_epoch, ProcessSetPriority)
+	return _LLM_Deps_PublishFailure(msg, on_failed?, captured_epoch, ProcessSetPriority)
 }
 
 ; Failure publication must not retry cancellation or discard a retained owner.

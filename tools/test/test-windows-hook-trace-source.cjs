@@ -185,6 +185,33 @@ const source = {
 	harness: read('static/ergopti_plus/windows/tests/hardware/group7_hook_trace.ahk'),
 	supervisor: read('tools/diagnostics/run-windows-group7-trace.ps1')
 };
+/** Requires process-lifetime DLL custody before a fixture installs native callbacks. */
+function checkModuleCustody(text, prefix) {
+	const acquire = text.indexOf(
+		`${prefix}Module := DllCall("LoadLibraryW", "Str", ${prefix}Dll, "Ptr")`
+	);
+	const guard = text.indexOf(`if !${prefix}Module`, acquire);
+	const start = text.indexOf(`${prefix}Native("Start",`);
+	assert(
+		acquire >= 0 && guard > acquire && start > guard,
+		'Retain the native callback module before Start.'
+	);
+	assert(
+		!text.includes('DllCall("FreeLibrary"'),
+		'InitOnce and callback custody lasts until process exit.'
+	);
+}
+for (const [file, prefix] of [
+	['group7_hook_trace.ahk', 'Trace'],
+	['group7_send_receiving.ahk', 'Probe']
+]) {
+	const text = read('static/ergopti_plus/windows/tests/hardware/' + file);
+	checkModuleCustody(text, prefix);
+	assert.throws(() =>
+		checkModuleCustody(text.replace('DllCall("LoadLibraryW"', 'DllCall("GetModuleHandleW"'), prefix)
+	);
+	assert.throws(() => checkModuleCustody(text + '\nDllCall("FreeLibrary", "Ptr", 1)', prefix));
+}
 check(source);
 const mutations = [
 	['def', (text) => text.replace('\tErgoptiNav_StartHookTrace\n', '')],

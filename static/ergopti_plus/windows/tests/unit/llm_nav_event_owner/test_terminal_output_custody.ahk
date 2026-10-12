@@ -69,6 +69,7 @@ _LNTOC_CheckKey(Owner, Key) {
 }
 
 _LNTOC_Begin(State, Owner, Key, Units, Capacity, Count, Attempt) {
+	AssertFalse(State.Pending, "A consumer cannot replace an unacknowledged native attempt.")
 	_LNTOC_CheckKey(Owner, Key), State.Begins += 1
 	AssertEqual(2048, Capacity), AssertEqual(20480, Units.Size)
 	AssertEqual(4, Count.Size), AssertEqual(8, Attempt.Size)
@@ -189,7 +190,11 @@ _LNTOC_ZeroUpCase() {
 }
 
 _LNTOC_NaturalModifierCase() {
-	for Up in [0, 1] {
+	for Up in [0, 1]
+		_LNTOC_WithState(_LNTOC_NaturalModifierVector.Bind(Up))
+}
+
+_LNTOC_NaturalModifierVector(Up) {
 		State := _LNTOC_State([], [[0, 0x2A, 0, 2, Up, 0, 0]])
 		State.Receipt := _LNTR_Receipt(9, 9)
 		NumPut("UChar", Up ? 16 : 0, "UChar", Up ? 0 : 16, State.Receipt, 68)
@@ -203,7 +208,6 @@ _LNTOC_NaturalModifierCase() {
 		AssertEqual(0x2A, Attempt["units"][1]["scan"]), AssertEqual(Up, Attempt["units"][1]["key_up"])
 		AssertTrue(LLM_NavEventOwner_AcknowledgeTerminalOutput(Handle, Attempt, 1))
 		AssertTrue(LLM_NavEventOwner_ConsumeTerminalOutput(Handle))
-	}
 }
 
 _LNTOC_IdentityCase() {
@@ -285,7 +289,10 @@ _LNTOC_UnknownPlanVector(Mutation, Status) {
 }
 
 _LNTOC_UnknownAttemptVector(Mutation, Status) {
-	State := _LNTOC_State()
+	_LNTR_LoadFixture(Chr(0x1F600))
+	State := _LNTOC_State([0xD83D, 0xDE00],
+		[[0, 0, 0xD83D, 1, 0, 0, 0], [0, 0, 0xD83D, 1, 1, 0, 0],
+		[0, 0, 0xDE00, 1, 0, 0, 0], [0, 0, 0xDE00, 1, 1, 0, 0]])
 	Handle := LLM_NavEventOwner_PlanTerminalOutput(901, "none", State.Port)
 	State.Mutation := Mutation, State.BeginStatus := Status
 	AssertThrows(() => LLM_NavEventOwner_BeginTerminalOutputAttempt(Handle))
@@ -453,3 +460,92 @@ Test("terminal output custody: natural modifiers cannot borrow another axis (tod
 	_LNTOC_CrossAxisCase)
 Test("terminal output custody: foreign origins and uninitialized receipts are fenced (todo49-output-custody-adapter)",
 	(*) => _LNTOC_WithState(_LNTOC_UnsupportedEventCase))
+
+/** Executes the consumer, rather than reconstructing its protocol in the test. */
+_LNTOC_ConsumerCase(TestCase) {
+	Calls := 0
+	if TestCase == "surrogate" {
+		_LNTR_LoadFixture(Chr(0x1F600))
+		State := _LNTOC_State([0xD83D, 0xDE00],
+			[[0, 0, 0xD83D, 1, 0, 0, 0], [0, 0, 0xD83D, 1, 1, 0, 0],
+			[0, 0, 0xDE00, 1, 0, 0, 0], [0, 0, 0xDE00, 1, 1, 0, 0]])
+	} else if TestCase == "zero-up" {
+		State := _LNTOC_State([], [])
+		NumPut("UChar", 1, State.Receipt, 141)
+	} else
+		State := _LNTOC_State()
+	if TestCase == "admission-refusal"
+		State.PlanStatus := 4
+	Consumer := TerminalOutputConsumer(901, "none", State.Port, Emit)
+	Emit(Attempt) {
+		Calls += 1
+		AssertFalse(Consumer.Service(), "Emitter reentry cannot begin another attempt.")
+		AssertFalse(Consumer.Cancel(), "An in-flight emission cannot release its raw edge.")
+		if TestCase == "surrogate" {
+			AssertEqual(Calls == 1 ? 4 : 3, Attempt["unit_count"])
+			AssertEqual(0xD83D, Attempt["units"][1]["utf16"])
+			AssertEqual(Calls == 1 ? 0 : 1, Attempt["units"][1]["key_up"], "A stranded UP must precede the remaining suffix.")
+			return Calls == 1 ? 1 : Calls == 2 ? 0 : 3
+		}
+		if TestCase == "invalid-receipt"
+			return 0.5
+		if TestCase == "oversized-receipt"
+			return Attempt["unit_count"] + 1
+		if TestCase == "emit-throw"
+			throw Error("Injected uncertain emission.")
+		if TestCase == "unit-mutation"
+			Attempt["units"][1]["utf16"] := 0x7A
+		if TestCase == "handle-mutation"
+			Consumer.Handle["plan_id"] += 1
+		return Attempt["unit_count"]
+	}
+	if TestCase == "cancel-unsent" {
+		AssertTrue(Consumer.Cancel())
+		AssertFalse(Consumer.Service())
+		AssertEqual(1, State.Cancels), AssertEqual(0, Calls), AssertEqual(0, State.Consumes)
+		return
+	}
+	if TestCase == "ack-refusal"
+		State.AckStatus := 4
+	if TestCase == "ack-throw"
+		State.Throw := "acknowledge"
+	if TestCase == "invalid-receipt" || TestCase == "oversized-receipt" || TestCase == "emit-throw" || TestCase == "ack-throw"
+		|| TestCase == "unit-mutation" || TestCase == "handle-mutation" {
+		AssertThrows(() => Consumer.Service())
+		AssertTrue(Consumer.Blocked)
+		AssertFalse(Consumer.Service()), AssertFalse(Consumer.Cancel())
+		AssertEqual(1, Calls), AssertEqual(0, State.Consumes), AssertEqual(0, State.Cancels)
+		AssertEqual(TestCase == "ack-throw" ? 1 : 0, State.Acks.Length)
+		return
+	}
+	if TestCase == "surrogate" {
+		AssertFalse(Consumer.Service())
+		AssertFalse(Consumer.Cancel(), "Accepted output cannot release raw capture for replay.")
+		AssertFalse(Consumer.Service())
+		AssertEqual(2, Calls, "Zero acceptance returns without spinning.")
+		AssertEqual(0, State.Consumes)
+		AssertTrue(Consumer.Service())
+		AssertEqual(3, Calls)
+	} else if TestCase == "ack-refusal" {
+		AssertFalse(Consumer.Service())
+		AssertEqual(1, Calls)
+		AssertFalse(Consumer.Cancel())
+		State.AckStatus := 0
+		AssertTrue(Consumer.Service(), "The retained acceptance receipt may be acknowledged without re-emission.")
+		AssertEqual(1, Calls), AssertEqual(1, State.Begins), AssertEqual(2, State.Acks.Length)
+	} else if TestCase == "admission-refusal" {
+		AssertFalse(Consumer.Service()), AssertFalse(Consumer.Cancel())
+		AssertEqual(0, Calls), AssertEqual(0, State.Begins), AssertEqual(0, State.Consumes)
+		return
+	} else {
+		AssertTrue(Consumer.Service())
+		AssertEqual(0, Calls), AssertEqual(0, State.Begins), AssertEqual(0, State.Acks.Length)
+	}
+	AssertEqual(1, State.Consumes), AssertEqual(0, State.Cancels)
+	AssertFalse(Consumer.Service(), "A retired consumer cannot remove a replacement FIFO head.")
+}
+
+for _LNTOC_ConsumerName in ["surrogate", "zero-up", "cancel-unsent", "admission-refusal", "ack-refusal",
+	"ack-throw", "invalid-receipt", "oversized-receipt", "emit-throw", "unit-mutation", "handle-mutation"]
+	Test("terminal output consumer: " . _LNTOC_ConsumerName . " (todo49-output-consumer)",
+		_LNTOC_WithState.Bind(_LNTOC_ConsumerCase.Bind(_LNTOC_ConsumerName)))

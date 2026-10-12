@@ -6905,6 +6905,64 @@ class LastNativeUIEvidenceControls(unittest.TestCase):
             self.assertEqual(terminal["status"], "refused")
             self.assertEqual(len(files), 4)
 
+    def test_optional_ui_facts_keep_scalar_projection_and_time_through_terminal(self):
+        expected = {
+            "schema": 1,
+            "ax_trusted": True,
+            "requester_qualified": True,
+            "scanned_agents": 2,
+            "windows": 1,
+            "nodes": 7,
+            "candidates": 0,
+            "matches": 0,
+            "first_agent": 1,
+            "first_attribute": "button-title",
+            "first_type": "absent",
+            "first_error": -25205,
+            "discovery": {
+                "schema": 1,
+                "scope": "candidate",
+                "sender": True,
+                "receiver": True,
+                "complete": True,
+                "nodes": 9,
+            },
+        }
+        supplied = dict(
+            json.loads(json.dumps(expected)),
+            first_button={"schema": 1, "subrole": "absent", "type": "absent", "error": -25205},
+            identity={
+                "schema": 1,
+                "sender": True,
+                "receiver": True,
+                "complete": True,
+                "nodes": 9,
+                "refusal": "none",
+                "error": 0,
+            },
+        )
+        with self.recorder() as (writer, files, clock):
+            self.assertTrue(writer.record("automation.ui-observation", native_ui=supplied))
+            immediate = json.loads(files["checkpoint.json"])
+            self.assertEqual(immediate["native_ui"], supplied)
+            self.assertEqual(immediate["last_native_ui"], expected)
+            self.assertEqual(immediate["last_native_ui_elapsed_seconds"], 10.0)
+            self.assertFalse(immediate["ownership_closed"])
+            supplied["discovery"]["nodes"] = 11
+            clock[0] = 20.0
+            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
+            terminal = json.loads(files["checkpoint.json"])
+            self.assertEqual(terminal["last_native_ui"], expected)
+            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 10.0)
+            self.assertEqual(terminal["elapsed_seconds"], 20.0)
+            self.assertEqual(terminal["status"], "refused")
+            self.assertTrue(terminal["ownership_closed"])
+            self.assertEqual(terminal["debt_kinds"], [])
+            self.assertNotIn("native_ui", terminal)
+            self.assertNotIn("first_button", terminal["last_native_ui"])
+            self.assertNotIn("identity", terminal["last_native_ui"])
+            self.assertTrue(all(len(image) <= 4096 for image in files.values()))
+
 
 class ActualPromptAdmissionTimeoutControls(unittest.TestCase):
     world = FirstCommandTimeoutControls.world

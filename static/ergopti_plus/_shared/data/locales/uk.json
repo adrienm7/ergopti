@@ -3294,5 +3294,14 @@
 	"menu.about.startup_other_command_reason": "Інша команда запуску: Автозапуск налаштовано для іншої команди або інсталяції. Наявне налаштування зберігається.",
 	"menu.llm.model_parent_with_health": "%sВибрана модель: %s",
 	"config.read_only.newer_schema": "Цю конфігурацію збережено новішою версією ErgoptiPlus. Ваші налаштування збережено без змін. Перед зміною налаштувань оновіть ErgoptiPlus і перезавантажте його.",
-	"menu.llm.save_unavailable": "Недоступно: відновіть роботу ErgoptiPlus, якщо її призупинено, або відкрийте діагностику, щоб з’ясувати, чому налаштування не зберігаються."
+	"menu.llm.save_unavailable": "Недоступно: відновіть роботу ErgoptiPlus, якщо її призупинено, або відкрийте діагностику, щоб з’ясувати, чому налаштування не зберігаються.",
+	"healthcheck.collection.start": "Зібрати діагностику Windows",
+	"healthcheck.collection.guided": "Керовані перевірки клавіатури й екрана",
+	"healthcheck.collection.skip": "Пропустити фізичні перевірки",
+	"healthcheck.collection.open": "Відкрити теку",
+	"healthcheck.collection.complete": "Архів створено. Вручну долучіть ZIP до розмови.",
+	"healthcheck.collection.unavailable": "Цей збирач Windows недоступний у macOS і Linux.",
+	"healthcheck.collection.guide": "Введіть тестовий текст нижче. В активному текстовому полі окремо утримайте й відпустіть Ctrl, а потім Shift.",
+	"healthcheck.collection.visual": "Я можу чітко прочитати тестовий текст.",
+	"healthcheck.collection.failed": "Збір завершився помилкою. Перевірте незавершені операції в локальній папці."
 }
