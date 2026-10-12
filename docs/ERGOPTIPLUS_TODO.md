@@ -5891,10 +5891,23 @@ source fingerprint; independent updater labels remain unchanged. Selected
 local verification passes formatting and all 1,908 AHK BOM/LF checks; native
 Windows gates remain unavailable locally. The composed JS run gives 422/426:
 one managed-Git-ancestor Linux uninstall fixture refusal (unchanged outside-Git
-replay PASS), plus the unchanged upstream macOS pinned-read ratchet, bare Lua
-gsub return and layout-default consumer failures. Their original assertions and
+replay PASS), plus the unchanged upstream macOS pinned-read, gsub-return and
+layout-default source-check failures. These failed checks do not by themselves
+prove application defects. Their original assertions and
 source bytes are preserved; no whole-suite green result or final-tree native
 acceptance is claimed.
+
+Integrated manual run
+[38285216938](https://github.com/adrienm7/ergopti/actions/runs/38285216938)
+receives the exact Dev 6d1efd3d tree: Windows E2E passes all 70 cases; Core
+passes 423/426 with the same three macOS/source-contract failures. Windows
+units never start because the hook-free native build rejects a potentially
+uninitialized `key` in `nav_event_owner.c` (`C4701`/`C2220`). The native owner
+subsequently publishes its correction in 680bb62e; receive that source and rerun
+the unchanged unit, startup, packaging and installation gates on the final
+source. Those gates and physical acceptance remain unexecuted;
+the completed run has 3 successful, 4 failed and 5 skipped jobs, with Release
+skipped. Its integration lease is released; the unfinished feature branch stays.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
