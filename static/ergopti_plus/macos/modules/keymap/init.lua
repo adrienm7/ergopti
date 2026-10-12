@@ -772,6 +772,8 @@ M.request_agent_selection = LLMBridge.request_agent_selection
 M.request_agent_command = LLMBridge.request_agent_command
 M.toggle_agent_auto = LLMBridge.toggle_agent_auto
 M.reset_predictions  = LLMBridge.reset_predictions
+-- Configuration retires prediction identity without reopening quarantined input.
+M.reset_predictions_for_configuration = LLMBridge.reset_quarantined_context
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 
 M.classify_trigger   = Registry.classify_trigger

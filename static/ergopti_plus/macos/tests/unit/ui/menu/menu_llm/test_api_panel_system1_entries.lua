@@ -118,7 +118,7 @@ local function install(args)
 		state = { llm_backend = "api", llm_model = "gpt-4o-mini" },
 		paused = false,
 		is_paused = function() return false end,
-		keymap = { reset_predictions = function() return true end },
+		keymap = { reset_predictions_for_configuration = function() return true end },
 		update_menu = function() end,
 		WarmupCtrl = { warmup = function() world.warmups = world.warmups + 1 end },
 	}
