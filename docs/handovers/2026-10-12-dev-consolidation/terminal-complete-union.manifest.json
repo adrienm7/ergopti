@@ -1,0 +1,202 @@
+{
+	"base_sha": "46abcb682bdfda86e4a7456bbb4df82a2bb94a9a",
+	"patch": "pending-terminal-complete-union.patch",
+	"patch_sha256": "02770c2db581ad9b7b719e8285020c590df3339515ca1df90b1e9a0c5c446418",
+	"paths": {
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c": {
+			"before_sha256": "f95841224e04c1de6677159c27e78fbd859cc9074122493a84c7d40bb189f967",
+			"after_sha256": "2b2d9d3cafee60bed3339d0e3a3c32b3f5e2dabb3f5032ca8109492916359213"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.def": {
+			"before_sha256": "49fd8a83c14b93918f680d0584488027c08aadbbc30c931c454b91445dcf3db8",
+			"after_sha256": "ca61491d30692f2c7d30ff7e4b54f478b3c5ae3f2f5c16dcf0082d2e46aa5a6a"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h": {
+			"before_sha256": "330485f3a7fcacec44f4f70f007036a0b1ee380947666f189b1742b6514ce741",
+			"after_sha256": "85a98b0f2657c4bf7b1c6652ea85ee1d4c10329b171a50c4aecffb9b47720223"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner_test.c": {
+			"before_sha256": "c5dc5e06f8a47b8f75dd5d5dc5204aacd64bd01e1b5a13f496a1dbfd25fefc75",
+			"after_sha256": "a9c157e9b9d626d838a9ac58ac2a38bd084c734bf745e95692ae6c9b00d79e22"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c": {
+			"before_sha256": "4432710663d7f61735d47ea84e559790edc02a1ba97be4d5c27352f4df383fb8",
+			"after_sha256": "fd9bc88c792be85c99d7f7ee5b68c2e32c09912197f28207229f56a3ceeb81b6"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h": {
+			"before_sha256": "6dc352785f5bfdede4ca7371fd0af34b43bda310cb3b2afbbc3a6d057853eda2",
+			"after_sha256": "8eefa480dbc6b5e995e29cd7781a8ff80044de6b3cb9d141e32a5ce0f2fa0661"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c": {
+			"before_sha256": "931daec1ed74b9988a0ebe8fe0a6fa5822c6098764d72d014ebda902a7b42e6d",
+			"after_sha256": "6a67809ea0bb6afa8ea3e31e76f2b345c19a4188ed2427f261d4406352fad6ae"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.c": {
+			"before_sha256": "14508fe4a4bde47f71ba5659121c87cad508de59df0f344b853b14affa27e4d8",
+			"after_sha256": "9ef61efed0a1fd8b7ffc506f88e71bf47ba92f28427166a3a692150a29efac5e"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h": {
+			"before_sha256": "d358cddf27ab6993bdc2d71dc02b31f139f102b0d0ed8892a2b401a063623476",
+			"after_sha256": "58718408c97b3edba7598c16137701f195d9d55810221c4208783bfcabc92514"
+		},
+		"static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c": {
+			"before_sha256": "ba651227681c94ac47b28c3c9a1bc0fb08eb26bf698038fe8e099272b1b4bf8a",
+			"after_sha256": "7ea4680ee29c9ed3b3e42b4432961b1820b292bbb235b5d3fde2a94b6fab72b1"
+		},
+		"static/ergopti_plus/windows/adapters/terminal_output_custody.ahk": {
+			"before_sha256": "e54d5bce5583b15105086c11fd5269c145897c93bc9f4efb25ad5227d43ea1f3",
+			"after_sha256": "a6ca11cd4bb09a7cfa49d96c720f73d63428b5adb98aa6641dc5a772f5367319"
+		},
+		"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_output_custody.ahk": {
+			"before_sha256": "47abc7996ff6ed008c2581c7a49897a08cef312d928404c7e0ecd57728751110",
+			"after_sha256": "a47b510c2b03cd2e8b352299c87c1493881ae37e9be696a6660037296899a54b"
+		},
+		"tools/test/test-windows-terminal-output-custody-adapter.cjs": {
+			"before_sha256": "61ac6079f7d8b67d8ce88faadd9299a89d18a3de070ba2e402fe3b78aa557e63",
+			"after_sha256": "0a9554fe7bd988ab00a93c0adff431f074241de0c1bb0a1f8b5aa93a14e91bfe"
+		},
+		"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": {
+			"before_sha256": "0a0319f4cf97e4317f05b6acd6ce62e46da877cec0e9c4012592b001405274d5",
+			"after_sha256": "6eb6a76bb581746fd80967baae029a6a531ac3ad6e81acc4ba8c67854a97bb2d"
+		},
+		"tools/test/test-windows-hook-trace-source.cjs": {
+			"before_sha256": "972f4cd8c61a5f6bd61eeb3c85986ea9e1d97e11bb1665fb4f841cb4cb947020",
+			"after_sha256": "0c5f0c307291751f152ac055ac40c95e62614123aee85be59efd6d3b961ede9e"
+		},
+		"static/ergopti_plus/windows/adapters/terminal_output_sendinput.ahk": {
+			"before_sha256": null,
+			"after_sha256": "3948f88f0fc6e1961f2383bc69672b88908deeec6695ab26af5d617790104d35"
+		},
+		"static/ergopti_plus/windows/tests/fixtures/terminal_output_sendinput_receiving_fixture.ahk": {
+			"before_sha256": null,
+			"after_sha256": "6335c1df600db8550703a877dd2164679d7c09afca4eaef337ec4bb756874e06"
+		},
+		"static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk": {
+			"before_sha256": "aadb10bb356d34f50d2d068312248c447fc9930cbe09c92939af5b33392a8581",
+			"after_sha256": "fea1f3ed796933db110bfd378aa22ab26135d84134ed2b307cb0635a1f4ea1dd"
+		},
+		"static/ergopti_plus/windows/tests/unit/test_keylayout_emulation.ahk": {
+			"before_sha256": "26fa940dcde2d506a6e22793f100a7f43e6ced83c909969a3159ffc6ff272fbe",
+			"after_sha256": "454ed84a060fbb464011ac3487b9390e983115f6eb5c4f71061e614bba8f550c"
+		}
+	},
+	"application": "Apply this union once to exact preimages; do not also apply its constituent patches.",
+	"constituents": [
+		"pending-modifier-custody.patch",
+		"pending-replay-output-protection.patch",
+		"pending-capture-clock-half-range.patch",
+		"pending-owned-win32-payload-serialization.patch",
+		"native-serializer-bridge.patch",
+		"pending-modifier-consumer.patch",
+		"packet-receiving-after-modifier.patch",
+		"native-serializer-source-binding.patch"
+	],
+	"native_C": {
+		"original_assertion_calls_preserved": {
+			"native_owner": 1352,
+			"replay_core": 108,
+			"output_plan": 124
+		},
+		"composed_assertion_calls": {
+			"native_owner": 1485,
+			"replay_core": 140,
+			"output_plan": 223
+		},
+		"actual_results": [
+			{
+				"command": ["node", "tools/test/run-windows-replay-route-core.cjs"],
+				"exit": 0,
+				"elapsed_ms": 188
+			},
+			{
+				"command": ["node", "tools/test/run-windows-terminal-output-plan.cjs"],
+				"exit": 0,
+				"elapsed_ms": 279
+			},
+			{
+				"command": ["node", "tools/test/run-nav-event-owner-portable.cjs"],
+				"exit": 0,
+				"elapsed_ms": 1623
+			}
+		],
+		"matrix_counts": {
+			"core": 8,
+			"output_plan": 11,
+			"owner_portable": 43,
+			"owner_native_census": 44
+		},
+		"sanitizers": [
+			{
+				"name": "output-sanitizer-compile",
+				"exit": 0,
+				"elapsed_ms": 648
+			},
+			{
+				"name": "output-sanitizer-run",
+				"exit": 0,
+				"elapsed_ms": 17
+			},
+			{
+				"name": "bridge-sanitizer-compile",
+				"exit": 0,
+				"elapsed_ms": 3430
+			},
+			{
+				"name": "bridge-sanitizer-run",
+				"exit": 0,
+				"elapsed_ms": 28
+			}
+		],
+		"full_owner_sanitizers": {
+			"compile_exit": 0,
+			"case_count": 43,
+			"all_exits_zero": true,
+			"checks": "Address, Undefined, Leak, assertions; none disabled"
+		}
+	},
+	"AHK": {
+		"old_cases": 23,
+		"additional_modifier": 98,
+		"additional_packets": 212,
+		"additional_original_authority": 123,
+		"additional_explicit_sender": 211,
+		"total_authored": 667,
+		"standalone_native_receiver_vectors": 2,
+		"runtime": "UNRUN; native Windows AHK/GUI required",
+		"additional_KLE_reset_observer": 91,
+		"KLE_runtime": "UNRUN; 91 new cases separately enrolled in existing keylayout emulation unit",
+		"terminal_cases_with_corrected_copy_hook": 48
+	},
+	"feature_source_guards": {
+		"source_checks": [
+			{
+				"command": ["node", "tools/test/test-windows-terminal-output-custody-adapter.cjs"],
+				"exit": 0,
+				"inverse_controls": 119
+			},
+			{
+				"command": ["node", "tools/test/test-windows-hook-trace-source.cjs"],
+				"exit": 0,
+				"inverse_controls": 27
+			}
+		],
+		"native_AHK": "UNRUN",
+		"DLL": "UNRUN",
+		"production_admission": false
+	},
+	"source_inverse_counts": {
+		"terminal_custody": 119,
+		"hook_trace": 27
+	},
+	"export_count": 41,
+	"qualification": "Linux C/threads and JavaScript source controls only; Windows SDK/MSVC/DLL/AHK/hooks and physical receiving UNRUN.",
+	"production_admission": false,
+	"emission_backend": "Mandatory explicitly supplied sender; separate user32 primitive and standalone CLI opt-in fixture; no production policy/admission change",
+	"incremental_constituents": [
+		"authority18d4c2ea73291dbb307d6d65e47b80a96426debede79c9f53e59ad4529a3b428",
+		"sender031e1e1414693fa3632c0a312c520d2e0e21287accb7322fd17f47fa6e751e5f",
+		"kle5558380d4fe611d21d99bcc9a1da995254caa206c7f116900126416bac38d4a3",
+		"copyhookdfc23bf2186a8721d43155f40cfa7eb3b0efa1a40991bc4ae5b332b7d5af44fd"
+	],
+	"composition_note": "All ten C postimages exactly match the earlier sanitized union. Retains 667 terminal callback cases; corrects the real copy-observer key in 48 authority vectors. Adds 91 separate KLE observer cases. Existing source assertions retain their prefixes and both exact additive suffixes; 119 custody and 27 bridge controls actually execute with exit 0. No native qualification or production admission."
+}
