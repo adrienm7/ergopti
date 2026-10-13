@@ -275,7 +275,10 @@ async function runBrowsers(site, basePath, engines) {
 							errors.local.push(response.url() + ' HTTP ' + response.status());
 					});
 					page.on('requestfailed', (request) => {
-						if (new URL(request.url()).origin === origin) errors.local.push(request.url());
+						if (new URL(request.url()).origin === origin)
+							errors.local.push(
+								request.url() + ' transport: ' + (request.failure()?.errorText || 'unknown failure')
+							);
 					});
 					await page.route('**/*', async (route) => {
 						const url = route.request().url();

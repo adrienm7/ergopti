@@ -698,7 +698,10 @@ async function run() {
 															status: () => 404
 														});
 													else if (fault === 'local-request-failed')
-														handlers.requestfailed({ url: () => origin + '/dev/missing.json' });
+														handlers.requestfailed({
+															url: () => origin + '/dev/missing.json',
+															failure: () => ({ errorText: 'net::ERR_ABORTED' })
+														});
 													else requests.push(fault);
 												}
 												for (const request of requests)
@@ -731,7 +734,13 @@ async function run() {
 				};
 				const invoke = () =>
 					loaded.exports.runBrowsers('recorded-site', '/dev', { chromium: engine, webkit: engine });
-				if (fault) await assert.rejects(invoke, /Browser failures|Local resource failures/);
+				if (fault)
+					await assert.rejects(invoke, (error) => {
+						assert.match(error.message, /Browser failures|Local resource failures/);
+						if (fault === 'local-request-failed')
+							assert.match(error.message, /transport: net::ERR_ABORTED/);
+						return true;
+					});
 				else {
 					const result = await invoke();
 					assert.deepEqual(
