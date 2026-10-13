@@ -75,21 +75,22 @@ def qualify_native_keys(source):
         """        // Inspect native metadata before the portable wrapper discards it.
         const auto element = IOHIDValueGetElement(*value);
         const auto usage = IOHIDElementGetUsage(element);
-        // Apple array handlers use UINT32_MAX; they accompany individual key leaves.
-        if (hs274_stream_selected_ && IOHIDElementGetUsagePage(element) == 7 &&
+        const auto page = IOHIDElementGetUsagePage(element);
+        // Array handlers accompany qualified individual leaves, never keys.
+        if (hs274_stream_selected_ && hs274_key_policy::is_button_page(page) &&
             usage != 0 && usage != UINT32_MAX) {
           const auto type = IOHIDElementGetType(element);
           const auto integer = IOHIDValueGetIntegerValue(*value);
-          // An inactive HID error indicator is auxiliary data, not lost coverage.
-          if ((usage < 4 && integer != 0) || (usage >= 4 &&
-              (usage > 255 || (integer != 0 && integer != 1) ||
-              !hs274_stream_protocol::binary_key({
-                  type >= kIOHIDElementTypeInput_Misc && type <= kIOHIDElementTypeInput_ScanCodes,
-                  static_cast<bool>(IOHIDElementIsRelative(element)),
-                  static_cast<bool>(IOHIDElementIsArray(element)),
-                  IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
-                  IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)})))) {
-            // Retain the raw receipt and remapping output, but revoke stream readiness.
+          const hs274_stream_protocol::key_element descriptor{
+              type >= kIOHIDElementTypeInput_Misc && type <= kIOHIDElementTypeInput_ScanCodes,
+              static_cast<bool>(IOHIDElementIsRelative(element)),
+              static_cast<bool>(IOHIDElementIsArray(element)),
+              IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
+              IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)};
+          if (!(page == 7 && usage <= 3 && integer == 0) &&
+              hs274_key_policy::admit_button(page, usage, descriptor, integer) !=
+              hs274_key_policy::button_admission::admitted) {
+            // Preserve remapping output, but revoke physical observation readiness.
             hs274_monitor_.stopped();
           }
         }
@@ -104,7 +105,7 @@ def stream_monitor(source):
     source = replace_once(
         source,
         '#include "hs274-raw-capture.hpp"',
-        '#include "hs274-stream-runtime.hpp"\n#include "hs274-stream-baseline-probe.hpp"\n#include "hs274-key-element.hpp"',
+        '#include "hs274-stream-runtime.hpp"\n#include "hs274-stream-baseline-probe.hpp"\n#include "hs274-stream-key-policy.hpp"',
     )
     source = replace_once(
         source,
@@ -117,11 +118,9 @@ def stream_monitor(source):
     source = replace_once(
         source,
         "        last_time_stamp_(0) {",
-        """        hs274_stream_selected_(!device_properties.get_device_identifiers().get_is_virtual_device() &&
-                               (device_properties.get_device_identifiers().get_is_keyboard() ||
-                                device_properties.get_device_identifiers().get_is_consumer())),
-        hs274_monitor_(hs274_stream_selected_ ? hs274_stream_protocol::runtime::attach(
-                                             hs274_probe_device_id_, device_properties.get_device_identifiers().get_is_keyboard())
+        """        hs274_stream_selected_(!device_properties.get_device_identifiers().get_is_virtual_device()),
+        hs274_native_binding_(hs274_stream_selected_ ? device : nullptr, hs274_probe_device_id_),
+        hs274_monitor_(hs274_stream_selected_ ? hs274_stream_protocol::runtime::attach(hs274_native_binding_)
                                          : hs274_stream_protocol::runtime::monitor{}),
         last_time_stamp_(0) {""",
     )
@@ -134,11 +133,9 @@ def stream_monitor(source):
         source,
         "      started();",
         "      if (hs274_stream_selected_) {\n"
-        "        const auto inventory = hs274_baseline_probe::capture_inventory(device, hs274_probe_device_id_);\n"
-        "        hs274_monitor_.started(inventory.samples.data(), inventory.samples.size(),\n"
-        "                               inventory.enumerated, inventory.exhausted);\n"
+        "        hs274_stream_protocol::runtime::started(hs274_monitor_, hs274_native_binding_, device);\n"
         "      }\n"
-        "      if (hs274_probe_owned_) hs274_baseline_probe::capture(device, hs274_probe_device_id_);\n"
+        "      if (hs274_probe_owned_) hs274_stream_protocol::runtime::reference(hs274_monitor_, device, hs274_probe_device_id_);\n"
         "      started();",
     )
     source = replace_once(
@@ -158,6 +155,7 @@ def stream_monitor(source):
         source,
         "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
         "  bool hs274_stream_selected_;\n"
+        "  const hs274_stream_protocol::native_binding hs274_native_binding_;\n"
         "  hs274_stream_protocol::runtime::monitor hs274_monitor_;\n"
         "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
     )
@@ -179,7 +177,9 @@ def stream_receiver(source):
     """Own capture through the authenticated receiver and its peer lifecycle."""
     require_pristine(source)
     source = replace_once(
-        source, "#pragma once\n", '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n'
+        source,
+        "#pragma once\n",
+        '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n',
     )
     source = replace_once(
         source,
@@ -233,7 +233,9 @@ def stream_entry(source):
     """Observe only reserved ignored fixtures without weakening seizure readiness."""
     require_pristine(source)
     source = replace_once(
-        source, "#pragma once\n", '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n'
+        source,
+        "#pragma once\n",
+        '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n',
     )
     return replace_once(
         source,
