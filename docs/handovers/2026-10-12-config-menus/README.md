@@ -88,3 +88,81 @@ receiving passes ten HTTP requests over stable and `/dev` bases: four exact
 TOML source responses, two SSR pages and four transformed module responses.
 Browser hydration, complete static builds and deployment remain separate Root
 Common qualifications. No new CHECKS entry or test move is required.
+
+## Snapshot16 harness and dependency handoff
+
+The [retained harness contract](SNAPSHOT16-HARNESS-CONTRACT.json) records the
+eight exact harness, principal, framework and subject paths and SHA-256 pins
+from `f385e3c7`. The source archive above contains the 14-file, 31-loop ownership
+map and normalized include closure. Root owns the future registration migration;
+Group 1 is not preparing a concurrent runner or framework correction.
+
+The intended contract loads the complete authentic principal, preserving
+`#Warn All, StdOut`, `/ErrorStdOut`, registration order and callbacks. Its
+`--only=windows91 snapshots:` selection first runs with `--dry-run`; only strict
+receiving permits execution of the same 16 original callbacks. It requires
+complete stdout equal to TAP without the disk BOM, empty stderr, native exit
+zero, unchanged sealed sources and the actual interpreter identity. Selecting
+16 callbacks does not replace whole-principal loading or qualify the general
+unit suite. The lexical archive is not the complete native source seal or SDK.
+
+Root preview 38325913747 on its separate `93d3` source is not this retained run.
+Equal reported byte lengths do not establish equal hashes, dependency closures
+or warning inventories. No warning suppression, prefix filtering, substituted
+principal or weakened capture contract is proposed.
+
+## Integrated-source macOS wizard checkpoint
+
+Dev `f43575f535a1f47f8c0aa3a48673269b0fa62fcd` contains the deferred wizard
+initialization correction, replayed atomically onto fresh parent `34e6cd9c`.
+The feature commit is `e579daf8`; only the native host, its delivery tests,
+fixture and item 7 change. No shared page, schema, generator, runner or workflow
+is modified. A refused timer retains the request for the same view and source;
+reopening can retry without allowing a retired view or changed source to
+initialize its successor. Pending and active requests coalesce.
+
+Manual [38329427303](https://github.com/adrienm7/ergopti/actions/runs/38329427303)
+tests private commit `7b01f3d290a936edbfa0b62d796fe357e01a8c1b`, whose tree
+`80b4f0162697be77dfbb9180d29233249b303701` exactly equals that Dev checkpoint.
+The complete unit reporter passes 19,027 tests in 1,578 modules with zero
+failures. Its owning delivery module passes all 52 preserved original subjects
+and 15 new regressions. The unit job retains 677 LuaCheck warnings, with zero
+errors; it is not warning-free. E2E passes 101/101 with one explicit skip.
+These suites exercise production Lua owners with native-port doubles and do
+not establish physical Cocoa interaction or installed wizard acceptance.
+
+Independent configured-Lua receiving passes 90/90 focused subjects. The same
+new tests and fixture against the literal predecessor pass 80 and fail ten;
+restoring the correction passes all 90 again. No independent expectations are
+regenerated. The earlier feature-context full local suite passes 19,013/19,013
+in 1,576 modules; it is a separate source context from the refreshed Dev tree.
+
+Actual native paired lease jobs pass on arm64 and amd64; cold MLX and 12 tooltip
+captures also pass. These are separate boundaries and grant no wizard or
+whole-package qualification. Core passes 424/426, retaining the shared Lua
+gsub and macOS layout-default guards. Both managed-Ollama jobs and archive
+qualification fail; the whole workflow fails. Packaging and installation are
+skipped. Release is skipped and no release is requested.
+
+The native failures remain open for their owners: number-row receiving refuses
+source ancestry before probing; the Go asset guard refuses a foreign policy
+subject; PAC/keychain and HTTP fixture retirement refuse, Shortcuts discovery
+times out, and archive qualification retains Swift failures and an Automation
+prompt deadline. No baseline comparison attributes these failures to an older
+source or excludes the current correction as a cause. Items 5/7/33/42/54/81
+and transversal 16/38 remain partial; no TODO item is removed.
+
+The retained independent whole-run receiving receipt has SHA-256
+`23b0d69b9342e4b7e33c871fd10befb2ce2b25983e85b3637a925ba7fb5ef280`.
+It authenticates 19 terminal jobs: eight successful, six failed and five
+skipped, with exact source, log and artifact joins. The tooltip ZIP digest and
+each of its 12 PNG captures are verified against the native receipt. No physical
+wizard or installed application acceptance is inferred from those captures.
+
+The earlier native import-timeout correction `c19927d7` is already integrated.
+Its owning fixture and timeout guard retain their qualified source images;
+historical receiving passes 18/18, fails three added cases with the literal
+predecessor and passes 18/18 after restoration. Current run 38329427303 also
+executes all 18 subjects successfully. The historical selected gate and inverse
+are separate source contexts; installed restart remains unexecuted. Item 7's
+previous blanket statement that this comparison was still pending is corrected.
