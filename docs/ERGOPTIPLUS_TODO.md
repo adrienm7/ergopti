@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-12. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
+Updated: 2026-10-13. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
 at `63cf3d005d371edb4e4093a906da276ced487182`, published and verified by the
 publication owner with [CI 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226).
 This checklist is the current handoff; older workflow task-status files are
@@ -11,6 +11,33 @@ Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+### October 13 Windows receiving checkpoint
+
+The isolated Windows continuation rebased the fifteen atomic AI corrections from
+`012ce5ef9886906d6e174227628a79db3fd93f26` onto fresh dev
+`13cf4ad8bf824027bde3a640b8fc0bab3cd2a701`, preserving their commit boundaries.
+Native AutoHotkey 2.0.26 receives all 88 added AI callback cases: offer affinity
+35, original-origin custody 17, manual requester 25, app picker six and auxiliary
+result five; each selected cohort exits 0 with zero failures/skips. The eight
+personal metadata source-type cases also pass. An original native 16/17 result
+exposed the auxiliary context constructor dropping its lexical origin capability;
+the constructor now retains it and all 17 cases pass without relaxing assertions.
+The managed/bootstrap and requester source guards, BOM/LF encoding and strict
+convention lint pass. These controlled callbacks do not qualify live managed or
+external model acquisition, inference, warmup, screen capture or installed apps.
+
+The broad local JS attempt remains **INCOMPLETE**, explicitly cancelled at its
+pure-source menu parity control after more than sixteen CPU minutes. Its earlier
+failed platform/receiver controls remain failures; neither cancellation nor a
+passing targeted source guard is a complete JS receipt. Full composed Windows
+unit/E2E/startup/build receiving remains open at this first checkpoint. The
+terminal bundle, C output alias preflight and observer/preregistration software
+are being received separately and are not included in this publication claim.
+Native macOS and Linux remain UNRUN here. The maintainer has no Linux machine;
+retained container receipts remain container evidence. Windows controlled/native
+software receiving, physical keyboard/hook-order/ISO/modifier acceptance and
+actual display/DPI/UIA/installed-application acceptance remain distinct.
 
 ### October 12 consolidation and macOS issue 94
 
