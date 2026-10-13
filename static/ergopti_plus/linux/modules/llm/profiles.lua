@@ -139,11 +139,27 @@ end
 --- Returns cached value if already fetched; call refresh_models() to force refresh.
 --- @return table Array of model name strings.
 function M.get_models()
-	if #_available_models > 0 and inventory_current(_model_inventory) then return _available_models end
+	-- Capture the getter before an inventory/native observer can replace its app.
+	local models, inventory, request, origin = _available_models, _model_inventory, _model_inventory_request, _base_url
+	local receipt = ResponseCapture()
+	local function retained()
+		return rawequal(_available_models, models) and rawequal(_model_inventory, inventory)
+			and rawequal(_model_inventory_request, request) and _base_url == origin
+	end
+	local cached = #models > 0 and inventory_current(inventory)
+	if not retained() then return {} end
+	if cached then return models end
 
-	-- Try to fetch from Ollama.
-	M.refresh_models()
-	return _available_models
+	if package.loaded["modules.llm.prediction_engine"] ~= ResponseEngine
+		or ResponseEngine.capture_runtime_response ~= ResponseCapture
+		or ResponseEngine.runtime_response_current ~= ResponseCurrent then return {} end
+	local current = ResponseCurrent(receipt, origin) == true
+	if not current or not retained() or package.loaded["modules.llm.prediction_engine"] ~= ResponseEngine
+		or ResponseEngine.capture_runtime_response ~= ResponseCapture
+		or ResponseEngine.runtime_response_current ~= ResponseCurrent then return {} end
+
+	-- A refused refresh must not return a retained cache or its successor's data.
+	return M.refresh_models()
 end
 
 --- Refreshes the model list from the Ollama /api/tags endpoint.
