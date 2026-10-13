@@ -21,6 +21,26 @@ static int32_t CheckOwner(const ErgoptiReplay_State *state, uint64_t owner)
 	return ERGOPTI_REPLAY_OK;
 }
 
+/** Refuses writable spans that wrap or overlap protected input/lifecycle storage. */
+static bool WritableOverlaps(
+	const void *output, size_t output_size, const void *protected, size_t protected_size)
+{
+	uintptr_t output_start;
+	uintptr_t protected_start;
+	if (output == NULL)
+		return false;
+	output_start = (uintptr_t)output;
+	if (output_size > UINTPTR_MAX - output_start)
+		return true;
+	if (protected == NULL)
+		return false;
+	protected_start = (uintptr_t)protected;
+	if (protected_size > UINTPTR_MAX - protected_start)
+		return true;
+	return output_start < protected_start + protected_size
+		&& protected_start < output_start + output_size;
+}
+
 /** Only one-bit prefix identities may enter the shared held-prefix mask. */
 static bool IsOneBit(uint32_t value)
 {
@@ -220,6 +240,9 @@ int32_t ErgoptiReplay_Step(
 	ErgoptiReplay_Hold *free_hold = NULL;
 	const ErgoptiReplay_Route *route;
 	int32_t status;
+	/* Refuse before even a refusal result could overwrite lifecycle storage. */
+	if (WritableOverlaps(snapshot, sizeof(*snapshot), state, sizeof(*state)))
+		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	/* A caller may reuse snapshot.event as the next input buffer. Freeze that
 	 * edge before clearing the output, so a valid up cannot become an orphan. */
 	if (event != NULL) {
@@ -323,6 +346,10 @@ int32_t ErgoptiReplay_PrepareNativeEdge(
 	const ErgoptiReplay_Snapshot *snapshot, ErgoptiReplay_NativeKeyEdge *edge)
 {
 	int32_t status;
+	/* The output cannot destroy either lifecycle storage or its captured recipe. */
+	if (WritableOverlaps(edge, sizeof(*edge), state, sizeof(*state))
+			|| WritableOverlaps(edge, sizeof(*edge), snapshot, sizeof(*snapshot)))
+		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	if (edge != NULL)
 		memset(edge, 0, sizeof(*edge));
 	status = CheckOwner(state, owner);

@@ -1,0 +1,125 @@
+{
+	"source_head": "0d3653cd2570e887ca2bbd2a1fc5d4d4c30482e8",
+	"receipts": [
+		{
+			"name": "test_api_ollama",
+			"command": ["lua", "tests/run.lua", "--only", "tests.unit.modules.llm.test_api_ollama"],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 384,
+			"summary": "Passed tests:  59\nFailed tests:  0"
+		},
+		{
+			"name": "test_ai_agent_local_model",
+			"command": [
+				"lua",
+				"tests/run.lua",
+				"--only",
+				"tests.unit.modules.llm.test_ai_agent_local_model"
+			],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 11345,
+			"summary": "Passed tests:  21\nFailed tests:  0"
+		},
+		{
+			"name": "test_screen_answer_end_to_end",
+			"command": [
+				"lua",
+				"tests/run.lua",
+				"--only",
+				"tests.unit.modules.llm.test_screen_answer_end_to_end"
+			],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 2944,
+			"summary": "Passed tests:  18\nFailed tests:  0"
+		},
+		{
+			"name": "test_agent_panel",
+			"command": ["lua", "tests/run.lua", "--only", "tests.unit.ui.menu.menu_llm.test_agent_panel"],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 17889,
+			"summary": "Passed tests:  55\nFailed tests:  0"
+		},
+		{
+			"name": "test_llm_factory_recovery_wiring",
+			"command": [
+				"lua",
+				"tests/run.lua",
+				"--only",
+				"tests.unit.ui.menu.menu_llm.test_llm_factory_recovery_wiring"
+			],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 1813,
+			"summary": "Passed tests:  7\nFailed tests:  0"
+		},
+		{
+			"name": "test_models_manager_requirement_capabilities",
+			"command": [
+				"lua",
+				"tests/run.lua",
+				"--only",
+				"tests.unit.ui.menu.menu_llm.test_models_manager_requirement_capabilities"
+			],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 146,
+			"summary": "Passed tests:  15\nFailed tests:  0"
+		},
+		{
+			"name": "linux-response",
+			"command": ["luajit", "tests/run.lua", "--only=linux-managed-response"],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 4214,
+			"summary": "Passed tests:  29\nFailed tests:  0"
+		},
+		{
+			"name": "linux-getter",
+			"command": ["luajit", "tests/run.lua", "--only=linux-inventory-getter"],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 2421,
+			"summary": "Passed tests:  7\nFailed tests:  0"
+		},
+		{
+			"name": "windows-origin-source",
+			"command": ["node", "tools/test/test-windows-managed-bootstrap.cjs"],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 107,
+			"summary": "Windows managed bootstrap production composition: PASS (portable source checks only).\nWindows model-offer affinity: PASS (11 causal source inverses; 35 authored AHK cases UNRUN).\nWindows original-origin custody: PASS (13 source inverses; authored AHK UNRUN).\nWindows exact auxiliary result: PASS (5 causal source inverses; authored AHK UNRUN).\n"
+		},
+		{
+			"name": "windows-requester-source",
+			"command": ["node", "tools/test/test-windows-rewrite-prompt-wiring.cjs"],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 142,
+			"summary": "Manual requester source currency: 19 causal source inverses passed; 25 added AHK cases UNRUN.\nAgent app-picker callback: PASS (3 causal source inverses; authored native AHK cases UNRUN).\n\u001b[32m[OK] Windows rewrite prompt and prompt action wiring (163 checks).\u001b[0m\n"
+		},
+		{
+			"name": "encoding",
+			"command": ["node", "tools/test/test-ahk-encoding.cjs"],
+			"exit": 0,
+			"signal": null,
+			"error": null,
+			"elapsed_ms": 474,
+			"summary": "\nEncoding check passed \u2014 1912 .ahk file(s) verified (UTF-8 BOM + LF).\n\n"
+		}
+	],
+	"qualification": "Linux container Lua/controlled Hammerspoon ports and Windows source guards; no native Windows/macOS qualification"
+}

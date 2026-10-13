@@ -343,6 +343,103 @@ static void TestInputOutputAliasing(void)
 	assert(ErgoptiReplay_Step(&state, OWNER, &snapshot.event, &snapshot) == 0);
 	assert(snapshot.event.timestamp == 2 && snapshot.event.key_up == 1);
 	assert(snapshot.route.recipe_id == 100 && snapshot.route.target_scan == 0x30);
+	/* Writable outputs cannot borrow lifecycle or immutable recipe storage. */
+	{
+		struct ProtectedState {
+			ErgoptiReplay_Snapshot preceding;
+			ErgoptiReplay_State live;
+			ErgoptiReplay_Snapshot adjacent;
+		} protected_state;
+		struct ProtectedSnapshot {
+			ErgoptiReplay_NativeKeyEdge preceding;
+			ErgoptiReplay_Snapshot captured;
+			ErgoptiReplay_NativeKeyEdge adjacent;
+		} protected_snapshot;
+		ErgoptiReplay_State retained;
+		ErgoptiReplay_Snapshot captured;
+		ErgoptiReplay_Event modifier = { .timestamp = 1, .source_id = 14,
+			.vk = 0xA0, .scan = 0x2A, .origin = ERGOPTI_REPLAY_PHYSICAL };
+		const size_t state_offsets[] = { 0, offsetof(ErgoptiReplay_State, composition),
+			offsetof(ErgoptiReplay_State, holds), sizeof(ErgoptiReplay_State) - 8 };
+		const size_t snapshot_offsets[] = { 0, offsetof(ErgoptiReplay_Snapshot, event),
+			offsetof(ErgoptiReplay_Snapshot, route), sizeof(ErgoptiReplay_Snapshot) - 2 };
+		Start(&protected_state.live);
+		assert(ErgoptiReplay_Step(&protected_state.live, OWNER, &modifier, &captured) == 0);
+		assert(captured.modifiers_lr_before == 0 && captured.modifiers_lr_after == 0x10);
+		memcpy(&retained, &protected_state.live, sizeof(retained));
+		modifier.timestamp = 2; modifier.key_up = 1;
+		for (uint32_t i = 0; i < sizeof(state_offsets) / sizeof(state_offsets[0]); ++i) {
+			ErgoptiReplay_Snapshot *aliased = (ErgoptiReplay_Snapshot *)(void *)
+				((unsigned char *)&protected_state.live + state_offsets[i]);
+			assert(ErgoptiReplay_Step(&protected_state.live, OWNER + 1, &modifier, aliased)
+				== ERGOPTI_REPLAY_INVALID_ARGUMENT);
+			assert(memcmp(&protected_state.live, &retained, sizeof(retained)) == 0);
+			assert(ErgoptiReplay_Step(&protected_state.live, OWNER, &modifier, aliased)
+				== ERGOPTI_REPLAY_INVALID_ARGUMENT);
+			assert(memcmp(&protected_state.live, &retained, sizeof(retained)) == 0);
+			ErgoptiReplay_NativeKeyEdge *edge_alias = (ErgoptiReplay_NativeKeyEdge *)(void *)aliased;
+			assert(ErgoptiReplay_PrepareNativeEdge(&protected_state.live, OWNER,
+				&captured, edge_alias) == ERGOPTI_REPLAY_INVALID_ARGUMENT);
+			assert(memcmp(&protected_state.live, &retained, sizeof(retained)) == 0);
+		}
+		memcpy(&protected_snapshot.captured, &captured, sizeof(captured));
+		for (uint32_t i = 0; i < sizeof(snapshot_offsets) / sizeof(snapshot_offsets[0]); ++i) {
+			ErgoptiReplay_NativeKeyEdge *edge_alias = (ErgoptiReplay_NativeKeyEdge *)(void *)
+				((unsigned char *)&protected_snapshot.captured + snapshot_offsets[i]);
+			assert(ErgoptiReplay_PrepareNativeEdge(&protected_state.live, OWNER,
+				&protected_snapshot.captured, edge_alias) == ERGOPTI_REPLAY_INVALID_ARGUMENT);
+			assert(memcmp(&protected_snapshot.captured, &captured, sizeof(captured)) == 0);
+			assert(memcmp(&protected_state.live, &retained, sizeof(retained)) == 0);
+		}
+		/* Crossing either start boundary must also refuse before writing. */
+		ErgoptiReplay_Snapshot *crossing_state = (ErgoptiReplay_Snapshot *)(void *)
+			((unsigned char *)&protected_state + 8);
+		assert(ErgoptiReplay_Step(&protected_state.live, OWNER, &modifier, crossing_state)
+			== ERGOPTI_REPLAY_INVALID_ARGUMENT);
+		assert(memcmp(&protected_state.live, &retained, sizeof(retained)) == 0);
+		ErgoptiReplay_NativeKeyEdge *crossing_snapshot = (ErgoptiReplay_NativeKeyEdge *)(void *)
+			((unsigned char *)&protected_snapshot + sizeof(protected_snapshot.preceding) - 2);
+		assert(ErgoptiReplay_PrepareNativeEdge(&protected_state.live, OWNER,
+			&protected_snapshot.captured, crossing_snapshot) == ERGOPTI_REPLAY_INVALID_ARGUMENT);
+		assert(memcmp(&protected_snapshot.captured, &captured, sizeof(captured)) == 0);
+		/* Touching boundaries are legal: neither protected span is written. */
+		assert(ErgoptiReplay_PrepareNativeEdge(&protected_state.live, OWNER,
+			&protected_snapshot.captured, &protected_snapshot.adjacent) == 0);
+		assert(protected_snapshot.adjacent.scan == 0x2A && protected_snapshot.adjacent.key_up == 0);
+		assert(memcmp(&protected_snapshot.captured, &captured, sizeof(captured)) == 0);
+		assert(ErgoptiReplay_Step(&protected_state.live, OWNER, &modifier, &protected_state.adjacent) == 0);
+		assert(protected_state.adjacent.modifiers_lr_before == 0x10
+			&& protected_state.adjacent.modifiers_lr_after == 0);
+		memcpy(&retained, &protected_state.live, sizeof(retained));
+		assert(ErgoptiReplay_Step(&protected_state.live, OWNER, &modifier,
+			(ErgoptiReplay_Snapshot *)(UINTPTR_MAX - 7u)) == ERGOPTI_REPLAY_INVALID_ARGUMENT);
+		assert(memcmp(&protected_state.live, &retained, sizeof(retained)) == 0);
+		assert(ErgoptiReplay_PrepareNativeEdge(&protected_state.live, OWNER, &captured,
+			(ErgoptiReplay_NativeKeyEdge *)(UINTPTR_MAX - 1u)) == ERGOPTI_REPLAY_INVALID_ARGUMENT);
+		assert(memcmp(&captured, &protected_snapshot.captured, sizeof(captured)) == 0);
+		/* Other refusals retain the historical cleared-output status protocol. */
+		ErgoptiReplay_NativeKeyEdge refused;
+		memset(&refused, 0xA5, sizeof(refused));
+		assert(ErgoptiReplay_PrepareNativeEdge(&protected_state.live, OWNER + 1,
+			&captured, &refused) == ERGOPTI_REPLAY_OWNER_MISMATCH);
+		assert(refused.vk == 0 && refused.scan == 0 && refused.key_up == 0 && refused.repeat == 0);
+		memset(&captured, 0xA5, sizeof(captured));
+		assert(ErgoptiReplay_Step(&protected_state.live, OWNER + 1, &modifier, &captured)
+			== ERGOPTI_REPLAY_OWNER_MISMATCH);
+		assert(captured.status == ERGOPTI_REPLAY_OWNER_MISMATCH && captured.owner == 0);
+		assert(memcmp(&protected_state.live, &retained, sizeof(retained)) == 0);
+		/* General event/output overlap remains legal, beyond snapshot.event reuse. */
+		union ReusedOutput {
+			ErgoptiReplay_Snapshot snapshot;
+			ErgoptiReplay_Event incoming;
+		} reused;
+		modifier.timestamp = 3; modifier.key_up = 0;
+		reused.incoming = modifier;
+		assert(ErgoptiReplay_Step(&protected_state.live, OWNER,
+			&reused.incoming, &reused.snapshot) == 0);
+		assert(reused.snapshot.event.timestamp == 3 && reused.snapshot.event.key_up == 0);
+		assert(reused.snapshot.modifiers_lr_before == 0 && reused.snapshot.modifiers_lr_after == 0x10);
+	}
 	puts("PASS replay-route reused input/output buffer retains its incoming event.");
 }
 

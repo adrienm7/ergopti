@@ -460,3 +460,517 @@ helpers.describe("runtime daemon pause and terminal authority", function()
 		end)
 	end)
 end)
+
+--- Runs the real repair, engine, profiles, probe and chat graph over owned OS ports.
+--- @param body function Receives actual producers and the retained service capability.
+local function with_managed_responses(body)
+	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "llm.runtime_repair" }
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+	local popen = io.popen
+	local ok, failure = xpcall(function()
+		with_owner(function(world)
+			local engine = world.load_engine()
+			local profiles = require("modules.llm.profiles")
+			local Repair = require("llm.runtime_repair")
+			world.responses, world.posts, world.observations = {}, {}, 0
+			world.runtime_valid, world.service_current = true, true
+			local engine_port, proof, app_source, app_epoch
+			local runtime = { current = function() world.observations = world.observations + 1; return world.runtime_valid end,
+				executable = function() return "/private/owned-ollama/bin/ollama" end }
+			local function operation(kind, done, authorized)
+				local op = { started = kind == "service" or kind == "timer", closed = false, listeners = {} }
+				function op:is_settled() return self.closed end
+				function op:on_settled(fn) if self.closed then fn() else self.listeners[#self.listeners + 1] = fn end; return true end
+				function op:close()
+					self.closed = true
+					local listeners = self.listeners; self.listeners = {}
+					for _, fn in ipairs(listeners) do fn() end
+				end
+				function op:cancel()
+					world.native_cancels = (world.native_cancels or 0) + 1
+					self.cancelled = true
+					if kind ~= "service" or not world.hold_service then self:close() end
+					return self.closed
+				end
+				function op:is_current() world.observations = world.observations + 1; return world.service_current and not self.closed and not self.cancelled and authorized() end
+				function op:is_running()
+					world.observations = world.observations + 1
+					local admitted = kind == "service" and not self.exited and self:is_current()
+					if world.observe_running then world.returned_running = true end
+					return admitted and not self.exited and not self.closed and not self.cancelled
+				end
+				function op:answer(value) done(value); self:close() end
+				return op
+			end
+			local ports = {
+				current = function() return engine_port.state().enabled == false end,
+				resolve = function() return { status = "installed", runtime = runtime } end,
+				install = function() error("this graph never installs a binary") end,
+				after = function(_, done) return operation("timer", done, function() return true end) end,
+				now_ms = function() return 0 end,
+				start_service = function(_, _, options, done)
+					world.service = operation("service", done, options.authorized); return world.service
+				end,
+				probe = function(_, _, _, done) world.ready = operation("probe", done, function() return true end); return world.ready end,
+				publish = function(_, acknowledge)
+					local state = engine_port.state()
+					if profiles.enable() ~= true or engine_port.publish_enabled(state.revision, state.app_epoch) ~= true then return false end
+					proof = {}; return acknowledge(proof)
+				end,
+				app_capture = function(candidate)
+					if candidate ~= proof then return nil end
+					app_source, app_epoch = {}, engine_port.state().app_epoch; return app_source
+				end,
+				app_current = function(source)
+					if world.on_observe then world.on_observe() end
+					world.observations = world.observations + 1
+					return source == app_source and engine_port.state().app_epoch == app_epoch
+				end,
+				compensate = function() return false end,
+			}
+			world.controller = Repair.new(ports, { bootstrap_timeout_ms = 100, poll_ms = 10 })
+			package.loaded["modules.llm.runtime_factory"] = { new = function(captured)
+				engine_port = captured
+				return { controller = world.controller, resolve = function() return { status = "installed" } end,
+					source = { capture = function() return { origin = engine.get_base_url() } end, diagnostic_current = function() return false end } }
+			end }
+			world.choice_index = 1
+			helpers.assert_true(engine.enable()); world.answer({ ok = false, status = 503, body = "" })
+			assert(world.ready, "the actual explicit repair acquired its version probe")
+			world.ready:answer({ ok = true, status = 200, body = '{"version":"0.24.0"}' })
+			helpers.assert_true(engine.is_enabled()); helpers.assert_eq(world.controller:app_status(), "running")
+			local Http = package.loaded["adapters.http_client"]
+			Http.postStream = function(url, _, _, _, chunk, done)
+				world.posts[#world.posts + 1] = { url = url, chunk = chunk, done = done }; return true
+			end
+			world.api = helpers.load_module("modules.llm.api_ollama")
+			world.profiles = profiles
+			function world:chat(verify)
+				return self.api.chat(engine.get_base_url(), "model:2b", {}, { verify_local_model = verify == true },
+					function(text) self.responses[#self.responses + 1] = "chunk:" .. text end,
+					function(text, err) self.responses[#self.responses + 1] = err or "done:" .. text end)
+			end
+			function world:respond()
+				local post = assert(self.posts[#self.posts]); post.chunk('{"message":{"content":"stale"}}\n'); post.done({ ok = true, status = 200 })
+			end
+			function world:begin_app()
+				local state = engine_port.state()
+				assert(self.controller:stop_app())
+				assert(profiles.disable()); assert(engine_port.restore_disabled(state.revision, state.app_epoch))
+				return self.controller:start({ origin = engine.get_base_url() }, "start", true)
+			end
+			function world:replace_app()
+				local request = self:begin_app()
+				self.ready:answer({ ok = true, status = 200, body = '{"version":"0.24.0"}' })
+				assert(request.result and request.result.ok == true)
+				assert(self.controller:app_status() == "running")
+			end
+			body(world, engine)
+			engine.stop_runtime(); world.api.cancel()
+		end)
+	end, debug.traceback)
+	io.popen = popen
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(failure, 0) end
+end
+
+helpers.describe("managed response preserves the originating application", function()
+	for _, unsettled in ipairs({ false, true }) do
+		test("(linux-managed-response) stopped app cannot publish late stream, debt=" .. tostring(unsettled), function()
+			with_managed_responses(function(world, engine)
+				world:chat(); helpers.assert_eq(#world.posts, 1)
+				world.hold_service = unsettled
+				helpers.assert_eq(engine.stop_runtime(), not unsettled)
+				world:respond(); helpers.assert_eq(#world.responses, 0, "same URL and unchanged chat epoch cannot revive the retired app")
+			end)
+		end)
+	end
+	test("(linux-managed-response) retained service exit cannot publish late stream or retire resources", function()
+		with_managed_responses(function(world)
+			world:chat(); world.service.exited = true
+			local cancellations = world.native_cancels
+			world:respond(); helpers.assert_eq(#world.responses, 0)
+			helpers.assert_eq(world.native_cancels, cancellations, "response observations never stop or retire a service")
+		end)
+	end)
+	test("(linux-managed-response) retired binary source cannot turn a tags response into chat", function()
+		with_managed_responses(function(world)
+			world:chat(true); local tags = world.calls[#world.calls]
+			world.runtime_valid = false
+			tags.callback({ ok = true, status = 200, body = '{"models":[{"name":"model:2b"}]}' })
+			helpers.assert_eq(#world.posts, 0); helpers.assert_eq(#world.responses, 0)
+		end)
+	end)
+	test("(linux-managed-response) origin construction cannot capture a successor after retiring the producer", function()
+		with_managed_responses(function(world, engine)
+			local Bridge = require("infra.llm_bridge"); local endpoint = Bridge.ollama_endpoint
+			Bridge.ollama_endpoint = function(...) engine.stop_runtime(); return endpoint(...) end
+			local called, failure = pcall(world.chat, world)
+			Bridge.ollama_endpoint = endpoint
+			helpers.assert_true(called, failure); helpers.assert_eq(#world.posts, 0); helpers.assert_eq(#world.responses, 0)
+		end)
+	end)
+	test("(linux-managed-response) same app permits the original stream", function()
+		with_managed_responses(function(world)
+			world:chat(); world:respond()
+			helpers.assert_eq(world.responses, { "chunk:stale", "done:stale" })
+		end)
+	end)
+end)
+
+helpers.describe("managed response private identities and inventory", function()
+	test("(linux-managed-response) same-origin app replacement cannot borrow the unchanged engine epoch", function()
+		with_managed_responses(function(world)
+			world:chat(); world:replace_app(); world:respond()
+			helpers.assert_eq(#world.responses, 0, "the original private app differs even at the same origin and engine epoch")
+		end)
+	end)
+	test("(linux-managed-response) capture invokes no observer and forged handles cannot authenticate", function()
+		with_managed_responses(function(world, engine)
+			local before = world.observations
+			local receipt = engine.capture_runtime_response()
+			helpers.assert_eq(world.observations, before, "capture is lexical only")
+			helpers.assert_eq(engine.runtime_response_current({}, engine.get_base_url()), false)
+			receipt.app, receipt.epoch = {}, -1
+			helpers.assert_true(engine.runtime_response_current(receipt, engine.get_base_url()), "caller fields have no authority")
+			helpers.assert_eq(world.api.chat(engine.get_base_url(), "model:2b", {}, { runtime_response = {} }), false)
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+	test("(linux-managed-response) endpoint reader retires the producer before model inventory dispatch", function()
+		with_managed_responses(function(world, engine)
+			local Bridge = require("infra.llm_bridge"); local endpoint = Bridge.ollama_endpoint
+			local opens = 0
+			io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"stale"}]}' end, close = function() return true end } end
+			Bridge.ollama_endpoint = function(...) engine.stop_runtime(); return endpoint(...) end
+			local called, models = pcall(world.profiles.refresh_models)
+			Bridge.ollama_endpoint = endpoint
+			helpers.assert_true(called, models); helpers.assert_eq(models, {}); helpers.assert_eq(opens, 0)
+		end)
+	end)
+	test("(linux-managed-response) same-origin service replacement during inventory read cannot publish models", function()
+		with_managed_responses(function(world)
+			io.popen = function() return { read = function() world:replace_app(); return '{"models":[{"name":"stale"}]}' end, close = function() return true end } end
+			helpers.assert_eq(world.profiles.refresh_models(), {})
+			helpers.assert_eq(world.profiles.get_current_model(), "model:2b")
+		end)
+	end)
+	test("(linux-managed-response) inventory cache belongs to its original private app", function()
+		with_managed_responses(function(world)
+			local opens = 0
+			io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"model:2b"}]}' end, close = function() return true end } end
+			helpers.assert_eq(world.profiles.refresh_models(), { "model:2b" })
+			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(opens, 1)
+			world:replace_app()
+			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(opens, 2, "a fresh app requires its own inventory response")
+		end)
+	end)
+	test("(linux-managed-response) origin resolution refuses before borrowing a newer managed owner", function()
+		with_managed_responses(function(world, engine)
+			local getter = world.profiles.get_base_url
+			world.profiles.get_base_url = function() world.profiles.get_base_url = getter; engine.stop_runtime(); return getter() end
+			helpers.assert_nil(engine.resolve_backend())
+			world.profiles.get_base_url = getter
+		end)
+	end)
+end)
+
+helpers.describe("managed response reentrancy and closed authority", function()
+	test("(linux-managed-response) source observer cannot deliver an old chunk after installing a successor request", function()
+		with_managed_responses(function(world)
+			local chunks = {}
+			world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function(text) chunks[#chunks + 1] = text end)
+			local original = world.posts[1]
+			world.on_observe = function()
+				world.on_observe = nil
+				world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function() end)
+			end
+			original.chunk('{"message":{"content":"old"}}\n')
+			helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
+		end)
+	end)
+	test("(linux-managed-response) a chunk callback retiring the app fences later lines in that same native chunk", function()
+		with_managed_responses(function(world, engine)
+			local chunks = {}
+			world.api.chat(engine.get_base_url(), "model:2b", {}, {}, function(text)
+				chunks[#chunks + 1] = text; engine.stop_runtime()
+			end)
+			world.posts[1].chunk('{"message":{"content":"first"}}\n{"message":{"content":"second"}}\n')
+			helpers.assert_eq(chunks, { "first" })
+		end)
+	end)
+	for _, member in ipairs({ "capture_response", "response_current" }) do
+		test("(linux-managed-response) replaced compatible controller port cannot grant custody: " .. member, function()
+			with_managed_responses(function(world)
+				local original = world.controller[member]
+				world.controller[member] = function() return member == "response_current" and true or {} end
+				local dispatched = world:chat()
+				world.controller[member] = original
+				helpers.assert_eq(dispatched, false); helpers.assert_eq(#world.posts, 0)
+			end)
+		end)
+	end
+	test("(linux-managed-response) stale response retains refused HTTP cancellation until actual acknowledgement", function()
+		with_managed_responses(function(world, engine)
+			world:chat(); engine.stop_runtime(); world:respond()
+			world.cancel_ok = false
+			helpers.assert_eq(world.api.cancel(), false); helpers.assert_true(world.api.is_active())
+			helpers.assert_eq(world:chat(), false); helpers.assert_eq(#world.posts, 1)
+			world.cancel_ok = true
+			helpers.assert_true(world.api.cancel()); helpers.assert_eq(world.api.is_active(), false)
+			helpers.assert_eq(world.responses, {}, "stale logical/cancel callbacks cannot claim replacement authority")
+		end)
+	end)
+	test("(linux-managed-response) fresh unowned same-origin query is observable only through its actual response", function()
+		with_managed_responses(function(world, engine)
+			local before = engine.capture_runtime_response()
+			helpers.assert_true(engine.stop_runtime())
+			helpers.assert_eq(world.api.chat(engine.get_base_url(), "model:2b", {}, { runtime_response = before }), false)
+			helpers.assert_eq(#world.posts, 0)
+			world:chat(); world:respond()
+			helpers.assert_eq(world.responses, { "chunk:stale", "done:stale" }, "a new explicit external query remains allowed, without a managed-identity claim")
+		end)
+	end)
+end)
+
+helpers.describe("managed response observer and cache publication order", function()
+	test("(linux-managed-response) superseded synchronous inventory cannot overwrite a newer cache", function()
+		with_managed_responses(function(world)
+			local reads = 0
+			io.popen = function() return { read = function()
+				reads = reads + 1
+				if reads == 1 then
+					helpers.assert_eq(world.profiles.refresh_models(), { "new" })
+					return '{"models":[{"name":"old"}]}'
+				end
+				return '{"models":[{"name":"new"}]}'
+			end, close = function() return true end } end
+			helpers.assert_eq(world.profiles.refresh_models(), {})
+			helpers.assert_eq(world.profiles.get_models(), { "new" }); helpers.assert_eq(reads, 2)
+		end)
+	end)
+	test("(linux-managed-response) final running proof has no later source observer", function()
+		with_managed_responses(function(world, engine)
+			local receipt = engine.capture_runtime_response()
+			world.returned_running, world.observe_running = false, true
+			world.on_observe = function() if world.returned_running then world.service.exited = true end end
+			helpers.assert_true(engine.runtime_response_current(receipt, world.profiles.get_base_url()))
+			helpers.assert_eq(world.service.exited, nil, "source callbacks cannot invalidate the final physical running observation")
+			world.on_observe, world.observe_running = nil, false
+		end)
+	end)
+	test("(linux-managed-response) reentrant controller-port replacement is refused by the originating wrapper", function()
+		with_managed_responses(function(world, engine)
+			local receipt = engine.capture_runtime_response()
+			local original = world.controller.response_current
+			world.on_observe = function() world.on_observe = nil; world.controller.response_current = function() return true end end
+			local current = engine.runtime_response_current(receipt, world.profiles.get_base_url())
+			world.controller.response_current = original
+			helpers.assert_eq(current, false)
+		end)
+	end)
+end)
+
+helpers.describe("managed provisional source has no response authority", function()
+	test("(linux-managed-response) provisional serve cannot borrow an absent app receipt", function()
+		with_managed_responses(function(world, engine)
+			local pending = world:begin_app()
+			helpers.assert_eq(pending:is_settled(), false)
+			local before = world.observations
+			local receipt = engine.capture_runtime_response()
+			helpers.assert_eq(world.observations, before)
+			helpers.assert_eq(engine.runtime_response_current(receipt, world.profiles.get_base_url()), false)
+			helpers.assert_eq(world:chat(), false); helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+end)
+
+helpers.describe("managed response reaches original transport admission", function()
+	test("(linux-managed-response) repeated app stop revokes an already unowned request epoch", function()
+		with_managed_responses(function(world, engine)
+			assert(engine.stop_runtime()); world:chat(); assert(engine.stop_runtime()); world:respond()
+			helpers.assert_eq(world.responses, {})
+		end)
+	end)
+	test("(linux-managed-response) standalone tags response cannot borrow a replacement app", function()
+		with_managed_responses(function(world, engine)
+			local delivered = 0
+			helpers.assert_true(require("modules.llm.local_model_probe").verify(engine.get_base_url(), "model:2b", nil,
+				function() delivered = delivered + 1 end))
+			local probe = world.calls[#world.calls]
+			world:replace_app()
+			probe.callback({ ok = true, status = 200, body = '{"models":[{"name":"model:2b"}]}' })
+			helpers.assert_eq(delivered, 0)
+		end)
+	end)
+	test("(linux-managed-response) native transport constructor receives the original final admission predicate", function()
+		with_managed_responses(function(world, engine)
+			local dispatched = 0
+			package.loaded["adapters.http_client"].postStream = function(_, _, _, options)
+				assert(engine.stop_runtime())
+				if options.authorized and options.authorized() ~= true then return false end
+				dispatched = dispatched + 1; return true
+			end
+			helpers.assert_eq(world:chat(), false)
+			helpers.assert_eq(dispatched, 0, "the existing actual HTTP admission contract must reject after reentrant teardown")
+		end)
+	end)
+end)
+
+helpers.describe("managed response closes per-line observer currency", function()
+	test("(linux-managed-response) per-line source observer cannot publish into a superseded request", function()
+		with_managed_responses(function(world)
+			local chunks = {}
+			world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function(text) chunks[#chunks + 1] = text end)
+			local original = world.posts[1]
+			local Bridge = require("infra.llm_bridge"); local parse = Bridge.parse_stream_line
+			Bridge.parse_stream_line = function(line)
+				Bridge.parse_stream_line = parse
+				world.on_observe = function()
+					world.on_observe = nil
+					world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function() end)
+				end
+				return parse(line)
+			end
+			local called, failure = pcall(original.chunk, '{"message":{"content":"old"}}\n')
+			Bridge.parse_stream_line = parse
+			helpers.assert_true(called, failure); helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
+		end)
+	end)
+end)
+
+helpers.describe("managed response consumers retain constructor-bound engine ports", function()
+	for _, consumer in ipairs({ "chat", "probe", "inventory" }) do
+		test("(linux-managed-response) compatible latest engine exports cannot authorize " .. consumer, function()
+			with_managed_responses(function(world, engine)
+				local probe = helpers.load_module("modules.llm.local_model_probe")
+				local capture, current = engine.capture_runtime_response, engine.runtime_response_current
+				local opens, delivered = 0, 0
+				io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"forged"}]}' end, close = function() return true end } end
+				engine.capture_runtime_response, engine.runtime_response_current = function() return {} end, function() return true end
+				local probes = #world.calls
+				local called, result = pcall(function()
+					if consumer == "chat" then return world:chat() end
+					if consumer == "probe" then return probe.verify(world.profiles.get_base_url(), "model:2b", nil, function() delivered = delivered + 1 end) end
+					return world.profiles.refresh_models()
+				end)
+				engine.capture_runtime_response, engine.runtime_response_current = capture, current
+				helpers.assert_true(called, result)
+				if consumer == "inventory" then helpers.assert_eq(result, {}) else helpers.assert_eq(result, false) end
+				helpers.assert_eq(#world.posts, 0); helpers.assert_eq(#world.calls, probes)
+				helpers.assert_eq(opens, 0); helpers.assert_eq(delivered, 0)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("managed inventory getter retains its original invocation", function()
+	local function install_inventory_pipe(world, names)
+		world.inventory_opens = 0
+		io.popen = function()
+			world.inventory_opens = world.inventory_opens + 1
+			return {
+				read = function()
+					if world.inventory_read then world.inventory_read() end
+					local model = names[world.inventory_opens] or names[#names]
+					return '{"models":[{"name":"' .. model .. '"}]}'
+				end,
+				close = function() return true end,
+			}
+		end
+	end
+
+	test("(linux-inventory-getter) shutdown refuses retained cache without touching personal selection", function()
+		with_managed_responses(function(world, engine)
+			install_inventory_pipe(world, { "original:2b" })
+			helpers.assert_eq(world.profiles.refresh_models(), { "original:2b" })
+			helpers.assert_eq(world.profiles.get_models(), { "original:2b" })
+			helpers.assert_eq(world.inventory_opens, 1)
+			helpers.assert_true(engine.shutdown_runtime())
+			helpers.assert_eq(world.profiles.get_models(), {}, "Refused refresh cannot expose the old cached inventory.")
+			helpers.assert_eq(world.inventory_opens, 1)
+			helpers.assert_eq(world.profiles.get_current_model(), "model:2b", "Configured selection remains personal state.")
+		end)
+	end)
+
+	test("(linux-inventory-getter) exited retained service refuses stale cache without cleanup or transport", function()
+		with_managed_responses(function(world)
+			install_inventory_pipe(world, { "original:2b" })
+			helpers.assert_eq(world.profiles.refresh_models(), { "original:2b" })
+			local cancellations = world.native_cancels or 0
+			world.service.exited = true
+			helpers.assert_eq(world.profiles.get_models(), {})
+			helpers.assert_eq(world.inventory_opens, 1)
+			helpers.assert_eq(world.native_cancels or 0, cancellations, "Currency is read-only and grants no retirement.")
+		end)
+	end)
+
+	test("(linux-inventory-getter) cached native observer cannot recapture a same-origin successor", function()
+		with_managed_responses(function(world)
+			install_inventory_pipe(world, { "original:2b", "successor:2b" })
+			helpers.assert_eq(world.profiles.refresh_models(), { "original:2b" })
+			world.on_observe = function()
+				world.on_observe = nil
+				world:replace_app()
+			end
+			helpers.assert_eq(world.profiles.get_models(), {}, "This getter belongs to the app captured before its observer.")
+			helpers.assert_eq(world.inventory_opens, 1, "Only a fresh getter may dispatch to the successor app.")
+			helpers.assert_eq(world.profiles.get_models(), { "successor:2b" })
+			helpers.assert_eq(world.inventory_opens, 2)
+		end)
+	end)
+
+	test("(linux-inventory-getter) reentrant newer inventory is preserved for its own fresh getter", function()
+		with_managed_responses(function(world)
+			install_inventory_pipe(world, { "original:2b", "newer:2b", "unexpected-third:2b" })
+			helpers.assert_eq(world.profiles.refresh_models(), { "original:2b" })
+			world.on_observe = function()
+				world.on_observe = nil
+				helpers.assert_eq(world.profiles.refresh_models(), { "newer:2b" })
+			end
+			helpers.assert_eq(world.profiles.get_models(), {}, "A superseded getter cannot publish a newer operation's cache.")
+			helpers.assert_eq(world.inventory_opens, 2)
+			helpers.assert_eq(world.profiles.get_models(), { "newer:2b" })
+			helpers.assert_eq(world.inventory_opens, 2, "The original getter must not erase or refetch its successor's cache.")
+		end)
+	end)
+
+	test("(linux-inventory-getter) fresh external response after app retirement retains ordinary caching", function()
+		with_managed_responses(function(world, engine)
+			install_inventory_pipe(world, { "original:2b", "external:2b" })
+			helpers.assert_eq(world.profiles.refresh_models(), { "original:2b" })
+			helpers.assert_true(engine.stop_runtime())
+			helpers.assert_eq(world.profiles.get_models(), { "external:2b" })
+			helpers.assert_eq(world.profiles.get_models(), { "external:2b" })
+			helpers.assert_eq(world.inventory_opens, 2, "Absence observes the transport response without authenticating an external PID.")
+		end)
+	end)
+
+	test("(linux-inventory-getter) original empty-cache getter rejects delayed native read after service replacement", function()
+		with_managed_responses(function(world)
+			install_inventory_pipe(world, { "late:2b", "successor:2b" })
+			world.inventory_read = function()
+				world.inventory_read = nil
+				world:replace_app()
+			end
+			helpers.assert_eq(world.profiles.get_models(), {})
+			helpers.assert_eq(world.inventory_opens, 1)
+			helpers.assert_eq(world.profiles.get_models(), { "successor:2b" })
+			helpers.assert_eq(world.inventory_opens, 2)
+		end)
+	end)
+	test("(linux-inventory-getter) delayed getter refresh returns refusal while preserving newer inventory", function()
+		with_managed_responses(function(world)
+			install_inventory_pipe(world, { "old-read:2b", "newer:2b" })
+			world.inventory_read = function()
+				world.inventory_read = nil
+				helpers.assert_eq(world.profiles.refresh_models(), { "newer:2b" })
+			end
+			helpers.assert_eq(world.profiles.get_models(), {}, "The getter must return its refresh refusal, not the newer global cache.")
+			helpers.assert_eq(world.inventory_opens, 2)
+			helpers.assert_eq(world.profiles.get_models(), { "newer:2b" })
+			helpers.assert_eq(world.inventory_opens, 2)
+		end)
+	end)
+
+end)

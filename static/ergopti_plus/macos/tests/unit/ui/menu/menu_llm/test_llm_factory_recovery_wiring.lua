@@ -10,6 +10,36 @@ local helpers = require("tests.helpers")
 local with_activation = require("tests.support.llm_activation_fixture")
 
 helpers.describe("LLM Factory Recovery Wiring", function()
+	helpers.it("(local-model-service-consent) forwards retained consent through the actual menu installer", function()
+		helpers.with_stub_scope({ "modules.llm.local_model_offer" }, function()
+			local installer
+			package.loaded["modules.llm.local_model_offer"] = {
+				set_installer = function(fn) installer = fn end,
+			}
+			with_activation("ollama", {}, {}, function()
+				local models = package.loaded["ui.menu.menu_llm.models_manager"].new()
+				local captured, completed, cancelled
+				models.pull_ollama_model = function(model, success, cancel, opts)
+					captured = { model = model, success = success, cancel = cancel, opts = opts }
+					return true
+				end
+				local current = function() return true end
+				helpers.assert_type(installer, "function")
+				helpers.assert_true(installer("fixture-model", function(ok, reason)
+					completed, cancelled = ok, reason
+				end, current))
+				helpers.assert_eq(captured.model, "fixture-model")
+				helpers.assert_type(captured.opts, "table", "the real menu must retain consent beyond its first dialog")
+				helpers.assert_eq(captured.opts.is_current, current)
+				captured.cancel("stale")
+				helpers.assert_eq(completed, false)
+				helpers.assert_eq(cancelled, "stale")
+				captured.success()
+				helpers.assert_eq(completed, true)
+			end)
+		end)
+	end)
+
 	helpers.it("HS-034 forwards the live candidate recovery owner through the real factory", function()
 		local candidate_calls = 0
 		with_activation("ollama", {}, {

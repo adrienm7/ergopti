@@ -78,6 +78,9 @@ global _LLM_NavEventOwnerTerminalRouteGeneration := 0
 global _LLM_NavEventOwnerTerminalRouteNextRecipe := 0
 global _LLM_NavEventOwnerTerminalRouteNextLayout := 1
 global _LLM_NavEventOwnerTerminalRouteRefreshing := false
+; An uncertain native registration retains its original candidate and owner.
+; No current-registration readback/settlement contract exists yet.
+global _LLM_NavEventOwnerTerminalRouteUnknown := 0
 global _LLM_NavEventOwnerTerminalRouteRecipes := Map()
 global _LLM_NavEventOwnerTerminalRouteModels := Map()
 global _LLM_NavEventOwnerTerminalRouteCoverage := Map(
@@ -2297,47 +2300,301 @@ _LLM_NavEventOwnerPublishCurrentProfileSurface(
 LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 	global _LLM_NavEventOwnerTerminalRouteRefreshing
 	global _LLM_NavEventOwnerTerminalRouteGeneration
-	global _LLM_NavEventOwnerTerminalRouteOwner
 	global _LLM_NavEventOwnerTerminalRouteRecipes
 	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteUnknown
 	PreviousCritical := Critical("On")
 	try {
 		if _LLM_NavEventOwnerTerminalRouteRefreshing
 			return false
+		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+			throw Error("Uncertain terminal registration retains its original native owner.")
 		_LLM_NavEventOwnerTerminalRouteRefreshing := true
 		try {
-			SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
-			Source := HasMethod(SourceFn, "Call")
-				? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
+			Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
+			try {
+				SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
+				Source := HasMethod(SourceFn, "Call")
+					? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+			} catch as Err {
+				if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
+					_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw Err
+			}
 			_LLM_NavEventOwnerTerminalRouteGeneration += 1
 			if _LLM_NavEventOwnerTerminalRouteGeneration <= 0
 				throw Error("Terminal route registration generation overflowed.")
 			Generation := _LLM_NavEventOwnerTerminalRouteGeneration
-			Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation)
+			Frame["generation"] := Generation
+			try Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame)
+			catch as Err {
+				; A partial build may legitimately allocate unused IDs/models. Its
+				; previous native references still cannot move to a foreign holder.
+				if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, false, false)
+					_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw Err
+			}
+			Frame["candidate"] := Candidate
+			_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source)
+			; Building may add one model identity, but never replaces its owner/maps.
+			if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, false) {
+				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw ValueError("The terminal source changed during recipe capture.")
+			}
+			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
 			Bindings := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
-			RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
-			Status := HasMethod(RegisterFn, "Call")
-				? RegisterFn.Call(_LLM_NavEventOwnerTerminalRouteOwner,
-					Generation, Candidate["layout_id"], Bindings, Candidate["routes"].Length)
+			Witness := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
+			Frame["bindings"] := Witness
+			try {
+				RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+			} catch as Err {
+				if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
+					_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw Err
+			}
+			Frame["native_attempted"] := true
+			try Status := HasMethod(RegisterFn, "Call")
+				? RegisterFn.Call(Frame["owner"], Generation, Candidate["layout_id"],
+					Bindings, Candidate["routes"].Length)
 				: _LLM_NavEventOwnerNativeRegisterTerminalRoutes(
-					_LLM_NavEventOwnerTerminalRouteOwner, Generation,
-					Candidate["layout_id"], Bindings, Candidate["routes"].Length)
-			if !(Status is Integer)
-				throw Error("Terminal route registration returned a malformed ACK.")
+					Frame["owner"], Generation, Candidate["layout_id"],
+					Bindings, Candidate["routes"].Length)
+			catch as Err {
+				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw Err
+			}
+			try {
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+				if !_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Bindings, Witness)
+					throw ValueError("The registration callback changed the native descriptor bytes.")
+			} catch as Err {
+				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw Err
+			}
+			if !(Status is Integer) || !_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
+				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw Error("Terminal route registration returned an unknown ACK.")
+			}
 			if Status == -11
 				return false
 			_LLM_NavEventOwnerNativeRequireOk(Status, "Terminal route registration")
 			for RecipeId, Admission in Candidate["recipes"]
-				_LLM_NavEventOwnerTerminalRouteRecipes[RecipeId] := Admission
+				Frame["recipes"][RecipeId] := Admission
 			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
 				"generation", Generation, "layout_id", Candidate["layout_id"],
 				"registered", Candidate["routes"].Length,
 				"cohort_complete", false, "transformed_output_enabled", false,
 				"unconverted", Candidate["unconverted"])
-			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port)
+			Frame["coverage"] := _LLM_NavEventOwnerTerminalRouteCoverage
+			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame)
+			if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
+				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+				throw ValueError("The original registration owner changed during retirement.")
+			}
 			return true
 		} finally _LLM_NavEventOwnerTerminalRouteRefreshing := false
 	} finally Critical(PreviousCritical)
+}
+
+/** Exact private authority retained before source/registration callbacks. */
+_LLM_NavEventOwnerTerminalRegistrationCapture() {
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	Owner := _LLM_NavEventOwnerTerminalRouteOwner
+	Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+	Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
+	Coverage := _LLM_NavEventOwnerTerminalRouteCoverage
+	NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe, NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
+	if !(NextRecipe is Integer) || NextRecipe < 0 || !(NextLayout is Integer) || NextLayout <= 0
+			|| !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation < 0
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipes)
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Models)
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Coverage)
+		throw ValueError("The terminal registration authority is malformed.")
+	for RecipeId in Recipes
+		if !(RecipeId is Integer) || RecipeId <= 0 || RecipeId > NextRecipe
+			throw ValueError("The terminal recipe identity owner precedes its retained references.")
+	Frame := Map("owner", Owner, "generation", Generation, "recipes", Recipes,
+		"models", Models, "coverage", Coverage, "recipe_refs", Recipes.Clone(),
+		"model_refs", Models.Clone(), "candidate", 0, "bindings", 0, "native_attempted", false,
+		"next_recipe", NextRecipe, "next_layout", NextLayout)
+	_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+	return Frame
+}
+
+_LLM_NavEventOwnerTerminalRegistrationPlainMap(Value) {
+	if !(Value is Map) || ObjGetBase(Value) != Map.Prototype
+		return false
+	for Name in ["Get", "Has", "Clone", "__Item", "__Enum", "Count"]
+		if Object.Prototype.HasOwnProp.Call(Value, Name)
+			return false
+	return true
+}
+
+/** No callback may exchange dictionary cells and still retire their old holders. */
+_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Owned, Snapshot) {
+	if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Owned) || Owned.Count != Snapshot.Count
+		return false
+	for Id, Value in Snapshot
+		if !Owned.Has(Id) || Type(Owned[Id]) != Type(Value) || !(Owned[Id] == Value)
+			return false
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, CheckModels := true, CheckIds := true) {
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	return _LLM_NavEventOwnerTerminalRouteOwner is Integer
+		&& _LLM_NavEventOwnerTerminalRouteOwner == Frame["owner"]
+		&& _LLM_NavEventOwnerTerminalRouteGeneration is Integer
+		&& _LLM_NavEventOwnerTerminalRouteGeneration == Frame["generation"]
+		&& _LLM_NavEventOwnerTerminalRouteRecipes == Frame["recipes"]
+		&& _LLM_NavEventOwnerTerminalRouteModels == Frame["models"]
+		&& _LLM_NavEventOwnerTerminalRouteCoverage == Frame["coverage"]
+		&& (!CheckIds || (_LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextRecipe == Frame["next_recipe"]
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout == Frame["next_layout"]))
+		&& _LLM_NavEventOwnerTerminalRegistrationPlainMap(Frame["models"])
+		&& _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["recipes"], Frame["recipe_refs"])
+		&& (!CheckModels || _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["models"], Frame["model_refs"]))
+		&& _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels)
+}
+
+/** Only this build's contiguous recipe IDs and one new model may advance owners. */
+_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source) {
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	ExpectedRecipe := Frame["next_recipe"] + Candidate["routes"].Length
+	NewModel := Source["active"] && Source.Get("model", 0) is Map
+		&& !Frame["model_refs"].Has(ObjPtr(Source["model"]))
+	ExpectedLayout := Frame["next_layout"] + (NewModel ? 1 : 0)
+	Valid := _LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+		&& _LLM_NavEventOwnerTerminalRouteNextRecipe == ExpectedRecipe
+		&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+		&& _LLM_NavEventOwnerTerminalRouteNextLayout == ExpectedLayout
+	for Index, Route in Candidate["routes"]
+		if Route["recipe_id"] != Frame["next_recipe"] + Index
+			Valid := false
+	if !Valid {
+		_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+		throw ValueError("A callback changed the terminal registration identity owners.")
+	}
+	Frame["next_recipe"] := ExpectedRecipe, Frame["next_layout"] := ExpectedLayout
+}
+
+/** Keep selected original object references even if a callback mutates a cell. */
+_LLM_NavEventOwnerTerminalRegistrationRetain(Frame) {
+	Frame["recipe_refs"] := Frame["recipes"].Clone()
+	Frame["model_refs"] := Frame["models"].Clone()
+	Routes := Map(), Models := Map()
+	for Id, Admission in Frame["recipes"] {
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
+			throw ValueError("A retained terminal recipe cell is malformed.")
+		Recipe := Admission["recipe"]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission["route"])
+				|| (Recipe is Map && !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe))
+			throw ValueError("The retained terminal route/model recipe is malformed.")
+		Routes[Id] := Map("route", Admission["route"], "recipe", Recipe,
+			"model", Recipe is Map ? Recipe.Get("model", 0) : 0,
+			"route_fields", Admission["route"].Clone(),
+			"recipe_fields", Recipe is Map ? Recipe.Clone() : 0,
+			"generation", Admission["generation"], "layout_id", Admission["layout_id"])
+	}
+	for Id, Identity in Frame["models"] {
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				|| !(Identity.Get("id", 0) is Integer) || Identity["id"] <= 1
+				|| Identity["id"] > Frame["next_layout"]
+			throw ValueError("A retained terminal model cell is malformed.")
+		Models[Id] := Map("model", Identity["model"], "id", Identity["id"])
+	}
+	Frame["route_objects"] := Routes, Frame["model_objects"] := Models
+}
+
+_LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels) {
+	if !CheckModels && !_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent(Frame)
+		return false
+	for Id, Expected in Frame["route_objects"] {
+		if !Frame["recipes"].Has(Id)
+			return false
+		Admission := Frame["recipes"][Id]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
+			return false
+		for Name in ["route", "recipe", "generation", "layout_id"]
+			if Type(Admission.Get(Name, "")) != Type(Expected[Name]) || !(Admission.Get(Name, "") == Expected[Name])
+				return false
+		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Expected["route"], Expected["route_fields"])
+			return false
+		Recipe := Expected["recipe"]
+		if Recipe is Map && (!_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe)
+				|| Recipe.Get("model", 0) != Expected["model"]
+				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Recipe, Expected["recipe_fields"]))
+			return false
+	}
+	; A partial builder may add its captured identity, but cannot mutate old cells.
+	for Id, Expected in Frame["model_objects"] {
+		if !Frame["models"].Has(Id)
+			return false
+		Identity := Frame["models"][Id]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				|| Identity.Get("model", 0) != Expected["model"]
+				|| !(Identity.Get("id", 0) is Integer) || Identity["id"] != Expected["id"]
+			return false
+	}
+	return true
+}
+
+/** Preserve old cells and the one actual allocation before recapturing snapshots. */
+_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent(Frame) {
+	Models := Frame["models"], Original := Frame["model_refs"]
+	for Id, Identity in Original
+		if !Models.Has(Id) || Models[Id] != Identity
+			return false
+	Key := Frame.Get("build_model_key", 0)
+	NewModel := Key != 0 && !Original.Has(Key)
+	if Models.Count != Original.Count + (NewModel ? 1 : 0)
+		return false
+	if Key != 0 {
+		if !Models.Has(Key) || Models[Key] != Frame["build_model_cell"]
+			return false
+		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Models[Key], Frame["build_model_fields"])
+			return false
+	}
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRegistrationRequire(Frame) {
+	if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
+		throw ValueError("A callback withdrew the original terminal registration authority.")
+}
+
+_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Actual, Expected) {
+	if !(Actual is Buffer) || Actual.Size != Expected.Size
+		return false
+	Loop Expected.Size
+		if NumGet(Actual, A_Index - 1, "UChar") != NumGet(Expected, A_Index - 1, "UChar")
+			return false
+	return true
+}
+
+/** Only documented native registration refusals prove no candidate was accepted. */
+_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
+	return Status == 0 || Status == -1 || Status == -2 || Status == -3
+		|| Status == -4 || Status == -5 || Status == -6 || Status == -9 || Status == -11
+}
+
+/** Retains original references without restoring a foreign dictionary or guessing ACK. */
+_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame) {
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	if !IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+		_LLM_NavEventOwnerTerminalRouteUnknown := Frame
+	return false
 }
 
 /**
@@ -2346,10 +2603,13 @@ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
  * script from starting capture between publication and the held-identity query.
  * A failed or malformed query retains every reference for a later safe retry.
  */
-_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port) {
+_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame := 0) {
 	global _LLM_NavEventOwnerTerminalRouteOwner
 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	if !(Frame is Map)
+		Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
 	try {
+		_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
 		HeldFn := _LLM_NavEventOwnerPortFn("list_terminal_held_recipes", Port)
 		; An injected registration without a held-reference boundary cannot prove
 		; retirement. Do not reach the real DLL through an incomplete test port.
@@ -2358,9 +2618,13 @@ _LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port) {
 			return false
 		HeldBuffer := Buffer(64 * 8, 0)
 		Reply := HasMethod(HeldFn, "Call")
-			? HeldFn.Call(_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
+			? HeldFn.Call(Frame["owner"], HeldBuffer, 64)
 			: _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
-				_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
+				Frame["owner"], HeldBuffer, 64)
+		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
+			_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+			throw ValueError("Held-query callback withdrew the original registration authority.")
+		}
 		if !(Reply is Map) || !(Reply.Get("status", "") is Integer)
 			throw Error("Held terminal recipe query returned a malformed ACK.")
 		if Reply["status"] != 0
@@ -2398,10 +2662,15 @@ _LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port) {
 			if !KeepModels.Has(Identity)
 				RetireModels.Push(Identity)
 		}
+		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
+			_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+			throw ValueError("Retirement cannot borrow a successor registration owner.")
+		}
 		for RecipeId in RetireRecipes
 			_LLM_NavEventOwnerTerminalRouteRecipes.Delete(RecipeId)
 		for Identity in RetireModels
 			_LLM_NavEventOwnerTerminalRouteModels.Delete(Identity)
+		_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
 		return true
 	} catch Error as Err {
 		_LLM_NavEventOwnerReport("Terminal route recipe retirement deferred: " . Err.Message)
@@ -2463,8 +2732,9 @@ _LLM_NavEventOwnerTerminalRouteDescriptor(RecipeId, RouteId, Axis, Code,
 		"effective_modifiers_lr", EffectiveLR)
 }
 
-_LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
+_LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0) {
 	global KEYLAYOUT_NEUTRAL_STATE
+	global _LLM_NavEventOwnerTerminalRouteModels
 	if !(Source is Map) || !Source.Has("active") || !Source.Has("caps")
 			|| !(Source["active"] is Integer) || Source["active"] < 0 || Source["active"] > 1
 			|| !(Source["caps"] is Integer) || Source["caps"] < 0 || Source["caps"] > 1
@@ -2472,6 +2742,17 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
 		throw ValueError("Terminal route source ownership is invalid.")
 	LayoutId := Source["active"] && Source.Has("model") && Source["model"] is Map
 		? _LLM_NavEventOwnerTerminalRouteLayoutId(Source["model"]) : 1
+	if Frame is Map {
+		Frame["build_model_key"] := 0
+		if Source["active"] && Source.Has("model") && Source["model"] is Map {
+			Key := ObjPtr(Source["model"]), Identity := _LLM_NavEventOwnerTerminalRouteModels[Key]
+			if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				throw ValueError("The allocated terminal model identity is malformed.")
+			Frame["build_model_key"] := Key
+			Frame["build_model_cell"] := Identity
+			Frame["build_model_fields"] := Identity.Clone()
+		}
+	}
 	Routes := []
 	Recipes := Map()
 	Unconverted := ["CapsLock", "AltGr", "dead-key sequences", "tap-hold transforms",
@@ -3241,6 +3522,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded() {
 		"ErgoptiNav_PlanTerminalOutput", "ErgoptiNav_BeginTerminalOutputAttempt",
 		"ErgoptiNav_AcknowledgeTerminalOutput", "ErgoptiNav_ConsumeTerminalOutput",
 		"ErgoptiNav_CancelTerminalOutput",
+		"ErgoptiNav_SerializeTerminalOutputAttempt",
 		"ErgoptiNav_BeginOwnerSwap",
 		"ErgoptiNav_CommitOwnerSwap", "ErgoptiNav_AbortOwnerSwap",
 		"ErgoptiNav_ClaimOwner",

@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-12. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
+Updated: 2026-10-13. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
 at `63cf3d005d371edb4e4093a906da276ced487182`, published and verified by the
 publication owner with [CI 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226).
 This checklist is the current handoff; older workflow task-status files are
@@ -11,6 +11,77 @@ Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+### October 13 Windows receiving checkpoint
+
+The isolated Windows continuation rebased the fifteen atomic AI corrections from
+`012ce5ef9886906d6e174227628a79db3fd93f26` onto fresh dev
+`13cf4ad8bf824027bde3a640b8fc0bab3cd2a701`, preserving their commit boundaries.
+Native AutoHotkey 2.0.26 receives all 88 added AI callback cases: offer affinity
+35, original-origin custody 17, manual requester 25, app picker six and auxiliary
+result five; each selected cohort exits 0 with zero failures/skips. The eight
+personal metadata source-type cases also pass. An original native 16/17 result
+exposed the auxiliary context constructor dropping its lexical origin capability;
+the constructor now retains it and all 17 cases pass without relaxing assertions.
+The managed/bootstrap and requester source guards, BOM/LF encoding and strict
+convention lint pass. These controlled callbacks do not qualify live managed or
+external model acquisition, inference, warmup, screen capture or installed apps.
+
+The broad local JS attempt remains **INCOMPLETE**, explicitly cancelled at its
+pure-source menu parity control after more than sixteen CPU minutes. Its earlier
+failed platform/receiver controls remain failures; neither cancellation nor a
+passing targeted source guard is a complete JS receipt. Full composed Windows
+unit/E2E/startup/build receiving remains open at this first checkpoint. The
+terminal bundle, C output alias preflight and observer/preregistration software
+are being received separately and are not included in this publication claim.
+Native macOS and Linux remain UNRUN here. The maintainer has no Linux machine;
+retained container receipts remain container evidence. Windows controlled/native
+software receiving, physical keyboard/hook-order/ISO/modifier acceptance and
+actual display/DPI/UIA/installed-application acceptance remain distinct.
+
+#### Windows observer hint receiving
+
+The manifest-bound observer correction receives seven new AHK lifecycle/hint
+cases, all 16 existing arrival FIFO cases and the actual shutdown-close-chain
+case, each exit 0 without failure or skip. Native execution first exposed the
+new shutdown-rollback test calling leases absent from its include graph. The
+unchanged production Begin/Cancel shutdown bodies now live in their existing
+shutdown helper, included by both production and the unit runner; no duplicate
+lease implementation or test mock replaces them. Hint invalidation and refused
+Down admission retain FIFO/privacy and ergonomic callback signatures. Actual
+InputHook delivery, IME/composition, physical pairing and hook order remain open;
+macOS/Linux do not have this Windows cross-callback hint cache.
+
+#### Windows terminal source and native artifact receiving
+
+The exact nineteen-path terminal union is received on Windows with official
+MSVC/SDK: replay eight matrices, output eleven, trace six and all 44 native-owner
+cases, followed by hardened x64 PE, exact 41 exports and source/DLL/recipe
+provenance verification. Plan and Begin originally fail genuine public alias
+regressions; their corrected wrappers reject whole-owner, immutable input/key,
+pairwise output and overflowing spans before initialization, locks or writes.
+The production-inclusion harness receives 170 cold/initialized/FIFO/planned/
+attempted-state refusal vectors, preserving the full singleton and caller bytes.
+
+All 667 terminal AHK cases pass under their six exact filters, plus 91 KLE reset
+observer and ten existing layout-emulation cases, each natural exit 0 without
+failure/skip. These Windows controlled ports do not establish user32 output or
+hook delivery. The completed preregistration candidate receives all 91 draft,
+nine original metadata and twenty added model-builder custody cases. The latter
+are native 0/20 original-red and 20/20 fixed-green, preserving old model cells
+and the actual newly allocated cell before callbacks; unknown native effects
+retain their original candidate and refuse retry. The source guards retain their
+original inverses and add controls without dropping assertions.
+
+Item 49 remains partial: complete non-hook cohort migration, production emitter
+selection/recovery and a real uncertain-registration settlement contract remain
+software/native contract work. Production cohort/transformed-output admission
+stays false. The standalone user32 fixture and SendEvent/SendInput comparison are
+UNRUN because the personal resident input owner must remain active. No forced
+output or process stop is used to obtain an acknowledgement. Full composed
+unit/E2E/startup/build and installed collector receiving remain separate gates.
+The existing collector receives 13 AHK owner cases and 30 stock PowerShell5.1
+controls, including actual archive integrity and private/successor-file refusal.
 
 ### October 12 consolidation and macOS issue 94
 
@@ -308,6 +379,18 @@ adapter requires an official matching Windows SDK/MSVC DLL rebuild. Active
 source/DLL provenance and production admission are unchanged. Full cohort
 migration, preregistration and production emission still have software work;
 no backend choice, native or physical qualification is inferred.
+
+The Windows continuation now retains fifteen atomic three-driver AI corrections
+on `codex/groups-247-windows-resume-20261013`, with exact source inventory and
+[local continuation](handovers/2026-10-13-groups-247-windows/README.md).
+The current composed focused receiving passes 175 Mac portable cases, 29 Linux
+managed-response and seven Linux getter cases, both Windows source guards and
+AHK encoding, each exit 0. These do not replace complete composition or native
+receiving: 88 added Windows AI cases remain UNRUN. TODO 46/47/48/88 stay partial.
+The same handover preserves the unfinished preregistration draft, the separate
+G6-overlap observer candidate and the unimplemented C Begin/Plan writable-output
+alias gap. TODO 49 remains software-incomplete as well as native/device-unqualified;
+no complete cohort, production backend or physical acceptance is inferred.
 
 ### Historical v1.0.0 publication checkpoint
 

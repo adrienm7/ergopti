@@ -31,10 +31,10 @@
 ;    system-auth dialogs and password fields are short-circuited at
 ;    the source. The cache inside MF_ShouldFilter keeps the per-keystroke
 ;    cost negligible (≤ 50 ms TTL).
-; 4. Per-keystroke metadata: each event carries a ``kc`` (virtual
-;    keycode) entry inside its meta Map so the walker's same-finger /
-;    same-hand streak detection has the input it needs. The QWERTY
-;    finger map in keylogger_walker.ahk consumes this directly.
+; 4. Optional key metadata: OnKeyDown supplies its actual vk/sc arguments.
+;    OnChar may retain only a same-lifecycle cached hint, because its callback
+;    has no key identity. A lifecycle barrier removes that hint; no native
+;    physical event pairing is inferred from these metadata fields.
 ; 5. Buffered flush: nothing hits disk on the keystroke path. The
 ;    buffer accumulates in RAM and a SetTimer (default 2 s) calls
 ;    KL_FlushBuffer to compose a typing entry and append it to
@@ -123,12 +123,12 @@ class KLHook {
 		static live_push_timer := unset  ; one-shot debounce for KLWV_NotifyIngest
 		static last_tick := 0        ; A_TickCount of the last captured event
 
-		; Last (vk, sc) seen by OnKeyDown — paired with OnChar so each
-		; printable char carries both the virtual keycode AND the hardware
-		; scancode. The scancode is layout-independent and is what the
-		; Windows heatmap renders against.
+		; Last admitted OnKeyDown hints within this capture/logger lifecycle.
+		; OnChar supplies no native edge identity: these are optional metadata,
+		; never authenticated physical pairing or capture/replay permission.
 		static last_vk := 0
 		static last_sc := 0
+		static last_hint_lifecycle := 0
 
 		; Active-window context cache. Avoids hammering Win32 on every
 		; keystroke; refreshed at most every CONTEXT_TTL_MS.
@@ -352,6 +352,9 @@ KL_Hook_InvalidateCapture(Stopping := false) {
 	PreviousCritical := Critical("On")
 	try {
 		KLHook.capture_generation += 1
+		KLHook.last_vk := 0
+		KLHook.last_sc := 0
+		KLHook.last_hint_lifecycle := 0
 		if Stopping
 			KLHook.capture_stopping := true
 	}
@@ -363,14 +366,20 @@ _KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := uns
 	try {
 		if A_IsSuspended
 			return false
+		if !Keylogger.initialized || Keylogger._shutting_down || KLHook.capture_stopping
+			return false
+		; Shutdown rollback may advance logger ownership without restarting InputHook.
+		if KLHook.last_hint_lifecycle != Keylogger.lifecycle_generation {
+			KLHook.last_vk := 0
+			KLHook.last_sc := 0
+		}
+		KLHook.last_hint_lifecycle := Keylogger.lifecycle_generation
 		if Kind = "key" {
 			if IsNumber(vk)
 				KLHook.last_vk := vk
 			if IsNumber(sc)
 				KLHook.last_sc := sc
 		}
-		if !Keylogger.initialized || Keylogger._shutting_down || KLHook.capture_stopping
-			return false
 		Tick := IsSet(NowTick) ? NowTick : A_TickCount
 		TickElapsed64(0, Tick)
 		Intent := {
@@ -739,6 +748,9 @@ KL_Hook_Start() {
 		try {
 			KLHook.capture_generation += 1
 			KLHook.capture_stopping := false
+			KLHook.last_vk := 0
+			KLHook.last_sc := 0
+			KLHook.last_hint_lifecycle := Keylogger.lifecycle_generation
 			KLHook.last_tick := A_TickCount
 		} finally Critical(PreviousCritical)
 		KLHook.cb_char := KL_Hook_OnChar.Bind()
