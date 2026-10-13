@@ -476,7 +476,7 @@ class OllamaManagedBootstrap {
 	}
 
 	/** An explicit menu download borrows this exact ready runtime, never PATH. */
-	PullModel(Model, OnDone := 0) {
+	PullModel(Model, OnDone := 0, CurrentFn := 0) {
 		if !this.Ready || !this._Current() || !this.RuntimeIdentityReady() || IsObject(this.PullTask) || this.MenuPull is Map
 			return false
 		try Tag := LLM_ManagedModelTag(Model)
@@ -487,8 +487,10 @@ class OllamaManagedBootstrap {
 		; A READY flow can outlive its bootstrap clock. The new request owns one
 		; captured budget through consent, native retirement and fresh model tags.
 		Operation := Map("tag", Tag, "callback", OnDone, "started_tick", this._Now(),
-			"deadline_ms", this.Plan["deadline_ms"], "failed", false)
+			"deadline_ms", this.Plan["deadline_ms"], "failed", false, "source_current", CurrentFn)
 		this.MenuPull := Operation
+		if !this._MenuPullCurrent(Operation)
+			return false
 		LoggerTrace("LLM.managed", "Starting bounded managed menu model download.")
 		try {
 			if !this._Consent("model", Tag) {
@@ -512,6 +514,19 @@ class OllamaManagedBootstrap {
 	/** A menu operation cannot borrow another request or reset its deadline. */
 	_MenuPullCurrent(Operation) {
 		if !(Operation is Map) || this.MenuPull != Operation || Operation["failed"]
+			return false
+		SourceCurrent := Operation.Get("source_current", 0)
+		try {
+			if HasMethod(SourceCurrent, "Call") && !this._True(SourceCurrent.Call()) {
+				this._MenuPullRetire(Operation)
+				return false
+			}
+		} catch {
+			this._MenuPullRetire(Operation)
+			return false
+		}
+		; A source callback may pump a modal or replace the exact operation.
+		if this.MenuPull != Operation || Operation["failed"]
 			return false
 		Now := this._Now()
 		if Now < Operation["started_tick"] || Now - Operation["started_tick"] >= Operation["deadline_ms"]
