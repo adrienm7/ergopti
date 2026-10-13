@@ -7,7 +7,7 @@
  * No driver downloads an update before the user chose to install it: Windows
  * and Linux download from the install prompt or tray row, macOS's Sparkle
  * never downloads on its own (SUAllowsAutomaticUpdates false). The copy shown
- * while an update is only found must say so, in every locale.
+ * while an update is only found must announce availability, in every locale.
  *
  * ROOT CAUSE ENCODED:
  * updater.tray_new_version_body, the Windows and Linux "new version" toast,
@@ -17,9 +17,9 @@
  * "Download and install {tag}"). Each locale's own word for "ready" is taken
  * from updater.ready_to_install_body, the copy shown once a consented download
  * is staged, and must not appear in any copy shown before consent. The toast
- * then named the tray menu as the place to install from, while clicking it on
- * Windows installs too: it now ends with the consent sentence of the prompt it
- * opens, updater.update_found_body.
+ * must remain a concise availability sentence. Consent belongs to the install
+ * action; the availability notification and prompt do not explain the absence
+ * of an unrequested download.
  * ==============================================================================
  */
 
@@ -57,8 +57,8 @@ const NOTIFICATION_KEYS = ['updater.tray_new_version_title', 'updater.tray_new_v
 
 // The toast is one of several ways to one install choice: clicking it on
 // Windows opens the prompt that says updater.update_found_body, and Linux
-// installs from its tray row. So it states the consent in that prompt's own
-// words, which name no single place to install from.
+// installs from its tray row. Both announce availability without appending
+// a download explanation or naming a single place to install from.
 const TOAST_KEY = 'updater.tray_new_version_body';
 const PROMPT_KEY = 'updater.update_found_body';
 const FIRST_SENTENCE = /^.*?[.。।]\s*/su;
@@ -88,9 +88,8 @@ const READY_BY_LOCALE = {
 	zh: /就绪|准备好/u
 };
 
-// English also states the download itself; anything but "downloaded only"
-// claims it already happened.
-const EN_DOWNLOADED = /\b(?:has been|was|already|is) downloaded\b(?!\s+only)/i;
+// Availability copy cannot claim a download has already happened.
+const EN_DOWNLOADED = /\b(?:has been|was|already|is) downloaded\b/i;
 const QUOTES = /["«»„“”「」『』]/u;
 const PLACEHOLDER = /\{[A-Za-z0-9_]+\}/g;
 
@@ -171,14 +170,14 @@ for (const code of locales) {
 	const prompt = catalog[PROMPT_KEY];
 	const toast = catalog[TOAST_KEY];
 	if (typeof prompt !== 'string' || typeof toast !== 'string') continue;
-	const consent = prompt.replace(FIRST_SENTENCE, '');
-	if (consent === '' || consent === prompt) {
-		errors.push(`${code}: ${PROMPT_KEY} has no consent sentence after its first one: ${prompt}`);
-	} else if (toast.replace(FIRST_SENTENCE, '') !== consent) {
-		errors.push(
-			`${code}: ${TOAST_KEY} must follow its first sentence with the consent of ${PROMPT_KEY} ("${consent}"), ` +
-				`not send the user to one place to install from: ${toast}`
-		);
+	for (const [key, text] of [
+		[PROMPT_KEY, prompt],
+		[TOAST_KEY, toast]
+	]) {
+		const sentence = text.match(FIRST_SENTENCE)?.[0].trim();
+		if (!sentence || sentence !== text.trim()) {
+			errors.push(`${code}: ${key} must contain only its availability sentence: ${text}`);
+		}
 	}
 }
 
