@@ -3906,6 +3906,20 @@ Hosted Lua owner tests do not qualify physical input.
   native macOS installation or the customer lease failure. Those requirements
   remain open under this item.
 
+WP3 delivery/transport captures its original admission ports, requires literal
+completion of an optional original baseline observer, and keeps task settlement
+pending through active emission and error-report callbacks. The original 18
+delivery and 10 transport controls remain unchanged; eight frozen regressions
+receive 28 passes / 8 failures before, 36 / 0 current, and 28 / 8 after the exact
+inverse. All source, Git, child-group and mask/debt checks remain whole. The
+complete private receiver nevertheless returns 1: twelve diagnostic lines differ
+only in dictionary key order between before and restored raw output. That
+refusal is preserved without normalization or a shared formatter change.
+Full native packaging, installed capture and physical acceptance remain pending.
+These Hammerspoon Lua software/model controls do not qualify native capture,
+Core/installed runtime, other drivers or the customer exit73 incident. TODO31
+remains partial.
+
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 The minimal native lease-silence receiving topic derives from Dev `a2b1fb4be16ff88b9bab755841d744960512b89e`. Its additive DEBUG control uses real outer/inner processes with a fixed no-effect CLI and scripted guardian authority. The source-bound manual ARM/Intel receiver retains the direct Swift child status separately from the PTY and output-capture statuses. Forty-nine portable receiving controls passed on the retained helper packet. Its original 26 transcript assertions plus 14 frozen direct-status cases and one double-LF refusal now run as 41 lasting normal-suite controls; the separate eight source/host controls remain supplemental. All 41 lasting controls and the four strict CI inventories pass. The exact published logger fixture prerequisite `e47c88c23999973b6cd936cfed3db40e2a1cf3a5` is received unchanged so the original covering suite selects its configured sink. Actual native compilation/execution and current package acceptance remain unexecuted. The independent manual-only ARM/Intel CI job is enrolled under explicitly handed-off workflow custody, preserving every existing job, budget, package/install control and release condition. This neither proves the user watchdog exit73 cause nor grants physical input, installed-runtime or shipping authority.
