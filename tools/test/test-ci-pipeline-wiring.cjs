@@ -3318,14 +3318,18 @@ function topJobProblems(files) {
 }
 
 /**
- * Lists every permission beyond `contents: read`: each pipeline file reads
- * contents only, and release alone may write, to create the tag, the release
- * and the feed.
+ * Rejects permissions outside each exact role: three Common custody jobs
+ * may read Actions evidence, and release alone may write repository contents.
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
  */
 function permissionProblems(files) {
 	const problems = [];
+	const evidenceReaders = new Set([
+		`${ENTRY}:core`,
+		`${COMMON_BOX}:common-e2e`,
+		`${COMMON_BOX}:common-unit-verdict`
+	]);
 	for (const entry of files) {
 		const lines = entry.text.split('\n');
 		const at = lines.findIndex((line) => /^permissions:/.test(line));
@@ -3346,7 +3350,12 @@ function permissionProblems(files) {
 		}
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const value = pipeline.field(candidate.body, 'permissions');
-			const expected = entry.rel === ENTRY && candidate.id === 'release' ? 'contents: write' : null;
+			const expected =
+				entry.rel === ENTRY && candidate.id === 'release'
+					? 'contents: write'
+					: evidenceReaders.has(`${entry.rel}:${candidate.id}`)
+						? 'contents: read actions: read'
+						: null;
 			if (value !== expected) {
 				problems.push(
 					`${entry.rel} job ${candidate.id} must ${expected ? `grant exactly ${expected}` : 'not widen the permissions'}, got: ${value}`
@@ -3413,6 +3422,56 @@ for (const [what, rel, from, to] of [
 	]
 ]) {
 	mustCatch(what, rel, from, to, permissionProblems);
+}
+
+assert.deepEqual(
+	permissionProblems([...pipeline.files(), benchmarkWorkflow]),
+	[],
+	'Only exact Common evidence readers and release may override workflow permissions.'
+);
+for (const [rel, id] of [
+	[ENTRY, 'core'],
+	[COMMON_BOX, 'common-e2e'],
+	[COMMON_BOX, 'common-unit-verdict']
+]) {
+	const matches = pipeline.jobsOfText(pipeline.file(rel), rel).filter((job) => job.id === id);
+	assert.equal(matches.length, 1, id + ' has one actual permission owner');
+	const body = matches[0].body;
+	const grant = '    permissions:\n      contents: read\n      actions: read\n';
+	assert.equal(body.split(grant).length, 2, id + ' has one exact evidence grant');
+	for (const [label, replacement] of [
+		['missing evidence permission', ''],
+		['repository write permission', grant.replace('contents: read', 'contents: write')],
+		['Actions write permission', grant.replace('actions: read', 'actions: write')],
+		['extra permission', grant + '      checks: read\n'],
+		['all write permissions', '    permissions: write-all\n'],
+		['duplicate permission', grant + grant]
+	])
+		mustCatch(id + ' ' + label, rel, body, body.replace(grant, replacement), permissionProblems);
+}
+for (const [rel, id] of [
+	[ENTRY, 'validate'],
+	[ENTRY, 'prepare-common'],
+	[ENTRY, 'windows'],
+	[ENTRY, 'macos'],
+	[ENTRY, 'linux'],
+	[COMMON_BOX, 'shared-validation'],
+	[COMMON_BOX, 'common-build'],
+	[COMMON_BOX, 'common-testbuild'],
+	[WINDOWS_BOX, 'launch-windows'],
+	[MACOS_BOX, 'launch'],
+	[LINUX_BOX, 'install-linux']
+]) {
+	const matches = pipeline.jobsOfText(pipeline.file(rel), rel).filter((job) => job.id === id);
+	assert.equal(matches.length, 1, id + ' has one actual unrelated job');
+	const body = matches[0].body;
+	mustCatch(
+		id + ' cannot inherit a Common evidence grant',
+		rel,
+		body,
+		'    permissions:\n      contents: read\n      actions: read\n' + body,
+		permissionProblems
+	);
 }
 
 // ============================================
