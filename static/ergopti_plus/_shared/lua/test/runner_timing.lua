@@ -10,7 +10,9 @@
 
 local M = {}
 local format = string.format
-local native_print = print
+local native_stdout = io.stdout
+local native_write = native_stdout.write
+local native_flush = native_stdout.flush
 
 local function finite(value)
 	return type(value) == "number" and value == value
@@ -121,7 +123,11 @@ function M.capture(driver, emit)
 	assert(ok and type(provider) == "table" and type(provider.hrtime) == "function",
 		"Lua runner wall timing requires native luv.hrtime")
 	local now_ns = provider.hrtime
-	return M.new(driver, now_ns, emit or function(row) native_print(M.line(row)) end)
+	return M.new(driver, now_ns, emit or function(row)
+		-- Finish the parent's complete frame before the next case can start a child.
+		assert(native_write(native_stdout, M.line(row) .. "\n"))
+		assert(native_flush(native_stdout))
+	end)
 end
 
 return M
