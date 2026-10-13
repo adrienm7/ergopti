@@ -98,13 +98,30 @@ async function run() {
 		])
 			assert.throws(() => smoke.resolveRequest(root, '', url, files(entries)));
 	});
-	await check('only the three declared inert GitHub API routes exist', () => {
+	await check('only the four declared inert GitHub API routes exist', () => {
 		const repo = 'https://api.github.com/repos/adrienm7/ergopti';
 		assert.equal(smoke.githubFixture(repo).stargazers_count, 123);
 		assert.equal(smoke.githubFixture(repo + '/releases/latest').prerelease, false);
 		assert.equal(smoke.githubFixture(repo + '/releases?per_page=100&page=1')[0].prerelease, true);
+		const changelog = smoke.githubFixture(repo + '/releases?per_page=20');
+		assert.ok(
+			Array.isArray(changelog),
+			'the authored changelog releases endpoint has an inert fixture'
+		);
+		assert.deepEqual(
+			changelog.map((release) => release.prerelease),
+			[false, true],
+			'the actual embedded changelog receives both channels'
+		);
+		assert.notEqual(
+			changelog[0].tag_name,
+			changelog[1].tag_name,
+			'release identities stay distinct'
+		);
 		for (const url of [
 			repo + '/releases?per_page=100&page=2',
+			repo + '/releases?per_page=21',
+			repo + '/releases?per_page=20&page=1',
 			'https://foreign.invalid/',
 			'http://127.0.0.1/hotstrings/magickey.toml'
 		])
