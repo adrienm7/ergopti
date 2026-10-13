@@ -83,6 +83,38 @@ unit/E2E/startup/build and installed collector receiving remain separate gates.
 The existing collector receives 13 AHK owner cases and 30 stock PowerShell5.1
 controls, including actual archive integrity and private/successor-file refusal.
 
+#### Composed Windows and CI receiving
+
+Published source `e43f3e6384093f2eaef0f1620259cc6b1a47db69` preserves incoming
+macOS capture changes through `d0949426a5eb86ae2ddbde8647ade0fcd583a38a`.
+The actual full Windows unit runner reaches its existing 7,200,000 ms watchdog:
+11,222 of 12,567 cases finish, including 95 failures, then natural exit 2.
+The full unit receipt is FAILED_INCOMPLETE. Two old Ollama presence cases expect
+an obsolete public failure callback after an auxiliary epoch change; the newer
+origin-custody contract requires stale callbacks to remain silent. This explicit
+contract conflict remains RED; no wrapper bypass or test relaxation is applied.
+Other observed failures, including TOML publication, buffered snapshots, native
+transport cleanup, source guards and purity ratchets, remain recorded for triage.
+
+[CI 38424106990](https://github.com/adrienm7/ergopti/actions/runs/38424106990)
+is failed: Windows unit admission rejects Snapshot16 because warning stdout is
+not the exact TAP transport; Core JS and native macOS managed Ollama also fail.
+Windows engine E2E, macOS portable/stubbed tests and Linux software/package/install
+jobs pass. Those hosted receipts do not qualify personal Linux/macOS or physical
+Windows. The actual local full-startup smoke exits 0 across fresh, reloaded,
+independent, suspend-marker, extension opt-in, script-chord, retired-Metrics,
+neutral-default and older-release boots, with no error logged.
+
+The terminal SendInput factory is now included by the production entrypoint;
+its function definitions expose the explicitly chosen primitive without selecting
+an emitter, admitting transformed output or enabling a production cohort. All
+211 existing explicit-SendInput cases exit 0, and the actual full entry compiles.
+The architecture diagram is regenerated through its owner. Adapter reachability,
+architecture, generated-output drift and their coverage controls now pass. The
+remaining Lua gsub and keyboard-registry Core JS failures have identical source
+and test blobs at the incoming baseline and published Windows source; they stay
+open rather than being relabelled as successful.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
