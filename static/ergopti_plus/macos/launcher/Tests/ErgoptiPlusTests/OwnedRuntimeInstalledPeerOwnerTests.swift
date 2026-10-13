@@ -104,8 +104,8 @@ final class OwnedRuntimeInstalledPeerOwnerTests: XCTestCase {
 			defer { posix_spawnattr_destroy(&attributes) }
 			XCTAssertEqual(posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT)), 0)
 			try held.installInheritance(actions: &actions)
-			let arguments = ["/bin/sleep", "2"].map { strdup($0) } + [nil]
-			let environment = ["PATH=/usr/bin:/bin"].map { strdup($0) } + [nil]
+			let arguments = ["/bin/sleep", "2"].map { value in value.withCString { strdup($0) } } + [nil]
+			let environment = ["PATH=/usr/bin:/bin"].map { value in value.withCString { strdup($0) } } + [nil]
 			defer { arguments.compactMap { $0 }.forEach { free($0) }; environment.compactMap { $0 }.forEach { free($0) } }
 			var child: pid_t = 0
 			let status = arguments.withUnsafeBufferPointer { argv in
