@@ -101,18 +101,46 @@ end
 -- ==========================
 -- ==========================
 
---- Ends one capture: stops its tap and timer and releases the pin. A stale
---- timer or a second press of an ended capture changes nothing.
+--- Retires one retained timer only after its native cancellation is acknowledged.
+--- @param live table Capture owner.
+--- @param member string Exact timer slot.
+--- @return boolean settled
+local function stop_capture_timer(live, member)
+	local handle = live[member]
+	if handle == nil then return true end
+	local called, stopped = pcall(Timer.cancel, handle)
+	if called and stopped == true then
+		live[member] = nil
+		return true
+	end
+	Logger.error(LOG, "The capture %s timer remains owned after cancellation refused: %s.",
+		member, tostring(stopped))
+	return false
+end
+
+--- Fences one capture before attempting exact native retirement. Refused
+--- handles keep the owner pinned and prevent a successor from being acquired.
 --- @param live table The capture being ended.
---- @return boolean ended True when `live` was the capture in progress.
+--- @return boolean ended True only after all native resources retired.
 local function stop_capture(live)
 	if _capture ~= live then return false end
-	_capture = nil
-	if live.timer then Timer.cancel(live.timer) end
-	if live.tap then
-		local ok, err = pcall(function() live.tap:stop() end)
-		if not ok then Logger.error(LOG, "The capture tap could not be stopped: %s.", tostring(err)) end
+	live.active, live.retiring, live.answered = false, true, true
+	local timers_stopped = stop_capture_timer(live, "answer_timer")
+	timers_stopped = stop_capture_timer(live, "timer") and timers_stopped
+	local tap_stopped = live.tap == nil
+	if live.tap ~= nil then
+		local called, stopped = pcall(function() return live.tap:stop() end)
+		local observed, enabled = pcall(function() return live.tap:isEnabled() end)
+		tap_stopped = called and stopped ~= nil and stopped ~= false and observed and enabled == false
+		if tap_stopped then
+			live.tap = nil
+		else
+			Logger.error(LOG, "The capture tap remains owned after retirement refused: %s.",
+				tostring(not called and stopped or enabled))
+		end
 	end
+	if not timers_stopped or not tap_stopped then return false end
+	_capture = nil
 	return true
 end
 
@@ -120,12 +148,15 @@ end
 --- @param ctx table The menu context of M.choose.
 --- @return boolean started
 function M.capture(ctx)
-	if _capture then
-		Logger.debug(LOG, "A capture is already waiting for a key.")
-		return false
+	if _capture ~= nil then
+		if _capture.retiring ~= true or not stop_capture(_capture) then
+			Logger.debug(LOG, "A capture is active or still owns native retirement debt.")
+			return false
+		end
 	end
 	Source.resolver() -- Warm the registry before the event callback.
-	local live = { answered = false }
+	local live = { answered = false, active = false }
+	_capture = live -- Own every candidate before construction or activation.
 	local function settle(keycode, keyboard_type)
 		if not stop_capture(live) then return end
 		if keycode == nil then
@@ -142,28 +173,56 @@ function M.capture(ctx)
 		M.choose(ctx, code)
 	end
 
-	live.tap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+	local constructed, tap = pcall(hs.eventtap.new, { hs.eventtap.event.types.keyDown }, function(event)
 		local provenance, status, fence = EventProvenance.classify_with_fence(event, CONSUMER)
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
-		-- Ergopti's own output, an unreadable event and every key after the answer
-		-- pass through untouched.
-		if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE or live.answered then
-			return false, fence_events
-		end
-		live.answered = true
+		if _capture ~= live or live.active ~= true or live.answered
+			or provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then return false, fence_events end
 		local keycode = event:getKeyCode()
 		local keyboard_type = Geometry.event_type(event)
 		local candidate = Source.code_for(keycode, keyboard_type)
-		-- Decided on the next run-loop turn: saving the choice is file work, which
-		-- must not run inside an event tap.
-		Timer.after(0, function() settle(keycode ~= Keycodes.ESCAPE and keycode or nil, keyboard_type) end)
-		-- An unproved physical position remains native; no adjacent key is claimed.
+		local premature, committed = false, false
+		local called, handle, accepted = pcall(Timer.after, 0, function()
+			if committed ~= true then premature = true return end
+			if _capture ~= live or live.active ~= true then return end
+			settle(keycode ~= Keycodes.ESCAPE and keycode or nil, keyboard_type)
+		end)
+		if type(handle) == "table" then live.answer_timer = handle end
+		if not called or accepted ~= true or type(handle) ~= "table" or handle.fired == true or premature then
+			Logger.error(LOG, "The captured key could not be scheduled — nothing changed.")
+			if not stop_capture_timer(live, "answer_timer") then stop_capture(live) end
+			return false, fence_events
+		end
+		committed, live.answered = true, true
+		-- Consumption belongs only to an acknowledged deferred selection.
 		return keycode == Keycodes.ESCAPE or candidate ~= nil, fence_events
 	end)
-	live.timer = Timer.after(Timings.sec("ui", "magic_key_capture_timeout_ms"), function() settle(nil) end)
-	_capture = live
-	live.tap:start()
+	if not constructed or (type(tap) ~= "table" and type(tap) ~= "userdata") then
+		Logger.error(LOG, "The physical magic key capture tap could not be constructed.")
+		stop_capture(live)
+		return false
+	end
+	live.tap = tap
+	local premature = false
+	local timed, timer, admitted = pcall(Timer.after, Timings.sec("ui", "magic_key_capture_timeout_ms"), function()
+		if live.active ~= true then premature = true return end
+		settle(nil)
+	end)
+	if type(timer) == "table" then live.timer = timer end
+	if not timed or admitted ~= true or type(timer) ~= "table" or timer.fired == true or premature then
+		Logger.error(LOG, "The capture timeout could not be armed — no key is captured.")
+		stop_capture(live)
+		return false
+	end
+	local started, result = pcall(function() return tap:start() end)
+	local observed, enabled = pcall(function() return tap:isEnabled() end)
+	if not started or not result or not observed or enabled ~= true or premature then
+		Logger.error(LOG, "The physical magic key capture tap could not be activated.")
+		stop_capture(live)
+		return false
+	end
+	live.active = true
 	Notifications.notify(i18n.get("dialog.magic_key_source.title"),
 		i18n.get("dialog.magic_key_source.prompt"), "info")
 	Logger.info(LOG, "Waiting for the physical magic key…")

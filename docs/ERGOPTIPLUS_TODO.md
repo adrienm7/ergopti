@@ -3936,6 +3936,24 @@ requirements are complete. All unresolved magic-key ownership, watchdog
 recovery, native freshness and real-device requirements above remain in item 30.
 Hosted Lua owner tests do not qualify physical input.
 
+The macOS physical magic-key capture now acknowledges eventtap activation and
+its timeout before accepting input. A refused deferred answer leaves the key
+native; exact tap/timer retirement precedes persistence. Failed retirement
+retains inert native handles for cleanup retry and blocks successor capture.
+Provenance fences, ANSI/ISO geometry and existing tap assignments are preserved.
+Focused production-callback controls pass 33/0; the exact original source gives
+15 passes and 18 causal failures with all 14 previous cases retained. These
+modeled native-port checks do not qualify Hammerspoon scheduling, physical
+keyboards, packaged installation or customer lease recovery. The separately
+prepared Linux answer-admission fix awaits ownership reconciliation; Windows
+already retains InputHook retirement debt. Final selected checks pass formatting
+(393 files), macOS Lua (19,070/0 across 1,578 modules) and simulated E2E
+(101/0 with one original skip). Common retains 423 passes and three diagnosed
+failures: the two inherited source scanners and the protected temporary-context
+uninstall preflight; the unchanged uninstall control passes in the approved
+isolated context. Hosted native, packaging, installation and physical
+qualification remain required, and item 30 stays open.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
