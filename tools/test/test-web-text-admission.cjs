@@ -49,6 +49,34 @@ accepted = "yes"`);
 	assert.equal(parsed.ignored, undefined);
 	assert.equal(parsed.accepted, 'yes');
 	await checkHotstringSources();
+	await checkLayoutDataRoutes();
+}
+
+async function checkLayoutDataRoutes() {
+	const source = fs.readFileSync(
+		path.join(root, 'src/lib/keyboard/data/getKeyboardData.js'),
+		'utf8'
+	);
+	const owner = parse(source, { ecmaVersion: 'latest', sourceType: 'module' }).body.find(
+		(node) =>
+			node.type === 'ExportNamedDeclaration' && node.declaration?.id?.name === 'getKeyboardData'
+	);
+	assert.ok(owner, 'the actual layout loader is present');
+	for (const base of ['', '/dev']) {
+		const requests = [];
+		const layout = { keys: [] };
+		const realm = vm.createContext({
+			base,
+			console: { info() {}, debug() {}, error() {} },
+			fetch: async (url) => {
+				requests.push(url);
+				return { ok: true, status: 200, statusText: 'OK', json: async () => layout };
+			}
+		});
+		vm.runInContext(source.slice(owner.declaration.start, owner.declaration.end), realm);
+		assert.equal(await realm.getKeyboardData('2.2'), layout);
+		assert.deepEqual(requests, [base + '/layouts/visualisation/ergopti_v2.2.json']);
+	}
 }
 
 async function checkHotstringSources() {
