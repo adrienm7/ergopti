@@ -99,3 +99,79 @@ _LNEO_StopDiagnosticsRetainOwnershipAndThrottle() {
 }
 Test("LLM nav event owner: stop diagnostics retain ownership and throttle retries (native-stop-diagnostics)",
 	_LNEO_StopDiagnosticsRetainOwnershipAndThrottle)
+
+; Actual DllCall boundary callbacks are local controls; no native hook is installed.
+_LNEO_StartErrorNativeStart(State, Hwnd, WakeMessage) {
+	State.Events.Push("start")
+	return State.Status
+}
+
+_LNEO_StartErrorNativeStop(State) {
+	State.Events.Push("stop")
+	State.ErrorCode := 0
+	return 0
+}
+
+_LNEO_StartErrorNativeCode(State) {
+	State.Events.Push("error")
+	return State.ErrorCode
+}
+
+_LNEO_StartErrorBeforeCleanupCase(Status, MissingStop) {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports
+	SavedModule := _LLM_NavEventOwnerModule
+	SavedExports := _LLM_NavEventOwnerExports
+	Pointers := []
+	State := {Status: Status, ErrorCode: 1234, Events: []}
+	try {
+		Exports := Map()
+		for Description in [
+			["ErgoptiNav_Start", _LNEO_StartErrorNativeStart.Bind(State), 2],
+			["ErgoptiNav_Stop", _LNEO_StartErrorNativeStop.Bind(State), 0],
+			["ErgoptiNav_GetLastOsError", _LNEO_StartErrorNativeCode.Bind(State), 0]
+		] {
+			Pointer := CallbackCreate(Description[2], "", Description[3])
+			Pointers.Push(Pointer)
+			if !MissingStop || Description[1] != "ErgoptiNav_Stop"
+				Exports[Description[1]] := Pointer
+		}
+		; A controlled table exercises the real adapter; this sentinel never loads a DLL.
+		_LLM_NavEventOwnerModule := 1
+		_LLM_NavEventOwnerExports := Exports
+		Failure := 0
+		try _LLM_NavEventOwnerNativeStart(A_ScriptHwnd, 0x8001)
+		catch as CapturedFailure
+			Failure := CapturedFailure
+		AssertTrue(Failure is Error, "the real native adapter must refuse the failed start")
+		AssertTrue(Failure.HasOwnProp("NativeStatus"), "the primary native status must survive cleanup")
+		AssertEqual(Status, Failure.NativeStatus)
+		AssertEqual(Status == 6 ? 1234 : 0, Failure.NativeErrorCode)
+		AssertEqual("start", State.Events[1])
+		if Status == 6 {
+			AssertEqual("error", State.Events[2], "the original OS error must be captured before cleanup")
+			AssertContains(Failure.Message, "Win32 1234")
+		}
+		if MissingStop {
+			AssertTrue(Failure.HasOwnProp("NativeCleanupError"))
+			AssertTrue(Failure.NativeCleanupError is Error)
+			AssertContains(Failure.Message, "native stop cleanup failed")
+			AssertEqual(2, State.Events.Length)
+			AssertEqual(1234, State.ErrorCode)
+		} else {
+			AssertEqual(Status == 6 ? 3 : 2, State.Events.Length)
+			AssertEqual("stop", State.Events[State.Events.Length])
+			AssertEqual(0, State.ErrorCode, "the control cleanup must actually erase the original code")
+		}
+	} finally {
+		_LLM_NavEventOwnerModule := SavedModule
+		_LLM_NavEventOwnerExports := SavedExports
+		for Pointer in Pointers
+			CallbackFree(Pointer)
+	}
+}
+Test("native-start-error-custody: OS error survives actual adapter cleanup",
+	_LNEO_StartErrorBeforeCleanupCase.Bind(6, false))
+Test("native-start-error-custody: non-OS refusal still runs cleanup without an OS read",
+	_LNEO_StartErrorBeforeCleanupCase.Bind(5, false))
+Test("native-start-error-custody: cleanup lookup failure retains both errors",
+	_LNEO_StartErrorBeforeCleanupCase.Bind(6, true))
