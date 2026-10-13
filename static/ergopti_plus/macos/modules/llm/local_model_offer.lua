@@ -101,6 +101,9 @@ local function capture_owner(opts)
 		or not requester_current(owner) or owner.installer ~= _installer or owner.generation ~= _installer_generation
 		or package.loaded["modules.llm.api_ollama"] ~= api or api.get_base_url ~= owner.origin_reader
 		or api.capture_service_owner ~= owner.service_reader then return nil end
+	-- The requester is opaque; its last callback may retire this exact service.
+	current_ok, current = pcall(owner.service_current)
+	if not current_ok or current ~= true then return nil end
 	owner.origin = origin
 	return owner
 end
@@ -118,10 +121,13 @@ local function owner_current(owner)
 	if not current_ok or current ~= true then return false end
 	local read_ok, origin = pcall(owner.origin_reader)
 	current_ok, current = pcall(owner.service_current)
-	return current_ok and current == true and read_ok and origin == owner.origin
+	if not (current_ok and current == true and read_ok and origin == owner.origin
 		and requester_current(owner) and owner.installer == _installer and owner.generation == _installer_generation
 		and package.loaded["modules.llm.api_ollama"] == api and api.get_base_url == owner.origin_reader
-		and api.capture_service_owner == owner.service_reader
+		and api.capture_service_owner == owner.service_reader) then return false end
+	-- Recheck the genuine lexical service fence after the final opaque callback.
+	current_ok, current = pcall(owner.service_current)
+	return current_ok and current == true
 end
 
 --- Clears only the exact notice captured before download acquisition.
