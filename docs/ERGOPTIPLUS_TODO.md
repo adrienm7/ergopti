@@ -3989,6 +3989,29 @@ The captured macOS magic-key choice now belongs to the exact live script-control
   not an installed headless producer, signed runtime, native SDK, package or
   physical acceptance; WP3-WP10 and customer lease recovery remain open.
 
+  The dormant factory/build source lane now retains authentic upstream input
+  custody for the original 65 replacements and the explicit installed-SDK
+  opt-in (101 replacements, 54 SDK inputs). Source-bound signed product
+  preparation preserves the original claim and packaging checks; default boot
+  and the legacy factory route remain unchanged. The dependency-closed source
+  includes the original build/control suppliers rather than detached staging
+  facades. Canonical portable receiving passes 81 methods with no skips:
+  original build 41 plus parallel-build 10, product 13, entrypoint 5 and SDK
+  routing 12. A genuine private factory materialization received 4,557 files,
+  four links, its version generator and 12 generated outputs; that private
+  source receipt is not acceptance of this installed product.
+
+  Four frozen original CLI/HID snapshots now accompany the existing 8/6/8
+  software actors and their source-authenticated receiver. Canonical receiving
+  passes all 22 controls without rewriting independent expectations.
+  Original 60-second compile, 10-second execution and whole 300-second budgets
+  remain; Darwin uses the existing 330-second owned-process guardian. Real
+  macOS SDK/IOKit compilation, signing, packaging, installation, activation and
+  physical acceptance remain unqualified. Native shipping/Foundation suppliers,
+  correlated retained history, media persistence and the confirmed driver-only
+  update transaction are still software work; this does not solve customer
+  lease PONG/READY/exit73 or complete item 31.
+
   The dormant physical consumer now retains subscription and verifier startup,
   cancellation and accounting ownership through the exact outstanding native
   invocation. Version refusal gives one unavailable warning without retries;
