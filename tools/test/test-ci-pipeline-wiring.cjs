@@ -6788,6 +6788,12 @@ const shortcutsIndependentGuardian = pipeline.step(
 	'Receive selected-release shell corpus and native guardian cancellation'
 );
 const shortcutsIndependentPackage = '      - name: Observe native Apple Shortcuts discovery\n';
+const shortcutsIndependentFixtureCondition =
+	'        if: ' + macRole.condition('managed-ollama-native') + '\n';
+const shortcutsIndependentLaterFixture =
+	'      - name: Later gate fixture\n' +
+	shortcutsIndependentFixtureCondition +
+	'        run: echo later';
 for (const [label, transform] of [
 	[
 		'observer moved after native guardian',
@@ -6814,7 +6820,7 @@ for (const [label, transform] of [
 		(text) =>
 			text.replace(
 				shortcutsIndependentPair,
-				shortcutsIndependentPair + '\n\n      - name: Later gate fixture\n        run: echo later'
+				shortcutsIndependentPair + '\n\n' + shortcutsIndependentLaterFixture
 			)
 	]
 ]) {
@@ -6822,10 +6828,31 @@ for (const [label, transform] of [
 		file.rel === MACOS_BOX ? { ...file, text: transform(file.text) } : file
 	);
 	assert.notDeepEqual(mutated, shortcutsIndependentFiles, label + ' changes actual source');
+	if (label === 'later original-style gate after observer')
+		assert.ok(
+			macRole
+				.body(mutated.find((file) => file.rel === MACOS_BOX).text, 'managed-ollama-native')
+				.includes(shortcutsIndependentLaterFixture),
+			'the later fixture must reach the actual role member guard'
+		);
 	assert.ok(shortcutsIndependentReceivingProblems(mutated).length > 0, label + ' refuses');
 }
+// An unguarded later step is refused by the closed stage contract, outside any role.
+const shortcutsIndependentUnguarded = pipeline
+	.file(MACOS_BOX)
+	.replace(
+		shortcutsIndependentPair,
+		shortcutsIndependentPair + '\n\n      - name: Later gate fixture\n        run: echo later'
+	);
+assert.notEqual(shortcutsIndependentUnguarded, pipeline.file(MACOS_BOX));
+assert.ok(
+	macStageProblems(shortcutsIndependentUnguarded).length > 0,
+	'an unguarded later gate remains refused by the actual stage contract'
+);
 const shortcutsIndependentHarmless =
-	'      - name: Independent SDK guard harmless fixture\n        run: echo harmless';
+	'      - name: Independent SDK guard harmless fixture\n' +
+	shortcutsIndependentFixtureCondition +
+	'        run: echo harmless';
 for (const name of [
 	'Independent SDK guard harmless fixture',
 	'Independent SDK guard renamed harmless fixture'
@@ -6844,13 +6871,21 @@ for (const name of [
 			: file
 	);
 	assert.notDeepEqual(positive, shortcutsIndependentFiles, 'positive changes actual source');
+	assert.ok(
+		macRole
+			.body(positive.find((file) => file.rel === MACOS_BOX).text, 'managed-ollama-native')
+			.includes(
+				shortcutsIndependentHarmless.replace('Independent SDK guard harmless fixture', name)
+			),
+		'the positive fixture must reach the actual role member guard: ' + name
+	);
 	assert.deepEqual(
 		shortcutsIndependentReceivingProblems(positive),
 		[],
 		'unrelated own fixture remains editable: ' + name
 	);
 }
-console.log('PASS: independent Shortcuts SDK source controls=3 positive/27 refusal; native UNRUN.');
+console.log('PASS: independent Shortcuts SDK source controls=3 positive/28 refusal; native UNRUN.');
 
 if (errors.length > 0) {
 	console.error(
