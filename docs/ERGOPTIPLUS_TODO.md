@@ -3974,6 +3974,19 @@ qualification remain required, and item 30 stays open.
   with an explanation and offer a driver-only update requiring explicit
   confirmation. About 30-40 agent-days plus maintainer hardware time.
 
+  The diagnostic producer, CLI baseline admission and current Python reader
+  now agree on baseline version 2, retaining keyboard type per device and HID
+  usage page per key. Live readers require complete version-2 coverage;
+  immutable version-1 evidence is decoded only through explicit historical
+  replay. All four declaration boundaries are checked, including CLI-only
+  mismatch and missing/ambiguous declarations. Portable receiving passes 75
+  Python methods and four actual C++20 builds/runs; the new version-2 producer
+  control executes 43 independent assertions. Original native evidence and
+  JSON fixture expectations are unchanged. Current production callers retain
+  strict live admission. This supplies the WP4 diagnostic protocol dependency,
+  not an installed headless producer, signed runtime, native SDK, package or
+  physical acceptance; WP3-WP10 and customer lease recovery remain open.
+
   FileSystem transaction receipts now retain their original private issuer,
   publication chain and current source view; replacement after admission is
   refused, including an unchanged-byte publication. The six independent
