@@ -9,8 +9,10 @@ from hs274_capture import decimal, integer, unique_object, validate_cookie
 from hs274_baseline_frames import BaselineFrames
 
 
-def read_stream(output, partial=False):
+def read_stream(output, partial=False, *, historical_baseline=False):
     """During observation, inspect only complete lines; final reads reject truncation."""
+    if type(historical_baseline) is not bool:
+        raise ValueError("Invalid historical replay mode")
     if partial:
         output = output[: output.rfind("\n") + 1]
         if not output:
@@ -44,7 +46,13 @@ def read_stream(output, partial=False):
     decimal(opened["lease"], minimum=1)
     # Historical native receipts predate baseline transfer. Decoding them is
     # evidence replay, never admission of that producer to the live consumer.
-    baseline = BaselineFrames(opened["baseline"]) if "baseline" in opened else None
+    if "baseline" not in opened and not historical_baseline:
+        raise ValueError("Current stream requires a version-2 baseline")
+    baseline = (
+        BaselineFrames(opened["baseline"], historical_replay=historical_baseline)
+        if "baseline" in opened
+        else None
+    )
     records = []
     for frame in frames[1:]:
         if (
@@ -101,10 +109,10 @@ def read_stream(output, partial=False):
     return result
 
 
-def validate_successor(previous, opened):
+def validate_successor(previous, opened, *, historical_baseline=False):
     """Require the next lease in one producer, with its own sampled baseline."""
     for envelope in (previous, opened):
-        read_stream(json.dumps(envelope) + "\n")
+        read_stream(json.dumps(envelope) + "\n", historical_baseline=historical_baseline)
         if "baseline" not in envelope:
             raise ValueError("Successor capture requires a sampled baseline")
     stable = {field: value for field, value in previous.items() if field != "baseline"}
@@ -124,9 +132,9 @@ def fixture_records(records, device):
     return selected
 
 
-def validate_stream(output, capture):
+def validate_stream(output, capture, *, historical_baseline=False):
     """Compare the exact fixture subsequence while retaining all validated input."""
-    stream = read_stream(output)
+    stream = read_stream(output, historical_baseline=historical_baseline)
     reference = capture["records"]
     devices = {row["device"] for row in reference}
     if len(devices) != 1:
@@ -174,12 +182,12 @@ def fixture_drain(device, *, held=False):
     return complete
 
 
-def validate_interruption(output, expected_opened):
+def validate_interruption(output, expected_opened, *, historical_baseline=False):
     """Require one explicit terminal loss for the new idle observation lease."""
     lines = output.splitlines(keepends=True)
     if len(lines) < 2 or any(not line.endswith("\n") for line in lines):
         raise ValueError("Missing or unexpected interruption frames")
-    prefix = read_stream("".join(lines[:-1]))
+    prefix = read_stream("".join(lines[:-1]), historical_baseline=historical_baseline)
     if prefix["records"] or ("baseline" in prefix and not prefix["baseline"]["complete"]):
         raise ValueError("Interruption did not follow a completed idle baseline")
     opened = prefix["opened"]
