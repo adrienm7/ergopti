@@ -88,7 +88,7 @@ for (const file of [
 	const source = fs.readFileSync(path.join(root, file), 'utf8');
 	assert.match(
 		source,
-		/LLM_OllamaRequestOrigin\(\)/,
+		/LLM_Ollama(?:RequestOrigin|CaptureOriginCustody)\(\)/,
 		`${file} consumes the admitted native origin.`
 	);
 	assert.doesNotMatch(source, /LLM_OLLAMA_BASE_URL\s*\.\s*"\/api\//);
@@ -302,4 +302,146 @@ for (const name of [
 }
 process.stdout.write(
 	'Windows model-offer affinity: PASS (11 causal source inverses; 35 authored AHK cases UNRUN).\n'
+);
+
+/** Extracts a real top-level AHK function; every source assertion requires its body. */
+function originBody(source, name) {
+	const match = source.match(new RegExp(`^${name}\\([^\\n]*\\) \\{\\n([\\s\\S]*?)\\n\\}`, 'm'));
+	assert.ok(match && match[1], `Missing real ${name} function body.`);
+	return match[1];
+}
+
+/** Checks capture/delivery wiring only; no AHK or native service executes here. */
+function assertOriginCustody(native, httpSource, streamSource) {
+	const capture = originBody(native, 'LLM_OllamaCaptureOriginCustody');
+	const read = capture.indexOf('Observed := ReadFn.Call()');
+	assert.ok(read > 0);
+	for (const retained of [
+		'Flow := _LLM_ManagedBootstrap',
+		'Record :=',
+		'RecordTarget :=',
+		'Task :=',
+		'Generation :=',
+		'Tickets := Map()'
+	]) {
+		assert.ok(capture.indexOf(retained) >= 0 && capture.indexOf(retained) < read, retained);
+	}
+	assert.match(capture, /return Currency/);
+	assert.match(capture, /if !Bound\(\) \|\| !\(Observed is String\) \|\| \!\(Observed == Origin\)/);
+	for (const retained of [
+		'_LLM_ManagedBootstrap != Flow',
+		'Runtime.Record != Record',
+		'Flow.Target != Target',
+		'Record.Get("target", 0) != RecordTarget',
+		'Record.Get("task", 0) != Task',
+		'Runtime.Generation != Generation',
+		'!(RecordTarget.Get(Name, "") == Value)',
+		'AuxGeneration != LLM_AuxGeneration()'
+	]) {
+		assert.ok(capture.includes(retained), retained);
+	}
+	assert.match(capture, /ActiveOwned is Integer && ActiveOwned == false/);
+	assert.doesNotMatch(capture, /\.(?:Begin|Start|Stop|Cancel)\(/);
+	const probe = originBody(native, 'LLM_OllamaProbeOriginCurrent');
+	assert.match(probe, /LLM_ManagedBootstrapOriginIsCurrent\(Owner, Origin\)/);
+	assert.match(probe, /LLM_OllamaOriginCustodyCurrent\(Owner\["origin_custody"\], Origin\)/);
+	assert.match(probe, /!LLM_OllamaManagedOriginRequired\(\)/);
+	const owner = originBody(httpSource, '_LLM_OllamaAuxOwner');
+	assert.match(owner, /Custody := LLM_OllamaCaptureOriginCustody\(\)/);
+	assert.match(owner, /"origin_custody", Custody/);
+	assert.match(owner, /"endpoint", Custody.Call\("origin"\)/);
+	const ping = originBody(httpSource, 'LLM_OllamaIsRunning_Async');
+	assert.match(ping, /on_result := LLM_OllamaInvokeOriginCurrent.Bind/);
+	assert.match(ping, /Origin := Owner.Get\("endpoint", ""\)/);
+	const tags = originBody(httpSource, 'LLM_OllamaListModels_Async');
+	assert.match(tags, /on_result := LLM_OllamaInvokeOriginCurrent.Bind/);
+	const result = originBody(httpSource, '_LLM_OllamaInvokeAuxResult');
+	assert.match(result, /LLM_OllamaOriginCustodyCurrent/);
+	const job = originBody(streamSource, 'LLM_OllamaGenerate_Async');
+	assert.match(job, /job\["origin_custody"\] := LLM_OllamaCaptureOriginCustody\(\)/);
+	assert.match(job, /job\["on_success"\] := LLM_OllamaInvokeOriginCurrent.Bind/);
+	assert.match(job, /job\["on_fail"\] := LLM_OllamaInvokeOriginCurrent.Bind/);
+	const spawn = originBody(streamSource, '_LLM_Ollama_DoSpawn');
+	assert.match(spawn, /_Q\(entry\["base_url"\] \. "\/api\/chat"\)/);
+	const stream = originBody(streamSource, 'LLM_OllamaGenerate_Streaming');
+	const streamCapture = stream.indexOf('try Custody := LLM_OllamaCaptureOriginCustody()');
+	const streamBuild = stream.indexOf('payload := LLM_BuildOllamaPayload');
+	assert.ok(streamCapture >= 0 && streamBuild >= 0 && streamCapture < streamBuild);
+	const deletion = originBody(httpSource, 'LLM_OllamaDeleteModel_Async');
+	assert.match(deletion, /LLM_OllamaOriginCustodyCurrent/);
+	assert.match(deletion, /_Q\(Owner.Get\("endpoint", ""\) \. "\/api\/delete"\)/);
+	for (const callback of ['on_partial', 'on_success', 'on_fail']) {
+		assert.ok(
+			stream.includes(`${callback} := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin,`)
+		);
+	}
+	assert.match(
+		originBody(streamSource, '_LLM_Ollama_PresenceStillCurrent'),
+		/LLM_OllamaOriginCustodyCurrent/
+	);
+	assert.match(
+		originBody(streamSource, '_LLM_Ollama_StreamOriginCurrent'),
+		/LLM_OllamaOriginCustodyCurrent/
+	);
+	assert.match(
+		originBody(streamSource, '_LLM_Ollama_StreamFinalFlush'),
+		/if !_LLM_Ollama_StreamOriginCurrent\(handle\)/
+	);
+}
+
+const originHttp = fs.readFileSync(
+	path.join(root, 'modules/llm/api_ollama/ollama_http.ahk'),
+	'utf8'
+);
+const originStream = fs.readFileSync(
+	path.join(root, 'modules/llm/api_ollama/ollama_streaming.ahk'),
+	'utf8'
+);
+assertOriginCustody(flow, originHttp, originStream);
+const originInverses = [
+	['flow', 'Runtime.Record != Record', 'false'],
+	['flow', '_LLM_ManagedBootstrap != Flow', 'false'],
+	['flow', 'Record.Get("task", 0) != Task', 'false'],
+	['flow', 'Runtime.Generation != Generation', 'false'],
+	['flow', '!(RecordTarget.Get(Name, "") == Value)', 'false'],
+	[
+		'flow',
+		'if !Bound() || !(Observed is String) || !(Observed == Origin)',
+		'if !(Observed is String) || !(Observed == Origin)'
+	],
+	['flow', 'return Currency', 'return ReadFn'],
+	['http', '"origin_custody", Custody', '"origin_custody", 0'],
+	[
+		'http',
+		'on_result := LLM_OllamaInvokeOriginCurrent.Bind',
+		'on_result := _LLM_InvokeCallback.Bind'
+	],
+	[
+		'stream',
+		'job["on_success"] := LLM_OllamaInvokeOriginCurrent.Bind',
+		'job["on_success"] := _LLM_InvokeCallback.Bind'
+	],
+	[
+		'stream',
+		'on_partial := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin,',
+		'on_partial := _LLM_InvokeCallback.Bind(Custody, Origin,'
+	],
+	['stream', '_Q(entry["base_url"] . "/api/chat")', '_Q(LLM_OllamaRequestOrigin() . "/api/chat")'],
+	[
+		'http',
+		'_Q(Owner.Get("endpoint", "") . "/api/delete")',
+		'_Q(LLM_OllamaRequestOrigin() . "/api/delete")'
+	]
+];
+for (const [surface, retained, replacement] of originInverses) {
+	const sources = { flow, http: originHttp, stream: originStream };
+	const mutated = sources[surface].replace(retained, replacement);
+	assert.notEqual(mutated, sources[surface], `Actual ${surface} source seam must change.`);
+	sources[surface] = mutated;
+	assert.throws(() => assertOriginCustody(sources.flow, sources.http, sources.stream), {
+		code: 'ERR_ASSERTION'
+	});
+}
+process.stdout.write(
+	`Windows original-origin custody: PASS (${originInverses.length} source inverses; authored AHK UNRUN).\n`
 );

@@ -241,6 +241,7 @@ class _G4B_Runtime {
 		this.Starts := 0
 		this.Stops := 0
 		this.LiveIdentity := true
+		this.Generation := 1
 		this.Record := Map("ready_image_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	}
 	Start(Target, Authority, Ready, Exit) {
@@ -722,11 +723,12 @@ _G4B_RequestOrigin(State) {
 		AssertEqual(_LLM_Menu_EnableSnapshot()["origin"], "http://127.0.0.1:23456")
 		Owner := _LLM_OllamaAuxOwner(0, "g4_managed_consumer")
 		AssertEqual(Owner["endpoint"], "http://127.0.0.1:23456", "Post-enable auxiliary consumers capture the admitted listener.")
-		AssertTrue(_LLM_Ollama_PresenceStillCurrent(Map("presence_admitted", true,
+		Custody := LLM_OllamaCaptureOriginCustody()
+		AssertTrue(_LLM_Ollama_PresenceStillCurrent(Map("origin_custody", Custody, "presence_admitted", true,
 			"presence_generation", LLM_AuxGeneration(), "base_url", "http://127.0.0.1:23456")))
-		AssertFalse(_LLM_Ollama_PresenceStillCurrent(Map("presence_admitted", true,
+		AssertFalse(_LLM_Ollama_PresenceStillCurrent(Map("origin_custody", Custody, "presence_admitted", true,
 			"presence_generation", LLM_AuxGeneration(), "base_url", LLM_OLLAMA_BASE_URL)))
-		Handle := { Origin: "http://127.0.0.1:23456", OriginGeneration: LLM_AuxGeneration(), OriginOwned: true }
+		Handle := { Origin: "http://127.0.0.1:23456", OriginCustody: Custody, OriginGeneration: LLM_AuxGeneration(), OriginOwned: true }
 		AssertTrue(_LLM_Ollama_StreamOriginCurrent(Handle), "Actual streaming dispatch retains its admitted listener.")
 		F.CurrentValue := false
 		AssertFalse(_LLM_Ollama_StreamOriginCurrent(Handle))
@@ -1245,3 +1247,106 @@ Test("managed model offer: string current ACK forbids dispatch (groups247-offer-
 Test("managed model offer: float current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind(1.0))
 Test("managed model offer: thrown current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind("throw"))
 Test("managed model offer: notice dedupe includes original origin (groups247-offer-affinity)", _G4B_OfferNoticeOrigins)
+
+
+/** Runs the real origin API over explicit managed runtime fixture capabilities. */
+_G4O_WithManaged(Body) {
+	_LEA_WithFixture(Run)
+	Run(State) {
+		global _LLM_ManagedBootstrap
+		Saved := _LLM_ManagedBootstrap
+		F := _G4B_Fixture()
+		try {
+			F.Start(), F.Runtime.PublishReady()
+			_LLM_ManagedBootstrap := F.Flow
+			Body.Call(F)
+		} finally {
+			F.Close()
+			_LLM_ManagedBootstrap := Saved
+		}
+	}
+}
+
+_G4O_Replacement(Mode, F) {
+	global _LLM_ManagedBootstrap, _LLM_AuxGeneration
+	Other := _G4B_Fixture(), Generation := _LLM_AuxGeneration
+	try {
+		Custody := LLM_OllamaCaptureOriginCustody()
+		Origin := Custody.Call("origin")
+		AssertTrue(LLM_OllamaOriginCustodyCurrent(Custody, Origin))
+		switch Mode {
+			case "flow":
+				AssertTrue(F.Flow.Cancel())
+				Other.Start(), Other.Runtime.PublishReady()
+				_LLM_ManagedBootstrap := Other.Flow
+				AssertEqual(Origin, LLM_OllamaRequestOrigin(), "Replacement deliberately keeps the exact URL.")
+			case "record": F.Runtime.Record := F.Runtime.Record.Clone()
+			case "target": F.Flow.Target := F.Flow.Target.Clone()
+			case "ticket": F.Flow.Target["runtime_ticket"] := "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+			case "generation": F.Runtime.Generation += 1
+			case "task": F.Runtime.Record["task"] := {}
+			case "retired": AssertTrue(F.Flow.Cancel())
+			case "aux": _LLM_AuxGeneration += 1
+		}
+		AssertFalse(LLM_OllamaOriginCustodyCurrent(Custody, Origin), "Old currency never borrows a successor owner or tuple.")
+	} finally {
+		Other.Close()
+		_LLM_AuxGeneration := Generation
+	}
+}
+for _G4O_Mode in ["flow", "record", "target", "ticket", "generation", "task", "retired", "aux"]
+	Test("Ollama managed origin: exact replacement " . _G4O_Mode . " (managed-origin-custody)",
+		_G4O_WithManaged.Bind(_G4O_Replacement.Bind(_G4O_Mode)))
+
+_G4O_BeforeReader(F) {
+	global _LLM_ManagedBootstrap
+	Other := _G4B_Fixture(), Origin := F.Flow.Target["origin"]
+	try {
+		AssertThrows(() => LLM_OllamaCaptureOriginCustody(Read), "Capture precedes a reentrant origin reader.")
+	} finally Other.Close()
+	Read() {
+		AssertTrue(F.Flow.Cancel())
+		Other.Start(), Other.Runtime.PublishReady()
+		_LLM_ManagedBootstrap := Other.Flow
+		return Origin
+	}
+}
+Test("Ollama managed origin: captures before foreign origin reader (managed-origin-custody)",
+	_G4O_WithManaged.Bind(_G4O_BeforeReader))
+
+_G4O_UnrelatedInventory(F) {
+	Custody := LLM_OllamaCaptureOriginCustody(), Origin := Custody.Call("origin")
+	Other := LLM_AuxBegin("unrelated_inventory", Map("endpoint", Origin))
+	Owner := _LLM_OllamaAuxOwner(0, "ordinary_tags")
+	try {
+		AssertTrue(LLM_OllamaOriginCustodyCurrent(Custody, Origin), "Inventory does not replace the managed daemon.")
+		AssertTrue(LLM_OllamaProbeOriginCurrent(Owner, Origin))
+	} finally {
+		LLM_AuxFinish(Owner)
+		LLM_AuxFinish(Other)
+	}
+}
+Test("Ollama managed origin: unrelated inventory keeps currency (managed-origin-custody)",
+	_G4O_WithManaged.Bind(_G4O_UnrelatedInventory))
+
+_G4O_Delivery(Kind, F) {
+	global _LLM_ManagedBootstrap
+	Other := _G4B_Fixture(), Calls := 0
+	Custody := LLM_OllamaCaptureOriginCustody(), Origin := Custody.Call("origin")
+	Delivery := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, Observe, Kind)
+	try {
+		Delivery.Call("original")
+		AssertEqual(1, Calls)
+		AssertTrue(F.Flow.Cancel())
+		Other.Start(), Other.Runtime.PublishReady()
+		_LLM_ManagedBootstrap := Other.Flow
+		Delivery.Call("late")
+		AssertEqual(1, Calls, "A held native delivery cannot cross a same-origin replacement.")
+	} finally Other.Close()
+	Observe(*) {
+		Calls += 1
+	}
+}
+for _G4O_Kind in ["on_result", "on_partial", "on_success", "on_fail"]
+	Test("Ollama managed origin: retained " . _G4O_Kind . " delivery (managed-origin-custody)",
+		_G4O_WithManaged.Bind(_G4O_Delivery.Bind(_G4O_Kind)))
