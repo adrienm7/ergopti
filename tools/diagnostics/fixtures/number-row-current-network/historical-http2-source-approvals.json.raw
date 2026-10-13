@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "role": "independently-reviewed-committed-source-inputs",
+  "approvals": [
+    {
+      "schema": 1,
+      "role": "independently-reviewed-committed-source-input",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift",
+      "original_git_blob": "e17ff5af9c971d32d2a3536693f93a4e02e634cd",
+      "original_sha256": "0650c5f3c6ab64b79f324dcf07331286a2c7710fec2734fec93c8d800cddd624",
+      "published_source_commit": "526f87895005adfe27bad1ddbfdc41c8ab811190",
+      "git_blob": "c5918e0b2ec3973f73bed4e3d96af80f2ed1af96",
+      "sha256": "621bead52172608f1ae40cb57713c718734f3c2c43f063485932ac9e560cc647",
+      "source_review_sha256": "694da4b9ddc788003eb6929da5b53c070461ad70a5551bd596d4f3733f9ffedd"
+    },
+    {
+      "schema": 1,
+      "role": "independently-reviewed-committed-source-input",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWorkerTests.swift",
+      "original_git_blob": "1b2f96dc1e9c29b5a79d8eba05d03fa0eca0b9e6",
+      "original_sha256": "ef4882cc6ac6a7c578e756405cb4ae77f0f80243e96e6417f4fff69be2b54243",
+      "published_source_commit": "526f87895005adfe27bad1ddbfdc41c8ab811190",
+      "git_blob": "3306c425ede973693449fc478767e2162d9d1979",
+      "sha256": "7c0d42255b332224ad78e4275ae58a894840c58e22eef156a45c6ae1f46f9fe4",
+      "source_review_sha256": "694da4b9ddc788003eb6929da5b53c070461ad70a5551bd596d4f3733f9ffedd"
+    }
+  ]
+}

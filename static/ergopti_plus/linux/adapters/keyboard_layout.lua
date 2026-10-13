@@ -46,6 +46,8 @@ local Keysym = require("infra.keysym")
 local XkbCapture = require("adapters.xkb_capture")
 local inverse_table, inverse_current = XkbCapture.inverse_table, XkbCapture.inverse_current
 local inverse_republish = XkbCapture.inverse_republish
+local inverse_retarget = XkbCapture.inverse_retarget
+local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
@@ -160,6 +162,48 @@ local function publish(built, receipt)
 	_table = owned
 	_cohort = { built = owned, receipt = receipt, check = inverse_current }
 end
+
+
+-- Only new typing requests may renew a different native X11 group. Existing
+-- plan checks, readiness and explicit overrides keep their old refusal contract.
+local typing_lookup = false
+local function typing_cohort()
+	if typing_lookup then return nil end
+	typing_lookup = true
+	local previous, epoch, source, base, selection = _cohort, _refresh_epoch, _source, _base, _selection_override
+	local function selection_current()
+		return rawequal(package.loaded["adapters.keyboard_layout"], M)
+			and rawequal(_cohort, previous) and _refresh_epoch == epoch and _source == source
+			and rawequal(_base, base) and _selection_override == selection
+			and previous ~= nil and rawequal(_table, previous.built)
+			and rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
+			and rawequal(package.loaded["infra.display_server"], DisplayServer)
+			and rawequal(DisplayServer.is_x11, retarget_is_x11)
+			and rawequal(XkbCapture.inverse_retarget, inverse_retarget)
+			and rawequal(XkbCapture.inverse_table, inverse_table) and rawequal(XkbCapture.inverse_current, inverse_current)
+	end
+	local called, result = pcall(function()
+		local current = current_cohort()
+		if current then return current end
+		if not selection_current() or not previous.revoked or not previous.receipt
+			or selection ~= nil or source == "override" or type(inverse_retarget) ~= "function" then return nil end
+		if not retarget_is_x11() or not selection_current() then return nil end
+		local built, _, receipt = inverse_retarget(previous.receipt)
+		if not selection_current() or type(built) ~= "table" or getmetatable(built) ~= nil or not receipt then return nil end
+		local count = 0
+		for _ in pairs(built) do count = count + 1 end
+		if count < MIN_PLAUSIBLE_ENTRIES then return nil end
+		local checked, current_receipt = pcall(inverse_current, receipt)
+		if not checked or current_receipt ~= true or not selection_current() then return nil end
+		local sealed, final = pcall(inverse_current, receipt, true)
+		if not sealed or final ~= true or not selection_current() then return nil end
+		publish(built, receipt)
+		return _cohort
+	end)
+	typing_lookup = false
+	return called and result or nil
+end
+
 
 
 
@@ -476,7 +520,7 @@ end
 --- @return table|nil { keycode = integer, level = integer, mods = table }.
 function M.resolve(char)
 	if type(char) ~= "string" or char == "" then return nil end
-	local cohort = current_cohort()
+	local cohort = typing_cohort()
 	local hit = cohort and cohort.built[char]
 	return hit and copy_step(hit) or nil
 end
@@ -496,7 +540,7 @@ function M.plan(text)
 	if type(text) ~= "string" then return nil, nil end
 	-- A pattern walk can skip malformed bytes and falsely approve a partial plan.
 	if not Utf8.len(text) then return nil, nil end
-	local cohort = current_cohort()
+	local cohort = typing_cohort()
 	if not cohort then return nil, text:sub(1, 1) end
 
 	local plan = {}

@@ -966,3 +966,155 @@ helpers.describe("keyboard_layout: startup-capture-publication route", function(
 		end)
 	end)
 end)
+
+-- New source-bound typing requests only; these controlled Capture ports do not
+-- qualify a native desktop, physical press, uinput output or installed daemon.
+helpers.describe("keyboard_layout: automatic different-group inverse renewal", function()
+	helpers.it("renews character resolution through the original issuer after a different desktop group", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				helpers.assert_eq(layout.resolve("z").keycode, 44)
+				capture.process(99, 1); state.native_generation = 8
+				helpers.assert_eq(layout.is_ready(), false, "old cohort is retired before any new request")
+				local next_step = layout.resolve("z")
+				helpers.assert_true(type(next_step) == "table")
+				helpers.assert_eq(next_step.keycode, 21); helpers.assert_eq(next_step.mods, {})
+				helpers.assert_true(layout.is_ready())
+				state.on_inverse = function() error("an unchanged current lookup must not enumerate again") end
+				helpers.assert_eq(layout.resolve("z").keycode, 21)
+			end)
+		end)
+	end)
+	helpers.it("a new plan never revives the prior group plan across observed ABA", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				local old_steps, _, old = layout.plan("z")
+				helpers.assert_eq(old_steps[1].keycode, 44); helpers.assert_true(layout.plan_current(old))
+				capture.process(99, 1); state.native_generation = 8
+				local next_steps, reason, next_plan = layout.plan("z")
+				helpers.assert_nil(reason); helpers.assert_eq(next_steps[1].keycode, 21)
+				helpers.assert_true(type(next_plan) == "table"); helpers.assert_true(next_plan ~= old)
+				helpers.assert_eq(layout.plan_current(old), false); helpers.assert_nil(layout.plan_view(old))
+				helpers.assert_true(layout.plan_current(next_plan))
+				capture.process(99, 1); state.native_generation = 9
+				local again, _, third = layout.plan("z")
+				helpers.assert_eq(again[1].keycode, 44); helpers.assert_true(layout.plan_current(third))
+				helpers.assert_eq(layout.plan_current(old), false); helpers.assert_eq(layout.plan_current(next_plan), false)
+				helpers.assert_nil(layout.plan_view(old)); helpers.assert_nil(layout.plan_view(next_plan))
+			end)
+		end)
+	end)
+	helpers.it("explicit override retirement never acquires an automatic desktop inverse", function()
+		cohort_fixture(function(capture, layout, state)
+			capture.process(99, 1)
+			state.on_inverse = function() error("an override cannot borrow the automatic source") end
+			helpers.assert_nil(layout.resolve("z")); helpers.assert_nil(layout.plan("z"))
+		end)
+	end)
+	helpers.it("an equal-group source replacement does not renew an old plan", function()
+		cohort_fixture(function(_, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				state.native_generation = 8
+				local enumerations = 0
+				state.on_inverse = function() enumerations = enumerations + 1 end
+				helpers.assert_nil(layout.resolve("z")); helpers.assert_nil(layout.plan("z"))
+				helpers.assert_eq(enumerations, 0)
+			end)
+		end)
+	end)
+	helpers.it("a same-map capture reset cannot borrow a different-group renewal", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				helpers.assert_true(capture.reset_state())
+				capture.process(99, 1); state.native_generation = 8
+				local enumerations = 0
+				state.on_inverse = function() enumerations = enumerations + 1 end
+				helpers.assert_nil(layout.resolve("z")); helpers.assert_nil(layout.plan("z"))
+				helpers.assert_eq(enumerations, 0)
+			end)
+		end)
+	end)
+	helpers.it("unacknowledged native source cannot provide a replacement cohort", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				capture.process(99, 1); state.native_generation = 8; state.acknowledged = false
+				local enumerations = 0
+				state.on_inverse = function() enumerations = enumerations + 1 end
+				helpers.assert_nil(layout.resolve("z")); helpers.assert_nil(layout.plan("z"))
+				helpers.assert_eq(enumerations, 0)
+				helpers.assert_eq(layout.is_ready(), false)
+			end)
+		end)
+	end)
+	helpers.it("source mutation during actual inverse enumeration denies publication", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				capture.process(99, 1); state.native_generation = 8
+				state.on_inverse = function() state.native_generation = 9 end
+				helpers.assert_nil(layout.resolve("z")); helpers.assert_eq(layout.is_ready(), false)
+			end)
+		end)
+	end)
+	helpers.it("a reentrant selection retirement cannot publish the captured old request", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				capture.process(99, 1); state.native_generation = 8
+				local retired = false
+				state.on_inverse = function() retired = true; layout._set_table_for_test(nil) end
+				helpers.assert_nil(layout.resolve("z")); helpers.assert_true(retired)
+				helpers.assert_eq(layout.is_ready(), false)
+			end)
+		end)
+	end)
+	helpers.it("nested character lookup cannot borrow an in-flight renewal", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				capture.process(99, 1); state.native_generation = 8
+				local entered, nested = 0, true
+				state.on_inverse = function() entered = entered + 1; nested = layout.resolve("z") end
+				local current = layout.resolve("z")
+				helpers.assert_eq(entered, 1); helpers.assert_nil(nested)
+				helpers.assert_eq(current.keycode, 21); helpers.assert_true(layout.is_ready())
+			end)
+		end)
+	end)
+	helpers.it("a foreign renewal export is never invoked by the captured layout owner", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				capture.process(99, 1); state.native_generation = 8
+				local original, foreign_calls = capture.inverse_retarget, 0
+				capture.inverse_retarget = function() foreign_calls = foreign_calls + 1; return {}, nil, {} end
+				local value = layout.resolve("z")
+				capture.inverse_retarget = original
+				helpers.assert_nil(value); helpers.assert_eq(foreign_calls, 0)
+			end)
+		end)
+	end)
+	helpers.it("lost fresh map size cannot publish a partial replacement", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				capture.process(99, 1); state.native_generation = 8
+				local old = backend.inverse
+				-- Mutate the actual returned enumeration, keeping the original issuer.
+				state.on_inverse = function()
+					for key in pairs(state.rows) do state.rows[key] = nil end
+					state.rows.z = { keycode = 21, level = 1, mods = {} }
+				end
+				helpers.assert_nil(layout.resolve("z")); helpers.assert_eq(layout.is_ready(), false)
+				helpers.assert_true(backend.inverse == old)
+			end)
+		end)
+	end)
+	helpers.it("retiring the actual layout issuer during enumeration refuses its old lookup", function()
+		cohort_fixture(function(capture, layout, state, backend)
+			desktop_cohort(layout, backend, state, function()
+				capture.process(99, 1); state.native_generation = 8
+				local original, retired = package.loaded["adapters.keyboard_layout"], false
+				state.on_inverse = function() retired = true; package.loaded["adapters.keyboard_layout"] = {} end
+				local value = layout.resolve("z")
+				package.loaded["adapters.keyboard_layout"] = original
+				helpers.assert_true(retired); helpers.assert_nil(value); helpers.assert_eq(layout.is_ready(), false)
+			end)
+		end)
+	end)
+end)
