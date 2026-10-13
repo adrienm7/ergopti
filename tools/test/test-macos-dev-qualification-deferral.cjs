@@ -654,6 +654,19 @@ function run({ includeLeafControls = true } = {}) {
 	check('complete-source-guard', () =>
 		assert.deepEqual(sourceProblems(packageSource, workflow, caller), [])
 	);
+	// Lane declaration order may change the graph without changing release custody.
+	const publication = pipeline
+		.jobsOfText(caller, '.github/workflows/ci.yml')
+		.filter((job) => job.id === 'publication-plan');
+	assert.equal(publication.length, 1, 'One actual publication prerequisite owner is required.');
+	const publicationNeeds = /^    needs:\n(?:      - [a-z][a-z0-9-]*\n)+/m.exec(publication[0].body);
+	assert.ok(publicationNeeds, 'The actual publication prerequisite block is required.');
+	const publicationNeedsBlock = publicationNeeds[0];
+	assert.equal(
+		caller.split(publicationNeedsBlock).length,
+		2,
+		'Publication mutation target is unique.'
+	);
 	for (const [name, before, after] of [
 		['missing-selector', policySelector, ''],
 		[
@@ -713,16 +726,11 @@ function run({ includeLeafControls = true } = {}) {
 			'Selected tests',
 			'workflow'
 		],
-		[
-			'release-needs-remain',
-			'    needs:\n      - core\n      - macos\n      - windows\n      - linux',
-			'    needs:\n      - core',
-			'caller'
-		]
+		['release-needs-remain', publicationNeedsBlock, '    needs:\n      - core\n', 'caller']
 	]) {
 		check(name, () => {
 			const text = target === 'package' ? packageSource : target === 'workflow' ? workflow : caller;
-			assert.ok(text.includes(token));
+			assert.ok(text.includes(token), `${name}: actual ${target} mutation target is missing`);
 			const changed = text.replace(token, replacement);
 			assert.ok(
 				sourceProblems(
@@ -1262,6 +1270,48 @@ function run({ includeLeafControls = true } = {}) {
 		});
 
 	assert.equal(passed, 79);
+	let publicationControls = 0;
+	for (const lane of ['core', 'macos', 'windows', 'linux']) {
+		const entry = `      - ${lane}\n`;
+		assert.equal(publicationNeedsBlock.split(entry).length, 2);
+		for (const changedBlock of [
+			publicationNeedsBlock.replace(entry, ''),
+			publicationNeedsBlock + entry
+		]) {
+			assert.ok(
+				sourceProblems(
+					packageSource,
+					workflow,
+					caller.replace(publicationNeedsBlock, changedBlock)
+				).includes('release-needs'),
+				`Publication requires exactly one ${lane} prerequisite.`
+			);
+			publicationControls++;
+		}
+	}
+	assert.ok(
+		sourceProblems(
+			packageSource,
+			workflow,
+			caller.replace(publicationNeedsBlock, publicationNeedsBlock + '      - foreign\n')
+		).includes('release-needs'),
+		'Publication refuses a foreign prerequisite.'
+	);
+	publicationControls++;
+	for (const lanes of [
+		['core', 'macos', 'windows', 'linux'],
+		['macos', 'windows', 'linux', 'core']
+	]) {
+		const reordered = '    needs:\n' + lanes.map((lane) => `      - ${lane}\n`).join('');
+		assert.deepEqual(
+			sourceProblems(packageSource, workflow, caller.replace(publicationNeedsBlock, reordered)),
+			[],
+			'Changing declaration order preserves the same four release prerequisites.'
+		);
+		publicationControls++;
+	}
+	assert.equal(publicationControls, 11);
+	console.log('PASS: publication lane membership controls=11; no release or native execution.');
 	console.log(
 		'PASS: Mac qualification deferral source/typed-receipt controls=79; Swift/native execution unqualified.'
 	);
