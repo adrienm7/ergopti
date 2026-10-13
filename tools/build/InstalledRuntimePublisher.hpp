@@ -18,8 +18,10 @@
 #include <string>
 #include <vector>
 
+namespace ergoptiplus::installed_maintenance::admission_detail { class retained_images; }
+
 namespace ergoptiplus::installed_publisher {
-enum class role { launcher, hammerspoon, module, core, console, cli };
+enum class role { launcher, hammerspoon, module, core, console, cli, installer };
 inline const char* identifier(role value) {
   switch (value) {
     case role::launcher: return "com.ergoptiplus.app";
@@ -28,12 +30,13 @@ inline const char* identifier(role value) {
     case role::core: return "com.ergoptiplus.remap.core";
     case role::console: return "com.ergoptiplus.remap.console";
     case role::cli: return "com.ergoptiplus.remap.cli";
+    case role::installer: return "com.ergoptiplus.app.runtime-installer";
   }
   return nullptr;
 }
 inline std::optional<role> closed_role(const char* name) {
   if (!name) return std::nullopt;
-  for (auto value : {role::launcher, role::hammerspoon, role::module, role::core, role::console, role::cli}) {
+  for (auto value : {role::launcher, role::hammerspoon, role::module, role::core, role::console, role::cli, role::installer}) {
     if (std::strcmp(name, identifier(value)) == 0) return value;
   }
   return std::nullopt;
@@ -65,30 +68,45 @@ inline bool empty_acl(int fd) {
 struct acquired_fd final {
   int value;
   bool& close_refused;
-  acquired_fd(int value, bool& close_refused) noexcept : value(value), close_refused(close_refused) {}
+  int* refused_descriptor;
+  acquired_fd(int value, bool& close_refused, int* refused_descriptor = nullptr) noexcept
+      : value(value), close_refused(close_refused), refused_descriptor(refused_descriptor) {}
   acquired_fd(const acquired_fd&) = delete;
-  ~acquired_fd() { if (value >= 0 && close(value) != 0) close_refused = true; }
+  ~acquired_fd() {
+    if (value >= 0 && close(value) != 0) {
+      close_refused = true;
+      if (refused_descriptor && *refused_descriptor < 0) *refused_descriptor = value;
+    }
+  }
   int release() noexcept { const int result = value; value = -1; return result; }
 };
 struct acquired_directory final {
   DIR* value;
   bool& close_refused;
-  acquired_directory(DIR* value, bool& close_refused) noexcept : value(value), close_refused(close_refused) {}
+  int* refused_descriptor;
+  acquired_directory(DIR* value, bool& close_refused, int* refused_descriptor = nullptr) noexcept
+      : value(value), close_refused(close_refused), refused_descriptor(refused_descriptor) {}
   acquired_directory(const acquired_directory&) = delete;
   ~acquired_directory() { finish(); }
   bool finish() noexcept {
-    if (value) { DIR* held = value; value = nullptr; if (closedir(held) != 0) close_refused = true; }
+    if (value) {
+      DIR* held = value; const int original = dirfd(held); value = nullptr;
+      if (closedir(held) != 0) {
+        close_refused = true;
+        if (refused_descriptor && *refused_descriptor < 0) *refused_descriptor = original;
+      }
+    }
     return !close_refused;
   }
 };
-inline std::optional<std::vector<std::string>> names(int fd, bool& close_refused) {
+inline std::optional<std::vector<std::string>> names(int fd, bool& close_refused, int* refused_descriptor = nullptr) {
   const int copy = fcntl(fd, F_DUPFD_CLOEXEC, 0);
   if (copy < 0) return std::nullopt;
-  acquired_fd held_copy(copy, close_refused);
+  acquired_fd held_copy(copy, close_refused, refused_descriptor);
   DIR* directory = fdopendir(copy);
   if (!directory) return std::nullopt;
   held_copy.release();
-  acquired_directory held_directory(directory, close_refused);
+  acquired_directory held_directory(directory, close_refused, refused_descriptor);
   rewinddir(directory);
   std::vector<std::string> result;
   errno = 0;
@@ -162,6 +180,7 @@ inline std::optional<std::vector<std::uint8_t>> path_leaf(const char* path, role
 
 // A retained native tree and cryptographic observation; not READY, process or capture ownership.
 class owner final {
+  friend class ergoptiplus::installed_maintenance::admission_detail::retained_images;
 public:
   owner(const owner&) = delete;
   owner& operator=(const owner&) = delete;
@@ -169,13 +188,29 @@ public:
     try { return acquire_checked(); } catch (...) { return nullptr; }
   }
 private:
+  static std::unique_ptr<owner> failed_acquisition(std::unique_ptr<owner> result) noexcept {
+    if (!result) return nullptr;
+    bool acknowledged=false;
+    try { acknowledged=result->release(); } catch (...) { result->close_refused_=true; }
+    if (!acknowledged) {
+      // No allocation follows native acquisition. The exact failed owner keeps
+      // its immutable FD identities/refused-close metadata and owns itself.
+      // Ambiguous close is sticky; no successor or destructor can retry it.
+      owner* original=result.get();
+      original->failed_custody_.reset(result.release());
+    }
+    return nullptr;
+  }
   static std::unique_ptr<owner> acquire_checked() {
     auto result = std::unique_ptr<owner>(new owner);
-    if (!result->anchor()) return nullptr;
-    auto observed = detail::path_leaf(core, role::core);
-    if (!observed) return nullptr;
-    result->leaf_ = std::move(*observed);
-    return result->current() ? std::move(result) : nullptr;
+    try {
+      if (!result->anchor()) return failed_acquisition(std::move(result));
+      auto observed = detail::path_leaf(core, role::core);
+      if (!observed) return failed_acquisition(std::move(result));
+      result->leaf_ = std::move(*observed);
+      if (!result->current()) return failed_acquisition(std::move(result));
+      return result;
+    } catch (...) { return failed_acquisition(std::move(result)); }
   }
 public:
   const std::vector<std::uint8_t>& observed_leaf() const { return leaf_; }
@@ -186,6 +221,31 @@ public:
   }
   bool current() const noexcept {
     try { return current_checked(); } catch (...) { return false; }
+  }
+  // Cleanup observation of this original held publisher; never image admission.
+  // Operation journals/stage directories may change protected ancestor entries.
+  bool custody_current() const noexcept {
+    try {
+      if (released_ || close_refused_ || nodes_.size() < 5 || !custody_tree_current()) return false;
+      const auto actual_core = detail::path_leaf(core, role::core);
+      const auto actual_console = detail::path_leaf(console, role::console);
+      const auto actual_cli = detail::path_leaf(cli, role::cli);
+      return actual_core && actual_console && actual_cli && *actual_core == leaf_
+          && *actual_console == leaf_ && *actual_cli == leaf_ && custody_tree_current();
+    } catch (...) { return false; }
+  }
+  // Installed-image admission is distinct from a generic signature/tree observation.
+  bool permits_installed_images() const noexcept {
+    try {
+      if (!current() || nodes_.size() < 5 || nodes_[3].name != "ErgoptiPlus") return false;
+      const int parent = nodes_[3].fd;
+      for (const char* name : {".runtime-install-journal", ".runtime-service-journal",
+          ".runtime-bootstrap-journal", ".runtime-maintenance-journal"}) {
+        struct stat observed{}; errno = 0;
+        if (fstatat(parent, name, &observed, AT_SYMLINK_NOFOLLOW) != -1 || errno != ENOENT) return false;
+      }
+      return current();
+    } catch (...) { return false; }
   }
 private:
   bool current_checked() const {
@@ -201,7 +261,10 @@ public:
     if (!released_) {
       released_ = true;
       for (auto it = nodes_.rbegin(); it != nodes_.rend(); ++it) {
-        if (it->fd >= 0 && close(it->fd) != 0) close_refused_ = true;
+        if (it->fd >= 0 && close(it->fd) != 0) {
+          it->refused_descriptor=it->fd;
+          close_refused_ = true;
+        }
         it->fd = -1;
       }
     }
@@ -216,6 +279,7 @@ private:
     struct stat identity;
     bool census = false;
     std::vector<std::string> children;
+    int refused_descriptor=-1;
   };
   owner() = default;
   static constexpr const char* core = "/Library/Application Support/ErgoptiPlus/Runtime/ErgoptiPlus-Remap-Core.app";
@@ -229,7 +293,28 @@ private:
       const int observed = i == 0 ? lstat("/", &named) : fstatat(nodes_[node.parent].fd, node.name.c_str(), &named, AT_SYMLINK_NOFOLLOW);
       if (observed != 0 || !detail::same(named, node.identity)) return false;
       if (node.census) {
-        const auto actual = detail::names(node.fd, close_refused_);
+        const auto actual = detail::names(node.fd, close_refused_, &unregistered_refused_descriptor_);
+        if (!actual || *actual != node.children) return false;
+      }
+    }
+    return !close_refused_;
+  }
+  bool custody_tree_current() const {
+    const auto same_ancestor = [](const struct stat& a, const struct stat& b) {
+      return S_ISDIR(a.st_mode) && S_ISDIR(b.st_mode) && a.st_dev == b.st_dev
+          && a.st_ino == b.st_ino && a.st_mode == b.st_mode && a.st_uid == b.st_uid && a.st_gid == b.st_gid;
+    };
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+      const auto& node = nodes_[i]; struct stat held{}, named{};
+      if (node.fd < 0 || fstat(node.fd, &held) != 0 || !detail::empty_acl(node.fd)) return false;
+      const int observed = i == 0 ? lstat("/", &named)
+          : fstatat(nodes_[node.parent].fd, node.name.c_str(), &named, AT_SYMLINK_NOFOLLOW);
+      if (observed != 0) return false;
+      if (i < 4) {
+        if (!same_ancestor(held, node.identity) || !same_ancestor(named, node.identity)) return false;
+      } else if (!detail::same(held, node.identity) || !detail::same(named, node.identity)) return false;
+      if (node.census) {
+        const auto actual = detail::names(node.fd, close_refused_, &unregistered_refused_descriptor_);
         if (!actual || *actual != node.children) return false;
       }
     }
@@ -238,7 +323,7 @@ private:
   bool enroll(int fd, std::size_t parent, const char* name, bool directory) {
     struct stat value{};
     if (fd < 0) return false;
-    detail::acquired_fd acquired(fd, close_refused_);
+    detail::acquired_fd acquired(fd, close_refused_, &unregistered_refused_descriptor_);
     const bool accepted = fstat(fd, &value) == 0 && value.st_uid == 0 && (value.st_mode & 0022) == 0 &&
         (directory ? S_ISDIR(value.st_mode) : (S_ISREG(value.st_mode) && value.st_nlink == 1)) && detail::empty_acl(fd);
     if (!accepted) return false;
@@ -247,7 +332,7 @@ private:
     return true;
   }
   bool walk(std::size_t index) {
-    const auto actual = detail::names(nodes_[index].fd, close_refused_);
+    const auto actual = detail::names(nodes_[index].fd, close_refused_, &unregistered_refused_descriptor_);
     if (!actual) return false;
     nodes_[index].census = true;
     nodes_[index].children = *actual;
@@ -273,8 +358,10 @@ private:
     return walk(parent);
   }
   std::vector<node> nodes_;
+  std::unique_ptr<owner> failed_custody_;
   std::vector<std::uint8_t> leaf_;
   bool released_ = false;
   mutable bool close_refused_ = false;
+  mutable int unregistered_refused_descriptor_ = -1;
 };
 } // namespace ergoptiplus::installed_publisher

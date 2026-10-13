@@ -102,6 +102,12 @@ final class OwnedRuntimeFirstInstallOwner {
 		guard state == .filesPublished else { return false }
 		do { try verify(); return true } catch { return false }
 	}
+	/// Lends this exact original EX namespace only after native publication completed; no new lock descriptor or receipt.
+	func withPublishedNamespace<T>(_ body: (OwnedRuntimeServiceLifecycleLock) throws -> T) throws -> T {
+		lock.lock(); defer { lock.unlock() }
+		guard state == .filesPublished else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		try verify(); return try body(lifecycle)
+	}
 	func snapshot() -> State { lock.lock(); defer { lock.unlock() }; return state }
 	deinit { _ = source.releaseOwnedDescriptors(); _ = helper.releaseOwnedDescriptors(); _ = lifecycle.retire() }
 }
