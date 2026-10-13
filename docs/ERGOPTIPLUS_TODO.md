@@ -10427,6 +10427,18 @@ Authentic pre-host acquisition, the held Windows bridge and clean original23
 source/runtime enrollment remain separate Root-owned source dependencies;
 these cannot be relabeled as a native-only remainder. Item62 stays open.
 
+A durable [inactive original23 source handoff](handovers/2026-10-12-group6-ci/INACTIVE-ORIGINAL23-SOURCE.md)
+now retains literal owner/held-bridge patches and independently reviewed
+Source22 dependency/model composition. The packet is not applied or enrolled.
+Both frozen22-control versions pass; original113/128 assertions,33 collector
+predicates,2307-byte child,21 input tuples and independent oracle are preserved.
+The held bridge has73 software controls and a conservative lease fallback
+correction; none authenticates the first host. Root's trusted pre-host native
+provider and source/workflow reconciliation remain real software dependencies,
+with profileUNQUALIFIED, kernel imageUNKNOWN and native23UNRUN. Current helper
+692 differs from frozen0db, so exact current-source receiving is still required.
+No stopped native experiment is repeated and no item is removed.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
