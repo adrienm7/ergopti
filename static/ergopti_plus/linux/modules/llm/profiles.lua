@@ -22,6 +22,12 @@
 
 local M = {}
 
+-- The cooperative constructor captures one engine owner, not a later compatible export.
+local ResponseEngine = require("modules.llm.prediction_engine")
+local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response, ResponseEngine.runtime_response_current
+assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
+	"original runtime response owner unavailable")
+
 local Logger = require("logger.shim")
 local LOG = "modules.llm.profiles"
 
@@ -49,6 +55,7 @@ local _enabled = false
 
 -- Cached list of available models from Ollama.
 local _available_models = {}
+local _model_inventory, _model_inventory_request = nil, nil
 
 -- Base URL for Ollama (default port 11434).
 local _base_url = nil
@@ -86,6 +93,7 @@ end
 ---              port  number  Ollama port (default 11434).
 ---              model string  Override default model.
 function M.init(opts)
+	_model_inventory, _model_inventory_request, _available_models = nil, nil, {}
 	local options = type(opts) == "table" and opts or {}
 	-- The bridge owns both the canonical origin and operation paths. A profile
 	-- stores only the origin; callers ask the bridge for /api/tags or /api/chat.
@@ -111,11 +119,27 @@ end
 -- =========================================
 -- =========================================
 
+
+--- Rechecks both private managed custody and this exact inventory publication frame.
+--- @param frame table Original inventory operation.
+--- @return boolean current
+local function inventory_current(frame)
+	if not frame or _model_inventory_request ~= frame or _base_url ~= frame.origin
+		or package.loaded["modules.llm.prediction_engine"] ~= frame.engine
+		or frame.engine.capture_runtime_response ~= frame.capture
+		or frame.engine.runtime_response_current ~= frame.current then return false end
+	local admitted = frame.current(frame.receipt, frame.origin) == true
+	return admitted and _model_inventory_request == frame and _base_url == frame.origin
+		and package.loaded["modules.llm.prediction_engine"] == frame.engine
+		and frame.engine.capture_runtime_response == frame.capture
+		and frame.engine.runtime_response_current == frame.current
+end
+
 --- Fetches the list of available models from the Ollama API.
 --- Returns cached value if already fetched; call refresh_models() to force refresh.
 --- @return table Array of model name strings.
 function M.get_models()
-	if #_available_models > 0 then return _available_models end
+	if #_available_models > 0 and inventory_current(_model_inventory) then return _available_models end
 
 	-- Try to fetch from Ollama.
 	M.refresh_models()
@@ -125,14 +149,22 @@ end
 --- Refreshes the model list from the Ollama /api/tags endpoint.
 --- @return table Array of model name strings (may be empty if Ollama unreachable).
 function M.refresh_models()
-	_available_models = {}
+	local engine = ResponseEngine
+	local capture, current = ResponseCapture, ResponseCurrent
+	if type(capture) ~= "function" or type(current) ~= "function" then return {} end
+	local receipt = capture()
+	local frame = { engine = engine, capture = capture, current = current, receipt = receipt, origin = _base_url }
+	_model_inventory_request = frame
+	if not inventory_current(frame) then return {} end
+	_available_models, _model_inventory = {}, nil
 
 	if not _base_url or not HttpBridge then
 		Logger.warn(LOG, "refresh_models(): no HTTP bridge or base URL — cannot fetch models.")
 		return {}
 	end
 
-	local url = HttpBridge.ollama_endpoint(_base_url, "tags")
+	local url = HttpBridge.ollama_endpoint(frame.origin, "tags")
+	if not inventory_current(frame) then return {} end
 	if not url then
 		Logger.error(LOG, "refresh_models(): invalid Ollama origin — cannot build the tags endpoint.")
 		return {}
@@ -160,14 +192,17 @@ function M.refresh_models()
 		return models
 	end)
 
+	if not inventory_current(frame) then return {} end
 	if not ok then
 		Logger.warn(LOG, "refresh_models(): HTTP error — %s", tostring(result))
 		return {}
 	end
 
 	_available_models = result or {}
+	_model_inventory = frame
 	Logger.info(LOG, "Fetched %d model(s) from Ollama.", #_available_models)
 
+	if not inventory_current(frame) then return {} end
 	-- Auto-select first available model if none is set.
 	if not _current_model and #_available_models > 0 then
 		_current_model = _available_models[1]

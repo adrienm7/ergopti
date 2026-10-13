@@ -19,6 +19,12 @@
 
 local M = {}
 
+-- The cooperative constructor captures one engine owner, not a later compatible export.
+local ResponseEngine = require("modules.llm.prediction_engine")
+local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response, ResponseEngine.runtime_response_current
+assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
+	"original runtime response owner unavailable")
+
 local Logger = require("logger.shim")
 local LOG = "modules.llm.api_ollama"
 
@@ -117,6 +123,29 @@ local function stop_for(line_mode)
 	return nil
 end
 
+
+--- Checks the original managed owner after potentially reentrant native readers.
+--- @param request table Retained private response owner.
+--- @return boolean current
+local function runtime_current(request)
+	if package.loaded["modules.llm.prediction_engine"] ~= request.runtime_engine
+		or request.runtime_engine.capture_runtime_response ~= request.runtime_capture
+		or request.runtime_engine.runtime_response_current ~= request.runtime_current then return false end
+	local admitted = request.runtime_current(request.runtime_receipt, request.origin) == true
+	return admitted and package.loaded["modules.llm.prediction_engine"] == request.runtime_engine
+		and request.runtime_engine.capture_runtime_response == request.runtime_capture
+		and request.runtime_engine.runtime_response_current == request.runtime_current
+end
+
+--- Finishes every external observer with the original lexical request checks.
+--- @param request table Original chat operation.
+--- @return boolean current
+local function request_current(request)
+	if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return false end
+	local admitted = runtime_current(request)
+	return admitted and _active_request == request and not request.terminal and request.epoch == _request_epoch
+end
+
 --- Delivers one terminal callback for a request epoch.
 --- @param request table
 --- @param err string|nil
@@ -124,7 +153,9 @@ local function finish_request(request, err)
 	if request.terminal then return end
 	request.terminal = true
 	if _active_request == request then _active_request = nil end
-	if type(request.on_done) == "function" then
+	local terminal_epoch = _request_epoch
+	local admitted = runtime_current(request)
+	if admitted and terminal_epoch == _request_epoch and type(request.on_done) == "function" then
 		local ok, callback_err = pcall(request.on_done, request.full_text, err)
 		if not ok then Logger.error(LOG, "chat(): terminal callback raised — %s", tostring(callback_err)) end
 	end
@@ -142,7 +173,7 @@ local function consume_chunk(request, chunk, flush)
 		local line = request.pending:sub(1, newline - 1):gsub("\r$", "")
 		request.pending = request.pending:sub(newline + 1)
 		local content = bridge_mod.parse_stream_line(line)
-		if content then
+		if content and request_current(request) then
 			request.full_text = request.full_text .. content
 			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
 		end
@@ -150,7 +181,7 @@ local function consume_chunk(request, chunk, flush)
 	if flush and request.pending ~= "" then
 		local content = bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
 		request.pending = ""
-		if content then
+		if content and request_current(request) then
 			request.full_text = request.full_text .. content
 			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
 		end
@@ -172,10 +203,19 @@ end
 --- @param on_chunk function  Called with (delta_text) for each streaming chunk.
 --- @param on_done  function  Called with (full_text, error) on completion.
 function M.chat(base_url, model, messages, opts, on_chunk, on_done)
+	local runtime_engine = ResponseEngine
+	local runtime_capture, response_current = ResponseCapture, ResponseCurrent
+	if type(runtime_capture) ~= "function" or type(response_current) ~= "function" then return false end
+	local fresh_receipt = runtime_capture()
+	local options = type(opts) == "table" and opts or {}
+	local runtime_receipt = rawget(options, "runtime_response")
+	if runtime_receipt == nil then runtime_receipt = fresh_receipt end
+	local response = { runtime_engine = runtime_engine, runtime_capture = runtime_capture,
+		runtime_current = response_current, runtime_receipt = runtime_receipt, origin = base_url }
+	if not runtime_current(response) then return false end
 	if _active_request and M.cancel() ~= true then return false end
 	_request_epoch = _request_epoch + 1
 
-	local options = type(opts) == "table" and opts or {}
 	local stream = options.stream ~= false  -- default: streaming on
 
 	-- Build the JSON payload.
@@ -201,6 +241,7 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 
 	local json_body = json_encode(payload)
 	local url = bridge_mod.ollama_endpoint(base_url, "chat")
+	if not runtime_current(response) then return false end
 	if not url then
 		Logger.error(LOG, "chat(): invalid Ollama origin — cannot build the chat endpoint.")
 		if on_done then pcall(on_done, "", "invalid Ollama origin") end
@@ -208,6 +249,8 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	end
 
 	local request = {
+		runtime_engine = runtime_engine, runtime_capture = runtime_capture, runtime_current = response_current,
+		runtime_receipt = runtime_receipt, origin = base_url,
 		epoch = _request_epoch,
 		on_chunk = on_chunk,
 		on_done = on_done,
@@ -219,15 +262,17 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 
 	Logger.debug(LOG, "chat() → %s (model=%s stream=%s)", url, model, tostring(stream))
 	local function dispatch()
-		if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return false end
+		if not request_current(request) then return false end
 		return HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, json_body, {
 			timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000,
+			authorized = function() return request_current(request) end,
 		}, function(chunk)
-			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+			if not request_current(request) then return end
 			consume_chunk(request, chunk, false)
 		end, function(result)
-			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+			if not request_current(request) then return end
 			consume_chunk(request, "", true)
+			if not request_current(request) then return end
 			if type(result) ~= "table" or result.ok ~= true then
 				finish_request(request, LocalModelPolicy.response_failure(result, base_url)
 					or (type(result) == "table" and result.error or "HTTP transport failed"))
@@ -240,11 +285,11 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	end
 	if options.verify_local_model == true then
 		return require("modules.llm.local_model_probe").verify(base_url, model, nil, function(installed, reason)
-			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+			if not request_current(request) then return end
 			if installed == nil then finish_request(request, reason) return end
 			if installed == false then finish_request(request, LocalModelPolicy.failure(model, base_url)) return end
 			dispatch()
-		end)
+		end, runtime_receipt)
 	end
 	return dispatch()
 end
