@@ -155,6 +155,19 @@ an inverse that restores the original direct OS call and rejects it. Other
 full-unit failures stay open. Unchanged source blobs alone are not a same-host
 native baseline reproduction.
 
+Native startup lifecycle requests now retain completed input initialization across
+temporary tray repaint. The ordinary readiness getter can become false only
+while rebuilding menus after initialization; reading it twice at admission or
+again at delivery stranded accepted Quit/Suspend commands. Explicit retirement
+still revokes this owner, and the ordinary suspend/reload/exit owners still gate
+execution. The initial four causal cases receive one PASS/three FAIL before the
+fix (exit 1); all five current cases pass, including cold Request/NotifyReady and
+later repaint, exactly-once delivery and retirement. Existing menu startup 19,
+tray bootstrap 13 and engine/native-Edit E2E 70 pass, each natural exit 0 without
+failure/skip. Authenticated full-entry compilation, BOM/LF encoding, conventions
+and all nine actual isolated source-startup scenarios also pass. These receipts
+do not qualify physical input or the live managed AI workflow.
+
 The local committed Windows build at `7e3da5567183914502e977d720e818e337e1dd49`
 compiles with the authenticated AutoHotkey2.0.26/Ahk2Exe toolchain. Actual
 operator-opted user32 receiving exits 0 with two owned Edit vectors and two
