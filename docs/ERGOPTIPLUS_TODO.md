@@ -115,6 +115,17 @@ remaining Lua gsub and keyboard-registry Core JS failures have identical source
 and test blobs at the incoming baseline and published Windows source; they stay
 open rather than being relabelled as successful.
 
+The official native builder now loads its hashing dependency from the executing
+PowerShell host. A Node launcher can retain a PowerShell7 module path when it
+starts PowerShell5.1: the wrong Utility manifest exposes ordinary cmdlets but
+omits the PowerShell5.1 `Get-FileHash` function. The actual original probe exits
+1 with hashing unavailable; current-host dependency loading exits 0 and preserves
+the inherited module path. Direct Node-launched official UpdateTracked and verify
+both exit 0 with all 44 native cases, eight/eleven/six matrices and 41 exports.
+The regenerated recipe fingerprint is
+`B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036`; the DLL
+remains `C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E`.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
