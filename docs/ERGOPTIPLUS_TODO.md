@@ -292,6 +292,23 @@ proof. The 41-export source guard retains all original assertions and adds
 live source/DLL provenance and closed admission are unchanged. Backend delivery
 and complete observer conversion remain software work, so item 49 stays open.
 
+Item 49 now retains the coherent [nineteen-path source bundle](handovers/2026-10-12-dev-consolidation/pending-terminal-complete-union.patch)
+with [exact preimages and postimages](handovers/2026-10-12-dev-consolidation/terminal-complete-union.manifest.json)
+and [executable receiving](handovers/2026-10-12-dev-consolidation/terminal-complete-receiving.md).
+Its ten C afterimages exactly match the sanitized 8 core / 11 output / 43 owner
+composition. The captured receiver now retains immutable original authority
+through opaque callbacks, and the explicitly supplied sender keeps separate
+owned bytes and authentic partial-output debt. The actual copy-observer key is
+corrected in 48 authority vectors. The KLE reset factory publishes only after
+complete registration and produces read-only metadata under the original
+binding/model/layout identity. Source controls pass 119 custody and 27 bridge
+inverses, exit 0. All 667 terminal cases, 91 new KLE cases and two opt-in user32
+receiving vectors remain native UNRUN. Apply the union once; its 41-export
+adapter requires an official matching Windows SDK/MSVC DLL rebuild. Active
+source/DLL provenance and production admission are unchanged. Full cohort
+migration, preregistration and production emission still have software work;
+no backend choice, native or physical qualification is inferred.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
@@ -3338,17 +3355,30 @@ remain required, separately from the local gates.
   DeferredWork and TimerScheduler with native-port doubles. The complete local
   macOS unit suite passes 19,013 tests across 1,576 modules; E2E passes 101/101
   with one host/driver-specific scenario skipped. Formatting passes; JS remains
-  422/426 with the four previously observed failures. Current macOS CI,
-  Cocoa interaction, packaging, installation and installed restart remain
-  unqualified; this bounded correction does not complete item 7 or item 38.
+  422/426 with the four previously observed failures. Manual macOS run
+  [38329427303](https://github.com/adrienm7/ergopti/actions/runs/38329427303)
+  tests `7b01f3d2`, whose tree exactly equals delivered Dev `f43575f5`.
+  Its stubbed units pass 19,027/19,027 across 1,578 modules, including all
+  67 delivery subjects; E2E passes 101/101 with one explicit skip. Native
+  paired leases on both architectures, cold MLX and 12 tooltip captures pass.
+  These separate native jobs do not qualify Cocoa wizard interaction.
+  The whole workflow fails: Core passes 424/426, retaining the Lua gsub and
+  layout-default guards; both managed-Ollama jobs and archive qualification
+  fail. Packaging and installation are skipped, and Release is skipped.
+  Cocoa interaction and installed restart remain unexecuted; this bounded
+  correction does not complete item 7 or item 38.
   The macOS wizard now requires a committed native import timeout before
   acquiring navigation-layer or remap work. A refused timer start takes the
   existing translated notice and reload continuation for answers already saved;
   the same Finish can retry after timer repair. The complete portable owning
   module passes 18 cases, including three new genuine DeferredWork and
   TimerScheduler admission controls; all 15 original subjects are retained.
-  Predecessor comparison, final selected gates and native installed restart
-  receiving remain separate requirements; this does not complete item 7.
+  Its retained timeout predecessor comparison passes 18/18, fails the three
+  added cases with the old timeout and passes 18/18 after restoration; the
+  original 15 remain intact. That earlier selected gate passes in its own
+  source context. Current run 38329427303 also executes all 18 subjects
+  successfully. Native installed restart receiving remains required; neither
+  the portable comparison nor the stubbed CI completes item 7.
   The tap-holds page lists each engine's recommended keys from the
   shared tap-hold catalogue and imports only the checked ones through each
   driver's tap-hold writer: Windows renders them into the tap_hold.toml beside
