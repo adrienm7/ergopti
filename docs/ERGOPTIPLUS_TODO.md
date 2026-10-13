@@ -3954,6 +3954,8 @@ uninstall preflight; the unchanged uninstall control passes in the approved
 isolated context. Hosted native, packaging, installation and physical
 qualification remain required, and item 30 stays open.
 
+The captured macOS magic-key choice now belongs to the exact live script-control owner and settled pause epoch, not the rendered menu snapshot. Missing, paused, transitioning or unreadable state refuses before acquisition; pause/resume crossings, owner replacement and reentrant activation/submission/retirement invalidate the selection before consumption or persistence. Exact native cleanup debt and synthetic provenance fences retain their existing owners. The current 33 case bodies remain byte-identical; 20 additional production-callback controls pass under Lua 5.4 with modeled native ports. Full selected and hosted native qualification, actual Hammerspoon scheduling and physical input remain required; this does not resolve the customer lease PONG/READY/73 cause.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -3986,6 +3988,31 @@ qualification remain required, and item 30 stays open.
   strict live admission. This supplies the WP4 diagnostic protocol dependency,
   not an installed headless producer, signed runtime, native SDK, package or
   physical acceptance; WP3-WP10 and customer lease recovery remain open.
+
+  The dormant physical consumer now retains subscription and verifier startup,
+  cancellation and accounting ownership through the exact outstanding native
+  invocation. Version refusal gives one unavailable warning without retries;
+  event sinks must explicitly acknowledge admission, and holds crossing an
+  excluded interval are cancelled in full. Legacy boot remains unchanged and
+  does not enable an owned runtime. Focused receiving passes 210/0 across 13
+  modules, retaining the newer admission-settlement and original baseline and
+  transport controls. Four original primitives with the forward owner retain
+  177 passes and 28 failures; the exact original verifier-start implementation
+  retains all 205 earlier controls and fails four of five new lifecycle cases.
+  This is software receiving over modeled native ports, not installed runtime,
+  hardware, packaging or customer lease qualification. Full selected and native
+  acceptance remain required; item 31 stays open.
+
+  The actual context tracker now issues an explicitly bound observation
+  subscription through the native clock adapter. Secure-field completion comes
+  from the real writer and matching app PID; failed or reentrant observations
+  deny publication, and exact callback frames survive detach until unwinding.
+  Legacy three-argument initialization and nil-observer detector behavior are
+  preserved. Focused receiving passes 341 declared controls and two direct
+  assertion modules, including 29 observation controls (original composition:
+  1 pass and 28 failures), 125 wiring controls and 28 healthcheck controls.
+  Correlated sampling, complete retained-history ownership, native acceptance
+  and production activation remain required; this is a dormant software slice.
 
   FileSystem transaction receipts now retain their original private issuer,
   publication chain and current source view; replacement after admission is
