@@ -1,30 +1,42 @@
 // tools/lib/owned-descriptor-read.cjs
 
-/** Read an acquired descriptor and attempt its close exactly once.
- * A secondary close refusal preserves the exact original read failure.
- * Successful close alone cannot turn a refused read into accepted bytes.
+/** Preserve owned operation/cleanup failures with one cleanup attempt.
+ * Explicit failure state retains falsy thrown values without claiming retirement.
  */
 'use strict';
 
-function readOwnedDescriptor(descriptor, read, close) {
+function performOwnedCleanup(operation, cleanup, message) {
 	let value;
 	let primary;
 	let refused = false;
 	try {
-		value = read();
+		value = operation();
 	} catch (error) {
 		primary = error;
 		refused = true;
 	}
 	try {
-		close(descriptor);
+		cleanup();
 	} catch (closure) {
-		if (refused)
-			throw new AggregateError([primary, closure], 'Owned descriptor read and close refused.');
+		if (refused) throw new AggregateError([primary, closure], message);
 		throw closure;
 	}
 	if (refused) throw primary;
 	return value;
 }
 
-module.exports = { readOwnedDescriptor };
+/** Run one owned operation and attempt its original cleanup once. */
+function runWithOwnedCleanup(operation, cleanup) {
+	return performOwnedCleanup(operation, cleanup, 'Owned operation and cleanup refused.');
+}
+
+/** Read an acquired descriptor without changing its original close arguments. */
+function readOwnedDescriptor(descriptor, read, close) {
+	return performOwnedCleanup(
+		read,
+		() => close(descriptor),
+		'Owned descriptor read and close refused.'
+	);
+}
+
+module.exports = { readOwnedDescriptor, runWithOwnedCleanup };

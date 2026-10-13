@@ -21,7 +21,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { shared } = require('../lib/paths.cjs');
-const { readOwnedDescriptor } = require('../lib/owned-descriptor-read.cjs');
+const { readOwnedDescriptor, runWithOwnedCleanup } = require('../lib/owned-descriptor-read.cjs');
 
 const FORMATS = new Map([
 	['zip', '.zip'],
@@ -174,70 +174,74 @@ function createArchives(application, output, options = {}) {
 	const before = snapshot(app);
 	const requirement = signedRequirement(app, run, destination);
 	const owned = fs.mkdtempSync(path.join(destination, '.release-archives-'));
-	try {
-		for (const archive of archives) {
-			const payload = path.join(owned, archive.name);
-			if (archive.format === 'zip') {
-				// Keep plain maximum-deflate ZIP while preserving Mac metadata.
-				run(
-					'/usr/bin/ditto',
-					[
-						'-c',
-						'-k',
-						'--sequesterRsrc',
-						'--keepParent',
-						'--zlibCompressionLevel',
-						'9',
-						app,
-						payload
-					],
-					destination
-				);
-			} else {
-				// The .app itself is the root entry, with no enclosing directory.
-				run(
-					'/usr/bin/tar',
-					[
-						'-cJf',
-						payload,
-						'--options',
-						'xz:compression-level=9',
-						'-C',
-						path.dirname(app),
-						'--',
-						basename
-					],
+	return runWithOwnedCleanup(
+		() => {
+			for (const archive of archives) {
+				const payload = path.join(owned, archive.name);
+				if (archive.format === 'zip') {
+					// Keep plain maximum-deflate ZIP while preserving Mac metadata.
+					run(
+						'/usr/bin/ditto',
+						[
+							'-c',
+							'-k',
+							'--sequesterRsrc',
+							'--keepParent',
+							'--zlibCompressionLevel',
+							'9',
+							app,
+							payload
+						],
+						destination
+					);
+				} else {
+					// The .app itself is the root entry, with no enclosing directory.
+					run(
+						'/usr/bin/tar',
+						[
+							'-cJf',
+							payload,
+							'--options',
+							'xz:compression-level=9',
+							'-C',
+							path.dirname(app),
+							'--',
+							basename
+						],
+						destination
+					);
+				}
+				if (
+					!fs.lstatSync(payload).isFile() ||
+					fs.lstatSync(payload).isSymbolicLink() ||
+					fs.statSync(payload).size === 0
+				)
+					throw new Error('The native archive output is not a nonempty regular file.');
+				const extracted = path.join(owned, 'verify-' + archive.format);
+				restoreArchive(
+					payload,
+					archive.format,
+					extracted,
+					basename,
+					before,
+					requirement,
+					run,
 					destination
 				);
 			}
-			if (
-				!fs.lstatSync(payload).isFile() ||
-				fs.lstatSync(payload).isSymbolicLink() ||
-				fs.statSync(payload).size === 0
-			)
-				throw new Error('The native archive output is not a nonempty regular file.');
-			const extracted = path.join(owned, 'verify-' + archive.format);
-			restoreArchive(
-				payload,
-				archive.format,
-				extracted,
-				basename,
-				before,
-				requirement,
-				run,
-				destination
-			);
-		}
-		if (snapshot(app) !== before)
-			throw new Error('The signed source changed during native archiving.');
-		// Link only after every archive passes. EEXIST refuses concurrent output
-		// replacement; the temporary directory belongs to this invocation alone.
-		for (const archive of archives)
-			fs.linkSync(path.join(owned, archive.name), path.join(destination, archive.name));
-		return archives.map((archive) => ({ ...archive, path: path.join(destination, archive.name) }));
-	} finally {
-		fs.rmSync(owned, { recursive: true });
-	}
+			if (snapshot(app) !== before)
+				throw new Error('The signed source changed during native archiving.');
+			// Link only after every archive passes. EEXIST refuses concurrent output
+			// replacement; the temporary directory belongs to this invocation alone.
+			for (const archive of archives)
+				fs.linkSync(path.join(owned, archive.name), path.join(destination, archive.name));
+			return archives.map((archive) => ({
+				...archive,
+				path: path.join(destination, archive.name)
+			}));
+		},
+		() => fs.rmSync(owned, { recursive: true })
+	);
 }
 
 /** Return canonical CI bindings without introducing another archive policy. */
@@ -376,39 +380,42 @@ function installCIArchive(input, output, options = {}) {
 	const run = options.execute ?? execute;
 	const owned = fs.mkdtempSync(path.join(source, '.ci-install-'));
 	let published = false;
-	try {
-		const payload = path.join(owned, selected.name);
-		fs.writeFileSync(payload, bytes, { flag: 'wx' });
-		if (options.quarantine !== undefined) {
-			if (
-				typeof options.quarantine !== 'string' ||
-				options.quarantine === '' ||
-				/[\r\n]/.test(options.quarantine)
-			)
-				throw new Error('The CI quarantine stamp is invalid.');
-			run('/usr/bin/xattr', ['-w', 'com.apple.quarantine', options.quarantine, payload], source);
+	return runWithOwnedCleanup(
+		() => {
+			const payload = path.join(owned, selected.name);
+			fs.writeFileSync(payload, bytes, { flag: 'wx' });
+			if (options.quarantine !== undefined) {
+				if (
+					typeof options.quarantine !== 'string' ||
+					options.quarantine === '' ||
+					/[\r\n]/.test(options.quarantine)
+				)
+					throw new Error('The CI quarantine stamp is invalid.');
+				run('/usr/bin/xattr', ['-w', 'com.apple.quarantine', options.quarantine, payload], source);
+			}
+			const restored = restoreArchive(
+				payload,
+				selected.format,
+				path.join(owned, 'app'),
+				bindings.basename,
+				receipt.snapshot,
+				receipt.requirement,
+				run,
+				source
+			);
+			if (snapshot(restored) !== receipt.snapshot)
+				throw new Error('The CI bundle changed during native signature verification.');
+			if (digest(archiveBytes(payload)) !== record.sha256)
+				throw new Error('The installed CI payload changed during native extraction.');
+			absent(installed);
+			fs.renameSync(restored, installed);
+			published = true;
+			return { archive: payload, format: selected.format, sha256: record.sha256 };
+		},
+		() => {
+			if (!published) fs.rmSync(owned, { recursive: true });
 		}
-		const restored = restoreArchive(
-			payload,
-			selected.format,
-			path.join(owned, 'app'),
-			bindings.basename,
-			receipt.snapshot,
-			receipt.requirement,
-			run,
-			source
-		);
-		if (snapshot(restored) !== receipt.snapshot)
-			throw new Error('The CI bundle changed during native signature verification.');
-		if (digest(archiveBytes(payload)) !== record.sha256)
-			throw new Error('The installed CI payload changed during native extraction.');
-		absent(installed);
-		fs.renameSync(restored, installed);
-		published = true;
-		return { archive: payload, format: selected.format, sha256: record.sha256 };
-	} finally {
-		if (!published) fs.rmSync(owned, { recursive: true });
-	}
+	);
 }
 
 if (require.main === module) {
