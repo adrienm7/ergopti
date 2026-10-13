@@ -4,7 +4,8 @@
 --- MODULE: Missing Local Model Offer
 --- DESCRIPTION:
 --- Names a missing Ollama model and offers its existing download manager after
---- explicit manual consent. Automatic typing only posts a notification.
+--- explicit manual consent bound to its original origin and installer. Automatic
+--- typing only posts a notification owned by that endpoint.
 --- ==============================================================================
 
 local M = {}
@@ -61,16 +62,31 @@ local function confirm(title, text, opts)
 end
 
 --- Resolves native effects without acquiring ownership until needed.
+--- @param automatic boolean Notifications do not acquire a download owner.
 --- @return table
-local function dependencies()
-	local deps = _deps or {}
+local function dependencies(automatic)
+	local owner = _deps
+	local deps = owner or {}
+	local install, download = deps.install, nil
+	if not automatic and install == nil then
+		download = require("modules.llm.model_download")
+		install = download.start
+	end
 	return {
 		confirm = deps.confirm or confirm,
 		notify = deps.notify or function(text, title)
 			return require("adapters.application_notifier").send(text, { title = title, level = "warning" })
 		end,
-		install = deps.install or function(base_url, model, on_done, current)
-			return require("modules.llm.model_download").start(base_url, model, model, on_done, current)
+		install = download and function(base_url, model, on_done, current)
+			return install(base_url, model, model, on_done, current)
+		end or install,
+		current = function()
+			if _deps ~= owner then return false end
+			if automatic then return true end
+			if download then
+				return package.loaded["modules.llm.model_download"] == download and download.start == install
+			end
+			return deps.install == install
 		end,
 	}
 end
@@ -91,19 +107,32 @@ end
 --- @return boolean handled
 function M.handle(failure, opts)
 	if not Policy.is_missing(failure) then return false end
+	local model, base_url, reason = failure.model, failure.base_url, failure.reason
+	local requesting = type(opts) == "table" and opts.current or nil
+	local automatic = type(opts) == "table" and opts.automatic == true
+	local deps = dependencies(automatic)
+	local function bound()
+		return failure.model == model and failure.base_url == base_url and failure.reason == reason
+			and (type(opts) ~= "table" or opts.current == requesting) and deps.current()
+	end
 	local function current()
-		if type(opts) ~= "table" or type(opts.current) ~= "function" then return true end
-		local ok, admitted = pcall(opts.current)
-		return ok and admitted == true
+		if not bound() then return false end
+		if type(requesting) ~= "function" then return true end
+		local ok, admitted = pcall(requesting)
+		return ok and admitted == true and bound()
 	end
 	if not current() then return true end
-	local model, title = failure.model, I18n.get("llm.local_model.missing_title")
-	local deps = dependencies()
+	local title = I18n.get("llm.local_model.missing_title")
 	local name = Policy.normalize(model)
-	if type(opts) == "table" and opts.automatic == true then
-		if not Policy.should_notify(_notified, model) then return true end
+	local notices = _notified[base_url]
+	if not notices then notices = {}; _notified[base_url] = notices end
+	local notice = notices[name]
+	if automatic then
+		if notice ~= nil then return true end
 		local ok, sent = pcall(deps.notify, label("llm.local_model.missing_notice", model), title)
-		if ok and sent == true then _notified[name] = true end
+		if ok and sent == true and current() and _notified[base_url] == notices and notices[name] == nil then
+			notices[name] = {}
+		end
 		if not ok or sent ~= true then Logger.warn(LOG, "Missing-model notification was refused: %s.", model) end
 		return true
 	end
@@ -119,9 +148,13 @@ function M.handle(failure, opts)
 	end
 	if accepted ~= true then return true end
 	Logger.start(LOG, "Downloading explicitly requested local model '%s'…", model)
-	local installed, admitted = pcall(deps.install, failure.base_url, model, function(done)
+	if not current() then return true end
+	local installed, admitted = pcall(deps.install, base_url, model, function(done)
+		if not current() then return end
 		if done == true then
-			_notified[name] = nil
+			if _notified[base_url] == notices and notice ~= nil and notices[name] == notice then
+				notices[name] = nil
+			end
 			Logger.success(LOG, "Local model '%s' downloaded.", model)
 		else
 			Logger.warn(LOG, "Local model '%s' download failed.", model)
