@@ -4173,6 +4173,8 @@ possible, and hosted qualification is still required. TODO31 stays partial.
 
 The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.
 
+The first native receiving on source `c4283adb98cfb7d0249e4d913f8e50fcbc6bf2b7` (run `38432611915`) refused Swift compilation before executing paired-silence/archive methods: the new signature helper header was absent from the C target umbrella. The additive umbrella export preserves the genuine SDK constant and original CMS/role policy; its ARM/Intel compiler receiving remains required on the corrected source. This failure is not a lease root-cause diagnosis.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
