@@ -1320,6 +1320,7 @@ _G4O_UnrelatedInventory(F) {
 	Owner := _LLM_OllamaAuxOwner(0, "ordinary_tags")
 	try {
 		AssertTrue(LLM_OllamaOriginCustodyCurrent(Custody, Origin), "Inventory does not replace the managed daemon.")
+		AssertTrue(Owner.Has("origin_custody"), "The auxiliary owner retains its admitted lexical capability.")
 		AssertTrue(LLM_OllamaProbeOriginCurrent(Owner, Origin))
 	} finally {
 		LLM_AuxFinish(Owner)
