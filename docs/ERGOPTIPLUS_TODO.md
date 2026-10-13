@@ -4589,6 +4589,18 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-12 producer and publication archive readers share one-close receiving
+that preserves exact read/validation and secondary close failures, including
+thrown falsy values. Nonblocking open precedes the original regular-file checks;
+real POSIX FIFO readers now refuse instead of blocking. ENOENT historical
+fallback, selection, signing and installation policies remain unchanged.
+All103 old assertions remain; the registered callback passes246 POSIX subcases
+with two actual FIFO readers and244 privately modeled Windows subcases without
+FIFO. The missing Windows constant has a causal original refusal and corrected
+normalized expectation; POSIX still requires a nonzero flag. Physical macOS
+signature/archive/Brew6 and complete package/install receiving remain open.
+Item36 and transversal16/38 stay open.
+
 2026-10-12 the Dev 2203 timestamp addition overwrote the Brew diagnostic's
 validated last-census projection with the full UI observation. The corrective
 copy retains the timestamp while excluding optional button/identity fields
@@ -5471,6 +5483,19 @@ controls pass. Seventy-three retained UI observations have no matching prompt;
 worker closure, no-prompt requery, both positive deliveries, policy denial and
 all six Brew operations still require native receiving. No initial-budget, TCC
 or main-thread cause is proved, and no timeout or assertion is changed.
+
+Archive creation and refused CI installation now preserve an initial work
+refusal together with a secondary owned temporary-directory cleanup refusal.
+The shared cleanup outcome keeps both exact values, including falsy throws,
+and makes one cleanup attempt without retry. The successful installer still
+retains its payload; original work bodies, signature/format policy and all
+76 existing packaging assertion expressions remain intact. The existing
+callback receives 334 portable cleanup subcases through actual API/CLI routes;
+the old implementation fails the paired-error assertion. An independent
+130-case descriptor equivalence matrix preserves the earlier reader contract.
+These are source regressions with modeled native command/failure ports, not
+Darwin signing, native archive creation or physical cleanup qualification.
+Full archive25, Brew6, package/install and transversal16/38 remain required.
 
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
@@ -7873,6 +7898,16 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+2026-10-12 the archive helper is explicitly enrolled in original Windows
+SourceRoots and the finite Source22 seed through two literal path additions.
+Every other SDK callback, predicate, assertion and registration remains exact.
+Actual Source receiving binds the helper and refuses its absence; the old roster
+incorrectly admitted that missing dependency. Composed registered22 controls
+pass. No pins, oracle, workflow, runtime ownership or native qualification is
+regenerated. Root host/held bridge acquisition, process-adapter enrollment, cache
+authentication and complete native/enterprise receiving remain required.
+Item62 and transversal16/38 stay open.
 
 2026-10-12 the source sealer now preserves exact write/validation and descriptor
 closure failures together, including thrown falsy values, with one close
@@ -10451,9 +10486,28 @@ child command, timeout or native assertion is changed. Root retains CI enrollmen
 and clock/graph ownership.
 
 The shared sealing generator's separate write/validation-plus-close masking
-path remains unmodified and requires a coordinated follow-up. Generator reads
-use the corrected common reader. This does not qualify original23 Windows,
+path was corrected in atomic f07fe268, with its original predicates preserved.
+Generator reads use the corrected common reader. This does not qualify original23 Windows,
 managed-network receiving or complete item62;16/38 stay open and22 excluded.
+
+The archive cleanup follow-up reuses the same required descriptor source root;
+its existing read/one-close semantics and paired diagnostic message remain
+unchanged. No independent21 input tuple or original23 oracle is regenerated.
+Authentic pre-host acquisition, the held Windows bridge and clean original23
+source/runtime enrollment remain separate Root-owned source dependencies;
+these cannot be relabeled as a native-only remainder. Item62 stays open.
+
+A durable [inactive original23 source handoff](handovers/2026-10-12-group6-ci/INACTIVE-ORIGINAL23-SOURCE.md)
+now retains literal owner/held-bridge patches and independently reviewed
+Source22 dependency/model composition. The packet is not applied or enrolled.
+Both frozen22-control versions pass; original113/128 assertions,33 collector
+predicates,2307-byte child,21 input tuples and independent oracle are preserved.
+The held bridge has73 software controls and a conservative lease fallback
+correction; none authenticates the first host. Root's trusted pre-host native
+provider and source/workflow reconciliation remain real software dependencies,
+with profileUNQUALIFIED, kernel imageUNKNOWN and native23UNRUN. Current helper
+692 differs from frozen0db, so exact current-source receiving is still required.
+No stopped native experiment is repeated and no item is removed.
 
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
