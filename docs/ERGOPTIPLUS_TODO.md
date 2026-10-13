@@ -134,6 +134,22 @@ an inverse that restores the original direct OS call and rejects it. Other
 full-unit failures stay open. Unchanged source blobs alone are not a same-host
 native baseline reproduction.
 
+The local committed Windows build at `7e3da5567183914502e977d720e818e337e1dd49`
+compiles with the authenticated AutoHotkey2.0.26/Ahk2Exe toolchain. Actual
+operator-opted user32 receiving exits 0 with two owned Edit vectors and two
+native calls, retaining injected plan/serializer scope: no native FIFO, physical
+keyboard, complete cohort or production backend policy is qualified.
+
+Actual compiled Diagnostics collection exposes a separate transport defect:
+nullable failed-worker receipts decode to the Windows JSON_NULL sentinel, but
+the page serializer tries to stringify that sentinel as an arbitrary object.
+The new causal test naturally fails 0/1 before the fix; exact-sentinel encoding
+preserves JSON null and all 14 collection state cases now pass with exit 0.
+The original compiled attempt remains FAILED, with an archive and an unresolved
+host completion/quit outcome; a corrected installed rerun is still pending.
+The stock collector's 30 PowerShell controls pass again at the same source SHA.
+User metadata refresh and installed receiving are not isolated-suite evidence.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
