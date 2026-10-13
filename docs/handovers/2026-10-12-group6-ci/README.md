@@ -596,3 +596,15 @@ pre-host primitive, bridge/enrollment composition and held macOS query/staged
 receiving remain real source dependencies. Final native Windows/macOS, archive25,
 Brew6, signing/install and corporate-network acceptance remain unqualified.
 Items36/62 and16/38 stay open;22 remains excluded.
+
+## Durable inactive owner and Source22 preparation
+
+[INACTIVE-ORIGINAL23-SOURCE.md](INACTIVE-ORIGINAL23-SOURCE.md) binds the strict
+65078-byte/15-member code-only packet and literal composition/reproduction.
+It preserves the reviewed owner, held bridge/source lease and Source22 models
+without changing canonical Root code, enrollment or native authority. The
+unimplemented first-host provider and current/frozen helper difference are
+explicit. There is no environment log, executable vendor data or generated
+source seal in the saved packet. Root must reconcile source roles and provide
+the genuine pre-host primitive before activation; current native acceptance
+and items36/62/16/38 remain open.
