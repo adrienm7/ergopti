@@ -214,8 +214,18 @@ _LLM_OllamaInvokeAuxResult(Owner, Callback, Value) {
 		LLM_AuxFinish(Owner)
 		return false
 	}
+	if !LLM_AuxIsCurrent(Owner)
+		return false
 	try _LLM_InvokeCallback(Callback, "on_result", Value)
 	finally LLM_AuxFinish(Owner)
+	return true
+}
+
+; The bound origin callback performs another opaque reader; retain the same operation.
+_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {
+	if !LLM_AuxIsCurrent(Owner)
+		return false
+	_LLM_InvokeCallback(Callback, "on_result", Value)
 	return true
 }
 
@@ -599,7 +609,8 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 	; its terminal sidecar (instant), so the AHK message loop is NEVER blocked.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_ping")
 	if Owner.Has("origin_custody")
-		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""), on_result, "on_result")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	ProcessOwner := 0
 	Stage := "private_directory"
 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=ping owner={1} generation={2}.",
@@ -826,7 +837,8 @@ LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 	; in its own process; we only poll its terminal sidecar, so the loop never blocks.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_tags")
 	if Owner.Has("origin_custody")
-		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""), on_result, "on_result")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	ProcessOwner := 0
 	Stage := "private_directory"
 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=tags owner={1} generation={2}.",
@@ -942,7 +954,8 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 	global LLM_OLLAMA_BASE_URL, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_delete:" . tag, tag)
 	if Owner.Has("origin_custody")
-		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""), on_result, "on_result")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	if (tag == "") {
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 		return
