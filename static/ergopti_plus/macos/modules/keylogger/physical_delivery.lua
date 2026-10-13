@@ -7,6 +7,7 @@ local Wire = require("modules.keylogger.physical_wire")
 local Baseline = require("modules.keylogger.physical_baseline")
 local Protocol = require("modules.keylogger.physical_protocol")
 local Release = require("keylogger.physical_release")
+local Position = require("keylogger.physical_position_observation")
 local decimal, successor = Wire.decimal, Wire.successor
 
 --- Orders uncounted tally rows by page, usage, keyboard type and reason.
@@ -55,6 +56,83 @@ function M.new(dependencies)
 	end
 	local uncounted = {}
 	local receiver = {}
+	local observation
+	local retired = setmetatable({}, { __mode = "k" })
+
+	local function retire_observation(record)
+		if record and record.frames == 0 and record.cancelled then
+			if observation == record then observation = nil end
+			retired[record.token] = true
+		end
+	end
+
+	local function revoke_observation()
+		if observation then
+			observation.cancelled = true
+			retire_observation(observation)
+		end
+	end
+
+	--- Reports original baseline admission without creating a request or native task.
+	function receiver.position_available()
+		return (state == "active" or state == "delivering") and observation == nil
+			and initial ~= nil and initial.position_available() == true
+	end
+
+	--- Enrolls one observational request without replacing metric publication ports.
+	---@param exact_current function Literal true while the original editor remains current.
+	---@param receive function Receives closed detached facts; native identity stays private.
+	---@return table|nil token Exact opaque request, never a native transport token.
+	function receiver.capture_position(exact_current, receive)
+		if type(exact_current) ~= "function" or type(receive) ~= "function"
+			or not receiver.position_available() then return nil end
+		local record = { token = {}, exact = exact_current, receive = receive, frames = 1 }
+		observation = record
+		local called, accepted = pcall(exact_current)
+		record.frames = 0
+		if not called or accepted ~= true or observation ~= record
+			or state ~= "active" and state ~= "delivering" or record.cancelled then
+			record.cancelled = true
+			retire_observation(record)
+			return nil
+		end
+		return record.token
+	end
+
+	--- Revokes one exact request now; callback unwind remains acknowledged retry debt.
+	---@param token table Original request identity.
+	---@return boolean retired Literal true only after its publication frames unwind.
+	function receiver.cancel_position(token)
+		if type(token) ~= "table" then return false end
+		if retired[token] then return true end
+		local record = observation
+		if not record or not rawequal(record.token, token) then return false end
+		record.cancelled = true
+		retire_observation(record)
+		return retired[token] == true
+	end
+
+	local function publish_position(record, prepared)
+		if not record or observation ~= record or record.cancelled or record.completed or record.frames > 0 then return end
+		for _, press in ipairs(prepared) do
+			if observation ~= record or record.cancelled or record.completed or state ~= "active" then break end
+			local facts = Position.facts(press)
+			if facts then
+				record.frames = record.frames + 1
+				local called, current = pcall(record.exact)
+				if not called or current ~= true then record.cancelled = true end
+				if observation == record and not record.cancelled and not record.completed and state == "active" then
+					-- One primary press consumes the request, even if the editor refuses it.
+					record.completed = true
+					pcall(record.receive, facts)
+					local checked, still_current = pcall(record.exact)
+					if not checked or still_current ~= true then record.cancelled = true end
+				end
+				record.frames = record.frames - 1
+				retire_observation(record)
+			end
+		end
+	end
 
 	--- Returns whether this receiver still owns delivery.
 	---@return boolean
@@ -70,7 +148,10 @@ function M.new(dependencies)
 	function receiver.ready() return state == "completing" or state == "active" or state == "delivering" end
 
 	--- Revokes delivery before any successor capture can begin.
-	function receiver.stop() state, ownership, initial, held = "stopped", nil, nil, {} end
+	function receiver.stop()
+		revoke_observation()
+		state, ownership, initial, held = "stopped", nil, nil, {}
+	end
 
 	--- Reports the presses delivered but not credited, for the capture's coverage.
 	--- Only fully committed batches are included, and privacy-excluded presses never are.
@@ -127,7 +208,7 @@ function M.new(dependencies)
 			end
 			return cursor
 		end)
-		if not ok then state, ownership, initial, held = "failed", nil, nil, {}; error(result, 0) end
+		if not ok then revoke_observation(); state, ownership, initial, held = "failed", nil, nil, {}; error(result, 0) end
 		return result
 	end
 
@@ -137,10 +218,12 @@ function M.new(dependencies)
 	---@return string sequence Last fully committed sequence, suitable for acknowledgement.
 	function receiver.deliver(frame)
 		if state ~= "active" then
+			revoke_observation()
 			state, ownership, initial, held = "failed", nil, nil, {}
 			error("Physical receiver is not active")
 		end
-		local owner = ownership
+		local owner, request = ownership, observation
+		local observations = {}
 		state = "delivering"
 		local ok, err = pcall(function()
 			assert(type(frame) == "table" and frame.version == 1 and frame.kind == "batch"
@@ -169,7 +252,10 @@ function M.new(dependencies)
 				local transition = initial.transition(row)
 				local element = { device = row.device, cookie = row.cookie, timestamp = row.timestamp,
 					page = row.page, usage = row.usage, transition = transition }
-				if transition == "press" then element.keyboard_type = initial.keyboard_type(element.device) end
+				if transition == "press" then
+					element.keyboard_type = initial.keyboard_type(element.device)
+					if request then element.held = initial.held_keys() end
+				end
 				prepared[#prepared + 1] = element
 			end
 			for _, element in ipairs(prepared) do
@@ -189,6 +275,11 @@ function M.new(dependencies)
 					assert(type(context) == "table" and type(context.allowed) == "boolean",
 						"Physical event context is unavailable")
 					if context.allowed then
+						if request and keycode ~= nil then
+							observations[#observations + 1] = { device = element.device, cookie = element.cookie,
+								page = element.page, usage = element.usage, keyboard_type = keyboard_type,
+								keycode = keycode, held = element.held }
+						end
 						if keycode == nil then
 							pending_uncounted[#pending_uncounted + 1] = { page = element.page, usage = element.usage,
 								keyboard_type = keyboard_type, reason = reason }
@@ -252,11 +343,16 @@ function M.new(dependencies)
 			sequence = next_sequence
 		end)
 		if not ok then
+			revoke_observation()
 			state, ownership, initial, held = "failed", nil, nil, {}
 			error(err, 0)
 		end
 		state = "active"
-		return sequence
+		-- Observer failures never invalidate the already committed metric batch.
+		-- The request was captured before intake, so reentrant enrollment is not fresh.
+		local committed = sequence
+		publish_position(request, observations)
+		return committed
 	end
 
 	return receiver

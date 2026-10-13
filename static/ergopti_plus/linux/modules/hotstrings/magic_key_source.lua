@@ -83,6 +83,7 @@ local _deps = nil
 
 -- The capture waiting for a key, nil when none: { handlers }.
 local _capture = nil
+local _capture_epoch = 0
 
 -- The magic key character last reported as untypable on the session layout.
 local _untypable_reported = nil
@@ -348,6 +349,14 @@ function M.can_capture()
 	return _deps ~= nil and _deps.can_capture() == true and _deps.is_active() == true
 end
 
+--- Fences pending and deferred captured choices at a committed pause boundary.
+--- Deferred timer capabilities remain owned by the event loop; their callbacks
+--- cannot publish after this logical capture generation is retired.
+function M.cancel_capture()
+	_capture_epoch = _capture_epoch + 1
+	_capture = nil
+end
+
 --- Captures the next grabbed key-down as the physical magic key. Escape or the
 --- shared timeout (timings [ui] magic_key_capture_timeout_ms) ends it with
 --- nothing changed. The decision runs after the hook returns: persisting it is
@@ -359,19 +368,24 @@ function M.capture(handlers)
 		or type(handlers.on_refused) ~= "function" then
 		error("magic_key_source.capture needs on_chosen and on_refused", 2)
 	end
-	if _capture ~= nil or not M.can_capture() then return false end
-	local live = { handlers = handlers }
+	if _capture ~= nil then return false end
+	local allowed = M.can_capture()
+	if _capture ~= nil or not allowed then return false end
+	local epoch = _capture_epoch
+	local live = { handlers = handlers, epoch = epoch + 1 }
 	_capture = live
-	local armed = _deps.defer(function()
+	local called, armed = pcall(_deps.defer, function()
 		if _capture ~= live then return end
 		_capture = nil
 		Logger.info(LOG, "Physical magic key capture timed out: nothing changed.")
 	end, CAPTURE_TIMEOUT_MS)
-	if armed ~= true then
-		_capture = nil
+	if not called or armed ~= true or _capture ~= live or _capture_epoch ~= epoch then
+		if _capture == live then _capture = nil end
 		Logger.error(LOG, "The capture timeout could not be armed — no key is captured.")
 		return false
 	end
+	-- Only a genuinely admitted request supersedes queued predecessor choices.
+	_capture_epoch = live.epoch
 	Logger.info(LOG, "Waiting for the physical magic key…")
 	return true
 end
@@ -439,12 +453,30 @@ end
 function M.on_key(detail)
 	if _deps == nil or type(detail) ~= "table" then return false end
 	if _capture ~= nil then
-		-- The answer of a capture reaches no application, whatever it is.
 		local live, evdev = _capture, detail.code
-		_capture = nil
-		if _deps.defer(function() settle(live, evdev) end, 0) ~= true then
-			Logger.error(LOG, "The captured key could not be settled — nothing changed.")
+		local allowed = M.can_capture()
+		if _capture ~= live or live.epoch ~= _capture_epoch or not allowed then
+			if _capture == live then M.cancel_capture() end
+			return false
 		end
+		local admitted, premature = false, false
+		local called, queued = pcall(_deps.defer, function()
+			if admitted ~= true then premature = true return end
+			local allowed = M.can_capture()
+			if live.epoch ~= _capture_epoch or not allowed then return end
+			settle(live, evdev)
+		end, 0)
+		if not called or queued ~= true or premature then
+			Logger.error(LOG, "The captured key could not be settled — nothing changed.")
+			return false
+		end
+		allowed = M.can_capture()
+		if _capture ~= live or live.epoch ~= _capture_epoch or not allowed then
+			if _capture == live then M.cancel_capture() end
+			return false
+		end
+		admitted = true
+		_capture = nil
 		return true
 	end
 	local code = M.evdev_code()
@@ -485,7 +517,7 @@ function M._reset_for_test()
 	_registry = nil
 	_editor_signature = nil
 	_editor_generation = _editor_generation + 1
-	_capture = nil
+	M.cancel_capture()
 	_code, _code_generation = nil, nil
 	_untypable_reported = nil
 end

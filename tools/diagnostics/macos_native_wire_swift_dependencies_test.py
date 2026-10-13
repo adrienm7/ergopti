@@ -30,6 +30,9 @@ RECIPE_INPUTS = (
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedImageAliasCompatibility.h",
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedSuspendedImageCompatibility.h",
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedListenerEventCompatibility.h",
+    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedRuntimeSignatureCompatibility.h",
+    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedInstalledConfiguration.h",
+    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedChildReapingCompatibility.h",
     "static/ergopti_plus/macos/platform/network/native_http.py",
     "static/ergopti_plus/macos/platform/network/managed_http.py",
     "static/ergopti_plus/_shared/python/network_proxy_policy.py",
@@ -153,6 +156,9 @@ class StandaloneSwiftDependencies(unittest.TestCase):
                 "OwnedImageAliasCompatibility.h",
                 "OwnedSuspendedImageCompatibility.h",
                 "OwnedListenerEventCompatibility.h",
+                "OwnedRuntimeSignatureCompatibility.h",
+                "OwnedInstalledConfiguration.h",
+                "OwnedChildReapingCompatibility.h",
             )
             self.assertEqual({path.name for path in module.glob("*.h")}, set(headers))
             for name in headers:
@@ -241,6 +247,36 @@ class StandaloneSwiftDependencies(unittest.TestCase):
 
     def test_missing_real_generated_policy_retires_before_compiler(self):
         self.missing_source("ManagedBootstrapPolicy.generated.swift")
+
+    def test_missing_public_umbrella_dependency_retires_before_compiler(self):
+        for name in (
+            "OwnedRuntimeSignatureCompatibility.h",
+            "OwnedInstalledConfiguration.h",
+            "OwnedChildReapingCompatibility.h",
+        ):
+            with self.subTest(header=name):
+                with tempfile.TemporaryDirectory(
+                    prefix="ergopti-missing-wire-header-"
+                ) as directory:
+                    source = Path(directory)
+                    for relative in RECIPE_INPUTS:
+                        destination = source / relative
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(SOURCE / relative, destination)
+                    missing = (
+                        source
+                        / "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include"
+                        / name
+                    )
+                    missing.unlink()
+                    self.module.ROOT = source
+                    self.module.MAC = source / "static/ergopti_plus/macos"
+                    with self.assertRaises(FileNotFoundError):
+                        self.run_recipe()
+                    self.assertEqual(self.arguments, [])
+                    self.assert_retired()
+                    self.assertFalse(missing.exists())
+                self.closed.clear()
 
     def test_root_acquisition_failure_retires_fixture_without_foreign_cleanup(self):
         with patch.object(tempfile, "mkdtemp", side_effect=OSError("create refused")):

@@ -89,6 +89,13 @@ local MAX_ROLLOVER_DRAIN_ITERS = 20
 --- Shared CoreState (set by M.init).
 local _state = nil
 
+-- Only a committed lifecycle may accept new physical work. Teardown revokes
+-- admission before touching native resources; already-owned FIFO work survives.
+local _physical_sink_active, _physical_sink_generation = false, 0
+local PhysicalAccounting = require("modules.keylogger.physical_accounting_mode")
+local PhysicalWire = require("modules.keylogger.physical_wire")
+local PhysicalRelease = require("keylogger.physical_release")
+
 --- Device identity, read from / written to device.json.
 local _device_id  = nil
 local _device_obj = nil
@@ -720,6 +727,53 @@ function M.log_system_event(event_type, metadata)
 		for k, v in pairs(metadata) do entry[k] = v end
 	end
 	M.append_log(entry)
+end
+
+--- Validates and copies the common physical event fields before queue ownership.
+--- @param press table Capture, exact device, keycode, original app and timestamp.
+--- @param action string Physical press or release action.
+--- @return table entry Detached scalar fields only.
+local function _physical_entry(press, action)
+	assert(type(press) == "table" and getmetatable(press) == nil, "Invalid physical press")
+	assert(type(press.capture) == "string" and press.capture ~= "", "Missing physical capture")
+	assert(type(press.device) == "string" and press.device:match("^[1-9]%d*$"), "Invalid physical device")
+	PhysicalWire.decimal(press.device, true)
+	assert(type(press.keycode) == "number" and press.keycode >= 0 and press.keycode % 1 == 0,
+		"Invalid physical keycode")
+	assert(type(press.app) == "string" and press.app ~= "", "Missing original physical application")
+	assert(type(press.timestamp) == "string"
+		and press.timestamp:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$"),
+		"Invalid original physical timestamp")
+	return { type = "system_event", action = action, capture = press.capture, device = press.device,
+		keycode = press.keycode, app = press.app, timestamp = press.timestamp }
+end
+
+--- Accepts one validated physical press into the ordered outbox by value.
+--- Retained event-time privacy is the capture owner's responsibility; consulting
+--- current focus here would reclassify delayed input. Exact true means FIFO
+--- ownership, not durable storage or SQLite ingestion.
+--- @param press table Capture, exact device, keycode, original app and timestamp.
+--- @return boolean accepted False when lifecycle or capture ownership is revoked.
+function M.log_physical_press(press)
+	if not _require_state("log_physical_press") then return false end
+	if not _physical_sink_active then return false end
+	local entry = _physical_entry(press, "physical_press")
+	if PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
+end
+
+--- Accepts one approved matched release by value under the same capture owner.
+--- The caller supplies its approved immutable app/date context and HID duration;
+--- current privacy or delivery time cannot redefine that historical decision.
+--- @param release table Common physical fields and nonnegative integer hold_ms.
+--- @return boolean accepted Exact true transfers ownership to the ordered FIFO.
+function M.log_physical_release(release)
+	if not _require_state("log_physical_release") then return false end
+	if not _physical_sink_active then return false end
+	local entry = _physical_entry(release, "physical_release")
+	entry.hold_ms = PhysicalRelease.duration(release.hold_ms)
+	if PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
 end
 
 function M.log_shortcut(shortcut_key, app_name)
@@ -1801,6 +1855,7 @@ end
 --- @param core_state table The shared CoreState from modules/keylogger/init.lua.
 --- @return boolean initialized True only when the complete initialization commits.
 function M.init(core_state)
+	local physical_generation = _physical_sink_generation
 	if not _state and _init_cleanup_pending then
 		local cleanup_complete = _release_failed_init_resources()
 		_init_cleanup_pending = not cleanup_complete
@@ -1813,7 +1868,11 @@ function M.init(core_state)
 
 	local state_was_committed = _state ~= nil
 	local ok, initialized_or_err = xpcall(_init, debug.traceback, core_state)
-	if ok then return initialized_or_err end
+	if ok then
+		if initialized_or_err == true and not state_was_committed
+			and _physical_sink_generation == physical_generation then _physical_sink_active = true end
+		return initialized_or_err
+	end
 
 	local cleanup_complete = true
 	if not state_was_committed then cleanup_complete = _rollback_failed_init() end
@@ -1830,6 +1889,7 @@ end
 --- ingest loop survives toggle OFF/ON without a full re-initialization.
 --- @return boolean running True only when one timer owner is committed.
 function M.ensure_ingest_running()
+	local physical_generation = _physical_sink_generation
 	if not _state then return false end
 	-- A candidate may have become native-live before start() raised/refused. It is
 	-- cleanup debt, not an ingest owner; never reopen the database underneath it.
@@ -1850,8 +1910,12 @@ function M.ensure_ingest_running()
 		end
 	end
 
-	if _ingest_timer then return true end
+	if _ingest_timer then
+		if _physical_sink_generation == physical_generation then _physical_sink_active = true end
+		return true
+	end
 	if not _start_ingest_timer() then return false end
+	if _physical_sink_generation == physical_generation then _physical_sink_active = true end
 	Logger.done(LOG, "Ingest timer re-armed after stop/start cycle.")
 	return true
 end
@@ -1868,6 +1932,8 @@ end
 --- @param opts table|nil `{ process_exit = true }` for the process-lifecycle stop.
 --- @return boolean complete True only when every owned resource was released.
 function M.stop(opts)
+	_physical_sink_active = false
+	_physical_sink_generation = _physical_sink_generation + 1
 	local process_exit = type(opts) == "table" and opts.process_exit == true
 	local complete = true
 	local ingest_timer = _ingest_timer

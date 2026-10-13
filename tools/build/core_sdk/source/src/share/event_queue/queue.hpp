@@ -1,0 +1,380 @@
+#pragma once
+
+#include "event_queue/entry.hpp"
+#include "event_queue/event.hpp"
+#include "event_queue/event_time_stamp.hpp"
+#include "manipulator/condition_expression_manager.hpp"
+#include "modifier_flag_manager.hpp"
+#include "pointing_button_manager.hpp"
+#include <string_view>
+
+namespace krbn::event_queue {
+class queue {
+public:
+  queue(const queue&) = delete;
+
+  queue() : time_stamp_delay_(0) {
+  }
+
+  void emplace_back_entry(device_id device_id,
+                          const event_time_stamp& event_time_stamp,
+                          const class event& event,
+                          event_type event_type,
+                          std::optional<event_integer_value::value_t> event_integer_value,
+                          const class event& original_event,
+                          state state,
+                          bool lazy = false,
+                          validity validity = validity::valid) {
+    auto t = event_time_stamp;
+    t.set_time_stamp(t.get_time_stamp() + time_stamp_delay_);
+
+    events_.emplace_back(device_id,
+                         t,
+                         event,
+                         event_type,
+                         event_integer_value,
+                         original_event,
+                         state,
+                         lazy,
+                         validity);
+
+    //
+    // Update modifier_flag_manager, pointing_button_manager
+    //
+
+    if (auto e = event.get_if<momentary_switch_event>()) {
+      if (auto modifier_flag = e->make_modifier_flag()) {
+        auto type = (event_type == event_type::key_down ? modifier_flag_manager::active_modifier_flag::type::increase
+                                                        : modifier_flag_manager::active_modifier_flag::type::decrease);
+        modifier_flag_manager::active_modifier_flag active_modifier_flag(type,
+                                                                         *modifier_flag,
+                                                                         device_id);
+        modifier_flag_manager_.push_back_active_modifier_flag(active_modifier_flag);
+      }
+
+      if (e->pointing_button()) {
+        auto type = (event_type == event_type::key_down ? pointing_button_manager::active_pointing_button::type::increase
+                                                        : pointing_button_manager::active_pointing_button::type::decrease);
+        pointing_button_manager::active_pointing_button active_pointing_button(type,
+                                                                               e->get_usage_pair(),
+                                                                               device_id);
+        pointing_button_manager_.push_back_active_pointing_button(active_pointing_button);
+      }
+
+      // Erase sticky modifiers
+      if (event_type == event_type::key_down &&
+          validity == validity::valid &&
+          !e->modifier_flag()) {
+        modifier_flag_manager_.erase_all_sticky_modifier_flags();
+      }
+
+    } else if (event.get_type() == event::type::sticky_modifier) {
+      if (event_type == event_type::key_down || event_type == event_type::single) {
+        if (auto sticky_modifier = event.get_sticky_modifier()) {
+          auto type = modifier_flag_manager::active_modifier_flag::type::increase_sticky;
+
+          if (sticky_modifier->second == sticky_modifier_type::toggle) {
+            if (modifier_flag_manager_.sticky_size(sticky_modifier->first) > 0) {
+              type = modifier_flag_manager::active_modifier_flag::type::decrease_sticky;
+            }
+          } else {
+            if (sticky_modifier->second != sticky_modifier_type::on) {
+              type = modifier_flag_manager::active_modifier_flag::type::decrease_sticky;
+            }
+          }
+
+          modifier_flag_manager::active_modifier_flag active_modifier_flag(type,
+                                                                           sticky_modifier->first,
+                                                                           device_id);
+          modifier_flag_manager_.push_back_active_modifier_flag(active_modifier_flag);
+        }
+      }
+
+    } else if (event.get_type() == event::type::caps_lock_state_changed) {
+      if (auto integer_value = event.get_integer_value()) {
+        auto type = (*integer_value ? modifier_flag_manager::active_modifier_flag::type::increase_led_lock
+                                    : modifier_flag_manager::active_modifier_flag::type::decrease_led_lock);
+        modifier_flag_manager::active_modifier_flag active_modifier_flag(type,
+                                                                         modifier_flag::caps_lock,
+                                                                         device_id);
+        modifier_flag_manager_.push_back_active_modifier_flag(active_modifier_flag);
+      }
+    }
+
+    //
+    // Update manipulator_environment
+    //
+
+    if (event.get_type() == event::type::device_grabbed) {
+      if (auto v = event.get_if<pqrs::not_null_shared_ptr_t<device_properties>>()) {
+        manipulator_environment_.insert_device_properties(device_id, *v);
+      }
+    }
+    if (event.get_type() == event::type::device_ungrabbed) {
+      manipulator_environment_.erase_device_properties(device_id);
+    }
+    if (auto frontmost_application = event.get_frontmost_application()) {
+      manipulator_environment_.set_frontmost_application(*frontmost_application);
+    }
+    if (auto properties = event.get_input_source_properties()) {
+      manipulator_environment_.set_input_source_properties(*properties);
+    }
+    if (auto set_variable = event.get_set_variable(); set_variable &&
+        (!event.owned_variable_application_ || event.owned_variable_application_->current())) {
+      switch (event_type) {
+        case event_type::key_down:
+          if (auto n = set_variable->get_name()) {
+            switch (set_variable->get_type()) {
+              case manipulator_environment_variable_set_variable::type::set:
+                if (auto v = set_variable->get_value()) {
+                  manipulator_environment_.set_variable(*n, *v);
+                  // Only the genuine key-down value application in the exact
+                  // target queue can settle Device's native event identity.
+                  if (event.owned_variable_application_)
+                    event.owned_variable_application_->applied_in(this);
+                }
+                if (auto v = set_variable->get_expression()) {
+                  manipulator_environment_.set_variable_system_now_milliseconds();
+                  manipulator_environment_.apply_to_expression_variable(v);
+
+                  manipulator_environment_.set_variable(*n,
+                                                        manipulator_environment_variable_value(v->value<int64_t>()));
+                }
+                break;
+
+              case manipulator_environment_variable_set_variable::type::unset:
+                manipulator_environment_.unset_variable(*n);
+                break;
+            }
+          }
+          break;
+        case event_type::key_up:
+          if (auto n = set_variable->get_name()) {
+            switch (set_variable->get_type()) {
+              case manipulator_environment_variable_set_variable::type::set:
+                if (auto v = set_variable->get_key_up_value()) {
+                  manipulator_environment_.set_variable(*n, *v);
+                }
+                if (auto v = set_variable->get_key_up_expression()) {
+                  manipulator_environment_.set_variable_system_now_milliseconds();
+                  manipulator_environment_.apply_to_expression_variable(v);
+
+                  manipulator_environment_.set_variable(*n,
+                                                        manipulator_environment_variable_value(v->value<int64_t>()));
+                }
+                break;
+              case manipulator_environment_variable_set_variable::type::unset:
+                // Do nothing
+                break;
+            }
+          }
+          break;
+        case event_type::single:
+          // Do nothing
+          break;
+      }
+    }
+    if (auto properties = event.get_if<pqrs::osx::system_preferences::properties>()) {
+      manipulator_environment_.set_variable("system.scroll_direction_is_natural",
+                                            manipulator_environment_variable_value(properties->get_scroll_direction_is_natural()));
+      manipulator_environment_.set_variable("system.use_fkeys_as_standard_function_keys",
+                                            manipulator_environment_variable_value(properties->get_use_fkeys_as_standard_function_keys()));
+    }
+    if (auto state = event.get_if<virtual_hid_devices_state>()) {
+      manipulator_environment_.set_virtual_hid_devices_state(*state);
+    }
+  }
+
+  void push_back_entry(const entry& entry) {
+    emplace_back_entry(entry.get_device_id(),
+                       entry.get_event_time_stamp(),
+                       entry.get_event(),
+                       entry.get_event_type(),
+                       entry.get_event_integer_value(),
+                       entry.get_original_event(),
+                       entry.get_state(),
+                       entry.get_lazy(),
+                       entry.get_validity());
+  }
+
+  void clear_events() {
+    events_.clear();
+    time_stamp_delay_ = absolute_time_duration(0);
+  }
+
+  [[nodiscard]] entry& get_front_event() {
+    return events_.front();
+  }
+
+  void erase_front_event() {
+    events_.erase(std::begin(events_));
+    if (events_.empty()) {
+      time_stamp_delay_ = absolute_time_duration(0);
+    }
+  }
+
+  [[nodiscard]] bool empty() const {
+    return events_.empty();
+  }
+
+  [[nodiscard]] const std::vector<entry>& get_entries() const {
+    return events_;
+  }
+
+  [[nodiscard]] const modifier_flag_manager& get_modifier_flag_manager() const {
+    return modifier_flag_manager_;
+  }
+
+  [[nodiscard]] modifier_flag_manager& get_modifier_flag_manager() {
+    return const_cast<modifier_flag_manager&>(static_cast<const queue&>(*this).get_modifier_flag_manager());
+  }
+
+  void erase_all_active_modifier_flags_except_lock_and_sticky(device_id device_id) {
+    modifier_flag_manager_.erase_all_active_modifier_flags_except_lock_and_sticky(device_id);
+  }
+
+  void erase_all_active_modifier_flags(device_id device_id) {
+    modifier_flag_manager_.erase_all_active_modifier_flags(device_id);
+  }
+
+  [[nodiscard]] const pointing_button_manager& get_pointing_button_manager() const {
+    return pointing_button_manager_;
+  }
+
+  void erase_all_active_pointing_buttons_except_lock(device_id device_id) {
+    pointing_button_manager_.erase_all_active_pointing_buttons_except_lock(device_id);
+  }
+
+  void erase_all_active_pointing_buttons(device_id device_id) {
+    pointing_button_manager_.erase_all_active_pointing_buttons(device_id);
+  }
+
+  [[nodiscard]] const manipulator::manipulator_environment& get_manipulator_environment() const {
+    return manipulator_environment_;
+  }
+
+  [[nodiscard]] manipulator::manipulator_environment& get_manipulator_environment() {
+    return const_cast<manipulator::manipulator_environment&>(static_cast<const queue&>(*this).get_manipulator_environment());
+  }
+
+  [[nodiscard]] absolute_time_duration get_time_stamp_delay() const {
+    return time_stamp_delay_;
+  }
+
+  void increase_time_stamp_delay(absolute_time_duration value) {
+    time_stamp_delay_ += value;
+  }
+
+  void sort_events() {
+    if (events_.empty()) {
+      return;
+    }
+
+    for (int i = 0; i < events_.size() - 1;) {
+      if (needs_swap(events_[i], events_[i + 1])) {
+        std::swap(events_[i], events_[i + 1]);
+        if (i > 0) {
+          --i;
+        }
+        continue;
+      }
+      ++i;
+    }
+  }
+
+  [[nodiscard]] static bool needs_swap(const entry& v1, const entry& v2) {
+    // Some devices are send modifier flag and key at the same HID report.
+    // For example, a key sends control+up-arrow by this reports.
+    //
+    //   modifiers: 0x0
+    //   keys: 0x0 0x0 0x0 0x0 0x0 0x0
+    //
+    //   modifiers: 0x1
+    //   keys: 0x52 0x0 0x0 0x0 0x0 0x0
+    //
+    // In this case, macOS does not guarantee the value event order to be modifier first.
+    // At least macOS 10.12 or prior sends the up-arrow event first.
+    //
+    //   ----------------------------------------
+    //   Example of hid value events in a single queue at control+up-arrow
+    //
+    //   1. up-arrow keydown
+    //     usage_page:0x7
+    //     usage:0x4f
+    //     integer_value:1
+    //
+    //   2. control keydown
+    //     usage_page:0x7
+    //     usage:0xe1
+    //     integer_value:1
+    //
+    //   3. up-arrow keyup
+    //     usage_page:0x7
+    //     usage:0x4f
+    //     integer_value:0
+    //
+    //   4. control keyup
+    //     usage_page:0x7
+    //     usage:0xe1
+    //     integer_value:0
+    //   ----------------------------------------
+    //
+    // These events will not be interpreted as intended in this order.
+    // Thus, we have to reorder the events.
+    //
+    // Devices that exhibit this behavior are:
+    // - Logitech Keyboard K480 (the expose key)
+    // - RollerMouse (the copy key and the paste key)
+
+    if (v1.get_event_time_stamp().get_time_stamp() == v2.get_event_time_stamp().get_time_stamp()) {
+      auto e1 = v1.get_event().get_if<momentary_switch_event>();
+      auto e2 = v2.get_event().get_if<momentary_switch_event>();
+
+      if (e1 && e2) {
+        auto modifier_flag1 = e1->make_modifier_flag();
+        auto modifier_flag2 = e2->make_modifier_flag();
+
+        // If either modifier_flag1 or modifier_flag2 is modifier, reorder it before.
+
+        if (!modifier_flag1 && modifier_flag2) {
+          // v2 is modifier_flag
+          if (v2.get_event_type() == event_type::key_up) {
+            return false;
+          } else {
+            // reorder to v2,v1 if v2 is pressed.
+            return true;
+          }
+        }
+
+        if (modifier_flag1 && !modifier_flag2) {
+          // v1 is modifier_flag
+          if (v1.get_event_type() == event_type::key_up) {
+            // reorder to v2,v1 if v1 is released.
+            return true;
+          } else {
+            return false;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+private:
+  friend class ::krbn::core_service::daemon::device_grabber;
+  // Only the genuine Device cleanup path may remove non-owned inputs.
+  // This does not expose a public mutator or grant native output permission.
+  void retain_owned_variable_inputs_for(const queue* target) {
+    std::erase_if(events_,[target](const entry& value) {
+      return !value.get_event().owned_variable_current_for(target);
+    });
+    if (events_.empty()) time_stamp_delay_=absolute_time_duration(0);
+  }
+  std::vector<entry> events_;
+  modifier_flag_manager modifier_flag_manager_;
+  pointing_button_manager pointing_button_manager_;
+  manipulator::manipulator_environment manipulator_environment_;
+  absolute_time_duration time_stamp_delay_;
+};
+} // namespace krbn::event_queue
