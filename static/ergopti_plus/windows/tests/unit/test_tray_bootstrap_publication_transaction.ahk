@@ -10,6 +10,70 @@
 
 #Requires AutoHotkey v2.0
 
+/** A later menu repaint cannot withdraw completed input initialization. */
+_TBPT_CommandReadyRepaint(Id) {
+	State := Map("ready", true, "commands", [], "timers", [])
+	Panel := TrayStartupCommands(() => State["ready"],
+		(Command) => State["commands"].Push(Command), (Fn, Delay) => State["timers"].Push(Fn))
+	AssertTrue(Panel.Request(Id))
+	AssertEqual(1, State["timers"].Length)
+	State["ready"] := false
+	State["timers"][1].Call()
+	AssertEqual(1, State["commands"].Length, "An admitted lifecycle command survives temporary menu unreadiness.")
+	AssertEqual(Id, State["commands"][1])
+	AssertEqual("", Panel.Pending)
+	State["timers"][1].Call()
+	AssertEqual(1, State["commands"].Length, "A retained command is delivered exactly once.")
+	Panel.Retire()
+	AssertFalse(Panel.Request(Id))
+	State["timers"][1].Call()
+	AssertEqual(1, State["commands"].Length, "Retired ownership cannot deliver another command.")
+}
+for _TBPT_Command in ["quit", "suspend", "reload"]
+	Test("startup lifecycle command survives menu repaint: " . _TBPT_Command . " (startup-command-ready-repaint)",
+		_TBPT_CommandReadyRepaint.Bind(_TBPT_Command))
+
+/** Diagnostic logging and scheduling consume the same observed readiness. */
+_TBPT_CommandSingleReadyRead() {
+	Reads := 0, Commands := [], Timers := []
+	Panel := TrayStartupCommands(ReadReady, (Command) => Commands.Push(Command), (Fn, Delay) => Timers.Push(Fn))
+	AssertTrue(Panel.Request("quit"))
+	AssertEqual(1, Timers.Length, "The accepted readiness cannot be lost to a second reader call.")
+	AssertEqual(1, Reads)
+	Timers[1].Call()
+	AssertEqual(1, Commands.Length)
+	AssertEqual("quit", Commands[1])
+	AssertEqual(1, Reads, "Completed initialization does not need to be reacquired before delivery.")
+	Panel.Retire()
+	ReadReady() {
+		Reads += 1
+		return Reads == 1
+	}
+}
+Test("startup lifecycle command reads readiness once (startup-command-ready-repaint)", _TBPT_CommandSingleReadyRead)
+
+/** A cold request acquires completed initialization through its notification owner. */
+_TBPT_CommandNotifiedReadyRepaint() {
+	State := Map("ready", false, "commands", [], "timers", [])
+	Panel := TrayStartupCommands(() => State["ready"],
+		(Command) => State["commands"].Push(Command), (Fn, Delay) => State["timers"].Push(Fn))
+	AssertTrue(Panel.Request("quit"))
+	AssertEqual(0, State["timers"].Length, "Cold input owners cannot deliver Quit.")
+	AssertFalse(Panel.NotifyReady())
+	State["ready"] := true
+	AssertTrue(Panel.NotifyReady())
+	AssertEqual(1, State["timers"].Length)
+	State["ready"] := false
+	State["timers"][1].Call()
+	AssertEqual(1, State["commands"].Length, "Notified readiness survives menu repaint.")
+	AssertEqual("quit", State["commands"][1])
+	State["timers"][1].Call()
+	AssertEqual(1, State["commands"].Length)
+	Panel.Retire()
+}
+Test("cold startup lifecycle notification survives menu repaint (startup-command-ready-repaint)",
+	_TBPT_CommandNotifiedReadyRepaint)
+
 class _TBPT_FakeMenu {
 	__New() {
 		this.Items := Map()
