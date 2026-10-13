@@ -2,12 +2,15 @@
 
 # Groups 2, 4 and 7 Windows continuation
 
-The recoverable source checkpoint is on `codex/groups-247-completion`, based on
+The recoverable source checkpoint is on `codex/groups-247-windows-resume-20261013`, based on
 fresh dev `bb5aaad56f927d4314bd2aa8de8ae2a93e4c9c56`. Fifteen atomic fixes are
 listed in `atomic-source-checkpoint.json`; their 37 source/test paths exactly
 match the independently frozen afterimages. The ordered `cut-01` through
 `cut-15` patches and manifests retain the causal evidence and dependencies.
 These cuts are already applied on this branch: do not apply them again.
+The legacy remote group branch at `5d6ef3e9a48a8dde40a03cb63207fbc828fd27be`
+has sixteen commits outside this dev ancestry and is preserved; do not force
+push or delete it while their historical integration remains unresolved.
 Normal commit hooks passed on each cut. No CI workflow, central runner,
 inventory, vendor DLL, qualification flag or release policy was changed.
 
