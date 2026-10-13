@@ -1,0 +1,543 @@
+--- a/static/ergopti_plus/macos/modules/llm/agent_runner.lua
++++ b/static/ergopti_plus/macos/modules/llm/agent_runner.lua
+@@ -606,11 +606,14 @@
+ 		local function on_fail(reason, detail)
+ 			if not still_current() then return end
+ 			Logger.warn(LOG, "Agent failed: System 2 gave no answer (%s).", tostring(reason))
++			if not still_current() then return end
+ 			if session then engine.close_answer_surface(session) end
++			if not still_current() then return end
+ 			local Offer = require("modules.llm.local_model_offer")
+ 			if Offer.is_missing(reason, detail) then
+ 				-- Named, with its Download button, instead of the vague failure
+-				Offer.offer(detail.model, { automatic = learning ~= nil })
++				Offer.offer(detail.model, { automatic = learning ~= nil,
++					current = learning == nil and still_current or nil })
+ 				return
+ 			end
+ 			if not learning then show_notice("llm.agent.failed") end
+@@ -686,7 +689,9 @@
+ 		Logger.error(LOG, "System 2 setting refused: '%s' is not a backend.", tostring(value))
+ 		return false
+ 	end
+-	settings().llm_agent_system2 = value
++	local state = settings()
++	if state.llm_agent_system2 ~= value then _generation = _generation + 1 end
++	state.llm_agent_system2 = value
+ 	Logger.debug(LOG, "System 2: '%s'.", value)
+ 	return true
+ end
+@@ -699,7 +704,9 @@
+ 		Logger.error(LOG, "Agent mode refused: '%s' is not a mode.", tostring(value))
+ 		return false
+ 	end
+-	settings().llm_agent_mode = value
++	local state = settings()
++	if value == M.MODE_OFF and state.llm_agent_mode ~= value then _generation = _generation + 1 end
++	state.llm_agent_mode = value
+ 	if value ~= M.MODE_AUTO then M.cancel_typing("mode " .. value) end
+ 	Logger.debug(LOG, "Agent mode: '%s'.", value)
+ 	return true
+--- a/static/ergopti_plus/macos/modules/llm/local_model_offer.lua
++++ b/static/ergopti_plus/macos/modules/llm/local_model_offer.lua
+@@ -70,23 +70,35 @@
+ end
+ 
+ 
++--- Checks the retained manual requester before acquiring source or UI ports.
++--- @param owner table Captured offer owner.
++--- @return boolean current
++local function requester_current(owner)
++	if owner.request_current == nil then return true end
++	local ok, current = pcall(owner.request_current)
++	return ok == true and current == true
++end
++
+ --- Captures the original configured endpoint and download registration.
+ --- @return table|nil owner
+-local function capture_owner()
++local function capture_owner(opts)
+ 	local owner = { installer = _installer, generation = _installer_generation }
++	if type(opts) == "table" then owner.request_current = opts.current end
++	if owner.request_current ~= nil and type(owner.request_current) ~= "function" then return nil end
++	if not requester_current(owner) then return nil end
+ 	local ok, api = pcall(require, "modules.llm.api_ollama")
+ 	if not ok or type(api) ~= "table" or type(api.get_base_url) ~= "function"
+-		or type(api.capture_service_owner) ~= "function" then return nil end
++		or type(api.capture_service_owner) ~= "function" or not requester_current(owner) then return nil end
+ 	owner.api, owner.origin_reader, owner.service_reader = api, api.get_base_url, api.capture_service_owner
+ 	local service_ok, service_current = pcall(owner.service_reader)
+-	if not service_ok or type(service_current) ~= "function" then return nil end
++	if not service_ok or type(service_current) ~= "function" or not requester_current(owner) then return nil end
+ 	owner.service_current = service_current
+ 	local current_ok, current = pcall(owner.service_current)
+-	if not current_ok or current ~= true then return nil end
++	if not current_ok or current ~= true or not requester_current(owner) then return nil end
+ 	local read_ok, origin = pcall(owner.origin_reader)
+ 	current_ok, current = pcall(owner.service_current)
+ 	if not current_ok or current ~= true or not read_ok or type(origin) ~= "string" or origin == ""
+-		or owner.installer ~= _installer or owner.generation ~= _installer_generation
++		or not requester_current(owner) or owner.installer ~= _installer or owner.generation ~= _installer_generation
+ 		or package.loaded["modules.llm.api_ollama"] ~= api or api.get_base_url ~= owner.origin_reader
+ 		or api.capture_service_owner ~= owner.service_reader then return nil end
+ 	owner.origin = origin
+@@ -97,7 +109,7 @@
+ --- @param owner table
+ --- @return boolean current
+ local function owner_current(owner)
+-	if type(owner) ~= "table" or owner.installer ~= _installer
++	if type(owner) ~= "table" or not requester_current(owner) or owner.installer ~= _installer
+ 		or owner.generation ~= _installer_generation then return false end
+ 	local ok, api = pcall(require, "modules.llm.api_ollama")
+ 	if not ok or api ~= owner.api or api.get_base_url ~= owner.origin_reader
+@@ -107,7 +119,7 @@
+ 	local read_ok, origin = pcall(owner.origin_reader)
+ 	current_ok, current = pcall(owner.service_current)
+ 	return current_ok and current == true and read_ok and origin == owner.origin
+-		and owner.installer == _installer and owner.generation == _installer_generation
++		and requester_current(owner) and owner.installer == _installer and owner.generation == _installer_generation
+ 		and package.loaded["modules.llm.api_ollama"] == api and api.get_base_url == owner.origin_reader
+ 		and api.capture_service_owner == owner.service_reader
+ end
+@@ -189,10 +201,11 @@
+ --- Downloads a model through the registered installer, the explicit choice of
+ --- the user (the dialog's button or the menu's row).
+ --- @param model string The model name, as the local server names it.
++--- @param opts table|nil { current = predicate } retaining manual requester currency.
+ --- @return boolean accepted
+-function M.install(model)
++function M.install(model, opts)
+ 	require_model(model, "install")
+-	local owner = capture_owner()
++	local owner = capture_owner(opts)
+ 	if owner == nil then
+ 		Logger.warn(LOG, "Local model download refused: its endpoint identity is unavailable.")
+ 		return false
+@@ -204,6 +217,7 @@
+ --- @param model string The model name, as the local server names it.
+ --- @param opts table|nil { automatic = true } for a request of the automatic
+ ---        mode: a notification per source and model, bound to that source.
++---        current = predicate optionally retains the original manual requester.
+ --- @return boolean offered
+ local function offer_owned(model, opts, owner)
+ 	if not owner_current(owner) then
+@@ -268,7 +282,7 @@
+ 
+ function M.offer(model, opts)
+ 	require_model(model, "offer")
+-	local owner = capture_owner()
++	local owner = capture_owner(opts)
+ 	if owner == nil then
+ 		Logger.warn(LOG, "Local model offer refused: its endpoint identity is unavailable.")
+ 		return false
+--- a/static/ergopti_plus/macos/modules/llm/screen_answer.lua
++++ b/static/ergopti_plus/macos/modules/llm/screen_answer.lua
+@@ -301,7 +301,9 @@
+ 			-- Named, with its Download button, instead of the vague failure
+ 			Logger.warn(LOG, "Screen reading failed: the local server does not hold model %s.", detail.model)
+ 			engine.close_answer_surface(session)
+-			Offer.offer(detail.model)
++			Offer.offer(detail.model, { current = function()
++				return is_current(generation, "model consent") and engine.get_llm_enabled() == true
++			end })
+ 			return
+ 		end
+ 		fail("the vision model gave no answer (" .. tostring(reason) .. ")")
+--- a/static/ergopti_plus/macos/tests/unit/modules/llm/test_ai_agent_local_model.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/llm/test_ai_agent_local_model.lua
+@@ -75,6 +75,125 @@
+ end
+ 
+ helpers.describe("AI agent local model (ai-agent-local-model)", function()
++	helpers.it("(local-model-requester) refuses an agent Download after its run is reset or superseded in the modal", function()
++		for _, change in ipairs({ "reset", "supersede" }) do
++			with_consent_world(function(world)
++				local dialog = require("infra.dialog_util")
++				local previous = dialog.block_alert
++				dialog.block_alert = function(...)
++					if change == "reset" then world.runner.reset() else trigger(world, "llm_agent_selection") end
++					return previous(...)
++				end
++				trigger(world, "llm_agent_selection")
++				World.list_local_models(world, {})
++				helpers.assert_eq(#world.installs, 0, "held consent cannot revive the original cancelled requester")
++				dialog.block_alert = previous
++				world.runner.set_system2("local")
++				world.runner.set_mode("action")
++				trigger(world, "llm_agent_selection")
++				World.list_local_models(world, {})
++				helpers.assert_eq(#world.installs, 1, "a fresh current requester still downloads normally")
++			end)
++		end
++	end)
++
++	helpers.it("(local-model-requester) refuses an agent Download after System2 or its mode withdraws the run", function()
++		for _, change in ipairs({ "off", "remote", "aba", "mode_off" }) do
++			with_consent_world(function(world)
++				local dialog = require("infra.dialog_util")
++				local previous = dialog.block_alert
++				dialog.block_alert = function(...)
++					if change == "mode_off" then world.runner.set_mode("off")
++					else world.runner.set_system2(change == "remote" and "cerebras" or "") end
++					if change == "aba" then world.runner.set_system2("local") end
++					return previous(...)
++				end
++				trigger(world, "llm_agent_selection")
++				World.list_local_models(world, {})
++				helpers.assert_eq(#world.installs, 0, "selection changes do not grant the old manual requester another download")
++				dialog.block_alert = previous
++				world.runner.set_mode("action")
++				world.runner.set_system2("local")
++				trigger(world, "llm_agent_selection")
++				World.list_local_models(world, {})
++				helpers.assert_eq(#world.installs, 1, "a fresh allowed requester follows the new selection")
++			end)
++		end
++	end)
++
++	helpers.it("(local-model-requester) refuses an expired requester before any endpoint or service acquisition", function()
++		with_consent_world(function(world, offer, api)
++			local reads = 0
++			local capture = api.capture_service_owner
++			api.capture_service_owner = function() reads = reads + 1; return capture() end
++			local opts = { current = function() return false end }
++			assert_false(offer.offer(DEFAULT_MODEL, opts))
++			assert_false(offer.install(DEFAULT_MODEL, opts))
++			helpers.assert_eq(reads, 0, "expired requester authority must be checked before source readers")
++			helpers.assert_eq(#world.alerts, 0)
++			helpers.assert_eq(#world.installs, 0)
++		end)
++	end)
++
++	helpers.it("(local-model-requester) preserves manual downloads and automatic notices while prediction is disabled", function()
++		with_consent_world(function(world, offer)
++			world.engine.set_llm_enabled(false)
++			trigger(world, "llm_agent_selection")
++			World.list_local_models(world, {})
++			helpers.assert_eq(#world.installs, 1, "action-mode agents remain independent of prediction enablement")
++			helpers.assert_true(offer.install(DEFAULT_MODEL, { current = function() return true end }))
++			helpers.assert_eq(#world.installs, 2, "explicit menu Download remains allowed")
++			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++			world.runner.reset()
++			world.notifications[#world.notifications].on_click()
++			helpers.assert_eq(#world.installs, 3, "automatic source-bound notices survive transient requester cancellation")
++		end)
++	end)
++
++	helpers.it("(local-model-requester) refuses malformed and expired predicates without acquiring private source data", function()
++		for _, current in ipairs({ false, 17, function() return nil end, function() return 17 end,
++			function() error("private-requester-secret") end }) do
++			with_consent_world(function(world, offer, api)
++				local reads = 0
++				local capture = api.capture_service_owner
++				api.capture_service_owner = function() reads = reads + 1; return capture() end
++				assert_false(offer.offer(DEFAULT_MODEL, { current = current }))
++				assert_false(offer.install(DEFAULT_MODEL, { current = current }))
++				helpers.assert_eq(reads, 0)
++				helpers.assert_eq(#world.alerts + #world.installs, 0)
++				for _, row in ipairs(world.logs) do
++					helpers.assert_true(not row.text:find("private-requester-secret", 1, true))
++				end
++			end)
++		end
++	end)
++
++	helpers.it("(local-model-requester) rechecks currency after source readers and retains the captured predicate through completion", function()
++		with_consent_world(function(world, offer, api)
++			local alive = true
++			local capture = api.capture_service_owner
++			api.capture_service_owner = function() local owner = capture(); alive = false; return owner end
++			assert_false(offer.offer(DEFAULT_MODEL, { current = function() return alive end }))
++			helpers.assert_eq(#world.alerts + #world.installs, 0)
++			api.capture_service_owner = capture
++			alive = true
++			local options = { current = function() return alive end }
++			local done, current
++			local forgot = 0
++			api.forget_local_models = function() forgot = forgot + 1 end
++			offer.set_installer(function(_, callback, predicate) done, current = callback, predicate; return true end)
++			local dialog = require("infra.dialog_util")
++			local previous = dialog.block_alert
++			dialog.block_alert = function(...) options.current = function() return false end; return previous(...) end
++			helpers.assert_true(offer.offer(DEFAULT_MODEL, options))
++			helpers.assert_true(current(), "mutable options cannot replace the captured predicate")
++			alive = false
++			assert_false(current())
++			done(true)
++			helpers.assert_eq(forgot, 0, "stale completion cannot invalidate another requester's inventory")
++		end)
++	end)
++
+ 	helpers.it("(local-model-consent-affinity) refuses a held Download after the actual configured endpoint changes", function()
+ 		with_consent_world(function(world, offer, _, port)
+ 			local dialog = require("infra.dialog_util")
+--- a/static/ergopti_plus/macos/tests/unit/modules/llm/test_screen_answer_end_to_end.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/llm/test_screen_answer_end_to_end.lua
+@@ -442,6 +442,30 @@
+ 		assert_answer_request(world, 1)
+ 	end)
+ 
++	helpers.it("(local-model-requester) refuses a vision Download after screen reading is reset or superseded in its modal", function()
++		for _, change in ipairs({ "reset", "supersede", "disabled" }) do
++			local world = build_world()
++			local dialog = require("infra.dialog_util")
++			local previous = dialog.block_alert
++			dialog.block_alert = function(...)
++				if change == "reset" then world.flow.reset()
++				elseif change == "disabled" then world.engine.set_llm_enabled(false)
++				else trigger(world, "llm_screen_region", "local") end
++				return previous(...)
++			end
++			helpers.assert_true(trigger(world, "llm_screen_region", "local"))
++			world.captures[1].on_image("image", IMAGE)
++			list_local_models(world, {})
++			helpers.assert_eq(#world.installs, 0, "a stale screen requester cannot download after modal cancellation")
++			dialog.block_alert = previous
++			world.engine.set_llm_enabled(true)
++			helpers.assert_true(trigger(world, "llm_screen_region", "local"))
++			world.captures[#world.captures].on_image("image", IMAGE)
++			list_local_models(world, {})
++			helpers.assert_eq(#world.installs, 1, "fresh screen reading consent remains functional")
++		end
++	end)
++
+ 	helpers.it("(ai-agent-local-model) names a missing local vision model and offers its download", function()
+ 		local world = build_world()
+ 		helpers.assert_eq(trigger(world, "llm_screen_region", "local"), true)
+--- a/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_agent_panel.lua
++++ b/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_agent_panel.lua
+@@ -349,6 +349,101 @@
+ 			helpers.assert_true((world.tool_lists or 0) >= 1, "opening the menu refreshes the Shortcuts list")
+ 		end)
+ 	end)
++	helpers.it("(local-model-requester) rejects obsolete panel verification after Off, remote or same-value reselection", function()
++		for _, choice in ipairs({ "off", "remote", "aba" }) do
++			local state = base_state()
++			with_panel(state, function(build, world)
++				local function rows() return row_starting(build().submenu, "🧠").menu end
++				row_starting(rows(), "Local").fn()
++				local pending = world.verifications[#world.verifications]
++				if choice == "remote" then row_starting(rows(), "Cerebras").fn()
++				else rows()[1].fn() end
++				if choice == "aba" then row_starting(rows(), "Local").fn() end
++				local updates = world.menu_updates
++				world.alert_answer = "first"
++				pending.on_result(false)
++				helpers.assert_eq(#world.alerts, 0, "an obsolete selection must not open model consent")
++				helpers.assert_eq(#world.installs, 0)
++				helpers.assert_eq(world.menu_updates, updates)
++				if choice == "aba" then
++					world.verifications[#world.verifications].on_result(false)
++					helpers.assert_eq(#world.installs, 1, "the reselected current setting retains its own offer")
++				end
++			end)
++		end
++	end)
++
++	helpers.it("(local-model-requester) fences held panel consent and stale direct Download rows", function()
++		local state = base_state()
++		state.llm_agent_system2 = "local"
++		with_panel(state, function(build, world)
++			world.listed = {}
++			local function rows() return row_starting(build().submenu, "🧠").menu end
++			local old_download = row_starting(rows(), "⬇️")
++			rows()[1].fn()
++			helpers.assert_eq(old_download.fn(), false, "an old Download row cannot borrow an Off selection")
++			helpers.assert_eq(#world.installs, 0)
++			row_starting(rows(), "Local").fn()
++			helpers.assert_eq(old_download.fn(), false, "same-value reselection does not revive the old row")
++			world.alert_answer = "first"
++			local dialog = require("infra.dialog_util")
++			local previous = dialog.block_alert
++			dialog.block_alert = function(...)
++				rows()[1].fn()
++				return previous(...)
++			end
++			world.verifications[#world.verifications].on_result(false)
++			helpers.assert_eq(#world.installs, 0, "panel consent rechecks selection after its modal")
++			dialog.block_alert = previous
++			row_starting(rows(), "Local").fn()
++			world.verifications[#world.verifications].on_result(false)
++			helpers.assert_eq(#world.installs, 1)
++		end)
++	end)
++
++	helpers.it("(local-model-requester) rechecks panel selection after its effectful model-status reader", function()
++		local state = base_state()
++		with_panel(state, function(build, world)
++			local menu = row_starting(build().submenu, "🧠").menu
++			local local_row, off = row_starting(menu, "Local"), menu[1]
++			local api = require("modules.llm.api_ollama")
++			local read = api.local_model_installed
++			api.local_model_installed = function(model)
++				api.local_model_installed = read
++				off.fn()
++				return read(model)
++			end
++			local_row.fn()
++			helpers.assert_eq(state.llm_agent_system2, "")
++			helpers.assert_eq(#world.verifications, 0, "withdrawn selection cannot acquire another presence request")
++			helpers.assert_eq(#world.installs, 0)
++		end)
++	end)
++
++	helpers.it("(local-model-requester) captures direct Download selection before an opaque status reader can reselect it", function()
++		local state = base_state()
++		state.llm_agent_system2 = "local"
++		with_panel(state, function(build, world)
++			world.listed = {}
++			local original = row_starting(build().submenu, "🧠").menu
++			local api = require("modules.llm.api_ollama")
++			local reader = api.local_model_installed
++			api.local_model_installed = function(model)
++				api.local_model_installed = reader
++				original[1].fn()
++				row_starting(original, "Local").fn()
++				return reader(model)
++			end
++			local old_rows = row_starting(build().submenu, "🧠").menu
++			helpers.assert_eq(row_starting(old_rows, "⬇️").fn(), false,
++				"a selection ABA during row acquisition cannot donate its new epoch to the old Download")
++			helpers.assert_eq(#world.installs, 0)
++			local fresh_rows = row_starting(build().submenu, "🧠").menu
++			helpers.assert_true(row_starting(fresh_rows, "⬇️").fn())
++			helpers.assert_eq(#world.installs, 1)
++		end)
++	end)
++
+ 	helpers.it("(ai-agent-local-model) shows whether the local model is installed and downloads a missing one", function()
+ 		local state = base_state()
+ 		state.llm_agent_system2 = "local"
+--- a/static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua
++++ b/static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua
+@@ -43,6 +43,9 @@
+ 
+ local LOG = "menu_llm.agent_panel"
+ 
++-- Each successfully applied system choice revokes older presence/Download intents.
++local _selection_epochs = setmetatable({}, { __mode = "k" })
++
+ -- The two systems: their setting, runtime setter and provider use
+ local SYSTEMS = {
+ 	agent_system1 = { key = "llm_agent_system1", setter = "set_llm_agent_system1",
+@@ -128,19 +131,41 @@
+ 	if not ok then Logger.error(LOG, "Menu refresh after a local model listing raised: %s.", tostring(err)) end
+ end
+ 
++--- Captures one system choice before resolving models or reading native state.
++--- @param ctx table Panel context.
++--- @param system table System descriptor.
++--- @param value string Expected selection.
++--- @return function current
++local function selection_current(ctx, system, value)
++	local state, manager = ctx.state, ctx.settings_mgr
++	local epochs = _selection_epochs[state]
++	local epoch = epochs and epochs[system.key] or 0
++	return function()
++		local observed = _selection_epochs[state]
++		return ctx.state == state and ctx.settings_mgr == manager and state[system.key] == value
++			and (observed and observed[system.key] or 0) == epoch
++	end
++end
++
+ --- Asks the local server whether it holds the local model a setting names,
+ --- and offers the download of a missing one.
+ --- @param ctx table Panel context.
++--- @param system table System descriptor.
+ --- @param value string The setting just applied.
+-local function offer_missing_local_model(ctx, value)
++local function offer_missing_local_model(ctx, system, value)
++	local current = selection_current(ctx, system, value)
++	if not current() then return end
+ 	local model = local_model_of(value)
+-	if model == nil then return end
++	if model == nil or not current() then return end
+ 	local Ollama = require("modules.llm.api_ollama")
+ 	local before = Ollama.local_model_installed(model)
++	if not current() then return end
+ 	Ollama.verify_local_model(model, function(installed, reason)
++		if not current() then return end
+ 		if installed ~= before then refresh_menu(ctx) end
++		if not current() then return end
+ 		if installed == false then
+-			require("modules.llm.local_model_offer").offer(model)
++			require("modules.llm.local_model_offer").offer(model, { current = current })
+ 		elseif installed == nil then
+ 			Logger.warn(LOG, "Whether local model '%s' is installed is unknown (%s).", model, tostring(reason))
+ 		end
+@@ -166,7 +191,12 @@
+ 	local committed = ctx.settings_mgr.apply_setting_transaction({
+ 		key = key, value = value, runtime_fn = setter, publish_setting = false,
+ 	}) == true
+-	if not committed then Logger.warn(LOG, "Agent setting '%s' was not applied.", key) end
++	if not committed then Logger.warn(LOG, "Agent setting '%s' was not applied.", key)
++	elseif key == "llm_agent_system1" or key == "llm_agent_system2" then
++		local epochs = _selection_epochs[ctx.state] or {}
++		_selection_epochs[ctx.state] = epochs
++		epochs[key] = (epochs[key] or 0) + 1
++	end
+ 	return committed
+ end
+ 
+@@ -209,7 +239,7 @@
+ 		return false
+ 	end
+ 	if not apply(ctx, system.key, value, system.setter) then return false end
+-	offer_missing_local_model(ctx, value)
++	offer_missing_local_model(ctx, system, value)
+ 	return true
+ end
+ 
+@@ -245,8 +275,9 @@
+ --- @param ctx table Panel context.
+ --- @param system table SYSTEMS entry.
+ --- @return table rows
+-local function system_rows(ctx, system)
+-	local value = ctx.state[system.key] or ""
++local function system_rows(ctx, system, selection)
++	local value = selection.value
++	local selection_is_current = selection.current
+ 	local parsed = value ~= "" and Vision.parse(value) or nil
+ 	local off = ManifestMenu.check_row("agent_system_controls", "agent_system_off", {
+ 		agent_system_off = function() return apply(ctx, system.key, "", system.setter) end,
+@@ -278,7 +309,7 @@
+ 		else
+ 			row.action = function()
+ 				if not apply(ctx, system.key, id, system.setter) then return false end
+-				offer_missing_local_model(ctx, id)
++				offer_missing_local_model(ctx, system, id)
+ 				return true
+ 			end
+ 		end
+@@ -316,7 +347,7 @@
+ 	end
+ 	if installed == false then
+ 		local download = ManifestMenu.template_rows("agent_download_frame", {
+-			["agent_download_model"] = function() return require("modules.llm.local_model_offer").install(model) end,
++			["agent_download_model"] = function() return require("modules.llm.local_model_offer").install(model, { current = selection_is_current }) end,
+ 		})
+ 		if not download or #download ~= 1 or type(download[1].action) ~= "function" then return nil end
+ 		download[1].label = download[1].label:gsub("{1}", function() return model end)
+@@ -372,6 +403,11 @@
+ 		or type(ctx.settings_mgr.apply_setting_transaction) ~= "function" then
+ 		error("agent_panel.build: a state and a settings manager are required")
+ 	end
++	local selections = {}
++	for id, system in pairs(SYSTEMS) do
++		local value = ctx.state[system.key] or ""
++		selections[id] = { value = value, current = selection_current(ctx, system, value) }
++	end
+ 	if type(rawget(ManifestMenu.get_root(), "agent_menu")) ~= "table" then return nil end
+ 	for _, key in ipairs({ "agent_panel_frame", "agent_system1_frame", "agent_system2_frame",
+ 		"agent_excluded_apps_frame", "agent_download_frame" }) do
+@@ -421,8 +457,8 @@
+ 		end
+ 	end
+ 	local submenu = ManifestMenu.build("agent_menu", "AI agent", {
+-		agent_system1 = dynamic("agent_system1", function() return system_rows(ctx, SYSTEMS.agent_system1) end),
+-		agent_system2 = dynamic("agent_system2", function() return system_rows(ctx, SYSTEMS.agent_system2) end),
++		agent_system1 = dynamic("agent_system1", function() return system_rows(ctx, SYSTEMS.agent_system1, selections.agent_system1) end),
++		agent_system2 = dynamic("agent_system2", function() return system_rows(ctx, SYSTEMS.agent_system2, selections.agent_system2) end),
+ 		agent_disabled_apps = dynamic("agent_disabled_apps", function() return disabled_apps_rows(ctx) end),
+ 	}, nil, {
+ 		commands = { agent_mode = function(id) return set_mode(ctx, id) end },

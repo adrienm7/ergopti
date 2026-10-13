@@ -200,17 +200,32 @@ _LLM_OllamaAuxOwner(Owner, Kind, Identity := "") {
 	global LLM_OLLAMA_BASE_URL
 	if Owner is Map
 		return Owner
+	Custody := LLM_OllamaCaptureOriginCustody()
 	return LLM_AuxBegin(Kind, Map(
-		"backend", "ollama",
-		"endpoint", LLM_OllamaRequestOrigin(),
+		"backend", "ollama", "origin_custody", Custody,
+		"endpoint", Custody.Call("origin"),
 		"identity", Identity))
 }
 
 _LLM_OllamaInvokeAuxResult(Owner, Callback, Value) {
 	if !LLM_AuxIsCurrent(Owner)
 		return false
+	if Owner.Has("origin_custody") && !LLM_OllamaOriginCustodyCurrent(Owner["origin_custody"], Owner.Get("endpoint", "")) {
+		LLM_AuxFinish(Owner)
+		return false
+	}
+	if !LLM_AuxIsCurrent(Owner)
+		return false
 	try _LLM_InvokeCallback(Callback, "on_result", Value)
 	finally LLM_AuxFinish(Owner)
+	return true
+}
+
+; The bound origin callback performs another opaque reader; retain the same operation.
+_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {
+	if !LLM_AuxIsCurrent(Owner)
+		return false
+	_LLM_InvokeCallback(Callback, "on_result", Value)
 	return true
 }
 
@@ -593,6 +608,9 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 	; uses curl. A curl child does the connect in its OWN process; we only poll
 	; its terminal sidecar (instant), so the AHK message loop is NEVER blocked.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_ping")
+	if Owner.Has("origin_custody")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	ProcessOwner := 0
 	Stage := "private_directory"
 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=ping owner={1} generation={2}.",
@@ -607,8 +625,8 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 				"finalizer", _LLM_OllamaAuxDeletePaths.Bind(Paths)))
 			return Owner
 		Stage := "command_build"
-		Origin := Structured ? Owner.Get("endpoint", "") : LLM_OllamaRequestOrigin()
-		if Structured && (!(Origin is String) || Origin == "" || !LLM_OllamaProbeOriginCurrent(Owner, Origin))
+		Origin := Owner.Get("endpoint", "")
+		if (Structured || Owner.Has("origin_custody")) && (!(Origin is String) || Origin == "" || !LLM_OllamaProbeOriginCurrent(Owner, Origin))
 			throw Error("Selected-origin version ownership is no longer current.")
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
@@ -622,7 +640,7 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 		Stage := "process_launch"
 		PreviousCritical := Critical("On")
 		try {
-			if Structured && !LLM_OllamaProbeOriginCurrent(Owner, Origin)
+			if (Structured || Owner.Has("origin_custody")) && !LLM_OllamaProbeOriginCurrent(Owner, Origin)
 				throw Error("Selected-origin version dispatch was superseded.")
 			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
 				cmd, "", "Hide", &pid)
@@ -818,6 +836,9 @@ LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 	; tray build (which runs under Critical) for up to its timeout. curl does the connect
 	; in its own process; we only poll its terminal sidecar, so the loop never blocks.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_tags")
+	if Owner.Has("origin_custody")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	ProcessOwner := 0
 	Stage := "private_directory"
 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=tags owner={1} generation={2}.",
@@ -869,8 +890,9 @@ LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 ; existing global selection fence.
 _LLM_OllamaTagsOrigin(Owner, Strict) {
 	global LLM_OLLAMA_BASE_URL
-	Origin := Strict ? Owner.Get("endpoint", "") : LLM_OllamaRequestOrigin()
-	if Strict && (!(Origin is String) || Origin == "" || !LLM_OllamaProbeOriginCurrent(Owner, Origin))
+	Origin := Owner.Get("endpoint", "")
+	if !(Origin is String) || Origin == ""
+			|| ((Strict || Owner.Has("origin_custody")) && !LLM_OllamaProbeOriginCurrent(Owner, Origin))
 		throw Error("Selected-origin models ownership is no longer current.")
 	return Origin
 }
@@ -931,6 +953,9 @@ _LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 	global LLM_OLLAMA_BASE_URL, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_delete:" . tag, tag)
+	if Owner.Has("origin_custody")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	if (tag == "") {
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 		return
@@ -977,7 +1002,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 			. _LLM_CurlMaxFileSizeArg() . '-X DELETE '
 			. '-H "Content-Type: application/json" '
 			. '--data-binary @' . _Q(tmp_payload) . ' '
-			. _Q(LLM_OllamaRequestOrigin() . "/api/delete") . ' '
+			. _Q(Owner.Get("endpoint", "") . "/api/delete") . ' '
 			. '-o ' . _Q(tmp_out)
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
@@ -988,7 +1013,8 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 			; WriteFn can pump a cancellation or endpoint transition. Revalidate the
 			; owner at the same atomic launch boundary used by the other curl paths:
 			; an invalidated model-delete request must never send its destructive POST.
-			if !_LLM_AuxOwnerIsCurrentLocked(Owner) {
+			if !_LLM_AuxOwnerIsCurrentLocked(Owner)
+					|| (Owner.Has("origin_custody") && !LLM_OllamaOriginCustodyCurrent(Owner["origin_custody"], Owner.Get("endpoint", ""))) {
 				launch_blocked := true
 			} else {
 				ProcessOwner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)

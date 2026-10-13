@@ -21,6 +21,7 @@ EXPORTS
 	ErgoptiNav_ListTerminalHeldRecipes
 	ErgoptiNav_PlanTerminalOutput
 	ErgoptiNav_BeginTerminalOutputAttempt
+	ErgoptiNav_SerializeTerminalOutputAttempt
 	ErgoptiNav_AcknowledgeTerminalOutput
 	ErgoptiNav_ConsumeTerminalOutput
 	ErgoptiNav_CancelTerminalOutput

@@ -1,0 +1,20 @@
+{
+	"status": "DRAFT_NOT_QUALIFIED",
+	"applies_after": "pending-terminal-complete-union.patch SHA25602770c2db581ad9b7b719e8285020c590df3339515ca1df90b1e9a0c5c446418",
+	"patch_sha256": "8c69ffc322e9565db98ea921633eb331e7684bc102703489099a9f308074e7bd",
+	"paths": {
+		"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": {
+			"before_sha256": "6eb6a76bb581746fd80967baae029a6a531ac3ad6e81acc4ba8c67854a97bb2d",
+			"after_sha256": "67ccf549f009a38f3b4314017c22489a7b3fe1a638ab7ed70be0f2c0a01dab52"
+		},
+		"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": {
+			"before_sha256": "c6e44973cb71b581b020505b1be48d9b0ed473a9c52fc76dd03fa093205e9cc7",
+			"after_sha256": "9f98e6102846f34b2b8025b197e3adef9e8d1437c2648950dd5c7bbe4c37c2fe"
+		},
+		"tools/test/test-windows-terminal-output-custody-adapter.cjs": {
+			"before_sha256": "0a9554fe7bd988ab00a93c0adff431f074241de0c1bb0a1f8b5aa93a14e91bfe",
+			"after_sha256": "a4d49c0f919eef18d86602db1dd413441af630fa78cf00cbffb9f842fb223cd0"
+		}
+	},
+	"validation": "No terminal source/native receiving receipt. Review before applying; no production admission/cleanup/ACK claim."
+}

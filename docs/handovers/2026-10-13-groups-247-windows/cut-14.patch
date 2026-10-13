@@ -1,0 +1,1015 @@
+--- a/static/ergopti_plus/linux/modules/llm/prediction_engine.lua
++++ b/static/ergopti_plus/linux/modules/llm/prediction_engine.lua
+@@ -75,6 +75,8 @@
+ local _enable_admission = nil
+ local _enable_generation = 0
+ local _runtime_app_epoch = 0
++local _runtime_responses = setmetatable({}, { __mode = "k" })
++local _runtime_response_ports = nil
+ local _runtime_closed = false
+ local _runtime_owner, _runtime_request = nil, nil
+ local retire_runtime_request, stop_runtime_app
+@@ -468,7 +470,7 @@
+ 	if _runtime_closed or _scope_owner then return false end
+ 	if stop_runtime_app and not stop_runtime_app() then return false end
+ 	if _runtime_closed or _scope_owner then return false end
+-	_runtime_owner = nil
++	_runtime_owner, _runtime_response_ports = nil, nil
+ 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
+ 	if _runtime_closed or _scope_owner then return false end
+ 	_enable_generation = _enable_generation + 1
+@@ -663,7 +665,7 @@
+ 		return
+ 	end
+ 
+-	local backend, target, model = M.resolve_backend()
++	local backend, target, model, runtime_response = M.resolve_backend()
+ 	if not backend then return end
+ 
+ 	local clean_context, trigger_chars = context_without_trigger(context,
+@@ -781,6 +783,7 @@
+ 		end
+ 		_inflight_backend = backend
+ 		backend.chat(target, model, messages, {
++			runtime_response = runtime_response,
+ 			stream = DisplaySettings.get("streaming") == true,
+ 			-- A batch asks once, at the builder's temperature. Sequential variants
+ 			-- each start from the user's own temperature and, when "raise the
+@@ -1211,7 +1214,7 @@
+ 		Logger.error(LOG, "Tone step refused: the built-in prompt '%s' is missing.", plan.profile_id)
+ 		return false
+ 	end
+-	local backend, target, model = M.resolve_backend()
++	local backend, target, model, runtime_response = M.resolve_backend()
+ 	if not backend then return false end
+ 	local system_prompt = resolve_system_prompt(profile, {
+ 		min_words = Settings.get("min_words"),
+@@ -1231,6 +1234,7 @@
+ 	local generation = _tone_generation
+ 	local focus = current_focus()
+ 	local request_opts = {
++		runtime_response = runtime_response,
+ 		stream = false,
+ 		verify_local_model = verify_local_model == true,
+ 		temperature = Settings.get("temperature"),
+@@ -1376,8 +1380,9 @@
+ --- The request options of an offer's one-off request: chat mode, no streaming.
+ --- @param max_tokens integer
+ --- @return table
+-local function offer_request_opts(max_tokens, verify_local_model)
++local function offer_request_opts(max_tokens, verify_local_model, runtime_response)
+ 	return {
++		runtime_response = runtime_response,
+ 		stream = false,
+ 		verify_local_model = verify_local_model == true,
+ 		temperature = Settings.get("temperature"),
+@@ -1440,7 +1445,7 @@
+ local function request_screen_answers(spec, screen)
+ 	local config = spec.config
+ 	local answers = spec.answers
+-	local backend, target, model = M.resolve_backend()
++	local backend, target, model, runtime_response = M.resolve_backend()
+ 	if not backend then
+ 		clear_offer()
+ 		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+@@ -1482,7 +1487,7 @@
+ 			{ role = "user", content = Vision.answer_user_text(screen) },
+ 		}
+ 		_inflight_backend = backend
+-		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens, true), nil, function(full_text, err)
++		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens, true, runtime_response), nil, function(full_text, err)
+ 			if _runtime_closed or _scope_owner then return end
+ 			if epoch ~= _request_epoch then
+ 				Logger.info(LOG, "Screen answer '%s' ignored: a newer action or an edit superseded it.", answer.id)
+@@ -1789,7 +1794,7 @@
+ 		end
+ 		return false
+ 	end
+-	local backend, backend_target, model = M.resolve_backend()
++	local backend, backend_target, model, runtime_response = M.resolve_backend()
+ 	if not backend then
+ 		Logger.info(LOG, "Translation refused (backend_not_ready).")
+ 		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+@@ -1809,7 +1814,7 @@
+ 		M.get_backend(), model, code, #selection)
+ 	send_paced(epoch, "Translation", function()
+ 		_inflight_backend = backend
+-		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens), nil,
++		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
+ 			function(full_text, err) finish_translation(epoch, meta, config, full_text, err) end)
+ 	end, function()
+ 		_predicting = false
+@@ -1885,7 +1890,7 @@
+ 		{ role = "system", content = Agent.system1_prompt(config, ctx) },
+ 		{ role = "user", content = sentence },
+ 	}
+-	chat.module.chat(chat.target, chat.model, messages, offer_request_opts(config.system1.max_tokens, true), nil,
++	chat.module.chat(chat.target, chat.model, messages, offer_request_opts(config.system1.max_tokens, true, chat.runtime_response), nil,
+ 		function(full_text, err)
+ 			if err then on_done(nil, err) return end
+ 			on_done(Agent.parse_system1(config, Parser.strip_thinking(full_text or "")), nil)
+@@ -1902,7 +1907,7 @@
+ 	chat.module.chat(chat.target, chat.model, {
+ 		{ role = "system", content = payload.system },
+ 		{ role = "user", content = payload.user },
+-	}, offer_request_opts(payload.max_tokens, true), nil, on_done)
++	}, offer_request_opts(payload.max_tokens, true, chat.runtime_response), nil, on_done)
+ end
+ 
+ --- The System 2 transport of an offer the user asked for: its backend is the
+@@ -1934,6 +1939,21 @@
+ 	return false
+ end
+ 
++
++--- Captures the original managed view before a model/origin reader can reenter.
++--- @param system string Existing agent system identity.
++--- @return table|nil chat
++--- @return string|nil reason
++local function owned_chat_target(system)
++	local receipt = M.capture_runtime_response()
++	local chat, reason = AgentSettings.chat_target(system)
++	if chat and chat.kind == "ollama" then
++		if not M.runtime_response_current(receipt, chat.target) then return nil, "runtime_source_changed" end
++		chat.runtime_response = receipt
++	end
++	return chat, reason
++end
++
+ --- System 2's chat target and agent.json, or nil after telling the user why:
+ --- off, no model, a provider without a stored key or that cannot chat all
+ --- mean that no System 2 is configured.
+@@ -1942,7 +1962,7 @@
+ local function system2_chat(what)
+ 	local config = AgentSettings.config()
+ 	if not config then return nil end
+-	local chat, reason = AgentSettings.chat_target("system2")
++	local chat, reason = owned_chat_target("system2")
+ 	if chat then return chat, config end
+ 	if reason == "off" or reason == "no_model" then
+ 		Logger.info(LOG, "%s refused: no System 2 is configured (%s).", what, reason)
+@@ -2177,13 +2197,13 @@
+ function M.set_agent_mode(mode)
+ 	if _runtime_closed or _scope_owner then return false end
+ 	if mode == "auto" then
+-		local system1, reason1 = AgentSettings.chat_target("system1")
++		local system1, reason1 = owned_chat_target("system1")
+ 		if not system1 then
+ 			Logger.info(LOG, "Automatic agent refused: System 1 cannot answer (%s).", tostring(reason1))
+ 			show_notice(AGENT_KEYS.no_system1, "no_system1")
+ 			return false
+ 		end
+-		local system2, reason2 = AgentSettings.chat_target("system2")
++		local system2, reason2 = owned_chat_target("system2")
+ 		if not system2 then
+ 			Logger.info(LOG, "Automatic agent refused: System 2 cannot answer (%s).", tostring(reason2))
+ 			show_notice(AGENT_KEYS.no_system2, "no_system2")
+@@ -2371,8 +2391,8 @@
+ 		Logger.debug(LOG, "Agent triage suppressed: secure field or excluded context.")
+ 		return
+ 	end
+-	local system1, reason1 = AgentSettings.chat_target("system1")
+-	local system2, reason2 = AgentSettings.chat_target("system2")
++	local system1, reason1 = owned_chat_target("system1")
++	local system2, reason2 = owned_chat_target("system2")
+ 	if not system1 or not system2 then
+ 		Logger.debug(LOG, "Agent triage skipped: System 1 (%s) or System 2 (%s) cannot answer.",
+ 			tostring(reason1 or "ready"), tostring(reason2 or "ready"))
+@@ -2702,6 +2722,51 @@
+ 	local runtime_closed = stop_runtime_app()
+ 	return probe_closed and download_closed and runtime_closed
+ end
++
++--- Captures existing managed lifetime before origin/settings/native readers run.
++--- This creates no runtime owner and invokes no readiness or service observer.
++--- @return table|nil receipt Opaque request identity or explicit refusal.
++function M.capture_runtime_response()
++	if _runtime_closed or _scope_owner then return nil end
++	local owner, epoch = _runtime_owner, _runtime_app_epoch
++	local ports = _runtime_response_ports
++	local controller = owner and ports and ports.owner == owner and ports.controller
++	local capture, current = controller and ports.capture, controller and ports.current
++	local app
++	if owner then
++		if type(capture) ~= "function" or type(current) ~= "function" or owner.controller ~= controller
++			or controller.capture_response ~= capture or controller.response_current ~= current then return nil end
++		local ok, captured = pcall(capture, controller)
++		if not ok or type(captured) ~= "table" then return nil end
++		app = captured
++	end
++	if owner ~= _runtime_owner or epoch ~= _runtime_app_epoch or _runtime_closed or _scope_owner then return nil end
++	local receipt = {}
++	_runtime_responses[receipt] = { owner = owner, epoch = epoch, controller = controller,
++		capture = capture, current = current, app = app }
++	return receipt
++end
++
++--- Validates only the originating managed owner; external same-URL replacement is unobservable.
++--- @param receipt table Original opaque request receipt.
++--- @param origin string Requested service origin.
++--- @return boolean current Read-only observation, without runtime construction or effects.
++function M.runtime_response_current(receipt, origin)
++	local held = _runtime_responses[receipt]
++	if not held or held.owner ~= _runtime_owner or held.epoch ~= _runtime_app_epoch
++		or _runtime_closed or _scope_owner then return false end
++	if held.owner then
++		if held.owner.controller ~= held.controller or held.controller.capture_response ~= held.capture
++			or held.controller.response_current ~= held.current then return false end
++		local called, current = pcall(held.current, held.controller, held.app, origin)
++		if not called or current ~= true then return false end
++	end
++	return held.owner == _runtime_owner and held.epoch == _runtime_app_epoch
++		and (not held.owner or held.owner.controller == held.controller
++			and held.controller.capture_response == held.capture and held.controller.response_current == held.current)
++		and _runtime_responses[receipt] == held and not _runtime_closed and _scope_owner == nil
++end
++
+ --- Reports retained runtime repair or app-service cleanup ownership.
+ --- @return boolean pending
+ function M.runtime_pending()
+@@ -2763,6 +2828,9 @@
+ 	if ok and owner then
+ 		if _runtime_closed or _scope_owner then return nil, "runtime_cancelled" end
+ 		_runtime_owner = owner
++		local controller = owner.controller
++		_runtime_response_ports = { owner = owner, controller = controller,
++			capture = controller and controller.capture_response, current = controller and controller.response_current }
+ 		return owner
+ 	end
+ 	Logger.error(LOG, "Local Ollama runtime construction refused: %s.", tostring(ok and reason or owner))
+@@ -3077,6 +3145,7 @@
+ --- @param quiet boolean Do not log why the backend cannot answer.
+ --- @return table|nil backend, any target, string|nil model
+ local function backend_target(quiet)
++	local runtime_response = M.capture_runtime_response()
+ 	local function refuse(...)
+ 		if not quiet then Logger.warn(LOG, ...) end
+ 		return nil
+@@ -3099,7 +3168,9 @@
+ 	local model = profiles and profiles.get_current_model()
+ 	if not ollama then return refuse("predict(): Ollama API not available.") end
+ 	if not model then return refuse("predict(): No model selected - run Ollama and refresh models.") end
+-	return ollama, profiles.get_base_url() or HttpBridge.resolve_base_url() or "", model
++	local origin = profiles.get_base_url() or HttpBridge.resolve_base_url() or ""
++	if not M.runtime_response_current(runtime_response, origin) then return refuse("predict(): originating managed runtime changed.") end
++	return ollama, origin, model, runtime_response
+ end
+ 
+ --- The module, target and model a prediction is sent with, or nil when the
+--- a/static/ergopti_plus/linux/modules/llm/api_ollama.lua
++++ b/static/ergopti_plus/linux/modules/llm/api_ollama.lua
+@@ -18,6 +18,12 @@
+ --- ==============================================================================
+ 
+ local M = {}
++
++-- The cooperative constructor captures one engine owner, not a later compatible export.
++local ResponseEngine = require("modules.llm.prediction_engine")
++local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response, ResponseEngine.runtime_response_current
++assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
++	"original runtime response owner unavailable")
+ 
+ local Logger = require("logger.shim")
+ local LOG = "modules.llm.api_ollama"
+@@ -117,6 +123,29 @@
+ 	return nil
+ end
+ 
++
++--- Checks the original managed owner after potentially reentrant native readers.
++--- @param request table Retained private response owner.
++--- @return boolean current
++local function runtime_current(request)
++	if package.loaded["modules.llm.prediction_engine"] ~= request.runtime_engine
++		or request.runtime_engine.capture_runtime_response ~= request.runtime_capture
++		or request.runtime_engine.runtime_response_current ~= request.runtime_current then return false end
++	local admitted = request.runtime_current(request.runtime_receipt, request.origin) == true
++	return admitted and package.loaded["modules.llm.prediction_engine"] == request.runtime_engine
++		and request.runtime_engine.capture_runtime_response == request.runtime_capture
++		and request.runtime_engine.runtime_response_current == request.runtime_current
++end
++
++--- Finishes every external observer with the original lexical request checks.
++--- @param request table Original chat operation.
++--- @return boolean current
++local function request_current(request)
++	if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return false end
++	local admitted = runtime_current(request)
++	return admitted and _active_request == request and not request.terminal and request.epoch == _request_epoch
++end
++
+ --- Delivers one terminal callback for a request epoch.
+ --- @param request table
+ --- @param err string|nil
+@@ -124,7 +153,9 @@
+ 	if request.terminal then return end
+ 	request.terminal = true
+ 	if _active_request == request then _active_request = nil end
+-	if type(request.on_done) == "function" then
++	local terminal_epoch = _request_epoch
++	local admitted = runtime_current(request)
++	if admitted and terminal_epoch == _request_epoch and type(request.on_done) == "function" then
+ 		local ok, callback_err = pcall(request.on_done, request.full_text, err)
+ 		if not ok then Logger.error(LOG, "chat(): terminal callback raised — %s", tostring(callback_err)) end
+ 	end
+@@ -142,7 +173,7 @@
+ 		local line = request.pending:sub(1, newline - 1):gsub("\r$", "")
+ 		request.pending = request.pending:sub(newline + 1)
+ 		local content = bridge_mod.parse_stream_line(line)
+-		if content then
++		if content and request_current(request) then
+ 			request.full_text = request.full_text .. content
+ 			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
+ 		end
+@@ -150,7 +181,7 @@
+ 	if flush and request.pending ~= "" then
+ 		local content = bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
+ 		request.pending = ""
+-		if content then
++		if content and request_current(request) then
+ 			request.full_text = request.full_text .. content
+ 			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
+ 		end
+@@ -172,10 +203,19 @@
+ --- @param on_chunk function  Called with (delta_text) for each streaming chunk.
+ --- @param on_done  function  Called with (full_text, error) on completion.
+ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
++	local runtime_engine = ResponseEngine
++	local runtime_capture, response_current = ResponseCapture, ResponseCurrent
++	if type(runtime_capture) ~= "function" or type(response_current) ~= "function" then return false end
++	local fresh_receipt = runtime_capture()
++	local options = type(opts) == "table" and opts or {}
++	local runtime_receipt = rawget(options, "runtime_response")
++	if runtime_receipt == nil then runtime_receipt = fresh_receipt end
++	local response = { runtime_engine = runtime_engine, runtime_capture = runtime_capture,
++		runtime_current = response_current, runtime_receipt = runtime_receipt, origin = base_url }
++	if not runtime_current(response) then return false end
+ 	if _active_request and M.cancel() ~= true then return false end
+ 	_request_epoch = _request_epoch + 1
+ 
+-	local options = type(opts) == "table" and opts or {}
+ 	local stream = options.stream ~= false  -- default: streaming on
+ 
+ 	-- Build the JSON payload.
+@@ -201,6 +241,7 @@
+ 
+ 	local json_body = json_encode(payload)
+ 	local url = bridge_mod.ollama_endpoint(base_url, "chat")
++	if not runtime_current(response) then return false end
+ 	if not url then
+ 		Logger.error(LOG, "chat(): invalid Ollama origin — cannot build the chat endpoint.")
+ 		if on_done then pcall(on_done, "", "invalid Ollama origin") end
+@@ -208,6 +249,8 @@
+ 	end
+ 
+ 	local request = {
++		runtime_engine = runtime_engine, runtime_capture = runtime_capture, runtime_current = response_current,
++		runtime_receipt = runtime_receipt, origin = base_url,
+ 		epoch = _request_epoch,
+ 		on_chunk = on_chunk,
+ 		on_done = on_done,
+@@ -219,15 +262,17 @@
+ 
+ 	Logger.debug(LOG, "chat() → %s (model=%s stream=%s)", url, model, tostring(stream))
+ 	local function dispatch()
+-		if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return false end
++		if not request_current(request) then return false end
+ 		return HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, json_body, {
+ 			timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000,
++			authorized = function() return request_current(request) end,
+ 		}, function(chunk)
+-			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
++			if not request_current(request) then return end
+ 			consume_chunk(request, chunk, false)
+ 		end, function(result)
+-			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
++			if not request_current(request) then return end
+ 			consume_chunk(request, "", true)
++			if not request_current(request) then return end
+ 			if type(result) ~= "table" or result.ok ~= true then
+ 				finish_request(request, LocalModelPolicy.response_failure(result, base_url)
+ 					or (type(result) == "table" and result.error or "HTTP transport failed"))
+@@ -240,11 +285,11 @@
+ 	end
+ 	if options.verify_local_model == true then
+ 		return require("modules.llm.local_model_probe").verify(base_url, model, nil, function(installed, reason)
+-			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
++			if not request_current(request) then return end
+ 			if installed == nil then finish_request(request, reason) return end
+ 			if installed == false then finish_request(request, LocalModelPolicy.failure(model, base_url)) return end
+ 			dispatch()
+-		end)
++		end, runtime_receipt)
+ 	end
+ 	return dispatch()
+ end
+--- a/static/ergopti_plus/linux/modules/llm/local_model_probe.lua
++++ b/static/ergopti_plus/linux/modules/llm/local_model_probe.lua
+@@ -8,6 +8,12 @@
+ --- ==============================================================================
+ 
+ local M = {}
++
++-- The cooperative constructor captures one engine owner, not a later compatible export.
++local ResponseEngine = require("modules.llm.prediction_engine")
++local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response, ResponseEngine.runtime_response_current
++assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
++	"original runtime response owner unavailable")
+ local Policy = require("llm.local_model_policy")
+ local HttpClient = require("adapters.http_client")
+ local Timings = require("infra.timings")
+@@ -28,18 +34,36 @@
+ --- @param model string
+ --- @param owner string|nil The existing inference HTTP owner.
+ --- @param on_done function Receives true or false, or nil and a failure reason.
++--- @param runtime_receipt table|nil Original opaque producer receipt, or a fresh direct probe capture.
+ --- @return boolean dispatched
+-function M.verify(base_url, model, owner, on_done)
++function M.verify(base_url, model, owner, on_done, runtime_receipt)
++	local engine = ResponseEngine
++	local capture, current = ResponseCapture, ResponseCurrent
++	if type(capture) ~= "function" or type(current) ~= "function" then return false end
++	local receipt = runtime_receipt
++	if receipt == nil then receipt = capture() end
++	local function admitted()
++		if package.loaded["modules.llm.prediction_engine"] ~= engine
++			or engine.capture_runtime_response ~= capture or engine.runtime_response_current ~= current then return false end
++		local accepted = current(receipt, base_url) == true
++		return accepted and package.loaded["modules.llm.prediction_engine"] == engine
++			and engine.capture_runtime_response == capture and engine.runtime_response_current == current
++	end
++	if not admitted() then return false end
+ 	local name = Policy.normalize(model)
+ 	local url = Bridge.ollama_endpoint(base_url, "tags")
++	if not admitted() then return false end
+ 	if not name or not url then
+ 		on_done(nil, "invalid local model or origin")
+ 		return false
+ 	end
+ 	return HttpClient.get(url, {}, {
+ 		owner = owner, timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms"),
++		authorized = admitted,
+ 	}, function(result)
++		if not admitted() then return end
+ 		local names, reason = Policy.list_receipt(result)
++		if not admitted() then return end
+ 		if not names then on_done(nil, reason) return end
+ 		on_done(names[name] == true)
+ 	end) == true
+--- a/static/ergopti_plus/linux/modules/llm/profiles.lua
++++ b/static/ergopti_plus/linux/modules/llm/profiles.lua
+@@ -22,6 +22,12 @@
+ 
+ local M = {}
+ 
++-- The cooperative constructor captures one engine owner, not a later compatible export.
++local ResponseEngine = require("modules.llm.prediction_engine")
++local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response, ResponseEngine.runtime_response_current
++assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
++	"original runtime response owner unavailable")
++
+ local Logger = require("logger.shim")
+ local LOG = "modules.llm.profiles"
+ 
+@@ -49,6 +55,7 @@
+ 
+ -- Cached list of available models from Ollama.
+ local _available_models = {}
++local _model_inventory, _model_inventory_request = nil, nil
+ 
+ -- Base URL for Ollama (default port 11434).
+ local _base_url = nil
+@@ -86,6 +93,7 @@
+ ---              port  number  Ollama port (default 11434).
+ ---              model string  Override default model.
+ function M.init(opts)
++	_model_inventory, _model_inventory_request, _available_models = nil, nil, {}
+ 	local options = type(opts) == "table" and opts or {}
+ 	-- The bridge owns both the canonical origin and operation paths. A profile
+ 	-- stores only the origin; callers ask the bridge for /api/tags or /api/chat.
+@@ -111,11 +119,27 @@
+ -- =========================================
+ -- =========================================
+ 
++
++--- Rechecks both private managed custody and this exact inventory publication frame.
++--- @param frame table Original inventory operation.
++--- @return boolean current
++local function inventory_current(frame)
++	if not frame or _model_inventory_request ~= frame or _base_url ~= frame.origin
++		or package.loaded["modules.llm.prediction_engine"] ~= frame.engine
++		or frame.engine.capture_runtime_response ~= frame.capture
++		or frame.engine.runtime_response_current ~= frame.current then return false end
++	local admitted = frame.current(frame.receipt, frame.origin) == true
++	return admitted and _model_inventory_request == frame and _base_url == frame.origin
++		and package.loaded["modules.llm.prediction_engine"] == frame.engine
++		and frame.engine.capture_runtime_response == frame.capture
++		and frame.engine.runtime_response_current == frame.current
++end
++
+ --- Fetches the list of available models from the Ollama API.
+ --- Returns cached value if already fetched; call refresh_models() to force refresh.
+ --- @return table Array of model name strings.
+ function M.get_models()
+-	if #_available_models > 0 then return _available_models end
++	if #_available_models > 0 and inventory_current(_model_inventory) then return _available_models end
+ 
+ 	-- Try to fetch from Ollama.
+ 	M.refresh_models()
+@@ -125,14 +149,22 @@
+ --- Refreshes the model list from the Ollama /api/tags endpoint.
+ --- @return table Array of model name strings (may be empty if Ollama unreachable).
+ function M.refresh_models()
+-	_available_models = {}
++	local engine = ResponseEngine
++	local capture, current = ResponseCapture, ResponseCurrent
++	if type(capture) ~= "function" or type(current) ~= "function" then return {} end
++	local receipt = capture()
++	local frame = { engine = engine, capture = capture, current = current, receipt = receipt, origin = _base_url }
++	_model_inventory_request = frame
++	if not inventory_current(frame) then return {} end
++	_available_models, _model_inventory = {}, nil
+ 
+ 	if not _base_url or not HttpBridge then
+ 		Logger.warn(LOG, "refresh_models(): no HTTP bridge or base URL — cannot fetch models.")
+ 		return {}
+ 	end
+ 
+-	local url = HttpBridge.ollama_endpoint(_base_url, "tags")
++	local url = HttpBridge.ollama_endpoint(frame.origin, "tags")
++	if not inventory_current(frame) then return {} end
+ 	if not url then
+ 		Logger.error(LOG, "refresh_models(): invalid Ollama origin — cannot build the tags endpoint.")
+ 		return {}
+@@ -160,14 +192,17 @@
+ 		return models
+ 	end)
+ 
++	if not inventory_current(frame) then return {} end
+ 	if not ok then
+ 		Logger.warn(LOG, "refresh_models(): HTTP error — %s", tostring(result))
+ 		return {}
+ 	end
+ 
+ 	_available_models = result or {}
++	_model_inventory = frame
+ 	Logger.info(LOG, "Fetched %d model(s) from Ollama.", #_available_models)
+ 
++	if not inventory_current(frame) then return {} end
+ 	-- Auto-select first available model if none is set.
+ 	if not _current_model and #_available_models > 0 then
+ 		_current_model = _available_models[1]
+--- a/static/ergopti_plus/_shared/lua/llm/runtime_repair.lua
++++ b/static/ergopti_plus/_shared/lua/llm/runtime_repair.lua
+@@ -45,6 +45,7 @@
+ 	-- Capture the ports once; arbitrary mutation of the caller table has no authority.
+ 	local P = {}; for key, value in pairs(ports) do P[key] = value end
+ 	local active, app, sequence, controller = nil, nil, 0, {}
++	local responses = setmetatable({}, {__mode='k'})
+ 	local bootstrap_ms, poll_ms=policy.bootstrap_timeout_ms, policy.poll_ms
+ 
+ 	local function call(fn, ...)
+@@ -99,6 +100,34 @@
+ 		return 'running'
+ 	end
+ 	function controller:has_debt() return active ~= nil or (app ~= nil and app.stopping) end
++
++	--- Captures original app/absence custody without invoking any observer or effect.
++	--- @return table receipt Opaque read-only response identity, never readiness.
++	function controller:capture_response()
++		local receipt={}
++		responses[receipt]={app=app,sequence=sequence}
++		return receipt
++	end
++	--- Checks the captured app, binary/source and exact retained service without retirement.
++	--- @param receipt table Original opaque observer receipt.
++	--- @param origin string Requested original service origin.
++	--- @return boolean current No start, stop, publication or cleanup is authorized.
++	function controller:response_current(receipt,origin)
++		local witness=responses[receipt]
++		if not witness or witness.app~=app or witness.sequence~=sequence then return false end
++		local record=witness.app
++		-- Absence authenticates only this controller view, never an external server.
++		if not record then return active == nil end
++		if record.origin~=origin or record.stopping then return false end
++		local held=record.service
++		if not held or held.acquiring or held.unknown or type(held.is_current)~='function'
++			or type(held.running)~='function' or not app_current(record) then return false end
++		if not yes(held.is_current,held.operation) or app~=record or record.stopping then return false end
++		if not yes(held.running,held.operation) or app~=record or record.stopping then return false end
++		-- Running is the final observer; later source callbacks could invalidate that proof.
++		return app==record and record.service==held
++			and responses[receipt]==witness and witness.sequence==sequence and not record.stopping
++	end
+ 
+ 	function controller:start(snapshot, action, explicit_consent, on_done)
+ 		local request = {started = false}
+--- a/static/ergopti_plus/linux/tests/unit/modules/llm/test_runtime_engine_acquisition.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/llm/test_runtime_engine_acquisition.lua
+@@ -460,3 +460,406 @@
+ 		end)
+ 	end)
+ end)
++
++--- Runs the real repair, engine, profiles, probe and chat graph over owned OS ports.
++--- @param body function Receives actual producers and the retained service capability.
++local function with_managed_responses(body)
++	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "llm.runtime_repair" }
++	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
++	local popen = io.popen
++	local ok, failure = xpcall(function()
++		with_owner(function(world)
++			local engine = world.load_engine()
++			local profiles = require("modules.llm.profiles")
++			local Repair = require("llm.runtime_repair")
++			world.responses, world.posts, world.observations = {}, {}, 0
++			world.runtime_valid, world.service_current = true, true
++			local engine_port, proof, app_source, app_epoch
++			local runtime = { current = function() world.observations = world.observations + 1; return world.runtime_valid end,
++				executable = function() return "/private/owned-ollama/bin/ollama" end }
++			local function operation(kind, done, authorized)
++				local op = { started = kind == "service" or kind == "timer", closed = false, listeners = {} }
++				function op:is_settled() return self.closed end
++				function op:on_settled(fn) if self.closed then fn() else self.listeners[#self.listeners + 1] = fn end; return true end
++				function op:close()
++					self.closed = true
++					local listeners = self.listeners; self.listeners = {}
++					for _, fn in ipairs(listeners) do fn() end
++				end
++				function op:cancel()
++					world.native_cancels = (world.native_cancels or 0) + 1
++					self.cancelled = true
++					if kind ~= "service" or not world.hold_service then self:close() end
++					return self.closed
++				end
++				function op:is_current() world.observations = world.observations + 1; return world.service_current and not self.closed and not self.cancelled and authorized() end
++				function op:is_running()
++					world.observations = world.observations + 1
++					local admitted = kind == "service" and not self.exited and self:is_current()
++					if world.observe_running then world.returned_running = true end
++					return admitted and not self.exited and not self.closed and not self.cancelled
++				end
++				function op:answer(value) done(value); self:close() end
++				return op
++			end
++			local ports = {
++				current = function() return engine_port.state().enabled == false end,
++				resolve = function() return { status = "installed", runtime = runtime } end,
++				install = function() error("this graph never installs a binary") end,
++				after = function(_, done) return operation("timer", done, function() return true end) end,
++				now_ms = function() return 0 end,
++				start_service = function(_, _, options, done)
++					world.service = operation("service", done, options.authorized); return world.service
++				end,
++				probe = function(_, _, _, done) world.ready = operation("probe", done, function() return true end); return world.ready end,
++				publish = function(_, acknowledge)
++					local state = engine_port.state()
++					if profiles.enable() ~= true or engine_port.publish_enabled(state.revision, state.app_epoch) ~= true then return false end
++					proof = {}; return acknowledge(proof)
++				end,
++				app_capture = function(candidate)
++					if candidate ~= proof then return nil end
++					app_source, app_epoch = {}, engine_port.state().app_epoch; return app_source
++				end,
++				app_current = function(source)
++					if world.on_observe then world.on_observe() end
++					world.observations = world.observations + 1
++					return source == app_source and engine_port.state().app_epoch == app_epoch
++				end,
++				compensate = function() return false end,
++			}
++			world.controller = Repair.new(ports, { bootstrap_timeout_ms = 100, poll_ms = 10 })
++			package.loaded["modules.llm.runtime_factory"] = { new = function(captured)
++				engine_port = captured
++				return { controller = world.controller, resolve = function() return { status = "installed" } end,
++					source = { capture = function() return { origin = engine.get_base_url() } end, diagnostic_current = function() return false end } }
++			end }
++			world.choice_index = 1
++			helpers.assert_true(engine.enable()); world.answer({ ok = false, status = 503, body = "" })
++			assert(world.ready, "the actual explicit repair acquired its version probe")
++			world.ready:answer({ ok = true, status = 200, body = '{"version":"0.24.0"}' })
++			helpers.assert_true(engine.is_enabled()); helpers.assert_eq(world.controller:app_status(), "running")
++			local Http = package.loaded["adapters.http_client"]
++			Http.postStream = function(url, _, _, _, chunk, done)
++				world.posts[#world.posts + 1] = { url = url, chunk = chunk, done = done }; return true
++			end
++			world.api = helpers.load_module("modules.llm.api_ollama")
++			world.profiles = profiles
++			function world:chat(verify)
++				return self.api.chat(engine.get_base_url(), "model:2b", {}, { verify_local_model = verify == true },
++					function(text) self.responses[#self.responses + 1] = "chunk:" .. text end,
++					function(text, err) self.responses[#self.responses + 1] = err or "done:" .. text end)
++			end
++			function world:respond()
++				local post = assert(self.posts[#self.posts]); post.chunk('{"message":{"content":"stale"}}\n'); post.done({ ok = true, status = 200 })
++			end
++			function world:begin_app()
++				local state = engine_port.state()
++				assert(self.controller:stop_app())
++				assert(profiles.disable()); assert(engine_port.restore_disabled(state.revision, state.app_epoch))
++				return self.controller:start({ origin = engine.get_base_url() }, "start", true)
++			end
++			function world:replace_app()
++				local request = self:begin_app()
++				self.ready:answer({ ok = true, status = 200, body = '{"version":"0.24.0"}' })
++				assert(request.result and request.result.ok == true)
++				assert(self.controller:app_status() == "running")
++			end
++			body(world, engine)
++			engine.stop_runtime(); world.api.cancel()
++		end)
++	end, debug.traceback)
++	io.popen = popen
++	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
++	if not ok then error(failure, 0) end
++end
++
++helpers.describe("managed response preserves the originating application", function()
++	for _, unsettled in ipairs({ false, true }) do
++		test("(linux-managed-response) stopped app cannot publish late stream, debt=" .. tostring(unsettled), function()
++			with_managed_responses(function(world, engine)
++				world:chat(); helpers.assert_eq(#world.posts, 1)
++				world.hold_service = unsettled
++				helpers.assert_eq(engine.stop_runtime(), not unsettled)
++				world:respond(); helpers.assert_eq(#world.responses, 0, "same URL and unchanged chat epoch cannot revive the retired app")
++			end)
++		end)
++	end
++	test("(linux-managed-response) retained service exit cannot publish late stream or retire resources", function()
++		with_managed_responses(function(world)
++			world:chat(); world.service.exited = true
++			local cancellations = world.native_cancels
++			world:respond(); helpers.assert_eq(#world.responses, 0)
++			helpers.assert_eq(world.native_cancels, cancellations, "response observations never stop or retire a service")
++		end)
++	end)
++	test("(linux-managed-response) retired binary source cannot turn a tags response into chat", function()
++		with_managed_responses(function(world)
++			world:chat(true); local tags = world.calls[#world.calls]
++			world.runtime_valid = false
++			tags.callback({ ok = true, status = 200, body = '{"models":[{"name":"model:2b"}]}' })
++			helpers.assert_eq(#world.posts, 0); helpers.assert_eq(#world.responses, 0)
++		end)
++	end)
++	test("(linux-managed-response) origin construction cannot capture a successor after retiring the producer", function()
++		with_managed_responses(function(world, engine)
++			local Bridge = require("infra.llm_bridge"); local endpoint = Bridge.ollama_endpoint
++			Bridge.ollama_endpoint = function(...) engine.stop_runtime(); return endpoint(...) end
++			local called, failure = pcall(world.chat, world)
++			Bridge.ollama_endpoint = endpoint
++			helpers.assert_true(called, failure); helpers.assert_eq(#world.posts, 0); helpers.assert_eq(#world.responses, 0)
++		end)
++	end)
++	test("(linux-managed-response) same app permits the original stream", function()
++		with_managed_responses(function(world)
++			world:chat(); world:respond()
++			helpers.assert_eq(world.responses, { "chunk:stale", "done:stale" })
++		end)
++	end)
++end)
++
++helpers.describe("managed response private identities and inventory", function()
++	test("(linux-managed-response) same-origin app replacement cannot borrow the unchanged engine epoch", function()
++		with_managed_responses(function(world)
++			world:chat(); world:replace_app(); world:respond()
++			helpers.assert_eq(#world.responses, 0, "the original private app differs even at the same origin and engine epoch")
++		end)
++	end)
++	test("(linux-managed-response) capture invokes no observer and forged handles cannot authenticate", function()
++		with_managed_responses(function(world, engine)
++			local before = world.observations
++			local receipt = engine.capture_runtime_response()
++			helpers.assert_eq(world.observations, before, "capture is lexical only")
++			helpers.assert_eq(engine.runtime_response_current({}, engine.get_base_url()), false)
++			receipt.app, receipt.epoch = {}, -1
++			helpers.assert_true(engine.runtime_response_current(receipt, engine.get_base_url()), "caller fields have no authority")
++			helpers.assert_eq(world.api.chat(engine.get_base_url(), "model:2b", {}, { runtime_response = {} }), false)
++			helpers.assert_eq(#world.posts, 0)
++		end)
++	end)
++	test("(linux-managed-response) endpoint reader retires the producer before model inventory dispatch", function()
++		with_managed_responses(function(world, engine)
++			local Bridge = require("infra.llm_bridge"); local endpoint = Bridge.ollama_endpoint
++			local opens = 0
++			io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"stale"}]}' end, close = function() return true end } end
++			Bridge.ollama_endpoint = function(...) engine.stop_runtime(); return endpoint(...) end
++			local called, models = pcall(world.profiles.refresh_models)
++			Bridge.ollama_endpoint = endpoint
++			helpers.assert_true(called, models); helpers.assert_eq(models, {}); helpers.assert_eq(opens, 0)
++		end)
++	end)
++	test("(linux-managed-response) same-origin service replacement during inventory read cannot publish models", function()
++		with_managed_responses(function(world)
++			io.popen = function() return { read = function() world:replace_app(); return '{"models":[{"name":"stale"}]}' end, close = function() return true end } end
++			helpers.assert_eq(world.profiles.refresh_models(), {})
++			helpers.assert_eq(world.profiles.get_current_model(), "model:2b")
++		end)
++	end)
++	test("(linux-managed-response) inventory cache belongs to its original private app", function()
++		with_managed_responses(function(world)
++			local opens = 0
++			io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"model:2b"}]}' end, close = function() return true end } end
++			helpers.assert_eq(world.profiles.refresh_models(), { "model:2b" })
++			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(opens, 1)
++			world:replace_app()
++			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(opens, 2, "a fresh app requires its own inventory response")
++		end)
++	end)
++	test("(linux-managed-response) origin resolution refuses before borrowing a newer managed owner", function()
++		with_managed_responses(function(world, engine)
++			local getter = world.profiles.get_base_url
++			world.profiles.get_base_url = function() world.profiles.get_base_url = getter; engine.stop_runtime(); return getter() end
++			helpers.assert_nil(engine.resolve_backend())
++			world.profiles.get_base_url = getter
++		end)
++	end)
++end)
++
++helpers.describe("managed response reentrancy and closed authority", function()
++	test("(linux-managed-response) source observer cannot deliver an old chunk after installing a successor request", function()
++		with_managed_responses(function(world)
++			local chunks = {}
++			world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function(text) chunks[#chunks + 1] = text end)
++			local original = world.posts[1]
++			world.on_observe = function()
++				world.on_observe = nil
++				world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function() end)
++			end
++			original.chunk('{"message":{"content":"old"}}\n')
++			helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
++		end)
++	end)
++	test("(linux-managed-response) a chunk callback retiring the app fences later lines in that same native chunk", function()
++		with_managed_responses(function(world, engine)
++			local chunks = {}
++			world.api.chat(engine.get_base_url(), "model:2b", {}, {}, function(text)
++				chunks[#chunks + 1] = text; engine.stop_runtime()
++			end)
++			world.posts[1].chunk('{"message":{"content":"first"}}\n{"message":{"content":"second"}}\n')
++			helpers.assert_eq(chunks, { "first" })
++		end)
++	end)
++	for _, member in ipairs({ "capture_response", "response_current" }) do
++		test("(linux-managed-response) replaced compatible controller port cannot grant custody: " .. member, function()
++			with_managed_responses(function(world)
++				local original = world.controller[member]
++				world.controller[member] = function() return member == "response_current" and true or {} end
++				local dispatched = world:chat()
++				world.controller[member] = original
++				helpers.assert_eq(dispatched, false); helpers.assert_eq(#world.posts, 0)
++			end)
++		end)
++	end
++	test("(linux-managed-response) stale response retains refused HTTP cancellation until actual acknowledgement", function()
++		with_managed_responses(function(world, engine)
++			world:chat(); engine.stop_runtime(); world:respond()
++			world.cancel_ok = false
++			helpers.assert_eq(world.api.cancel(), false); helpers.assert_true(world.api.is_active())
++			helpers.assert_eq(world:chat(), false); helpers.assert_eq(#world.posts, 1)
++			world.cancel_ok = true
++			helpers.assert_true(world.api.cancel()); helpers.assert_eq(world.api.is_active(), false)
++			helpers.assert_eq(world.responses, {}, "stale logical/cancel callbacks cannot claim replacement authority")
++		end)
++	end)
++	test("(linux-managed-response) fresh unowned same-origin query is observable only through its actual response", function()
++		with_managed_responses(function(world, engine)
++			local before = engine.capture_runtime_response()
++			helpers.assert_true(engine.stop_runtime())
++			helpers.assert_eq(world.api.chat(engine.get_base_url(), "model:2b", {}, { runtime_response = before }), false)
++			helpers.assert_eq(#world.posts, 0)
++			world:chat(); world:respond()
++			helpers.assert_eq(world.responses, { "chunk:stale", "done:stale" }, "a new explicit external query remains allowed, without a managed-identity claim")
++		end)
++	end)
++end)
++
++helpers.describe("managed response observer and cache publication order", function()
++	test("(linux-managed-response) superseded synchronous inventory cannot overwrite a newer cache", function()
++		with_managed_responses(function(world)
++			local reads = 0
++			io.popen = function() return { read = function()
++				reads = reads + 1
++				if reads == 1 then
++					helpers.assert_eq(world.profiles.refresh_models(), { "new" })
++					return '{"models":[{"name":"old"}]}'
++				end
++				return '{"models":[{"name":"new"}]}'
++			end, close = function() return true end } end
++			helpers.assert_eq(world.profiles.refresh_models(), {})
++			helpers.assert_eq(world.profiles.get_models(), { "new" }); helpers.assert_eq(reads, 2)
++		end)
++	end)
++	test("(linux-managed-response) final running proof has no later source observer", function()
++		with_managed_responses(function(world, engine)
++			local receipt = engine.capture_runtime_response()
++			world.returned_running, world.observe_running = false, true
++			world.on_observe = function() if world.returned_running then world.service.exited = true end end
++			helpers.assert_true(engine.runtime_response_current(receipt, world.profiles.get_base_url()))
++			helpers.assert_eq(world.service.exited, nil, "source callbacks cannot invalidate the final physical running observation")
++			world.on_observe, world.observe_running = nil, false
++		end)
++	end)
++	test("(linux-managed-response) reentrant controller-port replacement is refused by the originating wrapper", function()
++		with_managed_responses(function(world, engine)
++			local receipt = engine.capture_runtime_response()
++			local original = world.controller.response_current
++			world.on_observe = function() world.on_observe = nil; world.controller.response_current = function() return true end end
++			local current = engine.runtime_response_current(receipt, world.profiles.get_base_url())
++			world.controller.response_current = original
++			helpers.assert_eq(current, false)
++		end)
++	end)
++end)
++
++helpers.describe("managed provisional source has no response authority", function()
++	test("(linux-managed-response) provisional serve cannot borrow an absent app receipt", function()
++		with_managed_responses(function(world, engine)
++			local pending = world:begin_app()
++			helpers.assert_eq(pending:is_settled(), false)
++			local before = world.observations
++			local receipt = engine.capture_runtime_response()
++			helpers.assert_eq(world.observations, before)
++			helpers.assert_eq(engine.runtime_response_current(receipt, world.profiles.get_base_url()), false)
++			helpers.assert_eq(world:chat(), false); helpers.assert_eq(#world.posts, 0)
++		end)
++	end)
++end)
++
++helpers.describe("managed response reaches original transport admission", function()
++	test("(linux-managed-response) repeated app stop revokes an already unowned request epoch", function()
++		with_managed_responses(function(world, engine)
++			assert(engine.stop_runtime()); world:chat(); assert(engine.stop_runtime()); world:respond()
++			helpers.assert_eq(world.responses, {})
++		end)
++	end)
++	test("(linux-managed-response) standalone tags response cannot borrow a replacement app", function()
++		with_managed_responses(function(world, engine)
++			local delivered = 0
++			helpers.assert_true(require("modules.llm.local_model_probe").verify(engine.get_base_url(), "model:2b", nil,
++				function() delivered = delivered + 1 end))
++			local probe = world.calls[#world.calls]
++			world:replace_app()
++			probe.callback({ ok = true, status = 200, body = '{"models":[{"name":"model:2b"}]}' })
++			helpers.assert_eq(delivered, 0)
++		end)
++	end)
++	test("(linux-managed-response) native transport constructor receives the original final admission predicate", function()
++		with_managed_responses(function(world, engine)
++			local dispatched = 0
++			package.loaded["adapters.http_client"].postStream = function(_, _, _, options)
++				assert(engine.stop_runtime())
++				if options.authorized and options.authorized() ~= true then return false end
++				dispatched = dispatched + 1; return true
++			end
++			helpers.assert_eq(world:chat(), false)
++			helpers.assert_eq(dispatched, 0, "the existing actual HTTP admission contract must reject after reentrant teardown")
++		end)
++	end)
++end)
++
++helpers.describe("managed response closes per-line observer currency", function()
++	test("(linux-managed-response) per-line source observer cannot publish into a superseded request", function()
++		with_managed_responses(function(world)
++			local chunks = {}
++			world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function(text) chunks[#chunks + 1] = text end)
++			local original = world.posts[1]
++			local Bridge = require("infra.llm_bridge"); local parse = Bridge.parse_stream_line
++			Bridge.parse_stream_line = function(line)
++				Bridge.parse_stream_line = parse
++				world.on_observe = function()
++					world.on_observe = nil
++					world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function() end)
++				end
++				return parse(line)
++			end
++			local called, failure = pcall(original.chunk, '{"message":{"content":"old"}}\n')
++			Bridge.parse_stream_line = parse
++			helpers.assert_true(called, failure); helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
++		end)
++	end)
++end)
++
++helpers.describe("managed response consumers retain constructor-bound engine ports", function()
++	for _, consumer in ipairs({ "chat", "probe", "inventory" }) do
++		test("(linux-managed-response) compatible latest engine exports cannot authorize " .. consumer, function()
++			with_managed_responses(function(world, engine)
++				local probe = helpers.load_module("modules.llm.local_model_probe")
++				local capture, current = engine.capture_runtime_response, engine.runtime_response_current
++				local opens, delivered = 0, 0
++				io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"forged"}]}' end, close = function() return true end } end
++				engine.capture_runtime_response, engine.runtime_response_current = function() return {} end, function() return true end
++				local probes = #world.calls
++				local called, result = pcall(function()
++					if consumer == "chat" then return world:chat() end
++					if consumer == "probe" then return probe.verify(world.profiles.get_base_url(), "model:2b", nil, function() delivered = delivered + 1 end) end
++					return world.profiles.refresh_models()
++				end)
++				engine.capture_runtime_response, engine.runtime_response_current = capture, current
++				helpers.assert_true(called, result)
++				if consumer == "inventory" then helpers.assert_eq(result, {}) else helpers.assert_eq(result, false) end
++				helpers.assert_eq(#world.posts, 0); helpers.assert_eq(#world.calls, probes)
++				helpers.assert_eq(opens, 0); helpers.assert_eq(delivered, 0)
++			end)
++		end)
++	end
++end)

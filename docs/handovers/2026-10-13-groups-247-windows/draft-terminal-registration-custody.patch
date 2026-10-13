@@ -1,0 +1,666 @@
+diff --git a/static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk b/static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk
+--- a/static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk
++++ b/static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk
+@@ -78,6 +78,9 @@
+ global _LLM_NavEventOwnerTerminalRouteNextRecipe := 0
+ global _LLM_NavEventOwnerTerminalRouteNextLayout := 1
+ global _LLM_NavEventOwnerTerminalRouteRefreshing := false
++; An uncertain native registration retains its original candidate and owner.
++; No current-registration readback/settlement contract exists yet.
++global _LLM_NavEventOwnerTerminalRouteUnknown := 0
+ global _LLM_NavEventOwnerTerminalRouteRecipes := Map()
+ global _LLM_NavEventOwnerTerminalRouteModels := Map()
+ global _LLM_NavEventOwnerTerminalRouteCoverage := Map(
+@@ -2297,47 +2300,281 @@
+ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
+ 	global _LLM_NavEventOwnerTerminalRouteRefreshing
+ 	global _LLM_NavEventOwnerTerminalRouteGeneration
+-	global _LLM_NavEventOwnerTerminalRouteOwner
+ 	global _LLM_NavEventOwnerTerminalRouteRecipes
+ 	global _LLM_NavEventOwnerTerminalRouteCoverage
++	global _LLM_NavEventOwnerTerminalRouteUnknown
+ 	PreviousCritical := Critical("On")
+ 	try {
+ 		if _LLM_NavEventOwnerTerminalRouteRefreshing
+ 			return false
++		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
++			throw Error("Uncertain terminal registration retains its original native owner.")
+ 		_LLM_NavEventOwnerTerminalRouteRefreshing := true
+ 		try {
+-			SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
+-			Source := HasMethod(SourceFn, "Call")
+-				? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
++			Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
++			try {
++				SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
++				Source := HasMethod(SourceFn, "Call")
++					? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
++				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
++			} catch as Err {
++				if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
++					_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw Err
++			}
+ 			_LLM_NavEventOwnerTerminalRouteGeneration += 1
+ 			if _LLM_NavEventOwnerTerminalRouteGeneration <= 0
+ 				throw Error("Terminal route registration generation overflowed.")
+ 			Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+-			Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation)
++			Frame["generation"] := Generation
++			try Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation)
++			catch as Err {
++				; A partial build may legitimately allocate unused IDs/models. Its
++				; previous native references still cannot move to a foreign holder.
++				if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, false, false)
++					_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw Err
++			}
++			Frame["candidate"] := Candidate
++			_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source)
++			; Building may add one model identity, but never replaces its owner/maps.
++			if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, false) {
++				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw ValueError("The terminal source changed during recipe capture.")
++			}
++			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+ 			Bindings := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
+-			RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
+-			Status := HasMethod(RegisterFn, "Call")
+-				? RegisterFn.Call(_LLM_NavEventOwnerTerminalRouteOwner,
+-					Generation, Candidate["layout_id"], Bindings, Candidate["routes"].Length)
++			Witness := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
++			Frame["bindings"] := Witness
++			try {
++				RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
++				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
++			} catch as Err {
++				if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
++					_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw Err
++			}
++			Frame["native_attempted"] := true
++			try Status := HasMethod(RegisterFn, "Call")
++				? RegisterFn.Call(Frame["owner"], Generation, Candidate["layout_id"],
++					Bindings, Candidate["routes"].Length)
+ 				: _LLM_NavEventOwnerNativeRegisterTerminalRoutes(
+-					_LLM_NavEventOwnerTerminalRouteOwner, Generation,
+-					Candidate["layout_id"], Bindings, Candidate["routes"].Length)
+-			if !(Status is Integer)
+-				throw Error("Terminal route registration returned a malformed ACK.")
++					Frame["owner"], Generation, Candidate["layout_id"],
++					Bindings, Candidate["routes"].Length)
++			catch as Err {
++				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw Err
++			}
++			try {
++				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
++				if !_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Bindings, Witness)
++					throw ValueError("The registration callback changed the native descriptor bytes.")
++			} catch as Err {
++				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw Err
++			}
++			if !(Status is Integer) || !_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
++				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw Error("Terminal route registration returned an unknown ACK.")
++			}
+ 			if Status == -11
+ 				return false
+ 			_LLM_NavEventOwnerNativeRequireOk(Status, "Terminal route registration")
+ 			for RecipeId, Admission in Candidate["recipes"]
+-				_LLM_NavEventOwnerTerminalRouteRecipes[RecipeId] := Admission
++				Frame["recipes"][RecipeId] := Admission
+ 			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
+ 				"generation", Generation, "layout_id", Candidate["layout_id"],
+ 				"registered", Candidate["routes"].Length,
+ 				"cohort_complete", false, "transformed_output_enabled", false,
+ 				"unconverted", Candidate["unconverted"])
+-			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port)
++			Frame["coverage"] := _LLM_NavEventOwnerTerminalRouteCoverage
++			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
++			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame)
++			if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
++				_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++				throw ValueError("The original registration owner changed during retirement.")
++			}
+ 			return true
+ 		} finally _LLM_NavEventOwnerTerminalRouteRefreshing := false
+ 	} finally Critical(PreviousCritical)
++}
++
++/** Exact private authority retained before source/registration callbacks. */
++_LLM_NavEventOwnerTerminalRegistrationCapture() {
++	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
++	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
++	global _LLM_NavEventOwnerTerminalRouteCoverage
++	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
++	Owner := _LLM_NavEventOwnerTerminalRouteOwner
++	Generation := _LLM_NavEventOwnerTerminalRouteGeneration
++	Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
++	Coverage := _LLM_NavEventOwnerTerminalRouteCoverage
++	NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe, NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
++	if !(NextRecipe is Integer) || NextRecipe < 0 || !(NextLayout is Integer) || NextLayout <= 0
++			|| !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation < 0
++			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipes)
++			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Models)
++			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Coverage)
++		throw ValueError("The terminal registration authority is malformed.")
++	for RecipeId in Recipes
++		if !(RecipeId is Integer) || RecipeId <= 0 || RecipeId > NextRecipe
++			throw ValueError("The terminal recipe identity owner precedes its retained references.")
++	Frame := Map("owner", Owner, "generation", Generation, "recipes", Recipes,
++		"models", Models, "coverage", Coverage, "recipe_refs", Recipes.Clone(),
++		"model_refs", Models.Clone(), "candidate", 0, "bindings", 0, "native_attempted", false,
++		"next_recipe", NextRecipe, "next_layout", NextLayout)
++	_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
++	return Frame
++}
++
++_LLM_NavEventOwnerTerminalRegistrationPlainMap(Value) {
++	if !(Value is Map) || ObjGetBase(Value) != Map.Prototype
++		return false
++	for Name in ["Get", "Has", "Clone", "__Item", "__Enum", "Count"]
++		if Object.Prototype.HasOwnProp.Call(Value, Name)
++			return false
++	return true
++}
++
++/** No callback may exchange dictionary cells and still retire their old holders. */
++_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Owned, Snapshot) {
++	if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Owned) || Owned.Count != Snapshot.Count
++		return false
++	for Id, Value in Snapshot
++		if !Owned.Has(Id) || Type(Owned[Id]) != Type(Value) || !(Owned[Id] == Value)
++			return false
++	return true
++}
++
++_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, CheckModels := true, CheckIds := true) {
++	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
++	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
++	global _LLM_NavEventOwnerTerminalRouteCoverage
++	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
++	return _LLM_NavEventOwnerTerminalRouteOwner is Integer
++		&& _LLM_NavEventOwnerTerminalRouteOwner == Frame["owner"]
++		&& _LLM_NavEventOwnerTerminalRouteGeneration is Integer
++		&& _LLM_NavEventOwnerTerminalRouteGeneration == Frame["generation"]
++		&& _LLM_NavEventOwnerTerminalRouteRecipes == Frame["recipes"]
++		&& _LLM_NavEventOwnerTerminalRouteModels == Frame["models"]
++		&& _LLM_NavEventOwnerTerminalRouteCoverage == Frame["coverage"]
++		&& (!CheckIds || (_LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
++			&& _LLM_NavEventOwnerTerminalRouteNextRecipe == Frame["next_recipe"]
++			&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
++			&& _LLM_NavEventOwnerTerminalRouteNextLayout == Frame["next_layout"]))
++		&& _LLM_NavEventOwnerTerminalRegistrationPlainMap(Frame["models"])
++		&& _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["recipes"], Frame["recipe_refs"])
++		&& (!CheckModels || _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["models"], Frame["model_refs"]))
++		&& _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels)
++}
++
++/** Only this build's contiguous recipe IDs and one new model may advance owners. */
++_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source) {
++	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
++	ExpectedRecipe := Frame["next_recipe"] + Candidate["routes"].Length
++	NewModel := Source["active"] && Source.Get("model", 0) is Map
++		&& !Frame["model_refs"].Has(ObjPtr(Source["model"]))
++	ExpectedLayout := Frame["next_layout"] + (NewModel ? 1 : 0)
++	Valid := _LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
++		&& _LLM_NavEventOwnerTerminalRouteNextRecipe == ExpectedRecipe
++		&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
++		&& _LLM_NavEventOwnerTerminalRouteNextLayout == ExpectedLayout
++	for Index, Route in Candidate["routes"]
++		if Route["recipe_id"] != Frame["next_recipe"] + Index
++			Valid := false
++	if !Valid {
++		_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++		throw ValueError("A callback changed the terminal registration identity owners.")
++	}
++	Frame["next_recipe"] := ExpectedRecipe, Frame["next_layout"] := ExpectedLayout
++}
++
++/** Keep selected original object references even if a callback mutates a cell. */
++_LLM_NavEventOwnerTerminalRegistrationRetain(Frame) {
++	Frame["recipe_refs"] := Frame["recipes"].Clone()
++	Frame["model_refs"] := Frame["models"].Clone()
++	Routes := Map(), Models := Map()
++	for Id, Admission in Frame["recipes"] {
++		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
++			throw ValueError("A retained terminal recipe cell is malformed.")
++		Recipe := Admission["recipe"]
++		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission["route"])
++				|| (Recipe is Map && !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe))
++			throw ValueError("The retained terminal route/model recipe is malformed.")
++		Routes[Id] := Map("route", Admission["route"], "recipe", Recipe,
++			"model", Recipe is Map ? Recipe.Get("model", 0) : 0,
++			"route_fields", Admission["route"].Clone(),
++			"recipe_fields", Recipe is Map ? Recipe.Clone() : 0,
++			"generation", Admission["generation"], "layout_id", Admission["layout_id"])
++	}
++	for Id, Identity in Frame["models"] {
++		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
++				|| !(Identity.Get("id", 0) is Integer) || Identity["id"] <= 1
++				|| Identity["id"] > Frame["next_layout"]
++			throw ValueError("A retained terminal model cell is malformed.")
++		Models[Id] := Map("model", Identity["model"], "id", Identity["id"])
++	}
++	Frame["route_objects"] := Routes, Frame["model_objects"] := Models
++}
++
++_LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels) {
++	for Id, Expected in Frame["route_objects"] {
++		if !Frame["recipes"].Has(Id)
++			return false
++		Admission := Frame["recipes"][Id]
++		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
++			return false
++		for Name in ["route", "recipe", "generation", "layout_id"]
++			if Type(Admission.Get(Name, "")) != Type(Expected[Name]) || !(Admission.Get(Name, "") == Expected[Name])
++				return false
++		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Expected["route"], Expected["route_fields"])
++			return false
++		Recipe := Expected["recipe"]
++		if Recipe is Map && (!_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe)
++				|| Recipe.Get("model", 0) != Expected["model"]
++				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Recipe, Expected["recipe_fields"]))
++			return false
++	}
++	if CheckModels {
++		for Id, Expected in Frame["model_objects"] {
++			if !Frame["models"].Has(Id)
++				return false
++			Identity := Frame["models"][Id]
++			if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
++					|| Identity.Get("model", 0) != Expected["model"]
++					|| !(Identity.Get("id", 0) is Integer) || Identity["id"] != Expected["id"]
++				return false
++		}
++	}
++	return true
++}
++
++_LLM_NavEventOwnerTerminalRegistrationRequire(Frame) {
++	if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
++		throw ValueError("A callback withdrew the original terminal registration authority.")
++}
++
++_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Actual, Expected) {
++	if !(Actual is Buffer) || Actual.Size != Expected.Size
++		return false
++	Loop Expected.Size
++		if NumGet(Actual, A_Index - 1, "UChar") != NumGet(Expected, A_Index - 1, "UChar")
++			return false
++	return true
++}
++
++/** Only documented native registration refusals prove no candidate was accepted. */
++_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
++	return Status == 0 || Status == -1 || Status == -2 || Status == -3
++		|| Status == -4 || Status == -5 || Status == -6 || Status == -9 || Status == -11
++}
++
++/** Retains original references without restoring a foreign dictionary or guessing ACK. */
++_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame) {
++	global _LLM_NavEventOwnerTerminalRouteUnknown
++	if !IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
++		_LLM_NavEventOwnerTerminalRouteUnknown := Frame
++	return false
+ }
+ 
+ /**
+@@ -2346,10 +2583,13 @@
+  * script from starting capture between publication and the held-identity query.
+  * A failed or malformed query retains every reference for a later safe retry.
+  */
+-_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port) {
++_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame := 0) {
+ 	global _LLM_NavEventOwnerTerminalRouteOwner
+ 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
++	if !(Frame is Map)
++		Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
+ 	try {
++		_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+ 		HeldFn := _LLM_NavEventOwnerPortFn("list_terminal_held_recipes", Port)
+ 		; An injected registration without a held-reference boundary cannot prove
+ 		; retirement. Do not reach the real DLL through an incomplete test port.
+@@ -2358,9 +2598,13 @@
+ 			return false
+ 		HeldBuffer := Buffer(64 * 8, 0)
+ 		Reply := HasMethod(HeldFn, "Call")
+-			? HeldFn.Call(_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
++			? HeldFn.Call(Frame["owner"], HeldBuffer, 64)
+ 			: _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
+-				_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
++				Frame["owner"], HeldBuffer, 64)
++		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
++			_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++			throw ValueError("Held-query callback withdrew the original registration authority.")
++		}
+ 		if !(Reply is Map) || !(Reply.Get("status", "") is Integer)
+ 			throw Error("Held terminal recipe query returned a malformed ACK.")
+ 		if Reply["status"] != 0
+@@ -2398,10 +2642,15 @@
+ 			if !KeepModels.Has(Identity)
+ 				RetireModels.Push(Identity)
+ 		}
++		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
++			_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
++			throw ValueError("Retirement cannot borrow a successor registration owner.")
++		}
+ 		for RecipeId in RetireRecipes
+ 			_LLM_NavEventOwnerTerminalRouteRecipes.Delete(RecipeId)
+ 		for Identity in RetireModels
+ 			_LLM_NavEventOwnerTerminalRouteModels.Delete(Identity)
++		_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+ 		return true
+ 	} catch Error as Err {
+ 		_LLM_NavEventOwnerReport("Terminal route recipe retirement deferred: " . Err.Message)
+diff --git a/static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk b/static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk
+--- a/static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk
++++ b/static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk
+@@ -13,6 +13,7 @@
+ _LNTR_WithState(Fn) {
+ 	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_LevelIndex, KLE_State
+ 	global _LLM_NavEventOwnerTerminalRouteGeneration
++	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteUnknown
+ 	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+ 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+ 	global _LLM_NavEventOwnerTerminalRouteCoverage, _LLM_NavEventOwnerTerminalRouteRefreshing
+@@ -20,7 +21,8 @@
+ 		_LLM_NavEventOwnerTerminalRouteGeneration, _LLM_NavEventOwnerTerminalRouteNextRecipe,
+ 		_LLM_NavEventOwnerTerminalRouteNextLayout, _LLM_NavEventOwnerTerminalRouteRecipes,
+ 		_LLM_NavEventOwnerTerminalRouteModels, _LLM_NavEventOwnerTerminalRouteCoverage,
+-		_LLM_NavEventOwnerTerminalRouteRefreshing]
++		_LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteOwner,
++		_LLM_NavEventOwnerTerminalRouteUnknown]
+ 	try {
+ 		_LLM_NavEventOwnerTerminalRouteGeneration := 0
+ 		_LLM_NavEventOwnerTerminalRouteNextRecipe := 0
+@@ -28,6 +30,7 @@
+ 		_LLM_NavEventOwnerTerminalRouteRecipes := Map()
+ 		_LLM_NavEventOwnerTerminalRouteModels := Map()
+ 		_LLM_NavEventOwnerTerminalRouteRefreshing := false
++		_LLM_NavEventOwnerTerminalRouteUnknown := 0
+ 		_LNTR_LoadFixture("a")
+ 		Fn()
+ 	} finally {
+@@ -40,6 +43,8 @@
+ 		_LLM_NavEventOwnerTerminalRouteModels := Saved[10]
+ 		_LLM_NavEventOwnerTerminalRouteCoverage := Saved[11]
+ 		_LLM_NavEventOwnerTerminalRouteRefreshing := Saved[12]
++		_LLM_NavEventOwnerTerminalRouteOwner := Saved[13]
++		_LLM_NavEventOwnerTerminalRouteUnknown := Saved[14]
+ 	}
+ }
+ 
+@@ -151,7 +156,7 @@
+ }
+ 
+ _LNTR_RefusalCase() {
+-	global _LLM_NavEventOwnerTerminalRouteRecipes
++	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteUnknown
+ 	State := _LNTR_PortState()
+ 	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+ 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
+@@ -161,6 +166,13 @@
+ 	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
+ 	State.Status := "0"
+ 	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "a string ACK cannot certify native publication")
++	AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map, "The malformed ACK retains its exact candidate.")
++	Calls := State.Calls.Length
++	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "Unknown custody prevents another registration.")
++	AssertEqual(Calls, State.Calls.Length, "The retry never reaches a successor/native callback.")
++	; Isolate the following original known-error vector after this explicit mock
++	; boundary. This is not a production settlement/reset mechanism.
++	_LLM_NavEventOwnerTerminalRouteUnknown := 0
+ 	State.Status := -5
+ 	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "invalid native registrations stay errors")
+ 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
+@@ -346,3 +358,140 @@
+ 	() => _LNTR_WithState(_LNTR_RetirementCase))
+ Test("terminal route metadata: held-query failures preserve all references until retry (todo49-route-adapter)",
+ 	() => _LNTR_WithState(_LNTR_RetirementFailureCase))
++
++/** Original registration authority survives callback replacement and actual effects. */
++_LNTR_RegistrationCustody(Phase, Mutation, Outcome) {
++	_LNTR_WithState(Body)
++	Body() {
++		global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
++		global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
++		global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
++		global _LLM_NavEventOwnerTerminalRouteCoverage, _LLM_NavEventOwnerTerminalRouteUnknown
++		State := _LNTR_PortState()
++		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
++		Owner := _LLM_NavEventOwnerTerminalRouteOwner
++		Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
++		Route := Recipes[17]["route"], Recipe := Recipes[17]["recipe"], Model := Recipe["model"]
++		Changed := 0, HeldCalls := 0, OriginalCoverage := _LLM_NavEventOwnerTerminalRouteCoverage
++		if Phase == "source"
++			State.Port["terminal_route_source"] := Source
++		else if Phase == "register"
++			State.Port["register_terminal_routes"] := Register
++		else
++			State.Port["list_terminal_held_recipes"] := Held
++		AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
++		AssertEqual(1, Changed)
++		AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map)
++		Unknown := _LLM_NavEventOwnerTerminalRouteUnknown
++		AssertEqual(Owner, Unknown["owner"], "A foreign successor cannot inherit the old native owner.")
++		AssertTrue(Unknown["recipes"] == Recipes), AssertTrue(Unknown["models"] == Models)
++		AssertTrue(Unknown["route_objects"][17]["route"] == Route)
++		AssertTrue(Unknown["route_objects"][17]["recipe"] == Recipe)
++		AssertTrue(Unknown["route_objects"][17]["model"] == Model)
++		AssertEqual(Phase != "source", Unknown["native_attempted"])
++		if Phase != "source" {
++			AssertTrue(Unknown["candidate"] is Map)
++			AssertEqual(20, Unknown["candidate"]["recipes"].Count)
++			AssertEqual(800, Unknown["bindings"].Size)
++			AssertEqual(Owner, State.Calls[2]["owner"])
++		}
++		AssertEqual(Phase == "source" ? 1 : 2, State.Calls.Length)
++		AssertEqual(Phase == "held" ? 1 : 0, HeldCalls)
++		AssertEqual(Phase == "held" ? 2 : 1, Unknown["coverage"]["generation"])
++		Calls := State.Calls.Length
++		; Restoring public pointers never settles an unknown real registration.
++		_LLM_NavEventOwnerTerminalRouteOwner := Owner
++		_LLM_NavEventOwnerTerminalRouteGeneration := Unknown["generation"]
++		_LLM_NavEventOwnerTerminalRouteRecipes := Recipes
++		_LLM_NavEventOwnerTerminalRouteModels := Models
++		_LLM_NavEventOwnerTerminalRouteCoverage := Unknown["coverage"]
++		AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
++		AssertEqual(Calls, State.Calls.Length), AssertEqual(Phase == "held" ? 1 : 0, HeldCalls)
++		AssertFalse(LLM_NavEventOwner_TerminalRouteCoverage()["cohort_complete"])
++		AssertFalse(LLM_NavEventOwner_TerminalRouteCoverage()["transformed_output_enabled"])
++		Source() {
++			Result := _LNTR_Source(State)
++			Change()
++			return Result
++		}
++		Register(OwnerArg, Generation, Layout, Bindings, Count) {
++			AssertEqual(Owner, OwnerArg)
++			_LNTR_Register(State, OwnerArg, Generation, Layout, Bindings, Count)
++			if Mutation == "bindings-byte"
++				NumPut("UChar", NumGet(Bindings, 0, "UChar") ^ 1, Bindings, 0)
++			else if Mutation == "bindings-size"
++				Bindings.Size := 1
++			Change()
++			return Outcome == "busy" ? -11 : Outcome == "unknown" ? "0" : 0
++		}
++		Held(OwnerArg, BufferArg, Capacity) {
++			HeldCalls += 1
++			AssertEqual(Owner, OwnerArg)
++			Result := _LNTR_Held(State, OwnerArg, BufferArg, Capacity)
++			Change()
++			return Result
++		}
++		Change() {
++			Changed += 1
++			switch Mutation {
++				case "owner": _LLM_NavEventOwnerTerminalRouteOwner += 7
++				case "generation": _LLM_NavEventOwnerTerminalRouteGeneration += 7
++				case "next-recipe": _LLM_NavEventOwnerTerminalRouteNextRecipe += 7
++				case "next-layout": _LLM_NavEventOwnerTerminalRouteNextLayout += 7
++				case "recipes": _LLM_NavEventOwnerTerminalRouteRecipes := Recipes.Clone()
++				case "models": _LLM_NavEventOwnerTerminalRouteModels := Models.Clone()
++				case "coverage": _LLM_NavEventOwnerTerminalRouteCoverage := _LLM_NavEventOwnerTerminalRouteCoverage.Clone()
++				case "recipe-cell": Recipes[17] := Recipes[17].Clone()
++				case "route-object": Recipes[17]["route"] := Route.Clone()
++				case "route-field": Route["code"] += 1
++				case "recipe-object": Recipes[17]["recipe"] := Recipe.Clone()
++				case "recipe-field": Recipe["index"] += 1
++				case "recipe-model": Recipe["model"] := Model.Clone()
++			}
++			if Outcome == "throw"
++				throw Error("Injected callback failure after possible native registration.")
++		}
++	}
++}
++for _LNTR_CustodyPhase in ["source", "register", "held"]
++	for _LNTR_CustodyMutation in ["owner", "generation", "next-recipe", "next-layout", "recipes", "models", "coverage", "recipe-cell",
++		"route-object", "route-field", "recipe-object", "recipe-field", "recipe-model"]
++		for _LNTR_CustodyOutcome in ["normal", "throw"]
++			Test("terminal registration custody: " . _LNTR_CustodyPhase . ":" . _LNTR_CustodyMutation
++				. ":" . _LNTR_CustodyOutcome . " (todo49-registration-custody)",
++				_LNTR_RegistrationCustody.Bind(_LNTR_CustodyPhase, _LNTR_CustodyMutation, _LNTR_CustodyOutcome))
++for _LNTR_RefusedMutation in ["owner", "recipes", "generation", "bindings-byte", "bindings-size"]
++	for _LNTR_RefusedOutcome in ["busy", "unknown"]
++		Test("terminal registration custody: refused " . _LNTR_RefusedMutation . ":" . _LNTR_RefusedOutcome
++			. " (todo49-registration-custody)", _LNTR_RegistrationCustody.Bind("register", _LNTR_RefusedMutation, _LNTR_RefusedOutcome))
++for _LNTR_ByteMutation in ["bindings-byte", "bindings-size"]
++	Test("terminal registration custody: acknowledged " . _LNTR_ByteMutation . " (todo49-registration-custody)",
++		_LNTR_RegistrationCustody.Bind("register", _LNTR_ByteMutation, "normal"))
++
++_LNTR_RegistrationBuildFailureIsRetryable() {
++	_LNTR_WithState(Body)
++	Body() {
++		global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerTerminalRouteRecipes
++		State := _LNTR_PortState()
++		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
++		State.Port["terminal_route_source"] := Source
++		AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
++		AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown, "An ordinary failed pure build creates no native registration debt.")
++		AssertEqual(1, State.Calls.Length), AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
++		State.Port["terminal_route_source"] := _LNTR_Source.Bind(State)
++		State.HeldIds := [17]
++		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
++		AssertEqual(2, State.Calls.Length)
++		AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes.Has(17), "Fresh native census still retains its original held recipe.")
++		Source() {
++			Result := _LNTR_Source(State)
++			Result["capture"] := Capture
++			return Result
++		}
++		Capture(*) {
++			throw Error("A pure KLE capture failed before native registration.")
++		}
++	}
++}
++Test("terminal registration custody: pure build error stays retryable without ACK guess (todo49-registration-custody)",
++	_LNTR_RegistrationBuildFailureIsRetryable)
+diff --git a/tools/test/test-windows-terminal-output-custody-adapter.cjs b/tools/test/test-windows-terminal-output-custody-adapter.cjs
+--- a/tools/test/test-windows-terminal-output-custody-adapter.cjs
++++ b/tools/test/test-windows-terminal-output-custody-adapter.cjs
+@@ -1501,3 +1501,103 @@
+ process.stdout.write(
+ 	'Frozen-authority copy observer binding: 5 causal source inverses PASS; all667 authored AHK cases including48 affected copy mutations UNRUN.\n'
+ );
++
++/**
++ * Require actual preregistration authority and unknown-custody source seams.
++ * This never executes AHK, native registration or a hook.
++ * @param {string} loader - Actual owner adapter source.
++ * @param {string} authored - Existing and additive native AHK regressions.
++ * @returns {void}
++ */
++function validateTerminalRegistrationCustody(loader, authored) {
++	const body = (name) => {
++		const match = loader.match(new RegExp(`^${name}\\([^\\n]*\\) \\{\\n([\\s\\S]*?)\\n\\}`, 'm'));
++		assert.ok(match, `Missing actual preregistration helper ${name}.`);
++		return match[1];
++	};
++	const refresh = body('LLM_NavEventOwner_RefreshTerminalRoutes');
++	assert.doesNotMatch(refresh, /RegisterFn\.Call\(_LLM_NavEventOwnerTerminalRouteOwner/, 'A callback cannot receive the latest successor owner.');
++	const captured = refresh.indexOf('Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()');
++	assert.ok(captured >= 0 && captured < refresh.indexOf('_LLM_NavEventOwnerPortFn("terminal_route_source"'));
++	assert.match(refresh, /if IsObject\(_LLM_NavEventOwnerTerminalRouteUnknown\)\s+throw Error/);
++	assert.match(refresh, /RegisterFn\.Call\(Frame\["owner"\], Generation, Candidate\["layout_id"\]/);
++	assert.match(refresh, /_LLM_NavEventOwnerNativeRegisterTerminalRoutes\(\s+Frame\["owner"\], Generation/);
++	assert.match(refresh, /Frame\["native_attempted"\] := true\s+try Status :=/);
++	assert.match(refresh, /catch as Err \{\s+_LLM_NavEventOwnerTerminalRegistrationUnknown\(Frame\)\s+throw Err/);
++	assert.match(refresh, /Witness := _LLM_NavEventOwnerTerminalRouteMarshal\(Candidate\["routes"\]\)/);
++	assert.match(refresh, /if !_LLM_NavEventOwnerTerminalRegistrationBytesCurrent\(Bindings, Witness\)/);
++	assert.match(refresh, /if !\(Status is Integer\) \|\| !_LLM_NavEventOwnerTerminalRegistrationStatusKnown\(Status\)/);
++	assert.ok(refresh.indexOf('_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(') < refresh.indexOf('if Status == -11'));
++	assert.match(refresh, /Frame\["recipes"\]\[RecipeId\] := Admission/);
++	assert.match(refresh, /_LLM_NavEventOwnerTerminalRoutePrune\(Candidate, Source, Port, Frame\)/);
++	const current = body('_LLM_NavEventOwnerTerminalRegistrationCurrent');
++	for (const [global, field] of [
++		['Owner', 'owner'], ['Generation', 'generation'], ['Recipes', 'recipes'],
++		['Models', 'models'], ['Coverage', 'coverage'], ['NextRecipe', 'next_recipe'], ['NextLayout', 'next_layout']
++	]) {
++		assert.ok(current.includes(`_LLM_NavEventOwnerTerminalRoute${global} == Frame["${field}"]`), `Missing captured ${field} comparison.`);
++	}
++	assert.match(current, /_LLM_NavEventOwnerTerminalRegistrationRefsCurrent\(Frame\["recipes"\], Frame\["recipe_refs"\]\)/);
++	assert.match(current, /_LLM_NavEventOwnerTerminalRegistrationObjectsCurrent\(Frame, CheckModels\)/);
++	const retained = body('_LLM_NavEventOwnerTerminalRegistrationRetain');
++	assert.match(retained, /"route_fields", Admission\["route"\]\.Clone\(\)/);
++	assert.match(retained, /"recipe_fields", Recipe is Map \? Recipe\.Clone\(\) : 0/);
++	assert.match(retained, /Models\[Id\] := Map\("model", Identity\["model"\], "id", Identity\["id"\]\)/);
++	const bytes = body('_LLM_NavEventOwnerTerminalRegistrationBytesCurrent');
++	assert.match(bytes, /Actual\.Size != Expected\.Size/);
++	assert.match(bytes, /Loop Expected\.Size\s+if NumGet\(Actual, A_Index - 1, "UChar"\) != NumGet\(Expected, A_Index - 1, "UChar"\)/);
++	const advance = body('_LLM_NavEventOwnerTerminalRegistrationAdvance');
++	assert.match(advance, /ExpectedRecipe := Frame\["next_recipe"\] \+ Candidate\["routes"\]\.Length/);
++	assert.match(advance, /Route\["recipe_id"\] != Frame\["next_recipe"\] \+ Index/);
++	const unknown = body('_LLM_NavEventOwnerTerminalRegistrationUnknown');
++	assert.match(unknown, /if !IsObject\(_LLM_NavEventOwnerTerminalRouteUnknown\)\s+_LLM_NavEventOwnerTerminalRouteUnknown := Frame/);
++	assert.doesNotMatch(unknown, /Delete|Cancel|Register|Stop|:= 0/);
++	const prune = body('_LLM_NavEventOwnerTerminalRoutePrune');
++	assert.match(prune, /HeldFn\.Call\(Frame\["owner"\], HeldBuffer, 64\)/);
++	assert.match(prune, /_LLM_NavEventOwnerNativeListTerminalHeldRecipes\(\s+Frame\["owner"\], HeldBuffer, 64\)/);
++	assert.match(prune, /if !_LLM_NavEventOwnerTerminalRegistrationCurrent\(Frame\) \{\s+_LLM_NavEventOwnerTerminalRegistrationUnknown\(Frame\)/);
++	assert.match(prune, /throw ValueError\("Retirement cannot borrow a successor registration owner\."\)\s+\}\s+for RecipeId in RetireRecipes/);
++	assert.match(prune, /_LLM_NavEventOwnerTerminalRegistrationRetain\(Frame\)\s+return true/);
++	for (const literal of ['"source", "register", "held"', '"route-object", "route-field", "recipe-object", "recipe-field", "recipe-model"',
++		'"bindings-byte", "bindings-size"', 'Unknown["route_objects"][17]["model"] == Model', 'The retry never reaches a successor/native callback.'])
++		assert.ok(authored.includes(literal), `Missing independent custody vector ${literal}.`);
++}
++const registrationTests = fs.readFileSync(path.join(DRIVER, 'tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk'), 'utf8');
++validateTerminalRegistrationCustody(packetLoader, registrationTests);
++const registrationInverses = [
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)', 'if false'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'RegisterFn.Call(Frame["owner"],', 'RegisterFn.Call(_LLM_NavEventOwnerTerminalRouteOwner,'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', '_LLM_NavEventOwnerNativeRegisterTerminalRoutes(\n\t\t\t\t\tFrame["owner"],', '_LLM_NavEventOwnerNativeRegisterTerminalRoutes(\n\t\t\t\t\t_LLM_NavEventOwnerTerminalRouteOwner,'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'Frame["native_attempted"] := true', 'Frame["native_attempted"] := false'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'catch as Err {\n\t\t\t\t_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)', 'catch as Err {\n\t\t\t\tSleep(0)'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'Witness := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])', 'Witness := Bindings'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'if !_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Bindings, Witness)', 'if false'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'if !(Status is Integer) || !_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status)', 'if !Status'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', 'Frame["recipes"][RecipeId] := Admission', '_LLM_NavEventOwnerTerminalRouteRecipes[RecipeId] := Admission'],
++	['LLM_NavEventOwner_RefreshTerminalRoutes', '_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame)', '_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port)'],
++	['_LLM_NavEventOwnerTerminalRegistrationCurrent', '_LLM_NavEventOwnerTerminalRouteOwner == Frame["owner"]', 'true'],
++	['_LLM_NavEventOwnerTerminalRegistrationCurrent', '_LLM_NavEventOwnerTerminalRouteGeneration == Frame["generation"]', 'true'],
++	['_LLM_NavEventOwnerTerminalRegistrationCurrent', '_LLM_NavEventOwnerTerminalRouteRecipes == Frame["recipes"]', 'true'],
++	['_LLM_NavEventOwnerTerminalRegistrationCurrent', '_LLM_NavEventOwnerTerminalRouteModels == Frame["models"]', 'true'],
++	['_LLM_NavEventOwnerTerminalRegistrationCurrent', '_LLM_NavEventOwnerTerminalRouteNextRecipe == Frame["next_recipe"]', 'true'],
++	['_LLM_NavEventOwnerTerminalRegistrationCurrent', '_LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels)', 'true'],
++	['_LLM_NavEventOwnerTerminalRegistrationRetain', '"route_fields", Admission["route"].Clone()', '"route_fields", Admission["route"]'],
++	['_LLM_NavEventOwnerTerminalRegistrationRetain', '"recipe_fields", Recipe is Map ? Recipe.Clone() : 0', '"recipe_fields", Recipe'],
++	['_LLM_NavEventOwnerTerminalRegistrationBytesCurrent', 'Actual.Size != Expected.Size', 'false'],
++	['_LLM_NavEventOwnerTerminalRegistrationBytesCurrent', 'Loop Expected.Size', 'Loop 0'],
++	['_LLM_NavEventOwnerTerminalRegistrationAdvance', 'Route["recipe_id"] != Frame["next_recipe"] + Index', 'false'],
++	['_LLM_NavEventOwnerTerminalRegistrationUnknown', '_LLM_NavEventOwnerTerminalRouteUnknown := Frame', '_LLM_NavEventOwnerTerminalRouteUnknown := 0'],
++	['_LLM_NavEventOwnerTerminalRoutePrune', 'HeldFn.Call(Frame["owner"], HeldBuffer, 64)', 'HeldFn.Call(_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)'],
++	['_LLM_NavEventOwnerTerminalRoutePrune', '_LLM_NavEventOwnerNativeListTerminalHeldRecipes(\n\t\t\t\tFrame["owner"],', '_LLM_NavEventOwnerNativeListTerminalHeldRecipes(\n\t\t\t\t_LLM_NavEventOwnerTerminalRouteOwner,'],
++	['_LLM_NavEventOwnerTerminalRoutePrune', 'throw ValueError("Retirement cannot borrow a successor registration owner.")', 'Sleep(0)'],
++	['_LLM_NavEventOwnerTerminalRoutePrune', '_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)\n\t\treturn true', 'Sleep(0)\n\t\treturn true']
++];
++for (const [name, before, after] of registrationInverses) {
++	const region = packetLoader.match(new RegExp(`^${name}\\([^\\n]*\\) \\{\\n[\\s\\S]*?\\n\\}`, 'm'));
++	assert.ok(region);
++	const changed = region[0].replace(before, after);
++	assert.notEqual(changed, region[0], `Registration inverse missed ${name}.`);
++	const mutant = packetLoader.replace(region[0], changed);
++	assert.throws(() => validateTerminalRegistrationCustody(mutant, registrationTests), { code: 'ERR_ASSERTION' });
++}
++process.stdout.write('Terminal preregistration custody: 26 causal source inverses PASS; 91 authored AHK cases UNRUN; no native activation or settlement inferred.\n');

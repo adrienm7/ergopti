@@ -1,0 +1,58 @@
+{
+	"base_sha": "46abcb682bdfda86e4a7456bbb4df82a2bb94a9a",
+	"dependency_patches": [
+		"75356660b04198ec5279587cfa9a03bb92b2b3d099d13a1e55434d2bb0ddb82c",
+		"7bf1749a05dc2523b8eac853d46d6aae8ca17ca0ab252bdb9e995b4336d399d7"
+	],
+	"patch": "windows-manual-requester-currency.patch",
+	"patch_sha256": "57bfc693e395b4667d7b18f7ca9390ff7b9641ac53bbf0424e41f213dd85d2f8",
+	"paths": {
+		"static/ergopti_plus/windows/modules/llm/agent_action.ahk": {
+			"before_sha256": "df04861b6050447012f394cecf78bb3118b819e1b5e2b93ff78b0d323a447315",
+			"after_sha256": "1052288eb445ac173c554e2b3076e32c339650c7b2cc407487676e52d2a385ae"
+		},
+		"static/ergopti_plus/windows/modules/llm/vision_action.ahk": {
+			"before_sha256": "7885953ed1646cc087007b560af1462fe967341477a020001ef421997260d56d",
+			"after_sha256": "0ce056b52b70867001b3cc2f564a7343f3928c63cfb151e9a394fe1c7316588d"
+		},
+		"static/ergopti_plus/windows/tests/unit/test_llm_agent.ahk": {
+			"before_sha256": "ea2221d1988aa4f148a092ea9293831f7283995bf4f4c685aa142c14f0579a9c",
+			"after_sha256": "c9a6571d1fa6f7e9e68396fdb6bca49d0101b8a05c62eb421717c5184fa74bdd"
+		},
+		"static/ergopti_plus/windows/tests/unit/test_llm_vision.ahk": {
+			"before_sha256": "bbc2f424f32842e45e4a2ef7824c41926c54e315ed515276e926b89995086a78",
+			"after_sha256": "2934e0fdbdd80664db5bcd548714ec6d146dd2ce34c047f3bde0c30fe965e514"
+		},
+		"tools/test/test-windows-rewrite-prompt-wiring.cjs": {
+			"before_sha256": "740cff2e606b6e893a6da5ba74755f0cee8b7d3053001a9ebdd123db6ce2bafa",
+			"after_sha256": "4578d744ebd55bb5c1b1e0661c719488c2c404322e793c217a7cb7da626c9b46"
+		}
+	},
+	"source_controls": {
+		"original_checks": 163,
+		"additive_inverse_controls": 19,
+		"actual_original_agent_exit": 1,
+		"actual_original_vision_exit": 1,
+		"actual_corrected_exit": 0,
+		"node": "22.22.2",
+		"scope": "Source contract and source inverses only; no AHK execution"
+	},
+	"AHK": {
+		"new_agent_cases": 15,
+		"new_vision_cases": 10,
+		"new_cases": 25,
+		"runtime": "UNRUN",
+		"original_agent_assertions": 585,
+		"original_vision_assertions": 202,
+		"added_agent_assertions": 30,
+		"added_vision_assertions": 15,
+		"preservation": "Complete byte-exact original unit file prefixes; all original source guard bytes outside the additive block preserved"
+	},
+	"mechanical": {
+		"syntax_antipatterns": "4 private files PASS",
+		"loop_capture": "0/0 plus 14 self-test fixtures PASS",
+		"encoding": "4 changed AHK strict UTF-8 BOM/LF PASS",
+		"format": "repository Prettier PASS"
+	},
+	"qualification": "Native Windows AHK/desktop, real model download, and physical receiving UNRUN; readiness/native flags unchanged."
+}

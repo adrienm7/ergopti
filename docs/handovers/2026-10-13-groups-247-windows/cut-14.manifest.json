@@ -1,0 +1,269 @@
+{
+	"base": "fresh tracked46abcb682bdfda86e4a7456bbb4df82a2bb94a9a + exact frozen Linux consent A/B/C",
+	"depends_on": {
+		"affinity": "4a4074f9c10b0085078fa61fc196cf33b22fa4aaf06246fa8b7d7c244bf97e45",
+		"continuation": "488e61b34d7991908b6cca2e76ef046414cf5e404d1b857dbe28d9a0591f53e5",
+		"focus": "8d6c6a2231939ff19b20838b8916e82c60e1a25fb9127eac628e61f43dcdfd9e"
+	},
+	"patch_sha256": "b3b04e8bc35cd7a295333c3e8c1e668cc29f94bc5a41f50ee57e6bd792e0212b",
+	"files": [
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+			"before_sha256": "8f8bb00d08c6f4f2be937ead776caf43215d32f1dad82adb693523c1e9512af6",
+			"after_sha256": "8df96342bcfe3c2df80a1d6fcd6e18591718b5f9f32a631cd41699735cf65e9f"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/api_ollama.lua",
+			"before_sha256": "27ea82462d49acfce4b48fc967b141607601cec507204133e8252d9c9114c27e",
+			"after_sha256": "3d6ff7a888771537ed37cce4b597b0eb08fe9d141cb7ee5a2be857394291fa8f"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/local_model_probe.lua",
+			"before_sha256": "5a53643ad4ba88edeae23d6f348b82af286397dcc371eb0cff02f60ed9797813",
+			"after_sha256": "5032c2bc5fb7f1cc3acb703bfc71affed1ff9af21e1dfed823ab6974b25152c2"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/profiles.lua",
+			"before_sha256": "879c551afd7511efc22d38308a47c43df0d3b5b55d05170dccc343e29c927817",
+			"after_sha256": "b01791dd2e3e685a4764ae598257a8daa3f216f6ad39e614402343fac18d4bda"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/llm/runtime_repair.lua",
+			"before_sha256": "995b33c3d2520979b7ae2e06aa0ff11e263bd23ed3472edd541551b2a3fea55c",
+			"after_sha256": "e81b2bdbeafd16e954bfeefd6c61b6c7f57b3958345ac636e4b0d206903bc43c"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/test_runtime_engine_acquisition.lua",
+			"before_sha256": "1ae1ee2f011b5c7e23ceea2058d19ed0382f830320c477991fcce6fadd528232",
+			"after_sha256": "35ae5e32edaf1ad14c6a8158a3c76fd214af820f20b54f477b175d4774ae60b7"
+		}
+	],
+	"all_before_projection_files": {
+		"llm/runtime_repair.lua": "995b33c3d2520979b7ae2e06aa0ff11e263bd23ed3472edd541551b2a3fea55c",
+		"modules/llm/api_ollama.lua": "27ea82462d49acfce4b48fc967b141607601cec507204133e8252d9c9114c27e",
+		"modules/llm/local_model_offer.lua": "990a085afe8cb78e12f3dcc57ea782bce854a0c3e2355e2aede2582eb1fe288f",
+		"modules/llm/local_model_probe.lua": "5a53643ad4ba88edeae23d6f348b82af286397dcc371eb0cff02f60ed9797813",
+		"modules/llm/model_download.lua": "84b27b049a5fe6029d537d50a1628df1192a2259c0568a76ddb9deca46d4ed3c",
+		"modules/llm/prediction_engine.lua": "8f8bb00d08c6f4f2be937ead776caf43215d32f1dad82adb693523c1e9512af6",
+		"modules/llm/profiles.lua": "879c551afd7511efc22d38308a47c43df0d3b5b55d05170dccc343e29c927817",
+		"tests/unit/meta/test_api_ollama_stream_parse.lua": "e80ee3517b84c777cc2b333b294e38ed6e0dfb6f3a3b121aea2c048a580b507e",
+		"tests/unit/modules/llm/test_agent_flow.lua": "a4b9d338d1d6705a0e561d83e4ee3126c048ffe70943f32b4101484619606e0e",
+		"tests/unit/modules/llm/test_model_download.lua": "5014c18cac354ef2fef8faa0aca9f36e9e7743e6569679a1d1ada56a7d46928f",
+		"tests/unit/modules/llm/test_model_preferences_canonical.lua": "b6f0405f43d29be3702d76c991f702215111c1b8be33238d53e5524cc5a5261b",
+		"tests/unit/modules/llm/test_runtime_engine_acquisition.lua": "1ae1ee2f011b5c7e23ceea2058d19ed0382f830320c477991fcce6fadd528232",
+		"tests/unit/modules/llm/test_runtime_repair.lua": "da38095c4913739e20243e75c73310e30312a82ee612d41c6b8fb3f390ef517f"
+	},
+	"preservation": {
+		"test_original_prefix_byte_identical": true,
+		"old_assert_call_sites": 86,
+		"added_assert_call_sites": 84,
+		"unmodified_dependency_bytes_unchanged": true,
+		"shared_lifecycle_algorithm_changes": false,
+		"native_flags_changed": false,
+		"roster_runner_CI_vendor_schema_locale_changes": false,
+		"canonical_mutations": false
+	},
+	"verification": {
+		"first_authentic_original_graph": "1PASS/5FAIL actual stream/probe/dispatch assertions, no missing API",
+		"final_original_Lua54_LuaJIT": "1PASS/28FAIL each;23 behavioral/assertion failures and5 missing-new-interface cases, separately classified",
+		"corrected_new_Lua54_LuaJIT": "29PASS/0FAIL each",
+		"complete_cohorts": [
+			{
+				"runtime": "lua",
+				"module": "tests.unit.meta.test_api_ollama_stream_parse",
+				"exit": 0,
+				"summary": "RESULT 28 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_api_ollama_stream_parse.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.meta.test_api_ollama_payload",
+				"exit": 0,
+				"summary": "RESULT 6 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_api_ollama_payload.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.modules.llm.test_runtime_engine_acquisition",
+				"exit": 0,
+				"summary": "RESULT 42 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_runtime_engine_acquisition.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.modules.llm.test_runtime_repair",
+				"exit": 0,
+				"summary": "RESULT 54 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_runtime_repair.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.modules.llm.test_runtime_source",
+				"exit": 0,
+				"summary": "RESULT 37 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_runtime_source.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.modules.llm.test_runtime_composition",
+				"exit": 0,
+				"summary": "RESULT 10 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_runtime_composition.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.modules.llm.test_agent_flow",
+				"exit": 0,
+				"summary": "RESULT 38 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_agent_flow.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.modules.llm.test_model_download",
+				"exit": 0,
+				"summary": "RESULT 23 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_model_download.log"
+			},
+			{
+				"runtime": "lua",
+				"module": "tests.unit.modules.llm.test_model_preferences_canonical",
+				"exit": 0,
+				"summary": "RESULT 5 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-lua-test_model_preferences_canonical.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.meta.test_api_ollama_stream_parse",
+				"exit": 0,
+				"summary": "RESULT 28 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_api_ollama_stream_parse.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.meta.test_api_ollama_payload",
+				"exit": 0,
+				"summary": "RESULT 6 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_api_ollama_payload.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.modules.llm.test_runtime_engine_acquisition",
+				"exit": 0,
+				"summary": "RESULT 42 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_runtime_engine_acquisition.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.modules.llm.test_runtime_repair",
+				"exit": 0,
+				"summary": "RESULT 54 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_runtime_repair.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.modules.llm.test_runtime_source",
+				"exit": 0,
+				"summary": "RESULT 37 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_runtime_source.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.modules.llm.test_runtime_composition",
+				"exit": 0,
+				"summary": "RESULT 10 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_runtime_composition.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.modules.llm.test_agent_flow",
+				"exit": 0,
+				"summary": "RESULT 38 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_agent_flow.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.modules.llm.test_model_download",
+				"exit": 0,
+				"summary": "RESULT 23 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_model_download.log"
+			},
+			{
+				"runtime": "luajit",
+				"module": "tests.unit.modules.llm.test_model_preferences_canonical",
+				"exit": 0,
+				"summary": "RESULT 5 passed / 0 failed",
+				"log": "/tmp/ergopti247-linux-response-final-luajit-test_model_preferences_canonical.log"
+			}
+		],
+		"per_ABI_total": 243,
+		"frozen_A_B_C_cases_retained": 89,
+		"causal_mutants": [
+			{
+				"name": "api-latest-engine-ports",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/api-latest-engine-ports.log"
+			},
+			{
+				"name": "probe-latest-engine-ports",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/probe-latest-engine-ports.log"
+			},
+			{
+				"name": "inventory-latest-engine-ports",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/inventory-latest-engine-ports.log"
+			},
+			{
+				"name": "latest-app-borrow",
+				"exit": 1,
+				"summary": "RESULT 25 passed / 4 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/latest-app-borrow.log"
+			},
+			{
+				"name": "probe-recaptures-successor",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/probe-recaptures-successor.log"
+			},
+			{
+				"name": "request-post-observer-guard",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/request-post-observer-guard.log"
+			},
+			{
+				"name": "transport-original-admission",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/transport-original-admission.log"
+			},
+			{
+				"name": "inventory-publication-frame",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/inventory-publication-frame.log"
+			},
+			{
+				"name": "engine-app-epoch",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/engine-app-epoch.log"
+			},
+			{
+				"name": "observer-after-running",
+				"exit": 1,
+				"summary": "RESULT 28 passed / 1 failed",
+				"log": "/tmp/ergopti247-linux-response-mutants/observer-after-running.log"
+			}
+		],
+		"luac54_parse": "six changed paths PASS",
+		"UTF8_LF_and_whitespace": "six changed paths PASS",
+		"strict_patch_application": "PASS; exact final bytes",
+		"full_root_integration_lint_JS": "pending composition owner; private projection intentionally sparse"
+	},
+	"qualification": "Actual Linux-host production Lua graph over controlled OS/HTTP/readiness/profile/window ports; native desktop/live Ollama/macOS/Windows/physical input UNRUN.",
+	"scope": "Read-only authentic app/service/absence observer plus constructor-bound consumer and producer/response/cache custody; no readiness/start/stop/publication/qualification grants."
+}

@@ -1,0 +1,325 @@
+--- a/static/ergopti_plus/linux/modules/llm/local_model_offer.lua
++++ b/static/ergopti_plus/linux/modules/llm/local_model_offer.lua
+@@ -77,8 +77,8 @@
+ 		notify = deps.notify or function(text, title)
+ 			return require("adapters.application_notifier").send(text, { title = title, level = "warning" })
+ 		end,
+-		install = download and function(base_url, model, on_done, current)
+-			return install(base_url, model, model, on_done, current)
++		install = download and function(base_url, model, on_done, current, on_retired)
++			return install(base_url, model, model, on_done, current, on_retired)
+ 		end or install,
+ 		current = function()
+ 			if _deps ~= owner then return false end
+@@ -103,17 +103,21 @@
+ 
+ --- Offers a missing model only for an already admitted, current native failure.
+ --- @param failure any Structured local-model failure.
+---- @param opts table|nil { automatic, current, modal_observer }
++--- @param opts table|nil { automatic, current, modal_observer, on_complete, on_retired }
+ --- @return boolean handled
++--- @return boolean|nil downloading Exact affirmative installer admission, when attempted.
+ function M.handle(failure, opts)
+ 	if not Policy.is_missing(failure) then return false end
+ 	local model, base_url, reason = failure.model, failure.base_url, failure.reason
+ 	local requesting = type(opts) == "table" and opts.current or nil
+ 	local automatic = type(opts) == "table" and opts.automatic == true
++	local complete = type(opts) == "table" and opts.on_complete or nil
++	local retired = type(opts) == "table" and opts.on_retired or nil
+ 	local deps = dependencies(automatic)
+ 	local function bound()
+ 		return failure.model == model and failure.base_url == base_url and failure.reason == reason
+-			and (type(opts) ~= "table" or opts.current == requesting) and deps.current()
++			and (type(opts) ~= "table" or (opts.current == requesting
++				and opts.on_complete == complete and opts.on_retired == retired)) and deps.current()
+ 	end
+ 	local function current()
+ 		if not bound() then return false end
+@@ -156,14 +160,15 @@
+ 				notices[name] = nil
+ 			end
+ 			Logger.success(LOG, "Local model '%s' downloaded.", model)
++			if type(complete) == "function" then complete() end
+ 		else
+ 			Logger.warn(LOG, "Local model '%s' download failed.", model)
+ 		end
+-	end, current)
++	end, current, retired)
+ 	if not installed or admitted ~= true then
+ 		Logger.warn(LOG, "Local model '%s' download was refused.", model)
+ 	end
+-	return true
++	return true, installed and admitted == true
+ end
+ 
+ --- Resets native effects and notices for isolated tests.
+--- a/static/ergopti_plus/linux/modules/llm/prediction_engine.lua
++++ b/static/ergopti_plus/linux/modules/llm/prediction_engine.lua
+@@ -1419,9 +1419,14 @@
+ 			_model_consent_owner = nil
+ 		end
+ 	end
+-	local ok, handled = pcall(LocalModelOffer.handle, failure, { current = current, modal_observer = observer })
++	local function retired()
++		if _model_consent_owner == owner then _model_consent_owner = nil end
++	end
++	local ok, handled, downloading = pcall(LocalModelOffer.handle, failure, {
++		current = current, modal_observer = observer, on_complete = retired, on_retired = retired,
++	})
+ 	_modal_resync_owner = nil
+-	if _model_consent_owner == owner then _model_consent_owner = nil end
++	if _model_consent_owner == owner and downloading ~= true then _model_consent_owner = nil end
+ 	if not ok then Logger.warn(LOG, "Missing-model offer failed: %s.", tostring(handled)) end
+ 	return ok and handled == true
+ end
+--- a/static/ergopti_plus/linux/modules/llm/model_download.lua
++++ b/static/ergopti_plus/linux/modules/llm/model_download.lua
+@@ -191,8 +191,9 @@
+ --- @param label string Human-readable catalogue name.
+ --- @param on_done function|nil
+ --- @param admission function|nil Current consent, rechecked after native UI creation and on every retry.
+---- @return boolean
+-function M.start(base_url, tag, label, on_done, admission)
++--- @param on_retired function|nil Exact cleanup notification after retained transport and UI retirement.
++--- @return boolean
++function M.start(base_url, tag, label, on_done, admission, on_retired)
+ 	if _active then
+ 		if _active.creating or _active.acquiring or _active.cancelled then return false end
+ 		if _active.tag == tag then return DownloadWindow.focus(_active.session_id) end
+@@ -200,14 +201,15 @@
+ 	end
+ 	if _retained and not settled(_retained) then return false end
+ 	if type(base_url) ~= "string" or base_url == "" or not valid_tag(tag)
+-			or type(label) ~= "string" or label == "" then
++			or type(label) ~= "string" or label == ""
++			or (on_retired ~= nil and type(on_retired) ~= "function") then
+ 		return false
+ 	end
+ 	local request = {
+ 		base_url = base_url,
+ 		tag = tag,
+ 		label = label,
+-		on_done = on_done,
++		on_done = on_done, on_retired = on_retired,
+ 		admission = admission,
+ 		pending = "",
+ 		remote_error = nil,
+@@ -301,6 +303,11 @@
+ 	if _retry_request == request then _retry_request = nil end
+ 	if _retained == request then _retained = nil end
+ 	Logger.info(LOG, "Ollama model pull cancelled for '%s'.", request.tag)
++	if type(request.on_retired) == "function" and not request.retirement_notified then
++		request.retirement_notified = true
++		local called, err = pcall(request.on_retired)
++		if not called then Logger.error(LOG, "Model-download retirement callback raised: %s", tostring(err)) end
++	end
+ 	return _active == nil and _retained == nil and _retry_request == nil
+ end
+ 
+--- a/static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_flow.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_flow.lua
+@@ -412,3 +412,158 @@
+ 		helpers.assert_eq(actual.running, false)
+ 	end)
+ end)
++
++
++helpers.describe("AI agent: asynchronous model consent continuation", function()
++	helpers.it("linux-model-consent-continuation: accepted pull stays authorized after its modal returns", function()
++		Scenario.run({ local_backend = true, selection = SELECTION,
++			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
++			local admission
++			require("modules.llm.local_model_offer")._reset_for_test({
++				confirm = function() return true end,
++				install = function(base_url, model, on_done, current) admission = current; return true end,
++				notify = function() return true end,
++			})
++			helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
++			world.scheduler.test.advance(1)
++			world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
++			helpers.assert_eq(type(admission), "function")
++			helpers.assert_eq(admission(), true, "The asynchronous pull must retain its accepted consent after the dialog returns.")
++			world.base_url = "http://127.0.0.1:11435"
++			helpers.assert_eq(admission(), false, "An endpoint replacement still revokes the captured consent.")
++		end)
++	end)
++end)
++
++
++helpers.describe("AI agent: model consent terminal and withdrawal receipts", function()
++	for _, boundary in ipairs({ "withdrawal", "success", "retirement" }) do
++		helpers.it("linux-model-consent-continuation: exact " .. boundary .. " retires accepted consent", function()
++			Scenario.run({ local_backend = true, selection = SELECTION,
++				stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
++				local admission, completed, retired
++				require("modules.llm.local_model_offer")._reset_for_test({
++					confirm = function() return true end,
++					install = function(base_url, model, on_done, current, on_retired)
++						admission, completed, retired = current, on_done, on_retired
++						return true
++					end,
++					notify = function() return true end,
++				})
++				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
++				world.scheduler.test.advance(1)
++				world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
++				helpers.assert_eq(admission(), true)
++				if boundary == "withdrawal" then world.engine.dismiss()
++				elseif boundary == "success" then completed(true)
++				else retired() end
++				helpers.assert_eq(admission(), false)
++			end)
++		end)
++	end
++
++	for _, receipt in ipairs({ "cancel", "refusal", "error", "truthy" }) do
++		helpers.it("linux-model-consent-continuation: " .. receipt .. " grants no asynchronous holder", function()
++			Scenario.run({ local_backend = true, selection = SELECTION,
++				stored = { ["llm.agent_system2"] = "local" } }, function(world)
++				local admission, asking, installs = nil, nil, 0
++				require("modules.llm.local_model_offer")._reset_for_test({
++					confirm = function(title, text, opts) asking = opts.current; return receipt ~= "cancel" end,
++					install = function(base_url, model, on_done, current)
++						admission, installs = current, installs + 1
++						if receipt == "error" then error("Controlled installer refusal.") end
++						return receipt == "truthy" and "accepted" or false
++					end,
++					notify = function() return true end,
++				})
++				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
++				world.scheduler.test.advance(1)
++				world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
++				helpers.assert_eq(asking(), false)
++				helpers.assert_eq(installs, receipt == "cancel" and 0 or 1)
++				if admission then helpers.assert_eq(admission(), false) end
++			end)
++		end)
++	end
++end)
++
++
++helpers.describe("AI agent: real asynchronous model download composition", function()
++	helpers.it("linux-model-consent-continuation: actual engine and pull owner accept progress after modal return", function()
++		Scenario.run({ local_backend = true, selection = SELECTION,
++			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
++			local names = { "modules.llm.model_download", "ui.download_window.bridge" }
++			local saved = {}
++			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
++			local updates, completes, admission = 0, 0, nil
++			local controls = {}
++			require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], controls)
++			package.loaded["ui.download_window.bridge"] = {
++				show = function() return 19 end,
++				update = function() updates = updates + 1; return true end,
++				complete = function() completes = completes + 1; return true end,
++				session_id = function() return 19 end,
++				retire = function(id) return id == 19 end,
++				focus = function(id) return id == 19 end,
++			}
++			local Download = require("modules.llm.model_download")
++			local start = Download.start
++			Download.start = function(base_url, tag, label, on_done, current, on_retired)
++				admission = current
++				return start(base_url, tag, label, on_done, current, on_retired)
++			end
++			require("modules.llm.local_model_offer")._reset_for_test({
++				confirm = function() return true end, notify = function() return true end,
++			})
++			local ok, err = xpcall(function()
++				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
++				world.scheduler.test.advance(1)
++				world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
++				helpers.assert_eq(#world.posts, 1)
++				helpers.assert_eq(world.posts[1].url, "http://127.0.0.1:11434/api/pull")
++				helpers.assert_eq(world.posts[1].body.name, "qwen2.5:7b")
++				helpers.assert_eq(admission(), true)
++				world.posts[1].on_chunk('{"status":"pulling","completed":1,"total":4}\n')
++				helpers.assert_eq(updates, 1, "Actual post-modal chunk reaches the retained pull owner.")
++				world.posts[1].on_chunk('{"status":"success"}\n')
++				world.posts[1].callback({ ok = true, status = 200 })
++				helpers.assert_eq(completes, 1)
++				helpers.assert_eq(admission(), false, "Only the matching completed consent is retired.")
++				helpers.assert_true(Download.shutdown())
++			end, debug.traceback)
++			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
++			if not ok then error(err, 0) end
++		end)
++	end)
++end)
++
++
++helpers.describe("AI agent: superseded model consent settlement", function()
++	helpers.it("linux-model-consent-continuation: old completion and retirement cannot clear successor owner", function()
++		Scenario.run({ local_backend = true, selection = SELECTION,
++			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
++			local holders = {}
++			require("modules.llm.local_model_offer")._reset_for_test({
++				confirm = function() return true end,
++				install = function(base_url, model, complete, current, retired)
++					holders[#holders + 1] = { complete = complete, current = current, retired = retired }
++					return true
++				end,
++				notify = function() return true end,
++			})
++			for index = 1, 2 do
++				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
++				world.scheduler.test.advance(1)
++				world.probes[index].callback({ ok = true, status = 200, body = '{"models":[]}' })
++			end
++			helpers.assert_eq(#holders, 2)
++			helpers.assert_eq(holders[1].current(), false)
++			helpers.assert_eq(holders[2].current(), true)
++			holders[1].complete(true)
++			holders[1].retired()
++			helpers.assert_eq(holders[2].current(), true, "A stale receipt cannot release the successor holder.")
++			holders[2].complete(true)
++			helpers.assert_eq(holders[2].current(), false)
++		end)
++	end)
++end)
+--- a/static/ergopti_plus/linux/tests/unit/modules/llm/test_model_download.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/llm/test_model_download.lua
+@@ -488,3 +488,43 @@
+ 		helpers.assert_eq(coordinator.is_pending(), false)
+ 	end)
+ end)
++
++
++helpers.describe("model download: exact requester retirement continuation", function()
++	helpers.it("linux-model-consent-continuation: cancellation notifies only after retained transport settlement", function()
++		local Download, transport = load_fixture()
++		local retired = 0
++		transport.owned_http.settled = false
++		local ok, err = xpcall(function()
++			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen", nil,
++				function() return true end, function() retired = retired + 1 end))
++			helpers.assert_eq(Download.cancel(), false)
++			helpers.assert_eq(retired, 0, "Accepted cancel is not actual retirement.")
++			transport.owned_http.operations[1]:acknowledge()
++			helpers.assert_eq(retired, 1)
++			helpers.assert_true(Download.cancel())
++			helpers.assert_eq(retired, 1, "One holder receives exactly one retirement notification.")
++		end, debug.traceback)
++		restore()
++		if not ok then error(err, 0) end
++	end)
++
++	helpers.it("linux-model-consent-continuation: failed pull retains consent for the exact guarded retry", function()
++		local Download, transport, window, shown = load_fixture()
++		local retired, done = 0, nil
++		local ok, err = xpcall(function()
++			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen",
++				function(value) done = value end, function() return true end, function() retired = retired + 1 end))
++			transport.starts[1].on_done({ ok = false })
++			helpers.assert_eq(done, false)
++			helpers.assert_eq(retired, 0, "A failed but retryable request is still its consent holder.")
++			helpers.assert_true(shown().on_retry())
++			helpers.assert_eq(#transport.starts, 2)
++			helpers.assert_eq(transport.starts[2].url, "http://127.0.0.1:11434/api/pull")
++			helpers.assert_true(Download.cancel())
++			helpers.assert_eq(retired, 1)
++		end, debug.traceback)
++		restore()
++		if not ok then error(err, 0) end
++	end)
++end)

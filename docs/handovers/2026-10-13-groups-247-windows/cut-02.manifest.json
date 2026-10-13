@@ -1,0 +1,18 @@
+{
+	"required_predecessor_patch": "/tmp/ergopti94-local-model-consent/correction.patch",
+	"required_predecessor_sha256": "7b9bc657b70f73a44f23c990c3f642f2c20ddf2341b7fa5853d76279d7dcc56d",
+	"paths": [
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/api_ollama.lua",
+			"base_sha256": "c9c49fe75fc7b686b51630168dbcc59499a1ead3a51a8acf29cdcb0aaa699be9",
+			"after_sha256": "aab98b74faa5cc9b553989257f0b0af5e1f0fc98b7991765d35de0551aaa7d60"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua",
+			"base_sha256": "7cdda4bbf97659cebcfcd77e7b1fe2054510bcf898c43c1c3a708a473683cfd3",
+			"after_sha256": "6b162ae9157cfe16754690393711f0daf962378e7c76bda9b06ea95decdebfc7",
+			"all_original_lines_assertions_byte_preserved_in_order": true
+		}
+	],
+	"patch_sha256": "187a016bd32a393a31db19663e61618b90419a5a41b8d6386f02032c58ccefe5"
+}

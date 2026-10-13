@@ -1,0 +1,28 @@
+{
+	"patch_sha256": "03e48bb93733b59b5c9d282489b9b64b0487701dfec9dd8113f88882999ba620",
+	"paths": [
+		{
+			"path": "static/ergopti_plus/windows/modules/llm/api_ollama/ollama_http.ahk",
+			"before_sha256": "883a6192e75282342401ef881d561165981fc120a201f98acf6c854849f0d758",
+			"after_sha256": "5647a402b3ed0b7cade82b4a29ce60fa99d62abdbccda7e714f68f5666fca4de"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/test_llm_api_ollama.ahk",
+			"before_sha256": "17522bd13f71e5b50480e3dcb47dcfce70dbf5e016f462921c492843ac40be97",
+			"after_sha256": "a031c9442d8c0dd00e4eafeaeb9bff5018c84e41ad4612bdf8653cff94a9b0e6",
+			"previous_complete_byte_prefix_preserved": true,
+			"original_named_assertion_calls": 237,
+			"new_named_assertion_calls": 10,
+			"authored_native_cases": 5
+		},
+		{
+			"path": "tools/test/test-windows-managed-bootstrap.cjs",
+			"before_sha256": "3a9ddfde346c89710021e17048e2db30d0a1968f89d470552fafc4d89f1b4635",
+			"after_sha256": "b73d76c491b59b8a5a63df083bf69f023b1b72e66e9d7ba78beb5431a9bf3a9d",
+			"previous_complete_guard_byte_prefix_preserved": true
+		}
+	],
+	"preimage_dependency": "7bf1749a05dc2523b8eac853d46d6aae8ca17ca0ab252bdb9e995b4336d399d7",
+	"composition_order": "after753/7bf/57bfc/d7cc; later two patches touch distinct source paths",
+	"native_AHK": "UNRUN"
+}

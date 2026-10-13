@@ -1,0 +1,770 @@
+--- a/static/ergopti_plus/macos/modules/llm/api_ollama.lua
++++ b/static/ergopti_plus/macos/modules/llm/api_ollama.lua
+@@ -120,6 +120,19 @@
+ local _warmup_resume_observers = {}
+ local _warmup_client_recovery_token = nil
+ local WARMUP_RESUME_COMMIT_DELAY_SEC = 0.05
++
++--- Captures daemon custody for a held model consent without starting a service.
++--- The predicate grants no readiness or signalling authority and never joins a
++--- successor occupying the same endpoint after native retirement.
++--- @return function current Exact original daemon generation and retained slots.
++function M.capture_service_owner()
++	local generation = _ollama_start_generation
++	local serve, ambiguous = _ollama_serve_task, _ollama_ambiguous_task
++	return function()
++		return generation == _ollama_start_generation
++			and serve == _ollama_serve_task and ambiguous == _ollama_ambiguous_task
++	end
++end
+ 
+ --- Reads ScriptControl's exact public pause state and epoch without requiring it
+ --- through the LLM dependency cycle.
+--- a/static/ergopti_plus/macos/modules/llm/local_model_offer.lua
++++ b/static/ergopti_plus/macos/modules/llm/local_model_offer.lua
+@@ -15,7 +15,7 @@
+ ---    (its models manager and download window) when it is built; this module
+ ---    never pulls a model by itself.
+ --- 3. Never while typing: a request of the automatic mode posts one
+----    notification per model, whose click opens the dialog, instead of a modal
++---    notification per endpoint and model, whose click opens the dialog, instead of a modal
+ ---    dialog that would take the keystrokes.
+ --- ==============================================================================
+ 
+@@ -28,13 +28,14 @@
+ 
+ local LOG = "llm.local_model_offer"
+ 
+--- fn(model, on_done) -> boolean accepted; on_done(ok, reason) once the download settled
++-- fn(model, on_done, is_current) -> boolean accepted; on_done(ok, reason) settles once
+ local _installer = nil
++local _installer_generation = 0
+ 
+ -- The dialog is modal: a second failure while it is open asks nothing more
+-local _asking = false
+-
+--- Models whose notification the automatic mode already posted
++local _asking = nil
++
++-- Endpoint and model notifications retained by their original registration
+ local _notified = {}
+ 
+ 
+@@ -69,6 +70,102 @@
+ end
+ 
+ 
++--- Captures the original configured endpoint and download registration.
++--- @return table|nil owner
++local function capture_owner()
++	local owner = { installer = _installer, generation = _installer_generation }
++	local ok, api = pcall(require, "modules.llm.api_ollama")
++	if not ok or type(api) ~= "table" or type(api.get_base_url) ~= "function"
++		or type(api.capture_service_owner) ~= "function" then return nil end
++	owner.api, owner.origin_reader, owner.service_reader = api, api.get_base_url, api.capture_service_owner
++	local service_ok, service_current = pcall(owner.service_reader)
++	if not service_ok or type(service_current) ~= "function" then return nil end
++	owner.service_current = service_current
++	local current_ok, current = pcall(owner.service_current)
++	if not current_ok or current ~= true then return nil end
++	local read_ok, origin = pcall(owner.origin_reader)
++	current_ok, current = pcall(owner.service_current)
++	if not current_ok or current ~= true or not read_ok or type(origin) ~= "string" or origin == ""
++		or owner.installer ~= _installer or owner.generation ~= _installer_generation
++		or package.loaded["modules.llm.api_ollama"] ~= api or api.get_base_url ~= owner.origin_reader
++		or api.capture_service_owner ~= owner.service_reader then return nil end
++	owner.origin = origin
++	return owner
++end
++
++--- A held consent cannot borrow a successor endpoint, API or installer.
++--- @param owner table
++--- @return boolean current
++local function owner_current(owner)
++	if type(owner) ~= "table" or owner.installer ~= _installer
++		or owner.generation ~= _installer_generation then return false end
++	local ok, api = pcall(require, "modules.llm.api_ollama")
++	if not ok or api ~= owner.api or api.get_base_url ~= owner.origin_reader
++		or api.capture_service_owner ~= owner.service_reader then return false end
++	local current_ok, current = pcall(owner.service_current)
++	if not current_ok or current ~= true then return false end
++	local read_ok, origin = pcall(owner.origin_reader)
++	current_ok, current = pcall(owner.service_current)
++	return current_ok and current == true and read_ok and origin == owner.origin
++		and owner.installer == _installer and owner.generation == _installer_generation
++		and package.loaded["modules.llm.api_ollama"] == api and api.get_base_url == owner.origin_reader
++		and api.capture_service_owner == owner.service_reader
++end
++
++--- Clears only the exact notice captured before download acquisition.
++local function forget_notification(owner, model, original_rows, original_receipt)
++	local rows = _notified[owner.origin]
++	if rows and rows == original_rows and rows[model] == original_receipt then rows[model] = nil end
++end
++
++--- Dispatches exactly the owner whose consent was accepted.
++--- @return boolean accepted
++local function install_owned(model, owner)
++	if not owner_current(owner) then
++		Logger.warn(LOG, "Local model download consent expired after its source changed.")
++		return false
++	end
++	if type(owner.installer) ~= "function" then
++		Logger.error(LOG, "Local model '%s' cannot be downloaded: no installer is registered.", model)
++		show_notice(i18n.format("llm.local_model.missing_notice", model))
++		return false
++	end
++	local original_rows = _notified[owner.origin]
++	local original_receipt = original_rows and original_rows[model]
++	local admitted, terminal, pending = false, false, nil
++	local function publish(done, reason)
++		if terminal then return end
++		terminal = true
++		if not owner_current(owner) then return end
++		if type(owner.api.forget_local_models) == "function" then owner.api.forget_local_models() end
++		if not owner_current(owner) then return end
++		if done == true then
++			forget_notification(owner, model, original_rows, original_receipt)
++			Logger.success(LOG, "Local model '%s' downloaded.", model)
++		else
++			Logger.warn(LOG, "Local model '%s' was not downloaded (%s).", model, tostring(reason))
++		end
++	end
++	Logger.start(LOG, "Downloading local model '%s'…", model)
++	local ok, accepted = pcall(owner.installer, model, function(done, reason)
++		if terminal then return end
++		if not admitted then
++			if pending == nil then pending = { done, reason } end
++			return
++		end
++		publish(done, reason)
++	end, function() return owner_current(owner) end)
++	if not ok or accepted ~= true or not owner_current(owner) then
++		terminal = true
++		Logger.error(LOG, "The download of local model '%s' was refused.", model)
++		return false
++	end
++	admitted = true
++	if pending then publish(pending[1], pending[2]) end
++	return true
++end
++
++
+ 
+ 
+ -- =====================================
+@@ -78,12 +175,13 @@
+ -- =====================================
+ 
+ --- Registers the owner of model downloads (the AI menu's models manager).
+---- @param installer function|nil fn(model, on_done) -> boolean accepted, where
+----        on_done(ok, reason) runs once the download settled; nil clears it.
++--- @param installer function|nil fn(model, on_done, is_current) -> boolean accepted, where
++---        on_done(ok, reason) settles once and is_current retains original consent; nil clears it.
+ function M.set_installer(installer)
+ 	if installer ~= nil and type(installer) ~= "function" then
+ 		error("local_model_offer.set_installer: a function or nil is required")
+ 	end
++	_installer_generation = _installer_generation + 1
+ 	_installer = installer
+ 	Logger.debug(LOG, "Local model installer %s.", installer and "registered" or "cleared")
+ end
+@@ -94,56 +192,51 @@
+ --- @return boolean accepted
+ function M.install(model)
+ 	require_model(model, "install")
+-	if _installer == nil then
+-		-- The AI menu registers it when built: without it, only the name is left to show
+-		Logger.error(LOG, "Local model '%s' cannot be downloaded: no installer is registered.", model)
+-		show_notice(i18n.format("llm.local_model.missing_notice", model))
+-		return false
+-	end
+-	Logger.start(LOG, "Downloading local model '%s'…", model)
+-	local ok, accepted = pcall(_installer, model, function(done, reason)
+-		-- What the server holds changed: the next request lists it again
+-		local ok_ollama, Ollama = pcall(require, "modules.llm.api_ollama")
+-		if ok_ollama and type(Ollama) == "table" and type(Ollama.forget_local_models) == "function" then
+-			Ollama.forget_local_models()
+-		end
+-		if done == true then
+-			_notified[model] = nil
+-			Logger.success(LOG, "Local model '%s' downloaded.", model)
+-		else
+-			Logger.warn(LOG, "Local model '%s' was not downloaded (%s).", model, tostring(reason))
+-		end
+-	end)
+-	if not ok or accepted ~= true then
+-		Logger.error(LOG, "The download of local model '%s' was refused: %s.", model, tostring(accepted))
+-		return false
+-	end
+-	return true
++	local owner = capture_owner()
++	if owner == nil then
++		Logger.warn(LOG, "Local model download refused: its endpoint identity is unavailable.")
++		return false
++	end
++	return install_owned(model, owner)
+ end
+ 
+ --- Tells the user that a model is not installed and offers its download.
+ --- @param model string The model name, as the local server names it.
+ --- @param opts table|nil { automatic = true } for a request of the automatic
+----        mode: a notification, once per model, whose click opens the dialog.
++---        mode: a notification per source and model, bound to that source.
+ --- @return boolean offered
+-function M.offer(model, opts)
+-	require_model(model, "offer")
++local function offer_owned(model, opts, owner)
++	if not owner_current(owner) then
++		Logger.warn(LOG, "Local model offer expired after its source changed.")
++		return false
++	end
+ 	local title = i18n.get("llm.local_model.missing_title")
+ 	if type(opts) == "table" and opts.automatic == true then
+-		if _notified[model] then
++		local rows = _notified[owner.origin] or {}
++		_notified[owner.origin] = rows
++		if rows[model] and owner_current(rows[model]) then
+ 			Logger.debug(LOG, "Local model '%s' is still missing; its notification was already posted.", model)
+ 			return false
+ 		end
+-		_notified[model] = true
++		rows[model] = owner
+ 		Logger.warn(LOG, "Local model '%s' is not installed; notifying the user.", model)
++		local admitted, closed, pending_click = false, false, false
++		local function on_click()
++			if closed then return false end
++			if not admitted then pending_click = true; return false end
++			closed = true
++			return offer_owned(model, nil, owner)
++		end
+ 		local ok, sent = pcall(Notifications.notify, title, i18n.format("llm.local_model.missing_click", model),
+-			"warning", function() M.offer(model) end)
++			"warning", on_click)
+ 		if not ok or sent ~= true then
+-			Logger.error(LOG, "The missing-model notification for '%s' was not posted: %s.", model, tostring(sent))
+-			-- The next request tries again
+-			_notified[model] = nil
++			closed = true
++			Logger.error(LOG, "The missing-model notification for '%s' was not posted.", model)
++			if rows[model] == owner then rows[model] = nil end
+ 			return false
+ 		end
++		admitted = true
++		if pending_click then on_click() end
+ 		return true
+ 	end
+ 	if _asking then
+@@ -152,12 +245,17 @@
+ 	end
+ 	Logger.warn(LOG, "Local model '%s' is not installed; offering its download.", model)
+ 	local download = i18n.get("menu.llm.btn_download")
+-	_asking = true
++	local asking = { owner = owner }
++	_asking = asking
+ 	local ok, choice = pcall(Dialog.block_alert, title, i18n.format("llm.local_model.missing_body", model),
+ 		download, i18n.get("common.cancel"), "warning")
+-	_asking = false
++	if _asking == asking then _asking = nil end
++	if not owner_current(owner) then
++		Logger.warn(LOG, "Local model download consent expired after its source changed.")
++		return false
++	end
+ 	if not ok then
+-		Logger.error(LOG, "The missing-model dialog for '%s' could not be shown: %s.", model, tostring(choice))
++		Logger.error(LOG, "The missing-model dialog for '%s' could not be shown.", model)
+ 		show_notice(i18n.format("llm.local_model.missing_notice", model))
+ 		return false
+ 	end
+@@ -165,8 +263,17 @@
+ 		Logger.info(LOG, "Download of local model '%s' declined.", model)
+ 		return true
+ 	end
+-	M.install(model)
+-	return true
++	return install_owned(model, owner)
++end
++
++function M.offer(model, opts)
++	require_model(model, "offer")
++	local owner = capture_owner()
++	if owner == nil then
++		Logger.warn(LOG, "Local model offer refused: its endpoint identity is unavailable.")
++		return false
++	end
++	return offer_owned(model, opts, owner)
+ end
+ 
+ --- Tells whether a failure reason of the local transport is a missing model.
+@@ -181,7 +288,8 @@
+ 
+ --- Forgets the posted notifications and the installer, for tests and a fresh start.
+ function M.reset()
+-	_installer, _asking, _notified = nil, false, {}
++	_installer_generation = _installer_generation + 1
++	_installer, _asking, _notified = nil, nil, {}
+ end
+ 
+ return M
+--- a/static/ergopti_plus/macos/tests/unit/modules/llm/test_ai_agent_local_model.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/llm/test_ai_agent_local_model.lua
+@@ -27,6 +27,30 @@
+ local TWO_ACTIONS = World.TWO_ACTIONS
+ local build_world, trigger = World.build_world, World.trigger
+ 
++--- Requires an exact refusal from a production callback.
++local function assert_false(value, message)
++	helpers.assert_eq(value, false, message)
++end
++
++--- Drives the real offer and configured endpoint through held native UI ports.
++--- @param scenario function
++local function with_consent_world(scenario)
++	local world = build_world({ system2 = "local" })
++	local offer = require("modules.llm.local_model_offer")
++	local api = require("modules.llm.api_ollama")
++	local storage = require("adapters.storage")
++	local before = storage.get("llm.ollama_port")
++	local function port(value)
++		helpers.assert_true(storage.set("llm.ollama_port", value))
++		helpers.assert_eq(api.get_base_url(), "http://127.0.0.1:" .. tostring(value))
++	end
++	port(11470)
++	world.alert_answer = "first"
++	local ok, err = xpcall(function() scenario(world, offer, api, port) end, debug.traceback)
++	storage.set("llm.ollama_port", before)
++	if not ok then error(err, 0) end
++end
++
+ --- Answers a captured local chat request with a model's text.
+ --- @param post table
+ --- @param content string
+@@ -51,6 +75,227 @@
+ end
+ 
+ helpers.describe("AI agent local model (ai-agent-local-model)", function()
++	helpers.it("(local-model-consent-affinity) refuses a held Download after the actual configured endpoint changes", function()
++		with_consent_world(function(world, offer, _, port)
++			local dialog = require("infra.dialog_util")
++			local previous = dialog.block_alert
++			dialog.block_alert = function(...)
++				port(11471)
++				return previous(...)
++			end
++			assert_false(offer.offer(DEFAULT_MODEL), "A's consent must not acquire B's download")
++			helpers.assert_eq(#world.installs, 0)
++			dialog.block_alert = previous
++			helpers.assert_true(offer.offer(DEFAULT_MODEL))
++			helpers.assert_eq(#world.installs, 1, "a fresh B consent still downloads normally")
++		end)
++	end)
++
++	helpers.it("(local-model-consent-affinity) refuses installer replacement and same-function registration ABA during a dialog", function()
++		for _, reset in ipairs({ false, true }) do
++			with_consent_world(function(world, offer)
++				local old_calls, new_calls = 0, 0
++				local original = function() old_calls = old_calls + 1; return true end
++				offer.set_installer(original)
++				local dialog = require("infra.dialog_util")
++				local previous = dialog.block_alert
++				dialog.block_alert = function(...)
++					if reset then offer.reset(); offer.set_installer(original)
++					else offer.set_installer(function() new_calls = new_calls + 1; return true end) end
++					return previous(...)
++				end
++				assert_false(offer.offer(DEFAULT_MODEL))
++				helpers.assert_eq(old_calls, 0)
++				helpers.assert_eq(new_calls, 0)
++				dialog.block_alert = previous
++			end)
++		end
++	end)
++
++	helpers.it("(local-model-consent-affinity) fences stale notification clicks while a new endpoint receives its own offer", function()
++		with_consent_world(function(world, offer, _, port)
++			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++			local old = world.notifications[1]
++			port(11471)
++			old.on_click()
++			helpers.assert_eq(#world.alerts, 0, "an A notification must not open B's consent")
++			helpers.assert_eq(#world.installs, 0)
++			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++			helpers.assert_eq(#world.notifications, 2, "notification deduplication belongs to its origin")
++			assert_false(offer.offer(DEFAULT_MODEL, { automatic = true }))
++			world.notifications[2].on_click()
++			helpers.assert_eq(#world.alerts, 1)
++			helpers.assert_eq(#world.installs, 1)
++		end)
++	end)
++
++	helpers.it("(local-model-consent-affinity) fences replaced notification registrations without starving their successor", function()
++		with_consent_world(function(world, offer)
++			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++			local old = world.notifications[1]
++			local calls = 0
++			offer.set_installer(function() calls = calls + 1; return true end)
++			old.on_click()
++			helpers.assert_eq(#world.alerts, 0)
++			helpers.assert_eq(calls, 0)
++			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++			world.notifications[2].on_click()
++			helpers.assert_eq(calls, 1)
++		end)
++	end)
++
++	helpers.it("(local-model-notice-admission) refuses retained clicks from unacknowledged notifications", function()
++		for _, response in ipairs({ false, "accepted", "throw", true }) do
++			with_consent_world(function(world, offer)
++				local notify = require("infra.notifications")
++				local retained
++				notify.notify = function(_, _, _, on_click)
++					retained = on_click
++					on_click()
++					helpers.assert_eq(#world.installs, 0, "an early callback cannot manufacture send admission")
++					if response == "throw" then error("private-notification-secret") end
++					return response
++				end
++				helpers.assert_eq(offer.offer(DEFAULT_MODEL, { automatic = true }), response == true)
++				if response == true then
++					helpers.assert_eq(#world.installs, 1, "an accepted send delivers its queued current click once")
++					retained()
++					helpers.assert_eq(#world.installs, 1)
++				else
++					retained()
++					helpers.assert_eq(#world.alerts, 0)
++					helpers.assert_eq(#world.installs, 0)
++				end
++				for _, line in ipairs(world.logs) do
++					assert_false(line.text:find("private-notification-secret", 1, true) ~= nil)
++				end
++			end)
++		end
++	end)
++
++	helpers.it("(local-model-consent-affinity) keeps a late A completion from invalidating B's cache or notification", function()
++		with_consent_world(function(world, offer, api, port)
++			local forgets = 0
++			api.forget_local_models = function() forgets = forgets + 1 end
++			helpers.assert_true(offer.install(DEFAULT_MODEL))
++			port(11471)
++			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++			world.installs[1].on_done(true)
++			helpers.assert_eq(forgets, 0, "A's completion cannot invalidate B's acknowledged cache")
++			assert_false(offer.offer(DEFAULT_MODEL, { automatic = true }), "B's notice is still owned")
++		end)
++	end)
++
++	helpers.it("(local-model-notice-affinity) keeps a newer same-source notice after an older pull succeeds", function()
++		for _, earlier_notice in ipairs({ false, true }) do
++			with_consent_world(function(world, offer)
++				if earlier_notice then
++					helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++					helpers.assert_true(offer.install(DEFAULT_MODEL))
++				end
++				helpers.assert_true(offer.install(DEFAULT_MODEL))
++				local older_pull = world.installs[#world.installs]
++				if earlier_notice then world.installs[1].on_done(true) end
++				helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
++				local newer_notice = world.notifications[#world.notifications]
++				older_pull.on_done(true)
++				assert_false(offer.offer(DEFAULT_MODEL, { automatic = true }),
++					"an old success must not clear a notice posted after its installation admission")
++				newer_notice.on_click()
++				world.installs[#world.installs].on_done(true)
++				helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }),
++					"the exact current notice is cleared by its own completed download")
++			end)
++		end
++	end)
++
++	helpers.it("(local-model-consent-affinity) accepts one current completion and ignores repeats or registration replacement", function()
++		with_consent_world(function(world, offer, api)
++			local forgets = 0
++			api.forget_local_models = function() forgets = forgets + 1 end
++			helpers.assert_true(offer.install(DEFAULT_MODEL))
++			world.installs[1].on_done(true)
++			world.installs[1].on_done(true)
++			helpers.assert_eq(forgets, 1, "the registered callback is one-shot")
++			helpers.assert_true(offer.install(DEFAULT_MODEL))
++			offer.set_installer(function() return true end)
++			world.installs[2].on_done(true)
++			helpers.assert_eq(forgets, 1, "a replaced installer cannot affect its successor's cache")
++		end)
++	end)
++
++	helpers.it("(local-model-consent-affinity) publishes synchronous completion only after exact installer admission", function()
++		with_consent_world(function(_, offer, api)
++			local forgets = 0
++			api.forget_local_models = function() forgets = forgets + 1 end
++			offer.set_installer(function(_, done) done(true); return false end)
++			assert_false(offer.install(DEFAULT_MODEL))
++			helpers.assert_eq(forgets, 0, "a callback cannot manufacture refused installation admission")
++			offer.set_installer(function(_, done) done(true); return true end)
++			helpers.assert_true(offer.install(DEFAULT_MODEL))
++			helpers.assert_eq(forgets, 1)
++			offer.set_installer(function() return false end)
++			assert_false(offer.offer(DEFAULT_MODEL), "the Download button reports dispatch refusal truthfully")
++		end)
++	end)
++
++	helpers.it("(local-model-consent-affinity) refuses malformed endpoint acquisition without leaking its error", function()
++		with_consent_world(function(world, offer, api)
++			api.get_base_url = function() error("private-endpoint-secret") end
++			assert_false(offer.offer(DEFAULT_MODEL))
++			helpers.assert_eq(#world.alerts, 0)
++			helpers.assert_eq(#world.installs, 0)
++			for _, line in ipairs(world.logs) do
++				assert_false(line.text:find("private-endpoint-secret", 1, true) ~= nil)
++			end
++		end)
++		for _, malformed in ipairs({ false, 17, "" }) do
++			with_consent_world(function(world, offer, api)
++				api.get_base_url = function() return malformed end
++				assert_false(offer.offer(DEFAULT_MODEL))
++				helpers.assert_eq(#world.alerts, 0)
++				helpers.assert_eq(#world.installs, 0)
++			end)
++		end
++		with_consent_world(function(world, offer, api)
++			local old = api.get_base_url
++			api.get_base_url = function()
++				api.get_base_url = old
++				return old()
++			end
++			assert_false(offer.offer(DEFAULT_MODEL), "endpoint reader replacement during acquisition is refused")
++			helpers.assert_eq(#world.alerts, 0)
++			helpers.assert_eq(#world.installs, 0)
++			helpers.assert_true(offer.offer(DEFAULT_MODEL), "the stable reader permits fresh consent")
++			helpers.assert_eq(#world.installs, 1)
++		end)
++		for _, reader in ipairs({
++			function() return nil end,
++			function() return false end,
++			function() error("private-service-secret") end,
++			function() return function() return nil end end,
++			function() return function() return false end end,
++			function() return function() error("private-service-secret") end end,
++		}) do
++			with_consent_world(function(world, offer, api)
++				api.capture_service_owner = reader
++				assert_false(offer.offer(DEFAULT_MODEL))
++				helpers.assert_eq(#world.alerts, 0)
++				helpers.assert_eq(#world.installs, 0)
++				for _, line in ipairs(world.logs) do
++					assert_false(line.text:find("private-service-secret", 1, true) ~= nil)
++				end
++			end)
++		end
++		with_consent_world(function(world, offer)
++			world.alert_answer = "cancel"
++			helpers.assert_true(offer.offer(DEFAULT_MODEL))
++			helpers.assert_eq(#world.installs, 0, "cancellation does not dispatch")
++			world.alert_answer = "first"
++			helpers.assert_true(offer.offer(DEFAULT_MODEL))
++			helpers.assert_eq(#world.installs, 1, "cancellation releases the dialog owner")
++		end)
++	end)
+ 	helpers.it("(ai-agent-local-model) sends nothing before the local server lists the model, then posts it", function()
+ 		helpers.assert_eq(DEFAULT_MODEL, "qwen2.5:7b", "agent.json's local default, the model of the report")
+ 		local world = build_world({ system2 = "local" })
+--- a/static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua
+@@ -317,6 +317,76 @@
+ 		end)
+ 	end
+ 
++	helpers.it("(local-model-service-consent) refuses same-origin daemon replacement during held model consent", function()
++		with_startup({}, function(api, fixture)
++			helpers.with_stub_scope({ "modules.llm.local_model_offer", "infra.dialog_util" }, function()
++				helpers.assert_true(api.ensure_running())
++				local original = fixture.tasks[1]
++				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
++				local origin = api.get_base_url()
++				local installs, answered = 0, false
++				package.loaded["infra.i18n"].format = function(key) return key end
++				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, download)
++					if not answered then
++						answered = true
++						helpers.assert_eq(api.stop_owned_server(), false)
++						original.complete(0, original.frame("RETIRED 0"))
++						helpers.assert_true(api.ensure_running())
++						local successor = fixture.tasks[2]
++						successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
++					end
++					return download
++				end }
++				local offer = require("modules.llm.local_model_offer")
++				offer.set_installer(function() installs = installs + 1; return true end)
++				helpers.assert_eq(offer.offer("fixture-model"), false,
++					"unchanged URL and menu installer do not transfer consent to a successor daemon")
++				helpers.assert_eq(installs, 0)
++				helpers.assert_eq(api.get_base_url(), origin)
++				helpers.assert_eq(#fixture.tasks, 2)
++				helpers.assert_true(original.completed)
++				helpers.assert_true(fixture.tasks[2].running)
++				helpers.assert_true(offer.offer("fixture-model"), "fresh consent names the live successor")
++				helpers.assert_eq(installs, 1)
++			end)
++		end)
++	end)
++
++	helpers.it("(local-model-service-consent) retains accepted async consent and fences a replaced daemon's late result", function()
++		with_startup({}, function(api, fixture)
++			helpers.with_stub_scope({ "modules.llm.local_model_offer" }, function()
++				helpers.assert_true(api.ensure_running())
++				local original = fixture.tasks[1]
++				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
++				local offer = require("modules.llm.local_model_offer")
++				local done, current, forgets
++				forgets = 0
++				api.forget_local_models = function() forgets = forgets + 1 end
++				offer.set_installer(function(_, callback, is_current)
++					done, current = callback, is_current
++					return true
++				end)
++				helpers.assert_true(offer.install("fixture-model"))
++				helpers.assert_eq(type(current), "function", "the actual installer receives the captured owner")
++				helpers.assert_true(current(), "modal return does not revoke an accepted asynchronous download")
++				helpers.assert_eq(api.stop_owned_server(), false)
++				helpers.assert_eq(current(), false, "retirement revokes the original consent before exit")
++				original.complete(0, original.frame("RETIRED 0"))
++				helpers.assert_true(api.ensure_running())
++				local successor = fixture.tasks[2]
++				successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
++				helpers.assert_eq(current(), false, "a READY successor cannot revive the old owner")
++				done(true)
++				helpers.assert_eq(forgets, 0)
++				helpers.assert_true(offer.install("fixture-model"))
++				helpers.assert_true(current())
++				done(true)
++				helpers.assert_eq(forgets, 1)
++				helpers.assert_eq(current(), true, "terminal publication does not impersonate native retirement")
++			end)
++		end)
++	end)
++
+ 	helpers.it("(ollama-owned-retirement) closes only its published daemon and retains receipt debt", function()
+ 		with_startup({}, function(api, fixture)
+ 			helpers.assert_true(api.ensure_running())
+--- a/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_agent_panel.lua
++++ b/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_agent_panel.lua
+@@ -52,6 +52,8 @@
+ 		}
+ 		package.loaded["modules.llm.api_ollama"] = {
+ 			MODEL_MISSING = "model_missing",
++			get_base_url = function() return "http://127.0.0.1:11470" end,
++			capture_service_owner = function() return function() return true end end,
+ 			local_model_installed = function(model)
+ 				if world.listed == nil then return nil end
+ 				return world.listed[model] == true
+--- a/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_llm_factory_recovery_wiring.lua
++++ b/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_llm_factory_recovery_wiring.lua
+@@ -10,6 +10,36 @@
+ local with_activation = require("tests.support.llm_activation_fixture")
+ 
+ helpers.describe("LLM Factory Recovery Wiring", function()
++	helpers.it("(local-model-service-consent) forwards retained consent through the actual menu installer", function()
++		helpers.with_stub_scope({ "modules.llm.local_model_offer" }, function()
++			local installer
++			package.loaded["modules.llm.local_model_offer"] = {
++				set_installer = function(fn) installer = fn end,
++			}
++			with_activation("ollama", {}, {}, function()
++				local models = package.loaded["ui.menu.menu_llm.models_manager"].new()
++				local captured, completed, cancelled
++				models.pull_ollama_model = function(model, success, cancel, opts)
++					captured = { model = model, success = success, cancel = cancel, opts = opts }
++					return true
++				end
++				local current = function() return true end
++				helpers.assert_type(installer, "function")
++				helpers.assert_true(installer("fixture-model", function(ok, reason)
++					completed, cancelled = ok, reason
++				end, current))
++				helpers.assert_eq(captured.model, "fixture-model")
++				helpers.assert_type(captured.opts, "table", "the real menu must retain consent beyond its first dialog")
++				helpers.assert_eq(captured.opts.is_current, current)
++				captured.cancel("stale")
++				helpers.assert_eq(completed, false)
++				helpers.assert_eq(cancelled, "stale")
++				captured.success()
++				helpers.assert_eq(completed, true)
++			end)
++		end)
++	end)
++
+ 	helpers.it("HS-034 forwards the live candidate recovery owner through the real factory", function()
+ 		local candidate_calls = 0
+ 		with_activation("ollama", {}, {
+--- a/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_models_manager_requirement_capabilities.lua
++++ b/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_models_manager_requirement_capabilities.lua
+@@ -47,6 +47,10 @@
+ 				return true, record.had == true
+ 			end
+ 			manager.get_installed_models = function() return {} end
++			manager.pull_model = function(model, repo, on_success, on_cancel, opts)
++				record.pull = { model = model, repo = repo, success = on_success, cancel = on_cancel, opts = opts }
++				return true
++			end
+ 			manager.delete_model = function() return true end
+ 			manager.get_mlx_repo = function(value) return value end
+ 			if name == "mlx" then
+@@ -113,6 +117,24 @@
+ end
+ 
+ helpers.describe("ModelsManager backend-agnostic requirement capabilities", function()
++	helpers.it("(local-model-service-consent) forwards the exact consent predicate through the actual Ollama facade", function()
++		with_fixture(function(fixture)
++			local current = true
++			local opts = { is_current = function() return current end }
++			local success, cancel = function() end, function() end
++			helpers.assert_true(fixture.manager.pull_ollama_model("fixture-model", success, cancel, opts))
++			local pull = fixture.records.ollama.pull
++			helpers.assert_eq(pull.model, "fixture-model")
++			helpers.assert_eq(pull.repo, "fixture-model")
++			helpers.assert_eq(pull.success, success)
++			helpers.assert_eq(pull.cancel, cancel)
++			helpers.assert_eq(pull.opts, opts, "the facade cannot discard the consent owner before native acquisition")
++			helpers.assert_true(pull.opts.is_current())
++			current = false
++			helpers.assert_eq(pull.opts.is_current(), false)
++		end)
++	end)
++
+ 	helpers.it("maps one public owner to distinct backend-local capabilities", function()
+ 		with_fixture(function(fixture)
+ 			local capability = fixture.manager.create_requirement_owner("startup")
+--- a/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua
++++ b/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua
+@@ -2105,11 +2105,11 @@
+ 		-- The local models the agent and the screen reading name are
+ 		-- downloaded by this menu's models manager, in its download window;
+ 		-- a completed download changes what the AI agent menu shows.
+-		require("modules.llm.local_model_offer").set_installer(function(model, on_done)
++		require("modules.llm.local_model_offer").set_installer(function(model, on_done, is_current)
+ 				return models_mgr.pull_ollama_model(model, function()
+ 						on_done(true)
+ 						if type(update_menu) == "function" then pcall_log("update_menu(local model pulled)", update_menu) end
+-				end, function(reason) on_done(false, reason) end)
++				end, function(reason) on_done(false, reason) end, { is_current = is_current })
+ 		end)
+ 		-- A repaired MLX runtime restarts the model it could not load, as
+ 		-- selecting that model does; the repair offer owns the button.
+--- a/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua
++++ b/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua
+@@ -874,12 +874,13 @@
+ 	--- @param model string Ollama model name.
+ 	--- @param on_success function|nil Called once the model is pulled.
+ 	--- @param on_cancel function|nil Receives the reason of a failed or cancelled pull.
++	--- @param opts table|nil Existing pull freshness and ownership options.
+ 	--- @return boolean accepted
+-	function obj.pull_ollama_model(model, on_success, on_cancel)
++	function obj.pull_ollama_model(model, on_success, on_cancel, opts)
+ 		if type(model) ~= "string" or model == "" then
+ 			error("models_manager.pull_ollama_model: a model name is required")
+ 		end
+-		return ollama.pull_model(model, model, on_success, on_cancel) == true
++		return ollama.pull_model(model, model, on_success, on_cancel, opts) == true
+ 	end
+ 	function obj.delete_model(name) return get_active().delete_model(name) end
+ 	function obj.force_mlx_check(target_model, on_success, on_cancel, opts)

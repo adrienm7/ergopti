@@ -235,9 +235,11 @@ LLM_Agent_OpenAppPicker() {
 LLM_Agent_OnAppPickerSave(Selected, Receipt) {
 	global _LLM_Agent_CommitFn
 	Commit := HasMethod(_LLM_Agent_CommitFn, "Call") ? _LLM_Agent_CommitFn : LLM_Menu_CommitMutation
-	if !Commit.Call("the AI agent excluded applications",
+	Previous := LLM_Agent_Setting("agent_disabled_apps")
+	Committed := Commit.Call("the AI agent excluded applications",
 			_LLM_Agent_ApplyPickerSelection.Bind(Selected, Receipt),
-			_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps"))
+			_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps", Previous))
+	if !(Committed is Integer) || Committed != true
 		return false
 	LLM_Agent_RefreshTray()
 	return true
