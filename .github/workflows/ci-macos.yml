@@ -1395,7 +1395,9 @@ jobs:
           node-version-file: '.node-version'
       - name: Run scoped item 36 evidence controls
         if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
-        run: node tools/test/test-macos-dev-qualification-deferral.cjs
+        run: |
+          npm ci --ignore-scripts
+          node tools/test/test-macos-dev-qualification-deferral.cjs
       - uses: actions/setup-python@v5
         if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:

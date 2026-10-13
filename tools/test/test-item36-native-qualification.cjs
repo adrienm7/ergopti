@@ -165,6 +165,22 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	check('status-range', () => assert.throws(() => reader.evaluate(valid, 256, 0)));
 	check('scoped-filter-admitted', () => assert.ok(admitItem36Selector(workflow)));
 	for (const [label, token, replacement] of [
+		['missing-locked-dependencies', '          npm ci --ignore-scripts\n', ''],
+		[
+			'unlocked-dependencies',
+			'          npm ci --ignore-scripts\n',
+			'          npm install --ignore-scripts\n'
+		],
+		[
+			'forgiven-dependencies',
+			'          npm ci --ignore-scripts\n',
+			'          npm ci --ignore-scripts || true\n'
+		],
+		[
+			'late-dependencies',
+			'          npm ci --ignore-scripts\n          node tools/test/test-macos-dev-qualification-deferral.cjs\n',
+			'          node tools/test/test-macos-dev-qualification-deferral.cjs\n          npm ci --ignore-scripts\n'
+		],
 		['wrong-filter', ITEM36_FILTER, "--filter 'HomebrewArchiveAcceptanceTests'"],
 		['foreign-job', '  e2e-hs:\n', '  unrelated-native:\n'],
 		[

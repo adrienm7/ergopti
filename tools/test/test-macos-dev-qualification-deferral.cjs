@@ -305,6 +305,20 @@ function admitItem36Selector(mac) {
 		return null;
 	}
 	const job = jobs[0][0];
+	// Each matrix role starts on a fresh host; setup-node does not install YAML.
+	const controls = stageSource
+		.selected(job, 'item36-native')
+		.filter((step) => step.name === 'Run scoped item 36 evidence controls');
+	if (
+		controls.length !== 1 ||
+		pipeline.stepField(controls[0].body, 'if') !== stageSource.condition('item36-native') ||
+		JSON.stringify(pipeline.runOf(controls[0].body)) !==
+			JSON.stringify([
+				'npm ci --ignore-scripts',
+				'node tools/test/test-macos-dev-qualification-deferral.cjs'
+			])
+	)
+		return null;
 	if (
 		JSON.stringify(pipeline.needsOf(job)) !== JSON.stringify(['test-hs']) ||
 		pipeline.field(job, 'runs-on') !== '${{ matrix.runner }}' ||

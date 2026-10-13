@@ -60,7 +60,7 @@ function census(sources) {
 			item36 += loop.right.elements.length;
 		}
 	});
-	assert.equal(item36, 65);
+	assert.equal(item36, 69);
 	for (const [name, variable, expected] of [
 		['pac', 'passed', 82],
 		['deferral', 'passed', 79],
