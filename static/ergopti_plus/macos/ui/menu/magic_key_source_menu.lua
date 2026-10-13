@@ -144,6 +144,31 @@ local function stop_capture(live)
 	return true
 end
 
+--- Reads only the already-loaded script-control owner, never a menu snapshot.
+--- @return table|nil owner Exact pause-state provider.
+--- @return integer|nil epoch Settled active generation.
+local function capture_pause_source()
+	local owner = package.loaded["modules.shortcuts.script_control"]
+	if type(owner) ~= "table" or type(owner.is_paused) ~= "function"
+		or type(owner.is_pause_transition_pending) ~= "function" or type(owner.get_pause_epoch) ~= "function" then
+		return nil
+	end
+	local observed, paused, pending, epoch = pcall(function()
+		return owner.is_paused(), owner.is_pause_transition_pending(), owner.get_pause_epoch()
+	end)
+	if not observed or paused ~= false or pending ~= false or type(epoch) ~= "number"
+		or epoch < 0 or epoch % 1 ~= 0 then return nil end
+	return owner, epoch
+end
+
+--- Whether the original active generation still owns this captured choice.
+--- @param live table Capture owner.
+--- @return boolean current
+local function capture_pause_current(live)
+	local owner, epoch = capture_pause_source()
+	return owner ~= nil and owner == live.pause_owner and epoch == live.pause_epoch
+end
+
 --- Captures the next physical key pressed as the physical magic key.
 --- @param ctx table The menu context of M.choose.
 --- @return boolean started
@@ -154,11 +179,21 @@ function M.capture(ctx)
 			return false
 		end
 	end
+	local pause_owner, pause_epoch = capture_pause_source()
+	if pause_owner == nil then
+		Logger.error(LOG, "Physical magic key capture refused without a settled active script state.")
+		return false
+	end
 	Source.resolver() -- Warm the registry before the event callback.
-	local live = { answered = false, active = false }
+	local live = { answered = false, active = false, pause_owner = pause_owner, pause_epoch = pause_epoch }
 	_capture = live -- Own every candidate before construction or activation.
 	local function settle(keycode, keyboard_type)
+		local current = capture_pause_current(live)
 		if not stop_capture(live) then return end
+		if keycode ~= nil and (not current or not capture_pause_current(live)) then
+			Logger.info(LOG, "Physical magic key capture crossed a pause boundary: nothing changed.")
+			return
+		end
 		if keycode == nil then
 			Logger.info(LOG, "Physical magic key capture ended with no key: nothing changed.")
 			return
@@ -177,8 +212,14 @@ function M.capture(ctx)
 		local provenance, status, fence = EventProvenance.classify_with_fence(event, CONSUMER)
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
-		if _capture ~= live or live.active ~= true or live.answered
-			or provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then return false, fence_events end
+		if _capture ~= live or live.active ~= true then return false, fence_events end
+		if not capture_pause_current(live) then
+			stop_capture(live)
+			return false, fence_events
+		end
+		if live.answered or provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
+			return false, fence_events
+		end
 		local keycode = event:getKeyCode()
 		local keyboard_type = Geometry.event_type(event)
 		local candidate = Source.code_for(keycode, keyboard_type)
@@ -192,6 +233,10 @@ function M.capture(ctx)
 		if not called or accepted ~= true or type(handle) ~= "table" or handle.fired == true or premature then
 			Logger.error(LOG, "The captured key could not be scheduled — nothing changed.")
 			if not stop_capture_timer(live, "answer_timer") then stop_capture(live) end
+			return false, fence_events
+		end
+		if not capture_pause_current(live) then
+			stop_capture(live)
 			return false, fence_events
 		end
 		committed, live.answered = true, true
@@ -217,7 +262,7 @@ function M.capture(ctx)
 	end
 	local started, result = pcall(function() return tap:start() end)
 	local observed, enabled = pcall(function() return tap:isEnabled() end)
-	if not started or not result or not observed or enabled ~= true or premature then
+	if not started or not result or not observed or enabled ~= true or premature or not capture_pause_current(live) then
 		Logger.error(LOG, "The physical magic key capture tap could not be activated.")
 		stop_capture(live)
 		return false
