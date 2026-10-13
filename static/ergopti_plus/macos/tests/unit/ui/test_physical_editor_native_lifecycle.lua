@@ -22,7 +22,14 @@ local run_contract = function(helpers, load_host, load_builder)
   package.loaded['shortcuts.physical_slots']={new=function(model)c.decoded_model=model;return{candidates=function()return{}end}end}
   package.loaded['shortcuts.physical_editor_window']={new=function(options)
    local retired=false
-   return{retire=function()retired=true;c.retired=c.retired+1 end,receive=function()
+   return{retire=function()
+    retired=true;c.retired=c.retired+1
+    if c.during_retire then c.during_retire()end
+    if c.retire=='throw'then error('controlled editor retirement failure')end
+    if c.retire=='false'then return false end
+    if c.retire=='nil'then return nil end
+    return true
+   end,receive=function()
     if retired or options.page_current()~=true then return false end
     c.received=c.received+1;return true
    end}
@@ -34,6 +41,9 @@ local run_contract = function(helpers, load_host, load_builder)
    return c.native_model or {}
   end},drawing={windowLevels={normal=0}},focus=noop,screen={mainScreen=function()return {}end},
    webview={windowMasks={titled=1,closable=2},usercontent={new=function()
+    if c.bridge_construct=='throw'then error('controlled bridge construction failure')end
+    if c.bridge_construct=='nil'then return nil end
+    if c.bridge_construct=='false'then return false end
     local bridge={};function bridge:setCallback(fn)
      if fn==nil then
       c.detach_calls=c.detach_calls+1
@@ -191,6 +201,122 @@ local run_contract = function(helpers, load_host, load_builder)
     helpers.assert_eq(host.close(),true)
    end)
   end)
+  for _,mode in ipairs({'false','throw','nil'})do
+   helpers.it('(physical-editor-retirement) literal editor acknowledgement precedes native teardown: '..mode,function()
+    fixture(function(host,c,options)
+     helpers.assert_eq(host.open(options),true);c.retire=mode
+     helpers.assert_eq(host.close(),false,'Editor refusal retains the host')
+     helpers.assert_eq(c.delete_calls,0,'No native deletion without editor acknowledgement')
+     helpers.assert_eq(c.detach_calls,0,'No bridge release without editor acknowledgement')
+     helpers.assert_true(getmetatable(c.views[1])~=nil,'Original native page remains retained')
+     helpers.assert_eq(host.open(options),false,'Debt prevents successor allocation')
+     helpers.assert_eq(c.created,1);c.bridges[1].callback({body={action='ready'}})
+     helpers.assert_eq(c.received,0,'Refused retirement cannot admit the old page')
+     c.retire=nil;helpers.assert_eq(host.close(),true,'Same editor acknowledges retry')
+     helpers.assert_eq(c.delete_calls,1);helpers.assert_eq(c.detach_calls,1)
+     helpers.assert_eq(host.open(options),true,'Only settled debt admits successor')
+     helpers.assert_eq(c.created,2);helpers.assert_eq(host.close(),true)
+    end)
+   end)
+  end
+  helpers.it('(physical-editor-retirement) reentrant retirement cannot clear or replace its host',function()
+   fixture(function(host,c,options)
+    helpers.assert_eq(host.open(options),true);local nested_close,nested_open
+    c.retire='false';c.during_retire=function()
+     c.during_retire=nil;nested_close=host.close();nested_open=host.open(options)
+    end
+    helpers.assert_eq(host.close(),false)
+    helpers.assert_eq(nested_close,false);helpers.assert_eq(nested_open,false)
+    helpers.assert_eq(c.created,1);helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,0)
+    c.retire=nil;helpers.assert_eq(host.close(),true)
+   end)
+  end)
+  helpers.it('(physical-editor-retirement) SDK closing notification retains refused editor debt',function()
+   fixture(function(host,c,options)
+    helpers.assert_eq(host.open(options),true);c.retire='false'
+    setmetatable(c.views[1],nil);c.views[1].closing('closing')
+    helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,0)
+    helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1)
+    c.retire=nil;helpers.assert_eq(host.close(),true)
+    helpers.assert_eq(c.delete_calls,0,'Already retired SDK page is not deleted again')
+    helpers.assert_eq(c.detach_calls,1,'Bridge retires only after editor acknowledgement')
+    helpers.assert_eq(host.open(options),true);helpers.assert_eq(c.created,2);helpers.assert_eq(host.close(),true)
+   end)
+  end)
+  for _,mode in ipairs({'false','throw','nil'})do
+   helpers.it('(physical-editor-retirement) bridge acquisition refusal retains original editor: '..mode,function()
+    fixture(function(host,c,options)
+     c.bridge_construct=mode;c.retire='false'
+     helpers.assert_eq(host.open(options),false)
+     helpers.assert_eq(c.created,0);helpers.assert_eq(#c.bridges,0)
+     c.bridge_construct=nil
+     helpers.assert_eq(host.open(options),false,'Original editor debt blocks a healthy constructor')
+     helpers.assert_eq(c.created,0);helpers.assert_eq(#c.bridges,0)
+     c.retire=nil;helpers.assert_eq(host.close(),true,'Original editor retries without native resources')
+     helpers.assert_eq(host.open(options),true);helpers.assert_eq(c.created,1);helpers.assert_eq(host.close(),true)
+    end)
+   end)
+  end
+  helpers.it('(physical-editor-retirement) late Builder refusal keeps editor and acquired view together',function()
+   fixture(function(host,c,options)
+    c.retire='false';c.during_html=function()error('controlled late constructor refusal')end
+    helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1)
+    helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,0)
+    c.during_html=nil;helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1)
+    c.retire=nil;helpers.assert_eq(host.close(),true)
+    helpers.assert_eq(c.delete_calls,1);helpers.assert_eq(c.detach_calls,1)
+   end)
+  end)
+  helpers.it('(physical-editor-retirement) pre-Builder frame exception retains bridge until same-owner retirement retry',function()
+   fixture(function(host,c,options)
+    local builder=package.loaded['ui.ui_builder'];local original_frame=builder.get_centered_frame
+    builder.get_centered_frame=function()error('controlled pre-Builder frame provider exception')end
+    c.retire='false';helpers.assert_eq(host.open(options),false,'Frame exception becomes a closed construction refusal')
+    helpers.assert_eq(c.retired,1,'Construction reservation unwinds before original editor retirement')
+    helpers.assert_eq(c.created,0,'Builder has not acquired a native view')
+    helpers.assert_eq(#c.bridges,1,'Exact acquired bridge remains retained')
+    helpers.assert_eq(c.detach_calls,0,'Editor debt blocks bridge release')
+    c.bridges[1].callback({body={action='ready'}});helpers.assert_eq(c.received,0,'Refused constructor leaves page callbacks inert')
+    builder.get_centered_frame=original_frame
+    helpers.assert_eq(host.open(options),false,'Healthy frame provider cannot bypass original editor debt')
+    helpers.assert_eq(c.retired,2,'Same editor receives the retry')
+    helpers.assert_eq(c.created,0);helpers.assert_eq(#c.bridges,1);helpers.assert_eq(c.detach_calls,0)
+    c.retire=nil;helpers.assert_eq(host.close(),true,'Original editor acknowledgement settles retained bridge')
+    helpers.assert_eq(c.retired,3);helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,1)
+    helpers.assert_eq(c.bridges[1].callback,nil,'Original bridge is detached after acknowledgement')
+    helpers.assert_eq(host.open(options),true,'Only settled original debt admits successor')
+    helpers.assert_eq(c.created,1);helpers.assert_eq(#c.bridges,2);helpers.assert_eq(host.close(),true)
+   end)
+  end)
+  for _,mode in ipairs({'throw','nil','false'})do
+   helpers.it('(physical-editor-constructor) shared constructor refusal precedes native acquisition and permits retry: '..mode,function()
+    fixture(function(host,c,options)
+     local provider=package.loaded['shortcuts.physical_editor_window'];local original_new=provider.new
+     if mode=='throw'then
+      local genuine=assert(loadfile(helpers.shared('lua/shortcuts/physical_editor_window.lua')))()
+      provider.new=function(ports)
+       local constructed,owner=pcall(genuine.new,ports)
+       c.constructor_error=owner
+       if not constructed then error(owner,0)end
+       return owner
+      end
+     else
+      provider.new=function()if mode=='false'then return false end;return nil end
+     end
+     helpers.assert_eq(host.open(options),false,'Incomplete or refused shared constructor gives a closed refusal')
+     if mode=='throw'then
+      helpers.assert_true(tostring(c.constructor_error):find('physical editor port is incomplete',1,true)~=nil,
+       'Actual shared Editor rejects the missing catalogue label port')
+     end
+     helpers.assert_eq(c.created,0);helpers.assert_eq(#c.bridges,0)
+     helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,0);helpers.assert_eq(c.retired,0)
+     provider.new=original_new
+     helpers.assert_eq(host.close(),true,'Pure constructor refusal leaves no native or editor owner debt')
+     helpers.assert_eq(host.open(options),true,'Healthy successor starts after construction reservation unwinds')
+     helpers.assert_eq(c.created,1);helpers.assert_eq(#c.bridges,1);helpers.assert_eq(host.close(),true)
+    end)
+   end)
+  end
  end)
 end
 
