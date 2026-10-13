@@ -1,0 +1,254 @@
+{
+	"version": 1,
+	"vectors": [
+		{
+			"name": "file delay wrong type",
+			"source": "[_meta]\ndelay = true # preserve this typed owner\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "delay",
+			"value": 0.2,
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "delay = true # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "file color wrong type",
+			"source": "[_meta]\ncolor = 42 # preserve this typed owner\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "color",
+			"value": "#112233",
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "color = 42 # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "file show_tooltip wrong type",
+			"source": "[_meta]\nshow_tooltip = \"foreign\" # preserve this typed owner\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "show_tooltip",
+			"value": false,
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "show_tooltip = \"foreign\" # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "file priority wrong type",
+			"source": "[_meta]\npriority = \"foreign\" # preserve this typed owner\ncolor = \"#aabbcc\"\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "priority",
+			"value": 51,
+			"allowed": false,
+			"safe_field": "color",
+			"safe_value": "#445566",
+			"preserve": "priority = \"foreign\" # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "section delay wrong type",
+			"source": "[_meta.sections.\"words.team\"]\ndelay = true # preserve this typed owner\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.2,
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "delay = true # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "section color wrong type",
+			"source": "[_meta.sections.\"words.team\"]\ncolor = 42 # preserve this typed owner\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "color",
+			"value": "#112233",
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "color = 42 # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "section show_tooltip wrong type",
+			"source": "[_meta.sections.\"words.team\"]\nshow_tooltip = \"foreign\" # preserve this typed owner\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "show_tooltip",
+			"value": false,
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "show_tooltip = \"foreign\" # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "section priority wrong type",
+			"source": "[_meta.sections.\"words.team\"]\npriority = \"foreign\" # preserve this typed owner\ncolor = \"#aabbcc\"\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "priority",
+			"value": 51,
+			"allowed": false,
+			"safe_field": "color",
+			"safe_value": "#445566",
+			"preserve": "priority = \"foreign\" # preserve this typed owner",
+			"native_refusal": true
+		},
+		{
+			"name": "file delay ordinary valid edit and clear",
+			"source": "[_meta]\ndelay = 0.125\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "delay",
+			"value": 0.2,
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "section delay ordinary valid edit and clear",
+			"source": "[_meta.sections.\"words.team\"]\ndelay = 0.125\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.2,
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "file color ordinary valid edit and clear",
+			"source": "[_meta]\ncolor = \"#aabbcc\"\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "color",
+			"value": "#112233",
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "section color ordinary valid edit and clear",
+			"source": "[_meta.sections.\"words.team\"]\ncolor = \"#aabbcc\"\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "color",
+			"value": "#112233",
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "file show_tooltip ordinary valid edit and clear",
+			"source": "[_meta]\nshow_tooltip = false\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "show_tooltip",
+			"value": false,
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "section show_tooltip ordinary valid edit and clear",
+			"source": "[_meta.sections.\"words.team\"]\nshow_tooltip = false\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "show_tooltip",
+			"value": false,
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "file priority ordinary valid edit and clear",
+			"source": "[_meta]\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "priority",
+			"value": 51,
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "section priority ordinary valid edit and clear",
+			"source": "[_meta.sections.\"words.team\"]\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "priority",
+			"value": 51,
+			"allowed": true,
+			"preserve": "future = { untouched = [], enabled = false }"
+		},
+		{
+			"name": "invalid legacy delay true",
+			"source": "[_meta.section_delays]\n\"words.team\" = true # preserve legacy data\n[_meta.sections.\"words.team\"]\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.25,
+			"allowed": false,
+			"safe_field": "color",
+			"safe_value": "#445566",
+			"preserve": "\"words.team\" = true # preserve legacy data"
+		},
+		{
+			"name": "invalid legacy delay \"foreign\"",
+			"source": "[_meta.section_delays]\n\"words.team\" = \"foreign\" # preserve legacy data\n[_meta.sections.\"words.team\"]\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.25,
+			"allowed": false,
+			"safe_field": "color",
+			"safe_value": "#445566",
+			"preserve": "\"words.team\" = \"foreign\" # preserve legacy data"
+		},
+		{
+			"name": "invalid legacy delay []",
+			"source": "[_meta.section_delays]\n\"words.team\" = [] # preserve legacy data\n[_meta.sections.\"words.team\"]\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.25,
+			"allowed": false,
+			"safe_field": "color",
+			"safe_value": "#445566",
+			"preserve": "\"words.team\" = [] # preserve legacy data"
+		},
+		{
+			"name": "invalid legacy delay { future = false }",
+			"source": "[_meta.section_delays]\n\"words.team\" = { future = false } # preserve legacy data\n[_meta.sections.\"words.team\"]\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.25,
+			"allowed": false,
+			"safe_field": "color",
+			"safe_value": "#445566",
+			"preserve": "\"words.team\" = { future = false } # preserve legacy data"
+		},
+		{
+			"name": "blocked metadata ancestor []",
+			"source": "[_meta]\nsections = [] # preserve ancestor\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.25,
+			"allowed": false,
+			"safe_file_field": "color",
+			"safe_value": "#445566",
+			"preserve": "sections = [] # preserve ancestor"
+		},
+		{
+			"name": "blocked metadata ancestor \"foreign\"",
+			"source": "[_meta]\nsections = \"foreign\" # preserve ancestor\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.25,
+			"allowed": false,
+			"safe_file_field": "color",
+			"safe_value": "#445566",
+			"preserve": "sections = \"foreign\" # preserve ancestor"
+		},
+		{
+			"name": "valid legacy section delay edit removes only its owned alias",
+			"source": "[_meta.section_delays]\n\"words.team\" = 0.75\nuntouched = 0.9\n[_meta.sections.\"words.team\"]\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"section": "words.team",
+			"field": "delay",
+			"value": 0.25,
+			"allowed": true,
+			"preserve": "untouched = 0.9",
+			"clear": true
+		},
+		{
+			"name": "raw invalid leaf remains unavailable behind valid override",
+			"source": "[_meta]\ndelay = true # preserve raw invalid leaf\ncolor = \"#aabbcc\"\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "delay",
+			"value": 0.25,
+			"legacy": {
+				"delay": 0.5
+			},
+			"allowed": false,
+			"safe_field": "color",
+			"safe_value": "#445566",
+			"preserve": "delay = true # preserve raw invalid leaf"
+		}
+	]
+}
