@@ -250,5 +250,45 @@
 		"run_id": 38424106990,
 		"macos_portable_stubbed": "PASS",
 		"source_sha": "e43f3e6384093f2eaef0f1620259cc6b1a47db69"
+	},
+	"compiled_collection": {
+		"schema_version": 1,
+		"source_sha": "e235a917e2eaab4ab53569e631a9c631acc1b067",
+		"session_id": "ergopti-diagnostic-0ed1933bd2119046b7693564e6e05fbe",
+		"archive_name": "diagnostic-Windows-e235a917e2.zip",
+		"bytes": 7956,
+		"sha256": "965e2d7309251977e8009001446e83f6e8f7b38e550d689ba806ea732ed1526a",
+		"scope": "Actual compiled Diagnostics collection; no functional or physical qualification",
+		"zip_crc": "PASS",
+		"entry_allowlist": "PASS",
+		"redaction_review": "PASS",
+		"component_hashes": "PASS",
+		"passed": 6,
+		"unrun": 6,
+		"skipped": 2,
+		"failed": 0,
+		"webview_cold_open": "FAIL cache invalidation TimeoutError; native fallback worked; reopen worked"
+	},
+	"local_build": {
+		"channel": "dev",
+		"compiler_exit": 0,
+		"bytes": 11037184,
+		"version": "0.0.0-dev",
+		"source_sha": "e235a917e2eaab4ab53569e631a9c631acc1b067",
+		"artifact": "ErgoptiPlus-e235a917e2.exe",
+		"scope": "Local compiled development artifact; not a release verdict",
+		"sha256": "ef96387dc8efbaedee9d3ca06370ce044ef9e35443244ba61849488a8ec92c6d"
+	},
+	"collection_close_reopen": {
+		"same_session": true,
+		"reopened_original_archive": true,
+		"close_completed": 10,
+		"close_phase": "guided",
+		"second_explicit_skip_archive": true,
+		"no_forced_cleanup": true,
+		"host_exit_code": "Not separately captured by observer",
+		"cancel_control_created": false,
+		"archive_open_action_invoked": true,
+		"archive_open_confirmed": true
 	}
 }
