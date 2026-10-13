@@ -35,6 +35,9 @@ HEADER_INPUTS = tuple(
         "OwnedImageAliasCompatibility.h",
         "OwnedSuspendedImageCompatibility.h",
         "OwnedListenerEventCompatibility.h",
+        "OwnedRuntimeSignatureCompatibility.h",
+        "OwnedInstalledConfiguration.h",
+        "OwnedChildReapingCompatibility.h",
     )
 )
 RUNTIME_INPUTS = (

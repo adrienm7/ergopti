@@ -419,6 +419,10 @@ function M.walk_system_event(entry)
 		Physical.walk_press(entry, C, S)
 		return
 	end
+	if entry.action == "physical_release" then
+		Physical.walk_release(entry, C, S)
+		return
+	end
 	local date_str = entry.timestamp:sub(1, 10)
 	local action   = entry.action
 	if action == "manifest_increment" and MANIFEST_STAT_FIELDS[entry.stat] then

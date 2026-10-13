@@ -102,6 +102,26 @@ local function mark_context(component, complete)
 	end
 end
 
+--- Reads only native window identity while the exact correlated writer owns it.
+local function observe_window_identity(window)
+	local frame = _context_transaction
+	if not frame or not frame.binding.correlated then return end
+	local function current()
+		return rawequal(_context_transaction, frame) and rawequal(_physical_context_binding, frame.binding)
+			and frame.binding.channel.owns(frame.ticket)
+	end
+	if not current() then return end
+	local ok_app, app = pcall(function() return window:application() end)
+	if not current() then return end
+	local pid
+	if ok_app and app then
+		local ok_pid, value = pcall(function() return app:pid() end)
+		if not current() then return end
+		if ok_pid and math.type(value) == "integer" and value > 0 then pid = value end
+	end
+	frame.binding.channel.mark_window_pid(frame.ticket, pid)
+end
+
 local function secure_element_observer(app_pid)
 	if not _context_transaction or not _physical_context_binding then return nil end
 	return function(complete)
@@ -178,7 +198,13 @@ local function bind_context_observer(owner, capacity, receive, on_refused, may_p
 			if guard and guard() ~= true then error("Physical context sample clock owner changed", 0) end
 			return at
 		end,
-		function(record) return receive(record, binding.token) end,
+		function(record)
+			local guard = binding.sample_guard
+			if guard and guard() ~= true then error("Physical context sample owner unavailable before receipt", 0) end
+			local accepted = receive(record, binding.token)
+			if guard and guard() ~= true then error("Physical context sample owner changed during receipt", 0) end
+			return accepted
+		end,
 		function(reason) Logger.callback(LOG, "Physical context refusal observer", on_refused, reason) end, correlated, binding)
 	_physical_context_binding = binding
 	local accepted, reason = binding.channel.seed()
@@ -202,6 +228,177 @@ end
 ---@return table|nil scope Exact callback ownership and post-frame retirement, also on acquired bootstrap failure.
 function M.bind_physical_context_observer(owner, capacity, receive, on_refused, may_persist)
 	return bind_context_observer(owner, capacity, receive, on_refused, may_persist)
+end
+
+--- Binds explicit native window/app PID correlation through the same owner slot.
+--- Correlation is observed field evidence; retained permission history is separate.
+---@param owner table Exact trusted caller identity, compared without equality hooks.
+---@param capacity integer Maximum acknowledged receipts before exact replacement.
+---@param receive function Receives (copied record, exact detach token), accepting true.
+---@param on_refused function Once-only terminal denial notification.
+---@param may_persist function Existing authoritative persistence decision, accepting true.
+---@return boolean bound False if the initial denied observation is refused.
+---@return table|string token Exact detach token or refusal reason.
+---@return table|nil scope Exact callback ownership and post-frame retirement, also on acquired bootstrap failure.
+function M.bind_physical_correlated_context_observer(owner, capacity, receive, on_refused, may_persist)
+	return bind_context_observer(owner, capacity, receive, on_refused, may_persist, true)
+end
+
+--- Samples fresh physical permission without changing legacy app/window/AX ownership.
+--- Literal true acknowledges the observation, including denied/incomplete receipts.
+---@param owner table Exact owner of the already-bound correlated subscription.
+---@param token table Exact token returned by that subscription.
+---@return boolean acknowledged No permission or capture authority is implied.
+function M.sample_physical_context(owner, token)
+	local binding, state, pause_port = _physical_context_binding, _state, _is_paused
+	if not binding or not binding.correlated or not rawequal(owner, binding.owner)
+		or not rawequal(token, binding.token) or not state then return false end
+	local previous_guard = binding.sample_guard
+	local results = table.pack(pcall(binding.channel.run_writer, function()
+		local native_probe
+		local ticket = binding.channel.begin("fresh_lease_sample")
+		if ticket == nil then return false end
+		-- Unknown writer names do not reset every cached field in the channel.
+		for _, field in ipairs({ "app", "window", "secure" }) do binding.channel.mark(ticket, field, false) end
+		binding.channel.mark_app_pid(ticket, nil)
+		binding.channel.mark_window_pid(ticket, nil)
+		local keys = { "is_enabled", "active_app_name", "active_app_bundle", "active_app_path",
+			"active_app_pid", "active_app_start", "private_filter_enabled", "secure_field_filter_enabled",
+			"system_auth_filter_enabled", "disabled_apps", "is_private_window", "is_secure_field", "ax_observer" }
+		local original = {}
+		for _, key in ipairs(keys) do original[key] = rawget(state, key) end
+		local function stable()
+			if not rawequal(_physical_context_binding, binding) or not rawequal(_state, state)
+				or not rawequal(_is_paused, pause_port) then return false end
+			for _, key in ipairs(keys) do
+				if not rawequal(rawget(state, key), original[key]) then return false end
+			end
+			return true
+		end
+		local sampling = false
+		local function fence()
+			if not stable() or (native_probe ~= nil and not native_probe.current()) then return false end
+			if sampling then
+				local ok, live_paused = pcall(pause_port)
+				if not stable() or (native_probe ~= nil and not native_probe.current()) then return false end
+				if not ok or live_paused ~= false then
+					binding.channel.refuse("Physical context sample pause changed")
+					return false
+				end
+			end
+			return true
+		end
+		local function current() return (native_probe == nil or native_probe.current()) and fence() and binding.channel.owns(ticket) end
+		local function read(operation)
+			if not current() then return false end
+			local ok, value = pcall(operation)
+			if not current() then return false end
+			return ok, value
+		end
+		local function finish(observed, paused, permission)
+			if not current() then return false end
+			local accepted = binding.channel.finish(ticket, observed, paused, permission)
+			return accepted == true and fence()
+		end
+		if type(pause_port) ~= "function" then return binding.channel.refuse("Missing physical context pause predicate") end
+		local ok_pause, paused = read(pause_port)
+		if not current() then return false end
+		if not ok_pause or type(paused) ~= "boolean" then
+			return binding.channel.refuse("Invalid physical context pause predicate")
+		end
+		if original.is_enabled ~= true or paused then return finish({}, paused, function() return false end) end
+		-- Retain actual native API identities only for an enabled unpaused sample.
+		native_probe = require("adapters.physical_context_probe").snapshot()
+		-- Bounded guards belong only to this explicit sample, never a pause poller.
+		sampling, binding.sample_guard = true, fence
+		local observed = { private_filter_enabled = original.private_filter_enabled,
+			secure_field_filter_enabled = original.secure_field_filter_enabled,
+			system_auth_filter_enabled = original.system_auth_filter_enabled, disabled_apps = original.disabled_apps }
+		local ok_app, app = read(function() return native_probe.frontmost_application() end)
+		if not current() then return false end
+		if not ok_app or app == nil then return finish(observed, paused, function() return false end) end
+		local app_known = true
+		for _, property in ipairs({ { "name", "active_app_name" }, { "bundleID", "active_app_bundle" },
+			{ "path", "active_app_path" }, { "pid", "active_app_pid" } }) do
+			local ok, value = read(function() return app[property[1]](app) end)
+			if not current() then return false end
+			observed[property[2]], app_known = value, app_known and ok
+		end
+		local app_pid = math.type(observed.active_app_pid) == "integer" and observed.active_app_pid > 0
+			and observed.active_app_pid or nil
+		binding.channel.mark(ticket, "app", app_known and app_pid ~= nil)
+		binding.channel.mark_app_pid(ticket, app_pid)
+		local ok_window, window = read(function() return native_probe.focused_window() end)
+		if not current() then return false end
+		if ok_window and window ~= nil then
+			local ok_application, window_app = read(function() return window:application() end)
+			if not current() then return false end
+			if ok_application and window_app ~= nil then
+				local ok_pid, window_pid = read(function() return window_app:pid() end)
+				if not current() then return false end
+				binding.channel.mark_window_pid(ticket, ok_pid and math.type(window_pid) == "integer"
+					and window_pid > 0 and window_pid or nil)
+			end
+			local ok_title, title = read(function() return window:title() end)
+			if not current() then return false end
+			if ok_title and type(title) == "string" then
+				local ok_keywords, keywords = read(get_private_keywords)
+				if not current() then return false end
+				if ok_keywords then
+					local ok_private, private = read(function() return PrivateWindow.matches(title, keywords) end)
+					if not current() then return false end
+					if ok_private and type(private) == "boolean" then
+						observed.is_private_window = private
+						binding.channel.mark(ticket, "window", true)
+					end
+				end
+			end
+		end
+		-- Reuse the existing secure classifier, fencing EACH actual AX read.
+		-- The proxy never enters CoreState or a native watcher registration.
+		local pid = observed.active_app_pid
+		if math.type(pid) == "integer" and pid > 0 then
+			local ok_element, app_element = read(function() return native_probe.application_element(pid) end)
+			if not current() then return false end
+			if ok_element and app_element ~= nil then
+				local ok_focus, focused = read(function() return app_element:attributeValue("AXFocusedUIElement") end)
+				if not current() then return false end
+				if ok_focus and focused ~= nil then
+					local complete = false
+					local proxy = { attributeValue = function(_, attribute)
+						local ok, value = read(function() return focused:attributeValue(attribute) end)
+						if not ok then error("Physical context AX observation refused", 0) end
+						return value
+					end }
+					local ok_secure, secure = read(function()
+						return SecureFieldDetector.isElementSecure(proxy, function(known) if current() then complete = known == true end end)
+					end)
+					if not current() then return false end
+					local ok_sensitive, sensitive = read(function() return SecureFieldDetector.isSecureApp(observed.active_app_name) end)
+					if not current() then return false end
+					if ok_secure and type(secure) == "boolean" and ok_sensitive and type(sensitive) == "boolean" then
+						observed.is_secure_field = secure or sensitive
+						binding.channel.mark(ticket, "secure", complete)
+					end
+				end
+			end
+		end
+		local function permission()
+			if not current() then return false end
+			for _, key in ipairs({ "active_app_name", "active_app_bundle", "active_app_path", "active_app_pid" }) do
+				if not rawequal(observed[key], original[key]) then return false end
+			end
+			local allowed = require("modules.keylogger.privacy_context").allows_logging(observed)
+			if not current() or allowed ~= true then return false end
+			local permitted = binding.may_persist()
+			if not current() then return false end
+			return permitted
+		end
+		return finish(observed, paused, permission)
+	end))
+	binding.sample_guard = previous_guard
+	if not results[1] then error(results[2], 0) end
+	return table.unpack(results, 2, results.n)
 end
 
 --- Detaches only the exact owner and token, including a retired subscription.
@@ -617,6 +814,7 @@ function M.update_private_status()
 	_state.session_document_path = nil
 
 	if not win then return end
+	observe_window_identity(win)
 
 	-- hs.window:isFullScreen() returns nil for a window that does not expose the
 	-- attribute, and is_fullscreen feeds an INTEGER NOT NULL column — coerce to a

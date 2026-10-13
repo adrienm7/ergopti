@@ -1,0 +1,765 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#include <cxxopts.hpp>
+#pragma clang diagnostic pop
+
+#include "complex_modifications_assets_file.hpp"
+#include "console_user_server_client.hpp"
+#include "constants.hpp"
+#include "core_service_daemon_client.hpp"
+#include "dispatcher_utility.hpp"
+#include "duktape_utility.hpp"
+#include "environment_variable_utility.hpp"
+#include "filesystem_utility.hpp"
+#include "json_utility.hpp"
+#include "karabiner_version.h"
+#include "logger.hpp"
+#include "monitor/configuration_monitor.hpp"
+#include "run_loop_thread_utility.hpp"
+#include "set_variables_from_stdin.hpp"
+#include "watch_multitouch_extension_variables.hpp"
+#include "hs274-stream-cli.hpp"
+#include "hs274-installed-cli.hpp"
+#include "hs274-stream-clock.hpp"
+#include <filesystem>
+#include <functional>
+#include <iostream>
+#include <pqrs/gsl.hpp>
+#include <pqrs/thread_wait.hpp>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <sys/stat.h>
+
+namespace {
+void apply_core_configuration_function(std::function<void(pqrs::not_null_shared_ptr_t<krbn::core_configuration::core_configuration>)> function) {
+  auto wait = pqrs::make_thread_wait();
+  krbn::configuration_monitor monitor(krbn::constants::get_user_core_configuration_file_path(),
+                                      geteuid(),
+                                      krbn::core_configuration::error_handling::loose);
+
+  monitor.core_configuration_updated.connect([wait, function](auto&& weak_core_configuration) {
+    if (auto core_configuration = weak_core_configuration.lock()) {
+      function(core_configuration);
+    }
+    wait->notify();
+  });
+
+  monitor.async_start();
+
+  wait->wait_notice();
+}
+
+void select_profile(const std::string& name) {
+  apply_core_configuration_function([name](auto core_configuration) {
+    auto& profiles = core_configuration->get_profiles();
+    for (size_t i = 0; i < profiles.size(); ++i) {
+      if (profiles[i]->get_name() == name) {
+        core_configuration->select_profile(i);
+        core_configuration->sync_save_to_file();
+        return;
+      }
+    }
+    krbn::logger::get_logger()->error("`{0}` is not found.", name);
+  });
+}
+
+void show_current_profile_name() {
+  apply_core_configuration_function([](auto core_configuration) {
+    std::cout << core_configuration->get_selected_profile().get_name() << std::endl;
+  });
+}
+
+void list_profile_names() {
+  apply_core_configuration_function([](auto core_configuration) {
+    for (const auto& profile : core_configuration->get_profiles()) {
+      std::cout << profile->get_name() << std::endl;
+    }
+  });
+}
+
+void list_connected_devices() {
+  try {
+    auto wait = pqrs::make_thread_wait();
+
+    krbn::core_service_daemon_client client;
+
+    client.connect_failed.connect([&wait](auto&& error_code) {
+      std::cerr << "list-connected-devices error:" << error_code << std::endl;
+      wait->notify();
+    });
+
+    client.connected.connect([&client] {
+      client.async_observe_connected_devices();
+    });
+
+    client.received.connect([&wait](auto&& operation_type,
+                                    auto&& json) {
+      try {
+        switch (operation_type) {
+          case krbn::operation_type::connected_devices: {
+            std::cout << krbn::json_utility::dump(json.at("connected_devices")) << std::endl;
+            wait->notify();
+            break;
+          }
+
+          default:
+            break;
+        }
+      } catch (std::exception& e) {
+        std::cerr << "list-connected-devices error:" << std::endl
+                  << e.what() << std::endl;
+      }
+    });
+
+    client.async_start();
+
+    wait->wait_notice();
+  } catch (std::exception& e) {
+    std::cerr << "list-connected-devices error:" << std::endl
+              << e.what() << std::endl;
+  }
+}
+
+void list_system_variables() {
+  try {
+    auto wait = pqrs::make_thread_wait();
+
+    krbn::core_service_daemon_client client;
+
+    client.connect_failed.connect([&wait](auto&& error_code) {
+      std::cerr << "list-system-variables error:" << error_code << std::endl;
+      wait->notify();
+    });
+
+    client.connected.connect([&client] {
+      client.async_get_system_variables();
+    });
+
+    client.received.connect([&wait](auto&& operation_type,
+                                    auto&& json) {
+      try {
+        switch (operation_type) {
+          case krbn::operation_type::system_variables: {
+            std::cout << krbn::json_utility::dump(json.at("system_variables")) << std::endl;
+            wait->notify();
+            break;
+          }
+
+          default:
+            break;
+        }
+      } catch (std::exception& e) {
+        std::cerr << "list-system-variables error:" << std::endl
+                  << e.what() << std::endl;
+      }
+    });
+
+    client.async_start();
+
+    wait->wait_notice();
+  } catch (std::exception& e) {
+    std::cerr << "list-system-variables error:" << std::endl
+              << e.what() << std::endl;
+  }
+}
+
+void list_multitouch_extension_variables() {
+  try {
+    auto wait = pqrs::make_thread_wait();
+
+    krbn::core_service_daemon_client client;
+
+    client.connect_failed.connect([&wait](auto&& error_code) {
+      std::cerr << "list-multitouch-extension-variables error:" << error_code << std::endl;
+      wait->notify();
+    });
+
+    client.connected.connect([&client] {
+      client.async_get_multitouch_extension_variables();
+    });
+
+    client.received.connect([&wait](auto&& operation_type,
+                                    auto&& json) {
+      try {
+        switch (operation_type) {
+          case krbn::operation_type::multitouch_extension_variables: {
+            std::cout << krbn::json_utility::dump(json.at("multitouch_extension_variables")) << std::endl;
+            wait->notify();
+            break;
+          }
+
+          default:
+            break;
+        }
+      } catch (std::exception& e) {
+        std::cerr << "list-multitouch-extension-variables error:" << std::endl
+                  << e.what() << std::endl;
+      }
+    });
+
+    client.async_start();
+
+    wait->wait_notice();
+  } catch (std::exception& e) {
+    std::cerr << "list-multitouch-extension-variables error:" << std::endl
+              << e.what() << std::endl;
+  }
+}
+
+void set_variables(const std::string& variables) {
+  try {
+    auto json = krbn::json_utility::parse_jsonc(variables);
+
+    auto wait = pqrs::make_thread_wait();
+
+    krbn::core_service_daemon_client client;
+    client.connect_failed.connect([wait](auto&& error_code) {
+      std::cerr << "set-variables error:" << error_code << std::endl;
+      wait->notify();
+    });
+    client.connected.connect([&client, &json, wait] {
+      client.async_set_variables_with_completion_handler(
+          json,
+          [wait](auto&&) {
+            wait->notify();
+          });
+    });
+
+    client.async_start();
+
+    wait->wait_notice();
+  } catch (std::exception& e) {
+    std::cerr << "set-variables error:" << std::endl
+              << e.what() << std::endl;
+  }
+}
+
+int copy_current_profile_to_system_default_profile() {
+  if (!krbn::filesystem_utility::create_directories(krbn::constants::get_system_configuration_directory())) {
+    return 1;
+  }
+
+  if (krbn::filesystem_utility::is_directory(krbn::constants::get_system_configuration_directory())) {
+    if (!krbn::filesystem_utility::permissions(krbn::constants::get_system_configuration_directory(),
+                                               krbn::filesystem_utility::permissions_0755)) {
+      return 1;
+    }
+  }
+
+  if (!krbn::filesystem_utility::copy(krbn::constants::get_user_core_configuration_file_path(),
+                                      krbn::constants::get_system_core_configuration_file_path(),
+                                      std::filesystem::copy_options::overwrite_existing)) {
+    return 1;
+  }
+
+  if (!krbn::filesystem_utility::permissions(krbn::constants::get_system_core_configuration_file_path(),
+                                             krbn::filesystem_utility::permissions_0644)) {
+    return 1;
+  }
+
+  return 0;
+}
+
+int remove_system_default_profile() {
+  if (!krbn::filesystem_utility::exists(krbn::constants::get_system_core_configuration_file_path())) {
+    krbn::logger::get_logger()->error("{0} is not found.",
+                                      krbn::constants::get_system_core_configuration_file_path().string());
+    return 1;
+  }
+
+  if (!krbn::filesystem_utility::remove(krbn::constants::get_system_core_configuration_file_path())) {
+    return 1;
+  }
+
+  return 0;
+}
+
+void show_settings_window_guidance() {
+  try {
+    auto wait = pqrs::make_thread_wait();
+
+    krbn::console_user_server_client client(geteuid());
+
+    client.connect_failed.connect([&wait](auto&& error_code) {
+      std::cerr << "show-settings-window-guidance error:" << error_code << std::endl;
+      wait->notify();
+    });
+
+    client.connected.connect([&client] {
+      client.async_get_settings_window_guidance();
+    });
+
+    client.received.connect([&wait](auto&& operation_type,
+                                    auto&& json) {
+      switch (operation_type) {
+        case krbn::operation_type::settings_window_guidance: {
+          std::cout << krbn::json_utility::dump(json.at("settings_window_guidance")) << std::endl;
+          wait->notify();
+          break;
+        }
+
+        default:
+          break;
+      }
+    });
+
+    client.async_start();
+
+    wait->wait_notice();
+  } catch (std::exception& e) {
+    std::cerr << "show-settings-window-guidance error:" << std::endl
+              << e.what() << std::endl;
+  }
+}
+} // namespace
+
+int main(int argc, char** argv) {
+  umask(0022);
+
+  //
+  // Initialize
+  //
+
+  auto scoped_dispatcher_manager = krbn::dispatcher_utility::initialize_dispatchers();
+  auto scoped_run_loop_thread_manager = krbn::run_loop_thread_utility::initialize_scoped_run_loop_thread_manager(
+      pqrs::cf::run_loop_thread::failure_policy::exit);
+
+  //
+  // Load custom environment variables
+  //
+
+  auto environment_variables = krbn::environment_variable_utility::load_custom_environment_variables();
+  // for (const auto& [k, v] : environment_variables) {
+  //   std::cout << "setenv: " << k << " = " << v << std::endl;
+  // }
+
+  //
+  // Setup logger
+  //
+
+  krbn::logger::set_stdout_color_logger("karabiner_cli",
+                                        "[%l] %v");
+
+  //
+  // Setup options
+  //
+
+  cxxopts::Options options("karabiner_cli",
+                           "A command line utility of Karabiner-Elements");
+
+  options.add_options()("hs274-clock", "Describe the physical timestamp timebase");
+
+  options.add_options()("installed-physical-capture",
+                        "Observe the authenticated installed physical source",
+                        cxxopts::value<int>(), "polling-interval-in-milliseconds");
+
+  options.add_options()("hs274-capture",
+                        "Observe the experimental physical fixture stream",
+                        cxxopts::value<int>(), "polling-interval-in-milliseconds");
+
+  options.add_options()("select-profile",
+                        "Select a profile by name", cxxopts::value<std::string>());
+
+  options.add_options()("show-current-profile-name",
+                        "Show current profile name");
+
+  options.add_options()("list-profile-names",
+                        "Show all profile names");
+
+  options.add_options()("list-connected-devices",
+                        "Show all connected devices");
+
+  options.add_options()("list-system-variables",
+                        "Show all system variables");
+
+  options.add_options()("list-multitouch-extension-variables",
+                        "Show all multitouch extension variables");
+
+  options.add_options()("watch-multitouch-extension-variables",
+                        "Watch multitouch extension variables and print all of them in one line whenever any variable changes",
+                        cxxopts::value<int>()->implicit_value("500"),
+                        "polling-interval-in-milliseconds");
+
+  options.add_options()("set-variables",
+                        "Json string: {[key: string]: number|boolean|string}",
+                        cxxopts::value<std::string>());
+
+  options.add_options()("set-variables-from-stdin",
+                        "Read one variables JSON object per line from stdin");
+
+  options.add_options()("copy-current-profile-to-system-default-profile",
+                        "Copy the current profile to system default profile");
+
+  options.add_options()("remove-system-default-profile",
+                        "Remove the system default profile");
+
+  options.add_options()("show-settings-window-guidance",
+                        "Show the settings window guidance state");
+
+  options.add_options()("lint-complex-modifications",
+                        "Validate complex modifications JSON and JavaScript files for distribution",
+                        cxxopts::value<std::vector<std::string>>(),
+                        "glob-patterns");
+
+  options.add_options()("format-json",
+                        "Format json files",
+                        cxxopts::value<std::vector<std::string>>(),
+                        "glob-patterns");
+
+  options.add_options()("eval-js",
+                        "Run javascript files using Duktape",
+                        cxxopts::value<std::vector<std::string>>(),
+                        "glob-patterns");
+
+  options.add_options()("eval-js-to-json",
+                        "Evaluate a JavaScript file and print the returned object as JSON",
+                        cxxopts::value<std::string>(),
+                        "file");
+
+  options.add_options()("version",
+                        "Displays version");
+
+  options.add_options()("version-number",
+                        "Displays version_number");
+
+  options.add_options()("help",
+                        "Print help");
+
+  options.add_options()("silent",
+                        "Suppress messages",
+                        cxxopts::value<bool>()->default_value("false"));
+
+  options.add_options()("verbose",
+                        "Print variables successfully set by --set-variables-from-stdin",
+                        cxxopts::value<bool>()->default_value("false"));
+
+  options.parse_positional({
+      "lint-complex-modifications",
+      "format-json",
+      "eval-js",
+  });
+
+  //
+  // Run
+  //
+
+  int exit_code = 0;
+
+  try {
+    auto parse_result = options.parse(argc, argv);
+
+    bool silent = parse_result["silent"].as<bool>();
+
+    if (parse_result.count("installed-physical-capture")) {
+      try {
+        exit_code = krbn::cli::installed_capture::run(
+            parse_result["installed-physical-capture"].as<int>());
+      } catch (const std::exception&) {
+        std::cerr << "Installed physical source admission refused" << std::endl;
+        exit_code = 1;
+      }
+      goto finish;
+    }
+
+    if (parse_result.count("hs274-clock")) {
+      try {
+        std::cout << hs274_clock::information().dump() << std::endl;
+      } catch (const std::exception& error) {
+        std::cerr << error.what() << std::endl;
+        exit_code = 1;
+      }
+      goto finish;
+    }
+
+    if (parse_result.count("hs274-capture")) {
+      exit_code = krbn::cli::hs274_capture::run(parse_result["hs274-capture"].as<int>());
+      goto finish;
+    }
+
+    {
+      std::string key = "select-profile";
+      if (parse_result.count(key)) {
+        select_profile(parse_result[key].as<std::string>());
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "show-current-profile-name";
+      if (parse_result.count(key)) {
+        show_current_profile_name();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "list-profile-names";
+      if (parse_result.count(key)) {
+        list_profile_names();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "list-connected-devices";
+      if (parse_result.count(key)) {
+        list_connected_devices();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "list-system-variables";
+      if (parse_result.count(key)) {
+        list_system_variables();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "list-multitouch-extension-variables";
+      if (parse_result.count(key)) {
+        list_multitouch_extension_variables();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "watch-multitouch-extension-variables";
+      if (parse_result.count(key)) {
+        exit_code = krbn::cli::watch_multitouch_extension_variables::run(parse_result[key].as<int>());
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "set-variables";
+      if (parse_result.count(key)) {
+        set_variables(parse_result[key].as<std::string>());
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "set-variables-from-stdin";
+      if (parse_result.count(key)) {
+        krbn::cli::set_variables_from_stdin::runner runner(
+            parse_result["verbose"].as<bool>());
+        exit_code = runner.run(std::cin);
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "copy-current-profile-to-system-default-profile";
+      if (parse_result.count(key)) {
+        if (geteuid() != 0) {
+          krbn::logger::get_logger()->error("--{0} requires root privilege.", key);
+          exit_code = 1;
+          goto finish;
+        }
+        exit_code = copy_current_profile_to_system_default_profile();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "remove-system-default-profile";
+      if (parse_result.count(key)) {
+        if (geteuid() != 0) {
+          krbn::logger::get_logger()->error("--{0} requires root privilege.", key);
+          exit_code = 1;
+          goto finish;
+        }
+        exit_code = remove_system_default_profile();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "show-settings-window-guidance";
+      if (parse_result.count(key)) {
+        show_settings_window_guidance();
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "lint-complex-modifications";
+      if (parse_result.count(key)) {
+        auto glob_patterns = parse_result[key].as<std::vector<std::string>>();
+        for (const auto& glob_pattern : glob_patterns) {
+          for (const auto& file_path : glob::glob(glob_pattern)) {
+            if (!silent) {
+              std::cout << file_path.string() << ": ";
+            }
+
+            try {
+              auto assets_file = krbn::complex_modifications_assets_file(file_path.string(),
+                                                                         krbn::core_configuration::error_handling::strict);
+              auto error_messages = assets_file.lint();
+              if (error_messages.empty()) {
+                if (!silent) {
+                  std::cout << "ok" << std::endl;
+                }
+
+              } else {
+                exit_code = 1;
+
+                for (const auto& e : error_messages) {
+                  std::cout << e << std::endl;
+                }
+                goto finish;
+              }
+
+            } catch (std::exception& e) {
+              exit_code = 1;
+              std::cout << e.what() << std::endl;
+              goto finish;
+            }
+          }
+        }
+
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "format-json";
+      if (parse_result.count(key)) {
+        auto glob_patterns = parse_result[key].as<std::vector<std::string>>();
+        for (const auto& glob_pattern : glob_patterns) {
+          for (const auto& file_path : glob::glob(glob_pattern)) {
+            if (!silent) {
+              std::cout << "formatting " << file_path.string() << std::endl;
+            }
+
+            std::ifstream input(file_path);
+            if (input) {
+              try {
+                auto json = krbn::json_utility::parse_ordered_jsonc(input);
+
+                auto status = krbn::filesystem_utility::status(file_path);
+                if (!status) {
+                  exit_code = 1;
+                  std::cerr << fmt::format("status error in {0}", file_path.string()) << std::endl;
+                  continue;
+                }
+                krbn::json_writer::save_to_file(json,
+                                                file_path,
+                                                status->permissions());
+              } catch (std::exception& e) {
+                exit_code = 1;
+                std::cerr << fmt::format("parse error in {0}: {1}", file_path.string(), e.what()) << std::endl;
+                goto finish;
+              }
+            }
+          }
+        }
+
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "eval-js-to-json";
+      if (parse_result.count(key)) {
+        auto file_path = parse_result[key].as<std::string>();
+
+        try {
+          if (auto code = krbn::filesystem_utility::read_file(file_path)) {
+            auto result = krbn::duktape_utility::eval_string_to_json(*code, false);
+            pqrs::json::requires_object(result.json, "javascript result");
+            std::cout << krbn::json_utility::dump(result.json) << std::endl;
+          } else {
+            throw std::runtime_error(fmt::format("failed to open {0}", file_path));
+          }
+        } catch (std::exception& e) {
+          exit_code = 1;
+          std::cerr << e.what() << std::endl;
+        }
+
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "eval-js";
+      if (parse_result.count(key)) {
+        auto glob_patterns = parse_result[key].as<std::vector<std::string>>();
+        for (const auto& glob_pattern : glob_patterns) {
+          for (const auto& file_path : glob::glob(glob_pattern)) {
+            try {
+              auto log_messages = krbn::duktape_utility::eval_file_with_fs_access(file_path);
+              if (!log_messages.empty()) {
+                std::cout << log_messages << std::endl;
+              }
+            } catch (std::exception& e) {
+              exit_code = 1;
+              std::cerr << e.what() << std::endl;
+              goto finish;
+            }
+          }
+        }
+
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "version";
+      if (parse_result.count(key)) {
+        std::cout << karabiner_version << std::endl;
+        goto finish;
+      }
+    }
+
+    {
+      std::string key = "version-number";
+      if (parse_result.count(key)) {
+        int n = 0;
+        std::string number;
+
+        for (const auto& c : std::string_view(karabiner_version)) {
+          if (c == '.') {
+            if (!number.empty()) {
+              n += stoi(number);
+              number.clear();
+            }
+            n *= 100;
+
+          } else {
+            number += c;
+          }
+        }
+
+        if (!number.empty()) {
+          n += stoi(number);
+          number.clear();
+        }
+
+        std::cout << n << std::endl;
+        goto finish;
+      }
+    }
+
+  } catch (const cxxopts::exceptions::exception& e) {
+    std::cout << "error parsing options: " << e.what() << std::endl;
+    exit_code = 2;
+    goto finish;
+  }
+
+  options.show_positional_help();
+  std::cout << options.help() << std::endl;
+  std::cout << "Examples:" << std::endl;
+  std::cout << "  karabiner_cli --select-profile 'Default profile'" << std::endl;
+  std::cout << "  karabiner_cli --show-current-profile-name" << std::endl;
+  std::cout << "  karabiner_cli --list-profile-names" << std::endl;
+  std::cout << "  karabiner_cli --set-variables '{\"cli_flag1\":1, \"cli_flag2\":2}'" << std::endl;
+  std::cout << "  printf '{\"cli_flag1\":1}\\n{\"cli_flag2\":2}\\n' | karabiner_cli --set-variables-from-stdin --verbose" << std::endl;
+  std::cout << std::endl;
+
+  exit_code = 1;
+
+finish:
+  return exit_code;
+}

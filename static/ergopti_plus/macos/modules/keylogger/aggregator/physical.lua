@@ -3,6 +3,24 @@
 --- Aggregates already validated physical presses independently of logical text.
 --- Capture ownership must be established by the producer's consumer before logging.
 local M = {}
+local Wire = require("modules.keylogger.physical_wire")
+local Release = require("keylogger.physical_release")
+
+--- Validates original physical attribution before changing aggregate state.
+---@param entry table Original capture, exact device, keycode, app and timestamp.
+local function require_attribution(entry)
+	assert(type(entry.capture) == "string" and entry.capture ~= "",
+		"Physical press requires capture ownership")
+	assert(type(entry.device) == "string" and entry.device:match("^[1-9]%d*$"),
+		"Physical press requires an exact device identifier")
+	Wire.decimal(entry.device, true)
+	assert(type(entry.keycode) == "number" and entry.keycode >= 0
+		and entry.keycode % 1 == 0, "Physical press requires an integer keycode")
+	assert(type(entry.app) == "string" and entry.app ~= "",
+		"Physical press requires its captured application")
+	assert(type(entry.timestamp) == "string" and entry.timestamp:match("^%d%d%d%d%-%d%d%-%d%d "),
+		"Physical press requires its captured timestamp")
+end
 
 --- Returns the common ergonomic row for either input channel.
 ---@param date string Captured calendar date.
@@ -41,16 +59,7 @@ end
 ---@param C table Aggregator operations owned by the caller.
 ---@param S table Aggregator state owned by the caller.
 function M.walk_press(entry, C, S)
-	assert(type(entry.capture) == "string" and entry.capture ~= "",
-		"Physical press requires capture ownership")
-	assert(type(entry.device) == "string" and entry.device:match("^[1-9]%d*$"),
-		"Physical press requires an exact device identifier")
-	assert(type(entry.keycode) == "number" and entry.keycode >= 0
-		and entry.keycode % 1 == 0, "Physical press requires an integer keycode")
-	assert(type(entry.app) == "string" and entry.app ~= "",
-		"Physical press requires its captured application")
-	assert(type(entry.timestamp) == "string" and entry.timestamp:match("^%d%d%d%d%-%d%d%-%d%d "),
-		"Physical press requires its captured timestamp")
+	require_attribution(entry)
 
 	local date = entry.timestamp:sub(1, 10)
 	local key = date .. "\1" .. entry.app
@@ -67,6 +76,20 @@ function M.walk_press(entry, C, S)
 		ctx.physical = physical
 	end
 	M.advance_streak(ergo, physical, C.KC_TO_FINGER[entry.keycode])
+end
+
+--- Credits one approved release solely to the existing hold aggregate.
+---@param entry table Original physical attribution and HID-derived hold_ms.
+---@param C table Aggregator operations owned by the caller.
+---@param S table Aggregator state owned by the caller.
+function M.walk_release(entry, C, S)
+	require_attribution(entry)
+	local hold_ms = Release.duration(entry.hold_ms)
+	local date = entry.timestamp:sub(1, 10)
+	local key = date .. "\1" .. entry.app .. "\1" .. tostring(entry.keycode)
+	local row = C.gc(S.agg_batch.kc_hold, key, { date = date, app = entry.app, keycode = entry.keycode,
+		sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 })
+	Release.accumulate(row, hold_ms, C.HOLD_THRESHOLD_MS)
 end
 
 return M

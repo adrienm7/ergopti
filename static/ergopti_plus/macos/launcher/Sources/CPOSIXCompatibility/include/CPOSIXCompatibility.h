@@ -11,10 +11,13 @@
 #endif
 
 #include "OwnedProgramCompatibility.h"
+#include "OwnedChildReapingCompatibility.h"
+#include "OwnedInstalledConfiguration.h"
 #include "LoopbackListenerCompatibility.h"
 #include "OwnedImageAliasCompatibility.h"
 #include "OwnedSuspendedImageCompatibility.h"
 #include "OwnedListenerEventCompatibility.h"
+#include "OwnedRuntimeSignatureCompatibility.h"
 
 int ergopti_flock_compat(int descriptor, int operation);
 int ergopti_process_exit_monitor_open(pid_t process_identifier, int *error_code);
