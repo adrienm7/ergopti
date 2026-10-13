@@ -12378,6 +12378,18 @@ Hosted native expected-failure receiving, forced output, installation and
 physical delivery remain required. Neither source enrollment nor diagnostic
 SDK constants qualify the native Swift Shortcuts product or remote invocation.
 
+The current-network source companion additionally retains the four reviewed
+HTTP build inputs at e94153e8, the two approved Group5 Remap inputs and the
+other 93 historical inputs in the original 99-path recipe. Its 31 controlled
+software cases pass on the exact final fixture; three independently predicted
+omissions fail 5, 1 and 1 cases respectively. The original core, historical
+53/51 controls, native twelve expectations and TIS closure checks are unchanged.
+[The standalone companion command](../tools/diagnostics/fixtures/number-row-current-network/README.md)
+is available, but its Common inventory enrollment remains owned by Root and
+pending. Current committed Git-generation, hosted native expected-failure
+receiving, forced output, installed acceptance and physical delivery remain
+unqualified. Item 107 stays partial.
+
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
   Win/Super on Windows/Linux. Implemented: one ordinary editable conditional
