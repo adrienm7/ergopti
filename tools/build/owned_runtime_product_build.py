@@ -11,6 +11,7 @@ import hashlib
 import importlib.util
 import io
 import os
+import signal
 import re
 import stat
 import subprocess
@@ -559,11 +560,11 @@ def compile_native_parts(repository, owner, lua_build_work, deadline):
 INSTALLER_ID = "com.ergoptiplus.app.runtime-installer"
 MODULE_ID = "com.ergoptiplus.app.installed-physical-source"
 CORE_IDLE_FACTORY_SHA256 = "d30b414066703652ed8d59cf668c0db4f6d8fed0aeebb1f9eb7ac5ed46f6fc22"
-CURRENT_SOURCE_FACTORY_SHA256 = "4c60f6b348f78e523342ee2f70aa70bc766b80ed28291dc590a26bc03730cc8f"
+CURRENT_SOURCE_FACTORY_SHA256 = "9caa7c6b7a89fd1420452b59c4c5697a7a2aaaa9293498652f6b8a6628094c9d"
 SDK_SOURCE_SUPPLIER_SHA256 = "aeb2949e50e628ed6db88aaa9d4726c4d485a48d94adccb67ba1203563b1668f"
 
 
-def _snapshot(root, deadline):
+def _snapshot(root, deadline, *, resource_owner=None):
     """Retain every ordinary built leaf and directory, never a JSON authority."""
     root = Path(root)
     require(root.resolve(strict=True) == root and root.is_dir(), "product root changed")
@@ -584,7 +585,8 @@ def _snapshot(root, deadline):
         directories[parent.relative_to(root).as_posix()] = identity(directory_info)
         for name in leaves:
             path = parent / name
-            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+            acquire = os.open if resource_owner is None else resource_owner.open
+            descriptor = acquire(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
             try:
                 info = os.fstat(descriptor)
                 require(
@@ -609,12 +611,16 @@ def _snapshot(root, deadline):
                 )
                 files[path.relative_to(root).as_posix()] = (identity(info), digest.hexdigest())
             finally:
-                os.close(descriptor)
+                if resource_owner is None:
+                    os.close(descriptor)
+                else:
+                    resource_owner.close_preserving(descriptor, sys.exc_info()[1])
     return directories, files
 
 
-def _compiled_bytes(path, expected, deadline):
-    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+def _compiled_bytes(path, expected, deadline, *, resource_owner=None):
+    acquire = os.open if resource_owner is None else resource_owner.open
+    descriptor = acquire(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         before = identity(os.fstat(descriptor))
         require(
@@ -635,7 +641,10 @@ def _compiled_bytes(path, expected, deadline):
         )
         return data
     finally:
-        os.close(descriptor)
+        if resource_owner is None:
+            os.close(descriptor)
+        else:
+            resource_owner.close_preserving(descriptor, sys.exc_info()[1])
 
 
 def _snapshot_leaf(path, deadline):
@@ -667,13 +676,223 @@ def _snapshot_leaf(path, deadline):
         os.close(descriptor)
 
 
-def _write_exclusive(path, data, mode, deadline):
+class _ResourceDescriptorScope:
+    """Root resource descriptors before acquisition and retain ambiguous close debt."""
+
+    def __init__(self, held_sources=()):
+        # These are the original native HeldSource owners, already rooted by the
+        # packaging continuation; no detached descriptor creates source scope.
+        self.held_sources = held_sources
+        self.prior_custody = None
+        self.owners = []
+        self.failures = []
+        self.debt = False
+        self.original_mask = None
+        self.mask_restored = False
+
+    def __enter__(self):
+        try:
+            self.original_mask = signal.pthread_sigmask(signal.SIG_BLOCK, set())
+            signal.pthread_sigmask(
+                signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGALRM}
+            )
+        except BaseException as error:
+            self.debt = True
+            self.failures.append(error)
+            self.__exit__(type(error), error, error.__traceback__)
+            raise
+        return self
+
+    def callback(self, operation):
+        """Keep retained FD owners while restoring the caller's child-process mask."""
+        primary = None
+        try:
+            signal.pthread_sigmask(signal.SIG_SETMASK, self.original_mask)
+            return operation()
+        except BaseException as error:
+            primary = error
+            raise
+        finally:
+            try:
+                signal.pthread_sigmask(
+                    signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGALRM}
+                )
+            except BaseException as cleanup:
+                self.debt = True
+                self.failures.append(cleanup)
+                if primary is None:
+                    raise
+                primary.add_note("Resource signal deferral also refused: " + type(cleanup).__name__)
+
+    def open(self, path, flags, mode=0o777, *, dir_fd=None):
+        owner = {"descriptor": None, "close_attempted": False, "closed": False, "debt": False}
+        self.owners.append(owner)
+        try:
+            owner["descriptor"] = os.open(path, flags, mode, dir_fd=dir_fd)
+        except BaseException as error:
+            # An interrupted acquisition cannot invent proof that no descriptor
+            # was allocated. The rooted record remains attached to the failure.
+            owner["debt"] = self.debt = True
+            self.failures.append(error)
+            raise
+        return owner["descriptor"]
+
+    def close(self, descriptor):
+        owner = next(row for row in self.owners if row["descriptor"] == descriptor)
+        require(not owner["close_attempted"], "resource descriptor close already attempted")
+        owner["close_attempted"] = True
+        try:
+            os.close(descriptor)
+        except BaseException as error:
+            # Retrying a close whose physical outcome is unknown could close an
+            # unrelated reused descriptor. Retain debt and refuse publication.
+            owner["debt"] = self.debt = True
+            self.failures.append(error)
+            raise
+        owner["closed"] = True
+        owner["descriptor"] = None
+
+    def close_preserving(self, descriptor, primary):
+        try:
+            self.close(descriptor)
+        except BaseException as cleanup:
+            if primary is None:
+                raise
+            # The pending primary is rethrown by the original finally. Its
+            # rooted scope still retains this close refusal and unknown outcome.
+            primary.add_note("Resource close also refused: " + type(cleanup).__name__)
+
+    def __exit__(self, kind, primary, trace):
+        cleanup = None
+        try:
+            signal.pthread_sigmask(
+                signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGALRM}
+            )
+        except BaseException as error:
+            self.debt = True
+            self.failures.append(error)
+            cleanup = error
+        for source in self.held_sources:
+            if source.descriptor < 0:
+                continue
+            owner = {
+                "descriptor": source.descriptor,
+                "source": source,
+                "close_attempted": True,
+                "closed": False,
+                "debt": False,
+            }
+            self.owners.append(owner)
+            try:
+                source.close()
+            except BaseException as error:
+                owner["debt"] = self.debt = True
+                self.failures.append(error)
+                if cleanup is None:
+                    cleanup = error
+            else:
+                owner["closed"] = True
+                owner["descriptor"] = None
+            finally:
+                # The genuine owner attempted this close exactly once. Unknown
+                # physical outcome remains rooted above, never retried against
+                # a descriptor number that may already have been reused.
+                source.descriptor = -1
+        for owner in reversed(self.owners):
+            if owner["descriptor"] is not None and not owner["close_attempted"]:
+                try:
+                    self.close(owner["descriptor"])
+                except BaseException as error:
+                    if cleanup is None:
+                        cleanup = error
+        try:
+            if self.original_mask is None:
+                # Entry could not observe the caller mask. Retire every held FD
+                # but never invent a restored mask or a positive cleanup result.
+                self.debt = True
+            else:
+                signal.pthread_sigmask(signal.SIG_SETMASK, self.original_mask)
+                self.mask_restored = True
+        except BaseException as error:
+            # A deferred handler can raise after the kernel restored the mask.
+            # Observe that exact mask without changing it; retain any uncertainty.
+            try:
+                self.mask_restored = (
+                    signal.pthread_sigmask(signal.SIG_BLOCK, set()) == self.original_mask
+                )
+            except BaseException as observation:
+                self.failures.append(observation)
+            self.debt = self.debt or not self.mask_restored
+            self.failures.append(error)
+            if cleanup is None:
+                cleanup = error
+        error = primary if primary is not None else cleanup
+        if error is not None:
+            prior = getattr(error, "_resource_custody", None)
+            if prior is not None and prior is not self:
+                self.prior_custody = prior
+                self.debt = self.debt or prior.debt
+            error._resource_custody = self
+            if primary is not None:
+                for secondary in self.failures:
+                    if secondary is not primary:
+                        primary.add_note(
+                            "Resource custody also refused: " + type(secondary).__name__
+                        )
+                return False
+            raise error
+        require(not self.debt and self.mask_restored, "resource custody retirement unresolved")
+        return False
+
+
+def _retire_sdk_sources(held_sources, backend_source, primary):
+    """Close original SDK source owners without replacing a pending resource refusal."""
+    scope = _ResourceDescriptorScope((*held_sources, backend_source))
+    try:
+        scope.__enter__()
+    except BaseException as acquisition:
+        # __enter__ already attempted the rooted closures on deferral refusal.
+        if primary is None:
+            raise
+        prior = getattr(primary, "_resource_custody", None)
+        scope.prior_custody = prior
+        scope.debt = scope.debt or (prior is not None and prior.debt)
+        primary._resource_custody = scope
+        primary.add_note("SDK source retirement also refused: " + type(acquisition).__name__)
+        return
+    scope.__exit__(
+        type(primary) if primary is not None else None,
+        primary,
+        primary.__traceback__ if primary is not None else None,
+    )
+
+
+def _write_exclusive(path, data, mode, deadline, *, directory_descriptor=None, resource_owner=None):
     require(
         type(data) is bytes and type(mode) is int and mode in (0o644, 0o755),
         "output leaf bytes or mode refused",
     )
-    descriptor = os.open(
-        path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, mode
+    if directory_descriptor is not None and resource_owner is None:
+        with _ResourceDescriptorScope() as scope:
+            return _write_exclusive(
+                path,
+                data,
+                mode,
+                deadline,
+                directory_descriptor=directory_descriptor,
+                resource_owner=scope,
+            )
+    if directory_descriptor is not None:
+        require(
+            type(path) is str and Path(path).name == path and path not in {".", ".."},
+            "resource output is not one fixed leaf",
+        )
+    acquire = os.open if resource_owner is None else resource_owner.open
+    descriptor = acquire(
+        path,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+        mode,
+        dir_fd=directory_descriptor,
     )
     try:
         os.fchmod(descriptor, mode)
@@ -689,12 +908,119 @@ def _write_exclusive(path, data, mode, deadline):
             and info.st_uid == os.getuid()
             and info.st_nlink == 1
             and info.st_size == len(data)
-            and identity(info) == identity(Path(path).lstat()),
+            and identity(info)
+            == identity(os.stat(path, dir_fd=directory_descriptor, follow_symlinks=False)),
             "output identity changed",
         )
         os.fsync(descriptor)
     finally:
-        os.close(descriptor)
+        if resource_owner is None:
+            os.close(descriptor)
+        else:
+            resource_owner.close_preserving(descriptor, sys.exc_info()[1])
+
+
+VIRTUAL_HID_RESOURCE_NAMES = (
+    "Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg",
+    "org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon.plist",
+)
+
+
+def _stage_virtual_hid_resources(resources_parent, payload, deadline, current):
+    """Copy only retained source resource bytes through exact owned directory descriptors."""
+    require(callable(current), "source payload currentness absent")
+    current()
+    require(time.monotonic() < deadline, "resource copy budget expired")
+    rows = payload.resources
+    require(
+        type(rows) is tuple
+        and len(rows) == 2
+        and all(type(row) is tuple and len(row) == 2 and type(row[1]) is bytes for row in rows)
+        and tuple(row[0] for row in rows) == VIRTUAL_HID_RESOURCE_NAMES,
+        "fixed source payload membership differs",
+    )
+    parent = Path(resources_parent)
+    require(
+        parent.is_absolute() and parent.resolve(strict=True) == parent, "resource parent redirects"
+    )
+    with _ResourceDescriptorScope() as scope:
+        parent_fd = scope.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        parent_info = os.fstat(parent_fd)
+        require(
+            stat.S_ISDIR(parent_info.st_mode) and parent_info.st_uid == os.getuid(),
+            "resource parent is not owned",
+        )
+        parent_identity = (
+            parent_info.st_dev,
+            parent_info.st_ino,
+            parent_info.st_uid,
+            parent_info.st_mode,
+        )
+        scope.callback(current)
+        os.mkdir("VirtualHIDDriverPayload", mode=0o755, dir_fd=parent_fd)
+        destination_fd = scope.open(
+            "VirtualHIDDriverPayload",
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=parent_fd,
+        )
+        target = parent / "VirtualHIDDriverPayload"
+        target_info = os.fstat(destination_fd)
+        require(
+            stat.S_ISDIR(target_info.st_mode) and target_info.st_uid == os.getuid(),
+            "resource destination is not owned",
+        )
+        target_identity = (
+            target_info.st_dev,
+            target_info.st_ino,
+            target_info.st_uid,
+            target_info.st_mode,
+        )
+
+        def boundary():
+            scope.callback(current)
+            for held, named, expected in (
+                (os.fstat(parent_fd), parent.lstat(), parent_identity),
+                (os.fstat(destination_fd), target.lstat(), target_identity),
+            ):
+                require(
+                    (held.st_dev, held.st_ino, held.st_uid, held.st_mode) == expected
+                    and (named.st_dev, named.st_ino, named.st_uid, named.st_mode) == expected,
+                    "resource directory custody changed",
+                )
+            require(parent.resolve(strict=True) == parent, "resource ancestor redirects")
+            require(time.monotonic() < deadline, "resource copy budget expired")
+
+        boundary()
+        for name, data in rows:
+            boundary()
+            _write_exclusive(
+                name,
+                data,
+                0o644,
+                deadline,
+                directory_descriptor=destination_fd,
+                resource_owner=scope,
+            )
+            boundary()
+        require(
+            set(os.listdir(destination_fd)) == set(VIRTUAL_HID_RESOURCE_NAMES),
+            "unowned resource member appeared",
+        )
+        snapshot = _snapshot(target, deadline, resource_owner=scope)
+        require(
+            set(snapshot[0]) == {"."} and set(snapshot[1]) == set(VIRTUAL_HID_RESOURCE_NAMES),
+            "resource tree membership differs",
+        )
+        for name, data in rows:
+            _compiled_bytes(target / name, snapshot[1][name], deadline, resource_owner=scope)
+            require(
+                snapshot[1][name][1] == hashlib.sha256(data).hexdigest(),
+                "copied source payload bytes differ",
+            )
+        os.fsync(destination_fd)
+        os.fsync(parent_fd)
+        boundary()
+        return target, snapshot
 
 
 def _package_live(
@@ -711,6 +1037,9 @@ def _package_live(
     deadline,
     *,
     source_current=None,
+    staged_source=None,
+    driver_payload=None,
+    driver_payload_current=None,
 ):
     """Fixed continuation of the original signed scope; never install or start.
 
@@ -732,6 +1061,7 @@ def _package_live(
     )
     require(source_current is None or callable(source_current), "current source owner absent")
     claim_current()
+    sdk = False
     if source_current is None:
         # The original schema-2 source/history admission remains exact.
         require(
@@ -762,6 +1092,20 @@ def _package_live(
 
     if source_current is not None:
         source_current()
+    if sdk:
+        require(
+            staged_source is not None
+            and driver_payload is not None
+            and driver_payload.image is staged_source
+            and callable(driver_payload_current),
+            "original staged SDK payload source absent",
+        )
+        driver_payload_current()
+    else:
+        require(
+            staged_source is None and driver_payload is None and driver_payload_current is None,
+            "legacy production cannot acquire SDK resource scope",
+        )
     require(
         type(signing_identity) is str
         and re.fullmatch(r"[A-F0-9]{40}", signing_identity) is not None
@@ -779,7 +1123,26 @@ def _package_live(
     )
     work, receipts = compile_native_parts(repository, owner, lua_build, deadline)
     claim_current()
-    compiled_snapshot = _snapshot(work, deadline)
+
+    def snapshot(root, budget):
+        if not sdk:
+            return _snapshot(root, budget)
+        with _ResourceDescriptorScope() as scope:
+            return _snapshot(root, budget, resource_owner=scope)
+
+    def compiled_bytes(path, expected, budget):
+        if not sdk:
+            return _compiled_bytes(path, expected, budget)
+        with _ResourceDescriptorScope() as scope:
+            return _compiled_bytes(path, expected, budget, resource_owner=scope)
+
+    def write_exclusive(path, data, mode, budget):
+        if not sdk:
+            return _write_exclusive(path, data, mode, budget)
+        with _ResourceDescriptorScope() as scope:
+            return _write_exclusive(path, data, mode, budget, resource_owner=scope)
+
+    compiled_snapshot = snapshot(work, deadline)
     # The validator is an inert native executable. It never acquires installer
     # authority; its direct zero status closes product validation only.
     backend_source = capture_source(repository, NATIVE_BACKEND)
@@ -815,6 +1178,12 @@ def _package_live(
             finally:
                 current()
 
+        def payload_current():
+            current()
+            require(sdk and driver_payload.image is staged_source, "original SDK payload detached")
+            driver_payload_current()
+            current()
+
         stage = owner / "production_runtime_package"
         stage.mkdir(mode=0o700)
         installer = stage / "ErgoptiPlus-Runtime-Installer.app"
@@ -843,17 +1212,17 @@ def _package_live(
                 name.startswith("Runtime/"), "signed file inventory escaped fixed Runtime products"
             )
             destination = products / name.removeprefix("Runtime/")
-            _write_exclusive(
+            write_exclusive(
                 destination, observation.data, stat.S_IMODE(observation.identity[3]), deadline
             )
             current()
-        _write_exclusive(
+        write_exclusive(
             installer / "Contents/MacOS/ErgoptiPlus-Runtime-Installer",
-            _compiled_bytes(work / "installer", compiled_snapshot[1]["installer"], deadline),
+            compiled_bytes(work / "installer", compiled_snapshot[1]["installer"], deadline),
             0o755,
             deadline,
         )
-        _write_exclusive(
+        write_exclusive(
             installer / "Contents/Info.plist",
             plistlib.dumps(
                 {
@@ -868,14 +1237,18 @@ def _package_live(
             deadline,
         )
         module = stage / "installed_physical_source.so"
-        _write_exclusive(
+        write_exclusive(
             module,
-            _compiled_bytes(work / "module.so", compiled_snapshot[1]["module.so"], deadline),
+            compiled_bytes(work / "module.so", compiled_snapshot[1]["module.so"], deadline),
             0o755,
             deadline,
         )
+        if sdk:
+            _stage_virtual_hid_resources(
+                installer / "Contents/Resources", driver_payload, deadline, payload_current
+            )
         public_leaf = work / "approved_publisher.der"
-        _write_exclusive(public_leaf, leaf, 0o644, deadline)
+        write_exclusive(public_leaf, leaf, 0o644, deadline)
         for name, identifier, target in (
             ("installer_sign", INSTALLER_ID, installer),
             ("module_sign", MODULE_ID, module),
@@ -895,7 +1268,7 @@ def _package_live(
                     str(target),
                 ],
             )
-        before_validation = _snapshot(stage, deadline)
+        before_validation = snapshot(stage, deadline)
         for name, option, target in (
             ("products_validate", "--products", products),
             ("installer_validate", "--installer", installer),
@@ -908,7 +1281,7 @@ def _package_live(
                 "native product validator emitted an unrecognized stream",
             )
             require(
-                _snapshot(stage, deadline) == before_validation,
+                snapshot(stage, deadline) == before_validation,
                 "native validation changed product identities/content",
             )
         # Final app staging remains inside the original signed claim. No
@@ -949,7 +1322,7 @@ def _package_live(
             not final_module.exists() and not final_module.is_symlink(),
             "native module destination already exists",
         )
-        original_helper = _snapshot(installer, deadline)
+        original_helper = snapshot(installer, deadline)
         final_helper.mkdir(mode=0o755)
         for relative, stamp in sorted(
             original_helper[0].items(), key=lambda row: (row[0].count("/"), row[0])
@@ -961,23 +1334,28 @@ def _package_live(
         for relative, stamp in original_helper[1].items():
             current()
             require(
-                _snapshot(installer, deadline) == original_helper,
+                snapshot(installer, deadline) == original_helper,
                 "signed helper changed before final copy",
             )
-            _write_exclusive(
+            write_exclusive(
                 final_helper / relative,
-                _compiled_bytes(installer / relative, stamp, deadline),
+                compiled_bytes(installer / relative, stamp, deadline),
                 stat.S_IMODE(stamp[0][2]),
                 deadline,
             )
         current()
-        _write_exclusive(
+        write_exclusive(
             final_module,
-            _compiled_bytes(module, _snapshot_leaf(module, deadline), deadline),
+            compiled_bytes(module, _snapshot_leaf(module, deadline), deadline),
             0o755,
             deadline,
         )
-        final_helper_snapshot = _snapshot(final_helper, deadline)
+        main_payload_snapshot = None
+        if sdk:
+            main_payload_snapshot = _stage_virtual_hid_resources(
+                app / "Contents/Resources", driver_payload, deadline, payload_current
+            )
+        final_helper_snapshot = snapshot(final_helper, deadline)
         final_module_snapshot = _snapshot_leaf(final_module, deadline)
         for name, option, target in (
             ("staged_installer_validate", "--installer", final_helper),
@@ -987,12 +1365,18 @@ def _package_live(
             require(
                 (owner / ("production_" + name + ".stdout")).read_bytes() == b""
                 and (owner / ("production_" + name + ".stderr")).read_bytes() == b""
-                and _snapshot(final_helper, deadline) == final_helper_snapshot
+                and snapshot(final_helper, deadline) == final_helper_snapshot
                 and _snapshot_leaf(final_module, deadline) == final_module_snapshot
-                and _snapshot(stage, deadline) == before_validation,
+                and snapshot(stage, deadline) == before_validation,
                 "final staged native product validation or custody changed",
             )
         current()
+        if main_payload_snapshot is not None:
+            payload_current()
+            require(
+                snapshot(main_payload_snapshot[0], deadline) == main_payload_snapshot[1],
+                "Main payload resources changed before outer signing handoff",
+            )
         return {
             "root": str(stage),
             "source_receipts": receipts,
@@ -1005,6 +1389,9 @@ def _package_live(
             "virtual_hid_qualified": False,
         }
     finally:
-        for source in held_sources:
-            source.close()
-        backend_source.close()
+        if sdk:
+            _retire_sdk_sources(held_sources, backend_source, sys.exc_info()[1])
+        else:
+            for source in held_sources:
+                source.close()
+            backend_source.close()

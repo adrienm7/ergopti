@@ -4417,6 +4417,23 @@ are skipped. The owned runtime remains dormant; first-init/cache composition,
 signed production enrollment, complete native acceptance and physical-Mac
 receiving remain unfinished. No group item is removed at this checkpoint.
 
+The dormant SDK resource builder now retains actual official DriverKit payload
+sources, initial signal-mask observation and callback mask restoration through
+its original build scope. Initial observation refusal still closes every held
+source exactly once and retains unknown mask/descriptor cleanup debt. The
+legacy finalizer body is unchanged. Canonical source receiving passes all 111
+distinct Python methods: original parallel/build/product/entrypoint/SDK controls
+81 and resource controls 30, with zero failures or skips. New control enrollment
+is coordinated with the CI owner; full factory, Darwin compilation, CMS,
+installation and product activation remain unqualified.
+Selected formatting passes all 430 files. The complete local Common gate
+receives 424/426 and retains two failures: genuine source-clone admission and
+uninstall preflight beneath protected Git ancestors. The source-clone failure
+is not relabelled as successful; insufficient local capacity still blocks a
+fresh complete clone/factory. Current-source uninstall receiving passes outside
+Git in the owned `/var/tmp` sandbox, with every preservation assertion retained.
+Final exact-source hosted receiving is required.
+
 ## Remaining work after the 2026-09-30 releases
 
 The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.
