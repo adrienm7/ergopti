@@ -126,6 +126,14 @@ The regenerated recipe fingerprint is
 `B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036`; the DLL
 remains `C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E`.
 
+The offer's delayed rebuild now delegates its retained callback and exact period
+to the existing timer adapter. This removes the introduced direct-timer family
+ratchet regression without raising any baseline. All 35 native offer-affinity
+cases and all three platform-API family ratchets exit 0; the source oracle adds
+an inverse that restores the original direct OS call and rejects it. Other
+full-unit failures stay open. Unchanged source blobs alone are not a same-host
+native baseline reproduction.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
