@@ -115,6 +115,17 @@ remaining Lua gsub and keyboard-registry Core JS failures have identical source
 and test blobs at the incoming baseline and published Windows source; they stay
 open rather than being relabelled as successful.
 
+The Lua single-return source guard is now received against the actual loopback
+endpoint function. Concatenation adjusts its final `gsub` result to one value;
+the former greedy regex wrongly reported two. The corrected token/grouping
+classification passes all 14 positive/negative controls and scans 954 production
+Lua files, retaining 75 protected grouped sites. The original complete guard
+exits 1 on unchanged actual source; the corrected guard exits 0, and withdrawing
+the concatenation into an actual-source grouped-receiver `gsub` exits 1.
+Portable Lua5.4 executes the extracted actual function and both inverses:
+one/one/two return values, natural exit 0. This is language/source evidence,
+not native macOS or Linux receiving.
+
 The official native builder now loads its hashing dependency from the executing
 PowerShell host. A Node launcher can retain a PowerShell7 module path when it
 starts PowerShell5.1: the wrong Utility manifest exposes ordinary cmdlets but
