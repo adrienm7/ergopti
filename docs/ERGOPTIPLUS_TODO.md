@@ -3954,6 +3954,8 @@ uninstall preflight; the unchanged uninstall control passes in the approved
 isolated context. Hosted native, packaging, installation and physical
 qualification remain required, and item 30 stays open.
 
+The captured macOS magic-key choice now belongs to the exact live script-control owner and settled pause epoch, not the rendered menu snapshot. Missing, paused, transitioning or unreadable state refuses before acquisition; pause/resume crossings, owner replacement and reentrant activation/submission/retirement invalidate the selection before consumption or persistence. Exact native cleanup debt and synthetic provenance fences retain their existing owners. The current 33 case bodies remain byte-identical; 20 additional production-callback controls pass under Lua 5.4 with modeled native ports. Full selected and hosted native qualification, actual Hammerspoon scheduling and physical input remain required; this does not resolve the customer lease PONG/READY/73 cause.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
