@@ -8,6 +8,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const path = require('node:path');
+const { loadPlan } = require('./linux-install-matrix.cjs');
 
 const JOBS = Object.freeze({
 	windows: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'],
@@ -79,8 +81,26 @@ function context(value) {
 function predecessor(job, index, platform, current) {
 	keys(job, ['result', 'outputs']);
 	assert.ok(RESULTS.includes(job.result), 'Unknown scheduler result');
-	const expected = platform === 'linux' && index === 1 ? [...OUTPUTS, 'ci_unit_result'] : OUTPUTS;
+	const linuxPackage = platform === 'linux' && index === 2;
+	const expected = [
+		...OUTPUTS,
+		...(platform === 'linux' && index === 1 ? ['ci_unit_result'] : []),
+		...(linuxPackage ? ['install_matrix', 'install_metadata'] : [])
+	];
 	keys(job.outputs, expected);
+	if (linuxPackage) {
+		const plan = loadPlan(path.resolve(__dirname, '../..'));
+		assert.equal(
+			job.outputs.install_matrix,
+			JSON.stringify(plan.matrix),
+			'Linux package matrix differs from the complete authored plan'
+		);
+		assert.equal(
+			job.outputs.install_metadata,
+			JSON.stringify(plan.metadata),
+			'Linux package metadata differs from the complete authored map'
+		);
+	}
 	assert.equal(job.outputs.ci_source_sha, current.sourceSha, 'Foreign scheduler source');
 	assert.equal(job.outputs.ci_run_id, current.runId, 'Foreign scheduler run');
 	assert.match(job.outputs.ci_attempt, /^[1-9][0-9]*$/, 'Invalid producer attempt');
