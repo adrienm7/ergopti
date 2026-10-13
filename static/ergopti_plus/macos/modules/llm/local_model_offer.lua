@@ -70,23 +70,35 @@ local function show_notice(text)
 end
 
 
+--- Checks the retained manual requester before acquiring source or UI ports.
+--- @param owner table Captured offer owner.
+--- @return boolean current
+local function requester_current(owner)
+	if owner.request_current == nil then return true end
+	local ok, current = pcall(owner.request_current)
+	return ok == true and current == true
+end
+
 --- Captures the original configured endpoint and download registration.
 --- @return table|nil owner
-local function capture_owner()
+local function capture_owner(opts)
 	local owner = { installer = _installer, generation = _installer_generation }
+	if type(opts) == "table" then owner.request_current = opts.current end
+	if owner.request_current ~= nil and type(owner.request_current) ~= "function" then return nil end
+	if not requester_current(owner) then return nil end
 	local ok, api = pcall(require, "modules.llm.api_ollama")
 	if not ok or type(api) ~= "table" or type(api.get_base_url) ~= "function"
-		or type(api.capture_service_owner) ~= "function" then return nil end
+		or type(api.capture_service_owner) ~= "function" or not requester_current(owner) then return nil end
 	owner.api, owner.origin_reader, owner.service_reader = api, api.get_base_url, api.capture_service_owner
 	local service_ok, service_current = pcall(owner.service_reader)
-	if not service_ok or type(service_current) ~= "function" then return nil end
+	if not service_ok or type(service_current) ~= "function" or not requester_current(owner) then return nil end
 	owner.service_current = service_current
 	local current_ok, current = pcall(owner.service_current)
-	if not current_ok or current ~= true then return nil end
+	if not current_ok or current ~= true or not requester_current(owner) then return nil end
 	local read_ok, origin = pcall(owner.origin_reader)
 	current_ok, current = pcall(owner.service_current)
 	if not current_ok or current ~= true or not read_ok or type(origin) ~= "string" or origin == ""
-		or owner.installer ~= _installer or owner.generation ~= _installer_generation
+		or not requester_current(owner) or owner.installer ~= _installer or owner.generation ~= _installer_generation
 		or package.loaded["modules.llm.api_ollama"] ~= api or api.get_base_url ~= owner.origin_reader
 		or api.capture_service_owner ~= owner.service_reader then return nil end
 	owner.origin = origin
@@ -97,7 +109,7 @@ end
 --- @param owner table
 --- @return boolean current
 local function owner_current(owner)
-	if type(owner) ~= "table" or owner.installer ~= _installer
+	if type(owner) ~= "table" or not requester_current(owner) or owner.installer ~= _installer
 		or owner.generation ~= _installer_generation then return false end
 	local ok, api = pcall(require, "modules.llm.api_ollama")
 	if not ok or api ~= owner.api or api.get_base_url ~= owner.origin_reader
@@ -107,7 +119,7 @@ local function owner_current(owner)
 	local read_ok, origin = pcall(owner.origin_reader)
 	current_ok, current = pcall(owner.service_current)
 	return current_ok and current == true and read_ok and origin == owner.origin
-		and owner.installer == _installer and owner.generation == _installer_generation
+		and requester_current(owner) and owner.installer == _installer and owner.generation == _installer_generation
 		and package.loaded["modules.llm.api_ollama"] == api and api.get_base_url == owner.origin_reader
 		and api.capture_service_owner == owner.service_reader
 end
@@ -189,10 +201,11 @@ end
 --- Downloads a model through the registered installer, the explicit choice of
 --- the user (the dialog's button or the menu's row).
 --- @param model string The model name, as the local server names it.
+--- @param opts table|nil { current = predicate } retaining manual requester currency.
 --- @return boolean accepted
-function M.install(model)
+function M.install(model, opts)
 	require_model(model, "install")
-	local owner = capture_owner()
+	local owner = capture_owner(opts)
 	if owner == nil then
 		Logger.warn(LOG, "Local model download refused: its endpoint identity is unavailable.")
 		return false
@@ -204,6 +217,7 @@ end
 --- @param model string The model name, as the local server names it.
 --- @param opts table|nil { automatic = true } for a request of the automatic
 ---        mode: a notification per source and model, bound to that source.
+---        current = predicate optionally retains the original manual requester.
 --- @return boolean offered
 local function offer_owned(model, opts, owner)
 	if not owner_current(owner) then
@@ -268,7 +282,7 @@ end
 
 function M.offer(model, opts)
 	require_model(model, "offer")
-	local owner = capture_owner()
+	local owner = capture_owner(opts)
 	if owner == nil then
 		Logger.warn(LOG, "Local model offer refused: its endpoint identity is unavailable.")
 		return false
