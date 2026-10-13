@@ -5414,6 +5414,19 @@ worker closure, no-prompt requery, both positive deliveries, policy denial and
 all six Brew operations still require native receiving. No initial-budget, TCC
 or main-thread cause is proved, and no timeout or assertion is changed.
 
+Archive creation and refused CI installation now preserve an initial work
+refusal together with a secondary owned temporary-directory cleanup refusal.
+The shared cleanup outcome keeps both exact values, including falsy throws,
+and makes one cleanup attempt without retry. The successful installer still
+retains its payload; original work bodies, signature/format policy and all
+76 existing packaging assertion expressions remain intact. The existing
+callback receives 334 portable cleanup subcases through actual API/CLI routes;
+the old implementation fails the paired-error assertion. An independent
+130-case descriptor equivalence matrix preserves the earlier reader contract.
+These are source regressions with modeled native command/failure ports, not
+Darwin signing, native archive creation or physical cleanup qualification.
+Full archive25, Brew6, package/install and transversal16/38 remain required.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -10403,9 +10416,16 @@ child command, timeout or native assertion is changed. Root retains CI enrollmen
 and clock/graph ownership.
 
 The shared sealing generator's separate write/validation-plus-close masking
-path remains unmodified and requires a coordinated follow-up. Generator reads
-use the corrected common reader. This does not qualify original23 Windows,
+path was corrected in atomic f07fe268, with its original predicates preserved.
+Generator reads use the corrected common reader. This does not qualify original23 Windows,
 managed-network receiving or complete item62;16/38 stay open and22 excluded.
+
+The archive cleanup follow-up reuses the same required descriptor source root;
+its existing read/one-close semantics and paired diagnostic message remain
+unchanged. No independent21 input tuple or original23 oracle is regenerated.
+Authentic pre-host acquisition, the held Windows bridge and clean original23
+source/runtime enrollment remain separate Root-owned source dependencies;
+these cannot be relabeled as a native-only remainder. Item62 stays open.
 
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the

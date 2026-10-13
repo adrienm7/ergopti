@@ -568,3 +568,31 @@ No source pin, independent oracle, registration or Root workflow was changed.
 Root authentic host/held bridge acquisition and process-adapter enrollment,
 actual archive/signature/Brew6, installation and enterprise acceptance remain
 open. Items36/62 and transversal16/38 are retained.
+
+## Archive work and temporary cleanup failures (October 13)
+
+The separate three-code-path source tranche retains initial archive creation or
+CI installation refusal when temporary-root cleanup also refuses. A private
+common outcome powers `runWithOwnedCleanup` and the existing descriptor
+wrapper, preserving exact falsy/single/paired errors, order and one attempt.
+Both producer work and cleanup bodies remain unchanged after unwrapping;
+the successful installer's `published` guard still retains the launch payload.
+A cleanup refusal never emits a successful API/CLI receipt or proves retirement.
+
+Independent final source capsule81258B/36regulars SHA256
+`7746af98f835eacaf093ee6f2dbb9dceada6423c65c09ff0e9a1e5add3e09c83`
+passes334 actual API/CLI portable cleanup subcases and130 descriptor equivalence
+controls. All76 previous packaging assertions and the full old test program
+remain preserved. The old producer fails the paired-error assertion; eight
+causal route records retain the owned temporary debt. Native executors and
+cleanup failures are modeled, not Windows/Darwin acceptance. The same normal
+callback retains its prior7 workflow,22 native-owner portable and246 descriptor
+subcases, including two POSIX FIFO children. No inventory declaration is added.
+
+The helper is a required full-source root, not one of the independent21 frozen
+input tuples. No pin/oracle regeneration, cache admission, workflow, runner,
+clock or shared Windows process-owner edit is included. Root's authentic
+pre-host primitive, bridge/enrollment composition and held macOS query/staged
+receiving remain real source dependencies. Final native Windows/macOS, archive25,
+Brew6, signing/install and corporate-network acceptance remain unqualified.
+Items36/62 and16/38 stay open;22 remains excluded.
