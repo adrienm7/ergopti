@@ -168,6 +168,20 @@ failure/skip. Authenticated full-entry compilation, BOM/LF encoding, conventions
 and all nine actual isolated source-startup scenarios also pass. These receipts
 do not qualify physical input or the live managed AI workflow.
 
+Buffered source snapshots now store captured prototypes in `OriginalBase`.
+An object initializer's `Base` changes inheritance, so a Map/Array prototype
+caused `Invalid base` instead of becoming an image fact. The actual old public
+Capture/Matches owner receives 0/2 native Map/Array controls (exit 1); the
+corrected owner receives 2/2 (exit 0). The existing sixteen snapshot cases
+originally receive one PASS/fifteen FAIL. The field correction resolves fourteen
+old failures; the remaining Map fixture had to set CaseSense before inserting
+its unchanged data, as required by the actual AHK runtime. All seventeen current
+cases now pass with exit 0 and no skip, including the new nested image identity
+and mutation inverse. No existing assertion is removed. Original source identity,
+builtin-port custody and exact image cleanup remain covered. This AHK-only owner
+does not replace other drivers' snapshot implementations. The recorded broad
+95-failure unit receipt is still FAILED_INCOMPLETE until a complete rerun.
+
 The local committed Windows build at `7e3da5567183914502e977d720e818e337e1dd49`
 compiles with the authenticated AutoHotkey2.0.26/Ahk2Exe toolchain. Actual
 operator-opted user32 receiving exits 0 with two owned Edit vectors and two
