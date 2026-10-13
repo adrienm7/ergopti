@@ -76,7 +76,10 @@ def main(root, stream=False):
     headers = ["hs274-raw-capture.hpp"]
     transforms = [
         ("src/share/hid_device_events_monitor.hpp", instrument_monitor),
-        ("src/apps/CoreService/include/core_service/main/daemon.hpp", instrument_shutdown),
+        (
+            "src/apps/CoreService/include/core_service/main/daemon.hpp",
+            instrument_shutdown,
+        ),
     ]
     if stream:
         from hs274_stream_patch import (
@@ -97,6 +100,13 @@ def main(root, stream=False):
             "hs274-stream-ack.hpp",
             "hs274-stream-baseline-probe.hpp",
             "hs274-key-element.hpp",
+            "hs274-stream-key-policy.hpp",
+            "hs274-stream-native-control.hpp",
+            "hs274-stream-native-fault.hpp",
+            "hs274-stream-native-boundary.hpp",
+            "hs274-stream-native-binding.hpp",
+            "hs274-keyboard-type-observation.hpp",
+            "hs274-observation-control.hpp",
             "hs274-stream-inventory.hpp",
             "hs274-key-state.hpp",
             "hs274-stream-baseline-pages.hpp",
@@ -109,10 +119,16 @@ def main(root, stream=False):
         ]
         transforms[0] = ("src/share/hid_device_events_monitor.hpp", stream_monitor)
         transforms += [
-            ("vendor/vendor/include/asio/detail/impl/socket_ops.ipp", stream_socket_ops),
+            (
+                "vendor/vendor/include/asio/detail/impl/socket_ops.ipp",
+                stream_socket_ops,
+            ),
             ("vendor/vendor/include/pqrs/unix_domain_stream/server.hpp", stream_server),
             ("src/share/types/operation_type.hpp", stream_operations),
-            ("src/apps/CoreService/include/core_service/daemon/receiver.hpp", stream_receiver),
+            (
+                "src/apps/CoreService/include/core_service/daemon/receiver.hpp",
+                stream_receiver,
+            ),
             (
                 "src/apps/CoreService/include/core_service/daemon/device_grabber_details/entry.hpp",
                 stream_entry,
