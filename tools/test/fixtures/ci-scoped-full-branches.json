@@ -1207,12 +1207,12 @@
 	"receipt_consumers": [
 		{
 			"file": ".github/workflows/ci-common.yml",
-			"job": "common-unit-verdict",
+			"job": "common-e2e",
 			"step": "Require every declared check exactly once",
 			"scope": "core-js-suite",
 			"issuer_job": "shared-validation",
 			"issuer_step": "Run shared validation suite",
-			"body": "set -euo pipefail\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json)\"\nif [ \"$mode\" = full ]; then\n    node tools/ci/validate-js-feature-results.cjs feature-timings\nelif [ \"$mode\" = deferred ]; then\n    echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'\nelse\n    exit 1\nfi",
+			"body": "set -euo pipefail\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json)\"\nif [ \"$mode\" = full ]; then\n    node tools/ci/validate-js-feature-results.cjs feature-timings\nelif [ \"$mode\" = deferred ]; then\n    node tools/ci/validate-js-feature-results.cjs --admit-jobs\n    echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'\nelse\n    exit 1\nfi",
 			"issuer_command": "npm run test:js"
 		}
 	]

@@ -455,3 +455,13 @@ try {
 console.log(
 	`Feature union: two complete-order controls and ${mutations.length + 2} refusal controls passed.`
 );
+
+require('./fixtures/common-unit-admission-controls.cjs')
+	.run()
+	.then((count) => {
+		assert.equal(count, 45, 'complete source plan and actual Unit writer admission controls');
+	})
+	.catch((error) => {
+		console.error(error);
+		process.exitCode = 1;
+	});

@@ -4,11 +4,15 @@
 # their exact source-bound union, then runs browser E2E once. Parent ci.yml owns
 # concurrency and awaits this entire lane before publication.
 
-name: Common
+name: 'YAML, shared code & web'
 
 on:
   workflow_call:
     inputs:
+      common_plan:
+        description: Complete source/ref-bound plan from the shallow formatter checkout
+        required: true
+        type: string
       release:
         description: True when the canonical plan resolved a release
         required: true
@@ -34,47 +38,15 @@ permissions:
   contents: read
 
 jobs:
-  prepare-common:
-    name: 'Check formatting and plan unit tests'
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-      metadata: ${{ steps.plan.outputs.metadata }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - run: npm ci
-
-      - name: Check formatting
-        run: |
-          python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"
-          node tools/lint/format.cjs --check
-
-      - name: Plan every canonical feature and additional suite
-        id: plan
-        run: |
-          set -euo pipefail
-          node tools/ci/js-feature-matrix.cjs plan
-
   shared-validation:
     name: 'Unit tests'
-    needs: [prepare-common]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare-common.outputs.matrix) }}
+      matrix: ${{ fromJSON(inputs.common_plan).matrix }}
     env:
       COMMON_LOT: ${{ matrix.lot }}
-      COMMON_METADATA: ${{ needs.prepare-common.outputs.metadata }}
+      COMMON_PLAN: ${{ inputs.common_plan }}
       ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
       ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
       ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
@@ -160,22 +132,32 @@ jobs:
           if-no-files-found: ignore
           overwrite: true
 
-  common-unit-verdict:
-    name: 'Verify complete unit inventory'
+  common-e2e:
+    name: 'E2E tests'
     needs: [shared-validation]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     env:
+      COMMON_PLAN: ${{ inputs.common_plan }}
+      COMMON_PREDECESSOR_RESULT: ${{ needs.shared-validation.result }}
+      GH_TOKEN: ${{ github.token }}
       ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
       ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
       ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
       ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
       ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+    outputs:
+      site_matrix: ${{ steps.site-plan.outputs.matrix }}
+      site_metadata: ${{ steps.site-plan.outputs.metadata }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
+          cache: 'npm'
 
       - name: Download exact source-bound qualification
         uses: actions/download-artifact@v4
@@ -196,25 +178,11 @@ jobs:
           if [ "$mode" = full ]; then
               node tools/ci/validate-js-feature-results.cjs feature-timings
           elif [ "$mode" = deferred ]; then
+              node tools/ci/validate-js-feature-results.cjs --admit-jobs
               echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'
           else
               exit 1
           fi
-
-  common-e2e:
-    name: 'E2E tests'
-    needs: [common-unit-verdict]
-    runs-on: ubuntu-latest
-    outputs:
-      site_matrix: ${{ steps.site-plan.outputs.matrix }}
-      site_metadata: ${{ steps.site-plan.outputs.metadata }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
 
       - uses: actions/setup-python@v5
         with:
@@ -329,11 +297,47 @@ jobs:
         run: |
           set -euo pipefail
           node tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"
+          mkdir "$RUNNER_TEMP/site-proof"
+          cp "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-proof/build.json"
+          cp "$RUNNER_TEMP/site-testbuild.json" "$RUNNER_TEMP/site-proof/site-testbuild.json"
 
       - name: Retain production browser proof
         uses: actions/upload-artifact@v4
         with:
           name: common-site-testbuild-${{ env.ERGOPTI_SITE_TARGET }}
-          path: ${{ runner.temp }}/site-testbuild.json
+          path: ${{ runner.temp }}/site-proof/
           if-no-files-found: error
           overwrite: true
+
+  common-unit-verdict:
+    name: 'Verdict'
+    needs: [common-testbuild]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      SITE_PREDECESSOR_RESULT: ${{ needs.common-testbuild.result }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Receive stable production browser proof
+        uses: actions/download-artifact@v4
+        with:
+          name: common-site-testbuild-main
+          path: site-proof/main
+
+      - name: Receive development production browser proof
+        uses: actions/download-artifact@v4
+        with:
+          name: common-site-testbuild-dev
+          path: site-proof/dev
+
+      - name: Require both exact Build and browser receipts
+        run: node tools/ci/site-verdict.cjs verify site-proof

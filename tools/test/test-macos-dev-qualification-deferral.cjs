@@ -604,8 +604,8 @@ function sourceProblems(pkg, mac, rootCaller) {
 	const releaseJobs = publicationJobs.filter((job) => job.id === 'release');
 	if (
 		preflight.length !== 1 ||
-		JSON.stringify(pipeline.needsOf(preflight[0].body)) !==
-			JSON.stringify(['core', 'macos', 'windows', 'linux'])
+		JSON.stringify(pipeline.needsOf(preflight[0].body).sort()) !==
+			JSON.stringify(['core', 'macos', 'windows', 'linux'].sort())
 	)
 		errors.push('release-needs');
 	if (

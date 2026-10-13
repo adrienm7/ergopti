@@ -18,9 +18,9 @@ const ENTRY_REL = raw.ENTRY_REL;
 const JOBS = [
 	['.github/workflows/ci.yml', 'validate', null],
 	['.github/workflows/ci.yml', 'core', null],
-	['.github/workflows/ci-common.yml', 'prepare-common', null],
+	['.github/workflows/ci.yml', 'prepare-common', null],
 	['.github/workflows/ci-common.yml', 'shared-validation', null],
-	['.github/workflows/ci-common.yml', 'common-unit-verdict', null],
+	['.github/workflows/ci-common.yml', 'common-unit-verdict', 'always()'],
 	['.github/workflows/ci-common.yml', 'common-e2e', null],
 	['.github/workflows/ci-common.yml', 'common-build', null],
 	['.github/workflows/ci-common.yml', 'common-testbuild', null],

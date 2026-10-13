@@ -664,22 +664,20 @@ try {
 
 /** Pin fresh feature runners and the exact independently gated additional suites. */
 function checkCore(caller, body, prepare, browser, planner = displayPlan) {
-	assert.deepEqual(pipeline.needsOf(caller), ['validate']);
+	assert.deepEqual(pipeline.needsOf(caller), ['validate', 'prepare-common']);
 	assert.equal(pipeline.field(caller, 'if'), null);
 	assert.equal(pipeline.field(caller, 'uses'), './.github/workflows/ci-common.yml');
-	assert.deepEqual(pipeline.needsOf(body), ['prepare-common']);
+	assert.match(caller, /^      common_plan: \$\{\{ needs\.prepare-common\.outputs\.plan \}\}$/m);
+	assert.deepEqual(pipeline.needsOf(body), []);
 	assert.equal(pipeline.field(body, 'if'), null);
 	assert.match(body, /^      fail-fast: false$/m);
 	assert.equal(
 		pipeline.field(body, 'strategy'),
-		'fail-fast: false matrix: ${{ fromJSON(needs.prepare-common.outputs.matrix) }}'
+		'fail-fast: false matrix: ${{ fromJSON(inputs.common_plan).matrix }}'
 	);
 	assert.deepEqual(pipeline.needsOf(prepare), []);
 	assert.equal(pipeline.field(prepare, 'if'), null);
-	assert.equal(
-		pipeline.field(prepare, 'outputs'),
-		'matrix: ${{ steps.plan.outputs.matrix }} metadata: ${{ steps.plan.outputs.metadata }}'
-	);
+	assert.equal(pipeline.field(prepare, 'outputs'), 'plan: ${{ steps.plan.outputs.plan }}');
 	assert.equal(
 		pipeline.stepField(
 			pipeline.step(prepare, 'Plan every canonical feature and additional suite'),
@@ -711,10 +709,7 @@ function checkCore(caller, body, prepare, browser, planner = displayPlan) {
 	assert.equal(pipeline.stepField(checkout[0].body, 'with'), null);
 	assert.doesNotMatch(body, /\bgit (?:fetch|pull|clone)\b/);
 	assert.match(body, /^      COMMON_LOT: \$\{\{ matrix\.lot \}\}$/m);
-	assert.match(
-		body,
-		/^      COMMON_METADATA: \$\{\{ needs\.prepare-common\.outputs\.metadata \}\}$/m
-	);
+	assert.match(body, /^      COMMON_PLAN: \$\{\{ inputs\.common_plan \}\}$/m);
 	const admission = pipeline.step(body, 'Admit the complete Common lot map');
 	assert.equal(pipeline.stepField(admission, 'id'), 'common-lot');
 	assert.equal(pipeline.stepField(admission, 'if'), null);
@@ -754,7 +749,7 @@ function checkCore(caller, body, prepare, browser, planner = displayPlan) {
 		body,
 		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y lua5\.4 lua-luv libxml2-utils/
 	);
-	assert.deepEqual(pipeline.needsOf(browser), ['common-unit-verdict']);
+	assert.deepEqual(pipeline.needsOf(browser), ['shared-validation']);
 	assert.equal(pipeline.field(browser, 'if'), null);
 	for (const [name, command] of [
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
@@ -775,7 +770,7 @@ const coreBrowser = pipeline.job('common-e2e');
 assert.equal(pipeline.locate('shared-validation').file, '.github/workflows/ci-common.yml');
 checkCore(coreCaller, core, corePrepare, coreBrowser);
 for (const [from, to] of [
-	['needs: [validate]', 'needs: [macos]'],
+	['needs: [validate, prepare-common]', 'needs: [macos]'],
 	['./.github/workflows/ci-common.yml', './.github/workflows/foreign.yml']
 ]) {
 	const changed = coreCaller.replace(from, to);
@@ -806,10 +801,10 @@ assert.throws(
 for (const [from, to] of [
 	['fail-fast: false', 'fail-fast: true'],
 	['js) npm run test:js -- --feature "$FEATURE" ;;', 'js) npm run test:js -- --only lint ;;'],
-	['needs: [prepare-common]', 'needs: []'],
+	["name: 'Unit tests'", "name: 'Unit tests'\n    needs: [prepare-common]"],
 	['FEATURE: ${{ steps.common-lot.outputs.feature }}', 'FEATURE: foreign'],
 	['COMMON_LOT: ${{ matrix.lot }}', 'COMMON_LOT: foreign'],
-	['COMMON_METADATA: ${{ needs.prepare-common.outputs.metadata }}', 'COMMON_METADATA: {}'],
+	['COMMON_PLAN: ${{ inputs.common_plan }}', 'COMMON_PLAN: {}'],
 	['id: common-lot', 'id: common-lot\n        if: false'],
 	['node tools/ci/js-feature-matrix.cjs select', 'node tools/ci/js-feature-matrix.cjs plan'],
 	['id: hotstrings-format', 'id: foreign-format'],
@@ -831,7 +826,7 @@ for (const [from, to] of [
 	assert.throws(() => checkCore(coreCaller, changed, corePrepare, coreBrowser), from);
 }
 for (const [from, to] of [
-	['metadata: ${{ steps.plan.outputs.metadata }}', 'metadata: ${{ steps.plan.outputs.matrix }}'],
+	['plan: ${{ steps.plan.outputs.plan }}', 'plan: ${{ steps.plan.outputs.matrix }}'],
 	['node tools/ci/js-feature-matrix.cjs plan', 'node tools/ci/js-feature-matrix.cjs select']
 ]) {
 	const changed = corePrepare.replace(from, to);

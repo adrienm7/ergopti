@@ -55,6 +55,36 @@ concurrency:
 # ========================================================
 
 jobs:
+  prepare-common:
+    name: 'Check formatting and plan unit tests'
+    runs-on: ubuntu-latest
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Check formatting
+        run: |
+          python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"
+          node tools/lint/format.cjs --check
+
+      - name: Plan every canonical feature and additional suite
+        id: plan
+        run: |
+          set -euo pipefail
+          node tools/ci/js-feature-matrix.cjs plan
+
   # ─────────────────────────────────────────────────
   # 1.1) Validate the release inputs and resolve the plan
   # ─────────────────────────────────────────────────
@@ -345,7 +375,7 @@ jobs:
   # ─────────────────────────────────────────────────
   macos:
     name: 'macOS'
-    needs: [validate]
+    needs: [validate, prepare-common]
     if: needs.validate.outputs.lane_macos == 'true'
     uses: ./.github/workflows/ci-macos.yml
     with:
@@ -365,7 +395,7 @@ jobs:
   # ─────────────────────────────────────────────────
   windows:
     name: 'Windows'
-    needs: [validate]
+    needs: [validate, prepare-common]
     if: needs.validate.outputs.lane_windows == 'true'
     uses: ./.github/workflows/ci-windows.yml
     with:
@@ -384,7 +414,7 @@ jobs:
   # ─────────────────────────────────────────────────
   linux:
     name: 'Linux'
-    needs: [validate]
+    needs: [validate, prepare-common]
     if: needs.validate.outputs.lane_linux == 'true'
     uses: ./.github/workflows/ci-linux.yml
     with:
@@ -398,10 +428,14 @@ jobs:
   # Every run proves its selected lanes before receiving the original plan.
   # Missing retained artifacts or outputs fail this read-only preflight.
   core:
-    name: 'Common'
-    needs: [validate]
+    name: 'YAML, shared code & web'
+    needs: [validate, prepare-common]
     uses: ./.github/workflows/ci-common.yml
+    permissions:
+      contents: read
+      actions: read
     with:
+      common_plan: ${{ needs.prepare-common.outputs.plan }}
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
       tag: ${{ needs.validate.outputs.tag }}

@@ -68,7 +68,9 @@ function checkCiFormatting(body) {
 
 check('CI installs the pinned Ruff and checks the whole tree', () => {
 	const owner = pipeline.locate('prepare-common');
-	assert.strictEqual(owner.file, '.github/workflows/ci-common.yml');
+	assert.strictEqual(owner.file, '.github/workflows/ci.yml');
+	for (const id of ['core', 'windows', 'macos', 'linux'])
+		assert.deepStrictEqual(pipeline.needsOf(pipeline.job(id)), ['validate', 'prepare-common']);
 	assert.strictEqual(
 		pipeline.field(pipeline.job('core'), 'uses'),
 		'./.github/workflows/ci-common.yml'

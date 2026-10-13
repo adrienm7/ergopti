@@ -249,14 +249,7 @@ check('every scoped full body remains owned; all other product scripts remain ex
 			source.find((entry) => entry.rel === '.github/workflows/ci-common.yml').text,
 			'.github/workflows/ci-common.yml'
 		).map((job) => job.id),
-		[
-			'prepare-common',
-			'shared-validation',
-			'common-unit-verdict',
-			'common-e2e',
-			'common-build',
-			'common-testbuild'
-		],
+		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
 		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
 	);
 	assert.equal(jobs, 28);
