@@ -1215,11 +1215,16 @@ _OllamaPresenceRecordFailure(State, Failure := "") {
 ; tags transport and post-admission spawn cross deterministic fixture boundaries.
 _OllamaPresenceWithFixture(Body) {
 	global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort
-	Saved := Map("async", _LLM_Ollama_Async, "pending", _LLM_Ollama_Pending, "port", _LLM_Ollama_PreflightPort)
+	global _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Engine
+	Saved := Map("async", _LLM_Ollama_Async, "pending", _LLM_Ollama_Pending, "port", _LLM_Ollama_PreflightPort,
+		"generation", _LLM_AuxGeneration, "owners", _LLM_AuxOwners, "debt", _LLM_AuxCleanupDebt, "engine", _LLM_Engine)
 	State := Map("tags", 0, "posts", 0, "failures", [], "timer", 0, "owner", 0)
 	try {
 		_LLM_Ollama_Async := Map()
 		_LLM_Ollama_Pending := ""
+		_LLM_AuxOwners := Map()
+		_LLM_AuxCleanupDebt := Map()
+		_LLM_Engine := Map("enabled", true)
 		_LLM_Ollama_PreflightPort := Map("schedule", _OllamaPresenceRecordSchedule.Bind(State),
 			"list_models", _OllamaPresenceRecordList.Bind(State), "spawn", _OllamaPresenceRecordSpawn.Bind(State))
 		Id := LLM_OllamaChat_Async('{"model":"QWEN2.5","messages":[{"role":"user","content":"private text"}]}',
@@ -1227,6 +1232,8 @@ _OllamaPresenceWithFixture(Body) {
 		State["id"] := Id
 		AssertTrue(_LLM_Ollama_Async.Has(Id), "the public chat call must reserve the existing request slot")
 		Entry := _LLM_Ollama_Async[Id]
+		State["entry"] := Entry
+		State["initial_deferred"] := State["timer"]
 		AssertEqual(0, Entry["presence_owner"], "the reserved slot declares that no native tags owner exists yet")
 		AssertFalse(Entry["presence_pending"], "a queued preflight is not an acquired tags owner")
 		AssertFalse(Entry["presence_admitted"], "reserving a slot does not admit a private POST")
@@ -1242,13 +1249,21 @@ _OllamaPresenceWithFixture(Body) {
 		AssertEqual(0, State["posts"], "a pending list cannot admit an inference POST")
 		Body.Call(State)
 	} finally {
-		if State["owner"] is Map
-			_LLM_AuxRetireOwner(State["owner"], true)
-		if _LLM_Ollama_Async.Has(State.Get("id", 0))
-			_LLM_Ollama_Async.Delete(State["id"])
-		_LLM_Ollama_Async := Saved["async"]
-		_LLM_Ollama_Pending := Saved["pending"]
-		_LLM_Ollama_PreflightPort := Saved["port"]
+		try {
+			for _, Owner in _LLM_AuxOwners.Clone()
+				_LLM_AuxRetireOwner(Owner, true)
+			if _LLM_Ollama_Async.Has(State.Get("id", 0))
+				_LLM_Ollama_Async.Delete(State["id"])
+			AssertEqual(0, _LLM_AuxCleanupDebt.Count, "Fixture teardown cannot hide unresolved resource cleanup.")
+		} finally {
+			_LLM_Ollama_Async := Saved["async"]
+			_LLM_Ollama_Pending := Saved["pending"]
+			_LLM_Ollama_PreflightPort := Saved["port"]
+			_LLM_AuxGeneration := Saved["generation"]
+			_LLM_AuxOwners := Saved["owners"]
+			_LLM_AuxCleanupDebt := Saved["debt"]
+			_LLM_Engine := Saved["engine"]
+		}
 	}
 }
 
@@ -1305,15 +1320,117 @@ _OllamaPresenceCancelledCase() {
 }
 Test("Ollama local presence: exact auxiliary retirement fences late callbacks (todo-46-local-model)", _OllamaPresenceCancelledCase)
 
-_OllamaPresenceSuperseded(State) {
-	global _LLM_AuxGeneration
-	_LLM_AuxGeneration += 1
-	try State["callback"].Call(LLM_LocalModelListReceipt(Map("ok", true, "status", 200,
-		"body", '{"models":[{"name":"qwen2.5"}]}')))
-	finally _LLM_AuxGeneration -= 1
-	AssertEqual(0, State["posts"], "an endpoint/backend epoch change cannot admit an old tags receipt")
+/** Records the exact auxiliary timer acquired and cancelled by the actual owner. */
+_OllamaPresenceOwnedSchedule(State, Callback, Period) {
+	State["owned_periods"].Push(Period)
+	if Period == 0
+		State["cancelled_timer"] := Callback
+	else
+		State["owned_timer"] := Callback
+}
+
+_OllamaPresenceOwnedFinalizer(State, Finalizer) {
+	State["finalizers"] += 1
+	Finalizer.Call()
+}
+
+/** Observes internal classification while delegating the original public fence unchanged. */
+_OllamaPresenceInternalFailure(State, Callback, Failure := "") {
+	State["internal_failures"].Push(Failure)
+	Callback.Call(Failure)
+}
+
+/** Acquires genuine owner resources so cleanup assertions cannot pass vacuously. */
+_OllamaPresenceOwnTimer(State) {
+	State["owned_periods"] := []
+	State["owned_ticks"] := 0
+	State["finalizers"] := 0
+	State["cancelled_timer"] := 0
+	State["internal_failures"] := []
+	State["entry"]["on_fail"] := _OllamaPresenceInternalFailure.Bind(State, State["entry"]["on_fail"])
+	Finalizer := State["owner"]["on_retired"]
+	AssertTrue(LLM_AuxBindResources(State["owner"],
+		Map("finalizer", _OllamaPresenceOwnedFinalizer.Bind(State, Finalizer))))
+	AssertTrue(LLM_AuxSchedule(State["owner"], (*) => State["owned_ticks"] += 1,
+		-1, _OllamaPresenceOwnedSchedule.Bind(State)))
+	AssertEqual(1, State["owned_periods"].Length)
+	AssertEqual(-1, State["owned_periods"][1])
+	AssertTrue(State["owner"]["timer"] == State["owned_timer"])
+}
+
+/** The exact retired slot and acquired resources settle without public callbacks. */
+_OllamaPresenceAssertRetired(State, Id, Entry, Owner) {
+	global _LLM_Ollama_Async, _LLM_AuxOwners, _LLM_AuxCleanupDebt
+	AssertFalse(_LLM_Ollama_Async.Has(Id))
+	AssertFalse(Entry["presence_pending"])
+	AssertFalse(Entry["presence_admitted"])
+	for Key in ["tmp_payload", "tmp_stdout", "tmp_status", "tmp_exit"]
+		AssertFalse(FileExist(Entry[Key]), "Retired preflight publishes no private artifact.")
+	AssertTrue(Owner["cleanup_claimed"])
+	AssertEqual(0, Owner["timer"])
+	AssertEqual(0, Owner["timer_cancel"])
+	AssertEqual(0, Owner["finalizer"])
+	AssertEqual(2, State["owned_periods"].Length)
+	AssertEqual(0, State["owned_periods"][2])
+	AssertTrue(State["cancelled_timer"] == State["owned_timer"])
+	AssertEqual(1, State["finalizers"])
+	AssertEqual(0, _LLM_AuxOwners.Count)
+	AssertEqual(0, _LLM_AuxCleanupDebt.Count)
+	AssertEqual(0, State["owned_ticks"])
+	AssertEqual(0, State["posts"])
+	AssertEqual(0, State["failures"].Length, "Retired-origin failure delivery stays silent.")
+	AssertEqual(1, State["internal_failures"].Length, "The original internal settlement still happens exactly once.")
+	AssertEqual("request_superseded", State["internal_failures"][1])
+}
+
+/** Old callbacks cannot touch a current public successor's exact slot or owner. */
+_OllamaPresenceCurrentSuccessor(State, StaleCallbacks) {
+	global _LLM_Ollama_Async, _LLM_AuxOwners, _LLM_AuxCleanupDebt
+	Id := LLM_OllamaChat_Async('{"model":"qwen2.5","messages":[]}',
+		(*) => 0, _OllamaPresenceRecordFailure.Bind(State))
+	State["id"] := Id
+	AssertTrue(_LLM_Ollama_Async.Has(Id))
+	Entry := _LLM_Ollama_Async[Id]
+	State["timer"].Call()
+	Owner := State["owner"]
+	AssertTrue(Entry["presence_owner"] == Owner)
+	AssertEqual(2, State["tags"], "A current successor can acquire its actual tags owner.")
+	Callback := State["callback"]
+	Settled := State["internal_failures"].Length
+	loop 2 {
+		for Stale in StaleCallbacks
+			Stale.Call()
+		AssertTrue(_LLM_Ollama_Async.Has(Id))
+		AssertTrue(_LLM_Ollama_Async[Id] == Entry)
+		AssertTrue(Entry["presence_owner"] == Owner)
+		AssertEqual(2, State["tags"])
+		AssertEqual(0, State["posts"])
+		AssertEqual(0, State["failures"].Length)
+		AssertEqual(0, State["owned_ticks"])
+		AssertEqual(1, State["finalizers"])
+		AssertEqual(Settled, State["internal_failures"].Length, "Stale duplicates cannot settle again internally.")
+	}
+	Callback.Call(LLM_LocalModelListReceipt(Map("ok", true, "status", 200, "body", '{"models":[]}')))
+	AssertFalse(_LLM_Ollama_Async.Has(Id))
+	AssertEqual(1, State["failures"].Length, "Current-origin failure still settles exactly once.")
+	AssertTrue(LLM_LocalModelIsMissing(State["failures"][1]))
+	AssertEqual("qwen2.5", State["failures"][1]["model"])
+	Callback.Call(LLM_LocalModelListReceipt(Map("ok", true, "status", 200, "body", '{"models":[]}')))
 	AssertEqual(1, State["failures"].Length)
-	AssertEqual("request_superseded", State["failures"][1])
+	AssertEqual(0, State["posts"])
+	AssertTrue(LLM_AuxFinish(Owner))
+	AssertEqual(0, _LLM_AuxOwners.Count)
+	AssertEqual(0, _LLM_AuxCleanupDebt.Count, "Current successor finalization cannot be hidden by fixture restoration.")
+}
+
+_OllamaPresenceSuperseded(State) {
+	Owner := State["owner"], Entry := State["entry"], Id := State["id"]
+	Tag := State["callback"].Bind(LLM_LocalModelListReceipt(Map("ok", true, "status", 200,
+		"body", '{"models":[{"name":"qwen2.5"}]}')))
+	_OllamaPresenceOwnTimer(State)
+	LLM_AuxInvalidate("presence fixture supersession")
+	_OllamaPresenceAssertRetired(State, Id, Entry, Owner)
+	_OllamaPresenceCurrentSuccessor(State, [Tag, State["owned_timer"], State["initial_deferred"]])
 }
 _OllamaPresenceSupersededCase() {
 	_OllamaPresenceWithFixture(_OllamaPresenceSuperseded)
@@ -1381,23 +1498,36 @@ Test("Ollama local presence: existing download owner acknowledges launch and pre
 
 
 _OllamaPresenceQueuedGeneration(State) {
-	global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_AuxGeneration
-	LLM_OllamaChat_Async('{"model":"qwen2.5","messages":[]}', (*) => 0, _OllamaPresenceRecordFailure.Bind(State))
+	global _LLM_Ollama_Async, _LLM_Ollama_Pending
+	Owner := State["owner"], Entry := State["entry"], Id := State["id"]
+	Tag := State["callback"].Bind(LLM_LocalModelListReceipt(Map("ok", true, "status", 200,
+		"body", '{"models":[{"name":"qwen2.5"}]}')))
+	QueuedId := LLM_OllamaChat_Async('{"model":"qwen2.5","messages":[]}',
+		(*) => 0, _OllamaPresenceRecordFailure.Bind(State))
 	Queued := _LLM_Ollama_Pending
 	AssertTrue(Queued is Map, "the ordinary latest-only coalescing owner retains the waiting chat")
-	_LLM_Ollama_Pending := ""
-	_LLM_Ollama_Async.Delete(State["id"])
-	LLM_AuxFinish(State["owner"])
-	_LLM_AuxGeneration += 1
-	try {
-		_LLM_Ollama_DispatchAsync(Queued)
-		State["id"] := Queued["req_id"]
-		State["timer"].Call()
-	} finally _LLM_AuxGeneration -= 1
+	AssertEqual(QueuedId, Queued["req_id"])
+	_OllamaPresenceOwnTimer(State)
+	LLM_AuxInvalidate("presence fixture queued supersession")
+	_OllamaPresenceAssertRetired(State, Id, Entry, Owner)
+	AssertEqual("", _LLM_Ollama_Pending, "The actual finalizer drains the coalesced job.")
+	AssertTrue(_LLM_Ollama_Async.Has(QueuedId))
+	QueuedEntry := _LLM_Ollama_Async[QueuedId]
+	QueuedEntry["on_fail"] := _OllamaPresenceInternalFailure.Bind(State, QueuedEntry["on_fail"])
+	Deferred := State["timer"]
+	AssertEqual(Queued["presence_generation"], QueuedEntry["presence_generation"])
+	State["id"] := QueuedId
+	Deferred.Call()
+	AssertFalse(_LLM_Ollama_Async.Has(QueuedId))
+	AssertFalse(QueuedEntry["presence_pending"])
+	AssertFalse(QueuedEntry["presence_admitted"])
+	AssertFalse(FileExist(QueuedEntry["tmp_payload"]))
 	AssertEqual(1, State["tags"], "a queued old-endpoint chat cannot even start tags on the new daemon")
 	AssertEqual(0, State["posts"])
-	AssertEqual(1, State["failures"].Length)
-	AssertEqual("request_superseded", State["failures"][1])
+	AssertEqual(0, State["failures"].Length)
+	AssertEqual(2, State["internal_failures"].Length)
+	AssertEqual("request_superseded", State["internal_failures"][2], "The queued request retains its original internal classification.")
+	_OllamaPresenceCurrentSuccessor(State, [Tag, State["owned_timer"], State["initial_deferred"], Deferred])
 }
 _OllamaPresenceQueuedGenerationCase() {
 	_OllamaPresenceWithFixture(_OllamaPresenceQueuedGeneration)
