@@ -217,7 +217,7 @@ function validateWorkflow(workflow) {
 	for (const lane of ['core', 'windows', 'macos', 'linux'])
 		assert.deepEqual(jobs[lane].needs, ['validate']);
 	const preflight = jobs['publication-plan'];
-	assert.deepEqual(preflight.needs, ['core', 'macos', 'windows', 'linux']);
+	assert.deepEqual(preflight.needs, ['macos', 'windows', 'linux', 'core']);
 	assert.equal(preflight.if, 'always() && !cancelled()');
 	assert.ok(!preflight.permissions && !JSON.stringify(preflight).includes('secrets.'));
 	const download = preflight.steps.find((step) => step.uses === 'actions/download-artifact@v4');
