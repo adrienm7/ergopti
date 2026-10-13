@@ -972,7 +972,98 @@ for (const [key, value] of planOutputs) {
 		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which never writes ${key}`);
 	}
 }
-const COMMON_MATRIX = '${{ fromJSON(needs.prepare-common.outputs.matrix) }}';
+const COMMON_MATRIX = '${{ fromJSON(inputs.common_plan).matrix }}';
+
+/** Admit the one root plan transport and its complete cross-workflow consumer. */
+function commonPlanProblems(files) {
+	const problems = [];
+	try {
+		const root = YAML.parse(files.find((file) => file.rel === ENTRY).text, { uniqueKeys: true });
+		const common = YAML.parse(files.find((file) => file.rel === COMMON_BOX).text, {
+			uniqueKeys: true
+		});
+		const prepare = root.jobs['prepare-common'];
+		assert.deepEqual(
+			prepare,
+			{
+				name: 'Check formatting and plan unit tests',
+				'runs-on': 'ubuntu-latest',
+				outputs: { plan: '${{ steps.plan.outputs.plan }}' },
+				steps: [
+					{ uses: 'actions/checkout@v4' },
+					{
+						uses: 'actions/setup-node@v4',
+						with: { 'node-version-file': '.node-version', cache: 'npm' }
+					},
+					{ uses: 'actions/setup-python@v5', with: { 'python-version': '3.12' } },
+					{ run: 'npm ci' },
+					{
+						name: 'Check formatting',
+						run: 'python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"\nnode tools/lint/format.cjs --check\n'
+					},
+					{
+						name: 'Plan every canonical feature and additional suite',
+						id: 'plan',
+						run: 'set -euo pipefail\nnode tools/ci/js-feature-matrix.cjs plan\n'
+					}
+				]
+			},
+			'One genuine shallow formatter and plan producer'
+		);
+		for (const id of ['core', 'macos', 'windows', 'linux'])
+			assert.deepEqual(
+				root.jobs[id].needs,
+				['validate', 'prepare-common'],
+				'Every lane awaits formatting and release plan'
+			);
+		assert.equal(root.jobs.core.with.common_plan, '${{ needs.prepare-common.outputs.plan }}');
+		assert.deepEqual(root.jobs.core.permissions, { contents: 'read', actions: 'read' });
+		assert.deepEqual(common.on.workflow_call.inputs.common_plan, {
+			description: 'Complete source/ref-bound plan from the shallow formatter checkout',
+			required: true,
+			type: 'string'
+		});
+		const unit = common.jobs['shared-validation'];
+		assert.equal(unit.needs, undefined);
+		assert.deepEqual(unit.strategy, {
+			'fail-fast': false,
+			matrix: '${{ fromJSON(inputs.common_plan).matrix }}'
+		});
+		assert.equal(unit.env.COMMON_LOT, '${{ matrix.lot }}');
+		assert.equal(unit.env.COMMON_PLAN, '${{ inputs.common_plan }}');
+		assert.equal(common.jobs['common-e2e'].env.COMMON_PLAN, '${{ inputs.common_plan }}');
+		assert.deepEqual(
+			unit.steps.filter((step) => step.id === 'common-lot'),
+			[
+				{
+					name: 'Admit the complete Common lot map',
+					id: 'common-lot',
+					run: 'node tools/ci/js-feature-matrix.cjs select'
+				}
+			]
+		);
+		assert.ok(
+			unit.steps.findIndex((step) => step.id === 'common-lot') <
+				unit.steps.findIndex((step) => step.name === 'Install native validation tools')
+		);
+		const expectedReads = [
+			[ENTRY, '      common_plan: ${{ needs.prepare-common.outputs.plan }}'],
+			[COMMON_BOX, '      matrix: ${{ fromJSON(inputs.common_plan).matrix }}'],
+			[COMMON_BOX, '      COMMON_PLAN: ${{ inputs.common_plan }}'],
+			[COMMON_BOX, '      COMMON_PLAN: ${{ inputs.common_plan }}']
+		];
+		const reads = files.flatMap((file) =>
+			file.text
+				.split('\n')
+				.filter((line) => /needs\.prepare-common\.outputs|inputs\.common_plan/.test(line))
+				.map((line) => [file.rel, line])
+		);
+		assert.deepEqual(reads, expectedReads, 'No extra or foreign root plan readers');
+	} catch (error) {
+		problems.push('Common root plan transport: ' + error.message);
+	}
+	return problems;
+}
 
 const LUA_TIMING_RETENTION = [
 	{
@@ -1035,15 +1126,6 @@ function lotTransport(source, rel) {
 					]
 				: rel === COMMON_BOX
 					? [
-							[
-								'prepare-common',
-								'shared-validation',
-								'plan',
-								'matrix',
-								'metadata',
-								'Plan every canonical feature and additional suite',
-								'set -euo pipefail\nnode tools/ci/js-feature-matrix.cjs plan\n'
-							],
 							[
 								'common-e2e',
 								'common-build',
@@ -1119,24 +1201,6 @@ function lotTransport(source, rel) {
 				assert.deepEqual(receiving.env, env);
 				for (const [key, value] of Object.entries(env))
 					if (key !== 'MACOS_STAGE_LOT') fields.push([6, key, value]);
-			} else if (consumer === 'shared-validation') {
-				assert.equal(receiving.env.COMMON_LOT, '${{ matrix.lot }}');
-				assert.equal(receiving.env.COMMON_METADATA, '${{ needs.prepare-common.outputs.metadata }}');
-				fields.push([6, 'COMMON_METADATA', receiving.env.COMMON_METADATA]);
-				assert.deepEqual(
-					receiving.steps.filter((step) => step.id === 'common-lot'),
-					[
-						{
-							name: 'Admit the complete Common lot map',
-							id: 'common-lot',
-							run: 'node tools/ci/js-feature-matrix.cjs select'
-						}
-					]
-				);
-				assert.ok(
-					receiving.steps.findIndex((step) => step.id === 'common-lot') <
-						receiving.steps.findIndex((step) => step.name === 'Install native validation tools')
-				);
 			} else if (rel === COMMON_BOX) {
 				const env = {
 					SITE_LOT: '${{ matrix.lot }}',
@@ -1200,7 +1264,7 @@ function lotTransport(source, rel) {
 
 /** Keep release-plan outputs at validate and feature matrices at their exact consumers. */
 function planReferenceProblems(files) {
-	const problems = [];
+	const problems = commonPlanProblems(files);
 	for (const file of files) {
 		const transport = lotTransport(file.text, file.rel);
 		problems.push(...transport.problems);
@@ -1252,11 +1316,11 @@ function planReferenceProblems(files) {
 			)
 				continue;
 			if (
+				file.rel === ENTRY &&
+				owner?.id === 'core' &&
 				match[1] === 'prepare-common' &&
-				match[2] === 'matrix' &&
-				matrixStart >= 0 &&
-				match.index >= matrixStart &&
-				match.index + match[0].length <= matrixStart + COMMON_MATRIX.length
+				match[2] === 'plan' &&
+				commonPlanProblems(files).length === 0
 			)
 				continue;
 			if (match[1] !== ROOT) {
@@ -1573,6 +1637,32 @@ if (contract !== null) {
 // ======================================
 
 // What each caller needs is pinned with the graph shape in section 3.
+/** Keep release qualification inputs and the independent shallow inventory producer exact. */
+function callerInputProblems(id, inputs) {
+	const problems = [];
+	if (inputs.get('release') !== RELEASE_INPUT) {
+		problems.push(
+			`caller ${id} must pass release: ${RELEASE_INPUT}, got: ${inputs.get('release')}`
+		);
+	}
+	for (const [key, value] of inputs) {
+		if (key === 'release') continue;
+		if (id === 'core' && key === 'common_plan') {
+			if (value !== '${{ needs.prepare-common.outputs.plan }}')
+				problems.push('Common plan must come from the mandatory shallow formatter owner');
+			continue;
+		}
+		if (value !== `\${{ needs.${ROOT}.outputs.${key} }}`) {
+			problems.push(
+				`caller ${id} must pass ${key}: \${{ needs.${ROOT}.outputs.${key} }}, got: ${value}`
+			);
+		}
+	}
+	if (id === 'core' && !inputs.has('common_plan'))
+		problems.push('Common caller requires the complete shallow formatter plan');
+	return problems;
+}
+
 const callers = pipeline.calls();
 if (callers.length !== 4)
 	errors.push(`ci.yml must call Common and the three OS lanes, found ${callers.length} call(s)`);
@@ -1582,19 +1672,7 @@ for (const call of callers) {
 	// The release input is the only computed one: a false value on a release
 	// run skips the lane's release build while the lane still succeeds.
 	const inputs = mappingOf(body, 'with', call.id) ?? new Map();
-	if (inputs.get('release') !== RELEASE_INPUT) {
-		errors.push(
-			`caller ${call.id} must pass release: ${RELEASE_INPUT}, got: ${inputs.get('release')}`
-		);
-	}
-	for (const [key, value] of inputs) {
-		if (key === 'release') continue;
-		if (value !== `\${{ needs.${ROOT}.outputs.${key} }}`) {
-			errors.push(
-				`caller ${call.id} must pass ${key}: \${{ needs.${ROOT}.outputs.${key} }}, got: ${value}`
-			);
-		}
-	}
+	errors.push(...callerInputProblems(call.id, inputs));
 	const inlineSecrets = /^ {4}secrets:[ \t]*([^\s#].*)$/m.exec(body);
 	if (inlineSecrets) {
 		errors.push(
@@ -1616,6 +1694,69 @@ for (const call of callers) {
 		}
 	}
 }
+
+for (const [label, id, entries] of [
+	['missing Common plan', 'core', [['release', RELEASE_INPUT]]],
+	[
+		'foreign Common producer',
+		'core',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.validate.outputs.plan }}']
+		]
+	],
+	[
+		'foreign Common output',
+		'core',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.matrix }}']
+		]
+	],
+	[
+		'Common plan routed into Windows',
+		'windows',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	],
+	[
+		'Common plan routed into macOS',
+		'macos',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	],
+	[
+		'Common plan routed into Linux',
+		'linux',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	],
+	[
+		'qualification input uses inventory owner',
+		'core',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}'],
+			['version', '${{ needs.prepare-common.outputs.version }}']
+		]
+	],
+	[
+		'release predicate weakened',
+		'core',
+		[
+			['release', 'true'],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	]
+])
+	assert.ok(callerInputProblems(id, new Map(entries)).length > 0, label);
+
 if (gatedSecrets < MIN_GATED_SECRETS) {
 	errors.push(
 		`found ${gatedSecrets} release-only secret(s) passed to the lanes (floor ${MIN_GATED_SECRETS}); the secrets parse drifted`
@@ -1640,6 +1781,46 @@ const COMMON_DISPATCH = [
 
 /** Preserve the reusable Common caller, literal inventory, exact union and browser custody. */
 /** Keep production output custody separate from the existing source-rendering E2Es. */
+/** Pin the actual receipt pair consumer; a display-only final job cannot pass. */
+function commonVerdictProblems(source) {
+	const problems = [];
+	try {
+		const job = YAML.parse(source, { uniqueKeys: true }).jobs['common-unit-verdict'];
+		assert.deepEqual(job, {
+			name: 'Verdict',
+			needs: ['common-testbuild'],
+			if: 'always()',
+			'runs-on': 'ubuntu-latest',
+			permissions: { contents: 'read', actions: 'read' },
+			env: {
+				SITE_PREDECESSOR_RESULT: '${{ needs.common-testbuild.result }}',
+				GH_TOKEN: '${{ github.token }}'
+			},
+			steps: [
+				{ uses: 'actions/checkout@v4' },
+				{ uses: 'actions/setup-node@v4', with: { 'node-version-file': '.node-version' } },
+				{
+					name: 'Receive stable production browser proof',
+					uses: 'actions/download-artifact@v4',
+					with: { name: 'common-site-testbuild-main', path: 'site-proof/main' }
+				},
+				{
+					name: 'Receive development production browser proof',
+					uses: 'actions/download-artifact@v4',
+					with: { name: 'common-site-testbuild-dev', path: 'site-proof/dev' }
+				},
+				{
+					name: 'Require both exact Build and browser receipts',
+					run: 'node tools/ci/site-verdict.cjs verify site-proof'
+				}
+			]
+		});
+	} catch (error) {
+		problems.push('Shared Verdict must receive both tested receipt pairs: ' + error.message);
+	}
+	return problems;
+}
+
 function commonSiteProblems(source) {
 	const errors = [];
 	try {
@@ -1770,7 +1951,7 @@ function commonSiteProblems(source) {
 		command(
 			test,
 			'Test received production site — ${{ matrix.lot }}',
-			'set -euo pipefail\nnode tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"\n'
+			'set -euo pipefail\nnode tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"\nmkdir "$RUNNER_TEMP/site-proof"\ncp "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-proof/build.json"\ncp "$RUNNER_TEMP/site-testbuild.json" "$RUNNER_TEMP/site-proof/site-testbuild.json"\n'
 		);
 		same(
 			test.steps[7],
@@ -1779,7 +1960,7 @@ function commonSiteProblems(source) {
 				uses: 'actions/upload-artifact@v4',
 				with: {
 					name: 'common-site-testbuild-${{ env.ERGOPTI_SITE_TARGET }}',
-					path: '${{ runner.temp }}/site-testbuild.json',
+					path: '${{ runner.temp }}/site-proof/',
 					'if-no-files-found': 'error',
 					overwrite: true
 				}
@@ -2105,7 +2286,7 @@ const SITE_BUILD_REFUSALS = [
 	],
 	[
 		'missing browser proof',
-		'          path: ${{ runner.temp }}/site-testbuild.json\n',
+		'          path: ${{ runner.temp }}/site-proof/\n',
 		'          path: missing.json\n'
 	],
 	[
@@ -2192,7 +2373,7 @@ const SITE_DEPLOY_REFUSALS = [
 ];
 
 function commonProblems(files) {
-	const problems = [];
+	const problems = commonPlanProblems(files);
 	const entry = files.find((file) => file.rel === ENTRY);
 	const common = files.find((file) => file.rel === COMMON_BOX);
 	const callers = entry ? pipeline.jobsOfText(entry.text, ENTRY) : [];
@@ -2200,13 +2381,16 @@ function commonProblems(files) {
 	const children = common ? pipeline.jobsOfText(common.text, COMMON_BOX) : [];
 	const byId = new Map(children.map((job) => [job.id, job]));
 	const child = byId.get('shared-validation');
-	const prepare = byId.get('prepare-common');
+	const prepare = callers.find((job) => job.id === 'prepare-common');
 	const verdict = byId.get('common-unit-verdict');
 	const browser = byId.get('common-e2e');
 	if (!call || pipeline.field(call.body, 'uses') !== './.github/workflows/ci-common.yml')
 		problems.push('core must call the exact reusable Common workflow');
-	if (!call || JSON.stringify(pipeline.needsOf(call.body)) !== JSON.stringify([ROOT]))
-		problems.push('Common caller must still await validate alone');
+	if (
+		!call ||
+		JSON.stringify(pipeline.needsOf(call.body)) !== JSON.stringify([ROOT, 'prepare-common'])
+	)
+		problems.push('Common caller must await validation and the independent formatter');
 	for (const key of ['if', 'continue-on-error', 'secrets', 'runs-on', 'strategy', 'env', 'steps'])
 		if (call && pipeline.field(call.body, key) !== null)
 			problems.push('Common caller must set no ' + key);
@@ -2215,7 +2399,7 @@ function commonProblems(files) {
 			.exec(body)?.[0]
 			.trimEnd();
 	const callerInputs =
-		'    with:\n' +
+		'    with:\n      common_plan: ${{ needs.prepare-common.outputs.plan }}\n' +
 		COMMON_INPUTS.map(
 			(key) =>
 				`      ${key}: \${{ needs.validate.outputs.${key}${key === 'release' ? " == 'true'" : ''} }}`
@@ -2223,10 +2407,9 @@ function commonProblems(files) {
 	if (!call || fieldBlock(call.body, 'with') !== callerInputs)
 		problems.push('Common caller must forward exactly the five canonical plan inputs');
 	const dependencies = {
-		'prepare-common': [],
-		'shared-validation': ['prepare-common'],
-		'common-unit-verdict': ['shared-validation'],
-		'common-e2e': ['common-unit-verdict'],
+		'shared-validation': [],
+		'common-unit-verdict': ['common-testbuild'],
+		'common-e2e': ['shared-validation'],
 		'common-build': ['common-e2e'],
 		'common-testbuild': ['common-build']
 	};
@@ -2240,7 +2423,12 @@ function commonProblems(files) {
 		if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(needs))
 			problems.push(id + ' must await its exact mandatory prerequisites');
 		for (const key of ['if', 'continue-on-error', 'uses', 'secrets'])
-			if (job && pipeline.field(job.body, key) !== null) problems.push(id + ' must set no ' + key);
+			if (
+				job &&
+				pipeline.field(job.body, key) !==
+					(id === 'common-unit-verdict' && key === 'if' ? 'always()' : null)
+			)
+				problems.push(id + ' must set no ' + key);
 		if (!job || pipeline.field(job.body, 'runs-on') !== 'ubuntu-latest')
 			problems.push(id + ' must retain its Ubuntu runner');
 	}
@@ -2250,7 +2438,7 @@ function commonProblems(files) {
 	if (
 		!prepare ||
 		fieldBlock(prepare.body, 'outputs') !==
-			'    outputs:\n      matrix: ${{ steps.plan.outputs.matrix }}\n      metadata: ${{ steps.plan.outputs.metadata }}'
+			'    outputs:\n      plan: ${{ steps.plan.outputs.plan }}'
 	)
 		problems.push('Common must expose the actual prepared matrix');
 	const environment =
@@ -2258,16 +2446,19 @@ function commonProblems(files) {
 		['RELEASE', 'PRERELEASE', 'CHANNEL', 'TAG', 'VERSION']
 			.map((key) => `      ERGOPTI_DEV_RELEASE_${key}: \${{ inputs.${key.toLowerCase()} }}`)
 			.join('\n');
-	for (const job of [child, verdict])
+	for (const job of [child, browser])
 		if (
 			!job ||
 			fieldBlock(job.body, 'env') !==
 				(job === child
 					? environment.replace(
 							'    env:\n',
-							'    env:\n      COMMON_LOT: ${{ matrix.lot }}\n      COMMON_METADATA: ${{ needs.prepare-common.outputs.metadata }}\n'
+							'    env:\n      COMMON_LOT: ${{ matrix.lot }}\n      COMMON_PLAN: ${{ inputs.common_plan }}\n'
 						)
-					: environment)
+					: environment.replace(
+							'    env:\n',
+							'    env:\n      COMMON_PLAN: ${{ inputs.common_plan }}\n      COMMON_PREDECESSOR_RESULT: ${{ needs.shared-validation.result }}\n      GH_TOKEN: ${{ github.token }}\n'
+						))
 		)
 			problems.push('Common must retain exact qualification input bindings');
 	if (common) {
@@ -2276,16 +2467,16 @@ function commonProblems(files) {
 		const onStart = common.text.indexOf('\non:\n');
 		const permissionStart = common.text.indexOf('\npermissions:\n');
 		const trigger = common.text.slice(onStart + 1, permissionStart);
-		const names = [...trigger.matchAll(/^ {6}([a-z]+):$/gm)].map((match) => match[1]);
+		const names = [...trigger.matchAll(/^ {6}([a-z_]+):$/gm)].map((match) => match[1]);
 		if (
 			onStart < 0 ||
 			permissionStart <= onStart ||
 			!trigger.startsWith('on:\n  workflow_call:\n    inputs:\n') ||
-			JSON.stringify(names) !== JSON.stringify(COMMON_INPUTS) ||
+			JSON.stringify(names) !== JSON.stringify(['common_plan', ...COMMON_INPUTS]) ||
 			[...trigger.matchAll(/^ {2}([a-z_]+):$/gm)].some((match) => match[1] !== 'workflow_call')
 		)
 			problems.push('Common must accept only its exact workflow_call interface');
-		for (const key of COMMON_INPUTS) {
+		for (const key of ['common_plan', ...COMMON_INPUTS]) {
 			const type = key === 'release' ? 'boolean' : 'string';
 			if (
 				!new RegExp(
@@ -2335,7 +2526,7 @@ function commonProblems(files) {
 	)
 		problems.push('Common must dispatch the exact suite and feature from its declared matrix');
 	const consumer = scoped.contract.receipt_consumers[0];
-	exactStep(verdict, consumer.step, consumer.body);
+	exactStep(browser, consumer.step, consumer.body);
 	for (const [name, artifact, directory] of [
 		[
 			'Download exact source-bound qualification',
@@ -2344,8 +2535,8 @@ function commonProblems(files) {
 		],
 		['Download completed feature timings', 'pattern: core-js-timings-*', 'feature-timings']
 	]) {
-		const matches = verdict
-			? pipeline.steps(verdict.body).filter((step) => step.name === name)
+		const matches = browser
+			? pipeline.steps(browser.body).filter((step) => step.name === name)
 			: [];
 		if (
 			matches.length !== 1 ||
@@ -2363,10 +2554,54 @@ function commonProblems(files) {
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
 	])
 		exactStep(browser, name, command);
-	if (common) problems.push(...commonSiteProblems(common.text));
+	if (browser) {
+		const steps = pipeline.steps(browser.body);
+		const admission = steps.findIndex((step) => step.name === consumer.step);
+		const firstSetup = steps.findIndex(
+			(step) => pipeline.stepField(step.body, 'uses') === 'actions/setup-python@v5'
+		);
+		if (admission < 0 || admission >= firstSetup)
+			problems.push('Unit receipt admission must precede all browser preparation');
+	}
+	if (common)
+		problems.push(...commonSiteProblems(common.text), ...commonVerdictProblems(common.text));
 	return problems;
 }
 errors.push(...commonProblems(pipeline.files()));
+
+for (const [label, from, to] of [
+	['missing site Verdict', '  common-unit-verdict:\n', '  missing-verdict:\n'],
+	['Verdict wrong predecessor', '    needs: [common-testbuild]\n', '    needs: [common-build]\n'],
+	[
+		'Verdict forged aggregate',
+		'      SITE_PREDECESSOR_RESULT: ${{ needs.common-testbuild.result }}\n',
+		'      SITE_PREDECESSOR_RESULT: success\n'
+	],
+	[
+		'Verdict missing stable proof',
+		'          name: common-site-testbuild-main\n',
+		'          name: foreign\n'
+	],
+	[
+		'Verdict missing development proof',
+		'          name: common-site-testbuild-dev\n',
+		'          name: foreign\n'
+	],
+	[
+		'Verdict omits actual receipt receiving',
+		'run: node tools/ci/site-verdict.cjs verify site-proof',
+		'run: echo passed'
+	],
+	[
+		'Verdict forgives receiving',
+		'      - name: Require both exact Build and browser receipts\n',
+		'      - name: Require both exact Build and browser receipts\n        continue-on-error: true\n'
+	]
+])
+	mustCatch(label, COMMON_BOX, from, to, (files) =>
+		commonVerdictProblems(files.find((file) => file.rel === COMMON_BOX).text)
+	);
+
 for (const [label, from, to] of SITE_BUILD_REFUSALS) {
 	const source = pipeline.file(COMMON_BOX);
 	assert.equal(source.split(from).length, 2, label + ' has one real source seam');
@@ -2422,8 +2657,8 @@ for (const [label, from, to] of [
 mustCatch(
 	'prepared matrix cannot become a release caller input',
 	ENTRY,
-	"    uses: ./.github/workflows/ci-common.yml\n    with:\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.validate.outputs.tag }}\n",
-	"    uses: ./.github/workflows/ci-common.yml\n    with:\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.prepare-common.outputs.matrix }}\n",
+	"    uses: ./.github/workflows/ci-common.yml\n    permissions:\n      contents: read\n      actions: read\n    with:\n      common_plan: ${{ needs.prepare-common.outputs.plan }}\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.validate.outputs.tag }}\n",
+	"    uses: ./.github/workflows/ci-common.yml\n    permissions:\n      contents: read\n      actions: read\n    with:\n      common_plan: ${{ needs.prepare-common.outputs.plan }}\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.prepare-common.outputs.matrix }}\n",
 	planReferenceProblems
 );
 for (const [what, file, from, to] of [
@@ -2440,7 +2675,12 @@ for (const [what, file, from, to] of [
 		pipeline.job('core'),
 		pipeline.job('core').replace('      tag: ${{ needs.validate.outputs.tag }}\n', '')
 	],
-	['Common caller skips', ENTRY, "    name: 'Common'\n", "    name: 'Common'\n    if: false\n"],
+	[
+		'Common caller skips',
+		ENTRY,
+		"    name: 'YAML, shared code & web'\n",
+		"    name: 'YAML, shared code & web'\n    if: false\n"
+	],
 	[
 		'Common claims caller concurrency',
 		COMMON_BOX,
@@ -2486,9 +2726,9 @@ for (const [what, file, from, to] of [
 	],
 	[
 		'Common omits prepare dependency',
-		COMMON_BOX,
-		'    needs: [prepare-common]\n',
-		'    needs: []\n'
+		ENTRY,
+		pipeline.job('core'),
+		pipeline.job('core').replace('needs: [validate, prepare-common]', 'needs: [validate]')
 	],
 	[
 		'Common omits a unit verdict prerequisite',
@@ -2499,16 +2739,21 @@ for (const [what, file, from, to] of [
 	[
 		'Common browsers bypass exact unit union',
 		COMMON_BOX,
-		'    needs: [common-unit-verdict]\n',
-		'    needs: [shared-validation]\n'
+		'      - name: Require every declared check exactly once\n',
+		'      - name: Require every declared check exactly once\n        if: false\n'
 	],
 	[
 		'Common substitutes matrix planner',
-		COMMON_BOX,
+		ENTRY,
 		'node tools/ci/js-feature-matrix.cjs plan',
 		'node tools/ci/foreign-matrix.cjs'
 	],
-	['Common drops planner identity', COMMON_BOX, '        id: plan\n', '        id: foreign\n'],
+	[
+		'Common drops planner identity',
+		ENTRY,
+		pipeline.job('prepare-common'),
+		pipeline.job('prepare-common').replace('        id: plan\n', '        id: foreign\n')
+	],
 	[
 		'Common changes feature input',
 		COMMON_BOX,
@@ -2559,7 +2804,7 @@ function checkCommonReceiptConsumer() {
 	const owners = scoped.contract.receipt_consumers.filter((owner) => owner.file === COMMON_BOX);
 	assert.equal(owners.length, 1);
 	const owner = owners[0];
-	assert.equal(owner.job, 'common-unit-verdict');
+	assert.equal(owner.job, 'common-e2e');
 	assert.equal(owner.scope, 'core-js-suite');
 	assert.equal(owner.issuer_job, 'shared-validation');
 	assert.equal(owner.issuer_step, 'Run shared validation suite');
@@ -2664,17 +2909,17 @@ function graphProblems(files) {
 	const roots = topLevel
 		.filter((candidate) => pipeline.needsOf(candidate.body).length === 0)
 		.map((candidate) => candidate.id);
-	if (JSON.stringify(roots) !== JSON.stringify([ROOT])) {
+	if (JSON.stringify(roots) !== JSON.stringify(['prepare-common', ROOT])) {
 		problems.push(
-			`ci.yml must have exactly one root job, ${ROOT}, that needs nothing; got [${roots.join(', ')}]`
+			`ci.yml must have exactly the formatter and release-plan roots, ${ROOT}, that needs nothing; got [${roots.join(', ')}]`
 		);
 	}
 	const lanes = topLevel.filter((candidate) => pipeline.field(candidate.body, 'uses') !== null);
 	for (const lane of lanes) {
 		const needs = pipeline.needsOf(lane.body);
-		if (JSON.stringify(needs) !== JSON.stringify([ROOT])) {
+		if (JSON.stringify(needs) !== JSON.stringify([ROOT, 'prepare-common'])) {
 			problems.push(
-				`caller ${lane.id} must need the root alone, [${ROOT}], so the root fans out to one job per lane; got [${needs.join(', ')}]`
+				`caller ${lane.id} must need the formatter and release-plan roots, [${ROOT}], so the root fans out to one job per lane; got [${needs.join(', ')}]`
 			);
 		}
 	}
@@ -2695,12 +2940,19 @@ function graphProblems(files) {
 		problems.push('the manual verdict must wait for the root, shared core and every OS result');
 	}
 	if (
-		topLevel.length !== 7 ||
+		topLevel.length !== 8 ||
 		topLevel.some(
 			(job) =>
-				!['validate', 'core', 'macos', 'windows', 'linux', 'publication-plan', 'release'].includes(
-					job.id
-				)
+				![
+					'prepare-common',
+					'validate',
+					'core',
+					'macos',
+					'windows',
+					'linux',
+					'publication-plan',
+					'release'
+				].includes(job.id)
 		)
 	) {
 		problems.push('ci.yml must contain only the original jobs and the manual verdict');
@@ -2932,13 +3184,13 @@ for (const [what, rel, from, to] of [
 	[
 		'a caller that no longer needs the root',
 		ENTRY,
-		"    name: 'Linux'\n    needs: [validate]\n",
+		"    name: 'Linux'\n    needs: [validate, prepare-common]\n",
 		"    name: 'Linux'\n"
 	],
 	[
 		'a caller that also needs another lane',
 		ENTRY,
-		"    name: 'Windows'\n    needs: [validate]\n",
+		"    name: 'Windows'\n    needs: [validate, prepare-common]\n",
 		"    name: 'Windows'\n    needs: [validate, macos]\n"
 	],
 	[
@@ -4233,7 +4485,7 @@ for (const line of [
 function assertLotTransportControls() {
 	let count = 0;
 	for (const [rel, producer, consumer, matrix, metadata] of [
-		[COMMON_BOX, 'prepare-common', 'shared-validation', 'matrix', 'metadata'],
+		[COMMON_BOX, null, 'shared-validation', 'matrix', 'metadata'],
 		[COMMON_BOX, 'common-e2e', 'common-build', 'site_matrix', 'site_metadata'],
 		[COMMON_BOX, 'common-build', 'common-testbuild', 'site_matrix', 'site_metadata'],
 		[MACOS_BOX, 'test-hs', 'e2e-hs', 'e2e_matrix', 'e2e_metadata'],
@@ -4244,17 +4496,28 @@ function assertLotTransportControls() {
 		const job = pipeline.jobsOfText(source, rel).find((item) => item.id === consumer);
 		assert.ok(job, 'Actual human-lot consumer exists');
 		const matrixLine =
-			'      matrix: ${{ fromJSON(needs.' + producer + '.outputs.' + matrix + ') }}\n';
-		const metadataRef = 'needs.' + producer + '.outputs.' + metadata;
+			producer === null
+				? '      matrix: ' + COMMON_MATRIX + '\n'
+				: '      matrix: ${{ fromJSON(needs.' + producer + '.outputs.' + matrix + ') }}\n';
+		const metadataRef =
+			producer === null ? 'inputs.common_plan' : 'needs.' + producer + '.outputs.' + metadata;
 		const metadataLine = job.body.split('\n').find((line) => line.includes(metadataRef));
 		assert.ok(metadataLine, 'Actual metadata owner read exists');
 		for (const [label, before, after] of [
 			['missing matrix', matrixLine, ''],
-			['foreign matrix producer', matrixLine, matrixLine.replace(producer, 'foreign')],
+			[
+				'foreign matrix producer',
+				matrixLine,
+				producer === null
+					? matrixLine.replace('inputs.common_plan', 'inputs.foreign')
+					: matrixLine.replace(producer, 'foreign')
+			],
 			[
 				'foreign matrix key',
 				matrixLine,
-				matrixLine.replace('.outputs.' + matrix, '.outputs.foreign')
+				producer === null
+					? matrixLine.replace(').matrix', ').foreign')
+					: matrixLine.replace('.outputs.' + matrix, '.outputs.foreign')
 			],
 			[
 				'foreign metadata producer',
@@ -4346,19 +4609,22 @@ function namingProblems(files) {
 			const valid =
 				entry.rel === ENTRY
 					? caller
-						? { core: 'Common', macos: 'macOS', windows: 'Windows', linux: 'Linux' }[
-								candidate.id
-							] === name
+						? {
+								core: 'YAML, shared code & web',
+								macos: 'macOS',
+								windows: 'Windows',
+								linux: 'Linux'
+							}[candidate.id] === name
 						: {
+								'prepare-common': 'Check formatting and plan unit tests',
 								validate: 'Release plan',
 								'publication-plan': 'Release / Verify all lanes and original plan',
 								release: 'Release / Publish'
 							}[candidate.id] === name
 					: entry.rel === COMMON_BOX
 						? {
-								'prepare-common': 'Check formatting and plan unit tests',
 								'shared-validation': 'Unit tests',
-								'common-unit-verdict': 'Verify complete unit inventory',
+								'common-unit-verdict': 'Verdict',
 								'common-e2e': 'E2E tests',
 								'common-build': 'Build',
 								'common-testbuild': 'Install and launch'
@@ -4440,7 +4706,7 @@ for (const [before, after] of [
 	mustCatch('qualification owner ' + before, ENTRY, before, after, rootProblems);
 errors.push(...namingProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
-	['an incorrect Common caller name', ENTRY, "name: 'Common'", "name: 'Linux'"],
+	['an incorrect Common caller name', ENTRY, "name: 'YAML, shared code & web'", "name: 'Linux'"],
 	[
 		'an incorrect Common matrix name',
 		COMMON_BOX,

@@ -472,14 +472,22 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 {
 	const pipeline = require('./ci-pipeline.cjs');
 	const workflows = {
-		'ci.yml': ['validate', 'macos', 'windows', 'linux', 'core', 'publication-plan', 'release'],
-		'ci-common.yml': [
+		'ci.yml': [
 			'prepare-common',
+			'validate',
+			'macos',
+			'windows',
+			'linux',
+			'core',
+			'publication-plan',
+			'release'
+		],
+		'ci-common.yml': [
 			'shared-validation',
-			'common-unit-verdict',
 			'common-e2e',
 			'common-build',
-			'common-testbuild'
+			'common-testbuild',
+			'common-unit-verdict'
 		],
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 		'ci-macos.yml': ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
@@ -491,6 +499,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		linux: "needs.validate.outputs.lane_linux == 'true'",
 		'publication-plan': 'always() && !cancelled()',
 		release: "github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
+		'common-unit-verdict': 'always()',
 		'windows-ok': 'always()',
 		'macos-ok': 'always()',
 		'package-linux':

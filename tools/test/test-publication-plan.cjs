@@ -215,7 +215,7 @@ function validateWorkflow(workflow) {
 	assert.equal(upload.with['if-no-files-found'], 'error');
 	assert.equal(upload.with.overwrite, true);
 	for (const lane of ['core', 'windows', 'macos', 'linux'])
-		assert.deepEqual(jobs[lane].needs, ['validate']);
+		assert.deepEqual(jobs[lane].needs, ['validate', 'prepare-common']);
 	const preflight = jobs['publication-plan'];
 	assert.deepEqual(preflight.needs, ['macos', 'windows', 'linux', 'core']);
 	assert.equal(preflight.if, 'always() && !cancelled()');
@@ -291,4 +291,16 @@ for (const mutate of [
 	mutate(changed);
 	refuses(() => validateWorkflow(changed));
 }
+for (const lane of ['core', 'windows', 'macos', 'linux'])
+	for (const needs of [
+		['validate'],
+		['prepare-common'],
+		['validate', 'prepare-common', 'foreign'],
+		['validate', 'prepare-common', 'prepare-common'],
+		['validate', 'prepare-common', 'core']
+	]) {
+		const changed = clone(workflow);
+		changed.jobs[lane].needs = needs;
+		refuses(() => validateWorkflow(changed));
+	}
 console.log(`Publication plan controls: ${checks} passed; no publication or native qualification.`);

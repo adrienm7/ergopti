@@ -1013,6 +1013,9 @@ async function main() {
 	await check('production output browser assertions reject inert causal failures', async () => {
 		assert.equal(await require('./fixtures/site-artifact-smoke-controls.cjs').run(), 15);
 	});
+	await check('final shared Verdict receives both exact Build and browser proofs', async () => {
+		assert.equal((await require('./fixtures/site-verdict-controls.cjs').run()).controls, 49);
+	});
 	await check('human site lots retain the one target and base authority', () => {
 		const owner = require('../dev/site-context.cjs');
 		const metadata = owner.siteLots();
@@ -1075,9 +1078,9 @@ async function main() {
 			assert.throws(() => planSiteLots('admit', { ...env, ...change }));
 		assert.throws(() => planSiteLots('unknown', env));
 	});
-	assert.equal(checks, 34, 'every declared behavior control must complete');
+	assert.equal(checks, 35, 'every declared behavior control must complete');
 	console.log(
-		'Website release resolver and branch identity: 34 actual-source controls passed; no network used.'
+		'Website release resolver and branch identity: 35 actual-source controls passed; no network used.'
 	);
 }
 main().catch((error) => {

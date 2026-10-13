@@ -68,6 +68,162 @@ async function collect(readApi, endpoint, field) {
 	throw new Error('Site deployment admission refused: API census did not terminate.');
 }
 
+/** Read the actual current CI identity without deployment, branch-tip or completed-run policy. */
+async function readCurrentRun(env, readApi) {
+	refuse(
+		env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === REPOSITORY,
+		'actual repository CI context is required.'
+	);
+	refuse(
+		typeof env.GITHUB_SHA === 'string' && /^[a-f0-9]{40}$/.test(env.GITHUB_SHA),
+		'invalid actual source SHA.'
+	);
+	for (const key of ['GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_REPOSITORY_ID'])
+		refuse(number(env[key]) === env[key], 'canonical actual CI identity is required.');
+	refuse(
+		typeof env.GITHUB_EVENT_NAME === 'string' && env.GITHUB_EVENT_NAME.length > 0,
+		'actual CI event is required.'
+	);
+	refuse(
+		env.GITHUB_WORKFLOW === 'CI' && typeof readApi === 'function',
+		'canonical CI workflow and API reader are required.'
+	);
+	const prefix = '/repos/' + REPOSITORY + '/actions';
+	const run = await readApi(prefix + '/runs/' + env.GITHUB_RUN_ID);
+	refuse(
+		number(run.id) === env.GITHUB_RUN_ID && number(run.run_attempt) === env.GITHUB_RUN_ATTEMPT,
+		'foreign current run or attempt.'
+	);
+	refuse(
+		run.repository?.full_name === REPOSITORY &&
+			number(run.repository.id) === env.GITHUB_REPOSITORY_ID,
+		'foreign current run repository.'
+	);
+	refuse(
+		typeof run.head_sha === 'string' && /^[a-f0-9]{40}$/.test(run.head_sha),
+		'invalid API head SHA.'
+	);
+	refuse(run.event === env.GITHUB_EVENT_NAME, 'current run event differs from actual CI.');
+	refuse(
+		typeof run.head_branch === 'string' && run.head_branch.length > 0,
+		'missing API head branch.'
+	);
+	refuse(
+		typeof run.head_repository?.full_name === 'string' && run.head_repository.full_name.length > 0,
+		'missing API head repository.'
+	);
+	// Pull requests may build a merge commit while the API identifies their head commit.
+	if (run.event !== 'pull_request')
+		refuse(run.head_sha === env.GITHUB_SHA, 'API head differs from actual CI source.');
+	const workflowId = number(run.workflow_id);
+	const workflow = await readApi(prefix + '/workflows/' + workflowId);
+	refuse(
+		number(workflow.id) === workflowId &&
+			workflow.path === '.github/workflows/ci.yml' &&
+			workflow.name === env.GITHUB_WORKFLOW,
+		'current run is not canonical CI.'
+	);
+	return {
+		run_id: number(run.id),
+		run_attempt: number(run.run_attempt),
+		head_sha: run.head_sha,
+		head_branch: run.head_branch,
+		event: run.event,
+		workflow_id: workflowId,
+		repository_id: number(run.repository.id),
+		head_repository_id: number(run.head_repository.id),
+		head_repository: run.head_repository.full_name
+	};
+}
+
+/** Select the exact successful receipt writers for both targets across all actual attempts. */
+async function selectSiteJobs(identity, readApi) {
+	closed(identity, ['head_sha', 'run_id', 'run_attempt']);
+	refuse(
+		typeof identity.head_sha === 'string' && /^[a-f0-9]{40}$/.test(identity.head_sha),
+		'invalid API head SHA.'
+	);
+	const headSha = identity.head_sha;
+	const runId = number(identity.run_id),
+		attempt = number(identity.run_attempt);
+	refuse(
+		runId === identity.run_id && attempt === identity.run_attempt,
+		'canonical run identity is required.'
+	);
+	refuse(typeof readApi === 'function', 'missing API reader.');
+	const prefix = '/repos/' + REPOSITORY + '/actions';
+	const targets = Object.values(siteLots()).map((row) => row.target);
+	const stages = [
+		{ name: 'YAML, shared code & web / Build', writer: 'Build and seal production site' },
+		{
+			name: 'YAML, shared code & web / Install and launch',
+			writer: 'Test received production site'
+		}
+	];
+	const identities = stages.flatMap(({ name, writer }, stage) =>
+		targets.map((target) => ({
+			stage,
+			target,
+			name: name + ' (' + siteLot(target) + ')',
+			writer: writer + ' — ' + siteLot(target)
+		}))
+	);
+	const jobs = await collect(readApi, prefix + '/runs/' + runId + '/jobs?filter=all', 'jobs');
+	// Real receipt writers must agree with the human lot in the exact visible job name.
+	// Classify every row before choosing attempts so a failed rerun cannot hide old success.
+	const cells = stages.map(() => new Map(targets.map((name) => [name, []])));
+	for (const job of jobs) {
+		const identity = identities.find((row) => job.name === row.name);
+		const markers = Array.isArray(job.steps)
+			? job.steps.filter(
+					(step) =>
+						typeof step?.name === 'string' && stages.some((row) => step.name.includes(row.writer))
+				)
+			: [];
+		if (identity === undefined) {
+			refuse(markers.length === 0, 'foreign stage job name carries a reserved writer marker.');
+			continue;
+		}
+		refuse(
+			Array.isArray(job.steps) && job.steps.length <= MAX_RECORDS && markers.length === 1,
+			'missing, duplicate or oversized stage writer metadata.'
+		);
+		refuse(markers[0].name === identity.writer, 'unknown target or wrong-stage writer marker.');
+		refuse(Number(number(job.run_attempt)) <= Number(attempt), 'future stage job attempt.');
+		refuse(
+			number(job.run_id) === runId && job.head_sha === headSha,
+			'stage job is not successful for this source/run.'
+		);
+		cells[identity.stage].get(identity.target).push({ job, writer: markers[0] });
+	}
+	const selectedTargets = {};
+	for (const cellTarget of targets) {
+		const selected = cells.map((stage) => {
+			const matches = stage.get(cellTarget);
+			refuse(matches.length > 0, 'missing stage job name for an authored target.');
+			const latest = Math.max(...matches.map(({ job }) => Number(number(job.run_attempt))));
+			const current = matches.filter(({ job }) => Number(number(job.run_attempt)) === latest);
+			refuse(current.length === 1, 'duplicate stage job name for the chosen target/attempt.');
+			const { job, writer } = current[0];
+			refuse(
+				job.status === 'completed' && job.conclusion === 'success',
+				'stage job is not successful for this source/run.'
+			);
+			refuse(
+				writer.status === 'completed' && writer.conclusion === 'success',
+				'selected stage receipt writer is not successful.'
+			);
+			return { job_id: number(job.id), run_attempt: number(job.run_attempt) };
+		});
+		refuse(
+			Number(number(selected[0].run_attempt)) <= Number(number(selected[1].run_attempt)),
+			'stage attempt lineage runs backward.'
+		);
+		selectedTargets[cellTarget] = { build: selected[0], testbuild: selected[1] };
+	}
+	return selectedTargets;
+}
+
 /** Admit metadata only; downloaded build bytes and browser evidence must be received separately. */
 async function admitProducer(selection, readApi) {
 	closed(selection, ['repository', 'trigger']);
@@ -122,70 +278,7 @@ async function admitProducer(selection, readApi) {
 		'producer workflow is not canonical CI.'
 	);
 	const target = run.head_branch;
-	const targets = Object.values(siteLots()).map((row) => row.target);
-	const stages = [
-		{ name: 'Common / Build', writer: 'Build and seal production site' },
-		{ name: 'Common / Install and launch', writer: 'Test received production site' }
-	];
-	const identities = stages.flatMap(({ name, writer }, stage) =>
-		targets.map((target) => ({
-			stage,
-			target,
-			name: name + ' (' + siteLot(target) + ')',
-			writer: writer + ' — ' + siteLot(target)
-		}))
-	);
-	const jobs = await collect(readApi, prefix + '/runs/' + runId + '/jobs?filter=all', 'jobs');
-	// Real receipt writers must agree with the human lot in the exact visible job name.
-	// Classify every row before choosing attempts so a failed rerun cannot hide old success.
-	const cells = stages.map(() => new Map(targets.map((name) => [name, []])));
-	for (const job of jobs) {
-		const identity = identities.find((row) => job.name === row.name);
-		const markers = Array.isArray(job.steps)
-			? job.steps.filter(
-					(step) =>
-						typeof step?.name === 'string' && stages.some((row) => step.name.includes(row.writer))
-				)
-			: [];
-		if (identity === undefined) {
-			refuse(markers.length === 0, 'foreign stage job name carries a reserved writer marker.');
-			continue;
-		}
-		refuse(
-			Array.isArray(job.steps) && job.steps.length <= MAX_RECORDS && markers.length === 1,
-			'missing, duplicate or oversized stage writer metadata.'
-		);
-		refuse(markers[0].name === identity.writer, 'unknown target or wrong-stage writer marker.');
-		refuse(Number(number(job.run_attempt)) <= Number(attempt), 'future stage job attempt.');
-		refuse(
-			number(job.run_id) === runId && job.head_sha === run.head_sha,
-			'stage job is not successful for this source/run.'
-		);
-		cells[identity.stage].get(identity.target).push({ job, writer: markers[0] });
-	}
-	for (const cellTarget of targets) {
-		const selected = cells.map((stage) => {
-			const matches = stage.get(cellTarget);
-			refuse(matches.length > 0, 'missing stage job name for an authored target.');
-			const latest = Math.max(...matches.map(({ job }) => Number(number(job.run_attempt))));
-			const current = matches.filter(({ job }) => Number(number(job.run_attempt)) === latest);
-			refuse(current.length === 1, 'duplicate stage job name for the chosen target/attempt.');
-			const { job, writer } = current[0];
-			refuse(
-				job.status === 'completed' && job.conclusion === 'success',
-				'stage job is not successful for this source/run.'
-			);
-			refuse(
-				writer.status === 'completed' && writer.conclusion === 'success',
-				'selected stage receipt writer is not successful.'
-			);
-			return job;
-		});
-		refuse(
-			Number(number(selected[0].run_attempt)) <= Number(number(selected[1].run_attempt)),
-			'stage attempt lineage runs backward.'
-		);
-	}
+	await selectSiteJobs({ head_sha: run.head_sha, run_id: runId, run_attempt: attempt }, readApi);
 	const artifacts = await collect(readApi, prefix + '/runs/' + runId + '/artifacts', 'artifacts');
 	const artifactIds = ['common-site-build-', 'common-site-testbuild-'].map((name) => {
 		const matches = artifacts.filter((row) => row.name === name + target);
@@ -434,6 +527,9 @@ if (require.main === module)
 		process.exitCode = 1;
 	});
 module.exports = {
+	collect,
+	readCurrentRun,
+	selectSiteJobs,
 	admitProducer,
 	verifyDownloaded,
 	selectionFromEvent,

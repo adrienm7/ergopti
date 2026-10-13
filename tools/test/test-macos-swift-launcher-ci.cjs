@@ -702,8 +702,8 @@ check(
 	'release waits only on its complete publication admission'
 );
 check(
-	JSON.stringify(pipeline.needsOf(pipeline.job('publication-plan'))) ===
-		JSON.stringify(['core', 'macos', 'windows', 'linux']),
+	JSON.stringify(pipeline.needsOf(pipeline.job('publication-plan')).sort()) ===
+		JSON.stringify(['core', 'macos', 'windows', 'linux'].sort()),
 	'publication admission requires the four actual lane results'
 );
 check(
@@ -859,8 +859,14 @@ check(
 		pipeline.stepField(judge, 'continue-on-error') === null,
 	'(symlinked-config-dir) the launch verdict step must set neither if nor continue-on-error'
 );
+check(
+	launch.includes(
+		'MACOS_STAGE_SCENARIO: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].scenario }}'
+	),
+	'the installed-app judge scenario must come from the complete adjacent Build metadata'
+);
 const JUDGE_RUN =
-	/^python3 tools\/diagnostics\/macos_launch_gate\.py \/Applications\/ErgoptiPlus\.app "\$RUNNER_TEMP\/launch-gate" "\$\{\{ matrix\.scenario \}\}"(?:\s|$)/;
+	/^python3 tools\/diagnostics\/macos_launch_gate\.py \/Applications\/ErgoptiPlus\.app "\$RUNNER_TEMP\/launch-gate" "\$\{\{ env\.MACOS_STAGE_SCENARIO \}\}"(?:\s|$)/;
 check(
 	JUDGE_RUN.test(pipeline.stepField(judge, 'run') ?? ''),
 	'(symlinked-config-dir) the launch verdict step must run macos_launch_gate.py on the installed app for the matrix scenario'

@@ -59,28 +59,53 @@ function selectLot(inventory, ref, lot, metadata) {
 	return expected[lot];
 }
 
+/** Bind the complete shallow-checkout inventory to the actual source and ref. */
+function createPlan(inventory, context) {
+	if (
+		!context ||
+		!/^[0-9a-f]{40}$/.test(context.source || '') ||
+		!/^[0-9a-f]{64}$/.test(inventory.digest || '')
+	)
+		throw new Error('Common plan requires exact source and inventory digests');
+	return {
+		schema_version: 1,
+		source_sha: context.source,
+		ref: context.ref,
+		inventory_sha256: inventory.digest,
+		...displayPlan(inventory, context.ref)
+	};
+}
+
+/** Reject a missing, foreign or partial plan before a matrix cell executes. */
+function admitPlan(inventory, context, encoded) {
+	const expected = createPlan(inventory, context);
+	if (encoded !== JSON.stringify(expected))
+		throw new Error('Common source/ref plan differs from the complete authored inventory');
+	return expected;
+}
+
+/** Select one human lot only after admitting the complete producer plan. */
+function selectPlannedLot(inventory, context, lot, encoded) {
+	const plan = admitPlan(inventory, context, encoded);
+	return selectLot(inventory, context.ref, lot, JSON.stringify(plan.metadata));
+}
+
 if (require.main === module) {
 	const { loadInventory } = require('../test/lib/js-feature-inventory.cjs');
 	const inventory = loadInventory(path.resolve(__dirname, '../..'));
 	if (process.argv.length !== 3 || !['plan', 'select'].includes(process.argv[2]))
 		throw new Error('Usage: node tools/ci/js-feature-matrix.cjs plan|select');
 	if (!process.env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required');
+	const context = { source: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF };
 	if (process.argv[2] === 'plan') {
-		const planned = displayPlan(inventory, process.env.GITHUB_REF);
-		fs.appendFileSync(
-			process.env.GITHUB_OUTPUT,
-			'matrix=' +
-				JSON.stringify(planned.matrix) +
-				'\nmetadata=' +
-				JSON.stringify(planned.metadata) +
-				'\n'
-		);
+		const planned = createPlan(inventory, context);
+		fs.appendFileSync(process.env.GITHUB_OUTPUT, 'plan=' + JSON.stringify(planned) + '\n');
 	} else {
-		const row = selectLot(
+		const row = selectPlannedLot(
 			inventory,
-			process.env.GITHUB_REF,
+			context,
 			process.env.COMMON_LOT,
-			process.env.COMMON_METADATA
+			process.env.COMMON_PLAN
 		);
 		fs.appendFileSync(
 			process.env.GITHUB_OUTPUT,
@@ -89,4 +114,4 @@ if (require.main === module) {
 	}
 }
 
-module.exports = { createMatrix, displayPlan, selectLot };
+module.exports = { createMatrix, displayPlan, selectLot, createPlan, admitPlan, selectPlannedLot };
