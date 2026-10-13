@@ -108,6 +108,7 @@ graph TD
         MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_owned_program_runner["OwnedProgramRunner.lua"]
+        MACOS_physical_observation_clock["PhysicalObservationClock.lua"]
         MACOS_physical_shortcut_hook["PhysicalShortcutHook.lua"]
         MACOS_process_lifecycle["ProcessLifecycle.lua"]
         MACOS_program_providers["ProgramProviders.lua"]

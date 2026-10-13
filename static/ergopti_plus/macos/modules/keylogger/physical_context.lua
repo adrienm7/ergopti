@@ -3,6 +3,7 @@
 --- Retains observed privacy decisions for delayed physical input, without guessing
 --- the OS focus-transition time from asynchronous watcher delivery.
 local M = {}
+local Interval = require("keylogger.physical_interval")
 
 local function timestamp(value)
 	assert(math.type(value) == "integer" and value >= 0, "Invalid physical context timestamp")
@@ -18,6 +19,7 @@ function M.new(capacity, format_epoch)
 	assert(math.type(capacity) == "integer" and capacity > 0, "Invalid physical context capacity")
 	assert(type(format_epoch) == "function", "Missing physical context timestamp formatter")
 	local observations, active = {}, true
+	local interval_pending = false
 	local owner = {}
 
 	--- Revokes lookup before external native owners are stopped.
@@ -63,6 +65,36 @@ function M.new(capacity, format_epoch)
 		assert(active, "Physical context owner was revoked during formatting")
 		assert(type(formatted) == "string" and formatted ~= "", "Invalid physical context formatted timestamp")
 		return { allowed = true, app = selected.app, timestamp = formatted }
+	end
+
+	--- Resolves an entire retained hold using the original permitted press context.
+	--- Permission boundaries use their observed times, never inferred OS transition
+	--- times. Any forbidden part cancels the hold; app changes keep press attribution.
+	--- Source gaps must separately revoke the matched capture owner.
+	---@param first_ns integer Original press converted into host nanoseconds.
+	---@param last_ns integer Original release in the same clock domain.
+	---@return table context Copied initial press context, or only allowed=false.
+	function owner.resolve_interval(first_ns, last_ns)
+		assert(active, "Physical context owner is retired")
+		if interval_pending then
+			active = false
+			error("Physical context interval resolution reentered", 2)
+		end
+		timestamp(first_ns)
+		timestamp(last_ns)
+		assert(first_ns <= last_ns, "Physical context interval is reversed")
+		assert(observations[1] and observations[1].at <= first_ns,
+			"Physical event predates retained context")
+		if not Interval.permits(observations, first_ns, last_ns) then return { allowed = false } end
+		local retained, count = observations, #observations
+		interval_pending = true
+		local ok, context = pcall(owner.resolve, first_ns)
+		interval_pending = false
+		if not ok then error(context, 0) end
+		assert(active, "Physical context owner was revoked during formatting")
+		assert(observations == retained and #observations == count,
+			"Physical interval history changed during formatting")
+		return context
 	end
 
 	return owner

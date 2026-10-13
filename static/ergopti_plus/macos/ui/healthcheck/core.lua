@@ -253,6 +253,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.physical_observation_clock",
+		contract = { "now" },
+		-- Reached by explicit configuration binding; loading never samples time.
+		wired    = true,
+	},
+	{
 		id       = "adapters.managed_ollama_hint",
 		contract = { "get", "cancel" },
 		-- Structural dispatch wiring; source and image admission stay independent.
