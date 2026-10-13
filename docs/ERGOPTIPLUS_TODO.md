@@ -310,7 +310,7 @@ migration, preregistration and production emission still have software work;
 no backend choice, native or physical qualification is inferred.
 
 The Windows continuation now retains fifteen atomic three-driver AI corrections
-on `codex/groups-247-completion`, with exact source inventory and
+on `codex/groups-247-windows-resume-20261013`, with exact source inventory and
 [local continuation](handovers/2026-10-13-groups-247-windows/README.md).
 The current composed focused receiving passes 175 Mac portable cases, 29 Linux
 managed-response and seven Linux getter cases, both Windows source guards and

@@ -9,9 +9,9 @@ AGENTS.md, docs/memory/README.md and the routed Windows/workflow topics; apply
 ship-fix, verify-change, ahk-driver, cross-driver-parity and i18n as appropriate.
 The previous local session is archived: do not restart it.
 
-Fetch explicit dev and codex/groups-247-completion mappings. Compare origin/dev
+Fetch explicit dev and codex/groups-247-windows-resume-20261013 mappings. Compare origin/dev
 with ls-remote; do not trust a main-only refspec. Inspect status before switching.
-Continue on codex/groups-247-completion, whose completed fifteen AI cuts are
+Continue on codex/groups-247-windows-resume-20261013, whose completed fifteen AI cuts are
 already applied. Read this handover's README and atomic-source-checkpoint.json,
 docs/ERGOPTIPLUS_TODO.md and docs/handovers/2026-10-11-groups-247/windows-delivery.md.
 First integrate fresh dev by rebase preserving commits, never force/squash.
