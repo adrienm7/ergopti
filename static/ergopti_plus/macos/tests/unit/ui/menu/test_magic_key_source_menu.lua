@@ -21,7 +21,7 @@ local KEYCODE_ESCAPE = 53
 local MODULES = {
 	"ui.menu.magic_key_source_menu", "adapters.timer_scheduler", "infra.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
-	"adapters.keyboard_geometry", "adapters.event_provenance",
+	"adapters.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -30,6 +30,16 @@ local MODULES = {
 local function with_menu(body, faults)
 	helpers.with_fresh_modules(MODULES, function()
 		local world = { timers = {}, notices = {}, taps = {}, faults = faults or {}, cancellations = {} }
+		world.pause = { paused = false, pending = false, epoch = 0 }
+		world.pause_owner = {
+			is_paused = function()
+				if world.pause.throw then error("Controlled pause observation refusal") end
+				return world.pause.paused
+			end,
+			is_pause_transition_pending = function() return world.pause.pending end,
+			get_pause_epoch = function() return world.pause.epoch end,
+		}
+		package.loaded["modules.shortcuts.script_control"] = world.pause_owner
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn }
@@ -37,6 +47,7 @@ local function with_menu(body, faults)
 				if mode == "throw" then error("Controlled timer construction refusal") end
 				world.timers[#world.timers + 1] = handle
 				if mode == "premature" then fn() end
+				if delay == 0 and world.faults.answer_pause then world.pause.epoch = world.pause.epoch + 1 end
 				return handle, mode ~= "refuse"
 			end,
 			cancel = function(handle)
@@ -74,6 +85,7 @@ local function with_menu(body, faults)
 				self.running = world.faults.start ~= "inactive"
 				if world.faults.start == "throw" then error("Controlled tap activation refusal") end
 				if world.faults.start == "refuse" then return false end
+				if world.faults.start_pause then world.pause.epoch = world.pause.epoch + 1 end
 				return self
 			end
 			function tap:stop()
@@ -81,6 +93,7 @@ local function with_menu(body, faults)
 				if world.faults.stop == "throw" then error("Controlled tap stop refusal") end
 				if world.faults.stop == "refuse" then return false end
 				self.running = world.faults.stop == "active"
+				if world.faults.stop_pause then world.pause.epoch = world.pause.epoch + 1 end
 				return self
 			end
 			function tap:isEnabled()
@@ -512,4 +525,136 @@ helpers.describe("magic key source menu: retained event provenance fences", func
 			end, { provenance = true })
 		end)
 	end
+end)
+
+helpers.describe("magic key source menu: live pause admission", function()
+	for _, invalid in ipairs({ "missing", "paused", "pending", "unknown", "negative", "fractional", "throw" }) do
+		helpers.it("refuses capture with " .. invalid .. " live pause state before acquisition", function()
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				if invalid == "missing" then package.loaded["modules.shortcuts.script_control"] = nil end
+				if invalid == "paused" then world.pause.paused = true end
+				if invalid == "pending" then world.pause.pending = true end
+				if invalid == "unknown" then world.pause.epoch = nil end
+				if invalid == "negative" then world.pause.epoch = -1 end
+				if invalid == "fractional" then world.pause.epoch = 0.5 end
+				if invalid == "throw" then world.pause.throw = true end
+				helpers.assert_eq(Menu.capture(ctx), false)
+				helpers.assert_eq(#world.taps, 0)
+				helpers.assert_eq(#world.timers, 0)
+				helpers.assert_eq(ctx.saves, 0)
+				world.pause = { paused = false, pending = false, epoch = 2 }
+				package.loaded["modules.shortcuts.script_control"] = world.pause_owner
+				helpers.assert_true(Menu.capture(ctx))
+				world.taps[1].callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
+				helpers.assert_eq(Menu.capturing(), false)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("magic key source menu: pause crossings retire captured choices", function()
+	for _, stage in ipairs({ "before_press", "after_answer" }) do
+		for _, crossing in ipairs({ "paused", "pending", "roundtrip", "replaced" }) do
+			helpers.it("discards " .. crossing .. " boundary " .. stage .. " without saving", function()
+				with_menu(function(Menu, world)
+					local ctx = context(true)
+					helpers.assert_true(Menu.capture(ctx))
+					local tap = world.taps[1]
+					if stage == "after_answer" then helpers.assert_true(tap.callback(key_down(KEYCODE_J))) end
+					if crossing == "paused" then world.pause.paused = true end
+					if crossing == "pending" then world.pause.pending = true end
+					if crossing == "roundtrip" then world.pause.epoch = world.pause.epoch + 2 end
+					if crossing == "replaced" then
+						package.loaded["modules.shortcuts.script_control"] = {
+							is_paused = world.pause_owner.is_paused,
+							is_pause_transition_pending = world.pause_owner.is_pause_transition_pending,
+							get_pause_epoch = world.pause_owner.get_pause_epoch,
+						}
+					end
+					if stage == "before_press" then helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), false) end
+					run_deferred(world)
+					helpers.assert_eq(ctx.saves, 0)
+					helpers.assert_eq(ctx.state.magic_key_source, "auto")
+					helpers.assert_eq(ctx.applied, {})
+					helpers.assert_eq(tap.running, false)
+					helpers.assert_eq(Menu.capturing(), false)
+				end)
+			end)
+		end
+	end
+
+	for _, boundary in ipairs({ "start_pause", "answer_pause" }) do
+		helpers.it("refuses reentrant " .. boundary .. " before capture or key consumption", function()
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				if boundary == "start_pause" then
+					helpers.assert_eq(Menu.capture(ctx), false)
+				else
+					helpers.assert_true(Menu.capture(ctx))
+					helpers.assert_eq(world.taps[1].callback(key_down(KEYCODE_J)), false)
+				end
+				run_deferred(world)
+				helpers.assert_eq(ctx.saves, 0)
+				helpers.assert_eq(Menu.capturing(), false)
+				helpers.assert_eq(world.taps[1].running, false)
+			end, { [boundary] = true })
+		end)
+	end
+
+	helpers.it("keeps failed pause-boundary retirement owned until exact retry", function()
+		with_menu(function(Menu, world)
+			local ctx = context(true)
+			helpers.assert_true(Menu.capture(ctx))
+			local tap = world.taps[1]
+			helpers.assert_true(tap.callback(key_down(KEYCODE_J)))
+			world.pause.epoch = world.pause.epoch + 2
+			world.faults.stop = "refuse"
+			run_deferred(world)
+			helpers.assert_eq(ctx.saves, 0)
+			helpers.assert_true(Menu.capturing())
+			helpers.assert_eq(Menu.capture(ctx), false)
+			helpers.assert_eq(#world.taps, 1)
+			helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), false)
+			world.faults.stop = nil
+			helpers.assert_true(Menu.capture(ctx))
+			helpers.assert_eq(tap.running, false)
+			world.taps[2].callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
+			helpers.assert_eq(ctx.saves, 0)
+			helpers.assert_eq(Menu.capturing(), false)
+		end)
+	end)
+
+	helpers.it("honors the original synthetic provenance fence before paused user capture", function()
+		with_menu(function(Menu, world)
+			local ctx = context(true)
+			helpers.assert_true(Menu.capture(ctx))
+			local tap = world.taps[1]
+			world.pause.paused = true
+			local replacement = { key_down(KEYCODE_SPACE) }
+			world.faults.fence = { consume_original = true, events = replacement }
+			local consumed, events = tap.callback(key_down(KEYCODE_J))
+			helpers.assert_true(consumed)
+			helpers.assert_true(events == replacement)
+			helpers.assert_eq(ctx.saves, 0)
+			world.faults.fence = nil
+			helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), false)
+			helpers.assert_eq(Menu.capturing(), false)
+		end, { provenance = true })
+	end)
+end)
+
+helpers.describe("magic key source menu: retirement preserves the pause boundary", function()
+	helpers.it("revalidates the active epoch after native retirement before saving", function()
+		with_menu(function(Menu, world)
+			local ctx = context(true)
+			helpers.assert_true(Menu.capture(ctx))
+			helpers.assert_true(world.taps[1].callback(key_down(KEYCODE_J)))
+			run_deferred(world)
+			helpers.assert_eq(ctx.saves, 0)
+			helpers.assert_eq(ctx.applied, {})
+			helpers.assert_eq(ctx.state.magic_key_source, "auto")
+			helpers.assert_eq(Menu.capturing(), false)
+		end, { stop_pause = true })
+	end)
 end)
