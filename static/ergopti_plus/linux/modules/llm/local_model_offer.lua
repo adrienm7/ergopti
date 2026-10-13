@@ -77,8 +77,8 @@ local function dependencies(automatic)
 		notify = deps.notify or function(text, title)
 			return require("adapters.application_notifier").send(text, { title = title, level = "warning" })
 		end,
-		install = download and function(base_url, model, on_done, current)
-			return install(base_url, model, model, on_done, current)
+		install = download and function(base_url, model, on_done, current, on_retired)
+			return install(base_url, model, model, on_done, current, on_retired)
 		end or install,
 		current = function()
 			if _deps ~= owner then return false end
@@ -103,17 +103,21 @@ end
 
 --- Offers a missing model only for an already admitted, current native failure.
 --- @param failure any Structured local-model failure.
---- @param opts table|nil { automatic, current, modal_observer }
+--- @param opts table|nil { automatic, current, modal_observer, on_complete, on_retired }
 --- @return boolean handled
+--- @return boolean|nil downloading Exact affirmative installer admission, when attempted.
 function M.handle(failure, opts)
 	if not Policy.is_missing(failure) then return false end
 	local model, base_url, reason = failure.model, failure.base_url, failure.reason
 	local requesting = type(opts) == "table" and opts.current or nil
 	local automatic = type(opts) == "table" and opts.automatic == true
+	local complete = type(opts) == "table" and opts.on_complete or nil
+	local retired = type(opts) == "table" and opts.on_retired or nil
 	local deps = dependencies(automatic)
 	local function bound()
 		return failure.model == model and failure.base_url == base_url and failure.reason == reason
-			and (type(opts) ~= "table" or opts.current == requesting) and deps.current()
+			and (type(opts) ~= "table" or (opts.current == requesting
+				and opts.on_complete == complete and opts.on_retired == retired)) and deps.current()
 	end
 	local function current()
 		if not bound() then return false end
@@ -156,14 +160,15 @@ function M.handle(failure, opts)
 				notices[name] = nil
 			end
 			Logger.success(LOG, "Local model '%s' downloaded.", model)
+			if type(complete) == "function" then complete() end
 		else
 			Logger.warn(LOG, "Local model '%s' download failed.", model)
 		end
-	end, current)
+	end, current, retired)
 	if not installed or admitted ~= true then
 		Logger.warn(LOG, "Local model '%s' download was refused.", model)
 	end
-	return true
+	return true, installed and admitted == true
 end
 
 --- Resets native effects and notices for isolated tests.

@@ -412,3 +412,158 @@ helpers.describe("AI agent: native missing-model modal ownership", function()
 		helpers.assert_eq(actual.running, false)
 	end)
 end)
+
+
+helpers.describe("AI agent: asynchronous model consent continuation", function()
+	helpers.it("linux-model-consent-continuation: accepted pull stays authorized after its modal returns", function()
+		Scenario.run({ local_backend = true, selection = SELECTION,
+			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
+			local admission
+			require("modules.llm.local_model_offer")._reset_for_test({
+				confirm = function() return true end,
+				install = function(base_url, model, on_done, current) admission = current; return true end,
+				notify = function() return true end,
+			})
+			helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+			world.scheduler.test.advance(1)
+			world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+			helpers.assert_eq(type(admission), "function")
+			helpers.assert_eq(admission(), true, "The asynchronous pull must retain its accepted consent after the dialog returns.")
+			world.base_url = "http://127.0.0.1:11435"
+			helpers.assert_eq(admission(), false, "An endpoint replacement still revokes the captured consent.")
+		end)
+	end)
+end)
+
+
+helpers.describe("AI agent: model consent terminal and withdrawal receipts", function()
+	for _, boundary in ipairs({ "withdrawal", "success", "retirement" }) do
+		helpers.it("linux-model-consent-continuation: exact " .. boundary .. " retires accepted consent", function()
+			Scenario.run({ local_backend = true, selection = SELECTION,
+				stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
+				local admission, completed, retired
+				require("modules.llm.local_model_offer")._reset_for_test({
+					confirm = function() return true end,
+					install = function(base_url, model, on_done, current, on_retired)
+						admission, completed, retired = current, on_done, on_retired
+						return true
+					end,
+					notify = function() return true end,
+				})
+				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+				world.scheduler.test.advance(1)
+				world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+				helpers.assert_eq(admission(), true)
+				if boundary == "withdrawal" then world.engine.dismiss()
+				elseif boundary == "success" then completed(true)
+				else retired() end
+				helpers.assert_eq(admission(), false)
+			end)
+		end)
+	end
+
+	for _, receipt in ipairs({ "cancel", "refusal", "error", "truthy" }) do
+		helpers.it("linux-model-consent-continuation: " .. receipt .. " grants no asynchronous holder", function()
+			Scenario.run({ local_backend = true, selection = SELECTION,
+				stored = { ["llm.agent_system2"] = "local" } }, function(world)
+				local admission, asking, installs = nil, nil, 0
+				require("modules.llm.local_model_offer")._reset_for_test({
+					confirm = function(title, text, opts) asking = opts.current; return receipt ~= "cancel" end,
+					install = function(base_url, model, on_done, current)
+						admission, installs = current, installs + 1
+						if receipt == "error" then error("Controlled installer refusal.") end
+						return receipt == "truthy" and "accepted" or false
+					end,
+					notify = function() return true end,
+				})
+				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+				world.scheduler.test.advance(1)
+				world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+				helpers.assert_eq(asking(), false)
+				helpers.assert_eq(installs, receipt == "cancel" and 0 or 1)
+				if admission then helpers.assert_eq(admission(), false) end
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("AI agent: real asynchronous model download composition", function()
+	helpers.it("linux-model-consent-continuation: actual engine and pull owner accept progress after modal return", function()
+		Scenario.run({ local_backend = true, selection = SELECTION,
+			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
+			local names = { "modules.llm.model_download", "ui.download_window.bridge" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+			local updates, completes, admission = 0, 0, nil
+			local controls = {}
+			require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], controls)
+			package.loaded["ui.download_window.bridge"] = {
+				show = function() return 19 end,
+				update = function() updates = updates + 1; return true end,
+				complete = function() completes = completes + 1; return true end,
+				session_id = function() return 19 end,
+				retire = function(id) return id == 19 end,
+				focus = function(id) return id == 19 end,
+			}
+			local Download = require("modules.llm.model_download")
+			local start = Download.start
+			Download.start = function(base_url, tag, label, on_done, current, on_retired)
+				admission = current
+				return start(base_url, tag, label, on_done, current, on_retired)
+			end
+			require("modules.llm.local_model_offer")._reset_for_test({
+				confirm = function() return true end, notify = function() return true end,
+			})
+			local ok, err = xpcall(function()
+				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+				world.scheduler.test.advance(1)
+				world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+				helpers.assert_eq(#world.posts, 1)
+				helpers.assert_eq(world.posts[1].url, "http://127.0.0.1:11434/api/pull")
+				helpers.assert_eq(world.posts[1].body.name, "qwen2.5:7b")
+				helpers.assert_eq(admission(), true)
+				world.posts[1].on_chunk('{"status":"pulling","completed":1,"total":4}\n')
+				helpers.assert_eq(updates, 1, "Actual post-modal chunk reaches the retained pull owner.")
+				world.posts[1].on_chunk('{"status":"success"}\n')
+				world.posts[1].callback({ ok = true, status = 200 })
+				helpers.assert_eq(completes, 1)
+				helpers.assert_eq(admission(), false, "Only the matching completed consent is retired.")
+				helpers.assert_true(Download.shutdown())
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)
+
+
+helpers.describe("AI agent: superseded model consent settlement", function()
+	helpers.it("linux-model-consent-continuation: old completion and retirement cannot clear successor owner", function()
+		Scenario.run({ local_backend = true, selection = SELECTION,
+			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
+			local holders = {}
+			require("modules.llm.local_model_offer")._reset_for_test({
+				confirm = function() return true end,
+				install = function(base_url, model, complete, current, retired)
+					holders[#holders + 1] = { complete = complete, current = current, retired = retired }
+					return true
+				end,
+				notify = function() return true end,
+			})
+			for index = 1, 2 do
+				helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+				world.scheduler.test.advance(1)
+				world.probes[index].callback({ ok = true, status = 200, body = '{"models":[]}' })
+			end
+			helpers.assert_eq(#holders, 2)
+			helpers.assert_eq(holders[1].current(), false)
+			helpers.assert_eq(holders[2].current(), true)
+			holders[1].complete(true)
+			holders[1].retired()
+			helpers.assert_eq(holders[2].current(), true, "A stale receipt cannot release the successor holder.")
+			holders[2].complete(true)
+			helpers.assert_eq(holders[2].current(), false)
+		end)
+	end)
+end)

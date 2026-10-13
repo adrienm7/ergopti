@@ -488,3 +488,43 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 		helpers.assert_eq(coordinator.is_pending(), false)
 	end)
 end)
+
+
+helpers.describe("model download: exact requester retirement continuation", function()
+	helpers.it("linux-model-consent-continuation: cancellation notifies only after retained transport settlement", function()
+		local Download, transport = load_fixture()
+		local retired = 0
+		transport.owned_http.settled = false
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen", nil,
+				function() return true end, function() retired = retired + 1 end))
+			helpers.assert_eq(Download.cancel(), false)
+			helpers.assert_eq(retired, 0, "Accepted cancel is not actual retirement.")
+			transport.owned_http.operations[1]:acknowledge()
+			helpers.assert_eq(retired, 1)
+			helpers.assert_true(Download.cancel())
+			helpers.assert_eq(retired, 1, "One holder receives exactly one retirement notification.")
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-model-consent-continuation: failed pull retains consent for the exact guarded retry", function()
+		local Download, transport, window, shown = load_fixture()
+		local retired, done = 0, nil
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen",
+				function(value) done = value end, function() return true end, function() retired = retired + 1 end))
+			transport.starts[1].on_done({ ok = false })
+			helpers.assert_eq(done, false)
+			helpers.assert_eq(retired, 0, "A failed but retryable request is still its consent holder.")
+			helpers.assert_true(shown().on_retry())
+			helpers.assert_eq(#transport.starts, 2)
+			helpers.assert_eq(transport.starts[2].url, "http://127.0.0.1:11434/api/pull")
+			helpers.assert_true(Download.cancel())
+			helpers.assert_eq(retired, 1)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+end)

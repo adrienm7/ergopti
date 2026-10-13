@@ -1419,9 +1419,14 @@ local function offer_missing_model(failure, require_enabled)
 			_model_consent_owner = nil
 		end
 	end
-	local ok, handled = pcall(LocalModelOffer.handle, failure, { current = current, modal_observer = observer })
+	local function retired()
+		if _model_consent_owner == owner then _model_consent_owner = nil end
+	end
+	local ok, handled, downloading = pcall(LocalModelOffer.handle, failure, {
+		current = current, modal_observer = observer, on_complete = retired, on_retired = retired,
+	})
 	_modal_resync_owner = nil
-	if _model_consent_owner == owner then _model_consent_owner = nil end
+	if _model_consent_owner == owner and downloading ~= true then _model_consent_owner = nil end
 	if not ok then Logger.warn(LOG, "Missing-model offer failed: %s.", tostring(handled)) end
 	return ok and handled == true
 end
