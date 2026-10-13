@@ -83,10 +83,16 @@ for (const job of ['managed-ollama-native', 'cold-bootstrap-native']) {
 const canvasStage = pipeline.job('e2e-hs');
 const canvas = macRole.body(pipeline.file('.github/workflows/ci-macos.yml'), 'tooltip-canvas');
 assert.deepEqual(pipeline.needsOf(canvasStage), ['test-hs']);
-assert.equal(pipeline.field(canvasStage, 'runs-on'), '${{ matrix.runner }}');
+assert.equal(
+	pipeline.field(canvasStage, 'runs-on'),
+	'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}'
+);
 assert.equal(pipeline.field(canvasStage, 'if'), null);
 assert.equal(pipeline.field(canvasStage, 'continue-on-error'), null);
-assert.equal(pipeline.field(canvasStage, 'timeout-minutes'), '${{ matrix.timeout_minutes }}');
+assert.equal(
+	pipeline.field(canvasStage, 'timeout-minutes'),
+	'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}'
+);
 for (const release of [false, true])
 	for (const event_name of ['push', 'pull_request', 'workflow_dispatch']) {
 		const cells = macPlans.plan('e2e', {

@@ -35,10 +35,11 @@ permissions:
 
 jobs:
   prepare-common:
-    name: 'Prepare feature inventory'
+    name: 'Check formatting and plan unit tests'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      metadata: ${{ steps.plan.outputs.metadata }}
     steps:
       - uses: actions/checkout@v4
 
@@ -62,17 +63,18 @@ jobs:
         id: plan
         run: |
           set -euo pipefail
-          matrix="$(node tools/ci/js-feature-matrix.cjs)"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          node tools/ci/js-feature-matrix.cjs plan
 
   shared-validation:
-    name: 'Unit — ${{ matrix.feature }}'
+    name: 'Unit tests'
     needs: [prepare-common]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare-common.outputs.matrix) }}
     env:
+      COMMON_LOT: ${{ matrix.lot }}
+      COMMON_METADATA: ${{ needs.prepare-common.outputs.metadata }}
       ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
       ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
       ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
@@ -92,18 +94,27 @@ jobs:
 
       - run: npm ci
 
+      - name: Admit the complete Common lot map
+        id: common-lot
+        run: node tools/ci/js-feature-matrix.cjs select
+
       - name: Install native validation tools
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils
 
+      - name: Check hotstring TOML files are sorted and formatted
+        id: hotstrings-format
+        if: ${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}
+        run: python tools/format_toml.py --hotstrings --all --check
+
       - name: Run shared validation suite
         env:
-          SUITE: ${{ matrix.suite }}
-          FEATURE: ${{ matrix.feature }}
+          SUITE: ${{ steps.common-lot.outputs.suite }}
+          FEATURE: ${{ steps.common-lot.outputs.feature }}
         run: |
           set -euo pipefail
           mode=full
-          if [ "${{ matrix.suite }}" = js ]; then
+          if [ "${{ steps.common-lot.outputs.suite }}" = js ]; then
               receipt="$RUNNER_TEMP/stable-core-js-suite.json"
               node tools/ci/dev-release-qualification.cjs --scope core-js-suite --receipt "$receipt"
               mode="$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt "$receipt")"
@@ -115,6 +126,7 @@ jobs:
                   js) npm run test:js -- --feature "$FEATURE" ;;
                   properties) npm run test:properties ;;
                   mutation) npm run test:mutation ;;
+                  hotstrings-format) test "${{ steps.hotstrings-format.outcome }}" = success ;;
                   *) exit 1 ;;
               esac
           else
@@ -122,7 +134,7 @@ jobs:
           fi
 
       - name: Retain the source-bound Core JavaScript qualification
-        if: always() && matrix.suite == 'js' && matrix.feature == 'test-infrastructure'
+        if: always() && steps.common-lot.outputs.suite == 'js' && steps.common-lot.outputs.feature == 'test-infrastructure'
         uses: actions/upload-artifact@v4
         with:
           name: assets-qualification-core-js
@@ -131,19 +143,19 @@ jobs:
           overwrite: true
 
       - name: Retain shared validation timings, including interrupted runs
-        if: always() && matrix.suite == 'js'
+        if: always() && steps.common-lot.outputs.suite == 'js'
         uses: actions/upload-artifact@v4
         with:
-          name: core-js-timings-${{ matrix.feature }}
+          name: core-js-timings-${{ steps.common-lot.outputs.feature }}
           path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson
           if-no-files-found: warn
           overwrite: true
 
       - name: Retain captured JS failure output
-        if: always() && matrix.suite == 'js'
+        if: always() && steps.common-lot.outputs.suite == 'js'
         uses: actions/upload-artifact@v4
         with:
-          name: core-js-failures-${{ matrix.feature }}
+          name: core-js-failures-${{ steps.common-lot.outputs.feature }}
           path: ${{ runner.temp }}/ergopti-js-suite-*/failures/**
           if-no-files-found: ignore
           overwrite: true
@@ -190,9 +202,12 @@ jobs:
           fi
 
   common-e2e:
-    name: 'E2E browser rendering'
+    name: 'E2E tests'
     needs: [common-unit-verdict]
     runs-on: ubuntu-latest
+    outputs:
+      site_matrix: ${{ steps.site-plan.outputs.matrix }}
+      site_metadata: ${{ steps.site-plan.outputs.metadata }}
     steps:
       - uses: actions/checkout@v4
 
@@ -219,22 +234,26 @@ jobs:
       - name: Test shared Versions installation rendering
         run: npm run test:browser:changelog-install
 
+      - name: Plan both production site targets
+        id: site-plan
+        run: node tools/ci/site-matrix.cjs plan
+
   common-build:
-    name: 'Build site — ${{ matrix.target }}'
+    name: 'Build'
     needs: [common-e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - target: main
-            base_path: ''
-          - target: dev
-            base_path: '/dev'
+      matrix: ${{ fromJSON(needs.common-e2e.outputs.site_matrix) }}
+    outputs:
+      site_matrix: ${{ steps.site-plan.outputs.matrix }}
+      site_metadata: ${{ steps.site-plan.outputs.metadata }}
     env:
-      ERGOPTI_SITE_TARGET: ${{ matrix.target }}
-      BASE_PATH: ${{ matrix.base_path }}
+      SITE_LOT: ${{ matrix.lot }}
+      SITE_METADATA: ${{ needs.common-e2e.outputs.site_metadata }}
+      ERGOPTI_SITE_TARGET: ${{ fromJSON(needs.common-e2e.outputs.site_metadata)[matrix.lot].target }}
+      BASE_PATH: ${{ fromJSON(needs.common-e2e.outputs.site_metadata)[matrix.lot].base_path }}
       ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -246,7 +265,11 @@ jobs:
 
       - run: npm ci
 
-      - name: Build and seal production site
+      - name: Admit the complete production site map
+        id: site-plan
+        run: node tools/ci/site-matrix.cjs admit
+
+      - name: Build and seal production site — ${{ matrix.lot }}
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/common-site-$ERGOPTI_SITE_TARGET"
@@ -259,28 +282,25 @@ jobs:
       - name: Retain exact production site
         uses: actions/upload-artifact@v4
         with:
-          name: common-site-build-${{ matrix.target }}
-          path: ${{ runner.temp }}/common-site-${{ matrix.target }}/
+          name: common-site-build-${{ env.ERGOPTI_SITE_TARGET }}
+          path: ${{ runner.temp }}/common-site-${{ env.ERGOPTI_SITE_TARGET }}/
           include-hidden-files: true
           if-no-files-found: error
           overwrite: true
 
   common-testbuild:
-    name: 'Testbuild site — ${{ matrix.target }}'
+    name: 'Install and launch'
     needs: [common-build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - target: main
-            base_path: ''
-          - target: dev
-            base_path: '/dev'
+      matrix: ${{ fromJSON(needs.common-build.outputs.site_matrix) }}
     env:
-      ERGOPTI_SITE_TARGET: ${{ matrix.target }}
-      BASE_PATH: ${{ matrix.base_path }}
+      SITE_LOT: ${{ matrix.lot }}
+      SITE_METADATA: ${{ needs.common-build.outputs.site_metadata }}
+      ERGOPTI_SITE_TARGET: ${{ fromJSON(needs.common-build.outputs.site_metadata)[matrix.lot].target }}
+      BASE_PATH: ${{ fromJSON(needs.common-build.outputs.site_metadata)[matrix.lot].base_path }}
       ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -292,16 +312,20 @@ jobs:
 
       - run: npm ci
 
+      - name: Admit the complete production site map
+        id: site-plan
+        run: node tools/ci/site-matrix.cjs admit
+
       - name: Install production site browsers
         run: node tools/ci/install-playwright.cjs chromium webkit
 
       - name: Receive exact production site
         uses: actions/download-artifact@v4
         with:
-          name: common-site-build-${{ matrix.target }}
+          name: common-site-build-${{ env.ERGOPTI_SITE_TARGET }}
           path: ${{ runner.temp }}/received-site
 
-      - name: Test received production site
+      - name: Test received production site — ${{ matrix.lot }}
         run: |
           set -euo pipefail
           node tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"
@@ -309,7 +333,7 @@ jobs:
       - name: Retain production browser proof
         uses: actions/upload-artifact@v4
         with:
-          name: common-site-testbuild-${{ matrix.target }}
+          name: common-site-testbuild-${{ env.ERGOPTI_SITE_TARGET }}
           path: ${{ runner.temp }}/site-testbuild.json
           if-no-files-found: error
           overwrite: true

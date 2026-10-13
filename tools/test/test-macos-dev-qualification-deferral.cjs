@@ -15,19 +15,21 @@ const stageSource = require('./fixtures/macos-stage-source.cjs');
 
 // The old managed job environment is now explicit on every owned role step.
 const MANAGED_ROLE_ENV =
-	"        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'\n";
+	"        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'\n";
 
 /** Retains the expected step body, inherited environment and exact role fence. */
 function guardedStep(role, text) {
-	return text.replace(
-		/^(      - name: [^\n]+\n)(?:        if: ([^\n]+)\n)?/gm,
-		(_, heading, predicate) =>
-			heading +
-			(role === 'managed-ollama-native' ? MANAGED_ROLE_ENV : '') +
-			'        if: ' +
-			stageSource.condition(role, predicate ?? null) +
-			'\n'
-	);
+	return stageSource
+		.metadata(text, role)
+		.replace(
+			/^(      - name: [^\n]+\n)(?:        if: ([^\n]+)\n)?/gm,
+			(_, heading, predicate) =>
+				heading +
+				(role === 'managed-ollama-native' ? MANAGED_ROLE_ENV : '') +
+				'        if: ' +
+				stageSource.condition(role, predicate ?? null) +
+				'\n'
+		);
 }
 const workflow = fullDefault.file('.github/workflows/ci-macos.yml');
 const caller = fullDefault.file('.github/workflows/ci.yml');
@@ -321,8 +323,10 @@ function admitItem36Selector(mac) {
 		return null;
 	if (
 		JSON.stringify(pipeline.needsOf(job)) !== JSON.stringify(['test-hs']) ||
-		pipeline.field(job, 'runs-on') !== '${{ matrix.runner }}' ||
-		pipeline.field(job, 'timeout-minutes') !== '${{ matrix.timeout_minutes }}' ||
+		pipeline.field(job, 'runs-on') !==
+			'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}' ||
+		pipeline.field(job, 'timeout-minutes') !==
+			'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}' ||
 		pipeline.field(job, 'if') !== null ||
 		pipeline.field(job, 'continue-on-error') !== null ||
 		pipeline.field(job, 'secrets') !== null ||

@@ -439,9 +439,15 @@ assert.equal(timingStep.job, 'shared-validation');
 const upload = timingStep.body;
 const core = pipeline.job('shared-validation');
 assert(core.indexOf(upload) > core.indexOf(pipeline.step(core, 'Run shared validation suite')));
-assert.equal(pipeline.stepField(upload, 'if'), "always() && matrix.suite == 'js'");
+assert.equal(
+	pipeline.stepField(upload, 'if'),
+	"always() && steps.common-lot.outputs.suite == 'js'"
+);
 assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
-assert.match(upload, /^ {10}name: core-js-timings-\$\{\{ matrix\.feature \}\}$/m);
+assert.match(
+	upload,
+	/^ {10}name: core-js-timings-\$\{\{ steps\.common-lot\.outputs\.feature \}\}$/m
+);
 assert.match(upload, /^ {10}overwrite: true$/m);
 assert.match(upload, /^ {10}path: \$\{\{ runner.temp \}\}\/ergopti-js-suite-\*\/timings\.ndjson$/m);
 assert.doesNotMatch(
@@ -457,9 +463,15 @@ const failureUpload = failureStep.body;
 assert(
 	core.indexOf(failureUpload) > core.indexOf(pipeline.step(core, 'Run shared validation suite'))
 );
-assert.equal(pipeline.stepField(failureUpload, 'if'), "always() && matrix.suite == 'js'");
+assert.equal(
+	pipeline.stepField(failureUpload, 'if'),
+	"always() && steps.common-lot.outputs.suite == 'js'"
+);
 assert.equal(pipeline.stepField(failureUpload, 'uses'), 'actions/upload-artifact@v4');
-assert.match(failureUpload, /^ {10}name: core-js-failures-\$\{\{ matrix\.feature \}\}$/m);
+assert.match(
+	failureUpload,
+	/^ {10}name: core-js-failures-\$\{\{ steps\.common-lot\.outputs\.feature \}\}$/m
+);
 assert.match(
 	failureUpload,
 	/^ {10}path: \$\{\{ runner.temp \}\}\/ergopti-js-suite-\*\/failures\/\*\*$/m

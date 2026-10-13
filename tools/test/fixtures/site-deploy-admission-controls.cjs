@@ -5,6 +5,7 @@
 
 const assert = require('node:assert/strict');
 const subject = require('../../ci/site-deploy-admission.cjs');
+const { siteLot } = require('../../dev/site-context.cjs');
 
 function fixture(target = 'main') {
 	const source = 'a'.repeat(40);
@@ -21,15 +22,29 @@ function fixture(target = 'main') {
 		workflow_id: 77
 	};
 	const workflow = { id: 77, path: '.github/workflows/ci.yml', name: 'CI' };
-	const jobs = ['Build site — ', 'Testbuild site — '].map((name, i) => ({
-		id: 201 + i,
-		name: 'Common / ' + name + target,
-		run_id: 123,
-		head_sha: source,
-		run_attempt: i + 1,
-		status: 'completed',
-		conclusion: 'success'
-	}));
+	const jobs = [target, target === 'main' ? 'dev' : 'main'].flatMap((cellTarget, cellIndex) =>
+		[
+			['Common / Build', 'Build and seal production site'],
+			['Common / Install and launch', 'Test received production site']
+		].map(([name, writer], i) => ({
+			id: 201 + i + cellIndex * 10,
+			name: name + ' (' + siteLot(cellTarget) + ')',
+			run_id: 123,
+			head_sha: source,
+			run_attempt: i + 1,
+			status: 'completed',
+			conclusion: 'success',
+			steps: [
+				{ name: 'Set up job', number: 1, status: 'completed', conclusion: 'success' },
+				{
+					name: writer + ' — ' + siteLot(cellTarget),
+					number: 2,
+					status: 'completed',
+					conclusion: 'success'
+				}
+			]
+		}))
+	);
 	const artifacts = ['common-site-build-', 'common-site-testbuild-'].map((name, i) => ({
 		id: 301 + i,
 		name: name + target,
@@ -272,7 +287,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		[
 			'missing testbuild job',
 			(m) => {
-				m.jobs.pop();
+				m.jobs.splice(1, 1);
 			},
 			/stage job name/
 		],
@@ -427,7 +442,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		[
 			'truncated jobs census',
 			(m) => {
-				m.jobsTotal = 3;
+				m.jobsTotal = m.jobs.length + 1;
 			},
 			/census is incomplete/
 		],
@@ -517,7 +532,12 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		[
 			'newer foreign alias',
 			(m) =>
-				m.jobs.push({ ...m.jobs[0], id: 204, run_attempt: 2, name: 'Foreign / Build site — main' }),
+				m.jobs.push({
+					...m.jobs[0],
+					id: 204,
+					run_attempt: 2,
+					name: m.jobs[0].name.replace('Common / ', 'Foreign / ')
+				}),
 			/stage job name/
 		]
 	]) {
@@ -805,6 +825,148 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		controls,
 		101,
 		'metadata/event, retained-role reruns, target freshness, strict CLI transport and exact downloaded-byte controls all execute'
+	);
+	const markerMutations = [
+		['missing writer steps', (m) => delete m.jobs[0].steps, /stage writer metadata/],
+		['non-array writer steps', (m) => (m.jobs[0].steps = {}), /stage writer metadata/],
+		['empty writer steps', (m) => (m.jobs[0].steps = []), /stage writer metadata/],
+		['missing writer marker', (m) => m.jobs[0].steps.pop(), /stage writer metadata/],
+		[
+			'duplicate writer marker',
+			(m) => m.jobs[0].steps.push({ ...m.jobs[0].steps[1], number: 3 }),
+			/stage writer metadata/
+		],
+		[
+			'two target markers in one stage job',
+			(m) => m.jobs[0].steps.push({ ...m.jobs[2].steps[1], number: 3 }),
+			/stage writer metadata/
+		],
+		[
+			'unknown writer target',
+			(m) => (m.jobs[0].steps[1].name = 'Build and seal production site — Preview site'),
+			/unknown target or wrong-stage/
+		],
+		[
+			'prefixed writer alias',
+			(m) => (m.jobs[0].steps[1].name = 'Forged ' + m.jobs[0].steps[1].name),
+			/unknown target or wrong-stage/
+		],
+		[
+			'suffixed writer alias',
+			(m) => (m.jobs[0].steps[1].name += ' forged'),
+			/unknown target or wrong-stage/
+		],
+		[
+			'wrong-stage writer marker',
+			(m) => (m.jobs[0].steps[1] = structuredClone(m.jobs[1].steps[1])),
+			/unknown target or wrong-stage/
+		],
+		[
+			'other-target writer under an exact authored job name',
+			(m) => (m.jobs[0].steps[1] = structuredClone(m.jobs[2].steps[1])),
+			/unknown target or wrong-stage/
+		],
+		[
+			'reserved writer under unrelated parent',
+			(m) => m.jobs.push({ ...m.jobs[0], id: 203, name: 'Windows / Build' }),
+			/foreign stage job name/
+		],
+		[
+			'failed selected receipt writer despite successful job',
+			(m) => (m.jobs[0].steps[1].conclusion = 'failure'),
+			/receipt writer is not successful/
+		],
+		[
+			'skipped selected receipt writer despite successful job',
+			(m) => (m.jobs[1].steps[1].conclusion = 'skipped'),
+			/receipt writer is not successful/
+		],
+		[
+			'incomplete selected receipt writer',
+			(m) => (m.jobs[1].steps[1].status = 'in_progress'),
+			/receipt writer is not successful/
+		],
+		[
+			'missing selected writer conclusion',
+			(m) => delete m.jobs[1].steps[1].conclusion,
+			/receipt writer is not successful/
+		],
+		['missing other-target Build', (m) => m.jobs.splice(2, 1), /stage job name/],
+		['failed other-target Build', (m) => (m.jobs[2].conclusion = 'failure'), /not successful/],
+		[
+			'failed other-target receipt writer',
+			(m) => (m.jobs[3].steps[1].conclusion = 'failure'),
+			/receipt writer is not successful/
+		],
+		['missing other-target marker', (m) => m.jobs[2].steps.pop(), /stage writer metadata/],
+		[
+			'newer failed Build without marker hides old success',
+			(m) =>
+				m.jobs.push({ ...m.jobs[0], id: 203, run_attempt: 2, conclusion: 'failure', steps: [] }),
+			/stage writer metadata/
+		],
+		[
+			'newer skipped writer hides old success',
+			(m) => {
+				const newer = structuredClone(m.jobs[0]);
+				Object.assign(newer, { id: 203, run_attempt: 2 });
+				newer.steps[1].conclusion = 'skipped';
+				m.jobs.push(newer);
+			},
+			/receipt writer is not successful/
+		],
+		[
+			'older foreign writer marker cannot disappear during attempt selection',
+			(m) => {
+				const older = structuredClone(m.jobs[1]);
+				Object.assign(older, { id: 203, run_attempt: 1, conclusion: 'failure' });
+				older.steps[1].name = 'Test received production site — Preview site';
+				m.jobs.push(older);
+			},
+			/unknown target or wrong-stage/
+		],
+		[
+			'backward other-target lineage',
+			(m) => {
+				m.jobs[2].run_attempt = 2;
+				m.jobs[3].run_attempt = 1;
+			},
+			/lineage runs backward/
+		],
+		[
+			'newer failed other-target Build hides old success',
+			(m) => m.jobs.push({ ...m.jobs[2], id: 203, run_attempt: 2, conclusion: 'failure' }),
+			/not successful/
+		]
+	];
+	assert.equal(markerMutations.length, 25, 'every declared writer-custody refusal is present');
+	for (const target of ['main', 'dev']) {
+		for (const [name, mutate, reason] of markerMutations) {
+			const model = fixture(target);
+			mutate(model);
+			await assert.rejects(
+				() => owner.admitProducer(model.selection, reader(model).readApi),
+				reason,
+				target + ': ' + name
+			);
+			controls++;
+		}
+		const retained = fixture(target);
+		const older = structuredClone(retained.jobs[1]);
+		Object.assign(older, { id: 203, run_attempt: 1, conclusion: 'failure' });
+		older.steps[1].conclusion = 'failure';
+		retained.jobs.push(older);
+		retained.latestJobs = [retained.jobs[1], retained.jobs[3]];
+		assert.deepEqual(
+			await owner.admitProducer(retained.selection, reader(retained).readApi),
+			await owner.admitProducer(fixture(target).selection, reader(fixture(target)).readApi)
+		);
+		controls++;
+	}
+	assert.equal(
+		controls,
+		153,
+		'all original controls and both-target writer custody controls execute'
 	);
 	return {
 		controls,

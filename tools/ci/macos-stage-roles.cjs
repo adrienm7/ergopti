@@ -65,6 +65,99 @@ function plan(stage, context) {
 	];
 }
 
+/** Gives an admitted cell one human label without changing its runtime identity. */
+function humanLot(stage, selected) {
+	fields(selected, ['role', 'runner', 'architecture', 'timeout_minutes', 'scenario']);
+	return roleLot(stage, selected.role, selected.architecture, selected.scenario);
+}
+
+/** Names an existing role without asserting a runtime cell or constructing a CI context. */
+function roleLot(stage, role, architecture, scenario) {
+	for (const [name, value] of Object.entries({ stage, role, architecture, scenario }))
+		assert.equal(typeof value, 'string', 'Invalid human lot ' + name);
+	const native = () => {
+		assert.ok(['arm64', 'amd64'].includes(architecture), 'Unknown human lot architecture');
+		return architecture === 'arm64' ? 'Apple silicon' : 'Intel';
+	};
+	if (stage === 'testbuild' && role === 'launch') {
+		assert.match(scenario, /^[a-z][a-z0-9_]*$/);
+		return 'Installed app: ' + scenario.replace(/_/g, ' ') + ' (' + native() + ')';
+	}
+	assert.equal(scenario, '', 'Unexpected scenario for this human lot');
+	switch (stage + '/' + role) {
+		case 'unit/lua-unit-meta':
+			assert.equal(architecture, 'stubbed');
+			return 'Lua unit and meta (stubbed)';
+		case 'e2e/e2e-hs':
+			assert.equal(architecture, 'stubbed');
+			return 'Virtual-keyboard replay (stubbed)';
+		case 'e2e/tooltip-canvas':
+			assert.equal(architecture, 'arm64');
+			return 'Tooltip canvas (Apple silicon)';
+		case 'e2e/managed-ollama-native':
+			return 'Managed Ollama (' + native() + ')';
+		case 'e2e/item36-native':
+			assert.equal(architecture, 'host');
+			return 'Archive update controls';
+		case 'e2e/lease-silence-native':
+			return 'Lease silence (' + native() + ')';
+		case 'testbuild/cold-bootstrap-native':
+			assert.equal(architecture, 'arm64');
+			return 'Cold native bootstrap (Apple silicon)';
+		default:
+			throw new Error('Unknown human lot stage or role');
+	}
+}
+
+/** Separates the only matrix axis from the complete canonical cell metadata. */
+function displayPlan(stage, context) {
+	assert.ok(['unit', 'e2e', 'testbuild'].includes(stage), 'Stage has no human lot matrix');
+	const rows = plan(stage, context);
+	const lots = rows.map((selected) => humanLot(stage, selected));
+	assert.equal(new Set(lots).size, rows.length, 'Duplicate human lot label');
+	return {
+		matrix: { lot: lots },
+		metadata: Object.fromEntries(lots.map((lot, index) => [lot, rows[index]]))
+	};
+}
+
+/** Refuses a partial or altered map before returning the unchanged canonical cell. */
+function selectLot(stage, lot, metadata, context) {
+	const expected = displayPlan(stage, context);
+	assert.deepEqual(metadata, expected.metadata, 'Complete human lot metadata map differs');
+	assert.ok(
+		typeof lot === 'string' && Object.hasOwn(expected.metadata, lot),
+		'Missing or foreign human lot'
+	);
+	return expected.metadata[lot];
+}
+
+/** Unit has one canonical lot and needs no predecessor to produce its metadata map. */
+function selectUnitLot(lot, context) {
+	return selectLot('unit', lot, displayPlan('unit', context).metadata, context);
+}
+
+/** Validate the receiver's complete lot map before admitting or reading prior receipts. */
+function admit(stage, lot, metadata, needs, context, currentAttempt, receive) {
+	assert.ok(['unit', 'e2e', 'build'].includes(stage), 'Unknown preceding stage');
+	const receiver = STAGES[STAGES.indexOf(stage) + 1];
+	if (receiver !== 'build') selectLot(receiver, lot, metadata, context);
+	const result = aggregate(needs, stage);
+	assert.equal(typeof receive, 'function', 'Missing prior receipt reader');
+	return union(stage, receive(), result, context, currentAttempt);
+}
+
+/** Bind the visible lot to the original receipt cell without extending the receipt schema. */
+function recordLot(stage, selected, result, prior, context, host, attempt, lot, metadata) {
+	if (stage !== 'build') {
+		const expected =
+			stage === 'unit' ? selectUnitLot(lot, context) : selectLot(stage, lot, metadata, context);
+		assert.deepEqual(selected, expected, 'Selected human lot and receipt cell differ');
+		assert.equal(humanLot(stage, selected), lot, 'Receipt human lot differs');
+	}
+	return record(stage, selected, result, prior, context, host, attempt);
+}
+
 function identity(value) {
 	return [value.role, value.runner, value.scenario].join('/');
 }
@@ -323,30 +416,54 @@ function main(args) {
 				context.scenarios,
 				'Build scenario output differs from canonical owner'
 			);
+		const displayed = displayPlan(stage, context);
 		fs.appendFileSync(
 			process.env.GITHUB_OUTPUT,
-			stage + '_matrix=' + JSON.stringify(plan(stage, context)) + '\n'
+			stage +
+				'_matrix=' +
+				JSON.stringify(displayed.matrix) +
+				'\n' +
+				stage +
+				'_metadata=' +
+				JSON.stringify(displayed.metadata) +
+				'\n'
 		);
+	} else if (command === 'select') {
+		assert.equal(args.length, 2);
+		assert.equal(stage, 'unit');
+		const selected = selectUnitLot(process.env.MACOS_STAGE_LOT, context);
+		fs.appendFileSync(process.env.GITHUB_OUTPUT, 'cell=' + JSON.stringify(selected) + '\n');
 	} else if (command === 'admit') {
 		assert.equal(args.length, 4);
-		const result = aggregate(parseClosedJson(process.env.MACOS_STAGE_NEEDS), stage);
 		save(
 			output,
-			union(stage, readReceipts(input), result, context, Number(process.env.GITHUB_RUN_ATTEMPT))
+			admit(
+				stage,
+				process.env.MACOS_STAGE_LOT,
+				stage === 'e2e' ? undefined : parseClosedJson(process.env.MACOS_STAGE_METADATA),
+				parseClosedJson(process.env.MACOS_STAGE_NEEDS),
+				context,
+				Number(process.env.GITHUB_RUN_ATTEMPT),
+				() => readReceipts(input)
+			)
 		);
 	} else if (command === 'record') {
 		assert.equal(args.length, 4);
 		const prior = input === '-' ? { context, chain: [] } : read(input);
 		save(
 			output,
-			record(
+			recordLot(
 				stage,
 				parseClosedJson(process.env.MACOS_STAGE_CELL),
 				process.env.MACOS_STAGE_RESULT,
 				prior,
 				context,
 				{ os: process.platform, architecture: process.arch },
-				Number(process.env.GITHUB_RUN_ATTEMPT)
+				Number(process.env.GITHUB_RUN_ATTEMPT),
+				process.env.MACOS_STAGE_LOT,
+				['e2e', 'testbuild'].includes(stage)
+					? parseClosedJson(process.env.MACOS_STAGE_METADATA)
+					: undefined
 			)
 		);
 	} else {
@@ -371,6 +488,13 @@ module.exports = {
 	STAGES,
 	JOBS,
 	plan,
+	humanLot,
+	roleLot,
+	displayPlan,
+	selectLot,
+	selectUnitLot,
+	admit,
+	recordLot,
 	record,
 	aggregate,
 	union,

@@ -1,0 +1,123 @@
+{
+	"Debian: installed archive": {
+		"id": "distro-debian",
+		"kind": "install",
+		"distro": "debian",
+		"container": "debian:stable-slim",
+		"image": "debian:stable-slim",
+		"prep": "apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd ca-certificates git gcc libc6-dev linux-libc-dev"
+	},
+	"Fedora: installed archive": {
+		"id": "distro-fedora",
+		"kind": "install",
+		"distro": "fedora",
+		"container": "fedora:latest",
+		"image": "fedora:latest",
+		"prep": "dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers"
+	},
+	"Arch Linux: installed archive": {
+		"id": "distro-arch",
+		"kind": "install",
+		"distro": "arch",
+		"container": "archlinux:latest",
+		"image": "archlinux:latest",
+		"prep": "pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers"
+	},
+	"Alpine: installed archive": {
+		"id": "distro-alpine",
+		"kind": "install",
+		"distro": "alpine",
+		"container": "alpine:latest",
+		"image": "alpine:latest",
+		"prep": "apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers"
+	},
+	"openSUSE: installed archive": {
+		"id": "distro-opensuse",
+		"kind": "install",
+		"distro": "opensuse",
+		"container": "opensuse/tumbleweed:latest",
+		"image": "opensuse/tumbleweed:latest",
+		"prep": "sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow git gcc glibc-devel linux-glibc-devel"
+	},
+	"Ubuntu 22.04: first installation": {
+		"id": "first-install-ubuntu-22.04",
+		"kind": "first",
+		"distro": "ubuntu-22.04",
+		"container": "",
+		"image": "ubuntu:22.04"
+	},
+	"Ubuntu 24.04: first installation": {
+		"id": "first-install-ubuntu-24.04",
+		"kind": "first",
+		"distro": "ubuntu-24.04",
+		"container": "",
+		"image": "ubuntu:24.04"
+	},
+	"Debian 12: first installation": {
+		"id": "first-install-debian-12",
+		"kind": "first",
+		"distro": "debian-12",
+		"container": "",
+		"image": "debian:12"
+	},
+	"Debian 13: first installation": {
+		"id": "first-install-debian-13",
+		"kind": "first",
+		"distro": "debian-13",
+		"container": "",
+		"image": "debian:13"
+	},
+	"Fedora 41: first installation": {
+		"id": "first-install-fedora-41",
+		"kind": "first",
+		"distro": "fedora-41",
+		"container": "",
+		"image": "fedora:41",
+		"known": "webkit"
+	},
+	"Fedora latest: first installation": {
+		"id": "first-install-fedora-latest",
+		"kind": "first",
+		"distro": "fedora-latest",
+		"container": "",
+		"image": "fedora:latest",
+		"known": "webkit"
+	},
+	"Arch Linux: first installation": {
+		"id": "first-install-arch",
+		"kind": "first",
+		"distro": "arch",
+		"container": "",
+		"image": "archlinux:latest"
+	},
+	"openSUSE Tumbleweed: first installation": {
+		"id": "first-install-opensuse-tumbleweed",
+		"kind": "first",
+		"distro": "opensuse-tumbleweed",
+		"container": "",
+		"image": "opensuse/tumbleweed:latest",
+		"prep": "sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo"
+	},
+	"Alpine: first installation": {
+		"id": "first-install-alpine",
+		"kind": "first",
+		"distro": "alpine",
+		"container": "",
+		"image": "alpine:latest"
+	},
+	".deb package": {
+		"id": "smoke-deb-install",
+		"kind": "deb",
+		"container": ""
+	},
+	".rpm package": {
+		"id": "smoke-rpm-install",
+		"kind": "rpm",
+		"container": "fedora:latest"
+	},
+	"AppImage package": {
+		"id": "smoke-appimage-run",
+		"kind": "appimage",
+		"container": ""
+	}
+}

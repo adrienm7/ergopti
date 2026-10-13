@@ -35,7 +35,7 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 	assert.deepEqual(
 		job.steps.slice(index, index + 2),
 		expected.jobs['managed-ollama-native'].steps.map((step) => ({
-			...step,
+			...macRole.metadata(step, 'managed-ollama-native'),
 			if: macRole.condition('managed-ollama-native', step.if),
 			env: {
 				GOTOOLCHAIN: 'local',
@@ -43,7 +43,7 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 				ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}',
 				ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}',
 				ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}',
-				ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
+				ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
 			}
 		})),
 		'Actual two clock steps must equal the fixed reviewed producer input.'

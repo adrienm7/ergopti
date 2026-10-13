@@ -556,7 +556,10 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			assert.equal(pipeline.stepField(step.body, 'continue-on-error'), null);
 		assert.throws(() =>
 			MacStage.selected(
-				actualJob.body.replaceAll("matrix.role == '" + role + "'", "matrix.role == 'foreign'"),
+				actualJob.body.replaceAll(
+					"env.MACOS_STAGE_ROLE == '" + role + "'",
+					"env.MACOS_STAGE_ROLE == 'foreign'"
+				),
 				role
 			)
 		);
