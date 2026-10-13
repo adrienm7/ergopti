@@ -119,6 +119,8 @@ function githubFixture(url) {
 	if (url === repo) return { stargazers_count: 123 };
 	if (url === repo + '/releases/latest') return { ...release, prerelease: false };
 	if (url === repo + '/releases?per_page=100&page=1') return [release];
+	if (url === repo + '/releases?per_page=20')
+		return [{ ...release, tag_name: 'v0.0.0-smoke-stable', prerelease: false }, release];
 	return null;
 }
 
