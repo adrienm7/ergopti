@@ -1,0 +1,437 @@
+#pragma once
+
+#include "connected_devices.hpp"
+#include "InstalledUserConfiguration.hpp"
+#include "remap_runtime_installed_configuration.hpp"
+#include <sstream>
+#include "constants.hpp"
+#include "details/global_configuration.hpp"
+#include "details/machine_specific.hpp"
+#include "details/profile.hpp"
+#include "details/profile/complex_modifications.hpp"
+#include "details/profile/device.hpp"
+#include "details/profile/simple_modifications.hpp"
+#include "details/profile/virtual_hid_keyboard.hpp"
+#include "filesystem_utility.hpp"
+#include "json_utility.hpp"
+#include "json_writer.hpp"
+#include "logger.hpp"
+#include "types.hpp"
+#include "vector_utility.hpp"
+#include <filesystem>
+#include <fstream>
+#include <glob/glob.hpp>
+#include <pqrs/filesystem.hpp>
+#include <pqrs/osx/process_info.hpp>
+#include <pqrs/osx/session.hpp>
+#include <string>
+#include <sys/stat.h>
+#include <unordered_map>
+
+// Example: tests/src/core_configuration/json/example.json
+
+namespace krbn::core_service::daemon { class device_grabber; }
+
+namespace krbn::core_configuration {
+using namespace std::string_literals;
+
+class core_configuration final {
+  friend class ::krbn::core_service::daemon::device_grabber;
+  class owned_snapshot_key final {
+    friend class ::krbn::core_service::daemon::device_grabber;
+    const std::shared_ptr<ergoptiplus::installed_configuration::owner> publication_;
+    explicit owned_snapshot_key(std::shared_ptr<ergoptiplus::installed_configuration::owner> publication)
+      :publication_(std::move(publication)) {}
+  public:
+    owned_snapshot_key(const owned_snapshot_key&)=delete;
+  };
+  std::shared_ptr<ergoptiplus::installed_configuration::owner> owned_publication_;
+  std::string owned_generation_;
+public:
+  class owned_configuration_snapshot final {
+    friend class core_configuration;
+    const std::shared_ptr<ergoptiplus::installed_configuration::owner> publication_;
+    const std::string generation_;
+    const std::string sha256_;
+    owned_configuration_snapshot(std::shared_ptr<ergoptiplus::installed_configuration::owner> publication,
+                                 std::string generation)
+      :publication_(std::move(publication)),generation_(std::move(generation)),
+       sha256_([this] {
+         static constexpr char digits[]="0123456789abcdef";
+         std::string result;
+         result.reserve(64);
+         for (const auto byte:publication_->digest()) {
+           result.push_back(digits[byte>>4]);
+           result.push_back(digits[byte&15]);
+         }
+         return result;
+       }()) {}
+  public:
+    bool current() const noexcept {
+      return publication_ && publication_->namespace_current() && publication_->file_current();
+    }
+    const std::string& generation() const noexcept { return generation_; }
+    const std::string& sha256() const noexcept { return sha256_; }
+  };
+private:
+  std::shared_ptr<const owned_configuration_snapshot> owned_snapshot_;
+  std::shared_ptr<const owned_configuration_snapshot> retain_owned_configuration_snapshot() const {
+    return owned_snapshot_ && owned_snapshot_->current() ? owned_snapshot_ : nullptr;
+  }
+public:
+  enum class source {
+    default_configuration,
+    user_file,
+    system_file,
+  };
+
+  enum class load_state {
+    // The configuration is ready to use.
+    // This also includes the case where the file does not exist and the default configuration is used.
+    loaded,
+
+    // The configuration file exists, but macOS denied access to it (EACCES or EPERM).
+    // For example, this can occur when karabiner.json is stored in ~/Desktop and access has not been granted.
+    permission_error,
+
+    // The file was readable, but its JSON could not be parsed or applied to the configuration.
+    json_error,
+
+    // Loading failed for another reason, such as an invalid file owner or an I/O error.
+    other_error,
+  };
+
+  core_configuration(const core_configuration&) = delete;
+
+  core_configuration()
+      : core_configuration("",
+                           0,
+                           krbn::core_configuration::error_handling::loose) {
+  }
+
+  core_configuration(const std::string& file_path,
+                     uid_t expected_file_owner,
+                     error_handling error_handling)
+      : json_(nlohmann::json::object()),
+        error_handling_(error_handling),
+        load_state_(load_state::loaded),
+        source_(source::default_configuration),
+        global_configuration_(std::make_shared<details::global_configuration>(nlohmann::json::object(),
+                                                                              error_handling)),
+        machine_specific_(std::make_shared<details::machine_specific>(nlohmann::json::object(),
+                                                                      error_handling)) {
+    helper_values_.push_back_object<details::global_configuration>("global",
+                                                                   global_configuration_);
+
+    helper_values_.push_back_object<details::machine_specific>("machine_specific",
+                                                               machine_specific_);
+
+    helper_values_.push_back_array<details::profile>("profiles",
+                                                     profiles_);
+
+    std::error_code status_error;
+    auto file_status = std::filesystem::status(file_path, status_error);
+    if (status_error) {
+      if (status_error != std::errc::no_such_file_or_directory &&
+          status_error != std::errc::not_a_directory) {
+        load_state_ = is_permission_error(status_error)
+                          ? load_state::permission_error
+                          : load_state::other_error;
+        logger::get_logger()->error("failed to access {0}: {1}",
+                                    file_path,
+                                    status_error.message());
+      }
+
+    } else if (std::filesystem::exists(file_status)) {
+      bool valid_file_owner = false;
+
+      // Load karabiner.json only when the owner is root or current session user.
+      if (pqrs::filesystem::is_owned(file_path, 0)) {
+        valid_file_owner = true;
+      } else {
+        if (pqrs::filesystem::is_owned(file_path, expected_file_owner)) {
+          valid_file_owner = true;
+        }
+      }
+
+      if (!valid_file_owner) {
+        logger::get_logger()->warn("{0} is not owned by a valid user.", file_path);
+        load_state_ = load_state::other_error;
+
+      } else {
+        // errno is thread-local on macOS, so another thread cannot overwrite it.
+        // Clear it before opening the file and capture it immediately if opening fails because
+        // another function call on this thread could overwrite it.
+        errno = 0;
+        std::ifstream input(file_path);
+        if (input) {
+          try {
+            json_ = json_utility::parse_jsonc(input);
+
+            helper_values_.update_value(json_,
+                                        error_handling);
+
+            load_state_ = load_state::loaded;
+            source_ = file_path == constants::get_system_core_configuration_file_path().string()
+                          ? source::system_file
+                          : source::user_file;
+
+          } catch (std::exception& e) {
+            logger::get_logger()->error("parse error in {0}: {1}", file_path, e.what());
+            parse_error_message_ = e.what();
+            load_state_ = load_state::json_error;
+          }
+        } else {
+          auto error = std::error_code(errno, std::generic_category());
+          load_state_ = is_permission_error(error)
+                            ? load_state::permission_error
+                            : load_state::other_error;
+          logger::get_logger()->error("failed to open {0}: {1}",
+                                      file_path,
+                                      error.message());
+        }
+      }
+    }
+
+    // Fallbacks
+    if (profiles_.empty()) {
+      profiles_.push_back(std::make_shared<details::profile>(nlohmann::json({
+                                                                 {"name", "Default profile"},
+                                                                 {"selected", true},
+                                                             }),
+                                                             error_handling_));
+    }
+  }
+
+  // The key is only minted by the original retained Core device participant.
+  // This branch parses the captured native bytes and never reopens a pathname.
+  core_configuration(const owned_snapshot_key& key)
+      : json_(nlohmann::json::object()),
+        error_handling_(error_handling::strict),
+        load_state_(load_state::loaded),
+        source_(source::user_file),
+        global_configuration_(std::make_shared<details::global_configuration>(nlohmann::json::object(), error_handling::strict)),
+        machine_specific_(std::make_shared<details::machine_specific>(nlohmann::json::object(), error_handling::strict)) {
+    if (!key.publication_ || !key.publication_->file_current())
+      throw std::invalid_argument("Owned configuration snapshot is not current");
+    helper_values_.push_back_object<details::global_configuration>("global", global_configuration_);
+    helper_values_.push_back_object<details::machine_specific>("machine_specific", machine_specific_);
+    helper_values_.push_back_array<details::profile>("profiles", profiles_);
+    const auto& bytes=key.publication_->captured_bytes();
+    json_=json_utility::parse_jsonc(bytes.begin(),bytes.end());
+    owned_generation_=ergoptiplus::installed_configuration::generation_from_document(json_);
+    helper_values_.update_value(json_,error_handling::strict);
+    if (profiles_.empty() || !key.publication_->file_current())
+      throw std::invalid_argument("Owned configuration conversion lost its native snapshot");
+    owned_publication_=key.publication_;
+    owned_snapshot_=std::shared_ptr<const owned_configuration_snapshot>(
+        new owned_configuration_snapshot(owned_publication_,owned_generation_));
+    if (!owned_snapshot_->current())
+      throw std::invalid_argument("Owned parsed receipt lost its native snapshot");
+  }
+
+  nlohmann::json to_json() const {
+    auto j = json_;
+
+    helper_values_.update_json(j);
+
+    return j;
+  }
+
+  [[nodiscard]] load_state get_load_state() const {
+    return load_state_;
+  }
+
+  [[nodiscard]] source get_source() const {
+    return source_;
+  }
+
+  [[nodiscard]] const std::string& get_parse_error_message() const {
+    return parse_error_message_;
+  }
+
+  [[nodiscard]] const details::global_configuration& get_global_configuration() const {
+    return *global_configuration_;
+  }
+  [[nodiscard]] details::global_configuration& get_global_configuration() {
+    return *global_configuration_;
+  }
+
+  [[nodiscard]] const details::machine_specific& get_machine_specific() const {
+    return *machine_specific_;
+  }
+  [[nodiscard]] details::machine_specific& get_machine_specific() {
+    return *machine_specific_;
+  }
+
+  [[nodiscard]] const std::vector<pqrs::not_null_shared_ptr_t<details::profile>>& get_profiles() const {
+    return profiles_;
+  }
+
+  void set_profile_name(size_t index, const std::string name) {
+    if (index < profiles_.size()) {
+      profiles_[index]->set_name(name);
+    }
+  }
+
+  void select_profile(size_t index) {
+    if (index < profiles_.size()) {
+      for (size_t i = 0; i < profiles_.size(); ++i) {
+        if (i == index) {
+          profiles_[i]->set_selected(true);
+        } else {
+          profiles_[i]->set_selected(false);
+        }
+      }
+    }
+  }
+
+  void push_back_profile() {
+    profiles_.push_back(std::make_shared<details::profile>(nlohmann::json({
+                                                               {"name", "New profile"},
+                                                           }),
+                                                           error_handling_));
+  }
+
+  void duplicate_profile(const details::profile& profile) {
+    profiles_.push_back(std::make_shared<details::profile>(nlohmann::json(profile),
+                                                           error_handling_));
+
+    auto& p = *(profiles_.back());
+    p.set_name(p.get_name() + " (copy)");
+    p.set_selected(false);
+  }
+
+  void erase_profile(size_t index) {
+    if (index < profiles_.size()) {
+      if (profiles_.size() > 1) {
+        profiles_.erase(profiles_.begin() + index);
+      }
+    }
+  }
+
+  void move_profile(size_t source_index, size_t destination_index) {
+    vector_utility::move_element(profiles_, source_index, destination_index);
+  }
+
+  [[nodiscard]] const details::profile& get_selected_profile() const {
+    for (auto&& p : profiles_) {
+      if (p->get_selected()) {
+        return *p;
+      }
+    }
+    return *(profiles_[0]);
+  }
+  [[nodiscard]] details::profile& get_selected_profile() {
+    return const_cast<details::profile&>(static_cast<const core_configuration&>(*this).get_selected_profile());
+  }
+
+  // Note:
+  // Be careful calling `save` method.
+  // If the configuration file is corrupted temporarily (user editing the configuration file in editor),
+  // the user data will be lost by the `save` method.
+  // Thus, we should call the `save` method only when it is neccessary.
+
+  void sync_save_to_file() {
+    pqrs::osx::process_info::scoped_sudden_termination_blocker sudden_termination_blocker;
+
+    filesystem_utility::prepare_user_directories();
+
+    make_backup_file();
+    remove_old_backup_files();
+
+    auto file_path = constants::get_user_core_configuration_file_path();
+    json_writer::save_to_file(to_json(),
+                              file_path,
+                              user_core_configuration_file_mode);
+
+    load_state_ = load_state::loaded;
+    source_ = source::user_file;
+  }
+
+private:
+  [[nodiscard]] static bool is_permission_error(const std::error_code& error) {
+    return error == std::errc::permission_denied ||
+           error == std::errc::operation_not_permitted;
+  }
+
+  void make_backup_file() {
+    auto file_path = constants::get_user_core_configuration_file_path();
+
+    if (!filesystem_utility::exists(file_path)) {
+      return;
+    }
+
+    auto backups_directory = constants::get_user_core_configuration_automatic_backups_directory();
+    if (backups_directory.empty()) {
+      return;
+    }
+
+    if (filesystem_utility::create_directories(backups_directory) &&
+        filesystem_utility::is_directory(backups_directory)) {
+      if (!filesystem_utility::permissions(backups_directory,
+                                           filesystem_utility::permissions_0700)) {
+        return;
+      }
+    }
+
+    auto backup_file_path = backups_directory /
+                            fmt::format("karabiner_{0}.json", make_current_local_yyyymmdd_string());
+    if (filesystem_utility::exists(backup_file_path)) {
+      return;
+    }
+
+    if (filesystem_utility::copy(file_path,
+                                 backup_file_path,
+                                 std::filesystem::copy_options::overwrite_existing)) {
+      if (!filesystem_utility::permissions(backup_file_path,
+                                           user_core_configuration_file_mode)) {
+        return;
+      }
+    }
+  }
+
+  void remove_old_backup_files() {
+    auto backups_directory = constants::get_user_core_configuration_automatic_backups_directory();
+    if (backups_directory.empty()) {
+      return;
+    }
+
+    auto pattern = (backups_directory / "karabiner_????????.json").string();
+    auto paths = glob::glob(pattern);
+    std::sort(std::begin(paths), std::end(paths));
+
+    const int keep_count = 20;
+    if (paths.size() > keep_count) {
+      for (int i = 0; i < paths.size() - keep_count; ++i) {
+        filesystem_utility::remove(paths[i]);
+      }
+    }
+  }
+
+  [[nodiscard]] static std::string make_current_local_yyyymmdd_string() {
+    auto t = time(nullptr);
+
+    tm tm;
+    localtime_r(&t, &tm);
+
+    return fmt::format("{0:04d}{1:02d}{2:02d}",
+                       tm.tm_year + 1900,
+                       tm.tm_mon + 1,
+                       tm.tm_mday);
+  }
+
+  static constexpr auto user_core_configuration_file_mode = filesystem_utility::permissions_0600;
+
+  nlohmann::json json_;
+  error_handling error_handling_;
+  load_state load_state_;
+  source source_;
+  std::string parse_error_message_;
+
+  pqrs::not_null_shared_ptr_t<details::global_configuration> global_configuration_;
+  pqrs::not_null_shared_ptr_t<details::machine_specific> machine_specific_;
+  std::vector<pqrs::not_null_shared_ptr_t<details::profile>> profiles_;
+  configuration_json_helper::helper_values helper_values_;
+};
+} // namespace krbn::core_configuration

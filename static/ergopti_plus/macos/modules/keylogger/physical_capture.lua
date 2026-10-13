@@ -18,6 +18,49 @@ local LOG = "keylogger.physical_capture"
 local OWNER = "modules.keylogger.physical_capture"
 local dependencies, session, managed_source
 local finish_source, stop_session
+local position_owners = setmetatable({}, { __mode = "k" })
+
+--- Requires the exact admitted baseline and accounting owner, never a status grant.
+---@param candidate table Original session.
+---@return boolean admitted
+local function position_current(candidate)
+	return candidate ~= nil and session == candidate and candidate.state == "capturing"
+		and not candidate.stop_requested and not candidate.failure and candidate.clock_published == true
+		and candidate.capture ~= nil and Accounting.admitted_capture() == candidate.capture
+		and candidate.receiver.ready() == true
+end
+
+--- Reports an existing observational port without booting or replacing native capture.
+---@return boolean available
+function M.position_available()
+	return position_current(session) and session.receiver.position_available() == true
+end
+
+--- Observes one fresh press under the original admitted source and editor identity.
+---@param exact_current function Current page/source predicate, acknowledged with true.
+---@param receive function Closed native_code/mods receiver.
+---@return table|nil token Exact cancellation identity; no delivery or configuration grant.
+function M.capture_position(exact_current, receive)
+	if type(exact_current) ~= "function" or type(receive) ~= "function"
+		or not M.position_available() then return nil end
+	local candidate = session
+	local token = candidate.receiver.capture_position(function()
+		if not position_current(candidate) then return false end
+		local called, current_page = pcall(exact_current)
+		return called and current_page == true and position_current(candidate)
+	end, receive)
+	if type(token) ~= "table" then return nil end
+	position_owners[token] = candidate.receiver
+	return token
+end
+
+--- Cancels only the exact observation; primary transport and metric sinks are untouched.
+---@param token table Original observational request.
+---@return boolean retired Literal true after its callbacks unwind, otherwise retry debt.
+function M.cancel_position(token)
+	local receiver = type(token) == "table" and position_owners[token] or nil
+	return receiver ~= nil and receiver.cancel_position(token) == true
+end
 
 --- Reports whether a native session still belongs to this singleton owner.
 ---@param candidate table Captured session identity.

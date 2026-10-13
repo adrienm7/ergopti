@@ -133,5 +133,6 @@ let package = Package(
 				.define("ERGOPTI_GUARDIAN_TEST_SUPPORT", .when(configuration: .debug))
 			]
 		)
-	]
+	],
+	cxxLanguageStandard: .cxx17
 )

@@ -13,6 +13,8 @@
 local M = {}
 local Wire = require("modules.keylogger.physical_wire")
 local Protocol = require("modules.keylogger.physical_protocol")
+local Position = require("keylogger.physical_position_observation")
+local resolve_position = require("modules.keylogger.physical_key_identity").resolve
 local ENVELOPE = { "version", "kind", "coverage", "incarnation", "lease" }
 local PAGE = { "version", "kind", "coverage", "incarnation", "lease",
 	"boundary", "offset", "next", "total", "complete", "rows" }
@@ -46,6 +48,7 @@ function M.new(descriptor)
 	local total = Wire.integer(descriptor.rows, 1, 64 * (ELEMENTS_MAX + 1))
 	local status, cursor, count = "receiving", 0, 0
 	local devices, current = {}, nil
+	local position_available = false
 	local baseline = {}
 
 	local function device_complete()
@@ -63,6 +66,11 @@ function M.new(descriptor)
 	---@return boolean
 	function baseline.ready() return status == "ready" end
 
+	--- Reports an eligible key from the original completed fixed inventory only.
+	--- Its native registry mapping is inspected once at admission, never per press.
+	---@return boolean available
+	function baseline.position_available() return status == "ready" and position_available end
+
 	--- Returns the keyboard type a known device declared.
 	---@param device string Canonical device identity.
 	---@return string keyboard_type "ansi", "iso", "jis" or "none".
@@ -70,6 +78,23 @@ function M.new(descriptor)
 		local known = devices[device]
 		assert(known, "Physical event has no baseline device")
 		return known.keyboard_type
+	end
+
+	--- Copies held native elements at this exact validated transition frontier.
+	--- The roster stays private to the receiver; callback code cannot mutate state.
+	---@return table keys Detached dense held-key inventory across admitted devices.
+	function baseline.held_keys()
+		assert(status == "ready", "Physical baseline is not ready")
+		local rows = {}
+		for device, inventory in pairs(devices) do
+			for cookie, key in pairs(inventory.keys) do
+				if key.down then
+					rows[#rows + 1] = { device = device, cookie = cookie, page = key.page,
+						usage = key.usage, keyboard_type = inventory.keyboard_type }
+				end
+			end
+		end
+		return rows
 	end
 
 	--- Validates one page or the final marker; returns a page cursor to acknowledge.
@@ -82,6 +107,12 @@ function M.new(descriptor)
 				Wire.fields(frame, ENVELOPE)
 				assert(cursor == total, "Premature physical baseline completion")
 				device_complete()
+				for _, inventory in pairs(devices) do
+					for _, key in pairs(inventory.keys) do
+						local code = resolve_position(key.page, key.usage, inventory.keyboard_type)
+						if Position.primary(key.page, key.usage, code) then position_available = true end
+					end
+				end
 				status = "ready"
 				return nil
 			end

@@ -25,6 +25,7 @@ local MUTATED_PACKAGE_SLOTS = {
 	"modules.keylogger.aggregator", "modules.keylogger.export",
 	"modules.keylogger.log_manager", "modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer", "modules.keylogger.timestamp",
+	"modules.keylogger.physical_accounting_mode",
 	"tests.stubs.hs",
 }
 
@@ -141,19 +142,21 @@ end
 --- Loads LogManager with a Rotation sink that explicitly refuses before commit.
 --- @param sink_failures integer Number of exact false results before success.
 --- @return table fixture State, captures, and controllable deferred timers.
-local function load_log_manager_fixture(sink_failures)
+local function load_log_manager_fixture(sink_failures, initialize)
 	local restore_runtime = capture_runtime()
 	for _, name in ipairs({
 		"modules.keylogger.log_manager", "modules.keylogger.rotation",
 		"modules.keylogger.sqlite_writer", "modules.keylogger.aggregator",
 		"modules.keylogger.export", "keylogger.metrics", "infra.logger",
 		"infra.timings", "adapters.timer_scheduler",
+		"modules.keylogger.physical_accounting_mode",
 	}) do
 		package.loaded[name] = nil
 	end
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 
 	local appended = {}
+	local controls = {}
 	package.loaded["modules.keylogger.rotation"] = {
 		init = function() end,
 		is_initialized = function() return true end,
@@ -173,7 +176,10 @@ local function load_log_manager_fixture(sink_failures)
 	}
 	package.loaded["modules.keylogger.sqlite_writer"] = {
 		init = function() end,
-		open_db = function() return true end,
+		open_db = function()
+			if controls.on_open_db then controls.on_open_db() end
+			return true
+		end,
 		close_db = function() return true end,
 		get_db = function() return nil end,
 		build_inserts = function() return {} end,
@@ -259,6 +265,7 @@ local function load_log_manager_fixture(sink_failures)
 	package.loaded["adapters.file_system"] = saved_file_system
 
 	local state = {
+		is_enabled = true,
 		LOG_DIR = "/tmp/ergopti_append_transaction",
 		buffer_events = { { "old", 20, {} } },
 		buffer_text = "old",
@@ -276,10 +283,14 @@ local function load_log_manager_fixture(sink_failures)
 		today_idx = {},
 		manifest = {},
 	}
-	helpers.assert_true(manager.init(state), "fixture LogManager must initialize")
+	if initialize ~= false then
+		helpers.assert_true(manager.init(state), "fixture LogManager must initialize")
+	end
 
 	return {
 		manager = manager,
+		mode = require("modules.keylogger.physical_accounting_mode"),
+		controls = controls,
 		state = state,
 		appended = appended,
 		fire_next = function()
@@ -356,6 +367,258 @@ end)
 -- ===========================================
 
 helpers.describe("log_manager append transaction ownership", function()
+	helpers.it("owns an acknowledged matched press and release in FIFO order across storage refusal", function()
+		with_fixture(function() return load_log_manager_fixture(1) end, function(fixture)
+			local Delivery = require("modules.keylogger.physical_delivery")
+			local Clock = require("modules.keylogger.physical_clock")
+			local Context = require("modules.keylogger.physical_context")
+			local Frames = require("tests.support.physical_stream_frames")
+			local convert = Clock.new({ version = 1, domain = "mach_absolute_time", numer = 125, denom = 3 })
+			local history = Context.new(4, function() return "2026-10-04 23:59:59.500" end)
+			history.observe(0, { allowed = true, app = "Original", epoch = 1000 })
+			history.observe(1100000000, { allowed = true, app = "Later", epoch = 2000 })
+			local frames = Frames.new("holds-outbox", "8", { "41" })
+			for _, frame in pairs(frames) do frame.coverage = "complete" end
+			helpers.assert_true(fixture.mode.select_stream("holds-owner"))
+			local receiver = Delivery.new({ batch_limit = 8,
+				admit = function()
+					helpers.assert_true(fixture.mode.admit("holds-owner", "holds-outbox/8", "complete"))
+					return "holds-outbox/8"
+				end,
+				keycode = Frames.keycode,
+				context = function(ticks) return history.resolve(convert(ticks)) end,
+				emit = fixture.manager.log_physical_press,
+				holds = { convert = convert,
+					context = function(first, last) return history.resolve_interval(convert(first), convert(last)) end,
+					emit = fixture.manager.log_physical_release },
+			})
+			Frames.start(receiver, frames)
+			-- Delivery uses the retained decision, not the current disabled/private state.
+			fixture.state.is_enabled, fixture.state.is_private_window = false, true
+			local function row(sequence, ticks, value)
+				return { sequence = sequence, timestamp = ticks, device = "41", page = 7, usage = 44,
+					has_page = true, has_usage = true, has_cookie = true, cookie = 44, value = value }
+			end
+			local receipt = receiver.deliver({ version = 1, kind = "batch", coverage = "complete",
+				incarnation = "holds-outbox", lease = "8", records = {
+					row("1", "24000000", "1"), row("2", "30120000", "0") } })
+			helpers.assert_eq(receipt, "2", "Both real FIFO owners accept before acknowledgement")
+			helpers.assert_eq(fixture.appended, {}, "FIFO ownership is not durable storage")
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended, {}, "Refused storage retains the actual ordered FIFO")
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended, {
+				{ type = "system_event", action = "physical_press", capture = "holds-outbox/8", device = "41",
+					keycode = 49, app = "Original", timestamp = "2026-10-04 23:59:59.500" },
+				{ type = "system_event", action = "physical_release", capture = "holds-outbox/8", device = "41",
+					keycode = 49, app = "Original", timestamp = "2026-10-04 23:59:59.500", hold_ms = 255 },
+			})
+		end)
+	end)
+
+	helpers.it("owns a copied physical release and retains it across storage refusal", function()
+		with_fixture(function() return load_log_manager_fixture(2) end, function(fixture)
+			local release = { capture = "sink-test", device = "18446744073709551615", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 251 }
+			helpers.assert_eq(fixture.manager.log_physical_release(release), false)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			fixture.state.is_enabled, fixture.state.is_private_window = false, true
+			helpers.assert_eq(fixture.manager.log_physical_release(release), true)
+			helpers.assert_eq(#fixture.appended, 0, "FIFO acceptance precedes deferred storage")
+			release.capture, release.device, release.keycode = "changed", "1", 49
+			release.app, release.timestamp, release.hold_ms = "Changed", "invalid", 1
+			helpers.assert_true(fixture.mode.interrupt("sink-owner", "sink-test"))
+			helpers.assert_eq(fixture.manager.stop(), false, "refused storage retains teardown debt")
+			helpers.assert_eq(#fixture.appended, 0)
+			helpers.assert_eq(fixture.manager.log_physical_release(release), false)
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(fixture.appended, {{ type = "system_event", action = "physical_release",
+				capture = "sink-test", device = "18446744073709551615", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 251 }})
+		end)
+	end)
+
+	helpers.it("rejects invalid physical hold durations before outbox ownership", function()
+		with_fixture(function() return load_log_manager_fixture(0) end, function(fixture)
+			helpers.assert_eq(type(fixture.manager.log_physical_release), "function")
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			for _, invalid in ipairs({ -1, 0.5, "251", math.huge, 0 / 0, 1e100, 9223372036855 }) do
+				local release = { capture = "sink-test", device = "41", keycode = 53,
+					app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = invalid }
+				local accepted, refusal = pcall(fixture.manager.log_physical_release, release)
+				helpers.assert_eq(accepted, false)
+				helpers.assert_true(tostring(refusal):find(
+					"Physical release requires nonnegative integer hold_ms", 1, true) ~= nil,
+					"the duration guard must reject each malformed hold before ownership")
+			end
+			local maximum = { capture = "sink-test", device = "41", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 9223372036854 }
+			helpers.assert_true(fixture.manager.log_physical_release(maximum))
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(#fixture.appended, 1, "only the exact signed-nanosecond maximum is owned")
+			helpers.assert_eq(fixture.appended[1].hold_ms, 9223372036854)
+			helpers.assert_eq(fixture.appended[1].capture, "sink-test")
+			helpers.assert_eq(fixture.appended[1].device, "41")
+		end)
+	end)
+
+	helpers.it("acknowledges original retained context through the real physical outbox sink", function()
+		with_fixture(function() return load_log_manager_fixture(0) end, function(fixture)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			local Timestamp = require("modules.keylogger.timestamp")
+			local epoch = os.time({ year = 2026, month = 8, day = 13, hour = 12, min = 0, sec = 0 })
+			local history = require("modules.keylogger.physical_context").new(2, Timestamp.format_epoch)
+			history.observe(0, { allowed = true, app = "Original", epoch = epoch })
+			history.observe(2000000000, { allowed = false })
+			local convert = require("modules.keylogger.physical_clock").new({
+				version = 1, domain = "mach_absolute_time", numer = 1, denom = 1 })
+			local Frames = require("tests.support.physical_stream_frames")
+			local receiver = require("modules.keylogger.physical_delivery").new({ batch_limit = 2,
+				admit = function() return "sink-test" end,
+				context = function(ticks) return history.resolve(convert(ticks)) end,
+				keycode = Frames.keycode, emit = fixture.manager.log_physical_press,
+			})
+			local frames = Frames.new("sink-test", "1", { "41" })
+			for _, frame in pairs(frames) do frame.coverage = "complete" end
+			Frames.start(receiver, frames)
+			fixture.state.is_enabled, fixture.state.is_private_window = false, true
+			fixture.state.active_app_name = "Current private app"
+			local batch = frames.opened
+			batch.kind, batch.baseline = "batch", nil
+			batch.records = {
+				{ sequence = "1", device = "41", timestamp = "1000000000", has_page = true,
+					page = 7, has_usage = true, usage = 41, value = "1", has_cookie = true, cookie = 41 },
+				{ sequence = "2", device = "41", timestamp = "3000000000", has_page = true,
+					page = 7, has_usage = true, usage = 44, value = "1", has_cookie = true, cookie = 44 },
+			}
+			helpers.assert_eq(receiver.deliver(batch), "2")
+			helpers.assert_eq(#fixture.appended, 0)
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended, {{ type = "system_event", action = "physical_press",
+				capture = "sink-test", device = "41", keycode = 53, app = "Original",
+				timestamp = Timestamp.format_epoch(epoch + 1) }})
+			helpers.assert_true(fixture.manager.stop())
+		end)
+	end)
+
+	helpers.it("owns an immutable physical press before a deferred storage refusal and retry", function()
+		with_fixture(function() return load_log_manager_fixture(1) end, function(fixture)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			local press = { capture = "sink-test", device = "18446744073709551615", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", ignored = { secret = "discard" } }
+			helpers.assert_eq(fixture.manager.log_physical_press(press), true)
+			helpers.assert_eq(#fixture.appended, 0, "acceptance transfers FIFO ownership without writing disk")
+			press.capture, press.device, press.keycode, press.app, press.timestamp = "changed", "1", 49, "Changed", "invalid"
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(#fixture.appended, 0, "a refused durable append retains the accepted original entry")
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended, {{ type = "system_event", action = "physical_press",
+				capture = "sink-test", device = "18446744073709551615", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000" }})
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(#fixture.appended, 1, "retirement must not duplicate accepted work")
+		end)
+	end)
+
+	helpers.it("refuses physical work outside its exact active capture and lifecycle", function()
+		with_fixture(function() return load_log_manager_fixture(0) end, function(fixture)
+			local press = { capture = "sink-test", device = "41", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000" }
+			helpers.assert_eq(fixture.manager.log_physical_press(press), false)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_true(fixture.manager.init(fixture.state))
+			helpers.assert_eq(fixture.manager.log_physical_press(press), false, "stopped outbox cannot admit new stream work")
+			helpers.assert_true(fixture.manager.ensure_ingest_running())
+			fixture.state.is_enabled = false
+			fixture.state.is_private_window = true
+			helpers.assert_true(fixture.manager.log_physical_press(press))
+			helpers.assert_true(fixture.mode.interrupt("sink-owner", "sink-test"))
+			helpers.assert_eq(fixture.manager.log_physical_press(press), false)
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(#fixture.appended, 1, "accepted work survives a later capture interruption")
+		end)
+	end)
+
+	helpers.it("rejects malformed physical identity before outbox ownership", function()
+		with_fixture(function() return load_log_manager_fixture(0) end, function(fixture)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			for _, invalid in ipairs({
+				{ device = "0", reason = "Invalid physical device" },
+				{ device = "041", reason = "Invalid physical device" },
+				{ device = "18446744073709551616", reason = "Invalid physical decimal identifier" },
+			}) do
+				local press = { capture = "sink-test", device = invalid.device, keycode = 53,
+					app = "Original", timestamp = "2026-08-13 12:00:00.000" }
+				local accepted, refusal = pcall(fixture.manager.log_physical_press, press)
+				helpers.assert_eq(accepted, false)
+				helpers.assert_true(tostring(refusal):find(invalid.reason, 1, true) ~= nil,
+					"the identity must be rejected for its independently specified reason: " .. tostring(refusal))
+			end
+			helpers.assert_eq(#fixture.appended, 0)
+			local valid = { capture = "sink-test", device = "18446744073709551615", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000" }
+			helpers.assert_eq(fixture.manager.log_physical_press(valid), true,
+				"the same admitted capture must remain able to own a valid physical identity")
+			helpers.assert_eq(#fixture.appended, 0, "acceptance still precedes durable append")
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended, {{ type = "system_event", action = "physical_press",
+				capture = valid.capture, device = valid.device, keycode = valid.keycode,
+				app = valid.app, timestamp = valid.timestamp }})
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(#fixture.appended, 1, "one healthy control must commit exactly once")
+		end)
+	end)
+
+	helpers.it("cannot restore physical sink authority when stop reenters native rearm", function()
+		with_fixture(function() return load_log_manager_fixture(0) end, function(fixture)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			helpers.assert_true(fixture.manager.stop())
+			fixture.controls.on_open_db = function() fixture.manager.stop() end
+			fixture.manager.ensure_ingest_running()
+			local press = { capture = "sink-test", device = "41", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000" }
+			helpers.assert_eq(fixture.manager.log_physical_press(press), false,
+				"a stopped sink generation must stay revoked after native rearm unwinds")
+			helpers.assert_eq(#fixture.appended, 0)
+			fixture.controls.on_open_db = nil
+			helpers.assert_true(fixture.manager.stop())
+		end)
+	end)
+
+	helpers.it("cannot acknowledge a physical batch through an uninitialized production sink", function()
+		with_fixture(function()
+			return load_log_manager_fixture(0, false)
+		end, function(fixture)
+			local Frames = require("tests.support.physical_stream_frames")
+			local receiver = require("modules.keylogger.physical_delivery").new({
+				batch_limit = 2,
+				admit = function() return "sink-test" end,
+				context = function() return { allowed = true, app = "Original",
+					timestamp = "2026-08-13 12:00:00.000" } end,
+				keycode = Frames.keycode,
+				emit = fixture.manager.log_physical_press,
+			})
+			local frames = Frames.new("sink-test", "1", { "41" })
+			Frames.start(receiver, frames)
+			local batch = frames.opened
+			batch.kind, batch.baseline = "batch", nil
+			batch.records = {{ sequence = "1", device = "41", timestamp = "1", has_page = true,
+				page = 7, has_usage = true, usage = 41, value = "1", has_cookie = true, cookie = 41 }}
+			local acknowledged = pcall(receiver.deliver, batch)
+			helpers.assert_eq(acknowledged, false, "an early-boot ignored sink cannot grant a stream acknowledgement")
+			helpers.assert_eq(receiver.active(), false)
+			helpers.assert_eq(#fixture.appended, 0)
+		end)
+	end)
+
 	helpers.it("retains an OFF flush snapshot across refusal until exact commit", function()
 		-- flush_buffer() only transfers ownership to the outbox. stop() retries once
 		-- directly and once via its final ingest pass; refuse both attempts so the

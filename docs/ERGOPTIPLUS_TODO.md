@@ -4229,6 +4229,8 @@ qualification remain required, and item 30 stays open.
 
 The captured macOS magic-key choice now belongs to the exact live script-control owner and settled pause epoch, not the rendered menu snapshot. Missing, paused, transitioning or unreadable state refuses before acquisition; pause/resume crossings, owner replacement and reentrant activation/submission/retirement invalidate the selection before consumption or persistence. Exact native cleanup debt and synthetic provenance fences retain their existing owners. The current 33 case bodies remain byte-identical; 20 additional production-callback controls pass under Lua 5.4 with modeled native ports. Full selected and hosted native qualification, actual Hammerspoon scheduling and physical input remain required; this does not resolve the customer lease PONG/READY/73 cause.
 
+Linux capture now requires the actual deferred answer queue acknowledgement before consuming the physical key. A committed pause, loss of capture eligibility or a newer admitted request fences stale replies; a refused newer timeout keeps the older queued choice eligible. Synchronous, refused and throwing answer queues do not publish preferences. Throwing initial timeout submission releases only its own candidate and preserves a reentrant successor. The 107 focused controls pass under Lua 5.4 and LuaJIT with unchanged original assertions and red old-source inverses; whole-source, native X11/Wayland, installation and physical acceptance remain separate gates. Windows-PC pause/capture acceptance remains explicitly deferred.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -4261,6 +4263,29 @@ The captured macOS magic-key choice now belongs to the exact live script-control
   strict live admission. This supplies the WP4 diagnostic protocol dependency,
   not an installed headless producer, signed runtime, native SDK, package or
   physical acceptance; WP3-WP10 and customer lease recovery remain open.
+
+  The dormant factory/build source lane now retains authentic upstream input
+  custody for the original 65 replacements and the explicit installed-SDK
+  opt-in (101 replacements, 54 SDK inputs). Source-bound signed product
+  preparation preserves the original claim and packaging checks; default boot
+  and the legacy factory route remain unchanged. The dependency-closed source
+  includes the original build/control suppliers rather than detached staging
+  facades. Canonical portable receiving passes 81 methods with no skips:
+  original build 41 plus parallel-build 10, product 13, entrypoint 5 and SDK
+  routing 12. A genuine private factory materialization received 4,557 files,
+  four links, its version generator and 12 generated outputs; that private
+  source receipt is not acceptance of this installed product.
+
+  Four frozen original CLI/HID snapshots now accompany the existing 8/6/8
+  software actors and their source-authenticated receiver. Canonical receiving
+  passes all 22 controls without rewriting independent expectations.
+  Original 60-second compile, 10-second execution and whole 300-second budgets
+  remain; Darwin uses the existing 330-second owned-process guardian. Real
+  macOS SDK/IOKit compilation, signing, packaging, installation, activation and
+  physical acceptance remain unqualified. Native shipping/Foundation suppliers,
+  correlated retained history, media persistence and the confirmed driver-only
+  update transaction are still software work; this does not solve customer
+  lease PONG/READY/exit73 or complete item 31.
 
   The dormant physical consumer now retains subscription and verifier startup,
   cancellation and accounting ownership through the exact outstanding native
@@ -4336,7 +4361,77 @@ the complete suites were not rerun afterward. These local baseline outcomes
 do not establish source defects; isolated context or environment causes remain
 possible, and hosted qualification is still required. TODO31 stays partial.
 
+Original Core child-disposition compiler boundary: exact-source manual run
+`38449426462` on `8c1f705c` refuses the Swift `Darwin.sigaction` overload on
+ARM and Intel. The bounded C boundary retains the original default-handler
+and no-auto-reap checks; its native test restores the complete original
+disposition with a checked ACK. Independent source review and eleven real
+POSIX disposition/child controls pass on Linux. Successor Swift compilation
+and native test execution remain pending; no customer lease-73 repair is
+claimed.
+
+The independent native HTTP/model compiler owners now stage every genuine
+public umbrella dependency, preserving the original six headers and appending
+the signature, installed-configuration and child-disposition suppliers. All
+33 builder and five standalone compiler controls pass; Linux Clang admits the
+complete current headers and refuses each of eight individual omissions. The
+G6 frozen four-path handoff and original held-source assertions remain intact.
+Darwin fixture compilation, model inference and trust restoration are still
+separate native gates; this dependency correction is not a lease repair.
+
+The standalone wire-client compiler projection now names the same three
+additional public dependencies explicitly. Its original ten cases change from
+nine passes / one assertion failure to ten passes; one additional case checks
+all three missing-header refusals before compiler acquisition and verifies
+source cleanup. Exact header-set and source-byte assertions remain intact.
+Apple compiler execution, TLS trust restoration and customer lease recovery
+remain separate unqualified gates.
+
+The complete managed Ollama cohort now receives all eleven standalone wire
+cases with its exact census preserved. Corrected formatting passes. The preceding
+full Common run retains 421/426: four existing environment/source admissions
+and the old ten-case census; the complete focused cohort passes after that
+census correction. Final exact-source Common and native receiving remain open.
+
+Exact manual run `38464565467` on `95965e7ac` is terminal: 27 jobs succeeded,
+eight failed and four were skipped. Common receives 424/426; the two retained
+source guards are unrelated to the wire projection. Native ARM and Intel now
+pass the former sigaction compiler boundary but stop while compiling the
+installed-peer test's String-to-C-pointer argument mapping. Two explicit
+scoped CString borrows preserve its original vectors, strdup allocations,
+terminators, frees, spawn calls and all 42 assertions. Independent source
+review is clear; successor native compilation and XCTest execution remain
+unqualified. Native HTTP deadline/offline failures and refused trust restoration
+also remain open under their networking owner. Customer lease recovery is not
+claimed.
+
+Current source `265832bf852a90c1572f9643dc09a909ca98f0ff` receives the latest
+published dev without conflicts. Manual `38479555338` ends naturally with
+nine successful, five failed and five skipped jobs. All 426 Common checks,
+portable macOS unit/E2E, native paired lease controls on ARM and Intel, and
+cold MLX bootstrap pass. The former Swift compiler errors are absent; those
+paired controls do not execute the dormant installed-peer/Core suites or
+establish the customer lease cause. Homebrew AppleEvent consent and managed
+TLS/PAC/trust restoration still fail; macOS packaging/installation and release
+are skipped. The owned runtime remains dormant; first-init/cache composition,
+signed production enrollment, complete native acceptance and physical-Mac
+receiving remain unfinished. No group item is removed at this checkpoint.
+
 ## Remaining work after the 2026-09-30 releases
+
+The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.
+
+The first native receiving on source `c4283adb98cfb7d0249e4d913f8e50fcbc6bf2b7` (run `38432611915`) refused Swift compilation before executing paired-silence/archive methods: the new signature helper header was absent from the C target umbrella. The additive umbrella export preserves the genuine SDK constant and original CMS/role policy; its ARM/Intel compiler receiving remains required on the corrected source. This failure is not a lease root-cause diagnosis.
+
+The dormant physical accounting/history pipeline now joins accepted input to the original context tracker, configuration and pause owners, permission changes, ordered log transactions and actual SQLite persistence. The reviewed 36-path composition passes all 21 original focused commands (685 test invocations, zero failures), including a real temporary SQLite receiver. Whole-source, native service/permission/input and installed startup qualification remain separate; default startup does not acquire or enable this new runtime.
+
+The observation-only physical-position API now caches eligibility from the original completed baseline and keeps the outer delivery cursor and exact callback custody across reentry. Cancellation retains its live callback debt without stopping primary metrics. All 77 original and additive controls pass through the canonical runner; native capture, GUI enrollment and physical delivery remain unqualified. This software does not diagnose or repair stock lease PONG/READY/exit73.
+
+The full selected accounting composition gate preserves all sources and passes 19,767 portable macOS cases. It retains Common failures and three Linux preference-persistence failures; those same three original cases pass with an isolated writable XDG configuration owner. The strengthened observation rejection control now checks the original metric-refusal cause as well as failure and cleanup, without weakening the false-green guard. Native run 38439052533 on the preceding source passes actual ARM/Intel compilation and paired-silence receiving, Linux packaging and all 17 install/run scenarios, but remains failed on Common, native Automation and managed-network/trust receiving. These receipts do not qualify the new accounting composition or resolve the customer lease cause.
+
+The dormant Core/Console supplier composition now restores the genuine installed configuration C ABI, process and stream owners, explicit Core bootstrap/kickstart and exact exit observation. It preserves RunAtLoad=false and contains no Main/admin/default activation join. Two initializer failure paths now hand cleanup to the initialized owner before throwing verification; 59 native source cases are enrolled as SwiftPM test sources but remain unexecuted until actual Darwin receiving. Current source and all 53 prerequisite pins have independent review; native compilation, signing, installed service/physical acceptance and the privileged driver-only update channel remain separate unfinished gates.
+
+The dormant provider selected gate completed with all sources, HEAD and index intact: 422 formatted files and 19,767 portable macOS cases pass; Common retains five failures (three unchanged peer-owned source checks and the two local uninstall/clone environment admissions). Swift compilation and the 59 new native source cases are explicitly deferred on this Linux host. The next native source checkpoint must qualify the added C++/Swift suppliers; no installed Core startup or driver update success is implied.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review

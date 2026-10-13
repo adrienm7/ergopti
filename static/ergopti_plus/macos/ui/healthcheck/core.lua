@@ -253,6 +253,23 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.physical_history_context",
+		contract = { "new" },
+		-- Explicit retained history uses this factory; loading never enables capture.
+		wired    = true,
+	},
+	{
+		id       = "adapters.physical_lifecycle_event",
+		contract = { "classify" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.physical_context_probe",
+		contract = { "snapshot" },
+		-- Reached by the explicit fenced sampler; loading performs no native read.
+		wired    = true,
+	},
+	{
 		id       = "adapters.physical_observation_clock",
 		contract = { "now" },
 		-- Reached by explicit configuration binding; loading never samples time.
