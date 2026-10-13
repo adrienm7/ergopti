@@ -75,6 +75,125 @@ local function assert_selection_never_logged(world)
 end
 
 helpers.describe("AI agent local model (ai-agent-local-model)", function()
+	helpers.it("(local-model-requester) refuses an agent Download after its run is reset or superseded in the modal", function()
+		for _, change in ipairs({ "reset", "supersede" }) do
+			with_consent_world(function(world)
+				local dialog = require("infra.dialog_util")
+				local previous = dialog.block_alert
+				dialog.block_alert = function(...)
+					if change == "reset" then world.runner.reset() else trigger(world, "llm_agent_selection") end
+					return previous(...)
+				end
+				trigger(world, "llm_agent_selection")
+				World.list_local_models(world, {})
+				helpers.assert_eq(#world.installs, 0, "held consent cannot revive the original cancelled requester")
+				dialog.block_alert = previous
+				world.runner.set_system2("local")
+				world.runner.set_mode("action")
+				trigger(world, "llm_agent_selection")
+				World.list_local_models(world, {})
+				helpers.assert_eq(#world.installs, 1, "a fresh current requester still downloads normally")
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-requester) refuses an agent Download after System2 or its mode withdraws the run", function()
+		for _, change in ipairs({ "off", "remote", "aba", "mode_off" }) do
+			with_consent_world(function(world)
+				local dialog = require("infra.dialog_util")
+				local previous = dialog.block_alert
+				dialog.block_alert = function(...)
+					if change == "mode_off" then world.runner.set_mode("off")
+					else world.runner.set_system2(change == "remote" and "cerebras" or "") end
+					if change == "aba" then world.runner.set_system2("local") end
+					return previous(...)
+				end
+				trigger(world, "llm_agent_selection")
+				World.list_local_models(world, {})
+				helpers.assert_eq(#world.installs, 0, "selection changes do not grant the old manual requester another download")
+				dialog.block_alert = previous
+				world.runner.set_mode("action")
+				world.runner.set_system2("local")
+				trigger(world, "llm_agent_selection")
+				World.list_local_models(world, {})
+				helpers.assert_eq(#world.installs, 1, "a fresh allowed requester follows the new selection")
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-requester) refuses an expired requester before any endpoint or service acquisition", function()
+		with_consent_world(function(world, offer, api)
+			local reads = 0
+			local capture = api.capture_service_owner
+			api.capture_service_owner = function() reads = reads + 1; return capture() end
+			local opts = { current = function() return false end }
+			assert_false(offer.offer(DEFAULT_MODEL, opts))
+			assert_false(offer.install(DEFAULT_MODEL, opts))
+			helpers.assert_eq(reads, 0, "expired requester authority must be checked before source readers")
+			helpers.assert_eq(#world.alerts, 0)
+			helpers.assert_eq(#world.installs, 0)
+		end)
+	end)
+
+	helpers.it("(local-model-requester) preserves manual downloads and automatic notices while prediction is disabled", function()
+		with_consent_world(function(world, offer)
+			world.engine.set_llm_enabled(false)
+			trigger(world, "llm_agent_selection")
+			World.list_local_models(world, {})
+			helpers.assert_eq(#world.installs, 1, "action-mode agents remain independent of prediction enablement")
+			helpers.assert_true(offer.install(DEFAULT_MODEL, { current = function() return true end }))
+			helpers.assert_eq(#world.installs, 2, "explicit menu Download remains allowed")
+			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+			world.runner.reset()
+			world.notifications[#world.notifications].on_click()
+			helpers.assert_eq(#world.installs, 3, "automatic source-bound notices survive transient requester cancellation")
+		end)
+	end)
+
+	helpers.it("(local-model-requester) refuses malformed and expired predicates without acquiring private source data", function()
+		for _, current in ipairs({ false, 17, function() return nil end, function() return 17 end,
+			function() error("private-requester-secret") end }) do
+			with_consent_world(function(world, offer, api)
+				local reads = 0
+				local capture = api.capture_service_owner
+				api.capture_service_owner = function() reads = reads + 1; return capture() end
+				assert_false(offer.offer(DEFAULT_MODEL, { current = current }))
+				assert_false(offer.install(DEFAULT_MODEL, { current = current }))
+				helpers.assert_eq(reads, 0)
+				helpers.assert_eq(#world.alerts + #world.installs, 0)
+				for _, row in ipairs(world.logs) do
+					helpers.assert_true(not row.text:find("private-requester-secret", 1, true))
+				end
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-requester) rechecks currency after source readers and retains the captured predicate through completion", function()
+		with_consent_world(function(world, offer, api)
+			local alive = true
+			local capture = api.capture_service_owner
+			api.capture_service_owner = function() local owner = capture(); alive = false; return owner end
+			assert_false(offer.offer(DEFAULT_MODEL, { current = function() return alive end }))
+			helpers.assert_eq(#world.alerts + #world.installs, 0)
+			api.capture_service_owner = capture
+			alive = true
+			local options = { current = function() return alive end }
+			local done, current
+			local forgot = 0
+			api.forget_local_models = function() forgot = forgot + 1 end
+			offer.set_installer(function(_, callback, predicate) done, current = callback, predicate; return true end)
+			local dialog = require("infra.dialog_util")
+			local previous = dialog.block_alert
+			dialog.block_alert = function(...) options.current = function() return false end; return previous(...) end
+			helpers.assert_true(offer.offer(DEFAULT_MODEL, options))
+			helpers.assert_true(current(), "mutable options cannot replace the captured predicate")
+			alive = false
+			assert_false(current())
+			done(true)
+			helpers.assert_eq(forgot, 0, "stale completion cannot invalidate another requester's inventory")
+		end)
+	end)
+
 	helpers.it("(local-model-consent-affinity) refuses a held Download after the actual configured endpoint changes", function()
 		with_consent_world(function(world, offer, _, port)
 			local dialog = require("infra.dialog_util")

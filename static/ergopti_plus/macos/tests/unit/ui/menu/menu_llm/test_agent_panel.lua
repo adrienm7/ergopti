@@ -349,6 +349,101 @@ helpers.describe("AI agent menu (macOS)", function()
 			helpers.assert_true((world.tool_lists or 0) >= 1, "opening the menu refreshes the Shortcuts list")
 		end)
 	end)
+	helpers.it("(local-model-requester) rejects obsolete panel verification after Off, remote or same-value reselection", function()
+		for _, choice in ipairs({ "off", "remote", "aba" }) do
+			local state = base_state()
+			with_panel(state, function(build, world)
+				local function rows() return row_starting(build().submenu, "🧠").menu end
+				row_starting(rows(), "Local").fn()
+				local pending = world.verifications[#world.verifications]
+				if choice == "remote" then row_starting(rows(), "Cerebras").fn()
+				else rows()[1].fn() end
+				if choice == "aba" then row_starting(rows(), "Local").fn() end
+				local updates = world.menu_updates
+				world.alert_answer = "first"
+				pending.on_result(false)
+				helpers.assert_eq(#world.alerts, 0, "an obsolete selection must not open model consent")
+				helpers.assert_eq(#world.installs, 0)
+				helpers.assert_eq(world.menu_updates, updates)
+				if choice == "aba" then
+					world.verifications[#world.verifications].on_result(false)
+					helpers.assert_eq(#world.installs, 1, "the reselected current setting retains its own offer")
+				end
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-requester) fences held panel consent and stale direct Download rows", function()
+		local state = base_state()
+		state.llm_agent_system2 = "local"
+		with_panel(state, function(build, world)
+			world.listed = {}
+			local function rows() return row_starting(build().submenu, "🧠").menu end
+			local old_download = row_starting(rows(), "⬇️")
+			rows()[1].fn()
+			helpers.assert_eq(old_download.fn(), false, "an old Download row cannot borrow an Off selection")
+			helpers.assert_eq(#world.installs, 0)
+			row_starting(rows(), "Local").fn()
+			helpers.assert_eq(old_download.fn(), false, "same-value reselection does not revive the old row")
+			world.alert_answer = "first"
+			local dialog = require("infra.dialog_util")
+			local previous = dialog.block_alert
+			dialog.block_alert = function(...)
+				rows()[1].fn()
+				return previous(...)
+			end
+			world.verifications[#world.verifications].on_result(false)
+			helpers.assert_eq(#world.installs, 0, "panel consent rechecks selection after its modal")
+			dialog.block_alert = previous
+			row_starting(rows(), "Local").fn()
+			world.verifications[#world.verifications].on_result(false)
+			helpers.assert_eq(#world.installs, 1)
+		end)
+	end)
+
+	helpers.it("(local-model-requester) rechecks panel selection after its effectful model-status reader", function()
+		local state = base_state()
+		with_panel(state, function(build, world)
+			local menu = row_starting(build().submenu, "🧠").menu
+			local local_row, off = row_starting(menu, "Local"), menu[1]
+			local api = require("modules.llm.api_ollama")
+			local read = api.local_model_installed
+			api.local_model_installed = function(model)
+				api.local_model_installed = read
+				off.fn()
+				return read(model)
+			end
+			local_row.fn()
+			helpers.assert_eq(state.llm_agent_system2, "")
+			helpers.assert_eq(#world.verifications, 0, "withdrawn selection cannot acquire another presence request")
+			helpers.assert_eq(#world.installs, 0)
+		end)
+	end)
+
+	helpers.it("(local-model-requester) captures direct Download selection before an opaque status reader can reselect it", function()
+		local state = base_state()
+		state.llm_agent_system2 = "local"
+		with_panel(state, function(build, world)
+			world.listed = {}
+			local original = row_starting(build().submenu, "🧠").menu
+			local api = require("modules.llm.api_ollama")
+			local reader = api.local_model_installed
+			api.local_model_installed = function(model)
+				api.local_model_installed = reader
+				original[1].fn()
+				row_starting(original, "Local").fn()
+				return reader(model)
+			end
+			local old_rows = row_starting(build().submenu, "🧠").menu
+			helpers.assert_eq(row_starting(old_rows, "⬇️").fn(), false,
+				"a selection ABA during row acquisition cannot donate its new epoch to the old Download")
+			helpers.assert_eq(#world.installs, 0)
+			local fresh_rows = row_starting(build().submenu, "🧠").menu
+			helpers.assert_true(row_starting(fresh_rows, "⬇️").fn())
+			helpers.assert_eq(#world.installs, 1)
+		end)
+	end)
+
 	helpers.it("(ai-agent-local-model) shows whether the local model is installed and downloads a missing one", function()
 		local state = base_state()
 		state.llm_agent_system2 = "local"
