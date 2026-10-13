@@ -665,6 +665,168 @@ check(
 	'the agent settings must ride the AI menu persistence both ways'
 );
 
+// 11. Manual requester currency is distinct from prediction/backend readiness.
+/**
+ * Bind the actual settings and screenshot callbacks to their original scope.
+ * These are source controls; native AHK execution remains required.
+ * @param {string} agent - Production agent action source.
+ * @param {string} vision - Production screenshot action source.
+ * @returns {void}
+ */
+function validateManualRequester(agent, vision) {
+	const assert = require('node:assert/strict');
+	const committed = bodyOf(agent, '_LLM_Agent_ApplyCommitted');
+	assert.match(
+		committed,
+		/\(Key == "agent_system2" \|\| Key == "agent_mode"\) && Candidate\[Key\] != Previous\s+_LLM_Agent_Generation \+= 1/
+	);
+	assert.ok(committed.indexOf('_LLM_Agent_Generation += 1') < committed.indexOf('LoggerDebug('));
+	const commit = bodyOf(agent, 'LLM_Agent_CommitSetting');
+	assert.match(commit, /Previous := LLM_Agent_Setting\(Key\)/);
+	assert.match(commit, /_LLM_Agent_ApplyCommitted\.Bind\(Key, Previous\)/);
+	assert.match(commit, /if !\(Committed is Integer\) \|\| Committed != true\s+return false/);
+	assert.ok(
+		!bodyOf(agent, '_LLM_Agent_RenderIsCurrent').includes('"enabled"'),
+		'Agent actions remain independent of prediction enablement.'
+	);
+	assert.match(
+		bodyOf(agent, '_LLM_Agent_Notify'),
+		/if !_LLM_Agent_IsCurrent\(Flow\) \|\| A_IsSuspended\s+return/
+	);
+	const trigger = bodyOf(vision, 'LLM_Vision_Trigger');
+	const capture = trigger.indexOf('AuxGeneration := LLM_AuxGeneration()');
+	assert.ok(
+		capture >= 0 && capture < trigger.indexOf('Enabled := _LLM_Menu.Get('),
+		'Capture original epoch before native/readiness getters.'
+	);
+	assert.match(
+		trigger,
+		/if !_LLM_Vision_RequestScopeCurrent\(AuxGeneration\)\s+return false\s+_LLM_Vision_Generation \+= 1/
+	);
+	assert.match(
+		trigger,
+		/Requester := _LLM_Vision_RenderIsCurrent\.Bind\(_LLM_Vision_Generation, AuxGeneration\)/
+	);
+	assert.match(trigger, /"requester_current", Requester/);
+	const current = bodyOf(vision, '_LLM_Vision_IsCurrent');
+	assert.match(current, /Current := Flow\.Get\("requester_current", 0\)/);
+	assert.match(current, /Result := Current\.Call\(\)/);
+	assert.match(current, /Result is Integer && Result == true/);
+	assert.match(
+		bodyOf(vision, '_LLM_Vision_RenderIsCurrent'),
+		/&& _LLM_Vision_RequestScopeCurrent\(AuxGeneration\)\) \? true : false/
+	);
+	const scope = bodyOf(vision, '_LLM_Vision_RequestScopeCurrent');
+	assert.match(scope, /AuxGeneration == LLM_AuxGeneration\(\) && !A_IsSuspended/);
+	assert.match(scope, /_LLM_Menu is Map && _LLM_Menu\.Get\("enabled", false\) == true/);
+	for (const name of ['_LLM_Vision_OnReadFail', '_LLM_Vision_OnAnswerFail']) {
+		const callback = bodyOf(vision, name);
+		assert.match(callback, /if !_LLM_Vision_IsCurrent\(Flow\)\s+return/);
+		assert.match(callback, /LLM_LocalModelOffer\(Failure, false, Flow\["requester_current"\]\)/);
+	}
+	const show = bodyOf(vision, '_LLM_Vision_Show');
+	assert.match(show, /if !_LLM_Vision_IsCurrent\(Flow\)\s+return/);
+	assert.match(show, /"render_guard", Flow\["requester_current"\]/);
+	assert.match(show, /if _LLM_Vision_IsCurrent\(Flow\)\s+LLM_Tooltip_Show\(/);
+	assert.match(
+		bodyOf(vision, '_LLM_Vision_NextAnswer'),
+		/if !_LLM_Vision_IsCurrent\(Flow\)\s+return/
+	);
+	assert.match(
+		bodyOf(vision, '_LLM_Vision_NotifyCurrent'),
+		/if _LLM_Vision_IsCurrent\(Flow\)\s+return _LLM_Menu_ShowManualPredictionNotice\(Key\)/
+	);
+	assert.match(
+		bodyOf(vision, 'LLM_Vision_SendText'),
+		/Transport := _LLM_Engine_ResolveRemoteTransport\(\)\s+if !_LLM_Vision_CallbackCurrent\(CurrentFn\)\s+return false\s+Transport\.Call\(/
+	);
+	assert.match(
+		bodyOf(vision, '_LLM_Vision_Send'),
+		/_LLM_Vision_CancelEngine\(\)\s+if !_LLM_Vision_CallbackCurrent\(CurrentFn\)\s+return false/
+	);
+}
+validateManualRequester(agentAction, visionActions);
+const manualRequesterInverses = [
+	['agent', 'Candidate[Key] != Previous', 'false'],
+	[
+		'agent',
+		'_LLM_Agent_Generation += 1\n\tLoggerDebug',
+		'_LLM_Agent_Generation += 0\n\tLoggerDebug'
+	],
+	[
+		'agent',
+		'_LLM_Agent_ApplyCommitted.Bind(Key, Previous)',
+		'_LLM_Agent_ApplyCommitted.Bind(Key, Normalized)'
+	],
+	['agent', 'if !(Committed is Integer) || Committed != true', 'if !Committed'],
+	[
+		'agent',
+		'if !_LLM_Agent_IsCurrent(Flow) || A_IsSuspended\n\t\treturn',
+		'if A_IsSuspended\n\t\treturn'
+	],
+	['vision', 'AuxGeneration := LLM_AuxGeneration()', 'AuxGeneration := 0'],
+	[
+		'vision',
+		'if !_LLM_Vision_RequestScopeCurrent(AuxGeneration)\n\t\treturn false',
+		'if false\n\t\treturn false'
+	],
+	[
+		'vision',
+		'_LLM_Vision_RenderIsCurrent.Bind(_LLM_Vision_Generation, AuxGeneration)',
+		'_LLM_Vision_RenderIsCurrent.Bind(_LLM_Vision_Generation, LLM_AuxGeneration())'
+	],
+	['vision', '"requester_current", Requester', '"requester_current", (*) => true'],
+	['vision', 'Result is Integer && Result == true', 'Result == true'],
+	[
+		'vision',
+		'&& _LLM_Vision_RequestScopeCurrent(AuxGeneration)) ? true : false',
+		'&& true) ? true : false'
+	],
+	['vision', 'AuxGeneration == LLM_AuxGeneration() && !A_IsSuspended', 'true && !A_IsSuspended'],
+	['vision', '_LLM_Menu.Get("enabled", false) == true', 'true'],
+	[
+		'vision',
+		'LLM_LocalModelOffer(Failure, false, Flow["requester_current"])',
+		'LLM_LocalModelOffer(Failure, false, _LLM_Vision_RenderIsCurrent.Bind(Flow["generation"]))'
+	],
+	['vision', '"render_guard", Flow["requester_current"]', '"render_guard", (*) => true'],
+	[
+		'vision',
+		'if _LLM_Vision_IsCurrent(Flow)\n\t\tLLM_Tooltip_Show(',
+		'if true\n\t\tLLM_Tooltip_Show('
+	],
+	[
+		'vision',
+		'if _LLM_Vision_IsCurrent(Flow)\n\t\treturn _LLM_Menu_ShowManualPredictionNotice(Key)',
+		'if true\n\t\treturn _LLM_Menu_ShowManualPredictionNotice(Key)'
+	],
+	[
+		'vision',
+		'Transport := _LLM_Engine_ResolveRemoteTransport()\n\t\tif !_LLM_Vision_CallbackCurrent(CurrentFn)',
+		'Transport := _LLM_Engine_ResolveRemoteTransport()\n\t\tif false'
+	],
+	[
+		'vision',
+		'_LLM_Vision_CancelEngine()\n\tif !_LLM_Vision_CallbackCurrent(CurrentFn)',
+		'_LLM_Vision_CancelEngine()\n\tif false'
+	]
+];
+for (const [owner, original, replacement] of manualRequesterInverses) {
+	const assert = require('node:assert/strict');
+	const source = owner === 'agent' ? agentAction : visionActions;
+	const changed = source.replace(original, replacement);
+	assert.notEqual(changed, source, 'Manual requester inverse must change its actual seam.');
+	assert.throws(() =>
+		validateManualRequester(
+			owner === 'agent' ? changed : agentAction,
+			owner === 'vision' ? changed : visionActions
+		)
+	);
+}
+console.log(
+	'Manual requester source currency: 19 causal source inverses passed; 25 added AHK cases UNRUN.'
+);
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Windows rewrite prompt wiring:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
