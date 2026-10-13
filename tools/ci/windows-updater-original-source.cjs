@@ -18,6 +18,7 @@ const SOURCE_ROOTS = Object.freeze([
 	'static/ergopti_plus/windows',
 	'static/ergopti_plus/_shared',
 	'tools/build',
+	'tools/lib/owned-descriptor-read.cjs',
 	'tools/native',
 	'tools/ci/run-windows-updater-original-diagnostic-cohort.cjs',
 	'tools/ci/windows-updater-original-diagnostic-cohort-inputs.json',
