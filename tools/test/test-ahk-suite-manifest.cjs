@@ -129,6 +129,72 @@ for (const [job, name] of [
 	processReceipts.push({ name, start: start[0], finish: finish[0] });
 }
 
+// Supplemental capture debt cannot bypass the mandatory full suite or lose failed bytes.
+function assertSnapshot16Retention(jobBody) {
+	const script = pipeline.runOf(pipeline.step(jobBody, 'Run AHK test suite')).join('\n');
+	const supplemental =
+		'node "${{ github.workspace }}\\tools\\test\\test-ahk-suite-manifest.cjs" --ahk $ahk';
+	assert.ok(script.includes(supplemental), 'Snapshot16: the actual preflight remains mandatory');
+	assert.ok(
+		script.includes(supplemental + '\nif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'),
+		'Snapshot16: a supplemental refusal stops the native suite'
+	);
+	assert.ok(
+		script.indexOf('$proc = Start-Process') > script.indexOf(supplemental),
+		'Snapshot16: supplemental evidence never replaces the full native suite'
+	);
+	const artifact = pipeline.step(jobBody, 'Publish AHK execution manifest');
+	assert.equal(pipeline.stepField(artifact, 'if'), 'always()', 'Snapshot16: retain early failures');
+	assert.equal(pipeline.stepField(artifact, 'uses'), 'actions/upload-artifact@v4');
+	assert.match(artifact, /^ {10}overwrite: true$/m);
+	assert.match(artifact, /^ {10}if-no-files-found: warn$/m);
+	const paths = /^ {10}path: \|\n((?: {12}[^\n]*\n?)*)/m.exec(artifact);
+	assert.ok(paths, 'Snapshot16: retention belongs to the real upload path scalar');
+	assert.equal(
+		paths[1]
+			.split('\n')
+			.filter((line) => line === '            ${{ runner.temp }}/ergopti-snapshot16-*/**').length,
+		1,
+		'Snapshot16: retain all owned TAP, stdout, stderr, prefix and receipt files'
+	);
+}
+
+{
+	const jobBody = pipeline.job('test-ahk');
+	assertSnapshot16Retention(jobBody);
+	const changes = [
+		['            ${{ runner.temp }}/ergopti-snapshot16-*/**\n', ''],
+		[
+			'${{ runner.temp }}/ergopti-snapshot16-*/**',
+			'${{ github.workspace }}/ergopti-snapshot16-*/**'
+		],
+		['${{ runner.temp }}/ergopti-snapshot16-*/**', '${{ runner.temp }}/foreign-snapshot16-*/**'],
+		[
+			'      - name: Publish AHK execution manifest\n        if: always()\n',
+			'      - name: Publish AHK execution manifest\n'
+		],
+		[
+			'      - name: Publish AHK execution manifest\n        if: always()',
+			'      - name: Publish AHK execution manifest\n        if: success()'
+		],
+		['      - name: Publish AHK execution manifest', '      - name: Foreign execution manifest'],
+		['test-ahk-suite-manifest.cjs" --ahk $ahk', 'foreign-manifest.cjs" --ahk $ahk'],
+		[
+			'test-ahk-suite-manifest.cjs" --ahk $ahk\n          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+			'test-ahk-suite-manifest.cjs" --ahk $ahk'
+		]
+	];
+	for (const [before, after] of changes) {
+		const changed = jobBody.replace(before, after);
+		assert.notEqual(changed, jobBody, 'Snapshot16 retention inverse must alter the actual owner');
+		assert.throws(() => assertSnapshot16Retention(changed));
+	}
+	assertSnapshot16Retention(jobBody);
+	console.log(
+		'Snapshot16 retention: same-job capture and mandatory-suite guards passed; 8 withdrawals refused.'
+	);
+}
+
 // Isolated runners must not overwrite the main suite's canonical TAP receipt.
 const isolatedScript = pipeline
 	.runOf(pipeline.step(pipeline.job('test-ahk'), 'Run isolated AHK LLM suites'))
