@@ -1420,7 +1420,7 @@ function luaProducerTree(source) {
 }
 
 /** Admits only the native producer's closed direct call grammar across executable control paths. */
-function closedProducerCalls(unit, role) {
+function closedProducerCalls(unit, role, parseTree = luaProducerTree) {
 	if (!unit) return false;
 	const expected =
 		role === 'agent'
@@ -1446,7 +1446,7 @@ function closedProducerCalls(unit, role) {
 	if (!expected) return false;
 	let tree;
 	try {
-		tree = luaProducerTree(unit.text);
+		tree = parseTree(unit.text);
 	} catch {
 		return false;
 	}
@@ -1492,11 +1492,11 @@ function closedProducerCalls(unit, role) {
  * Rejects last-key-wins overwrites, computed keys and expressions that retain a callback
  * body without constructing its registered command/getter table.
  */
-function closedNativeContextRegistration(unit) {
+function closedNativeContextRegistration(unit, parseTree = luaProducerTree) {
 	if (!unit) return false;
 	let tree;
 	try {
-		tree = luaProducerTree(unit.text);
+		tree = parseTree(unit.text);
 	} catch {
 		return false;
 	}
@@ -1550,11 +1550,11 @@ function closedNativeContextRegistration(unit) {
  * Read-only field access keeps existing backend/native callbacks; bare values may pass
  * only to their declared owners. Unsupported aliases, nested shadows and writes refuse.
  */
-function closedCapturedNativeOwners(unit, role) {
+function closedCapturedNativeOwners(unit, role, parseTree = luaProducerTree) {
 	if (!unit || !['llm', 'agent'].includes(role)) return false;
 	let tree;
 	try {
-		tree = luaProducerTree(unit.text);
+		tree = parseTree(unit.text);
 	} catch {
 		return false;
 	}
@@ -1701,7 +1701,7 @@ function closedCapturedNativeOwners(unit, role) {
  * Named native row fields are table keys, not lexical vector references. The subordinate
  * append helper's loop-local rendered binding has its own complete permitted statement.
  */
-function closedCompletedChildFlow(unit, role) {
+function closedCompletedChildFlow(unit, role, parseTree = luaProducerTree) {
 	if (!unit) return false;
 	const names =
 		role === 'agent' ? ['children'] : role === 'llm' ? ['items', 'rendered', 'status_rows'] : null;
@@ -1724,7 +1724,7 @@ function closedCompletedChildFlow(unit, role) {
 				];
 	let tree, patterns;
 	try {
-		tree = luaProducerTree(unit.text);
+		tree = parseTree(unit.text);
 		patterns = statements.map((source) => luaProducerTree(source).body[0]);
 	} catch {
 		return false;
@@ -2212,6 +2212,12 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 	)
 		return false;
 	const { lex, positions, rootPositions, body, one } = luaPublicationParser();
+	// These checks read the same immutable producer bodies in this invocation only.
+	const producerTrees = new Map();
+	const parseProducer = (text) => {
+		if (!producerTrees.has(text)) producerTrees.set(text, luaProducerTree(text));
+		return producerTrees.get(text);
+	};
 	const tokenShape = (unit) =>
 		unit?.tokens.map((token) => [
 			token.kind,
@@ -2332,13 +2338,13 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		!closedNativeControl(wholeAgentCaller, 'agentCaller') ||
 		!closedNativeControl(wholeLlmCaller, 'llm') ||
 		!closedNativeControl(wholeAgentProducer, 'agent') ||
-		!closedProducerCalls(wholeAgentProducer, 'agent') ||
-		!closedProducerCalls(wholeLlmCaller, 'llm') ||
-		!closedNativeContextRegistration(wholeAgentProducer) ||
-		!closedCapturedNativeOwners(wholeAgentProducer, 'agent') ||
-		!closedCapturedNativeOwners(wholeLlmCaller, 'llm') ||
-		!closedCompletedChildFlow(wholeAgentProducer, 'agent') ||
-		!closedCompletedChildFlow(wholeLlmCaller, 'llm') ||
+		!closedProducerCalls(wholeAgentProducer, 'agent', parseProducer) ||
+		!closedProducerCalls(wholeLlmCaller, 'llm', parseProducer) ||
+		!closedNativeContextRegistration(wholeAgentProducer, parseProducer) ||
+		!closedCapturedNativeOwners(wholeAgentProducer, 'agent', parseProducer) ||
+		!closedCapturedNativeOwners(wholeLlmCaller, 'llm', parseProducer) ||
+		!closedCompletedChildFlow(wholeAgentProducer, 'agent', parseProducer) ||
+		!closedCompletedChildFlow(wholeLlmCaller, 'llm', parseProducer) ||
 		!closedOwnerReferences(wholeAgentProducer, ['NativeParent', 'ManifestMenu', 'AgentSettings']) ||
 		!closedOwnerReferences(wholeLlmCaller, ['NativeParent', 'ManifestMenu']) ||
 		!isDeepStrictEqual(
