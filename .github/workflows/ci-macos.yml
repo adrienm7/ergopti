@@ -125,6 +125,16 @@ jobs:
               exit 1
           fi
 
+      # Timing JSON is best-effort diagnostics; deferred or interrupted runs may have no file.
+      - name: Retain macOS Lua timing diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua-timings-macos-unit-${{ matrix.role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/macos-lua.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Retain source-bound test-hs qualification receipts
         if: always()
         uses: actions/upload-artifact@v4
