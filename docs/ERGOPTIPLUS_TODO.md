@@ -3312,17 +3312,30 @@ remain required, separately from the local gates.
   DeferredWork and TimerScheduler with native-port doubles. The complete local
   macOS unit suite passes 19,013 tests across 1,576 modules; E2E passes 101/101
   with one host/driver-specific scenario skipped. Formatting passes; JS remains
-  422/426 with the four previously observed failures. Current macOS CI,
-  Cocoa interaction, packaging, installation and installed restart remain
-  unqualified; this bounded correction does not complete item 7 or item 38.
+  422/426 with the four previously observed failures. Manual macOS run
+  [38329427303](https://github.com/adrienm7/ergopti/actions/runs/38329427303)
+  tests `7b01f3d2`, whose tree exactly equals delivered Dev `f43575f5`.
+  Its stubbed units pass 19,027/19,027 across 1,578 modules, including all
+  67 delivery subjects; E2E passes 101/101 with one explicit skip. Native
+  paired leases on both architectures, cold MLX and 12 tooltip captures pass.
+  These separate native jobs do not qualify Cocoa wizard interaction.
+  The whole workflow fails: Core passes 424/426, retaining the Lua gsub and
+  layout-default guards; both managed-Ollama jobs and archive qualification
+  fail. Packaging and installation are skipped, and Release is skipped.
+  Cocoa interaction and installed restart remain unexecuted; this bounded
+  correction does not complete item 7 or item 38.
   The macOS wizard now requires a committed native import timeout before
   acquiring navigation-layer or remap work. A refused timer start takes the
   existing translated notice and reload continuation for answers already saved;
   the same Finish can retry after timer repair. The complete portable owning
   module passes 18 cases, including three new genuine DeferredWork and
   TimerScheduler admission controls; all 15 original subjects are retained.
-  Predecessor comparison, final selected gates and native installed restart
-  receiving remain separate requirements; this does not complete item 7.
+  Its retained timeout predecessor comparison passes 18/18, fails the three
+  added cases with the old timeout and passes 18/18 after restoration; the
+  original 15 remain intact. That earlier selected gate passes in its own
+  source context. Current run 38329427303 also executes all 18 subjects
+  successfully. Native installed restart receiving remains required; neither
+  the portable comparison nor the stubbed CI completes item 7.
   The tap-holds page lists each engine's recommended keys from the
   shared tap-hold catalogue and imports only the checked ones through each
   driver's tap-hold writer: Windows renders them into the tap_hold.toml beside

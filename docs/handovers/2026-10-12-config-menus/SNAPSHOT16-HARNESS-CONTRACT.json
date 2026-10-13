@@ -1,0 +1,68 @@
+{
+	"retained_native_run": 38319577074,
+	"tested_commit": "f385e3c7b43604031f857c48046adbf9cd802005",
+	"tested_tree": "4984f799c76260b0c7a8a9d8bccb077addb15792",
+	"dev_commit_same_tree": "d5a1fe238163473748b05a9829ae22e5b8b9f255",
+	"published_handover_commit": "3abaabdea90cd34e2174d47e84bba3b336699c34",
+	"paths": [
+		{
+			"path": "tools/test/test-ahk-suite-manifest.cjs",
+			"bytes": 55899,
+			"sha256": "81373e1d5b5b52d5849f5f75fbc8f78464cd30c9391892d873e158c94b013a97"
+		},
+		{
+			"path": "tools/test/support/file-backed-native-runner.cjs",
+			"bytes": 1779,
+			"sha256": "4da636bdb04f19176e3dd78a06c60a1ba9b1676a2e3578fce1e64a0a8d3cd9c5"
+		},
+		{
+			"path": "tools/test/validate-ahk-suite-manifest.cjs",
+			"bytes": 6619,
+			"sha256": "ba8a3c26d6271e819fb3669e3e7ac95d30793d88c4a20e8173c636f7805da287"
+		},
+		{
+			"path": "tools/test/test-ahk-test-coverage.cjs",
+			"bytes": 5868,
+			"sha256": "1fa8646f23af317928bf6545e5e63baebd00cdc2913b59f338e9654d97a243b7"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/run_all.ahk",
+			"bytes": 109881,
+			"sha256": "078c0ac78ff44f506052fe5d7908e46b49bbe8663887c2f0042340ec6b59e376"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/test_framework.ahk",
+			"bytes": 37327,
+			"sha256": "2a021b7f5f069e77405709801a43d9abe20ced5a15eedc44f219791e73ec30bc"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk",
+			"bytes": 11278,
+			"sha256": "d049972c3566def451dedd9e9a34747e4a0dc7c3dcac600dabc419de02c84e97"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/test_buffered_data_snapshot_owner.ahk",
+			"bytes": 10919,
+			"sha256": "411e9a737b5f65be9e9eec59f7e96075130c7fd5a72e6c08fdabc7493169d992"
+		}
+	],
+	"native_contract": {
+		"principal": "authentic complete run_all.ahk with original registration and #Warn All, StdOut; no substituted harness",
+		"selection": "--only=windows91 snapshots:",
+		"dry_arguments": ["/ErrorStdOut", "run_all.ahk", "--only=windows91 snapshots:", "--dry-run"],
+		"execution_arguments": ["/ErrorStdOut", "run_all.ahk", "--only=windows91 snapshots:"],
+		"capture_env": "ERGOPTI_AHK_RESULTS_FILE exact original TAP path; original file-backed direct child/capture descriptors",
+		"dry_contract": "whole principal SDK load; original16 selected; none executed; strict stdout == TAP minus UTF8BOM; stderr empty; exit0",
+		"run_contract": "same complete source principal; original16 ordered names/callbacks; 16 executed/passed/timed, none failed; complete strict TAP/native exit and same source before/during/after; no full general-suite or application qualification",
+		"actual_outcome": "dry child exit0, selected16 of11627; stdout1484141B vs TAP445B; strict refusal; run child not launched; no general unit execution"
+	},
+	"source_seal_scope": "owner lexical includeClosure plus every tracked _shared non-md file and four JS harness/helpers; readable regular original tracked images, git blobs, hashes, exact official commit, actual interpreter hash sealed. Archive lexical1841 closure is not complete SDK/parser or full native source frame inventory.",
+	"closure_archive": "docs/handovers/2026-10-12-config-menus/snapshot16-global-registration-source-proof.tar.gz",
+	"closure_archive_sha256": "43f574b28e905fac6ed348e6b71d524cab11f2d81eeb6353b4ef8c56d91a2fbf",
+	"closure_member": "INCLUDE-CLOSURE-SOURCE-INDEX.json",
+	"closure_member_sha256": "d5bbecd32cb7dfe75394cec42465f655dd1610250769a56bb4aca5838eae444b",
+	"ownership": "Root future runner/framework/CI semantic migration; 14/31 registration map archived. Group1 grants coordination of own test_config_migrate registration917/924/1348/1351; no concurrent patch.",
+	"receiving_member": "FINAL-ACTUAL-RECEIVING-REVIEW.json",
+	"receiving_member_sha256": "47cb76bb7c18f566c7c891e94f509f745e0c7901f97f4427d4166d6f63d62916",
+	"limits": "Retained run has no complete raw stdout, only metadata/prefix64/tail4096 and15 complete warningtuples. Root93d3/38325913747 is distinctsource: matching byte sizes does not prove matching hashes or current closure."
+}
