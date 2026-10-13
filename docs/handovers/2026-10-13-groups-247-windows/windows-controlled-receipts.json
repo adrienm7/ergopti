@@ -196,7 +196,7 @@
 			"skipped": 0
 		}
 	],
-	"selected_passed": 1021.0,
+	"selected_passed": 1021,
 	"native_owner_cases": 44,
 	"replay_matrices": 8,
 	"output_matrices": 11,
@@ -290,5 +290,142 @@
 		"cancel_control_created": false,
 		"archive_open_action_invoked": true,
 		"archive_open_confirmed": true
+	},
+	"continued_receiving": {
+		"scope": "Windows controlled native AutoHotkey execution; injected transport/schedule ports; no physical input or native inference qualification",
+		"received_source_sha": "50301a62500b5a55ddf8af39f6f2774b51761c7a",
+		"integrated_dev_sha": "612f572310af9eb292bb56e7c9ab3f0ef8169491",
+		"serial_selections": [
+			{
+				"failed": 0,
+				"filter": "startup-command-ready-repaint",
+				"passed": 5,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 5,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "windows91 snapshots:",
+				"passed": 17,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 17,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "Ollama local presence:",
+				"passed": 13,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 13,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "ollama-pending-survives-suspend",
+				"passed": 1,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 1,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "todo49-model-build-custody",
+				"passed": 20,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 20,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "todo49-registration-custody",
+				"passed": 91,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 91,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "managed-origin-custody",
+				"passed": 17,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 17,
+				"accepted": true
+			}
+		],
+		"startup_ready_original": {
+			"selected": 4,
+			"passed": 1,
+			"failed": 3,
+			"exit": 1
+		},
+		"snapshot_original": {
+			"selected": 16,
+			"passed": 1,
+			"failed": 15,
+			"exit": 1
+		},
+		"snapshot_capture_original": {
+			"selected": 2,
+			"passed": 0,
+			"failed": 2,
+			"exit": 1,
+			"error": "Invalid base"
+		},
+		"snapshot_capture_fixed": {
+			"selected": 2,
+			"passed": 2,
+			"failed": 0,
+			"exit": 0
+		},
+		"presence_original": {
+			"selected": 13,
+			"passed": 11,
+			"failed": 2,
+			"exit": 1,
+			"scope": "Superseded public callback premise; current original-origin contract is retained"
+		},
+		"compiler": {
+			"good_exit": 0,
+			"bad_exit": 17,
+			"production_entry_exit": 0
+		},
+		"e2e": {
+			"passed": 70,
+			"failed": 0,
+			"skipped": 0,
+			"exit": 0,
+			"scope": "engine and owned native Edit messages; physical hooks/SendInput not qualified"
+		},
+		"startup": {
+			"scenarios": 9,
+			"exit": 0,
+			"scope": "actual isolated source startup; installed production release not qualified"
+		},
+		"complete_js_attempt": {
+			"selected": 425,
+			"passed": 407,
+			"failed": 18,
+			"exit": 1,
+			"status": "FAILED",
+			"source_snapshot_consistent": false,
+			"source_edits_during_attempt": true,
+			"startup_failure": {
+				"phase": "fresh-config",
+				"status": 6,
+				"kind": "native owner OS_ERROR",
+				"cause": "UNRESOLVED"
+			}
+		},
+		"physical_qualified": false,
+		"native_macos": "UNRUN here",
+		"native_linux": "UNRUN here; maintainer Linux unavailable"
 	}
 }
