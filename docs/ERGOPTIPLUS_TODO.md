@@ -3905,9 +3905,11 @@ Hosted Lua owner tests do not qualify physical input.
   Karabiner instances" option, WP7 owned configuration, WP8 native acceptance,
   WP9 real-Mac acceptance (internal keyboard: verify the ISO 0x35/0x64
   assumption and fn/globe), WP10 enable and retire. Open: an identity for media
-  keys without a macOS keycode (play/pause, track skips, brightness), and a
-  VirtualHIDDevice version-skew policy. About 30-40 agent-days plus maintainer
-  hardware time.
+  keys without a macOS keycode (play/pause, track skips, brightness), and
+  VirtualHIDDevice incompatibility detection, product wiring and authenticated
+  signed DriverKit payload suppliers. The policy is decided: block owned mode
+  with an explanation and offer a driver-only update requiring explicit
+  confirmation. About 30-40 agent-days plus maintainer hardware time.
 
   FileSystem transaction receipts now retain their original private issuer,
   publication chain and current source view; replacement after admission is
