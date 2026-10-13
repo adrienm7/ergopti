@@ -319,14 +319,16 @@ _PTIO_SessionChangesDuringWriterRefusePublication() {
 	global _PTIO_AtomicEvents, _PTIO_AtomicStagePath
 	global _PTIO_GuardEpoch, _PTIO_GuardExpectedEpoch, _PTIO_GuardSuspended
 	TargetPath := A_Temp . "\\ergopti_personal_session_guard_" . A_TickCount . ".toml"
-	Original := "old-session-personal-toml`n"
+	Original := ""
 	OldPath := ScriptInformation["PersonalTomlPath"]
 	OldCache := _ReadPersonalTomlCache
 	try {
 		try FileDelete(TargetPath)
-		FileAppend(Original, TargetPath, "UTF-8-RAW")
 		ScriptInformation["PersonalTomlPath"] := TargetPath
 		_ReadPersonalTomlCache := false
+		AssertTrue(WritePersonalToml(_PTIO_RaceModel("old")),
+			"the source-preserving writer must receive valid prior TOML before staging")
+		Original := FileRead(TargetPath, "UTF-8-RAW")
 		_PTIO_GuardExpectedEpoch := 41
 		_PTIO_GuardEpoch := 41
 		_PTIO_GuardSuspended := false
@@ -356,6 +358,26 @@ _PTIO_SessionChangesDuringWriterRefusePublication() {
 		AssertEqual(Original, FileRead(TargetPath, "UTF-8-RAW"),
 			"suspend entered during staging must refuse the pending rename")
 		AssertFalse(FileExist(_PTIO_AtomicStagePath))
+		; The same valid source must reach rename when the session stays current.
+		_PTIO_GuardEpoch := 41
+		_PTIO_GuardSuspended := false
+		_PTIO_AtomicEvents := []
+		_PTIO_AtomicStagePath := ""
+		AssertFalse(WritePersonalToml(_PTIO_RaceModel("current-session"),
+			_PTIO_WriteCompleteStage.Bind(), _PTIO_RefuseAtomicReplace.Bind(), 0,
+			_PTIO_AuthorizeCurrentEditorSession.Bind()))
+		AssertEqual(3, _PTIO_AtomicEvents.Length)
+		AssertEqual("write", _PTIO_AtomicEvents[1])
+		AssertEqual("authorize", _PTIO_AtomicEvents[2])
+		AssertEqual("replace", _PTIO_AtomicEvents[3])
+		AssertEqual(Original, FileRead(TargetPath, "UTF-8-RAW"))
+		AssertFalse(FileExist(_PTIO_AtomicStagePath))
+		Lease := _PersonalTomlWriteLeaseTryAcquire(TargetPath, "fixture-release-proof")
+		try AssertTrue(Lease is Object, "all refused candidates must release their path lease")
+		finally {
+			if Lease is Object
+				AssertTrue(_PersonalTomlWriteLeaseRelease(Lease))
+		}
 	} finally {
 		try FileDelete(_PTIO_AtomicStagePath)
 		try FileDelete(TargetPath)
@@ -371,6 +393,50 @@ _PTIO_SessionChangesDuringWriterRefusePublication() {
 }
 Test("personal-toml-pre-rename-guard: epoch or suspend changes during writer refuse publication",
 	_PTIO_SessionChangesDuringWriterRefusePublication)
+
+
+; Opaque prior bytes are rejected before any staging port can run.
+_PTIO_OpaqueSourceRefusesBeforeStaging() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	global _PTIO_AtomicEvents, _PTIO_AtomicStagePath
+	TargetPath := A_Temp . "\ergopti_personal_opaque_guard_" . A_TickCount . ".toml"
+	Original := "old-session-personal-toml`n"
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := _ReadPersonalTomlCache
+	try {
+		try FileDelete(TargetPath)
+		FileAppend(Original, TargetPath, "UTF-8-RAW")
+		ScriptInformation["PersonalTomlPath"] := TargetPath
+		_ReadPersonalTomlCache := false
+		_PTIO_AtomicEvents := []
+		_PTIO_AtomicStagePath := ""
+		AssertFalse(WritePersonalToml(_PTIO_RaceModel("opaque-candidate"),
+			_PTIO_WriteCompleteStage.Bind(), _PTIO_RefuseAtomicReplace.Bind(), 0,
+			_PTIO_AuthorizeCurrentEditorSession.Bind()))
+		AssertEqual(0, _PTIO_AtomicEvents.Length, "invalid prior TOML must refuse before staging")
+		AssertEqual("", _PTIO_AtomicStagePath)
+		AssertEqual(Original, FileRead(TargetPath, "UTF-8-RAW"))
+		Stages := 0
+		Loop Files, TargetPath . ".*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+		Lease := _PersonalTomlWriteLeaseTryAcquire(TargetPath, "opaque-release-proof")
+		try AssertTrue(Lease is Object, "parse refusal must release its path lease")
+		finally {
+			if Lease is Object
+				AssertTrue(_PersonalTomlWriteLeaseRelease(Lease))
+		}
+	} finally {
+		try FileDelete(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+		_PTIO_AtomicEvents := []
+		_PTIO_AtomicStagePath := ""
+		try _ParseTomlGroupConfig_InvalidatePath(TargetPath)
+	}
+}
+Test("personal-toml-pre-rename-guard: opaque source refuses before staging and releases ownership",
+	_PTIO_OpaqueSourceRefusesBeforeStaging)
 
 global _PTIO_CleanupWarnCalls := 0
 global _PTIO_CleanupWarnPath := ""
