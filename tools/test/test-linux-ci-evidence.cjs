@@ -2065,7 +2065,10 @@ function assertLinuxUnitFailureLog(job) {
 	assert.strictEqual(pipeline.stepField(upload, 'continue-on-error'), null);
 	assert.match(upload, /^          name: linux-unit-failure-log$/m);
 	assert.match(upload, /^          retention-days: 7$/m);
-	assert.match(upload, /^          path: \$\{\{ runner\.temp \}\}\/linux-unit\.log$/m);
+	assert.match(
+		upload,
+		/^          path: \|\n            \$\{\{ runner\.temp \}\}\/linux-unit\.log\n            \$\{\{ runner\.temp \}\}\/linux-lua\.json\n {10}(?=\S)/m
+	);
 	assert.match(upload, /^          if-no-files-found: error$/m);
 	const steps = pipeline.steps(job);
 	const at = steps.findIndex((step) => step.name === 'Run the driver unit test suite');
@@ -2087,12 +2090,19 @@ const unitLogMutations = [
 	['working-directory: static/ergopti_plus/linux', 'working-directory: static/ergopti_plus'],
 	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'success()'],
 	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'failure()'],
-	['path: ${{ runner.temp }}/linux-unit.log', 'path: ${{ runner.temp }}'],
+	['            ${{ runner.temp }}/linux-unit.log', '            ${{ runner.temp }}'],
+	['\n            ${{ runner.temp }}/linux-lua.json', ''],
+	['\n            ${{ runner.temp }}/linux-unit.log', ''],
+	['            ${{ runner.temp }}/linux-lua.json', '            ${{ runner.temp }}/foreign.json'],
+	[
+		'            ${{ runner.temp }}/linux-lua.json',
+		'            ${{ runner.temp }}/linux-lua.json\n            ${{ runner.temp }}/foreign.json'
+	],
 	['if-no-files-found: error', 'if-no-files-found: ignore']
 ];
 assert.strictEqual(
 	unitLogMutations.length,
-	12,
+	16,
 	'all independent diagnostic wiring mutations are present'
 );
 for (const [from, to] of unitLogMutations) {
