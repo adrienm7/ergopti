@@ -825,7 +825,12 @@ function M.consume(detail, opts)
 	if not hit or hit.held_back or _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
 	local generation = _dispatch_generation
 	local admission_reader, decision_reader = opts.admission, M.magic_editor_decision
-	if opts.defer(function()
+	-- A scheduled callback has no delivery rights until its original queue ACK.
+	local deferring, accepted, early, dispatched = true, false, false, false
+	local deferred, queued = pcall(opts.defer, function()
+		if deferring then early = true; return end
+		if not accepted or dispatched then return end
+		dispatched = true
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
 		if hit.physical then
 			if not physical_admitted(opts, hit) then return end
@@ -855,11 +860,14 @@ function M.consume(detail, opts)
 		-- Logging and lazy executor loading can reenter after the first live check.
 		fire(hit, hit.physical and function() return physical_current(hit) end
 			or hit.decision and contextual_current or nil)
-	end) ~= true then
+	end)
+	deferring = false
+	if not deferred or queued ~= true or early then
 		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
 		return false, nil
 	end
 	if _configuration_owner ~= nil or generation ~= _dispatch_generation then return false, nil end
+	accepted = true
 	return true, hit.slot
 end
 
