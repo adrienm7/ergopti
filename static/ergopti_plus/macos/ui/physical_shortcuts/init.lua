@@ -44,7 +44,14 @@ local function close(candidate)
 	if active ~= candidate or candidate.closing or candidate.constructing then return false end
 	candidate.closing = true
 	candidate.cancelled = true
-	if candidate.window then candidate.window.retire() end
+	if candidate.window then
+		local retired, acknowledged = pcall(candidate.window.retire)
+		if not retired or acknowledged ~= true then
+			candidate.closing = false
+			Logger.error("ui.physical_shortcuts", "Physical shortcut editor retirement refused; exact owner retained.")
+			return false
+		end
+	end
 	local called, acknowledged = pcall(function()
 		if candidate.webview then
 			if getmetatable(candidate.webview) ~= nil then
@@ -67,7 +74,6 @@ local function close(candidate)
 		return false
 	end
 	if active == candidate then active = nil end
-	if candidate.window then candidate.window.retire() end
 	return true
 end
 
@@ -97,27 +103,39 @@ function M.open(options)
 		local called, accepted = pcall(function() return candidate.webview:evaluateJavaScript(name.."("..Json.encode(packet)..")") end)
 		return called and accepted ~= false and current()
 	end
-	candidate.window = Window.new({model=model,catalogue=gestures,parameter_section="gestures.action_parameters",
-		positions=positions,translate=I18n.get,label=gestures.get_action_label,page_current=current,send=send,
-		capture=scope.capture_editor_inventory,current=scope.editor_source_current,
-		commit=function(rows,receipt) return scope.edit(rows,receipt) end,
-		close=function() return close(candidate) end,
-		picker=function(binding,action,on_confirm)
-			local items = require("ui.menu.menu_keyboard_slots").build_action_items(gestures)
-			local fields = require("ui.menu.shortcut_utils").picker_parameter_fields(gestures,items,binding)
-			fields.title, fields.current, fields.items = I18n.get("physical_shortcuts.window_title"),action,items
-			return require("ui.action_picker").open(fields,function(id,parameter)
-				local spec = gestures.get_action_parameter_spec(id)
-				if spec and parameter == nil then
-					parameter = require("ui.menu.shortcut_utils").ask_parameter_value(gestures,id,spec,
-						I18n.get("physical_shortcuts.window_title"),gestures.get_action_parameter(binding,id))
-				end
-				return on_confirm(id,parameter)
-			end)
-		end,
-	})
+	local window_constructed, window = pcall(function()
+		return Window.new({model=model,catalogue=gestures,parameter_section="gestures.action_parameters",
+			positions=positions,translate=I18n.get,label=gestures.get_action_label,page_current=current,send=send,
+			capture=scope.capture_editor_inventory,current=scope.editor_source_current,
+			commit=function(rows,receipt) return scope.edit(rows,receipt) end,
+			close=function() return close(candidate) end,
+			picker=function(binding,action,on_confirm)
+				local items = require("ui.menu.menu_keyboard_slots").build_action_items(gestures)
+				local fields = require("ui.menu.shortcut_utils").picker_parameter_fields(gestures,items,binding)
+				fields.title, fields.current, fields.items = I18n.get("physical_shortcuts.window_title"),action,items
+				return require("ui.action_picker").open(fields,function(id,parameter)
+					local spec = gestures.get_action_parameter_spec(id)
+					if spec and parameter == nil then
+						parameter = require("ui.menu.shortcut_utils").ask_parameter_value(gestures,id,spec,
+							I18n.get("physical_shortcuts.window_title"),gestures.get_action_parameter(binding,id))
+					end
+					return on_confirm(id,parameter)
+				end)
+			end,
+		})
+	end)
+	if not window_constructed or type(window) ~= "table" then
+		candidate.constructing = false
+		close(candidate)
+		return false
+	end
+	candidate.window = window
 	local constructed, bridge = pcall(hs.webview.usercontent.new,"physical_shortcuts_bridge")
-	if not constructed or bridge == nil or bridge == false then active = nil; candidate.window.retire(); return false end
+	if not constructed or bridge == nil or bridge == false then
+		candidate.constructing = false
+		close(candidate)
+		return false
+	end
 	candidate.bridge = bridge
 	local bound, accepted = pcall(function() return bridge:setCallback(function(message)
 		if not current() or type(message) ~= "table" or type(message.body) ~= "table" then return end
@@ -126,28 +144,28 @@ function M.open(options)
 		if not called then Logger.error("ui.physical_shortcuts", "Physical shortcut page request refused.") end
 	end) end)
 	if not bound or accepted ~= bridge then candidate.constructing = false; close(candidate); return false end
-	local geometry = ui_builder.get_app_geometry("physical_shortcuts")
-	if not geometry then candidate.constructing = false; close(candidate); return false end
-	local called, view = pcall(ui_builder.show_webview,{frame=ui_builder.get_centered_frame(geometry.width,geometry.height),
-		title=I18n.get("physical_shortcuts.window_title"),usercontent=bridge,assets_dir=Paths.shared("ui/physical_shortcuts").."/",
-		style_masks={"titled","closable","resizable"},
-		on_webview_created=function(view)
-			if active ~= candidate or candidate.webview ~= nil then return false end
-			candidate.webview = view
-			return not candidate.cancelled
-		end,
-		is_current=function() return current() and not candidate.cancelled end,
-		on_close=function()
-			if candidate.closing then return end
-			candidate.cancelled = true
-			candidate.window.retire()
-			if not candidate.constructing and active == candidate then close(candidate) end
-		end,
-	})
+	local called, view = pcall(function()
+		local geometry = ui_builder.get_app_geometry("physical_shortcuts")
+		if not geometry then return nil end
+		return ui_builder.show_webview({frame=ui_builder.get_centered_frame(geometry.width,geometry.height),
+			title=I18n.get("physical_shortcuts.window_title"),usercontent=bridge,assets_dir=Paths.shared("ui/physical_shortcuts").."/",
+			style_masks={"titled","closable","resizable"},
+			on_webview_created=function(view)
+				if active ~= candidate or candidate.webview ~= nil then return false end
+				candidate.webview = view
+				return not candidate.cancelled
+			end,
+			is_current=function() return current() and not candidate.cancelled end,
+			on_close=function()
+				if candidate.closing then return end
+				candidate.cancelled = true
+				if not candidate.constructing and active == candidate then close(candidate) end
+			end,
+		})
+	end)
 	candidate.constructing = false
 	if candidate.webview == nil and called and view ~= nil and view ~= false then candidate.webview = view end
 	if not called or view == nil or view == false or candidate.cancelled then
-		candidate.window.retire()
 		if close(candidate) ~= true then return false end
 		return false
 	end
