@@ -7959,6 +7959,22 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-13 the managed Go receiving policy now enrolls all17 original
+failure-stage subtests from committed e94153e87b, retaining every57 earlier
+identity and all original bounds. Both official89d architecture transcripts
+contain74 unique passes (39 parents/35 subtests), no failure/skip/duplicate and
+one successful package terminal; the predecessor policy refuses those existing
+children as foreign. The unchanged reader receives both retained transcripts
+under the corrected roster; this is read-only reprocessing, not new native
+execution or acceptance of the successor source. All45 registered portable
+controls pass, with102 additional missing/failed/skipped/duplicate/foreign
+subcase refusals; the exact old policy produces44 passes/one causal assertion
+failure. The original Linux44 receipt/corpus, parser, Go/Swift subjects, commands,
+clocks, ownership, restoration and registrations remain unchanged. Windows
+pre-host provisioning, current source-clock enrollment, macOS trust/Brew,
+packaging/install and enterprise acceptance remain open. Items62 and16/38 stay
+partial; no stopped native experiment is repeated.
+
 2026-10-12 the archive helper is explicitly enrolled in original Windows
 SourceRoots and the finite Source22 seed through two literal path additions.
 Every other SDK callback, predicate, assertion and registration remains exact.
