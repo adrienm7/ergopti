@@ -863,7 +863,7 @@ _KLF_WithState(Body) {
 	Owners := [Keylogger, KLHook, KLWatch, KLPasswordCache, MetricsFocusCache, MetricsFilters]
 	Fields := [["initialized", "_shutting_down", "lifecycle_generation", "buffer_events", "buffer_text",
 		"synth_active", "synth_type", "synth_private", "health_privacy_hits"],
-		["last_tick", "last_vk", "last_sc", "capture_queue", "capture_owner", "capture_generation", "capture_stopping"],
+		["last_tick", "last_vk", "last_sc", "last_hint_lifecycle", "capture_queue", "capture_owner", "capture_generation", "capture_stopping"],
 		["is_session_active", "session_started_at", "session_generation", "last_authorized_tick", "is_idle", "idle_started_at", "idle_generation",
 		"privacy_interrupted", "privacy_started_at", "session_close", "session_close_draining", "idle_close", "system_events", "system_failure_reported"],
 		["generation", "focus_generation"], ["generation", "state"],
@@ -893,6 +893,7 @@ _KLF_WithState(Body) {
 		KLHook.last_tick := 100
 		KLHook.last_vk := 0x41
 		KLHook.last_sc := 0x1E
+		KLHook.last_hint_lifecycle := Keylogger.lifecycle_generation
 		if KLHook.HasOwnProp("capture_queue") {
 			KLHook.capture_queue := []
 			KLHook.capture_owner := false
@@ -1175,3 +1176,70 @@ _KLF_CompletionRefusal(Kind) {
 for _KLF_Kind in ["char", "key"]
 	Test("keylogger arrival FIFO: completion refusal stays contained for " . _KLF_Kind,
 		_KLF_WithState.Bind(_KLF_CompletionRefusal.Bind(_KLF_Kind)))
+
+; OnChar has no key arguments. Cached fields are hints scoped to accepted
+; capture/logger epochs; these port-driven cases do not qualify native pairing.
+_KLF_HintBarrier(Mode) {
+	if Mode = "capture"
+		KL_Hook_InvalidateCapture()
+	else if Mode = "lifecycle"
+		Keylogger.lifecycle_generation += 1
+	else {
+		AssertTrue(KL_BeginShutdown(), "the actual shutdown lease must begin")
+		AssertFalse(_KL_Hook_CaptureInput("key", "", 0x42, 0x30, _KLF_Allow, 900),
+			"shutdown cannot admit a replacement cached identity")
+		AssertTrue(KL_CancelShutdown(), "the actual shutdown rollback must own a successor lifecycle")
+	}
+	Ergonomic := []
+	KL_Hook_OnChar(0, "z", _KLF_Allow, 1000, _KLF_RecordErgo.Bind(Ergonomic))
+	AssertEqual(1, Keylogger.buffer_events.Length, "a public successor Char must still be recorded")
+	Meta := Keylogger.buffer_events[1][3]
+	AssertFalse(Meta.Has("kc"), "a successor Char cannot inherit the prior lifecycle's keycode hint")
+	AssertFalse(Meta.Has("sk"), "a successor Char cannot inherit the prior lifecycle's scan hint")
+	AssertEqual(1, Ergonomic.Length)
+	AssertEqual(3, Ergonomic[1].Length, "the established ergonomic Char signature must remain unchanged")
+	AssertEqual(0, Ergonomic[1][2], "unknown key identity remains explicitly unknown")
+	AssertEqual(0, Ergonomic[1][3])
+	AssertEqual(0, KLHook.last_vk)
+	AssertEqual(0, KLHook.last_sc)
+	AssertFalse(KL_Hook_HasPendingInput(), "barrier handling must not strand an input owner")
+}
+for _KLF_HintMode in ["capture", "lifecycle", "shutdown-rollback"]
+	Test("keylogger observer hints: barrier " . _KLF_HintMode . " (todo49-observer-hints)",
+		_KLF_WithState.Bind(_KLF_HintBarrier.Bind(_KLF_HintMode)))
+
+_KLF_DeclinedHint(Mode) {
+	switch Mode {
+		case "uninitialized": Keylogger.initialized := false
+		case "shutdown": Keylogger._shutting_down := true
+		case "stopping": KLHook.capture_stopping := true
+	}
+	Before := KLHook.capture_queue.Length
+	AssertFalse(_KL_Hook_CaptureInput("key", "", 0x42, 0x30, _KLF_Allow, 1000),
+		"an inactive callback must not acquire input or metadata ownership")
+	AssertEqual(0x41, KLHook.last_vk, "a declined Down cannot overwrite the last admitted hint")
+	AssertEqual(0x1E, KLHook.last_sc)
+	AssertEqual(100, KLHook.last_hint_lifecycle)
+	AssertEqual(Before, KLHook.capture_queue.Length, "declined input must remain outside the FIFO")
+}
+for _KLF_HintMode in ["uninitialized", "shutdown", "stopping"]
+	Test("keylogger observer hints: declined " . _KLF_HintMode . " (todo49-observer-hints)",
+		_KLF_WithState.Bind(_KLF_DeclinedHint.Bind(_KLF_HintMode)))
+
+_KLF_FreshHint() {
+	KL_Hook_InvalidateCapture()
+	KL_Hook_OnKeyDown(0, 0x42, 0x30, _KLF_Allow, 950, _KLF_NoShortcut)
+	Ergonomic := []
+	KL_Hook_OnChar(0, "b", _KLF_Allow, 1000, _KLF_RecordErgo.Bind(Ergonomic))
+	AssertEqual(1, Keylogger.buffer_events.Length)
+	Meta := Keylogger.buffer_events[1][3]
+	AssertEqual(0x42, Meta["kc"], "a new admitted Down may provide a same-epoch metadata hint")
+	AssertEqual(0x30, Meta["sk"])
+	AssertEqual(Keylogger.lifecycle_generation, KLHook.last_hint_lifecycle)
+	AssertEqual(3, Ergonomic[1].Length)
+	AssertEqual(0x42, Ergonomic[1][2])
+	AssertEqual(0x30, Ergonomic[1][3])
+	AssertFalse(KL_Hook_HasPendingInput())
+}
+Test("keylogger observer hints: a newly admitted identity survives unchanged (todo49-observer-hints)",
+	_KLF_WithState.Bind(_KLF_FreshHint))

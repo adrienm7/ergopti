@@ -1,0 +1,574 @@
+diff --git a/static/ergopti_plus/windows/modules/llm/local_model_offer.ahk b/static/ergopti_plus/windows/modules/llm/local_model_offer.ahk
+--- a/static/ergopti_plus/windows/modules/llm/local_model_offer.ahk
++++ b/static/ergopti_plus/windows/modules/llm/local_model_offer.ahk
+@@ -27,45 +27,116 @@
+ 	return _LLM_Menu_PullModel(Model, true, BaseUrl)
+ }
+ 
++_LLM_LocalModelTrue(Value) {
++	return Value is Integer && Value == true
++}
++
++; This private receipt captures the actual admitted origin and installer owner
++; before any modal/notification callback. It never borrows a successor flow.
++_LLM_LocalModelOfferCapture(Failure, CurrentFn) {
++	global _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_ManagedBootstrap
++	Receipt := Map("origin", Failure["base_url"], "model", Failure["model"],
++		"generation", LLM_AuxGeneration(), "flow", _LLM_ManagedBootstrap,
++		"port", _LLM_LocalModelOfferPort, "notified", _LLM_LocalModelNotified, "current", CurrentFn)
++	Port := Receipt["port"]
++	Receipt["confirm"] := _LLM_CurlArtifactPortFn(Port, "confirm", _LLM_LocalModelConfirm)
++	Receipt["notify"] := _LLM_CurlArtifactPortFn(Port, "notify", _LLM_LocalModelNotify)
++	Receipt["install"] := _LLM_CurlArtifactPortFn(Port, "install", _LLM_LocalModelInstall)
++	return _LLM_LocalModelOfferCurrent(Receipt) ? Receipt : 0
++}
++
++_LLM_LocalModelOfferCurrent(Receipt) {
++	global _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_ManagedBootstrap
++	if !(Receipt is Map) || A_IsSuspended
++		return false
++	try {
++		CurrentFn := Receipt["current"]
++		if HasMethod(CurrentFn, "Call") && !_LLM_LocalModelTrue(CurrentFn.Call())
++			return false
++		Port := Receipt["port"]
++		if _LLM_CurlArtifactPortFn(Port, "confirm", _LLM_LocalModelConfirm) != Receipt["confirm"]
++				|| _LLM_CurlArtifactPortFn(Port, "notify", _LLM_LocalModelNotify) != Receipt["notify"]
++				|| _LLM_CurlArtifactPortFn(Port, "install", _LLM_LocalModelInstall) != Receipt["install"]
++			return false
++		; RequestOrigin includes the exact managed listener admission. Comparing
++		; against configured localhost would reject a valid managed 127.0.0.1.
++		if !LLM_OllamaOriginMatches(Receipt["origin"])
++			return false
++		return Receipt["generation"] == LLM_AuxGeneration()
++			&& Receipt["flow"] == _LLM_ManagedBootstrap
++			&& Receipt["port"] == _LLM_LocalModelOfferPort
++			&& Receipt["notified"] == _LLM_LocalModelNotified
++	} catch
++		return false
++}
++
++_LLM_LocalModelOfferPublished(Receipt, Callback := 0, *) {
++	if !_LLM_LocalModelOfferCurrent(Receipt)
++		return false
++	if HasMethod(Callback, "Call")
++		return Callback.Call()
++	return LLM_Menu_RequestBuild("managed_post_pull")
++}
++
++_LLM_LocalModelOfferSchedule(Receipt, Callback, Delay) {
++	if !_LLM_LocalModelOfferCurrent(Receipt)
++		return false
++	SetTimer(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)
++	return true
++}
++
++_LLM_LocalModelOfferInstall(Receipt) {
++	if !_LLM_LocalModelOfferCurrent(Receipt)
++		return false
++	InstallFn := Receipt["install"]
++	if InstallFn != _LLM_LocalModelInstall
++		return InstallFn.Call(Receipt["origin"], Receipt["model"])
++	Flow := Receipt["flow"]
++	if Flow is OllamaManagedBootstrap && Flow.Runtime.HasOwner()
++		return Flow.PullModel(Receipt["model"], _LLM_LocalModelOfferPublished.Bind(Receipt),
++			_LLM_LocalModelOfferCurrent.Bind(Receipt))
++	; Keep the existing external-server command and fence its delayed rebuild.
++	return _LLM_Menu_PullModel(Receipt["model"], true, Receipt["origin"], 0,
++		_LLM_LocalModelOfferSchedule.Bind(Receipt))
++}
++
+ ; CurrentFn fences a modal callback that outlives its requesting flow.
+ LLM_LocalModelOffer(Failure, Automatic := false, CurrentFn := 0) {
+-	global _LLM_LocalModelAsking, _LLM_LocalModelNotified, _LLM_LocalModelOfferPort, LLM_OLLAMA_BASE_URL
++	global _LLM_LocalModelAsking
+ 	if !LLM_LocalModelIsMissing(Failure)
+ 		return false
+-	if A_IsSuspended || (HasMethod(CurrentFn, "Call") && !CurrentFn.Call())
++	Receipt := _LLM_LocalModelOfferCapture(Failure, CurrentFn)
++	if !(Receipt is Map)
+ 		return true
+-	Port := _LLM_LocalModelOfferPort
+-	NotifyFn := _LLM_CurlArtifactPortFn(Port, "notify", _LLM_LocalModelNotify)
+ 	Title := t("llm.local_model.missing_title")
+-	Model := Failure["model"]
+-	Name := LLM_LocalModelNormalize(Model)
++	Model := Receipt["model"]
++	NoticeKey := Receipt["origin"] . "`n" . LLM_LocalModelNormalize(Model)
++	NotifyFn := Receipt["notify"]
+ 	if Automatic {
+-		if !LLM_LocalModelShouldNotify(_LLM_LocalModelNotified, Model)
++		if Receipt["notified"].Has(NoticeKey)
+ 			return true
+ 		try {
+-			if NotifyFn.Call(_LLM_LocalModelLabel("llm.local_model.missing_notice", Model), Title) == true
+-				_LLM_LocalModelNotified[Name] := true
++			Accepted := NotifyFn.Call(_LLM_LocalModelLabel("llm.local_model.missing_notice", Model), Title)
++			if _LLM_LocalModelTrue(Accepted) && _LLM_LocalModelOfferCurrent(Receipt)
++				Receipt["notified"][NoticeKey] := true
+ 		}
+ 		return true
+ 	}
+ 	if _LLM_LocalModelAsking
+ 		return true
+-	ConfirmFn := _LLM_CurlArtifactPortFn(Port, "confirm", _LLM_LocalModelConfirm)
+-	InstallFn := _LLM_CurlArtifactPortFn(Port, "install", _LLM_LocalModelInstall)
+-	Generation := LLM_AuxGeneration()
++	ConfirmFn := Receipt["confirm"]
+ 	_LLM_LocalModelAsking := true
+ 	Accepted := false
+-	try Accepted := ConfirmFn.Call(Title, _LLM_LocalModelLabel("llm.local_model.missing_body", Model)) == true
++	try Accepted := _LLM_LocalModelTrue(ConfirmFn.Call(Title, _LLM_LocalModelLabel("llm.local_model.missing_body", Model)))
+ 	catch {
+-		try NotifyFn.Call(_LLM_LocalModelLabel("llm.local_model.missing_notice", Model), Title)
++		if _LLM_LocalModelOfferCurrent(Receipt)
++			try NotifyFn.Call(_LLM_LocalModelLabel("llm.local_model.missing_notice", Model), Title)
+ 	} finally _LLM_LocalModelAsking := false
+-	if !Accepted || A_IsSuspended || Generation != LLM_AuxGeneration()
+-			|| Failure["base_url"] != LLM_OLLAMA_BASE_URL
+-			|| (HasMethod(CurrentFn, "Call") && !CurrentFn.Call())
++	if !Accepted || !_LLM_LocalModelOfferCurrent(Receipt)
+ 		return true
+ 	Admitted := false
+-	try Admitted := InstallFn.Call(Failure["base_url"], Model) == true
+-	if !Admitted
++	try Admitted := _LLM_LocalModelTrue(_LLM_LocalModelOfferInstall(Receipt))
++	if !Admitted && _LLM_LocalModelOfferCurrent(Receipt)
+ 		try LoggerWarn("LLM", "Requested local-model download was refused: {1}.", Model)
+ 	return true
+ }
+diff --git a/static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk b/static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk
+--- a/static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk
++++ b/static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk
+@@ -476,7 +476,7 @@
+ 	}
+ 
+ 	/** An explicit menu download borrows this exact ready runtime, never PATH. */
+-	PullModel(Model, OnDone := 0) {
++	PullModel(Model, OnDone := 0, CurrentFn := 0) {
+ 		if !this.Ready || !this._Current() || !this.RuntimeIdentityReady() || IsObject(this.PullTask) || this.MenuPull is Map
+ 			return false
+ 		try Tag := LLM_ManagedModelTag(Model)
+@@ -487,8 +487,10 @@
+ 		; A READY flow can outlive its bootstrap clock. The new request owns one
+ 		; captured budget through consent, native retirement and fresh model tags.
+ 		Operation := Map("tag", Tag, "callback", OnDone, "started_tick", this._Now(),
+-			"deadline_ms", this.Plan["deadline_ms"], "failed", false)
++			"deadline_ms", this.Plan["deadline_ms"], "failed", false, "source_current", CurrentFn)
+ 		this.MenuPull := Operation
++		if !this._MenuPullCurrent(Operation)
++			return false
+ 		LoggerTrace("LLM.managed", "Starting bounded managed menu model download.")
+ 		try {
+ 			if !this._Consent("model", Tag) {
+@@ -512,6 +514,19 @@
+ 	/** A menu operation cannot borrow another request or reset its deadline. */
+ 	_MenuPullCurrent(Operation) {
+ 		if !(Operation is Map) || this.MenuPull != Operation || Operation["failed"]
++			return false
++		SourceCurrent := Operation.Get("source_current", 0)
++		try {
++			if HasMethod(SourceCurrent, "Call") && !this._True(SourceCurrent.Call()) {
++				this._MenuPullRetire(Operation)
++				return false
++			}
++		} catch {
++			this._MenuPullRetire(Operation)
++			return false
++		}
++		; A source callback may pump a modal or replace the exact operation.
++		if this.MenuPull != Operation || Operation["failed"]
+ 			return false
+ 		Now := this._Now()
+ 		if Now < Operation["started_tick"] || Now - Operation["started_tick"] >= Operation["deadline_ms"]
+diff --git a/static/ergopti_plus/windows/tests/unit/test_ollama_managed_bootstrap.ahk b/static/ergopti_plus/windows/tests/unit/test_ollama_managed_bootstrap.ahk
+--- a/static/ergopti_plus/windows/tests/unit/test_ollama_managed_bootstrap.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_ollama_managed_bootstrap.ahk
+@@ -1000,3 +1000,248 @@
+ Test("managed bootstrap: initial native start false still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false", true, true))
+ Test("managed bootstrap: initial native start throw still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw", true, true))
+ Test("managed bootstrap: READY reentrant cancellation retains native failure custody (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_withdraw"))
++
++
++; These cases exercise production callbacks with injected OS ports. They are
++; authored for pinned AutoHotkey 2.0.26 and are UNRUN in the Linux container.
++class _G4B_OfferFixture extends _G4B_Fixture {
++	__New(Mode := "stable") {
++		super.__New()
++		global _LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking
++		this.OfferSaved := [_LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking]
++		_LLM_ManagedBootstrap := 0
++		_LLM_LocalModelNotified := Map()
++		_LLM_LocalModelAsking := false
++		this.Mode := Mode
++		this.ConfirmAck := true
++		this.NotifyAck := true
++		this.Confirms := 0
++		this.Notices := 0
++		this.Downloads := 0
++		this.Done := 0
++		this.Published := 0
++		this.Start()
++		this.Runtime.PublishReady()
++		this.Model := "qwen3:0.6b"
++		this.Flow.Port["pull"] := ObjBindMethod(this, "HoldPull")
++		_LLM_ManagedBootstrap := this.Flow
++		this.OfferPort := Map("confirm", ObjBindMethod(this, "OfferConfirm"), "notify", ObjBindMethod(this, "OfferNotify"))
++		_LLM_LocalModelOfferPort := this.OfferPort
++		this.Failure := LLM_LocalModelFailure(this.Model, LLM_OllamaRequestOrigin())
++	}
++	ChangeSource() {
++		global _LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, LLM_OLLAMA_BASE_URL
++		switch this.Mode {
++			case "endpoint": LLM_OLLAMA_BASE_URL := "http://localhost:23457"
++			case "flow": _LLM_ManagedBootstrap := this.Flow.Clone()
++			case "port": _LLM_LocalModelOfferPort := this.OfferPort.Clone()
++			case "installer": this.OfferPort["install"] := (*) => this.Downloads += 1
++			case "failure": this.Failure["base_url"] := "http://localhost:23457", this.Failure["model"] := "foreign:latest"
++			case "cancel": this.Flow.Cancel()
++			case "throw": throw Error("Injected modal refusal.")
++		}
++	}
++	OfferConfirm(*) {
++		this.Confirms += 1
++		this.ChangeSource()
++		return this.ConfirmAck
++	}
++	OfferNotify(*) {
++		this.Notices += 1
++		this.ChangeSource()
++		return this.NotifyAck
++	}
++	HoldPull(Target, Model, Done) {
++		this.Pulls += 1
++		AssertEqual("http://127.0.0.1:23456", Target["origin"], "Dispatch uses the original managed listener, not configured localhost.")
++		AssertEqual(this.Model, Model, "The callback cannot replace the consented model through Failure mutation.")
++		this.Done := Done
++		return true
++	}
++	OfferClose() {
++		global _LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking
++		try this.Close()
++		finally {
++			_LLM_ManagedBootstrap := this.OfferSaved[1]
++			_LLM_LocalModelOfferPort := this.OfferSaved[2]
++			_LLM_LocalModelNotified := this.OfferSaved[3]
++			_LLM_LocalModelAsking := this.OfferSaved[4]
++		}
++	}
++}
++
++_G4B_OfferModal(Mode, ExpectedPulls, Ack := true) {
++	F := _G4B_OfferFixture(Mode)
++	global _LLM_LocalModelAsking
++	try {
++		F.ConfirmAck := Ack
++		BeforeConsents := F.Consents.Length
++		AssertTrue(LLM_LocalModelOffer(F.Failure), "A missing-model failure remains handled even when consent is stale.")
++		AssertEqual(1, F.Confirms)
++		AssertEqual(ExpectedPulls, F.Pulls)
++		AssertEqual(0, F.Downloads, "A callback-installed replacement installer is never dispatched.")
++		AssertFalse(_LLM_LocalModelAsking, "Every acceptance, refusal and thrown modal restores the asking guard.")
++		AssertEqual(BeforeConsents + ExpectedPulls, F.Consents.Length, "Managed model consent remains separate from offer consent.")
++		AssertEqual(0, F.FailedCalls, "A retired offer does not replay the bootstrap observer.")
++	} finally F.OfferClose()
++}
++
++_G4B_OfferSecondConsent(Mode) {
++	F := _G4B_OfferFixture(Mode)
++	try {
++		F.OfferPort["confirm"] := (*) => true
++		F.Flow.Port["consent"] := (*) => (F.ChangeSource(), true)
++		AssertTrue(LLM_LocalModelOffer(F.Failure))
++		AssertEqual(0, F.Pulls, "Withdrawal during the second model consent forbids dispatch.")
++		AssertFalse(F.Flow.MenuPull is Map, "Only the exact unsent operation retires logically.")
++		AssertEqual(0, F.FailedCalls)
++		if Mode != "cancel" {
++			AssertTrue(F.Runtime.HasOwner(), "Offer withdrawal alone does not kill the original READY runtime.")
++			AssertTrue(F.Flow.Ready)
++		}
++	} finally F.OfferClose()
++}
++
++_G4B_OfferNotification(Mode, Ack, ExpectedCount) {
++	F := _G4B_OfferFixture(Mode)
++	global _LLM_LocalModelNotified
++	try {
++		F.NotifyAck := Ack
++		AssertTrue(LLM_LocalModelOffer(F.Failure, true))
++		AssertEqual(1, F.Notices)
++		AssertEqual(ExpectedCount, _LLM_LocalModelNotified.Count, "Only exact typed acknowledgement for the original source stamps the notice.")
++		AssertEqual(0, F.Confirms, "A native notice has no invented TrayTip click consent.")
++		AssertEqual(0, F.Pulls)
++		if ExpectedCount {
++			AssertTrue(LLM_LocalModelOffer(LLM_LocalModelFailure("QWEN3:0.6b", F.Failure["base_url"]), true))
++			AssertEqual(1, F.Notices, "Model normalization still deduplicates notices at the same origin.")
++		}
++	} finally F.OfferClose()
++}
++
++_G4B_OfferCompletion(Mode) {
++	F := _G4B_OfferFixture("stable")
++	try {
++		Receipt := _LLM_LocalModelOfferCapture(F.Failure, 0)
++		AssertTrue(Receipt is Map)
++		AssertTrue(F.Flow.PullModel(F.Model, (*) => F.Published += 1, _LLM_LocalModelOfferCurrent.Bind(Receipt)))
++		F.Mode := Mode
++		if Mode != "stable"
++			F.ChangeSource()
++		F.Done.Call(0)
++		AssertEqual(Mode == "stable" ? 1 : 0, F.Published, "Late completion cannot publish for a successor source.")
++		AssertFalse(F.Flow.MenuPull is Map)
++		AssertEqual(0, F.FailedCalls)
++		AssertEqual(Mode == "cancel" ? 1 : 0, F.Runtime.Stops, "Only actual cancellation retires the held runtime.")
++		CallbackRuns := 0
++		_LLM_LocalModelOfferPublished(Receipt, (*) => CallbackRuns += 1)
++		AssertEqual(Mode == "stable" ? 1 : 0, CallbackRuns, "The delayed rebuild callback independently rechecks the original source.")
++	} finally F.OfferClose()
++}
++
++_G4B_OfferExternal() {
++	F := _G4B_OfferFixture("stable")
++	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
++	try {
++		_LLM_ManagedBootstrap := 0
++		F.Failure := LLM_LocalModelFailure(F.Model, LLM_OLLAMA_BASE_URL)
++		F.OfferPort["install"] := (Origin, Model) => (AssertEqual(LLM_OLLAMA_BASE_URL, Origin), AssertEqual(F.Model, Model), F.Downloads += 1, true)
++		AssertTrue(LLM_LocalModelOffer(F.Failure))
++		AssertEqual(1, F.Downloads)
++		AssertEqual(0, F.Pulls, "Configured external sources keep their captured command owner.")
++		AssertTrue(F.Runtime.HasOwner(), "The offer never stops an unrelated managed runtime.")
++		Receipt := _LLM_LocalModelOfferCapture(F.Failure, 0)
++		LLM_OLLAMA_BASE_URL := "http://localhost:23457"
++		AssertFalse(_LLM_LocalModelOfferSchedule(Receipt, (*) => F.Published += 1, -1))
++		AssertEqual(0, F.Published, "A stale external rebuild is rejected before scheduling.")
++	} finally F.OfferClose()
++}
++
++Test("managed model offer: modal stable retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 1))
++Test("managed model offer: modal failure retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("failure", 1))
++Test("managed model offer: modal endpoint retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("endpoint", 0))
++Test("managed model offer: modal flow retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("flow", 0))
++Test("managed model offer: modal port retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("port", 0))
++Test("managed model offer: modal installer retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("installer", 0))
++Test("managed model offer: modal cancel retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("cancel", 0))
++Test("managed model offer: modal throw retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("throw", 0))
++Test("managed model offer: refused consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, false))
++Test("managed model offer: string consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, "true"))
++Test("managed model offer: numeric-string consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, "1"))
++Test("managed model offer: float consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, 1.0))
++Test("managed model offer: second consent flow cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("flow"))
++Test("managed model offer: second consent endpoint cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("endpoint"))
++Test("managed model offer: second consent port cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("port"))
++Test("managed model offer: second consent cancel cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("cancel"))
++Test("managed model offer: notice stable true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", true, 1))
++Test("managed model offer: notice stable false has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", false, 0))
++Test("managed model offer: notice stable string1string has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", "1", 0))
++Test("managed model offer: notice stable 1.0 has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", 1.0, 0))
++Test("managed model offer: notice flow true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("flow", true, 0))
++Test("managed model offer: notice endpoint true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("endpoint", true, 0))
++Test("managed model offer: notice port true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("port", true, 0))
++Test("managed model offer: completion stable preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("stable"))
++Test("managed model offer: completion flow preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("flow"))
++Test("managed model offer: completion endpoint preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("endpoint"))
++Test("managed model offer: completion port preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("port"))
++Test("managed model offer: completion cancel preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("cancel"))
++Test("managed model offer: external source and delayed rebuild remain fenced (groups247-offer-affinity)", _G4B_OfferExternal)
++
++
++_G4B_OfferGenerationABA() {
++	F := _G4B_OfferFixture("stable")
++	global LLM_OLLAMA_BASE_URL, _LLM_AuxGeneration
++	SavedGeneration := _LLM_AuxGeneration
++	Confirm(*) {
++		global LLM_OLLAMA_BASE_URL, _LLM_AuxGeneration
++		LLM_OLLAMA_BASE_URL := "http://localhost:23457"
++		_LLM_AuxGeneration += 1
++		LLM_OLLAMA_BASE_URL := "http://localhost:23456"
++		return true
++	}
++	try {
++		F.OfferPort["confirm"] := Confirm
++		AssertTrue(LLM_LocalModelOffer(F.Failure))
++		AssertEqual(0, F.Pulls, "Restoring equal endpoint bytes cannot restore the old consent generation.")
++		AssertTrue(F.Runtime.HasOwner())
++	} finally {
++		_LLM_AuxGeneration := SavedGeneration
++		F.OfferClose()
++	}
++}
++
++_G4B_OfferCurrentAck(Ack) {
++	F := _G4B_OfferFixture("stable")
++	State := Map("ack", true)
++	Current() {
++		if State["ack"] == "throw"
++			throw Error("Injected source-current callback failure.")
++		return State["ack"]
++	}
++	try {
++		F.OfferPort["confirm"] := (*) => (State["ack"] := Ack, true)
++		AssertTrue(LLM_LocalModelOffer(F.Failure, false, Current))
++		AssertEqual(0, F.Pulls, "An untyped, refused or thrown source acknowledgement cannot renew consent.")
++		AssertEqual(0, F.FailedCalls)
++	} finally F.OfferClose()
++}
++
++_G4B_OfferNoticeOrigins() {
++	F := _G4B_OfferFixture("stable")
++	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL, _LLM_LocalModelNotified
++	try {
++		_LLM_ManagedBootstrap := 0
++		AssertTrue(LLM_LocalModelOffer(LLM_LocalModelFailure(F.Model, LLM_OLLAMA_BASE_URL), true))
++		LLM_OLLAMA_BASE_URL := "http://localhost:23457"
++		AssertTrue(LLM_LocalModelOffer(LLM_LocalModelFailure(F.Model, LLM_OLLAMA_BASE_URL), true))
++		AssertEqual(2, F.Notices, "The same missing model on another origin receives its own notice.")
++		AssertEqual(2, _LLM_LocalModelNotified.Count)
++		AssertEqual(0, F.Pulls)
++	} finally F.OfferClose()
++}
++Test("managed model offer: endpoint ABA cannot reuse consent generation (groups247-offer-affinity)", _G4B_OfferGenerationABA)
++Test("managed model offer: false current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind(false))
++Test("managed model offer: string current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind("1"))
++Test("managed model offer: float current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind(1.0))
++Test("managed model offer: thrown current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind("throw"))
++Test("managed model offer: notice dedupe includes original origin (groups247-offer-affinity)", _G4B_OfferNoticeOrigins)
+diff --git a/tools/test/test-windows-managed-bootstrap.cjs b/tools/test/test-windows-managed-bootstrap.cjs
+--- a/tools/test/test-windows-managed-bootstrap.cjs
++++ b/tools/test/test-windows-managed-bootstrap.cjs
+@@ -171,3 +171,135 @@
+ process.stdout.write(
+ 	'Windows managed bootstrap production composition: PASS (portable source checks only).\n'
+ );
++
++// Missing-model consent must remain bound to the exact admitted origin and
++// installer owner. These causal controls are source evidence, not AHK execution.
++const modelOffer = fs.readFileSync(path.join(root, 'modules/llm/local_model_offer.ahk'), 'utf8');
++function assertModelOfferAffinity(source, managedSource) {
++	assert.doesNotMatch(source, /Failure\["base_url"\] != LLM_OLLAMA_BASE_URL/);
++	assert.match(source, /return Value is Integer && Value == true/);
++	assert.match(
++		source,
++		/Receipt := Map\("origin", Failure\["base_url"\], "model", Failure\["model"\]/
++	);
++	assert.match(source, /"generation", LLM_AuxGeneration\(\), "flow", _LLM_ManagedBootstrap/);
++	assert.match(source, /Receipt\["flow"\] == _LLM_ManagedBootstrap/);
++	assert.match(source, /Receipt\["port"\] == _LLM_LocalModelOfferPort/);
++	assert.match(source, /Receipt\["notified"\] == _LLM_LocalModelNotified/);
++	assert.match(source, /if !LLM_OllamaOriginMatches\(Receipt\["origin"\]\)/);
++	for (const fn of ['confirm', 'notify', 'install']) {
++		assert.ok(source.includes(`!= Receipt["${fn}"]`), `Fence captured ${fn} registration.`);
++	}
++	assert.match(source, /Receipt := _LLM_LocalModelOfferCapture\(Failure, CurrentFn\)/);
++	assert.match(
++		source,
++		/NoticeKey := Receipt\["origin"\] \. "`n" \. LLM_LocalModelNormalize\(Model\)/
++	);
++	assert.match(
++		source,
++		/if _LLM_LocalModelTrue\(Accepted\) && _LLM_LocalModelOfferCurrent\(Receipt\)\s+Receipt\["notified"\]\[NoticeKey\] := true/
++	);
++	assert.match(source, /if !Accepted \|\| !_LLM_LocalModelOfferCurrent\(Receipt\)\s+return true/);
++	assert.match(
++		source,
++		/return Flow\.PullModel\(Receipt\["model"\], _LLM_LocalModelOfferPublished\.Bind\(Receipt\),\s+_LLM_LocalModelOfferCurrent\.Bind\(Receipt\)\)/
++	);
++	assert.match(
++		source,
++		/SetTimer\(_LLM_LocalModelOfferPublished\.Bind\(Receipt, Callback\), Delay\)/
++	);
++	assert.match(
++		source,
++		/_LLM_LocalModelOfferPublished\(Receipt, Callback := 0, \*\) \{\s+if !_LLM_LocalModelOfferCurrent\(Receipt\)\s+return false/
++	);
++	assert.match(managedSource, /PullModel\(Model, OnDone := 0, CurrentFn := 0\)/);
++	assert.match(managedSource, /"source_current", CurrentFn/);
++	assert.match(managedSource, /SourceCurrent := Operation\.Get\("source_current", 0\)/);
++	assert.match(
++		managedSource,
++		/if HasMethod\(SourceCurrent, "Call"\) && !this\._True\(SourceCurrent\.Call\(\)\) \{\s+this\._MenuPullRetire\(Operation\)\s+return false/
++	);
++	assert.match(
++		managedSource,
++		/; A source callback may pump a modal or replace the exact operation\.\s+if this\.MenuPull != Operation \|\| Operation\["failed"\]/
++	);
++	const pull = managedSource.slice(
++		managedSource.indexOf('\tPullModel('),
++		managedSource.indexOf('\t_MenuPullRetire(')
++	);
++	assert.match(pull, /this\.MenuPull := Operation\s+if !this\._MenuPullCurrent\(Operation\)/);
++	assert.match(
++		pull,
++		/if !this\._Consent\("model", Tag\)[\s\S]+if !this\._MenuPullCurrent\(Operation\)[\s\S]+Done := ObjBindMethod/
++	);
++	const completed = managedSource.slice(managedSource.indexOf('\t_MenuPullModels('));
++	assert.match(
++		completed,
++		/if !this\._MenuPullCurrent\(Operation\)[\s\S]+OnDone := Operation\["callback"\]/
++	);
++}
++assertModelOfferAffinity(modelOffer, flow);
++const offerControls = [
++	['typed ACK', 'return Value is Integer && Value == true', 'return Value == true'],
++	[
++		'actual origin',
++		'LLM_OllamaOriginMatches(Receipt["origin"])',
++		'Receipt["origin"] == LLM_OLLAMA_BASE_URL'
++	],
++	['exact flow', 'Receipt["flow"] == _LLM_ManagedBootstrap', 'true'],
++	['exact installer registration', '!= Receipt["install"]', '!= Receipt["confirm"]'],
++	[
++		'post-notice scope',
++		'_LLM_LocalModelTrue(Accepted) && _LLM_LocalModelOfferCurrent(Receipt)',
++		'_LLM_LocalModelTrue(Accepted)'
++	],
++	['post-modal scope', 'if !Accepted || !_LLM_LocalModelOfferCurrent(Receipt)', 'if !Accepted'],
++	[
++		'captured managed dispatch',
++		'return Flow.PullModel(Receipt["model"]',
++		'return _LLM_ManagedBootstrap.PullModel(Receipt["model"]'
++	],
++	[
++		'delayed origin scope',
++		'SetTimer(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)',
++		'SetTimer(Callback, Delay)'
++	]
++];
++for (const [name, before, after] of offerControls) {
++	const mutant = modelOffer.replace(before, after);
++	assert.notEqual(mutant, modelOffer, `Withdraw actual ${name} production guard.`);
++	assert.throws(() => assertModelOfferAffinity(mutant, flow), { code: 'ERR_ASSERTION' }, name);
++	assertModelOfferAffinity(modelOffer, flow);
++}
++const flowControls = [
++	['second consent', '"source_current", CurrentFn', '"source_current", 0'],
++	['typed scoped ACK', '!this._True(SourceCurrent.Call())', '!SourceCurrent.Call()'],
++	[
++		'operation after callback',
++		'; A source callback may pump a modal or replace the exact operation.\n\t\tif this.MenuPull != Operation || Operation["failed"]',
++		'; A source callback may pump a modal or replace the exact operation.\n\t\tif false'
++	]
++];
++for (const [name, before, after] of flowControls) {
++	const mutant = flow.replace(before, after);
++	assert.notEqual(mutant, flow, `Withdraw actual ${name} production guard.`);
++	assert.throws(
++		() => assertModelOfferAffinity(modelOffer, mutant),
++		{ code: 'ERR_ASSERTION' },
++		name
++	);
++	assertModelOfferAffinity(modelOffer, flow);
++}
++assert.equal((nativeCases.match(/Test\("managed model offer:/g) || []).length, 35);
++for (const name of [
++	'_G4B_OfferModal',
++	'_G4B_OfferSecondConsent',
++	'_G4B_OfferNotification',
++	'_G4B_OfferCompletion',
++	'_G4B_OfferExternal'
++]) {
++	assert.ok(nativeCases.includes(name), `Retain authored production callback ${name}.`);
++}
++process.stdout.write(
++	'Windows model-offer affinity: PASS (11 causal source inverses; 35 authored AHK cases UNRUN).\n'
++);

@@ -1497,3 +1497,85 @@ _OllamaPresenceNativeScheduleContract() {
 }
 Test("Ollama local presence: native preflight timer owns one-shot and cancel semantics (todo-46-local-model)",
 	_OllamaPresenceNativeScheduleContract)
+
+
+/** Drives actual chat presence through retained source currency and transport ports. */
+_G4O_Presence(Mode, F) {
+	Other := _G4B_Fixture()
+	try _OllamaPresenceWithFixture(Receive)
+	finally Other.Close()
+	Receive(State) {
+		global _LLM_ManagedBootstrap
+		if Mode == "replacement" {
+			AssertTrue(F.Flow.Cancel())
+			Other.Start(), Other.Runtime.PublishReady()
+			_LLM_ManagedBootstrap := Other.Flow
+		}
+		Names := Mode == "installed" ? Map("qwen2.5:latest", true) : Map()
+		State["callback"].Call(Map("ok", true, "names", Names))
+		AssertEqual(Mode == "installed" ? 1 : 0, State["posts"])
+		AssertEqual(Mode == "missing" ? 1 : 0, State["failures"].Length)
+		if Mode == "missing"
+			AssertTrue(LLM_LocalModelIsMissing(State["failures"][1]))
+	}
+}
+for _G4O_PresenceMode in ["installed", "missing", "replacement"]
+	Test("Ollama managed origin: actual preflight " . _G4O_PresenceMode . " (managed-origin-custody)",
+		_G4O_WithManaged.Bind(_G4O_Presence.Bind(_G4O_PresenceMode)))
+
+/** Drives the existing public result path through a same-service, same-epoch reentry. */
+_G4A_FinalAuxCurrency(Mode, F) {
+	Kind := "original_aux_result", Origin := LLM_OllamaRequestOrigin()
+	Owner := _LLM_OllamaAuxOwner(0, Kind), Generation := LLM_AuxGeneration()
+	OriginalCurrent := F.Flow.Port["current"]
+	Successor := 0, Unrelated := 0, Fresh := 0, Reads := 0, Calls := 0, Replaced := false
+	try {
+		F.Flow.Port["current"] := ReentrantCurrent
+		if Mode == "direct"
+			_LLM_OllamaInvokeAuxResult(Owner, Observe, false)
+		else
+			LLM_OllamaDeleteModel_Async("", Observe, 0, Owner)
+		Withdrawn := Mode == "first" || Mode == "second" || Mode == "direct"
+		AssertEqual(Withdrawn ? 0 : 1, Calls,
+			"No retained result may cross its exact operation replacement during either native origin reader.")
+		AssertEqual(Generation, LLM_AuxGeneration(), "Same-kind replacement deliberately retains the whole lifecycle epoch.")
+		AssertTrue(F.Runtime.HasOwner()), AssertTrue(F.Flow.Ready, "The original service remains ready and unchanged.")
+		if Withdrawn {
+			AssertTrue(Replaced)
+			AssertFalse(LLM_AuxIsCurrent(Owner))
+			AssertTrue(LLM_AuxIsCurrent(Successor), "Old settlement must not release the successor's record.")
+			_LLM_OllamaInvokeAuxResult(Owner, Observe, false)
+			AssertEqual(0, Calls, "Repeated late delivery remains inert.")
+		}
+		F.Flow.Port["current"] := OriginalCurrent
+		Fresh := _LLM_OllamaAuxOwner(0, Kind)
+		Before := Calls
+		LLM_OllamaDeleteModel_Async("", Observe, 0, Fresh)
+		AssertEqual(Before + 1, Calls, "The successor's own public result still settles normally.")
+	} finally {
+		F.Flow.Port["current"] := OriginalCurrent
+		for Exact in [Owner, Successor, Unrelated, Fresh]
+			if Exact is Map
+				LLM_AuxFinish(Exact)
+	}
+	ReentrantCurrent() {
+		Reads += 1
+		Result := OriginalCurrent.Call()
+		Boundary := Mode == "second" ? 2 : 1
+		if Reads == Boundary && !Replaced && Mode != "unchanged" {
+			Replaced := true
+			if Mode == "unrelated"
+				Unrelated := LLM_AuxBegin("unrelated_inventory_during_reader", Map("endpoint", Origin))
+			else
+				Successor := LLM_AuxBegin(Kind, Map("endpoint", Origin))
+		}
+		return Result
+	}
+	Observe(Value) {
+		AssertFalse(Value, "Blank-tag refusal retains its existing Boolean result.")
+		Calls += 1
+	}
+}
+for _G4A_FinalAuxMode in ["direct", "first", "second", "unrelated", "unchanged"]
+	Test("Ollama auxiliary result: exact operation " . _G4A_FinalAuxMode . " (aux-final-origin-currency)",
+		_G4O_WithManaged.Bind(_G4A_FinalAuxCurrency.Bind(_G4A_FinalAuxMode)))

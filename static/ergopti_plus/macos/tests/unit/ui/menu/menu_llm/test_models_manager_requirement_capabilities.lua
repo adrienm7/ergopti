@@ -47,6 +47,10 @@ local function with_fixture(callback)
 				return true, record.had == true
 			end
 			manager.get_installed_models = function() return {} end
+			manager.pull_model = function(model, repo, on_success, on_cancel, opts)
+				record.pull = { model = model, repo = repo, success = on_success, cancel = on_cancel, opts = opts }
+				return true
+			end
 			manager.delete_model = function() return true end
 			manager.get_mlx_repo = function(value) return value end
 			if name == "mlx" then
@@ -113,6 +117,24 @@ local function with_fixture(callback)
 end
 
 helpers.describe("ModelsManager backend-agnostic requirement capabilities", function()
+	helpers.it("(local-model-service-consent) forwards the exact consent predicate through the actual Ollama facade", function()
+		with_fixture(function(fixture)
+			local current = true
+			local opts = { is_current = function() return current end }
+			local success, cancel = function() end, function() end
+			helpers.assert_true(fixture.manager.pull_ollama_model("fixture-model", success, cancel, opts))
+			local pull = fixture.records.ollama.pull
+			helpers.assert_eq(pull.model, "fixture-model")
+			helpers.assert_eq(pull.repo, "fixture-model")
+			helpers.assert_eq(pull.success, success)
+			helpers.assert_eq(pull.cancel, cancel)
+			helpers.assert_eq(pull.opts, opts, "the facade cannot discard the consent owner before native acquisition")
+			helpers.assert_true(pull.opts.is_current())
+			current = false
+			helpers.assert_eq(pull.opts.is_current(), false)
+		end)
+	end)
+
 	helpers.it("maps one public owner to distinct backend-local capabilities", function()
 		with_fixture(function(fixture)
 			local capability = fixture.manager.create_requirement_owner("startup")

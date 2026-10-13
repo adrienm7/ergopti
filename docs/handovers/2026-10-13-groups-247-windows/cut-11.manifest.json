@@ -1,0 +1,26 @@
+{
+	"base": "ae684ed723c82bb158dd873a9e928be2e105a9c1",
+	"depends_on": null,
+	"patch_sha256": "4a4074f9c10b0085078fa61fc196cf33b22fa4aaf06246fa8b7d7c244bf97e45",
+	"files": [
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/local_model_offer.lua",
+			"before_sha256": "9d209319ba4a05a4d31fde374f91d6dedbb06a65f96949af1c740b4b3eb841cc",
+			"after_sha256": "40ba011ad8708a9866504e8a4b9bb2263c4d63a9c25fb2d6b6a470c4a9014d7c"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/meta/test_api_ollama_stream_parse.lua",
+			"before_sha256": "cfa2be0c70273df2ffd901bb94e7db1981612aef079679731637e682448481dd",
+			"after_sha256": "d51c42e9f32714fb5b6f17f3317916eb5cad7d5db006312f172133660ac09b43",
+			"original_test_prefix_byte_identical": true,
+			"old_assertion_calls": 73,
+			"new_assertion_calls": 15
+		}
+	],
+	"proof": {
+		"original_new_cases": "0 passed / 10 failed, exit 1",
+		"corrected_new_cases": "10 passed / 0 failed, exit 0",
+		"corrected_full_module_Lua54_and_LuaJIT": "28 passed / 0 failed, exit 0"
+	},
+	"native_dialog_http_receiving": "UNRUN"
+}

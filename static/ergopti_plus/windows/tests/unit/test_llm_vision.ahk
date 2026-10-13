@@ -755,3 +755,105 @@ _LVS_MissingLocalModelStopsScreenFlow() {
 }
 Test("LLM vision: actual local missing-model failure stops screen answers and rejects stale offer (todo-46-local-model)",
 	_LVS_MissingLocalModelStopsScreenFlow)
+
+/** Source callbacks retain the original screenshot lifecycle across disable ABA. */
+_LVS_RequesterWithdrawal(Phase) {
+	_LVS_Run(_LPP_Menu(), Body)
+	Body(Calls, Lines, Sent, Fx) {
+		global _LLM_Menu, _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_LocalModelOfferPort, _Stub_LlmTooltipCalls
+		Saved := _LLM_LocalModelOfferPort, Epoch := _LLM_AuxGeneration, Owners := _LLM_AuxOwners
+		State := Map("confirms", 0, "downloads", 0)
+		try {
+			_LLM_AuxOwners := Map()
+			_LLM_LocalModelOfferPort := Map("confirm", Confirm, "install", (*) => (State["downloads"] += 1, true))
+			AssertTrue(_LVS_Invoke("llm_screen_region", "local"))
+			if Phase == "capture" {
+				Withdraw()
+				_LVS_Complete(Fx.Captures[1], true)
+				AssertEqual(0, Fx.Ollama.Length, "A retired screenshot cannot reach HTTP dispatch.")
+			} else {
+				_LVS_Complete(Fx.Captures[1], true)
+				AssertEqual(1, Fx.Ollama.Length)
+				Request := Fx.Ollama[1]
+				Model := JsonParse(Request["body"])["model"]
+				if InStr(Phase, "answer-") == 1 {
+					Request["on_success"].Call("SCREEN: " . LVS_SCREEN)
+					AssertEqual(1, Calls.Length)
+					if Phase != "answer-modal"
+						Withdraw()
+					if Phase == "answer-success"
+						_LPP_Answer(Calls[1], "ANSWER: Retired answer")
+					else
+						Calls[1]["on_fail"].Call(LLM_LocalModelFailure("qwen2.5:3b", LLM_OllamaRequestOrigin()))
+				} else {
+					if Phase != "modal" && Phase != "unchanged"
+						Withdraw()
+					if Phase == "success"
+						Request["on_success"].Call("SCREEN: " . LVS_SCREEN)
+					else if Phase == "ordinary-failure"
+						Request["on_fail"].Call(_LLMRemote_FailInfo("timeout"))
+					else
+						Request["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OllamaRequestOrigin()))
+				}
+			}
+			AssertEqual(Phase == "modal" || Phase == "answer-modal" || Phase == "unchanged" ? 1 : 0, State["confirms"])
+			AssertEqual(Phase == "unchanged" ? 1 : 0, State["downloads"])
+			AssertEqual(InStr(Phase, "answer-") == 1 ? 1 : 0, Calls.Length), AssertEqual(0, Sent.Length)
+			AssertEqual(0, _Stub_LlmTooltipCalls.Length)
+			if Phase == "ordinary-failure"
+				AssertEqual("", _LPP_PendingNotice(), "An old failure cannot publish a new notice after reenable.")
+		} finally {
+			_LLM_LocalModelOfferPort := Saved
+			_LLM_AuxGeneration := Epoch
+			_LLM_AuxOwners := Owners
+		}
+		Withdraw() {
+			_LLM_Menu["enabled"] := false
+			; This is the existing production disable boundary; empty fixtures have
+			; no native owned operations to clean, and no readiness is invented.
+			LLM_AuxInvalidate("requester test disable")
+			_LLM_Menu["enabled"] := true
+		}
+		Confirm(*) {
+			State["confirms"] += 1
+			if Phase == "modal" || Phase == "answer-modal"
+				Withdraw()
+			return true
+		}
+	}
+}
+for _LVS_RequesterPhase in ["capture", "missing-failure", "ordinary-failure", "success", "modal", "unchanged",
+	"answer-failure", "answer-success", "answer-modal"]
+	Test("LLM vision: original requester " . _LVS_RequesterPhase . " (todo46-manual-requester)",
+		_LVS_RequesterWithdrawal.Bind(_LVS_RequesterPhase))
+
+_LVS_RequesterSurfaceReentry() {
+	_LVS_Run(_LPP_Menu(), Body)
+	Body(Calls, Lines, Sent, Fx) {
+		global _LLM_Vision_SourceProbe, _LLM_Menu, _LLM_AuxGeneration, _LLM_AuxOwners, _Stub_LlmTooltipCalls
+		Epoch := _LLM_AuxGeneration, Probe := _LLM_Vision_SourceProbe, Owners := _LLM_AuxOwners
+		try {
+			_LLM_AuxOwners := Map()
+			_LLM_Vision_SourceProbe := WithdrawSource
+			AssertTrue(_LVS_Invoke("llm_screen_region", "local"))
+			_LVS_Complete(Fx.Captures[1], true)
+			Fx.Ollama[1]["on_success"].Call("SCREEN: " . LVS_SCREEN)
+			AssertEqual(1, Calls.Length)
+			_LPP_Answer(Calls[1], "ANSWER: Hold this answer")
+			AssertEqual(0, _Stub_LlmTooltipCalls.Length, "Source getter withdrawal cannot publish a screenshot surface.")
+			AssertEqual(1, Calls.Length, "A withdrawn surface callback cannot send the next answer.")
+			AssertEqual(0, Sent.Length)
+		} finally {
+			_LLM_Vision_SourceProbe := Probe
+			_LLM_AuxGeneration := Epoch
+			_LLM_AuxOwners := Owners
+		}
+		WithdrawSource() {
+			_LLM_Menu["enabled"] := false
+			LLM_AuxInvalidate("requester source getter withdrawal")
+			_LLM_Menu["enabled"] := true
+			return Map("hwnd", 7, "control", 9)
+		}
+	}
+}
+Test("LLM vision: native source getter cannot revive withdrawn requester (todo46-manual-requester)", _LVS_RequesterSurfaceReentry)

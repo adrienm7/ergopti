@@ -1,0 +1,179 @@
+--- a/static/ergopti_plus/windows/modules/llm/api_ollama/ollama_http.ahk
++++ b/static/ergopti_plus/windows/modules/llm/api_ollama/ollama_http.ahk
+@@ -214,8 +214,18 @@
+ 		LLM_AuxFinish(Owner)
+ 		return false
+ 	}
++	if !LLM_AuxIsCurrent(Owner)
++		return false
+ 	try _LLM_InvokeCallback(Callback, "on_result", Value)
+ 	finally LLM_AuxFinish(Owner)
++	return true
++}
++
++; The bound origin callback performs another opaque reader; retain the same operation.
++_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {
++	if !LLM_AuxIsCurrent(Owner)
++		return false
++	_LLM_InvokeCallback(Callback, "on_result", Value)
+ 	return true
+ }
+ 
+@@ -599,7 +609,8 @@
+ 	; its terminal sidecar (instant), so the AHK message loop is NEVER blocked.
+ 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_ping")
+ 	if Owner.Has("origin_custody")
+-		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""), on_result, "on_result")
++		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
++			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
+ 	ProcessOwner := 0
+ 	Stage := "private_directory"
+ 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=ping owner={1} generation={2}.",
+@@ -826,7 +837,8 @@
+ 	; in its own process; we only poll its terminal sidecar, so the loop never blocks.
+ 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_tags")
+ 	if Owner.Has("origin_custody")
+-		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""), on_result, "on_result")
++		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
++			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
+ 	ProcessOwner := 0
+ 	Stage := "private_directory"
+ 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=tags owner={1} generation={2}.",
+@@ -942,7 +954,8 @@
+ 	global LLM_OLLAMA_BASE_URL, LLM_OLLAMA_DELETE_TIMEOUT_MS
+ 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_delete:" . tag, tag)
+ 	if Owner.Has("origin_custody")
+-		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""), on_result, "on_result")
++		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
++			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
+ 	if (tag == "") {
+ 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
+ 		return
+--- a/static/ergopti_plus/windows/tests/unit/test_llm_api_ollama.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_llm_api_ollama.ahk
+@@ -1522,3 +1522,60 @@
+ for _G4O_PresenceMode in ["installed", "missing", "replacement"]
+ 	Test("Ollama managed origin: actual preflight " . _G4O_PresenceMode . " (managed-origin-custody)",
+ 		_G4O_WithManaged.Bind(_G4O_Presence.Bind(_G4O_PresenceMode)))
++
++/** Drives the existing public result path through a same-service, same-epoch reentry. */
++_G4A_FinalAuxCurrency(Mode, F) {
++	Kind := "original_aux_result", Origin := LLM_OllamaRequestOrigin()
++	Owner := _LLM_OllamaAuxOwner(0, Kind), Generation := LLM_AuxGeneration()
++	OriginalCurrent := F.Flow.Port["current"]
++	Successor := 0, Unrelated := 0, Fresh := 0, Reads := 0, Calls := 0, Replaced := false
++	try {
++		F.Flow.Port["current"] := ReentrantCurrent
++		if Mode == "direct"
++			_LLM_OllamaInvokeAuxResult(Owner, Observe, false)
++		else
++			LLM_OllamaDeleteModel_Async("", Observe, 0, Owner)
++		Withdrawn := Mode == "first" || Mode == "second" || Mode == "direct"
++		AssertEqual(Withdrawn ? 0 : 1, Calls,
++			"No retained result may cross its exact operation replacement during either native origin reader.")
++		AssertEqual(Generation, LLM_AuxGeneration(), "Same-kind replacement deliberately retains the whole lifecycle epoch.")
++		AssertTrue(F.Runtime.HasOwner()), AssertTrue(F.Flow.Ready, "The original service remains ready and unchanged.")
++		if Withdrawn {
++			AssertTrue(Replaced)
++			AssertFalse(LLM_AuxIsCurrent(Owner))
++			AssertTrue(LLM_AuxIsCurrent(Successor), "Old settlement must not release the successor's record.")
++			_LLM_OllamaInvokeAuxResult(Owner, Observe, false)
++			AssertEqual(0, Calls, "Repeated late delivery remains inert.")
++		}
++		F.Flow.Port["current"] := OriginalCurrent
++		Fresh := _LLM_OllamaAuxOwner(0, Kind)
++		Before := Calls
++		LLM_OllamaDeleteModel_Async("", Observe, 0, Fresh)
++		AssertEqual(Before + 1, Calls, "The successor's own public result still settles normally.")
++	} finally {
++		F.Flow.Port["current"] := OriginalCurrent
++		for Exact in [Owner, Successor, Unrelated, Fresh]
++			if Exact is Map
++				LLM_AuxFinish(Exact)
++	}
++	ReentrantCurrent() {
++		Reads += 1
++		Result := OriginalCurrent.Call()
++		Boundary := Mode == "second" ? 2 : 1
++		if Reads == Boundary && !Replaced && Mode != "unchanged" {
++			Replaced := true
++			if Mode == "unrelated"
++				Unrelated := LLM_AuxBegin("unrelated_inventory_during_reader", Map("endpoint", Origin))
++			else
++				Successor := LLM_AuxBegin(Kind, Map("endpoint", Origin))
++		}
++		return Result
++	}
++	Observe(Value) {
++		AssertFalse(Value, "Blank-tag refusal retains its existing Boolean result.")
++		Calls += 1
++	}
++}
++for _G4A_FinalAuxMode in ["direct", "first", "second", "unrelated", "unchanged"]
++	Test("Ollama auxiliary result: exact operation " . _G4A_FinalAuxMode . " (aux-final-origin-currency)",
++		_G4O_WithManaged.Bind(_G4A_FinalAuxCurrency.Bind(_G4A_FinalAuxMode)))
+--- a/tools/test/test-windows-managed-bootstrap.cjs
++++ b/tools/test/test-windows-managed-bootstrap.cjs
+@@ -445,3 +445,62 @@
+ process.stdout.write(
+ 	`Windows original-origin custody: PASS (${originInverses.length} source inverses; authored AHK UNRUN).\n`
+ );
++
++/** Exact operation custody is distinct from the service's unchanged origin tuple. */
++function assertFinalAuxCurrency(httpSource) {
++	const terminal = originBody(httpSource, '_LLM_OllamaInvokeAuxResult');
++	const currency = terminal.indexOf('LLM_OllamaOriginCustodyCurrent');
++	const final = terminal.lastIndexOf('if !LLM_AuxIsCurrent(Owner)');
++	const invoke = terminal.indexOf('_LLM_InvokeCallback');
++	assert.ok(
++		currency >= 0 && final > currency && invoke > final,
++		'Original operation must remain current after the opaque native origin reader.'
++	);
++	const callback = originBody(httpSource, '_LLM_OllamaInvokeCurrentAuxCallback');
++	assert.match(callback, /if !LLM_AuxIsCurrent\(Owner\)/);
++	assert.match(callback, /_LLM_InvokeCallback\(Callback, "on_result", Value\)/);
++	for (const name of [
++		'LLM_OllamaIsRunning_Async',
++		'LLM_OllamaListModels_Async',
++		'LLM_OllamaDeleteModel_Async'
++	]) {
++		const body = originBody(httpSource, name);
++		assert.match(
++			body,
++			/LLM_OllamaInvokeOriginCurrent\.Bind[\s\S]*?_LLM_OllamaInvokeCurrentAuxCallback\.Bind\(Owner, on_result\)/,
++			'Inner native currency validation must deliver through the exact captured operation.'
++		);
++	}
++}
++assertFinalAuxCurrency(originHttp);
++const finalAuxInverses = [
++	['	if !LLM_AuxIsCurrent(Owner)\n		return false\n	try _LLM_InvokeCallback', '	try _LLM_InvokeCallback'],
++	[
++		'_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {\n	if !LLM_AuxIsCurrent(Owner)',
++		'_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {\n	if false'
++	],
++	['_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result)', 'on_result']
++];
++for (const [original, replacement] of finalAuxInverses) {
++	const changed = originHttp.replace(original, replacement);
++	assert.notEqual(
++		changed,
++		originHttp,
++		'Final Aux inverse must withdraw its actual production seam.'
++	);
++	assert.throws(() => assertFinalAuxCurrency(changed));
++}
++// Independently withdraw the two remaining producer binders, not only the first match.
++const auxBinder = '_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result)';
++const auxBindings = originHttp.split(auxBinder);
++assert.equal(auxBindings.length, 4, 'Exactly ping, tags and delete retain the delivery owner.');
++for (const withdrawn of [1, 2]) {
++	const changed = auxBindings
++		.map((part, index) => part + (index < 3 ? (index === withdrawn ? 'on_result' : auxBinder) : ''))
++		.join('');
++	assert.notEqual(changed, originHttp);
++	assert.throws(() => assertFinalAuxCurrency(changed));
++}
++process.stdout.write(
++	'Windows exact auxiliary result: PASS (5 causal source inverses; authored AHK UNRUN).\n'
++);

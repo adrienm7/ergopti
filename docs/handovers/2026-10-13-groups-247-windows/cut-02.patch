@@ -1,0 +1,487 @@
+--- a/static/ergopti_plus/macos/modules/llm/api_ollama.lua
++++ b/static/ergopti_plus/macos/modules/llm/api_ollama.lua
+@@ -1173,6 +1173,8 @@
+ -- owners cannot publish an older inventory over a newer or forgotten receipt.
+ local _listed_models = nil
+ local _model_listing_epoch = 0
++-- Chat and vision share one HTTP owner; an inventory refresh has a different one.
++local _prebuilt_request_epoch = 0
+ 
+ --- Normalizes a model name as the local server matches it: case-insensitive,
+ --- with its implicit ":latest" tag written out.
+@@ -1207,12 +1209,26 @@
+ --- @return string|nil model nil for any other failure.
+ local missing_model_of = LocalModelPolicy.missing_model
+ 
++--- Checks original daemon custody around an opaque endpoint read.
++--- @param origin string Captured endpoint.
++--- @param service_current function Exact original daemon predicate.
++--- @return boolean current
++local function source_current(origin, service_current)
++	if package.loaded["modules.llm.api_ollama"] ~= M or type(service_current) ~= "function" then return false end
++	local ok, current = pcall(service_current)
++	if not ok or current ~= true then return false end
++	local origin_ok, observed_origin = pcall(M.get_base_url)
++	local still_ok, still_current = pcall(service_current)
++	return origin_ok and observed_origin == origin and still_ok and still_current == true
++		and package.loaded["modules.llm.api_ollama"] == M
++end
++
+ --- Whether this inventory still describes the canonical current endpoint.
+ --- @param receipt table|nil Captured inventory acquisition.
+ --- @return boolean
+ local function listing_current(receipt)
+ 	return type(receipt) == "table" and receipt.epoch == _model_listing_epoch
+-		and receipt.origin == M.get_base_url()
++		and source_current(receipt.origin, receipt.service_current)
+ end
+ 
+ --- Asks the local server which models it holds and records the answer.
+@@ -1220,9 +1236,14 @@
+ ---        newer request supersedes the listing as it supersedes the request.
+ --- @param on_done function Receives the listed names, or nil and a reason.
+ --- @param origin string|nil Canonical endpoint captured by the originating request.
+-local function list_models(client, on_done, origin)
++--- @param service_current function|nil Original request's retained daemon predicate.
++local function list_models(client, on_done, origin, service_current)
++	local original_service = service_current or M.capture_service_owner()
+ 	_model_listing_epoch = _model_listing_epoch + 1
+-	local receipt = { origin = origin or M.get_base_url(), epoch = _model_listing_epoch }
++	local epoch = _model_listing_epoch
++	local receipt = { origin = origin or M.get_base_url(), epoch = epoch,
++		service_current = original_service }
++	if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
+ 	client.get(receipt.origin .. "/api/tags", {}, function(r)
+ 		Logger.pcall(LOG, function()
+ 			if not listing_current(receipt) then
+@@ -1230,8 +1251,11 @@
+ 				return
+ 			end
+ 			if r.status ~= 200 then
++				local server_error = server_error_text(r)
++				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
+ 				Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
+-					tostring(r.status), server_error_text(r))
++					tostring(r.status), server_error)
++				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
+ 				on_done(nil, "http_" .. tostring(r.status or "unknown"))
+ 				return
+ 			end
+@@ -1239,8 +1263,10 @@
+ 			-- an array. The shared lossless receipt keeps unknown inventories
+ 			-- separate from a proved empty installation list on every driver.
+ 			local names, reason = LocalModelPolicy.list_receipt({ ok = true, status = r.status, body = r.body })
++			if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
+ 			if names == nil then
+ 				Logger.error(LOG, "The local server's model list is unreadable (%d byte(s)).", #(r.body or ""))
++				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
+ 				on_done(nil, reason)
+ 				return
+ 			end
+@@ -1893,8 +1919,18 @@
+ 	if normalize_model_name(model) == nil then
+ 		error("api_ollama." .. label .. " request: the body names no model")
+ 	end
++	_prebuilt_request_epoch = _prebuilt_request_epoch + 1
++	local request_epoch = _prebuilt_request_epoch
++	local service_current = M.capture_service_owner()
+ 	local origin = M.get_base_url()
++	local function request_current()
++		return request_epoch == _prebuilt_request_epoch and source_current(origin, service_current)
++			and request_epoch == _prebuilt_request_epoch
++	end
+ 	local encoded, encode_error = JsonCodec.encode(body)
++	if not request_current() then
++		return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
++	end
+ 	if not encoded then
+ 		Logger.error(LOG, "%s request body encode failed: %s.", label, tostring(encode_error))
+ 		ApiCommon.protected_call(on_fail, "on_fail", "encode_failed")
+@@ -1902,12 +1938,16 @@
+ 	end
+ 	local function post(receipt)
+ 		local function current()
+-			return listing_current(receipt) and receipt.origin == origin and _listed_models == receipt
++			return request_current() and listing_current(receipt)
++				and receipt.origin == origin and _listed_models == receipt
+ 		end
+ 		if not current() then
+ 			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+ 		end
+ 		local t0 = TimerScheduler.now()
++		if not current() then
++			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
++		end
+ 		Logger.info(LOG, "%s request to the local server (model %s, %d byte(s)).", label, model, #encoded)
+ 		-- The logger and timer are native boundaries too. Recheck immediately
+ 		-- before handing private bytes to the captured endpoint's HTTP owner.
+@@ -1917,15 +1957,21 @@
+ 		client.post(origin .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+ 			function(r)
+ 				Logger.pcall(LOG, function()
+-					if origin ~= M.get_base_url() then
++					if not request_current() then
+ 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+ 					end
+ 					local ms = math.floor((TimerScheduler.now() - t0) * 1000)
++					if not request_current() then
++						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
++					end
+ 					if r.status ~= 200 then
+ 						local server_error = server_error_text(r)
++						if not request_current() then
++							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
++						end
+ 						Logger.error(LOG, "%s request to the local server failed in %dms: HTTP %s (%s).",
+ 							label, ms, tostring(r.status), server_error)
+-						if origin ~= M.get_base_url() then
++						if not request_current() then
+ 							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+ 						end
+ 						local missing = missing_model_of(r.status, server_error)
+@@ -1939,19 +1985,25 @@
+ 						return
+ 					end
+ 					local resp = JsonCodec.decode(r.body)
++					if not request_current() then
++						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
++					end
+ 					local content = type(resp) == "table" and type(resp.message) == "table"
+ 						and resp.message.content or nil
+ 					local text = type(content) == "string" and Parser.strip_thinking(content) or ""
++					if not request_current() then
++						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
++					end
+ 					if text == "" then
+ 						Logger.warn(LOG, "%s answer of the local server holds no text (%dms).", label, ms)
+-						if origin ~= M.get_base_url() then
++						if not request_current() then
+ 							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+ 						end
+ 						ApiCommon.protected_call(on_fail, "on_fail", "empty_answer")
+ 						return
+ 					end
+ 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
+-					if origin ~= M.get_base_url() then
++					if not request_current() then
+ 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+ 					end
+ 					ApiCommon.protected_call(on_text, "on_text", text)
+@@ -1961,20 +2013,23 @@
+ 	if M.local_model_installed(model) == true then return post(_listed_models) end
+ 	Logger.info(LOG, "%s request: checking that the local server holds model %s…", label, model)
+ 	list_models(client, function(names, reason, receipt)
++		if not request_current() then
++			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
++		end
+ 		if names == nil then
+ 			ApiCommon.protected_call(on_fail, "on_fail", reason)
+ 			return
+ 		end
+ 		if names[normalize_model_name(model)] ~= true then
+ 			Logger.warn(LOG, "%s request not sent: the local server does not hold model %s.", label, model)
+-			if not listing_current(receipt) then
++			if not request_current() or not listing_current(receipt) then
+ 				return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+ 			end
+ 			ApiCommon.protected_call(on_fail, "on_fail", M.MODEL_MISSING, { model = model })
+ 			return
+ 		end
+ 		post(receipt)
+-	end, origin)
++	end, origin, service_current)
+ end
+ 
+ --- Posts one prebuilt vision request body (a screenshot and its prompt) to the
+--- a/static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua
+@@ -317,6 +317,289 @@
+ 		end)
+ 	end
+ 
++	-- Real API, shared inventory parser, native lifecycle and ShellRunner; only
++	-- native HTTP, JSON and timer boundaries are controlled in this cohort.
++	local function with_owned_responses(callback)
++		with_startup({}, function(api, fixture)
++			fixture.gets, fixture.posts, fixture.logs = {}, {}, {}
++			local client = get_upvalue(api.request_chat, "_vision_client")
++			local listing = get_upvalue(api.refresh_local_models, "_listing_client")
++			local function get(url, _, done)
++				fixture.gets[#fixture.gets + 1] = { url = url, done = done }
++			end
++			client.get, listing.get = get, get
++			client.post = function(url, _, body, done)
++				fixture.posts[#fixture.posts + 1] = { url = url, body = body, done = done }
++			end
++			local json = require("json")
++			fixture.codec = package.loaded["adapters.json_codec"]
++			fixture.codec.encode, fixture.codec.decode = json.encode, json.decode
++			package.loaded["adapters.timer_scheduler"].now = function() return 1 end
++			package.loaded["modules.llm.parser"].strip_thinking = require("llm.parser").strip_thinking
++			package.loaded["modules.llm.api_common"].protected_call = function(fn, _, ...)
++				return package.loaded["infra.logger"].callback("fixture", "request callback", fn, ...)
++			end
++			fixture.logger = package.loaded["infra.logger"]
++			for _, kind in ipairs({ "info", "warn", "error" }) do
++				fixture.logger[kind] = function(_, text, ...)
++					fixture.logs[#fixture.logs + 1] = { kind = kind, text = string.format(text, ...) }
++				end
++			end
++			helpers.assert_true(api.ensure_running())
++			local original = fixture.tasks[1]
++			original.emit(original.frame("ACTIVE") .. original.frame("READY"))
++			local origin = api.get_base_url()
++			function fixture.replace_service()
++				helpers.assert_eq(api.stop_owned_server(), false)
++				original.complete(0, original.frame("RETIRED 0"))
++				helpers.assert_true(api.ensure_running())
++				local successor = fixture.tasks[2]
++				successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
++				helpers.assert_eq(api.get_base_url(), origin, "the concrete replacement retains the same URL")
++				helpers.assert_true(original.completed)
++				helpers.assert_true(successor.running)
++			end
++			function fixture.request()
++				local result = { texts = {}, failures = {} }
++				api.request_chat({ model = "qwen2.5:7b", messages = {} },
++					function(text) result.texts[#result.texts + 1] = text end,
++					function(reason, detail) result.failures[#result.failures + 1] = { reason = reason, detail = detail } end)
++				return result
++			end
++			function fixture.tags(index, names)
++				fixture.gets[index].done({ status = 200, body = #names == 0 and '{"models":[]}' or json.encode({ models = names }) })
++			end
++			callback(api, fixture)
++		end)
++	end
++
++	helpers.it("(ollama-response-service-affinity) refuses held tags from a retired same-origin daemon", function()
++		for _, names in ipairs({ {}, { { name = "qwen2.5:7b" } } }) do
++			with_owned_responses(function(api, fixture)
++				local result = fixture.request()
++				helpers.assert_eq(#fixture.gets, 1)
++				fixture.replace_service()
++				fixture.tags(1, names)
++				helpers.assert_eq(#fixture.posts, 0, "old inventory cannot admit a successor chat")
++				helpers.assert_eq(#result.texts, 0)
++				helpers.assert_eq(#result.failures, 1)
++				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable", "old empty inventory is not MODEL_MISSING")
++				helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
++			end)
++		end
++	end)
++
++	helpers.it("(ollama-response-service-affinity) captures a refresh owner before its opaque endpoint read", function()
++		with_owned_responses(function(api, fixture)
++			local read_origin = api.get_base_url
++			api.get_base_url = function()
++				api.get_base_url = read_origin
++				fixture.replace_service()
++				return read_origin()
++			end
++			local refreshed, reason
++			api.refresh_local_models(function(ok, why) refreshed, reason = ok, why end)
++			helpers.assert_eq(#fixture.gets, 0, "an endpoint read cannot lend the refresh its successor service")
++			helpers.assert_eq(refreshed, false)
++			helpers.assert_eq(reason, "model_list_unavailable")
++		end)
++	end)
++
++	helpers.it("(ollama-response-service-affinity) invalidates acknowledged inventory when its real service retires", function()
++		with_owned_responses(function(api, fixture)
++			fixture.request()
++			fixture.tags(1, { { name = "qwen2.5:7b" } })
++			helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), true)
++			fixture.replace_service()
++			helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil,
++				"a READY successor cannot inherit the old process's acknowledged model cache")
++			local fresh = fixture.request()
++			helpers.assert_eq(#fixture.gets, 2, "the successor must provide its own actual inventory receipt")
++			helpers.assert_eq(#fixture.posts, 1)
++			fixture.tags(2, { { name = "qwen2.5:7b" } })
++			helpers.assert_eq(#fixture.posts, 2)
++			fixture.posts[2].done({ status = 200, body = '{"message":{"content":"fresh source answer"}}' })
++			helpers.assert_eq(fresh.texts, { "fresh source answer" })
++			helpers.assert_eq(#fresh.failures, 0)
++		end)
++	end)
++
++	helpers.it("(ollama-response-service-affinity) refuses old chat success and missing-model failure after replacement", function()
++		for _, response in ipairs({
++			{ status = 200, body = '{"message":{"content":"old private answer"}}' },
++			{ status = 404, body = require("json").encode({ error = 'model "qwen2.5:7b" not found' }) },
++			{ status = 503, body = '{"error":"old service failure"}' },
++		}) do
++			with_owned_responses(function(api, fixture)
++				local result = fixture.request()
++				fixture.tags(1, { { name = "qwen2.5:7b" } })
++				fixture.replace_service()
++				api.refresh_local_models()
++				fixture.tags(2, { { name = "successor-model" } })
++				fixture.posts[1].done(response)
++				helpers.assert_eq(#result.texts, 0)
++				helpers.assert_eq(#result.failures, 1)
++				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
++				helpers.assert_eq(api.local_model_installed("successor-model"), true,
++					"an old HTTP404 cannot forget the successor's cache")
++				for _, line in ipairs(fixture.logs) do
++					helpers.assert_true(not line.text:find("old private answer", 1, true))
++					helpers.assert_true(not line.text:find("old service failure", 1, true))
++				end
++			end)
++		end
++	end)
++
++	helpers.it("(ollama-response-service-affinity) preserves an issued same-service chat through parallel inventory", function()
++		with_owned_responses(function(api, fixture)
++			local result = fixture.request()
++			fixture.tags(1, { { name = "qwen2.5:7b" } })
++			api.refresh_local_models()
++			fixture.tags(2, { { name = "newly-listed-model" } })
++			fixture.posts[1].done({ status = 200, body = '{"message":{"content":"valid original answer"}}' })
++			helpers.assert_eq(result.texts, { "valid original answer" })
++			helpers.assert_eq(#result.failures, 0, "global listing epoch is only a dispatch prerequisite")
++			helpers.assert_eq(api.local_model_installed("newly-listed-model"), true)
++		end)
++	end)
++
++	helpers.it("(ollama-response-service-affinity) binds the originating service before JSON encoding", function()
++		with_owned_responses(function(_, fixture)
++			local encode = fixture.codec.encode
++			fixture.codec.encode = function(body)
++				fixture.codec.encode = encode
++				fixture.replace_service()
++				return encode(body)
++			end
++			local result = fixture.request()
++			helpers.assert_eq(#fixture.gets, 0, "encode reentry cannot acquire a successor inventory")
++			helpers.assert_eq(#fixture.posts, 0)
++			helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
++		end)
++	end)
++
++	helpers.it("(ollama-response-service-affinity) rechecks service custody after response decoding and logging", function()
++		for _, boundary in ipairs({ "decode", "log" }) do
++			with_owned_responses(function(_, fixture)
++				local result = fixture.request()
++				fixture.tags(1, { { name = "qwen2.5:7b" } })
++				if boundary == "decode" then
++					local decode = fixture.codec.decode
++					fixture.codec.decode = function(body)
++						fixture.codec.decode = decode
++						fixture.replace_service()
++						return decode(body)
++					end
++				else
++					local info = fixture.logger.info
++					fixture.logger.info = function(scope, text, ...)
++						if text:find("answer of the local server received", 1, true) then
++							fixture.logger.info = info
++							fixture.replace_service()
++						end
++						return info(scope, text, ...)
++					end
++				end
++				fixture.posts[1].done({ status = 200, body = '{"message":{"content":"old decoded answer"}}' })
++				helpers.assert_eq(#result.texts, 0)
++				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
++			end)
++		end
++	end)
++
++	helpers.it("(ollama-response-service-affinity) suppresses old error logging when decoding retires its service", function()
++		with_owned_responses(function(_, fixture)
++			local result = fixture.request()
++			fixture.tags(1, { { name = "qwen2.5:7b" } })
++			local decode = fixture.codec.decode
++			fixture.codec.decode = function(body)
++				fixture.codec.decode = decode
++				fixture.replace_service()
++				return decode(body)
++			end
++			fixture.posts[1].done({ status = 404, body = '{"error":"model qwen not found OLD-SOURCE-MARKER"}' })
++			for _, line in ipairs(fixture.logs) do
++				helpers.assert_true(not line.text:find("OLD-SOURCE-MARKER", 1, true), "old response diagnostics cannot describe the successor")
++			end
++			helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
++		end)
++	end)
++
++	helpers.it("(ollama-response-service-affinity) suppresses stale tags diagnostics after decoder or logger reentry", function()
++		for _, boundary in ipairs({ "decode", "log" }) do
++			with_owned_responses(function(api, fixture)
++				local result = fixture.request()
++				if boundary == "decode" then
++					local decode = fixture.codec.decode
++					fixture.codec.decode = function(body)
++						fixture.codec.decode = decode
++						fixture.replace_service()
++						return decode(body)
++					end
++				else
++					local log = fixture.logger.error
++					fixture.logger.error = function(scope, text, ...)
++						fixture.logger.error = log
++						fixture.replace_service()
++						return log(scope, text, ...)
++					end
++				end
++				fixture.gets[1].done({ status = 503, body = '{"error":"OLD-TAGS-MARKER"}' })
++				helpers.assert_eq(#fixture.posts, 0)
++				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
++				helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
++				if boundary == "decode" then
++					for _, line in ipairs(fixture.logs) do
++						helpers.assert_true(not line.text:find("OLD-TAGS-MARKER", 1, true))
++					end
++				end
++			end)
++		end
++	end)
++
++	helpers.it("(ollama-response-request-affinity) rechecks current request before HTTP failure diagnostics", function()
++		with_owned_responses(function(_, fixture)
++			local original = fixture.request()
++			fixture.tags(1, { { name = "qwen2.5:7b" } })
++			local successor
++			local decode = fixture.codec.decode
++			fixture.codec.decode = function(body)
++				fixture.codec.decode = decode
++				successor = fixture.request()
++				return decode(body)
++			end
++			fixture.posts[1].done({ status = 503, body = '{"error":"OBSOLETE-REQUEST-MARKER"}' })
++			helpers.assert_eq(#fixture.posts, 2)
++			helpers.assert_eq(original.failures[1].reason, "model_list_unavailable")
++			for _, line in ipairs(fixture.logs) do
++				helpers.assert_true(not line.text:find("OBSOLETE-REQUEST-MARKER", 1, true))
++			end
++			fixture.posts[2].done({ status = 200, body = '{"message":{"content":"current answer"}}' })
++			helpers.assert_eq(successor.texts, { "current answer" })
++		end)
++	end)
++
++	helpers.it("(ollama-response-request-affinity) fences reentrant same-service request replacement without borrowing inventory epoch", function()
++		with_owned_responses(function(_, fixture)
++			local original = fixture.request()
++			fixture.tags(1, { { name = "qwen2.5:7b" } })
++			local successor
++			local decode = fixture.codec.decode
++			fixture.codec.decode = function(body)
++				fixture.codec.decode = decode
++				successor = fixture.request()
++				return decode(body)
++			end
++			fixture.posts[1].done({ status = 200, body = '{"message":{"content":"old answer"}}' })
++			helpers.assert_eq(#fixture.posts, 2)
++			helpers.assert_eq(#original.texts, 0)
++			helpers.assert_eq(original.failures[1].reason, "model_list_unavailable")
++			fixture.posts[2].done({ status = 200, body = '{"message":{"content":"successor answer"}}' })
++			helpers.assert_eq(successor.texts, { "successor answer" })
++			helpers.assert_eq(#successor.failures, 0)
++		end)
++	end)
++
+ 	helpers.it("(local-model-service-consent) refuses same-origin daemon replacement during held model consent", function()
+ 		with_startup({}, function(api, fixture)
+ 			helpers.with_stub_scope({ "modules.llm.local_model_offer", "infra.dialog_util" }, function()

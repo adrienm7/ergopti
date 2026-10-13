@@ -144,6 +144,8 @@ LLM_Vision_BackendChoicesText() {
 LLM_Vision_Trigger(Kind, Value, AnswersKey := "answers") {
 	global _LLM_Menu, _LLM_Engine, _LLM_Vision_Generation, _LLM_Vision_CaptureFn
 	global LLM_VISION_REFUSAL_CONTEXT
+	; Retain the original lifecycle before readiness/native/target getters can reenter.
+	AuxGeneration := LLM_AuxGeneration()
 	if (Kind != "region" && Kind != "full")
 		throw ValueError("LLM_Vision_Trigger: unknown capture kind " . String(Kind) . ".")
 	if (AnswersKey != "answers" && AnswersKey != "error_answers")
@@ -185,9 +187,13 @@ LLM_Vision_Trigger(Kind, Value, AnswersKey := "answers") {
 		LoggerInfo("LLM", "Screen reading refused: the focused app is excluded from the AI.")
 		return false
 	}
+	if !_LLM_Vision_RequestScopeCurrent(AuxGeneration)
+		return false
 	_LLM_Vision_Generation += 1
+	Requester := _LLM_Vision_RenderIsCurrent.Bind(_LLM_Vision_Generation, AuxGeneration)
 	Flow := Map(
 		"generation", _LLM_Vision_Generation,
+		"requester_current", Requester,
 		"kind", Kind,
 		"backend", Parsed["backend"],
 		"model", Model,
@@ -300,7 +306,7 @@ _LLM_Vision_OnCaptured(Flow, Ok, Reason := "") {
 				return
 			}
 			LoggerWarn("LLM", "Screen reading #{1}: the capture failed: {2}.", Flow["generation"], Reason)
-			_LLM_Menu_ShowManualPredictionNotice("llm.vision.capture_failed")
+			_LLM_Vision_NotifyCurrent(Flow, "llm.vision.capture_failed")
 			return
 		}
 		if A_IsSuspended {
@@ -311,7 +317,7 @@ _LLM_Vision_OnCaptured(Flow, Ok, Reason := "") {
 		catch as Err {
 			LoggerWarn("LLM", "Screen reading #{1}: the screenshot could not be read: {2}.",
 				Flow["generation"], Err.Message)
-			_LLM_Menu_ShowManualPredictionNotice("llm.vision.capture_failed")
+			_LLM_Vision_NotifyCurrent(Flow, "llm.vision.capture_failed")
 			return
 		}
 	} finally {
@@ -328,7 +334,8 @@ _LLM_Vision_OnCaptured(Flow, Ok, Reason := "") {
 		"max_tokens", Config["read_max_tokens"]))
 	LoggerInfo("LLM", "Screen reading #{1}: {2} KB of image sent to '{3}'.",
 		Flow["generation"], Round(StrLen(Image) * 3 / 4 / 1024), Flow["backend"])
-	_LLM_Vision_Send(Target, Body, _LLM_Vision_OnRead.Bind(Flow), _LLM_Vision_OnReadFail.Bind(Flow))
+	if _LLM_Vision_IsCurrent(Flow)
+		_LLM_Vision_Send(Target, Body, _LLM_Vision_OnRead.Bind(Flow), _LLM_Vision_OnReadFail.Bind(Flow), true, Flow["requester_current"])
 }
 
 
@@ -425,10 +432,14 @@ _LLM_Vision_ProviderEntry(ProviderId) {
 ; @param {Boolean} CancelEngine Whether a pending or in-flight prediction gives
 ;     way: every request the user asked for; the AI agent's automatic triage,
 ;     which the user did not ask for, leaves the prediction running.
-_LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true) {
+_LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true, CurrentFn := 0) {
 	global _LLM_Vision_RemoteTransport, _LLM_Vision_OllamaTransport
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return false
 	if CancelEngine
 		_LLM_Vision_CancelEngine()
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return false
 	if Target.Has("resolved") {
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
 			? _LLM_Vision_RemoteTransport : LLM_RemotePostBody_Async
@@ -469,7 +480,7 @@ _LLM_Vision_OnRead(Flow, Raw, Meta := "") {
 	if (Screen == "") {
 		LoggerWarn("LLM", "Screen reading #{1}: the vision answer holds no transcription ({2} character(s)).",
 			Flow["generation"], (Raw is String) ? StrLen(Raw) : 0)
-		_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
+		_LLM_Vision_NotifyCurrent(Flow, "llm.vision.read_failed")
 		return
 	}
 	Flow["screen"] := Screen
@@ -486,10 +497,10 @@ _LLM_Vision_OnReadFail(Flow, Failure := "") {
 	LoggerWarn("LLM", "Screen reading #{1}: the vision request to '{2}' failed ({3}).",
 		Flow["generation"], Flow["backend"], _LLM_Vision_FailureReason(Failure))
 	if LLM_LocalModelIsMissing(Failure) {
-		LLM_LocalModelOffer(Failure, false, _LLM_Vision_RenderIsCurrent.Bind(Flow["generation"]))
+		LLM_LocalModelOffer(Failure, false, Flow["requester_current"])
 		return
 	}
-	_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
+	_LLM_Vision_NotifyCurrent(Flow, "llm.vision.read_failed")
 }
 
 /**
@@ -503,8 +514,10 @@ _LLM_Vision_OnReadFail(Flow, Failure := "") {
  * @param {Func} OnFail Called on failure.
  * @returns {Boolean} False, with nothing sent, when the API backend has no entry.
  */
-LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail) {
+LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail, CurrentFn := 0) {
 	global _LLM_Engine
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return false
 	if (_LLM_Engine.Get("backend", "ollama") == "api") {
 		Entry := _LLM_Engine_GetActiveApiEntry()
 		if !IsObject(Entry)
@@ -513,7 +526,10 @@ LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail) {
 		LLM_Engine_CancelInflight()
 		_LLM_Engine["last_request_tick"] := A_TickCount
 		; No PREFIX/TAIL in these prompts: the user turn goes as it is
-		_LLM_Engine_ResolveRemoteTransport().Call(Entry, System, User,
+		Transport := _LLM_Engine_ResolveRemoteTransport()
+		if !_LLM_Vision_CallbackCurrent(CurrentFn)
+			return false
+		Transport.Call(Entry, System, User,
 			_LLM_Engine["temperature"] + 0.0, OnSuccess, OnFail, "", MaxTokens)
 		return true
 	}
@@ -523,7 +539,7 @@ LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail) {
 		"model", LLM_ResolveOllamaTag(_LLM_Engine["model"]),
 		"system", System,
 		"text", User,
-		"max_tokens", MaxTokens)), OnSuccess, OnFail)
+		"max_tokens", MaxTokens)), OnSuccess, OnFail, true, CurrentFn)
 	return true
 }
 
@@ -531,6 +547,8 @@ LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail) {
 ; @param {Map} Flow The flow.
 _LLM_Vision_NextAnswer(Flow) {
 	global _LLM_Engine
+	if !_LLM_Vision_IsCurrent(Flow)
+		return
 	Prompts := Flow["prompts"]
 	Flow["index"] += 1
 	Index := Flow["index"]
@@ -541,7 +559,7 @@ _LLM_Vision_NextAnswer(Flow) {
 	System := LLM_Vision_FillLanguage(Prompts[Index]["prompt"], _LLM_Engine["language"])
 	User := LLM_Vision_AnswerUserText(Flow["screen"])
 	if !LLM_Vision_SendText(System, User, Flow["config"]["answer_max_tokens"],
-			_LLM_Vision_OnAnswer.Bind(Flow, Index), _LLM_Vision_OnAnswerFail.Bind(Flow, Index)) {
+			_LLM_Vision_OnAnswer.Bind(Flow, Index), _LLM_Vision_OnAnswerFail.Bind(Flow, Index), Flow["requester_current"]) {
 		LoggerWarn("LLM", "Screen reading #{1}: the API backend has no entry configured.", Flow["generation"])
 		_LLM_Vision_Finish(Flow)
 	}
@@ -583,7 +601,7 @@ _LLM_Vision_OnAnswerFail(Flow, Index, Failure := "") {
 	LoggerWarn("LLM", "Screen reading #{1}: the '{2}' answer request failed ({3}).",
 		Flow["generation"], Flow["prompts"][Index]["id"], _LLM_Vision_FailureReason(Failure))
 	if LLM_LocalModelIsMissing(Failure) {
-		LLM_LocalModelOffer(Failure, false, _LLM_Vision_RenderIsCurrent.Bind(Flow["generation"]))
+		LLM_LocalModelOffer(Failure, false, Flow["requester_current"])
 		return
 	}
 	_LLM_Vision_NextAnswer(Flow)
@@ -594,7 +612,7 @@ _LLM_Vision_OnAnswerFail(Flow, Index, Failure := "") {
 _LLM_Vision_Finish(Flow) {
 	if (Flow["answers"].Length == 0) {
 		LoggerWarn("LLM", "Screen reading #{1}: no answer could be drafted.", Flow["generation"])
-		_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
+		_LLM_Vision_NotifyCurrent(Flow, "llm.vision.read_failed")
 		return
 	}
 	_LLM_Vision_Show(Flow, true)
@@ -632,6 +650,8 @@ _LLM_Vision_FailureReason(Failure) {
 ; @param {Boolean} IsFinal Whether every answer request has settled.
 _LLM_Vision_Show(Flow, IsFinal) {
 	global _LLM_Vision_SourceProbe
+	if !_LLM_Vision_IsCurrent(Flow)
+		return
 	if A_IsSuspended {
 		LoggerInfo("LLM", "Screen reading #{1}: answers not shown, the driver is paused.", Flow["generation"])
 		return
@@ -645,25 +665,40 @@ _LLM_Vision_Show(Flow, IsFinal) {
 		"accept_source", Source,
 		"app_name", _LLM_Engine_AppNameForAcceptSource(Source),
 		"is_final", IsFinal ? true : false,
-		"render_guard", _LLM_Vision_RenderIsCurrent.Bind(Flow["generation"])
+		"render_guard", Flow["requester_current"]
 	)
-	LLM_Tooltip_Show(Flow["answers"].Clone(), 1, IsFinal ? true : false, Meta)
+	if _LLM_Vision_IsCurrent(Flow)
+		LLM_Tooltip_Show(Flow["answers"].Clone(), 1, IsFinal ? true : false, Meta)
 }
 
 ; @param {Map} Flow The flow.
 ; @returns {Boolean} True when no newer flow started.
 _LLM_Vision_IsCurrent(Flow) {
 	global _LLM_Vision_Generation
-	return Flow["generation"] == _LLM_Vision_Generation
+	Current := Flow.Get("requester_current", 0)
+	if !HasMethod(Current, "Call")
+		return false
+	Result := Current.Call()
+	return Result is Integer && Result == true
+		&& Flow["generation"] == _LLM_Vision_Generation
 }
 
 ; Render guard of the candidates: a strict Boolean the tooltip checks before
 ; painting.
 ; @param {Integer} Generation The flow's generation.
 ; @returns {Integer}
-_LLM_Vision_RenderIsCurrent(Generation) {
+_LLM_Vision_RenderIsCurrent(Generation, AuxGeneration := -1) {
 	global _LLM_Vision_Generation
-	return (Generation == _LLM_Vision_Generation && !A_IsSuspended) ? true : false
+	return (Generation == _LLM_Vision_Generation
+		&& _LLM_Vision_RequestScopeCurrent(AuxGeneration)) ? true : false
+}
+
+/** Original prediction lifecycle; this is currency, never a readiness grant. */
+_LLM_Vision_RequestScopeCurrent(AuxGeneration) {
+	global _LLM_Menu
+	return AuxGeneration is Integer && AuxGeneration > 0
+		&& AuxGeneration == LLM_AuxGeneration() && !A_IsSuspended
+		&& _LLM_Menu is Map && _LLM_Menu.Get("enabled", false) == true
 }
 
 ; @param {String} Value A backend id.
@@ -673,4 +708,19 @@ _LLM_Vision_RenderIsCurrent(Generation) {
 _LLM_Vision_Choice(Value, Label, Config) {
 	Default := Config["default_models"].Get(Value, "")
 	return Map("value", Value, "label", Label, "defaultModel", (Default is String) ? Default : "")
+}
+
+/** Logger/native getter reentry cannot publish a notice for a retired screenshot. */
+_LLM_Vision_NotifyCurrent(Flow, Key) {
+	if _LLM_Vision_IsCurrent(Flow)
+		return _LLM_Menu_ShowManualPredictionNotice(Key)
+	return false
+}
+
+/** Optional currency belongs only to callers that retain an original requester. */
+_LLM_Vision_CallbackCurrent(CurrentFn) {
+	if !HasMethod(CurrentFn, "Call")
+		return CurrentFn is Integer && CurrentFn == 0
+	Current := CurrentFn.Call()
+	return Current is Integer && Current == true
 }

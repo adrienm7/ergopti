@@ -1,0 +1,189 @@
+{
+	"base_dev": "bb5aaad56f927d4314bd2aa8de8ae2a93e4c9c56",
+	"commits": [
+		{
+			"commit": "b20153d5c81b92fecb98dfa067efc838e1580d97",
+			"subject": "fix(macos): retain local model consent ownership",
+			"patch_sha256": "7b9bc657b70f73a44f23c990c3f642f2c20ddf2341b7fa5853d76279d7dcc56d",
+			"paths": [
+				"static/ergopti_plus/macos/modules/llm/api_ollama.lua",
+				"static/ergopti_plus/macos/modules/llm/local_model_offer.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/llm/test_ai_agent_local_model.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_agent_panel.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_llm_factory_recovery_wiring.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_models_manager_requirement_capabilities.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_llm/init.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "5547b075778aaf56a57445550479b6a34a526e7e",
+			"subject": "fix(macos): fence responses by original service identity",
+			"patch_sha256": "187a016bd32a393a31db19663e61618b90419a5a41b8d6386f02032c58ccefe5",
+			"paths": [
+				"static/ergopti_plus/macos/modules/llm/api_ollama.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "b399aac87c6fb2bd13b3e8bc3cbcae8958805b3b",
+			"subject": "fix(macos): refuse withdrawn model inventory publication",
+			"patch_sha256": "b063128034898bde6cb6fd5515914c5a0f125e43e0f351adb90aee4e06439f3e",
+			"paths": [
+				"static/ergopti_plus/macos/modules/llm/api_ollama.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "a9cf65cc1e646948f7ca76aaac44c0060071f3d2",
+			"subject": "fix(macos): retire manual model offers with their requester",
+			"patch_sha256": "2138317eed8b3e2c953d42e4f245c5b31b379ba3f753a976168f25a300924c9b",
+			"paths": [
+				"static/ergopti_plus/macos/modules/llm/agent_runner.lua",
+				"static/ergopti_plus/macos/modules/llm/local_model_offer.lua",
+				"static/ergopti_plus/macos/modules/llm/screen_answer.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/llm/test_ai_agent_local_model.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/llm/test_screen_answer_end_to_end.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_agent_panel.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "0cf24a62cf4592a7b660470a5147bc3a0828a9bc",
+			"subject": "fix(macos): recheck service after requester observers",
+			"patch_sha256": "9b0720a9bda4d0038a185c32ece65582b3b5a48412c80f9e5f2e671303f17a97",
+			"paths": [
+				"static/ergopti_plus/macos/modules/llm/local_model_offer.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "6493ddd6d79d7ee54770c30592e28284355d4763",
+			"subject": "fix(windows): bind model consent to admitted runtime",
+			"patch_sha256": "75356660b04198ec5279587cfa9a03bb92b2b3d099d13a1e55434d2bb0ddb82c",
+			"paths": [
+				"static/ergopti_plus/windows/modules/llm/local_model_offer.ahk",
+				"static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_ollama_managed_bootstrap.ahk",
+				"tools/test/test-windows-managed-bootstrap.cjs"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "16e2d2e391c2656f4d3369e209c0a08a0a14106b",
+			"subject": "fix(windows): retain original managed response ownership",
+			"patch_sha256": "7bf1749a05dc2523b8eac853d46d6aae8ca17ca0ab252bdb9e995b4336d399d7",
+			"paths": [
+				"static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk",
+				"static/ergopti_plus/windows/modules/llm/api_ollama/ollama_http.ahk",
+				"static/ergopti_plus/windows/modules/llm/api_ollama/ollama_streaming.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_ollama_managed_bootstrap.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_llm_api_ollama.ahk",
+				"tools/test/test-windows-managed-bootstrap.cjs"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "ad81bd35f72455fc6ef67ef251a5ce4b2b75c84f",
+			"subject": "fix(windows): retire manual offers after requester changes",
+			"patch_sha256": "57bfc693e395b4667d7b18f7ca9390ff7b9641ac53bbf0424e41f213dd85d2f8",
+			"paths": [
+				"static/ergopti_plus/windows/modules/llm/agent_action.ahk",
+				"static/ergopti_plus/windows/modules/llm/vision_action.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_llm_agent.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_llm_vision.ahk",
+				"tools/test/test-windows-rewrite-prompt-wiring.cjs"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "ccc6314c0dada3ea69faa520ce8b8ffede29702d",
+			"subject": "fix(windows): pass previous agent exclusion settings",
+			"patch_sha256": "d7ccb03d79f5303c9f413fd686f459cd4188ef8bfb043a6cbf33f30676a739c5",
+			"paths": [
+				"static/ergopti_plus/windows/ui/menu/menu_llm/menu_agent.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_llm_agent.ahk",
+				"tools/test/test-windows-rewrite-prompt-wiring.cjs"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "b223f0e94d3310469922cdecb9890ca1e6a04e24",
+			"subject": "fix(windows): recheck exact auxiliary result owner",
+			"patch_sha256": "03e48bb93733b59b5c9d282489b9b64b0487701dfec9dd8113f88882999ba620",
+			"paths": [
+				"static/ergopti_plus/windows/modules/llm/api_ollama/ollama_http.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_llm_api_ollama.ahk",
+				"tools/test/test-windows-managed-bootstrap.cjs"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "1694884ee91088b06d00eb0fc1481ed7ba123c02",
+			"subject": "fix(linux): retain model consent source and requester",
+			"patch_sha256": "4a4074f9c10b0085078fa61fc196cf33b22fa4aaf06246fa8b7d7c244bf97e45",
+			"paths": [
+				"static/ergopti_plus/linux/modules/llm/local_model_offer.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_api_ollama_stream_parse.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "11c4df1b179423b3022c595bd8158e8a0b56451e",
+			"subject": "fix(linux): retain asynchronous model consent admission",
+			"patch_sha256": "488e61b34d7991908b6cca2e76ef046414cf5e404d1b857dbe28d9a0591f53e5",
+			"paths": [
+				"static/ergopti_plus/linux/modules/llm/local_model_offer.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/modules/llm/model_download.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_flow.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_model_download.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "b6bebd482811e89708d3d29ad43aff3debdb8994",
+			"subject": "fix(linux): distinguish focused and acquired model downloads",
+			"patch_sha256": "8d6c6a2231939ff19b20838b8916e82c60e1a25fb9127eac628e61f43dcdfd9e",
+			"paths": [
+				"static/ergopti_plus/linux/modules/llm/model_download.lua",
+				"static/ergopti_plus/linux/modules/llm/local_model_offer.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_flow.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_api_ollama_stream_parse.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "be6ffcf443209ce5f32464a3419484e7a3991c4d",
+			"subject": "fix(linux): bind responses to original managed service",
+			"patch_sha256": "b3b04e8bc35cd7a295333c3e8c1e668cc29f94bc5a41f50ee57e6bd792e0212b",
+			"paths": [
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/modules/llm/api_ollama.lua",
+				"static/ergopti_plus/linux/modules/llm/local_model_probe.lua",
+				"static/ergopti_plus/linux/modules/llm/profiles.lua",
+				"static/ergopti_plus/_shared/lua/llm/runtime_repair.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_runtime_engine_acquisition.lua"
+			],
+			"frozen_afterimages_match": true
+		},
+		{
+			"commit": "0d3653cd2570e887ca2bbd2a1fc5d4d4c30482e8",
+			"subject": "fix(linux): refuse stale model inventory getter results",
+			"patch_sha256": "270ab3664a4c811c0dec47719f3cb100c51239dc9c21c3d96fdbf64293d2e7d6",
+			"paths": [
+				"static/ergopti_plus/linux/modules/llm/profiles.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_runtime_engine_acquisition.lua"
+			],
+			"frozen_afterimages_match": true
+		}
+	],
+	"status": "FOCUSED_CONTAINER_RECEIVED; FULL_COMPOSITION_AND_NATIVE_WINDOWS_UNRUN"
+}
