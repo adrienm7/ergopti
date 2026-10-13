@@ -64,10 +64,12 @@ function parseResults(out, timingOutput = out) {
 		failed = 0,
 		format = 'unknown';
 
-	for (const line of timingOutput.split(/\r?\n/)) {
+	for (const [index, line] of timingOutput.split(/\r?\n/).entries()) {
 		if (line.startsWith('# lua_timing ')) {
+			let reason = 'malformed JSON';
 			try {
 				const row = JSON.parse(line.slice('# lua_timing '.length));
+				reason = 'invalid timing record';
 				if (
 					row.schema !== 1 ||
 					!Number.isSafeInteger(row.id) ||
@@ -84,9 +86,12 @@ function parseResults(out, timingOutput = out) {
 				)
 					throw new Error('invalid timing record');
 				timings.push(row);
-				if (row.timing_error) timing_errors.push(`${row.module}: ${row.name}: ${row.timing_error}`);
+				if (row.timing_error)
+					timing_errors.push(
+						`Timing input line ${index + 1}: ${row.module}: ${row.name}: ${row.timing_error}`
+					);
 			} catch {
-				timing_errors.push('Malformed Lua timing record');
+				timing_errors.push(`Timing input line ${index + 1}: ${reason}`);
 			}
 			continue;
 		}
@@ -199,6 +204,19 @@ function emit(opts, res, code, signal = null) {
 		? `${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`
 		: 'terminal counts unavailable';
 	const onGitHub = !!process.env.GITHUB_ACTIONS;
+	const timingSummary = res.timing_errors.length
+		? `Lua timing INCOMPLETE: ${res.timing_errors.length} error(s), ${res.timings.length} parsed record(s). Timing input: ${opts.cmd[0] === 'PARSE_FILE' ? 'capture file' : 'child stdout'}. Assertion counts are unchanged. ${opts.json ? `Inspect timing_errors in ${opts.json}.` : 'Use --json to retain timing_errors.'} Rerun the same test command with stdout and stderr captured separately.`
+		: '';
+	const timingDetails = timingSummary
+		? timingSummary + '\n' + failureNotice(res.timing_errors)
+		: '';
+	if (timingDetails)
+		process.stderr.write(
+			timingDetails
+				.split(/\r\n|\r|\n/)
+				.map((line) => `[report:${opts.name}] ${line}`)
+				.join('\n') + '\n'
+		);
 	if (onGitHub) {
 		for (const f of res.failures) {
 			process.stdout.write(`::error title=${ghEscape(opts.name)} test failed::${ghEscape(f)}\n`);
@@ -207,7 +225,11 @@ function emit(opts, res, code, signal = null) {
 			process.stdout.write(
 				`::notice title=${ghEscape(opts.name)} all failures::${ghEscape(failureNotice(res.failures))}\n`
 			);
-		const summary = `${opts.name}: ${res.counts_available ? counts : 'INCOMPLETE — ' + counts}`;
+		if (timingDetails)
+			process.stdout.write(
+				`::notice title=${ghEscape(opts.name)} timing incomplete::${ghEscape(timingDetails)}\n`
+			);
+		const summary = `${opts.name}: ${res.counts_available ? counts : 'INCOMPLETE — ' + counts}${timingSummary ? ' — Lua timing INCOMPLETE' : ''}`;
 		process.stdout.write(`::notice title=${ghEscape(opts.name)}::${ghEscape(summary)}\n`);
 		if (process.env.GITHUB_STEP_SUMMARY) {
 			const md =
@@ -216,7 +238,8 @@ function emit(opts, res, code, signal = null) {
 					: `### ${opts.name}\n\n- INCOMPLETE: terminal counts unavailable (exit ${code}).\n`) +
 				(res.failures.length
 					? `\n<details><summary>Failures</summary>\n\n${res.failures.map((f) => `- ${f}`).join('\n')}\n</details>\n`
-					: '');
+					: '') +
+				(timingDetails ? `\n${timingDetails}\n` : '');
 			try {
 				fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
 			} catch {

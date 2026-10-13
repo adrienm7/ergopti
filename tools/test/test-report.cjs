@@ -821,6 +821,255 @@ try {
 	);
 }
 
+/** Retains actual timing-parser reasons without changing child outcomes or assertion totals. */
+function testTimingDiagnostics(spawnReporter = spawnSync) {
+	const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-reporter-timing-'));
+	const reporter = path.resolve(__dirname, 'report.cjs');
+	const runner = path.join(folder, 'runner.cjs');
+	const transcript = path.join(folder, 'stdout.txt');
+	const receipt = path.join(folder, 'receipt.json');
+	const summary = path.join(folder, 'summary.md');
+	const rawStderr = '# lua_timing {stderr-only}\n';
+	let retired = true;
+	function launch(...args) {
+		retired = false;
+		const result = spawnReporter(...args);
+		retired =
+			!result.error &&
+			result.signal === null &&
+			Number.isInteger(result.status) &&
+			result.status >= 0;
+		return result;
+	}
+	const row = {
+		schema: 1,
+		driver: 'linux',
+		id: 1,
+		kind: 'case',
+		module: 'tests.unit.clock',
+		name: 'owned clock',
+		status: 'pass',
+		elapsed_ms: 0,
+		timing_error: ''
+	};
+	const output = [
+		'owned output header',
+		'# lua_timing ' + JSON.stringify(row),
+		'# lua_timing {',
+		'# lua_timing ' + JSON.stringify({ ...row, schema: 2 }),
+		'# lua_timing ' +
+			JSON.stringify({
+				...row,
+				elapsed_ms: null,
+				timing_error:
+					'clock%failed\n::error::not-an-annotation\r::error::not-a-cr-annotation\r\n::error::not-a-crlf-annotation'
+			}),
+		'Passed tests: 13569',
+		'Failed tests: 0',
+		''
+	].join('\n');
+	const expected = [
+		'Timing input line 3: malformed JSON',
+		'Timing input line 4: invalid timing record',
+		'Timing input line 5: tests.unit.clock: owned clock: clock%failed\n::error::not-an-annotation\r::error::not-a-cr-annotation\r\n::error::not-a-crlf-annotation'
+	];
+	try {
+		fs.writeFileSync(
+			runner,
+			"const fs = require('node:fs'); process.stdout.write(fs.readFileSync(process.argv[2])); process.stderr.write('# lua_timing {stderr-only}\\n'); process.exitCode = Number(process.argv[3]);\n"
+		);
+		for (const name of ['linux-lua', 'macos-lua']) {
+			for (const code of [0, 7]) {
+				fs.writeFileSync(transcript, output);
+				fs.writeFileSync(summary, '');
+				const result = launch(
+					process.execPath,
+					[
+						reporter,
+						'--name',
+						name,
+						'--json',
+						receipt,
+						'--',
+						process.execPath,
+						runner,
+						transcript,
+						String(code)
+					],
+					{
+						encoding: 'utf8',
+						timeout: 10000,
+						env: { ...process.env, GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: summary }
+					}
+				);
+				assert.ifError(result.error);
+				check(
+					'timing diagnostics retain native failure or elevate only timing failure',
+					result.status === (code || 1) && result.signal === null
+				);
+				check(
+					'timing diagnostics preserve exact original stdout prefix',
+					result.stdout.startsWith(output)
+				);
+				check(
+					'timing diagnostics preserve exact original stderr prefix',
+					result.stderr.startsWith(rawStderr)
+				);
+				check(
+					'timing failure reason is visible outside the JSON receipt',
+					result.stderr.includes('Lua timing INCOMPLETE:')
+				);
+				const json = JSON.parse(fs.readFileSync(receipt, 'utf8'));
+				assert.deepStrictEqual(json.timing_errors, expected);
+				check(
+					'timing diagnostics retain authoritative assertion counts and failures',
+					json.passed === 13569 &&
+						json.failed === 0 &&
+						json.failures.length === 0 &&
+						json.exit_code === (code || 1)
+				);
+				check(
+					'timing diagnostics distinguish parsed records from timing errors',
+					json.timings.length === 2 &&
+						result.stderr.includes(
+							'Lua timing INCOMPLETE: 3 error(s), 2 parsed record(s). Timing input: child stdout.'
+						)
+				);
+				for (const detail of expected.slice(0, 2))
+					check('exact timing reason reaches ordinary logs', result.stderr.includes(detail));
+				check(
+					'timing diagnostics provide retained receipt and separate-stream rerun context',
+					result.stderr.includes(`Inspect timing_errors in ${receipt}.`) &&
+						result.stderr.includes('stdout and stderr captured separately')
+				);
+				check(
+					'timing diagnostic details cannot forge a GitHub error command',
+					!result.stderr.split(/\r\n|\r|\n/).some((line) => line.startsWith('::error::')) &&
+						result.stdout.includes(
+							'clock%25failed%0A::error::not-an-annotation%0D::error::not-a-cr-annotation%0D%0A::error::not-a-crlf-annotation'
+						)
+				);
+				check(
+					'GitHub summary identifies incomplete timing despite passing assertions',
+					result.stdout.includes(`::notice title=${name} timing incomplete::`) &&
+						result.stdout.includes('13\u202F569 passed, 0 failed — Lua timing INCOMPLETE')
+				);
+				check(
+					'step summary retains precise timing causes',
+					fs.readFileSync(summary, 'utf8').includes(expected[0])
+				);
+			}
+		}
+		fs.writeFileSync(transcript, output);
+		const parsed = launch(
+			process.execPath,
+			[reporter, '--name', 'captured-lua', '--', 'PARSE_FILE', transcript],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, GITHUB_ACTIONS: '', GITHUB_STEP_SUMMARY: '' }
+			}
+		);
+		assert.ifError(parsed.error);
+		check(
+			'capture-file diagnostics avoid inventing stdout provenance or a JSON file',
+			parsed.status === 1 &&
+				parsed.stderr.includes('Timing input: capture file.') &&
+				parsed.stderr.includes('Use --json to retain timing_errors.')
+		);
+		const valid = '# lua_timing ' + JSON.stringify(row) + '\nPassed tests: 1\nFailed tests: 0\n';
+		fs.writeFileSync(transcript, valid);
+		const stderrOnly = launch(
+			process.execPath,
+			[
+				reporter,
+				'--name',
+				'stdout-custody',
+				'--json',
+				receipt,
+				'--',
+				process.execPath,
+				runner,
+				transcript,
+				'0'
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, GITHUB_ACTIONS: '', GITHUB_STEP_SUMMARY: '' }
+			}
+		);
+		assert.ifError(stderrOnly.error);
+		check(
+			'stderr timing-shaped text does not become a stdout timing error',
+			stderrOnly.status === 0 &&
+				stderrOnly.stderr === rawStderr &&
+				!stderrOnly.stdout.includes('timing INCOMPLETE')
+		);
+		assert.deepStrictEqual(JSON.parse(fs.readFileSync(receipt, 'utf8')).timing_errors, []);
+	} finally {
+		if (retired) fs.rmSync(folder, { recursive: true, force: true });
+		else
+			process.stderr.write(
+				`Reporter fixture retained because child retirement is unknown: ${folder}\n`
+			);
+	}
+}
+testTimingDiagnostics();
+
+/** Exercises actual fixture cleanup using recording launches that create no child process. */
+function testTimingFixtureRetirement() {
+	for (const [label, outcome, retained] of [
+		[
+			'launch throws',
+			() => {
+				throw new Error('owned launch refusal');
+			},
+			true
+		],
+		[
+			'timeout',
+			() => ({
+				error: Object.assign(new Error('owned timeout'), { code: 'ETIMEDOUT' }),
+				status: null,
+				signal: 'SIGTERM'
+			}),
+			true
+		],
+		['signal', () => ({ status: null, signal: 'SIGTERM' }), true],
+		['unknown exit', () => ({ status: null, signal: null }), true],
+		['natural failure', () => ({ status: 1, signal: null, stdout: '', stderr: '' }), false]
+	]) {
+		let folder = '',
+			calls = 0;
+		try {
+			assert.throws(() =>
+				testTimingDiagnostics((command, args) => {
+					calls++;
+					assert.equal(command, process.execPath);
+					const candidate = path.dirname(args[args.indexOf('--') + 2]);
+					assert.equal(path.dirname(candidate), os.tmpdir());
+					assert.ok(path.basename(candidate).startsWith('ergopti-reporter-timing-'));
+					folder = candidate;
+					return outcome();
+				})
+			);
+			check(
+				'recording fixture retirement observes one attempted launch: ' + label,
+				calls === 1 && folder !== ''
+			);
+			check(
+				'recording fixture cleanup respects observed retirement: ' + label,
+				fs.existsSync(folder) === retained
+			);
+		} finally {
+			// This recording port never starts a child, so its retained fixture is owned and idle.
+			if (folder) fs.rmSync(folder, { recursive: true, force: true });
+		}
+	}
+}
+testTimingFixtureRetirement();
+
 testOutputDrain()
 	.then(() => {
 		console.log(
