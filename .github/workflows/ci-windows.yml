@@ -459,6 +459,7 @@ jobs:
             ${{ runner.temp }}/windows-qualification.json
             ${{ runner.temp }}/windows-ahk-isolated-*.json
             ${{ runner.temp }}/ergopti-ahk-menu-lifecycle-*/**
+            ${{ runner.temp }}/ergopti-snapshot16-*/**
           if-no-files-found: warn
 
       - name: Check for AHK compiler warnings
