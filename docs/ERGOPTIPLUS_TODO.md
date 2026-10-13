@@ -4291,6 +4291,20 @@ G6 frozen four-path handoff and original held-source assertions remain intact.
 Darwin fixture compilation, model inference and trust restoration are still
 separate native gates; this dependency correction is not a lease repair.
 
+The standalone wire-client compiler projection now names the same three
+additional public dependencies explicitly. Its original ten cases change from
+nine passes / one assertion failure to ten passes; one additional case checks
+all three missing-header refusals before compiler acquisition and verifies
+source cleanup. Exact header-set and source-byte assertions remain intact.
+Apple compiler execution, TLS trust restoration and customer lease recovery
+remain separate unqualified gates.
+
+The complete managed Ollama cohort now receives all eleven standalone wire
+cases with its exact census preserved. Corrected formatting passes. The preceding
+full Common run retains 421/426: four existing environment/source admissions
+and the old ten-case census; the complete focused cohort passes after that
+census correction. Final exact-source Common and native receiving remain open.
+
 ## Remaining work after the 2026-09-30 releases
 
 The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.
