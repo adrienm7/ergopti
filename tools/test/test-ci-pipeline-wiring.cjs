@@ -461,6 +461,8 @@ const WINDOWS_FILE_RETENTION = [
 ];
 
 const STEP_CONDITIONS = [
+	[LINUX_BOX, 'test-linux', 'Retain Linux Lua timing diagnostics', '${{ !cancelled() }}'],
+	[MACOS_BOX, 'test-hs', 'Retain macOS Lua timing diagnostics', '${{ !cancelled() }}'],
 	[
 		COMMON_BOX,
 		'shared-validation',
@@ -4477,6 +4479,223 @@ for (const [rel, shell] of [
 		const changed = mutate(job.body);
 		assert.notEqual(changed, job.body, 'reporter admission inverse must alter its real owner');
 		mustCatch(what, MACOS_BOX, job.body, changed, reporterLifecycleProblems);
+	}
+}
+
+// Diagnostic timing JSON is retained separately from all qualification and role receipts.
+const LUA_TIMING_RETENTION = [
+	{
+		file: LINUX_BOX,
+		job: 'test-linux',
+		producer: 'Run the driver unit test suite',
+		after: 'Upload manual runtime acceptance evidence',
+		directory: 'static/ergopti_plus/linux',
+		step: 'Retain Linux Lua timing diagnostics',
+		artifact:
+			'lua-timings-linux-unit-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		path: '${{ runner.temp }}/linux-lua.json',
+		command:
+			'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"'
+	},
+	{
+		file: MACOS_BOX,
+		job: 'test-hs',
+		producer: 'Run unit + meta tests',
+		after: 'Run unit + meta tests',
+		directory: 'static/ergopti_plus/macos',
+		step: 'Retain macOS Lua timing diagnostics',
+		artifact:
+			'lua-timings-macos-unit-${{ matrix.role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		path: '${{ runner.temp }}/macos-lua.json',
+		command:
+			'node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua'
+	}
+];
+
+/** Binds each timing upload to its actual reporter file without granting qualification. */
+function luaTimingRetentionProblems(files) {
+	const problems = [];
+	for (const owner of LUA_TIMING_RETENTION) {
+		try {
+			const entries = files.filter((entry) => entry.rel === owner.file);
+			assert.equal(entries.length, 1, 'One timing source workflow.');
+			const workflow = YAML.parse(entries[0].text, { uniqueKeys: true });
+			const jobs = Object.entries(workflow.jobs);
+			const uploads = jobs.flatMap(([id, job]) =>
+				(job.steps ?? []).filter((step) => step.name === owner.step).map((step) => ({ id, step }))
+			);
+			assert.equal(uploads.length, 1, 'One timing diagnostic uploader.');
+			assert.equal(uploads[0].id, owner.job, 'Timing bytes stay on their producer host.');
+			const steps = workflow.jobs[owner.job].steps;
+			const producers = steps.filter((step) => step.name === owner.producer);
+			assert.equal(producers.length, 1, 'One actual Lua timing producer.');
+			assert.equal(producers[0]['working-directory'], owner.directory);
+			assert.equal(
+				producers[0].run.split('\n').filter((line) => line.trim() === owner.command).length,
+				1,
+				'The real reporter writes the exact retained JSON.'
+			);
+			const preceding = steps.filter((step) => step.name === owner.after);
+			assert.equal(preceding.length, 1, 'One exact diagnostic placement anchor.');
+			assert.ok(steps.indexOf(preceding[0]) >= steps.indexOf(producers[0]));
+			assert.equal(steps.indexOf(uploads[0].step), steps.indexOf(preceding[0]) + 1);
+			assert.deepEqual(uploads[0].step, {
+				name: owner.step,
+				if: '${{ !cancelled() }}',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: owner.artifact,
+					path: owner.path,
+					'if-no-files-found': 'warn',
+					'retention-days': 7
+				}
+			});
+		} catch (error) {
+			problems.push(owner.file + ' Lua timing retention refused: ' + error.message);
+		}
+	}
+	return problems;
+}
+errors.push(...luaTimingRetentionProblems(pipeline.files()));
+for (const owner of LUA_TIMING_RETENTION) {
+	const source = pipeline.file(owner.file);
+	const job = pipeline.jobsOfText(source, owner.file).find((entry) => entry.id === owner.job);
+	const upload = pipeline.step(job.body, owner.step);
+	const producer = pipeline.step(job.body, owner.producer);
+	for (const [what, mutate] of [
+		['missing upload', (text) => text.replace(upload, '')],
+		[
+			'cancelled-run upload',
+			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: always()'))
+		],
+		[
+			'foreign predicate',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace('if: ${{ !cancelled() }}', 'if: ${{ !cancelled() && env.FOREIGN }}')
+				)
+		],
+		['duplicate upload', (text) => text.replace(upload, upload + '\n' + upload)],
+		[
+			'success-only upload',
+			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: success()'))
+		],
+		[
+			'failure-only upload',
+			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: failure()'))
+		],
+		[
+			'manual-only upload',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace('if: ${{ !cancelled() }}', "if: github.event_name == 'workflow_dispatch'")
+				)
+		],
+		[
+			'default-success upload',
+			(text) => text.replace(upload, upload.replace('        if: ${{ !cancelled() }}\n', ''))
+		],
+		[
+			'forgiven upload',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace('        uses:', '        continue-on-error: true\n        uses:')
+				)
+		],
+		[
+			'wrong uploader',
+			(text) => text.replace(upload, upload.replace('upload-artifact@v4', 'download-artifact@v4'))
+		],
+		[
+			'broad path',
+			(text) => text.replace(upload, upload.replace(owner.path, '${{ runner.temp }}/*.json'))
+		],
+		[
+			'extra member',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace(
+						'path: ' + owner.path,
+						'path: |\n            ' + owner.path + '\n            ${{ runner.temp }}/foreign.json'
+					)
+				)
+		],
+		[
+			'role receipt directory',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace(owner.path, '${{ runner.temp }}/macos-stage-output/receipt.json')
+				)
+		],
+		[
+			'mandatory evidence directory',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace(owner.path, '${{ runner.temp }}/linux-ci-evidence/test-linux.json')
+				)
+		],
+		[
+			'qualification artifact namespace',
+			(text) => text.replace(upload, upload.replace(owner.artifact, 'assets-qualification-lua'))
+		],
+		[
+			'missing source identity',
+			(text) => text.replace(upload, upload.replace('-${{ github.sha }}', ''))
+		],
+		[
+			'missing run identity',
+			(text) => text.replace(upload, upload.replace('-${{ github.run_id }}', ''))
+		],
+		[
+			'missing attempt identity',
+			(text) => text.replace(upload, upload.replace('-${{ github.run_attempt }}', ''))
+		],
+		[
+			'silent missing files',
+			(text) =>
+				text.replace(upload, upload.replace('if-no-files-found: warn', 'if-no-files-found: ignore'))
+		],
+		[
+			'missing member promoted to requirement',
+			(text) =>
+				text.replace(upload, upload.replace('if-no-files-found: warn', 'if-no-files-found: error'))
+		],
+		[
+			'missing retention',
+			(text) => text.replace(upload, upload.replace('          retention-days: 7', ''))
+		],
+		[
+			'upload before producer',
+			(text) => text.replace(upload, '').replace(producer, upload + '\n' + producer)
+		],
+		[
+			'wrong producer path',
+			(text) =>
+				text.replace(producer, producer.replace(owner.path, '${{ runner.temp }}/foreign.json'))
+		],
+		[
+			'comment-only producer',
+			(text) => text.replace(producer, producer.replace(owner.command, '# ' + owner.command))
+		],
+		['missing producer', (text) => text.replace(producer, '')],
+		['duplicate producer', (text) => text.replace(producer, producer + '\n' + producer)],
+		['wrong owner', (text) => text.replace('  ' + owner.job + ':\n', '  foreign-lua-owner:\n')]
+	]) {
+		const changed = mutate(source);
+		assert.ok(changed !== source, 'Timing retention inverse must change actual source: ' + what);
+		mustCatch(
+			owner.job + ' timing ' + what,
+			owner.file,
+			source,
+			changed,
+			luaTimingRetentionProblems
+		);
 	}
 }
 

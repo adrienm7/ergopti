@@ -43,6 +43,11 @@
 					"working-directory": "static/ergopti_plus/macos"
 				},
 				{
+					"name": "Retain macOS Lua timing diagnostics",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ !cancelled() }}"
+				},
+				{
 					"name": "Retain source-bound test-hs qualification receipts",
 					"uses": "actions/upload-artifact@v4",
 					"if": "always()"
