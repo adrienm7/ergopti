@@ -4019,7 +4019,12 @@ for (const [what, rel, from, to] of [
 	],
 	['an unqualified root name', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate'"],
 	['a lowercase lane job', WINDOWS_BOX, "name: 'Unit tests'", "name: 'unit tests'"],
-	['a repeated lane prefix', MACOS_BOX, "name: 'Package'", "name: 'macOS / Package'"],
+	[
+		'a repeated lane prefix',
+		MACOS_BOX,
+		'  package-macos:\n    name: Build\n',
+		"  package-macos:\n    name: 'macOS / Build'\n"
+	],
 	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
 	[
 		'an extra root separator',
@@ -4222,17 +4227,76 @@ function reporterLifecycleProblems(files) {
 			);
 			continue;
 		}
+		const condition =
+			rel === MACOS_BOX ? "${{ steps.stage-admission.outcome == 'success' }}" : null;
+		if (rel === MACOS_BOX) {
+			const admissions = steps.filter(
+				(step) => pipeline.stepField(step.body, 'id') === 'stage-admission'
+			);
+			const downloads = steps.filter((step) => step.name === 'Download exact prior stage receipts');
+			const admission = admissions[0],
+				download = downloads[0];
+			const admissionAt = steps.indexOf(admission),
+				downloadAt = steps.indexOf(download);
+			if (
+				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['e2e-hs']) ||
+				pipeline.field(job.body, 'if') !== null ||
+				pipeline.field(job.body, 'continue-on-error') !== null ||
+				admissions.length !== 1 ||
+				steps.filter((step) => step.name === 'Admit complete successful predecessor stage')
+					.length !== 1 ||
+				downloads.length !== 1 ||
+				!(downloadAt >= 0 && downloadAt < admissionAt && admissionAt < steps.indexOf(node))
+			) {
+				problems.push(
+					rel +
+						' ' +
+						id +
+						' must admit its exact adjacent predecessor before Node, reporter and product'
+				);
+				continue;
+			}
+			if (
+				admission.name !== 'Admit complete successful predecessor stage' ||
+				(pipeline.runOf(admission.body) ?? []).join('\n').trim() !==
+					'node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"' ||
+				!/^        env:\n          MACOS_STAGE_NEEDS: \$\{\{ toJSON\(needs\) \}\}\n        run:/m.test(
+					admission.body
+				) ||
+				['if', 'continue-on-error', 'shell', 'working-directory'].some(
+					(key) => pipeline.stepField(admission.body, key) !== null
+				) ||
+				pipeline.stepField(download.body, 'uses') !== 'actions/download-artifact@v4' ||
+				['if', 'continue-on-error'].some(
+					(key) => pipeline.stepField(download.body, key) !== null
+				) ||
+				!/^          pattern: macos-stage-e2e-\*-\$\{\{ github\.run_id \}\}$/m.test(
+					download.body
+				) ||
+				!/^          path: \$\{\{ runner\.temp \}\}\/macos-stage-inputs$/m.test(download.body) ||
+				pipeline.stepField(steps[unit].body, 'if') !== condition ||
+				pipeline.stepField(steps[unit].body, 'continue-on-error') !== null
+			)
+				problems.push(
+					rel +
+						' ' +
+						id +
+						' reporter admission must retain the exact unconditional receipt gate and guarded product'
+				);
+		}
 		if (
 			!node.body.includes("          node-version-file: '.node-version'") ||
-			pipeline.stepField(node.body, 'if') !== null ||
+			pipeline.stepField(node.body, 'if') !== condition ||
 			pipeline.stepField(node.body, 'continue-on-error') !== null
 		) {
-			problems.push(`${rel} ${id} must unconditionally prepare the repository Node runtime`);
+			problems.push(
+				`${rel} ${id} must prepare the repository Node runtime under its exact native-stage condition`
+			);
 		}
 		const test = matches[0];
 		if (
 			(pipeline.runOf(test.body) ?? []).join('\n').trim() !== REPORTER_COMMAND ||
-			pipeline.stepField(test.body, 'if') !== null ||
+			pipeline.stepField(test.body, 'if') !== condition ||
 			pipeline.stepField(test.body, 'continue-on-error') !== null ||
 			pipeline.stepField(test.body, 'shell') !== shell ||
 			pipeline.stepField(test.body, 'working-directory') !== null
@@ -4252,19 +4316,21 @@ for (const [rel, shell] of [
 	[WINDOWS_BOX, '        shell: pwsh\n'],
 	[MACOS_BOX, '']
 ]) {
-	const block = `      - name: ${REPORTER_STEP}\n${shell}        run: ${REPORTER_COMMAND}\n`;
+	const condition =
+		rel === MACOS_BOX ? "        if: ${{ steps.stage-admission.outcome == 'success' }}\n" : '';
+	const block = `      - name: ${REPORTER_STEP}\n${shell}${condition}        run: ${REPORTER_COMMAND}\n`;
 	for (const [what, replacement] of [
 		['missing native reporter self-test', ''],
 		[
 			'manual-only native reporter self-test',
 			block.replace(
-				`${shell}        run:`,
+				`${shell}${condition}        run:`,
 				`${shell}        if: github.event_name == 'workflow_dispatch'\n        run:`
 			)
 		],
 		[
 			'forgiven native reporter self-test',
-			block.replace(`${shell}        run:`, `${shell}        continue-on-error: true\n        run:`)
+			block.replace('        run:', '        continue-on-error: true\n        run:')
 		],
 		[
 			'swallowed native reporter exit',
@@ -4294,6 +4360,124 @@ for (const [rel, shell] of [
 		block + '\n' + node + '\n',
 		reporterLifecycleProblems
 	);
+}
+
+// Mac reporter predicates are valid only behind the actual adjacent-stage receipt gate.
+{
+	const job = pipeline
+		.jobsOfText(pipeline.file(MACOS_BOX), MACOS_BOX)
+		.find((entry) => entry.id === 'package-macos');
+	const admission = pipeline.step(job.body, 'Admit complete successful predecessor stage');
+	const download = pipeline.step(job.body, 'Download exact prior stage receipts');
+	const node = pipeline.step(
+		job.body,
+		'Prepare Node for native policy fixtures and XCTest evidence'
+	);
+	const product = pipeline.step(job.body, 'Build release launcher');
+	const condition = "        if: ${{ steps.stage-admission.outcome == 'success' }}\n";
+	for (const [what, mutate] of [
+		['missing reporter admission', (body) => body.replace(admission, '')],
+		[
+			'duplicate reporter admission',
+			(body) => body.replace(admission, admission + '\n' + admission)
+		],
+		[
+			'duplicate reporter admission with foreign id',
+			(body) =>
+				body.replace(
+					admission,
+					admission + '\n' + admission.replace('id: stage-admission', 'id: foreign-admission')
+				)
+		],
+		[
+			'unknown reporter admission command',
+			(body) => body.replace(admission, admission.replace(' admit e2e ', ' admit unit '))
+		],
+		[
+			'manual-only reporter admission',
+			(body) =>
+				body.replace(
+					admission,
+					admission.replace(
+						'        id:',
+						"        if: github.event_name == 'workflow_dispatch'\n        id:"
+					)
+				)
+		],
+		[
+			'forgiven reporter admission',
+			(body) =>
+				body.replace(
+					admission,
+					admission.replace('        id:', '        continue-on-error: true\n        id:')
+				)
+		],
+		[
+			'foreign reporter admission id',
+			(body) =>
+				body.replace(admission, admission.replace('id: stage-admission', 'id: foreign-admission'))
+		],
+		[
+			'wrong reporter predecessor',
+			(body) => body.replace('    needs:\n      - e2e-hs', '    needs:\n      - test-hs')
+		],
+		[
+			'transitive reporter predecessor',
+			(body) =>
+				body.replace('    needs:\n      - e2e-hs', '    needs:\n      - e2e-hs\n      - test-hs')
+		],
+		[
+			'missing reporter predecessor metadata',
+			(body) => body.replace(admission, admission.replace('toJSON(needs)', 'toJSON(matrix)'))
+		],
+		['missing reporter receipt download', (body) => body.replace(download, '')],
+		[
+			'foreign reporter receipt download',
+			(body) => body.replace(download, download.replace('macos-stage-e2e-*', 'macos-stage-unit-*'))
+		],
+		[
+			'forgiven reporter receipt download',
+			(body) =>
+				body.replace(
+					download,
+					download.replace('        uses:', '        continue-on-error: true\n        uses:')
+				)
+		],
+		[
+			'reporter admission after Node',
+			(body) => body.replace(admission, '').replace(node, node + '\n' + admission)
+		],
+		['unconditional Mac reporter Node', (body) => body.replace(node, node.replace(condition, ''))],
+		[
+			'unknown Mac reporter Node predicate',
+			(body) => body.replace(node, node.replace(condition, '        if: always()\n'))
+		],
+		[
+			'unconditional Mac reporter product',
+			(body) => body.replace(product, product.replace(condition, ''))
+		],
+		[
+			'forgiven Mac reporter product',
+			(body) =>
+				body.replace(
+					product,
+					product.replace('        shell:', '        continue-on-error: true\n        shell:')
+				)
+		],
+		[
+			'unknown Mac reporter product predicate',
+			(body) => body.replace(product, product.replace(condition, '        if: always()\n'))
+		],
+		[
+			'manual-only Mac reporter job',
+			(body) => "    if: github.event_name == 'workflow_dispatch'\n" + body
+		],
+		['forgiven Mac reporter job', (body) => '    continue-on-error: true\n' + body]
+	]) {
+		const changed = mutate(job.body);
+		assert.notEqual(changed, job.body, 'reporter admission inverse must alter its real owner');
+		mustCatch(what, MACOS_BOX, job.body, changed, reporterLifecycleProblems);
+	}
 }
 
 /** Pins the real workflow ports of the callable manual selector. */
