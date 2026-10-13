@@ -1011,7 +1011,7 @@ async function main() {
 		}
 	);
 	await check('production output browser assertions reject inert causal failures', async () => {
-		assert.equal(await require('./fixtures/site-artifact-smoke-controls.cjs').run(), 14);
+		assert.equal(await require('./fixtures/site-artifact-smoke-controls.cjs').run(), 15);
 	});
 	assert.equal(checks, 31, 'every declared behavior control must complete');
 	console.log(
