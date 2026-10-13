@@ -39,6 +39,19 @@ retained container receipts remain container evidence. Windows controlled/native
 software receiving, physical keyboard/hook-order/ISO/modifier acceptance and
 actual display/DPI/UIA/installed-application acceptance remain distinct.
 
+#### Windows observer hint receiving
+
+The manifest-bound observer correction receives seven new AHK lifecycle/hint
+cases, all 16 existing arrival FIFO cases and the actual shutdown-close-chain
+case, each exit 0 without failure or skip. Native execution first exposed the
+new shutdown-rollback test calling leases absent from its include graph. The
+unchanged production Begin/Cancel shutdown bodies now live in their existing
+shutdown helper, included by both production and the unit runner; no duplicate
+lease implementation or test mock replaces them. Hint invalidation and refused
+Down admission retain FIFO/privacy and ergonomic callback signatures. Actual
+InputHook delivery, IME/composition, physical pairing and hook order remain open;
+macOS/Linux do not have this Windows cross-callback hint cache.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
