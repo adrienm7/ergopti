@@ -442,6 +442,30 @@ helpers.describe("screen answers end to end (llm-vision)", function()
 		assert_answer_request(world, 1)
 	end)
 
+	helpers.it("(local-model-requester) refuses a vision Download after screen reading is reset or superseded in its modal", function()
+		for _, change in ipairs({ "reset", "supersede", "disabled" }) do
+			local world = build_world()
+			local dialog = require("infra.dialog_util")
+			local previous = dialog.block_alert
+			dialog.block_alert = function(...)
+				if change == "reset" then world.flow.reset()
+				elseif change == "disabled" then world.engine.set_llm_enabled(false)
+				else trigger(world, "llm_screen_region", "local") end
+				return previous(...)
+			end
+			helpers.assert_true(trigger(world, "llm_screen_region", "local"))
+			world.captures[1].on_image("image", IMAGE)
+			list_local_models(world, {})
+			helpers.assert_eq(#world.installs, 0, "a stale screen requester cannot download after modal cancellation")
+			dialog.block_alert = previous
+			world.engine.set_llm_enabled(true)
+			helpers.assert_true(trigger(world, "llm_screen_region", "local"))
+			world.captures[#world.captures].on_image("image", IMAGE)
+			list_local_models(world, {})
+			helpers.assert_eq(#world.installs, 1, "fresh screen reading consent remains functional")
+		end
+	end)
+
 	helpers.it("(ai-agent-local-model) names a missing local vision model and offers its download", function()
 		local world = build_world()
 		helpers.assert_eq(trigger(world, "llm_screen_region", "local"), true)

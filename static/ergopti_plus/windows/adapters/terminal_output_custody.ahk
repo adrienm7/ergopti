@@ -87,6 +87,100 @@ class TerminalOutputConsumer {
 	}
 }
 
+/** Receives native packet copies while reusing the exact prefix/debt consumer. */
+class TerminalOutputPacketConsumer extends TerminalOutputConsumer {
+	__New(Token, State, Port := 0, Emitter := 0) {
+		this.PacketEmitter := Emitter
+		super.__New(Token, State, Port,
+			HasMethod(Emitter, "Call") ? this._EmitPackets.Bind(this) : 0)
+	}
+
+	/** Pins the same handle around delegated ACK/retirement without changing that protocol. */
+	Service() {
+		if this.Busy || this.Blocked || this.Retired
+			return false
+		OriginalHandle := this.Handle, Record := _LLM_TerminalOutputRecord(OriginalHandle)
+		Authority := IsObject(Record) ? _LLM_TerminalOutputCaptureAuthority(OriginalHandle, Record) : 0
+		try {
+			Result := super.Service()
+			if this.Handle != OriginalHandle
+				throw ValueError("Terminal delivery replaced the original consumer handle.")
+			if IsObject(Record) && !this.Retired
+				_LLM_TerminalOutputRequireRecord(OriginalHandle, Record, Authority)
+			return Result
+		} catch as Err {
+			this.Blocked := true
+			if IsObject(Record) && (this.Handle != OriginalHandle
+					|| !_LLM_TerminalOutputBindingCurrent(OriginalHandle, Record)
+					|| !_LLM_TerminalOutputAuthorityCurrent(Authority, Record))
+				_LLM_TerminalOutputMarkUnknown(Record, Authority)
+			throw Err
+		}
+	}
+
+	/** Retains the original logical holder across the existing native cancel callback. */
+	Cancel() {
+		if this.Busy || this.Blocked || this.Retired
+			return false
+		OriginalHandle := this.Handle, Record := _LLM_TerminalOutputRecord(OriginalHandle)
+		Authority := IsObject(Record) ? _LLM_TerminalOutputCaptureAuthority(OriginalHandle, Record) : 0
+		try {
+			Result := super.Cancel()
+			if this.Handle != OriginalHandle
+				throw ValueError("Terminal cancellation replaced the original consumer handle.")
+			if IsObject(Record) && !this.Retired
+				_LLM_TerminalOutputRequireRecord(OriginalHandle, Record, Authority)
+			return Result
+		} catch as Err {
+			this.Blocked := true
+			if IsObject(Record) && (this.Handle != OriginalHandle
+					|| !_LLM_TerminalOutputBindingCurrent(OriginalHandle, Record)
+					|| !_LLM_TerminalOutputAuthorityCurrent(Authority, Record))
+				_LLM_TerminalOutputMarkUnknown(Record, Authority)
+			throw Err
+		}
+	}
+
+	/** Keeps reentrant ACK/cancel outside the caller's packet observation window. */
+	_EmitPackets(Attempt) {
+		OriginalHandle := this.Handle
+		Record := _LLM_TerminalOutputRecord(OriginalHandle)
+		if !IsObject(Record)
+			throw ValueError("Packet delivery has no retained original record.")
+		Authority := _LLM_TerminalOutputCaptureAuthority(OriginalHandle, Record)
+		try {
+			Receipt := LLM_NavEventOwner_SerializeTerminalOutputAttempt(OriginalHandle, Attempt)
+			_LLM_TerminalOutputRequireRecord(OriginalHandle, Record, Authority)
+			if this.Handle != OriginalHandle || this.Attempt != Attempt
+				throw ValueError("Serialization changed the original consumer identity.")
+		} catch as Err {
+			if this.Handle != OriginalHandle || this.Attempt != Attempt
+					|| !_LLM_TerminalOutputAuthorityCurrent(Authority, Record)
+				_LLM_TerminalOutputMarkUnknown(Record, Authority)
+			throw Err
+		}
+		if !(Receipt is Map)
+			throw Error("Native packet serialization refused; the unsent attempt remains pending.")
+		Record["busy"] := true
+		try {
+			_LLM_TerminalOutputRequireRecord(OriginalHandle, Record, Authority)
+			LLM_NavEventOwner_ValidateTerminalOutputPackets(OriginalHandle, Receipt, Authority)
+			Accepted := this.PacketEmitter.Call(Receipt)
+			_LLM_TerminalOutputRequireRecord(OriginalHandle, Record, Authority)
+			if this.Handle != OriginalHandle || this.Attempt != Attempt || !(Accepted is Integer)
+					|| Accepted < 0 || Accepted > Record["attempt_count"]
+				throw ValueError("Packet delivery did not retain an exact owned accepted prefix.")
+			LLM_NavEventOwner_ValidateTerminalOutputPackets(OriginalHandle, Receipt, Authority)
+			return Accepted
+		} catch as Err {
+			_LLM_TerminalOutputMarkUnknown(Record, Authority)
+			throw Err
+		} finally {
+			Record["busy"] := false
+		}
+	}
+}
+
 /** Resolves and retains the exact native FIFO head; native refusal returns zero. */
 LLM_NavEventOwner_PlanTerminalOutput(Token, State, Port := 0) {
 	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputCreating
@@ -148,12 +242,14 @@ LLM_NavEventOwner_PlanTerminalOutput(Token, State, Port := 0) {
 			"sequence", Snapshot["sequence"], "plan_id", PlanId,
 			"unit_count", Canonical["count"], "delivery_enabled", false,
 			"cohort_complete", false)
-		_LLM_TerminalOutputRecords[ObjPtr(Handle)] := Map("handle", Handle,
+		Record := Map("handle", Handle,
 			"owner", Owner, "token", Token,
 			"sequence", Snapshot["sequence"], "plan_id", PlanId,
 			"unit_count", Canonical["count"], "canonical", Canonical["units"], "port", Port,
 			"accepted", 0, "pending", false, "attempt_id", 0, "attempt_count", 0,
 			"busy", false, "unknown", false)
+		Record["record_id"] := ObjPtr(Record)
+		_LLM_TerminalOutputRecords[ObjPtr(Handle)] := Record
 		return Handle
 	} finally {
 		_LLM_TerminalOutputCreating := false
@@ -166,6 +262,8 @@ LLM_NavEventOwner_BeginTerminalOutputAttempt(Handle) {
 	if !IsObject(Record) || Record["busy"] || Record["pending"] || Record["unknown"]
 			|| Record["accepted"] == Record["unit_count"]
 		return 0
+	Authority := _LLM_TerminalOutputCaptureAuthority(Handle, Record)
+	Record["packet_receipt"] := 0
 	Record["busy"] := true
 	try {
 		Key := _LLM_TerminalOutputKey(Record)
@@ -175,9 +273,15 @@ LLM_NavEventOwner_BeginTerminalOutputAttempt(Handle) {
 			? Fn.Call(Record["owner"], Key, Units, 2048, Count, Attempt)
 			: _LLM_TerminalOutputNativeBegin(Record["owner"], Key, Units, Count, Attempt)
 		catch as Err {
+			_LLM_TerminalOutputMarkUnknown(Record, Authority)
 			Record["unknown"] := true, Record["pending"] := true
 			Record["attempt_id"] := Attempt.Size >= 8 ? NumGet(Attempt, 0, "UInt64") : 0
 			Record["attempt_count"] := Record["unit_count"] - Record["accepted"]
+			throw Err
+		}
+		try _LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
+		catch as Err {
+			Record["pending"] := true
 			throw Err
 		}
 		if !(Status is Integer) || !_LLM_TerminalOutputKnownStatus(Status) {
@@ -203,10 +307,12 @@ LLM_NavEventOwner_BeginTerminalOutputAttempt(Handle) {
 			Record["unknown"] := true
 			throw Err
 		}
-		return Map("owner", Record["owner"], "token", Record["token"],
+		AttemptReceipt := Map("owner", Record["owner"], "token", Record["token"],
 			"sequence", Record["sequence"], "plan_id", Record["plan_id"],
 			"attempt_id", Record["attempt_id"], "unit_count", Record["attempt_count"],
 			"units", Decoded, "delivery_enabled", false, "cohort_complete", false)
+		Record["owned_attempt"] := AttemptReceipt
+		return AttemptReceipt
 	} finally {
 		Record["busy"] := false
 	}
@@ -217,7 +323,15 @@ LLM_NavEventOwner_AcknowledgeTerminalOutput(Handle, Attempt, Accepted) {
 	Record := _LLM_TerminalOutputRecord(Handle)
 	if !IsObject(Record) || Record["busy"] || Record["unknown"] || !Record["pending"]
 		return false
+	Authority := _LLM_TerminalOutputCaptureAuthority(Handle, Record)
 	_LLM_TerminalOutputValidateAttempt(Record, Attempt)
+	if IsObject(Record.Get("packet_receipt", 0)) {
+		if Attempt != Record["packet_attempt"] {
+			Record["unknown"] := true
+			throw ValueError("A foreign attempt cannot acknowledge an owned packet copy.")
+		}
+		LLM_NavEventOwner_ValidateTerminalOutputPackets(Handle, Record["packet_receipt"], Authority)
+	}
 	if !(Accepted is Integer) || Accepted < 0 || Accepted > Record["attempt_count"]
 		throw ValueError("An exact output acceptance prefix is required.")
 	Record["busy"] := true
@@ -229,9 +343,10 @@ LLM_NavEventOwner_AcknowledgeTerminalOutput(Handle, Attempt, Accepted) {
 			: _LLM_TerminalOutputNativeAcknowledge(Record["owner"], Key,
 				Record["attempt_id"], Accepted)
 		catch as Err {
-			Record["unknown"] := true
+			_LLM_TerminalOutputMarkUnknown(Record, Authority)
 			throw Err
 		}
+		_LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
 		if !(Status is Integer) || !_LLM_TerminalOutputKnownStatus(Status) {
 			Record["unknown"] := true
 			throw Error("Terminal output acknowledgement returned an unknown ACK.")
@@ -252,7 +367,7 @@ LLM_NavEventOwner_ConsumeTerminalOutput(Handle) {
 	if !IsObject(Record) || Record["busy"] || Record["unknown"] || Record["pending"]
 			|| Record["accepted"] != Record["unit_count"]
 		return false
-	return _LLM_TerminalOutputRetire(Record, "consume_terminal_output")
+	return _LLM_TerminalOutputRetire(Record, "consume_terminal_output", Handle)
 }
 
 /** Relinquishes only an unsent plan; outstanding/accepted output retains custody. */
@@ -261,7 +376,7 @@ LLM_NavEventOwner_CancelTerminalOutput(Handle) {
 	if !IsObject(Record) || Record["busy"] || Record["unknown"]
 			|| Record["pending"] || Record["accepted"] != 0
 		return false
-	return _LLM_TerminalOutputRetire(Record, "cancel_terminal_output")
+	return _LLM_TerminalOutputRetire(Record, "cancel_terminal_output", Handle)
 }
 
 /** Reports held custody without granting delivery or guessing unknown outcomes. */
@@ -295,10 +410,14 @@ _LLM_TerminalOutputStatus(Status) {
 }
 
 _LLM_TerminalOutputRecord(Handle) {
-	global _LLM_TerminalOutputRecords
+	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputUnknown
+	if IsObject(_LLM_TerminalOutputUnknown)
+		return 0
 	if !(Handle is Map) || !_LLM_TerminalOutputRecords.Has(ObjPtr(Handle))
 		return 0
 	Record := _LLM_TerminalOutputRecords[ObjPtr(Handle)]
+	if !(Record is Map) || !(Record.Get("record_id", 0) is Integer) || Record["record_id"] != ObjPtr(Record)
+		throw ValueError("The terminal custody registry changed its retained record instance.")
 	for Name in ["owner", "token", "sequence", "plan_id", "unit_count"]
 		if !Handle.Has(Name) || !(Handle[Name] is Integer) || Handle[Name] != Record[Name]
 			throw ValueError("The terminal custody handle changed its owned identity.")
@@ -362,8 +481,9 @@ _LLM_TerminalOutputValidateAttempt(Record, Attempt) {
 	}
 }
 
-_LLM_TerminalOutputRetire(Record, Operation) {
+_LLM_TerminalOutputRetire(Record, Operation, Handle) {
 	global _LLM_TerminalOutputRecords
+	Authority := _LLM_TerminalOutputCaptureAuthority(Handle, Record)
 	Record["busy"] := true
 	try {
 		Key := _LLM_TerminalOutputKey(Record)
@@ -371,9 +491,10 @@ _LLM_TerminalOutputRetire(Record, Operation) {
 		try Status := HasMethod(Fn, "Call") ? Fn.Call(Record["owner"], Key)
 			: _LLM_TerminalOutputNativeRetire(Record["owner"], Key, Operation)
 		catch as Err {
-			Record["unknown"] := true
+			_LLM_TerminalOutputMarkUnknown(Record, Authority)
 			throw Err
 		}
+		_LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
 		if !(Status is Integer) || !_LLM_TerminalOutputKnownStatus(Status) {
 			Record["unknown"] := true
 			throw Error("Terminal output retirement returned an unknown ACK.")
@@ -461,6 +582,10 @@ _LLM_TerminalOutputCanonical(Snapshot, State, Owner, Recipes) {
 			|| (Route["axis"] == 2 && (Route["target_scan"] != Route["code"] || Route["target_vk"]))
 			|| (Route["axis"] == 1 && (Route["target_vk"] != Route["code"] || Route["target_scan"]))
 		throw ValueError("The terminal output modifier is outside its natural subset.")
+	; Match the immutable native planner receipt: other sources may retain this
+	; natural bit. Zero output still requires the exact original FIFO retirement.
+	if ((Snapshot["modifiers_lr_before"] ^ Snapshot["modifiers_lr_after"]) & Route["effective_modifiers_lr"]) == 0
+		return Map("text", "", "count", 0, "units", Buffer(0))
 	Units := Buffer(10, 0)
 	NumPut("UShort", Route["target_vk"], "UShort", Route["target_scan"], Units, 0)
 	NumPut("UChar", 2, "UChar", Event["key_up"], "UChar", Event["repeat"], Units, 6)
@@ -488,4 +613,245 @@ _LLM_TerminalOutputNativeRetire(Owner, Key, Operation) {
 	Export := Operation == "consume_terminal_output"
 		? "ErgoptiNav_ConsumeTerminalOutput" : "ErgoptiNav_CancelTerminalOutput"
 	return DllCall(_LLM_NavEventOwnerNativeExport(Export), "UInt64", Owner, "Ptr", Key, "Int")
+}
+
+/** Copies one exact pending native attempt; no fallback constructs emit packets. */
+LLM_NavEventOwner_SerializeTerminalOutputAttempt(Handle, Attempt) {
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	Record := _LLM_TerminalOutputRecord(Handle)
+	if !IsObject(Record) || Record["busy"] || Record["unknown"] || !Record["pending"]
+			|| IsObject(Record.Get("packet_receipt", 0))
+		return 0
+	_LLM_TerminalOutputValidateAttempt(Record, Attempt)
+	if Attempt != Record.Get("owned_attempt", 0)
+		throw ValueError("Only the exact retained attempt may receive native packets.")
+	Authority := _LLM_TerminalOutputCaptureAuthority(Handle, Record)
+	Record["busy"] := true
+	try {
+		Key := _LLM_TerminalOutputKey(Record)
+		Packets := Buffer(81920, 0), Count := Buffer(4, 0)
+		Fn := _LLM_NavEventOwnerPortFn("serialize_terminal_output_attempt", Record["port"])
+		try Status := HasMethod(Fn, "Call")
+			? Fn.Call(Record["owner"], Key, Record["attempt_id"], Packets, 2048, Count)
+			: _LLM_TerminalOutputNativeSerialize(Record["owner"], Key,
+				Record["attempt_id"], Packets, Count)
+		catch as Err {
+			_LLM_TerminalOutputMarkUnknown(Record, Authority)
+			throw Err
+		}
+		_LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
+		if !(Status is Integer) || !_LLM_TerminalOutputKnownStatus(Status) {
+			_LLM_TerminalOutputMarkUnknown(Record, Authority)
+			throw Error("Native packet serialization returned an unknown ACK.")
+		}
+		if !_LLM_TerminalOutputStatus(Status)
+			return 0
+		try {
+			if Packets.Size != 81920 || Count.Size != 4 || Key.Size != 24
+					|| Record["owner"] != _LLM_NavEventOwnerTerminalRouteOwner
+					|| NumGet(Key, 0, "UInt64") != Record["token"]
+					|| NumGet(Key, 8, "UInt64") != Record["sequence"]
+					|| NumGet(Key, 16, "UInt64") != Record["plan_id"]
+					|| NumGet(Count, 0, "UInt") != Record["attempt_count"]
+				throw ValueError("The native packet receipt changed its exact owned ABI identity.")
+			_LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
+			_LLM_TerminalOutputValidateAttempt(Record, Attempt)
+			_LLM_TerminalOutputValidateNativePackets(Packets, Record)
+			ByteCount := Record["attempt_count"] * 40
+			OwnedBytes := Buffer(ByteCount, 0)
+			PublicBytes := Buffer(OwnedBytes.Size, 0)
+			_LLM_TerminalOutputCopyPacketBytes(OwnedBytes, Packets, Record, "owned", ByteCount, 81920, Handle, Attempt, Key, Authority)
+			if OwnedBytes.Size != ByteCount
+				throw ValueError("The detached native packet copy changed its exact bound.")
+			_LLM_TerminalOutputValidateNativePackets(OwnedBytes, Record)
+			_LLM_TerminalOutputCopyPacketBytes(PublicBytes, OwnedBytes, Record, "public", ByteCount, ByteCount, Handle, Attempt, Key, Authority)
+			if PublicBytes.Size != ByteCount || OwnedBytes.Size != ByteCount
+					|| Record["attempt_count"] * 40 != ByteCount
+					|| Record["owner"] != _LLM_NavEventOwnerTerminalRouteOwner
+				throw ValueError("The published packet copy changed its bound or current owner.")
+			_LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
+			_LLM_TerminalOutputValidateAttempt(Record, Attempt)
+			_LLM_TerminalOutputValidateNativePackets(OwnedBytes, Record)
+			_LLM_TerminalOutputValidateNativePackets(PublicBytes, Record)
+			Receipt := Map("owner", Record["owner"], "token", Record["token"],
+				"sequence", Record["sequence"], "plan_id", Record["plan_id"],
+				"attempt_id", Record["attempt_id"], "unit_count", Record["attempt_count"],
+				"packet_size", 40, "packets", PublicBytes,
+				"delivery_enabled", false, "cohort_complete", false)
+			Record["packet_receipt"] := Receipt, Record["packet_attempt"] := Attempt
+			Record["packet_private"] := OwnedBytes, Record["packet_public"] := PublicBytes
+			Record["packet_byte_count"] := ByteCount
+			return Receipt
+		} catch as Err {
+			_LLM_TerminalOutputMarkUnknown(Record, Authority)
+			throw Err
+		}
+	} finally {
+		Record["busy"] := false
+	}
+}
+
+/** Explicit protocol test ports observe real copy boundaries, never construct packets. */
+_LLM_TerminalOutputCopyPacketBytes(Destination, Source, Record, Stage, ByteCount, SourceSize, Handle, Attempt, Key, Authority) {
+	Fn := Record["port"] is Map
+		? _LLM_NavEventOwnerPortFn("observe_terminal_output_packet_copy", Record["port"]) : 0
+	if HasMethod(Fn, "Call")
+		Fn.Call("before_" . Stage, Destination, Source)
+	_LLM_TerminalOutputValidateCopyIdentity(Handle, Record, Attempt, Key, ByteCount, Authority)
+	if !(Destination is Buffer) || !(Source is Buffer)
+			|| Destination.Size != ByteCount || Source.Size != SourceSize
+		throw ValueError("The retained packet copy buffers changed before copying.")
+	DllCall("Kernel32\RtlMoveMemory", "Ptr", Destination, "Ptr", Source, "UPtr", ByteCount)
+	if HasMethod(Fn, "Call")
+		Fn.Call("after_" . Stage, Destination, Source)
+	_LLM_TerminalOutputValidateCopyIdentity(Handle, Record, Attempt, Key, ByteCount, Authority)
+}
+
+/** A callback cannot change the authenticated key or byte count being copied. */
+_LLM_TerminalOutputValidateCopyIdentity(Handle, Record, Attempt, Key, ByteCount, Authority) {
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	_LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
+	_LLM_TerminalOutputValidateAttempt(Record, Attempt)
+	if Record["unknown"] || !Record["pending"] || !Record["busy"]
+			|| Record["owner"] != _LLM_NavEventOwnerTerminalRouteOwner
+			|| Record.Get("owned_attempt", 0) != Attempt || Record["attempt_count"] * 40 != ByteCount
+			|| Key.Size != 24 || NumGet(Key, 0, "UInt64") != Record["token"]
+			|| NumGet(Key, 8, "UInt64") != Record["sequence"]
+			|| NumGet(Key, 16, "UInt64") != Record["plan_id"]
+		throw ValueError("The copy observer changed retained native attempt custody.")
+}
+
+/** A single private dictionary read distinguishes the original holder from a clone. */
+_LLM_TerminalOutputBindingCurrent(Handle, Record) {
+	global _LLM_TerminalOutputRecords
+	return Handle is Map && _LLM_TerminalOutputRecords.Get(ObjPtr(Handle), 0) == Record
+}
+
+/** Captures one original holder and detached native key before foreign work. */
+_LLM_TerminalOutputCaptureAuthority(Handle, Record) {
+	Current := _LLM_TerminalOutputRecord(Handle)
+	if !IsObject(Current) || Current != Record || Record["handle"] != Handle
+		throw ValueError("Terminal custody has no exact original handle binding.")
+	return Map("handle", Handle, "owner", Record["owner"], "token", Record["token"],
+		"sequence", Record["sequence"], "plan_id", Record["plan_id"], "unit_count", Record["unit_count"],
+		"key", _LLM_TerminalOutputKey(Record))
+}
+
+/** Private pre-callback evidence cannot borrow mutated record identity fields. */
+_LLM_TerminalOutputAuthorityCurrent(Authority, Record) {
+	if !(Authority is Map) || Record.Get("handle", 0) != Authority["handle"]
+		return false
+	for Name in ["owner", "token", "sequence", "plan_id", "unit_count"]
+		if !(Record.Get(Name, "") is Integer) || Record[Name] != Authority[Name]
+				|| !(Authority["handle"].Get(Name, "") is Integer) || Authority["handle"][Name] != Authority[Name]
+			return false
+	return true
+}
+
+/** Restores no ownership after an unregistered or foreign registry replacement. */
+_LLM_TerminalOutputRequireRecord(Handle, Record, Authority := 0) {
+	if !(Authority is Map)
+		Authority := _LLM_TerminalOutputCaptureAuthority(Handle, Record)
+	try {
+		Current := _LLM_TerminalOutputRecord(Handle)
+		if !IsObject(Current) || Current != Record || Authority["handle"] != Handle
+				|| !_LLM_TerminalOutputAuthorityCurrent(Authority, Record)
+			throw ValueError("The callback replaced the original terminal record binding.")
+		return true
+	} catch as Err {
+		_LLM_TerminalOutputMarkUnknown(Record, Authority)
+		throw Err
+	}
+}
+
+/** Lost/mutated bindings retain the original private key and holder, never a successor. */
+_LLM_TerminalOutputMarkUnknown(Record, Authority := 0) {
+	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputUnknown
+	Record["unknown"] := true
+	if !(Authority is Map)
+		Authority := _LLM_TerminalOutputCaptureAuthority(Record["handle"], Record)
+	Handle := Authority["handle"]
+	if !_LLM_TerminalOutputRecords.Has(ObjPtr(Handle))
+			|| _LLM_TerminalOutputRecords[ObjPtr(Handle)] != Record
+			|| !_LLM_TerminalOutputAuthorityCurrent(Authority, Record) {
+		if !IsObject(_LLM_TerminalOutputUnknown) {
+			_LLM_TerminalOutputUnknown := _LLM_TerminalOutputUnknownKey(
+				Authority["owner"], Authority["token"], Authority["sequence"], Authority["key"])
+			_LLM_TerminalOutputUnknown["record"] := Record
+			_LLM_TerminalOutputUnknown["handle"] := Handle
+		}
+	}
+}
+
+/** Pins the ABI mirror to the single native marker owner through the source gate. */
+_LLM_TerminalOutputReplayMarker() {
+	return 0x4552475054524D31
+}
+
+/** Validates every byte independently of the native packet construction branch. */
+_LLM_TerminalOutputValidateNativePackets(Packets, Record) {
+	Loop Record["attempt_count"] {
+		Base := (Record["accepted"] + A_Index - 1) * 10
+		Offset := (A_Index - 1) * 40
+		Kind := NumGet(Record["canonical"], Base + 6, "UChar")
+		Scan := NumGet(Record["canonical"], Base + 2, "UShort")
+		Vk := Kind == 1 ? 0 : NumGet(Record["canonical"], Base, "UShort")
+		Code := Kind == 1 ? NumGet(Record["canonical"], Base + 4, "UShort") : (Scan & 0xFF)
+		Flags := NumGet(Record["canonical"], Base + 7, "UChar") ? 2 : 0
+		Flags |= Kind == 1 ? 4 : (Scan ? 8 | ((Scan & 0x100) ? 1 : 0) : 0)
+		if NumGet(Packets, Offset, "UInt") != 1
+				|| NumGet(Packets, Offset + 4, "UInt") != 0
+				|| NumGet(Packets, Offset + 8, "UShort") != Vk
+				|| NumGet(Packets, Offset + 10, "UShort") != Code
+				|| NumGet(Packets, Offset + 12, "UInt") != Flags
+				|| NumGet(Packets, Offset + 16, "UInt64") != 0
+				|| NumGet(Packets, Offset + 24, "UInt64") != _LLM_TerminalOutputReplayMarker()
+				|| NumGet(Packets, Offset + 32, "UInt64") != 0
+			throw ValueError("Native packet bytes differ from the retained canonical output suffix.")
+	}
+}
+
+/** Mutated, foreign or stale public copies cannot authorize any accepted prefix. */
+LLM_NavEventOwner_ValidateTerminalOutputPackets(Handle, Receipt, Authority := 0) {
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	Record := _LLM_TerminalOutputRecord(Handle)
+	if !IsObject(Record)
+		throw ValueError("The packet copy has no retained terminal owner.")
+	if !(Authority is Map)
+		Authority := _LLM_TerminalOutputCaptureAuthority(Handle, Record)
+	try {
+		_LLM_TerminalOutputRequireRecord(Handle, Record, Authority)
+		if Record["unknown"] || !Record["pending"] || !(Receipt is Map)
+				|| Record["owner"] != _LLM_NavEventOwnerTerminalRouteOwner
+				|| Receipt != Record.Get("packet_receipt", 0)
+			throw ValueError("The packet receipt is foreign, stale or uncertain.")
+		for Name in ["owner", "token", "sequence", "plan_id", "attempt_id"]
+			if !Receipt.Has(Name) || !(Receipt[Name] is Integer) || Receipt[Name] != Record[Name]
+				throw ValueError("The public packet receipt changed its owned identity.")
+		if !(Receipt.Get("unit_count", -1) is Integer) || Receipt["unit_count"] != Record["attempt_count"]
+				|| !(Receipt.Get("packet_size", -1) is Integer) || Receipt["packet_size"] != 40
+				|| !(Receipt.Get("delivery_enabled", 1) is Integer) || Receipt["delivery_enabled"] != 0
+				|| !(Receipt.Get("cohort_complete", 1) is Integer) || Receipt["cohort_complete"] != 0
+				|| Receipt.Get("packets", 0) != Record["packet_public"]
+				|| Record["packet_public"].Size != Record["packet_private"].Size
+				|| Record["packet_private"].Size != Record["packet_byte_count"]
+				|| Record["packet_byte_count"] != Record["attempt_count"] * 40
+			throw ValueError("The public packet buffer changed its exact bounds or delivery guards.")
+		_LLM_TerminalOutputValidateAttempt(Record, Record["packet_attempt"])
+		_LLM_TerminalOutputValidateNativePackets(Record["packet_private"], Record)
+		Loop Record["packet_private"].Size
+			if NumGet(Record["packet_public"], A_Index - 1, "UChar")
+					!= NumGet(Record["packet_private"], A_Index - 1, "UChar")
+				throw ValueError("The caller changed an immutable native packet byte.")
+		return true
+	} catch as Err {
+		_LLM_TerminalOutputMarkUnknown(Record, Authority)
+		throw Err
+	}
+}
+
+_LLM_TerminalOutputNativeSerialize(Owner, Key, Attempt, Packets, Count) {
+	return DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_SerializeTerminalOutputAttempt"),
+		"UInt64", Owner, "Ptr", Key, "UInt64", Attempt, "Ptr", Packets, "UInt", 2048,
+		"Ptr", Count, "Int")
 }

@@ -1,0 +1,31 @@
+{
+	"patch_sha256": "d7ccb03d79f5303c9f413fd686f459cd4188ef8bfb043a6cbf33f30676a739c5",
+	"paths": [
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_agent.ahk",
+			"before_sha256": "f132a016d103b0fa6b289a4fb1cc3c8384a12a9b5699690e55aedad47db4e5d9",
+			"after_sha256": "4afeb2e271393f6b60f6188b9e4cbe1dd41afbf64555a230fab51e0374a56f84"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/test_llm_agent.ahk",
+			"before_sha256": "c9a6571d1fa6f7e9e68396fdb6bca49d0101b8a05c62eb421717c5184fa74bdd",
+			"after_sha256": "c1fc3c04d268f3448717404b06c11328cea0c4e2816dfad82f0514204c688b4f",
+			"previous_complete_byte_prefix_preserved": true,
+			"original_assertion_calls": 615,
+			"new_assertion_calls": 7,
+			"new_native_cases": 6,
+			"assertion_count_regex": "\\bAssert[A-Z]\\w*\\("
+		},
+		{
+			"path": "tools/test/test-windows-rewrite-prompt-wiring.cjs",
+			"before_sha256": "4578d744ebd55bb5c1b1e0661c719488c2c404322e793c217a7cb7da626c9b46",
+			"after_sha256": "0741770e93f2d41b6b85d468c8d5aae22cd6c0329eedcd4643e21490040ac4f1",
+			"previous_all_lines_preserved": true
+		}
+	],
+	"dependencies": [
+		"57bfc693e395b4667d7b18f7ca9390ff7b9641ac53bbf0424e41f213dd85d2f8",
+		"7bf1749a05dc2523b8eac853d46d6aae8ca17ca0ab252bdb9e995b4336d399d7",
+		"75356660b04198ec5279587cfa9a03bb92b2b3d099d13a1e55434d2bb0ddb82c"
+	]
+}

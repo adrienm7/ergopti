@@ -1,0 +1,220 @@
+{
+	"schema_version": 1,
+	"scope": "Actual Windows controlled software receiving; no physical or installed release qualification",
+	"base": "13cf4ad8bf824027bde3a640b8fc0bab3cd2a701",
+	"node": "22.22.2",
+	"ahk": "2.0.26 x64",
+	"powershell": "5.1",
+	"selected": [
+		{
+			"passed": 20,
+			"expected": 20,
+			"filter": "todo49-model-build-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 91,
+			"expected": 91,
+			"filter": "todo49-registration-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 9,
+			"expected": 9,
+			"filter": "todo49-route-adapter",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 35,
+			"expected": 35,
+			"filter": "groups247-offer-affinity",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 17,
+			"expected": 17,
+			"filter": "managed-origin-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 25,
+			"expected": 25,
+			"filter": "todo46-manual-requester",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 6,
+			"expected": 6,
+			"filter": "agent-app-picker-tail",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 5,
+			"expected": 5,
+			"filter": "aux-final-origin-currency",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 8,
+			"expected": 8,
+			"filter": "personal-metadata-source-type",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 212,
+			"expected": 212,
+			"filter": "todo49-packet-receiving",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 98,
+			"expected": 98,
+			"filter": "todo49-natural-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 12,
+			"expected": 12,
+			"filter": "todo49-output-custody-adapter",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 11,
+			"expected": 11,
+			"filter": "todo49-output-consumer",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 123,
+			"expected": 123,
+			"filter": "todo49-frozen-authority",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 211,
+			"expected": 211,
+			"filter": "todo49-explicit-sendinput",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 91,
+			"expected": 91,
+			"filter": "kle-reset-observer",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 10,
+			"expected": 10,
+			"filter": "layout-registry-emulation",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 7,
+			"expected": 7,
+			"filter": "todo49-observer-hints",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 16,
+			"expected": 0,
+			"filter": "keylogger arrival FIFO",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 13,
+			"expected": 0,
+			"filter": "groups247-collection",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 1,
+			"expected": 1,
+			"filter": "keylogger-shutdown-close-chain",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		}
+	],
+	"selected_passed": 1021.0,
+	"native_owner_cases": 44,
+	"replay_matrices": 8,
+	"output_matrices": 11,
+	"trace_matrices": 6,
+	"dll_exports": 41,
+	"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+	"native_source_fingerprint": "C174264C9C8675E9B6530F4C0AD561043D574D9085C39E984C5B550ED9021C22",
+	"private_alias_vectors": 170,
+	"registration_model_original": {
+		"failed": 20,
+		"passed": 0,
+		"exit": 1
+	},
+	"collector_powershell_controls": 30,
+	"full_js": "CANCELLED_INCOMPLETE",
+	"native_linux": "UNRUN unavailable",
+	"native_macos": "UNRUN",
+	"physical": "UNRUN",
+	"user32_fixture": "UNRUN resident preserved",
+	"production_cohort_enabled": false
+}

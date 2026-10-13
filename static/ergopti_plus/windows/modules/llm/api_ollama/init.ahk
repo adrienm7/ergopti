@@ -246,6 +246,9 @@ LLM_AuxBegin(Kind, Context := 0) {
 			"cancel", 0,
 			"finalizer", 0,
 			"cleanup_claimed", false)
+		; The lexical origin capability must survive this explicit context projection.
+		if Context.Has("origin_custody")
+			Owner["origin_custody"] := Context["origin_custody"]
 		_LLM_AuxOwners[Kind] := Owner
 	} finally Critical(PreviousCritical)
 	if Retired is Map
