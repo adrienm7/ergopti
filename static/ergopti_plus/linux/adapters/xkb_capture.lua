@@ -885,6 +885,64 @@ function M.inverse_republish(previous, require_source)
 end
 
 
+-- A group retarget mints a new readonly inverse; it never revives the old one.
+local inverse_retargeting = false
+local function retarget_inverse(previous)
+	local owned = _inverse_receipts[previous]
+	local function provenance()
+		return owned and owned.revoked == true and owned.desktop_generation ~= nil
+			and rawequal(package.loaded["adapters.xkb_capture"], M)
+			and type(_session) == "table" and getmetatable(_session) == nil
+			and type(_backend) == "table" and getmetatable(_backend) == nil
+			and rawequal(_session, owned.session) and rawequal(_backend, owned.backend)
+			and _keymap_text == owned.raw_map and _inverse_map_owner == owned.map_owner
+			and owned.session.identity == owned.native_map
+			and rawequal(_backend.create, owned.create) and rawequal(_backend.destroy, owned.destroy)
+			and rawequal(_backend.capture_group or _backend.source_group, owned.getter)
+			and rawequal(_backend.inverse, owned.inverse) and rawequal(_backend.source_group, owned.source_getter)
+			and rawequal(M.inverse_table, issue_inverse) and rawequal(M.inverse_current, check_inverse)
+			and rawequal(M.inverse_retarget, retarget_inverse)
+	end
+	if inverse_retargeting or not provenance() then return nil, "inverse-group-renewal-refused" end
+	inverse_retargeting = true
+	local fresh
+	local called, built, reason, receipt = pcall(function()
+		local observed_generation, _, observed = source_identity()
+		local group = _source_group
+		if not provenance() or not observed_generation or type(observed) ~= "function"
+			or group == owned.group then return nil, "inverse-group-renewal-refused" end
+		local values, why, next_receipt = issue_inverse(true)
+		fresh = _inverse_receipts[next_receipt]
+		if not values or not fresh then return nil, why or "inverse-group-renewal-refused" end
+		local checked, current = pcall(check_inverse, next_receipt)
+		if not provenance() or not checked or current ~= true
+			or fresh.group ~= group or fresh.desktop_generation ~= observed_generation then
+			return nil, "inverse-group-renewal-refused"
+		end
+		local sealed, still_observed = pcall(observed)
+		local final, current_fresh = pcall(check_inverse, next_receipt, true)
+		if not provenance() or not sealed or still_observed ~= true or not final or current_fresh ~= true
+			or _source_generation ~= observed_generation or _source_group ~= group then
+			return nil, "inverse-group-renewal-refused"
+		end
+		return values, nil, next_receipt
+	end)
+	inverse_retargeting = false
+	if not called or not built or not receipt then
+		if fresh then fresh.revoked = true end
+		return nil, "inverse-group-renewal-refused"
+	end
+	return built, reason, receipt
+end
+
+--- Renews an automatic desktop inverse for an observed different group only.
+--- Exact old map/session/issuer provenance stays required; old plans stay revoked.
+--- @param previous table Retired inverse receipt from the same live capture.
+--- @return table|nil built Detached output steps, never input/output authority.
+--- @return string|nil reason Closed refusal.
+--- @return table|nil receipt A distinct original readonly inverse receipt.
+M.inverse_retarget = retarget_inverse
+
 --- Enumerates every plain output in a detached state of the active group.
 --- This preserves duplicates for the shared owner to refuse ambiguity.
 --- @param codes table Dense array of registry evdev codes.
