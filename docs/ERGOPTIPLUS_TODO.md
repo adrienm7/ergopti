@@ -4238,6 +4238,15 @@ the complete suites were not rerun afterward. These local baseline outcomes
 do not establish source defects; isolated context or environment causes remain
 possible, and hosted qualification is still required. TODO31 stays partial.
 
+Original Core child-disposition compiler boundary: exact-source manual run
+`38449426462` on `8c1f705c` refuses the Swift `Darwin.sigaction` overload on
+ARM and Intel. The bounded C boundary retains the original default-handler
+and no-auto-reap checks; its native test restores the complete original
+disposition with a checked ACK. Independent source review and eleven real
+POSIX disposition/child controls pass on Linux. Successor Swift compilation
+and native test execution remain pending; no customer lease-73 repair is
+claimed.
+
 ## Remaining work after the 2026-09-30 releases
 
 The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.

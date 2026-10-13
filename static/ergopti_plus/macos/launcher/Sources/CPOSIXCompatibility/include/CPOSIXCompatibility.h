@@ -11,6 +11,7 @@
 #endif
 
 #include "OwnedProgramCompatibility.h"
+#include "OwnedChildReapingCompatibility.h"
 #include "OwnedInstalledConfiguration.h"
 #include "LoopbackListenerCompatibility.h"
 #include "OwnedImageAliasCompatibility.h"

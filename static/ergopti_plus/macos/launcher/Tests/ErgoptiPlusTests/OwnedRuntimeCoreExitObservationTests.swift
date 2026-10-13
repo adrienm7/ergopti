@@ -1,11 +1,32 @@
 // Tests/ErgoptiPlusTests/OwnedRuntimeCoreExitObservationTests.swift
 // Real native child/NOTE_EXITSTATUS controls; these observations never construct Core service authority.
+import CPOSIXCompatibility
 import Darwin
 import Foundation
 import XCTest
 @testable import ErgoptiPlus
 
 final class OwnedRuntimeCoreExitObservationTests: XCTestCase {
+	func testInheritedIgnoredChildDispositionIsRefusedThenRestoredBeforeNativeSpawn() throws {
+		XCTAssertEqual(ergopti_owned_child_reaping_observe(), 1)
+		var previous = sigaction()
+		guard ergopti_owned_child_disposition_read(&previous) == 0 else {
+			throw OwnedRuntimeInstallFailure.source
+		}
+		defer { XCTAssertEqual(ergopti_owned_child_disposition_write(&previous), 0) }
+		var ignored = previous
+		ignored.__sigaction_u.__sa_handler = SIG_IGN
+		guard ergopti_owned_child_disposition_write(&ignored) == 0 else {
+			throw OwnedRuntimeInstallFailure.source
+		}
+		XCTAssertEqual(ergopti_owned_child_reaping_observe(), 0)
+		XCTAssertEqual(ergopti_owned_child_reaping_restore(), 0)
+		XCTAssertEqual(ergopti_owned_child_reaping_observe(), 1)
+		let child = try NativeOwnedCat()
+		defer { XCTAssertTrue(child.retire()) }
+		try child.closeInput()
+		XCTAssertEqual(try child.waitForOrdinaryExit(), 0)
+	}
 	func testInvalidNativeProcessCannotAttach() {
 		XCTAssertNil(OwnedRuntimeCoreExitObservation.attach(process: 0))
 		XCTAssertNil(OwnedRuntimeCoreExitObservation.attach(process: -1))
@@ -46,10 +67,7 @@ private final class NativeOwnedCat {
 	let pid: pid_t
 	private var input: Int32 = -1, status: Int32?, lost = false, closeRefused = false
 	init() throws {
-		var disposition = sigaction()
-		guard Darwin.sigaction(SIGCHLD, nil, &disposition) == 0,
-			unsafeBitCast(disposition.__sigaction_u.__sa_handler, to: UInt.self) == unsafeBitCast(SIG_DFL, to: UInt.self),
-			disposition.sa_flags & SA_NOCLDWAIT == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard ergopti_owned_child_reaping_observe() == 1 else { throw OwnedRuntimeInstallFailure.source }
 		var pipeEnds: [Int32] = [-1, -1]
 		guard pipe(&pipeEnds) == 0 else { throw OwnedRuntimeInstallFailure.source }
 		var readEnd = pipeEnds[0], writeEnd = pipeEnds[1], null = open("/dev/null", O_RDWR | O_CLOEXEC)

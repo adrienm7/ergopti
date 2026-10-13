@@ -1,5 +1,6 @@
 // Sources/ErgoptiPlus/OwnedRuntimeCoreLaunchctl.swift
 // Fixed system launchctl commands own their unreaped native child until every timeout signal is complete.
+import CPOSIXCompatibility
 import Darwin
 import Foundation
 import Security
@@ -80,9 +81,7 @@ enum OwnedRuntimeCoreLaunchctl {
 		var argv = try raw([path] + arguments); defer { for case let pointer? in argv { free(pointer) } }
 		var env = try raw(["PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL=C"]); defer { for case let pointer? in env { free(pointer) } }
 		// This isolated privileged worker restores zombie-producing semantics before its own spawn.
-		var disposition = sigaction()
-		disposition.__sigaction_u.__sa_handler = SIG_DFL
-		guard sigemptyset(&disposition.sa_mask) == 0, Darwin.sigaction(SIGCHLD, &disposition, nil) == 0 else {
+		guard ergopti_owned_child_reaping_restore() == 0 else {
 			throw OwnedRuntimeInstallFailure.source
 		}
 		try parent.verifyAnchor(); try systemCode(path: path, descriptor: image)
