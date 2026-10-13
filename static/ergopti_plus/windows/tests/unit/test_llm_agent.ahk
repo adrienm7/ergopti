@@ -2235,7 +2235,7 @@ _LAG_AgentAppsCommandCustody() {
 		_Read(Corpus, Fx) {
 			for Fault in ["before getter Call", "before callback Call", "before current Call", "before renderer Call", "before ambiguity",
 				"after getter Call", "after callback Call", "after current Call", "after foreign getter",
-				"after foreign callback", "after declaration", "after declaration Has", "after ambiguity", "integer count", "empty count"]
+				"after foreign callback", "after declaration", "after declaration Has", "after ambiguity", "integer count", "control count"]
 				_LAG_AgentAppsCommandFault(Fault, Corpus)
 			AssertEqual(0, Fx.Commits.Length)
 			AssertEqual(0, Fx.Rebuilds)
@@ -2286,8 +2286,8 @@ _LAG_AgentAppsCommandFault(Fault, Corpus) {
 		Calls["count"] += 1
 		if Fault == "integer count"
 			return Integer(Value)
-		if Fault == "empty count"
-			return ""
+		if Fault == "control count"
+			return "invalid`ncount"
 		Withdraw()
 		return Value
 	}
