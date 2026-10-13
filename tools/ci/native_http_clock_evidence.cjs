@@ -7,6 +7,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const baseSource = require('../diagnostics/native_pac_source_evidence.cjs');
+const { roleLot } = require('./macos-stage-roles.cjs');
 const MAC = 'static/ergopti_plus/macos/';
 const SWIFT = Object.freeze([
 	...[
@@ -44,6 +45,7 @@ const LOADERS = Object.freeze([
 	'.github/workflows/ci.yml',
 	'.github/workflows/ci-macos.yml',
 	'tools/ci/native_http_clock_evidence.cjs',
+	'tools/ci/macos-stage-roles.cjs',
 	'tools/ci/dev-release-qualification.cjs',
 	'.github/ci/dev_release_qualification_exceptions.json',
 	'.github/ci/stable_release_qualification_exception.json',
@@ -673,15 +675,28 @@ function officialConsistency(verdict, run, artifact, job, archive, receiving) {
 			artifact.digest === 'sha256:' + sha(archive),
 		'Official artifact consistency refused'
 	);
+	requireFact(['arm64', 'amd64'].includes(epoch.architecture), 'Official job consistency refused');
+	const lot = roleLot('e2e', 'managed-ollama-native', epoch.architecture, '');
 	requireFact(
 		String(job.run_id) === epoch.run_id &&
+			String(job.run_attempt) === epoch.run_attempt &&
 			job.head_sha === candidate &&
 			job.status === 'completed' &&
-			((epoch.architecture === 'arm64' && job.name === 'macOS / Managed Ollama native · arm64') ||
-				(epoch.architecture === 'amd64' && job.name === 'macOS / Managed Ollama native · amd64')) &&
+			job.name === 'macOS / E2E tests (' + lot + ')' &&
 			job.conclusion !== 'skipped' &&
 			job.conclusion !== 'cancelled',
 		'Official job consistency refused'
+	);
+	const marker = 'Record actual stage role outcome';
+	const writers = Array.isArray(job.steps)
+		? job.steps.filter((step) => typeof step?.name === 'string' && step.name.includes(marker))
+		: [];
+	requireFact(
+		writers.length === 1 &&
+			writers[0].name === marker + ' — ' + lot &&
+			writers[0].status === 'completed' &&
+			writers[0].conclusion === 'success',
+		'Official stage writer consistency refused'
 	);
 	requireFact(
 		receiving?.job_api_path ===

@@ -33,21 +33,37 @@ const MacRoles = require('../ci/macos-stage-roles.cjs');
 function macRoleBody(body, role, expectedCount) {
 	const parent = role === 'cold-bootstrap-native' ? 'package-macos' : 'test-hs';
 	const matrix = role === 'cold-bootstrap-native' ? 'testbuild_matrix' : 'e2e_matrix';
+	const metadata = role === 'cold-bootstrap-native' ? 'testbuild_metadata' : 'e2e_metadata';
+	const selected = `fromJSON(needs.${parent}.outputs.${metadata})[matrix.lot]`;
 	assert.equal(pipeline.field(body, 'needs'), '- ' + parent);
 	assert.deepEqual(pipeline.needsOf(body), [parent]);
-	assert.equal(pipeline.field(body, 'runs-on'), '${{ matrix.runner }}');
-	assert.equal(pipeline.field(body, 'timeout-minutes'), '${{ matrix.timeout_minutes }}');
+	assert.equal(pipeline.field(body, 'runs-on'), '${{ ' + selected + '.runner }}');
+	assert.equal(pipeline.field(body, 'timeout-minutes'), '${{ ' + selected + '.timeout_minutes }}');
 	assert.equal(pipeline.field(body, 'if'), null);
 	assert.equal(pipeline.field(body, 'continue-on-error'), null);
-	assert.match(body, /fail-fast: false/);
-	assert.ok(body.includes('include: ${{ fromJSON(needs.' + parent + '.outputs.' + matrix + ') }}'));
+	assert.equal(
+		pipeline.field(body, 'strategy'),
+		'fail-fast: false matrix: ${{ fromJSON(needs.' + parent + '.outputs.' + matrix + ') }}'
+	);
+	assert.equal(
+		pipeline.field(body, 'env'),
+		[
+			'MACOS_STAGE_LOT: ${{ matrix.lot }}',
+			'MACOS_STAGE_METADATA: ${{ needs.' + parent + '.outputs.' + metadata + ' }}',
+			'MACOS_STAGE_CELL: ${{ toJSON(' + selected + ') }}',
+			...['role', 'runner', 'architecture', 'scenario'].map(
+				(key) => 'MACOS_STAGE_' + key.toUpperCase() + ': ${{ ' + selected + '.' + key + ' }}'
+			)
+		].join(' ')
+	);
 	const stage = role === 'cold-bootstrap-native' ? 'testbuild' : 'e2e';
 	const producer = pipeline.job(parent);
-	assert.ok(
-		pipeline
-			.field(producer, 'outputs')
-			.includes(matrix + ': ${{ steps.stage-plan.outputs.' + matrix + ' }}')
-	);
+	for (const output of [matrix, metadata])
+		assert.ok(
+			pipeline
+				.field(producer, 'outputs')
+				.includes(output + ': ${{ steps.stage-plan.outputs.' + output + ' }}')
+		);
 	const planners = pipeline
 		.steps(producer)
 		.filter((step) => pipeline.stepField(step.body, 'id') === 'stage-plan');
@@ -56,6 +72,7 @@ function macRoleBody(body, role, expectedCount) {
 		pipeline.stepField(planners[0].body, 'run'),
 		'node tools/ci/macos-stage-roles.cjs plan ' + stage
 	);
+	assert.equal(pipeline.stepField(planners[0].body, 'if'), null);
 	assert.equal(pipeline.stepField(planners[0].body, 'continue-on-error'), null);
 	const admission = pipeline.step(body, 'Admit complete successful predecessor stage');
 	assert.match(admission, /^          MACOS_STAGE_NEEDS: \$\{\{ toJSON\(needs\) \}\}$/m);
@@ -68,7 +85,7 @@ function macRoleBody(body, role, expectedCount) {
 	);
 	assert.equal(pipeline.stepField(admission, 'if'), null);
 	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
-	const record = pipeline.step(body, 'Record actual stage role outcome');
+	const record = pipeline.step(body, 'Record actual stage role outcome — ${{ matrix.lot }}');
 	assert.equal(pipeline.stepField(record, 'if'), 'always()');
 	assert.ok(
 		pipeline
@@ -98,7 +115,7 @@ function macRoleBody(body, role, expectedCount) {
 	return '    steps:\n' + steps.map((step) => step.body).join('\n');
 }
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
-const { createMatrix } = require('../ci/js-feature-matrix.cjs');
+const { displayPlan } = require('../ci/js-feature-matrix.cjs');
 const {
 	healthyUpgrade,
 	runContractCases,
@@ -646,7 +663,7 @@ try {
 }
 
 /** Pin fresh feature runners and the exact independently gated additional suites. */
-function checkCore(caller, body, prepare, browser, planner = createMatrix) {
+function checkCore(caller, body, prepare, browser, planner = displayPlan) {
 	assert.deepEqual(pipeline.needsOf(caller), ['validate']);
 	assert.equal(pipeline.field(caller, 'if'), null);
 	assert.equal(pipeline.field(caller, 'uses'), './.github/workflows/ci-common.yml');
@@ -659,7 +676,10 @@ function checkCore(caller, body, prepare, browser, planner = createMatrix) {
 	);
 	assert.deepEqual(pipeline.needsOf(prepare), []);
 	assert.equal(pipeline.field(prepare, 'if'), null);
-	assert.equal(pipeline.field(prepare, 'outputs'), 'matrix: ${{ steps.plan.outputs.matrix }}');
+	assert.equal(
+		pipeline.field(prepare, 'outputs'),
+		'matrix: ${{ steps.plan.outputs.matrix }} metadata: ${{ steps.plan.outputs.metadata }}'
+	);
 	assert.equal(
 		pipeline.stepField(
 			pipeline.step(prepare, 'Plan every canonical feature and additional suite'),
@@ -669,18 +689,17 @@ function checkCore(caller, body, prepare, browser, planner = createMatrix) {
 	);
 	assert.deepEqual(
 		pipeline.runOf(pipeline.step(prepare, 'Plan every canonical feature and additional suite')),
-		[
-			'set -euo pipefail',
-			'matrix="$(node tools/ci/js-feature-matrix.cjs)"',
-			'echo "matrix=$matrix" >> "$GITHUB_OUTPUT"'
-		]
+		['set -euo pipefail', 'node tools/ci/js-feature-matrix.cjs plan']
 	);
 	const inventory = loadInventory(path.resolve(__dirname, '../..'));
 	for (const ref of ['refs/heads/main', 'refs/heads/dev']) {
-		const rows = planner(inventory, ref).include;
+		const planned = planner(inventory, ref);
+		assert.deepEqual(planned.matrix, { lot: Object.keys(planned.metadata) });
+		const rows = Object.values(planned.metadata);
 		assert.deepEqual(rows, [
 			...inventory.features.map((feature) => ({ suite: 'js', feature })),
 			{ suite: 'properties', feature: 'properties' },
+			{ suite: 'hotstrings-format', feature: 'hotstrings-format' },
 			...(ref === 'refs/heads/main' ? [{ suite: 'mutation', feature: 'mutation' }] : [])
 		]);
 	}
@@ -691,15 +710,42 @@ function checkCore(caller, body, prepare, browser, planner = createMatrix) {
 	assert.equal(checkout.length, 1);
 	assert.equal(pipeline.stepField(checkout[0].body, 'with'), null);
 	assert.doesNotMatch(body, /\bgit (?:fetch|pull|clone)\b/);
+	assert.match(body, /^      COMMON_LOT: \$\{\{ matrix\.lot \}\}$/m);
+	assert.match(
+		body,
+		/^      COMMON_METADATA: \$\{\{ needs\.prepare-common\.outputs\.metadata \}\}$/m
+	);
+	const admission = pipeline.step(body, 'Admit the complete Common lot map');
+	assert.equal(pipeline.stepField(admission, 'id'), 'common-lot');
+	assert.equal(pipeline.stepField(admission, 'if'), null);
+	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
+	assert.deepEqual(pipeline.runOf(admission), ['node tools/ci/js-feature-matrix.cjs select']);
+	assert.ok(
+		body.indexOf(admission) < body.indexOf(pipeline.step(body, 'Install native validation tools'))
+	);
+	const hotstrings = pipeline.step(body, 'Check hotstring TOML files are sorted and formatted');
+	assert.equal(pipeline.stepField(hotstrings, 'id'), 'hotstrings-format');
+	assert.equal(
+		pipeline.stepField(hotstrings, 'if'),
+		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
+	);
+	assert.equal(pipeline.stepField(hotstrings, 'continue-on-error'), null);
+	assert.deepEqual(pipeline.runOf(hotstrings), [
+		'python tools/format_toml.py --hotstrings --all --check'
+	]);
+	assert.ok(
+		body.indexOf(hotstrings) < body.indexOf(pipeline.step(body, 'Run shared validation suite'))
+	);
 	assert.equal(
 		pipeline.stepField(pipeline.step(body, 'Run shared validation suite'), 'env'),
-		'SUITE: ${{ matrix.suite }} FEATURE: ${{ matrix.feature }}'
+		'SUITE: ${{ steps.common-lot.outputs.suite }} FEATURE: ${{ steps.common-lot.outputs.feature }}'
 	);
 	assert.deepEqual(pipeline.runOf(pipeline.step(body, 'Run shared validation suite')), [
 		'case "$SUITE" in',
 		'    js) npm run test:js -- --feature "$FEATURE" ;;',
 		'    properties) npm run test:properties ;;',
 		'    mutation) npm run test:mutation ;;',
+		'    hotstrings-format) test "${{ steps.hotstrings-format.outcome }}" = success ;;',
 		'    *) exit 1 ;;',
 		'esac'
 	]);
@@ -736,19 +782,24 @@ for (const [from, to] of [
 	assert.notEqual(changed, coreCaller, from + ' must mutate the actual Common caller');
 	assert.throws(() => checkCore(changed, core, corePrepare, coreBrowser), from);
 }
-for (const drop of ['mutation', 'properties']) {
+for (const drop of ['mutation', 'properties', 'hotstrings-format']) {
 	assert.throws(
 		() =>
-			checkCore(coreCaller, core, corePrepare, coreBrowser, (inventory, ref) => ({
-				include: createMatrix(inventory, ref).include.filter((row) => row.suite !== drop)
-			})),
+			checkCore(coreCaller, core, corePrepare, coreBrowser, (inventory, ref) => {
+				const metadata = Object.fromEntries(
+					Object.entries(displayPlan(inventory, ref).metadata).filter(
+						([, row]) => row.suite !== drop
+					)
+				);
+				return { matrix: { lot: Object.keys(metadata) }, metadata };
+			}),
 		'dropping the actual ' + drop + ' row'
 	);
 }
 assert.throws(
 	() =>
 		checkCore(coreCaller, core, corePrepare, coreBrowser, (inventory) =>
-			createMatrix(inventory, 'refs/heads/dev')
+			displayPlan(inventory, 'refs/heads/dev')
 		),
 	'main must retain its actual mutation row'
 );
@@ -756,7 +807,20 @@ for (const [from, to] of [
 	['fail-fast: false', 'fail-fast: true'],
 	['js) npm run test:js -- --feature "$FEATURE" ;;', 'js) npm run test:js -- --only lint ;;'],
 	['needs: [prepare-common]', 'needs: []'],
-	['FEATURE: ${{ matrix.feature }}', 'FEATURE: foreign'],
+	['FEATURE: ${{ steps.common-lot.outputs.feature }}', 'FEATURE: foreign'],
+	['COMMON_LOT: ${{ matrix.lot }}', 'COMMON_LOT: foreign'],
+	['COMMON_METADATA: ${{ needs.prepare-common.outputs.metadata }}', 'COMMON_METADATA: {}'],
+	['id: common-lot', 'id: common-lot\n        if: false'],
+	['node tools/ci/js-feature-matrix.cjs select', 'node tools/ci/js-feature-matrix.cjs plan'],
+	['id: hotstrings-format', 'id: foreign-format'],
+	[
+		'python tools/format_toml.py --hotstrings --all --check',
+		'python tools/format_toml.py --hotstrings --all'
+	],
+	[
+		'hotstrings-format) test "${{ steps.hotstrings-format.outcome }}" = success ;;',
+		'hotstrings-format) true ;;'
+	],
 	[
 		'- uses: actions/checkout@v4',
 		'- uses: actions/checkout@v4\n        with:\n          fetch-depth: 0'
@@ -765,6 +829,14 @@ for (const [from, to] of [
 	const changed = core.replace(from, to);
 	assert.notEqual(changed, core, from + ' must actually mutate the shared gate');
 	assert.throws(() => checkCore(coreCaller, changed, corePrepare, coreBrowser), from);
+}
+for (const [from, to] of [
+	['metadata: ${{ steps.plan.outputs.metadata }}', 'metadata: ${{ steps.plan.outputs.matrix }}'],
+	['node tools/ci/js-feature-matrix.cjs plan', 'node tools/ci/js-feature-matrix.cjs select']
+]) {
+	const changed = corePrepare.replace(from, to);
+	assert.notEqual(changed, corePrepare, 'one actual Common producer mutation');
+	assert.throws(() => checkCore(coreCaller, core, changed, coreBrowser));
 }
 for (const [from, to] of [
 	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
@@ -806,7 +878,7 @@ function checkManagedOllamaNative(body) {
 		assert.match(step.body, /^          ERGOPTI_RELEASE_CHANNEL: '\$\{\{ inputs\.channel \}\}'$/m);
 		assert.match(
 			step.body,
-			/^          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '\$\{\{ matrix\.architecture \}\}'$/m
+			/^          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '\$\{\{ env\.MACOS_STAGE_ARCHITECTURE \}\}'$/m
 		);
 	}
 	const acquire = pipeline.step(role, 'Acquire and verify genuine pinned upstream inputs');
@@ -883,28 +955,37 @@ for (const [from, to] of [
 	['    needs:\n      - test-hs\n', ''],
 	['    needs:\n      - test-hs', 'needs: []'],
 	[
-		'include: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}',
-		'include: ${{ fromJSON(needs.test-hs.outputs.foreign_matrix) }}'
+		'matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}',
+		'matrix: ${{ fromJSON(needs.test-hs.outputs.foreign_matrix) }}'
 	],
 	['    needs:\n      - test-hs', 'needs: [e2e-hs]'],
 	['    needs:\n      - test-hs', 'needs: [e2e-hs, test-linux]'],
 	['    needs:\n      - test-hs', 'needs: [package-macos]'],
-	['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest'],
+	[
+		'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+		'runs-on: ubuntu-latest'
+	],
 	['fail-fast: false', 'fail-fast: true'],
 	[
-		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'",
-		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.runner }}'"
+		'MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_metadata }}',
+		'MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_matrix }}'
 	],
-	["matrix.role == 'managed-ollama-native'", "matrix.role == 'tooltip-canvas'"],
+	['[matrix.lot].role', '[matrix.lot].runner'],
+	['Record actual stage role outcome — ${{ matrix.lot }}', 'Record actual stage role outcome'],
+	[
+		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'",
+		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_RUNNER }}'"
+	],
+	["env.MACOS_STAGE_ROLE == 'managed-ollama-native'", "env.MACOS_STAGE_ROLE == 'tooltip-canvas'"],
 	["GOTOOLCHAIN: 'local'", "GOTOOLCHAIN: 'auto'"],
 	['fetch --depth=1 --no-tags origin', 'fetch --depth=1 --no-tags other'],
 	["actual == identity['sha256']", 'actual == actual'],
 	['macos_managed_ollama_catalogue_test.py --native', 'macos_managed_ollama_catalogue_test.py'],
 	['for profile in pac-inline pac-url explicit-proxy', 'for profile in pac-inline'],
 	['Executed 12 tests, with 0 failures', 'Executed 0 tests, with 0 failures'],
-	['    name: E2E ·', '    needs: package-macos\n    name: E2E ·'],
-	['    name: E2E ·', '    if: inputs.release\n    name: E2E ·'],
-	['    name: E2E ·', '    continue-on-error: true\n    name: E2E ·']
+	['    name: E2E tests', '    needs: package-macos\n    name: E2E tests'],
+	['    name: E2E tests', '    if: inputs.release\n    name: E2E tests'],
+	['    name: E2E tests', '    continue-on-error: true\n    name: E2E tests']
 ]) {
 	const changed = managedOllamaNative.replace(from, to);
 	assert.notEqual(changed, managedOllamaNative, from);
@@ -2255,9 +2336,18 @@ for (const [from, to] of [
 	['    needs:\n      - package-macos', 'needs: [test-linux]'],
 	['    needs:\n      - package-macos', 'needs: [e2e-hs]'],
 	['    needs:\n      - package-macos', 'needs: [cold-bootstrap-native]'],
-	['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest'],
-	['timeout-minutes: ${{ matrix.timeout_minutes }}', 'timeout-minutes: 5'],
-	['runs-on: ${{ matrix.runner }}', 'needs: package-macos\n    runs-on: ${{ matrix.runner }}'],
+	[
+		'runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}',
+		'runs-on: ubuntu-latest'
+	],
+	[
+		'timeout-minutes: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}',
+		'timeout-minutes: 5'
+	],
+	[
+		'runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}',
+		'needs: package-macos\n    runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}'
+	],
 	["ERGOPTI_RELEASE: 'false'", "ERGOPTI_RELEASE: 'true'"],
 	[
 		'bash tools/build/build_macos_app.sh',

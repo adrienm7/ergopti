@@ -449,7 +449,7 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(
             conditions,
             [
-                "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure')) }}"
+                "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure')) }}"
             ],
         )
         self.assertIn("from macos_launch_gate import collect_security_logs", capture)
@@ -458,7 +458,7 @@ class VerdictTests(unittest.TestCase):
         self.assertIn("        timeout-minutes: 3\n", capture)
         retained = step("Retain actual native producer, catalogue and receiving evidence")
         self.assertIn(
-            "        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}\n",
+            "        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}\n",
             retained,
         )
         self.assertIn(
@@ -499,7 +499,7 @@ class VerdictTests(unittest.TestCase):
         )
         self.assertEqual(
             condition,
-            "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && failure() && ("
+            "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && failure() && ("
             + " || ".join(f"steps.{identifier}.outcome == 'failure'" for identifier in identifiers)
             + ")) }}",
         )

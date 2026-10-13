@@ -1006,16 +1006,78 @@ async function main() {
 		async () => {
 			assert.equal(
 				(await require('./fixtures/site-deploy-admission-controls.cjs').run()).controls,
-				101
+				153
 			);
 		}
 	);
 	await check('production output browser assertions reject inert causal failures', async () => {
 		assert.equal(await require('./fixtures/site-artifact-smoke-controls.cjs').run(), 15);
 	});
-	assert.equal(checks, 31, 'every declared behavior control must complete');
+	await check('human site lots retain the one target and base authority', () => {
+		const owner = require('../dev/site-context.cjs');
+		const metadata = owner.siteLots();
+		assert.deepEqual(metadata, {
+			'Stable site': { target: 'main', base_path: '' },
+			'Development site': { target: 'dev', base_path: '/dev' }
+		});
+		for (const [lot, row] of Object.entries(metadata)) {
+			assert.equal(owner.siteLot(row.target), lot);
+			assert.deepEqual(owner.selectSiteLot(lot, JSON.stringify(metadata)), row);
+			assert.deepEqual(owner.resolveSiteTarget(row.target, row.base_path), {
+				branch: row.target,
+				base_path: row.base_path
+			});
+		}
+	});
+	await check('both production build legs forward the same complete admitted map', () => {
+		const { planSiteLots } = require('../ci/site-matrix.cjs');
+		const expected = planSiteLots('plan', {});
+		assert.deepEqual(expected.matrix, { lot: ['Stable site', 'Development site'] });
+		for (const [lot, row] of Object.entries(expected.metadata))
+			assert.deepEqual(
+				planSiteLots('admit', {
+					SITE_LOT: lot,
+					SITE_METADATA: JSON.stringify(expected.metadata),
+					ERGOPTI_SITE_TARGET: row.target,
+					BASE_PATH: row.base_path
+				}),
+				expected
+			);
+	});
+	await check('foreign, partial, duplicated and reassigned site lot transports refuse', () => {
+		const { planSiteLots } = require('../ci/site-matrix.cjs');
+		const expected = planSiteLots('plan', {});
+		const env = {
+			SITE_LOT: 'Stable site',
+			SITE_METADATA: JSON.stringify(expected.metadata),
+			ERGOPTI_SITE_TARGET: 'main',
+			BASE_PATH: ''
+		};
+		for (const change of [
+			{ SITE_LOT: '' },
+			{ SITE_LOT: 'foreign' },
+			{ SITE_LOT: undefined },
+			{ SITE_METADATA: '' },
+			{ SITE_METADATA: '{}' },
+			{ SITE_METADATA: JSON.stringify({ 'Stable site': expected.metadata['Stable site'] }) },
+			{ SITE_METADATA: env.SITE_METADATA.replace('"main"', '"dev"') },
+			{ SITE_METADATA: env.SITE_METADATA.replace('"base_path":""', '"base_path":"/dev"') },
+			{ SITE_METADATA: env.SITE_METADATA.replace('{', '{"Stable site":{},') },
+			{
+				SITE_METADATA: JSON.stringify({
+					...expected.metadata,
+					Foreign: expected.metadata['Stable site']
+				})
+			},
+			{ ERGOPTI_SITE_TARGET: 'dev' },
+			{ BASE_PATH: '/dev' }
+		])
+			assert.throws(() => planSiteLots('admit', { ...env, ...change }));
+		assert.throws(() => planSiteLots('unknown', env));
+	});
+	assert.equal(checks, 34, 'every declared behavior control must complete');
 	console.log(
-		'Website release resolver and branch identity: 31 actual-source controls passed; no network used.'
+		'Website release resolver and branch identity: 34 actual-source controls passed; no network used.'
 	);
 }
 main().catch((error) => {

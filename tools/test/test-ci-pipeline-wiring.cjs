@@ -107,7 +107,7 @@ function macConditionalPrefix(head, stage = null) {
 function retainedManagedStep(original) {
 	const originalIf = pipeline.stepField(original, 'if');
 	const environment =
-		"        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'\n";
+		"        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'\n";
 	const marker = original.indexOf('\n') + 1;
 	assert.ok(marker > 0 && originalIf !== null);
 	return (original.slice(0, marker) + environment + original.slice(marker)).replace(
@@ -143,7 +143,7 @@ function macStageProblems(source) {
 		);
 		const expectedLease = YAML.parse('job:\n' + LEASE_SILENCE_NATIVE_BODY).job.steps.map(
 			(step) => ({
-				...step,
+				...macRole.metadata(step, 'lease-silence-native'),
 				if: macRole.condition('lease-silence-native', step.if)
 			})
 		);
@@ -212,7 +212,7 @@ const MIN_GATED_SECRETS = 6;
 
 // The root's checks after its setup, in order, with the one command each runs.
 const VALIDATE_SETUP = 'Prepare plan validation';
-const VALIDATE_CHECKS = [
+const COMMON_FORMAT_CHECKS = [
 	[
 		'Check hotstring TOML files are sorted and formatted',
 		'python tools/format_toml.py --hotstrings --all --check'
@@ -467,7 +467,7 @@ const STEP_CONDITIONS = [
 		COMMON_BOX,
 		'shared-validation',
 		'Retain captured JS failure output',
-		"always() && matrix.suite == 'js'"
+		"always() && steps.common-lot.outputs.suite == 'js'"
 	],
 	[MACOS_BOX, 'lease-silence-native', 'Retain exact paired-process native receiving', 'always()'],
 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
@@ -514,7 +514,12 @@ const STEP_CONDITIONS = [
 	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native updater archive pipeline', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify archive crypto and bin parent source controls', NOT_CANCELLED],
-	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
+	[
+		COMMON_BOX,
+		'shared-validation',
+		'Check hotstring TOML files are sorted and formatted',
+		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
+	],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
 		ENTRY,
@@ -595,7 +600,7 @@ const STEP_CONDITIONS = [
 		MACOS_BOX,
 		'launch',
 		'Retain source-bound AppleEvent launch qualification receipt',
-		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+		"${{ env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config' }}"
 	],
 	[
 		MACOS_BOX,
@@ -630,112 +635,147 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
 	// Failed upgrade setup/launch must retain its negative receipt before the verdict.
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory compiled upgrade failure evidence', 'always()'],
-	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
-	[LINUX_BOX, 'install-linux', 'Verify source compiler and checkout', "matrix.kind == 'install'"],
-	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', 'Prepare the container', "env.INSTALL_KIND == 'install'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Verify source compiler and checkout',
+		"env.INSTALL_KIND == 'install'"
+	],
+	[LINUX_BOX, 'install-linux', 'Create the installation user', "env.INSTALL_KIND == 'install'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Install as an ordinary user without runtime dependencies',
-		"matrix.kind == 'install'"
+		"env.INSTALL_KIND == 'install'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The installed tree is the one the daemon expects',
-		"matrix.kind == 'install'"
+		"env.INSTALL_KIND == 'install'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		"The unit suite on this distribution's LuaJIT",
-		"matrix.kind == 'install'"
+		"env.INSTALL_KIND == 'install'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload the native distro unit log',
-		"${{ !cancelled() && matrix.kind == 'install' }}"
+		"${{ !cancelled() && env.INSTALL_KIND == 'install' }}"
 	],
-	[LINUX_BOX, 'install-linux', 'Record mandatory distro evidence', "matrix.kind == 'install'"],
-	[LINUX_BOX, 'install-linux', 'Upload mandatory distro evidence', "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', 'Record mandatory distro evidence', "env.INSTALL_KIND == 'install'"],
+	[LINUX_BOX, 'install-linux', 'Upload mandatory distro evidence', "env.INSTALL_KIND == 'install'"],
 	[
 		LINUX_BOX,
 		'install-linux',
-		'Install on ${{ matrix.image }} and verify the first run',
-		"matrix.kind == 'first'"
+		'Install on ${{ env.INSTALL_IMAGE }} and verify the first run',
+		"env.INSTALL_KIND == 'first'"
 	],
-	[LINUX_BOX, 'install-linux', 'Record mandatory first-install evidence', "matrix.kind == 'first'"],
-	[LINUX_BOX, 'install-linux', 'Upload mandatory first-install evidence', "matrix.kind == 'first'"],
-	[LINUX_BOX, 'install-linux', 'Download the .deb built above (deb)', "matrix.kind == 'deb'"],
-	[LINUX_BOX, 'install-linux', 'Install it the way a user would (deb)', "matrix.kind == 'deb'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Record mandatory first-install evidence',
+		"env.INSTALL_KIND == 'first'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload mandatory first-install evidence',
+		"env.INSTALL_KIND == 'first'"
+	],
+	[LINUX_BOX, 'install-linux', 'Download the .deb built above (deb)', "env.INSTALL_KIND == 'deb'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install it the way a user would (deb)',
+		"env.INSTALL_KIND == 'deb'"
+	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The package installed the files the daemon reads (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
-	[LINUX_BOX, 'install-linux', 'Launch the installed binary (deb)', "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', 'Launch the installed binary (deb)', "env.INSTALL_KIND == 'deb'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The installed shared data tree resolves and opens (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Record mandatory .deb smoke evidence (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload mandatory .deb smoke evidence (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
-	[LINUX_BOX, 'install-linux', 'Tools the job itself needs (rpm)', "matrix.kind == 'rpm'"],
-	[LINUX_BOX, 'install-linux', 'Download the .rpm built above (rpm)', "matrix.kind == 'rpm'"],
-	[LINUX_BOX, 'install-linux', 'Install it the way a user would (rpm)', "matrix.kind == 'rpm'"],
-	[LINUX_BOX, 'install-linux', 'Launch the installed binary (rpm)', "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', 'Tools the job itself needs (rpm)', "env.INSTALL_KIND == 'rpm'"],
+	[LINUX_BOX, 'install-linux', 'Download the .rpm built above (rpm)', "env.INSTALL_KIND == 'rpm'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install it the way a user would (rpm)',
+		"env.INSTALL_KIND == 'rpm'"
+	],
+	[LINUX_BOX, 'install-linux', 'Launch the installed binary (rpm)', "env.INSTALL_KIND == 'rpm'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The installed shared data tree resolves and opens (rpm)',
-		"matrix.kind == 'rpm'"
+		"env.INSTALL_KIND == 'rpm'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Record mandatory .rpm smoke evidence (rpm)',
-		"matrix.kind == 'rpm'"
+		"env.INSTALL_KIND == 'rpm'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload mandatory .rpm smoke evidence (rpm)',
-		"matrix.kind == 'rpm'"
+		"env.INSTALL_KIND == 'rpm'"
 	],
-	[LINUX_BOX, 'install-linux', 'Download the AppImage built above', "matrix.kind == 'appimage'"],
-	[LINUX_BOX, 'install-linux', 'Unpack it (no FUSE on this runner)', "matrix.kind == 'appimage'"],
-	[LINUX_BOX, 'install-linux', 'Launch it', "matrix.kind == 'appimage'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Download the AppImage built above',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Unpack it (no FUSE on this runner)',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[LINUX_BOX, 'install-linux', 'Launch it', "env.INSTALL_KIND == 'appimage'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The bundled shared data tree resolves and opens',
-		"matrix.kind == 'appimage'"
+		"env.INSTALL_KIND == 'appimage'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Record mandatory AppImage smoke evidence',
-		"matrix.kind == 'appimage'"
+		"env.INSTALL_KIND == 'appimage'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload mandatory AppImage smoke evidence',
-		"matrix.kind == 'appimage'"
+		"env.INSTALL_KIND == 'appimage'"
 	]
 ].map(macConditionEntry);
 // test-linux runs each harness under !cancelled(), so a red one hides no other;
@@ -934,48 +974,237 @@ for (const [key, value] of planOutputs) {
 }
 const COMMON_MATRIX = '${{ fromJSON(needs.prepare-common.outputs.matrix) }}';
 
+const LUA_TIMING_RETENTION = [
+	{
+		file: LINUX_BOX,
+		job: 'test-linux',
+		producer: 'Run the driver unit test suite',
+		after: 'Upload manual runtime acceptance evidence',
+		directory: 'static/ergopti_plus/linux',
+		step: 'Retain Linux Lua timing diagnostics',
+		artifact:
+			'lua-timings-linux-unit-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		path: '${{ runner.temp }}/linux-lua.json',
+		command:
+			'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"'
+	},
+	{
+		file: MACOS_BOX,
+		job: 'test-hs',
+		producer: 'Run unit + meta tests',
+		after: 'Run unit + meta tests',
+		directory: 'static/ergopti_plus/macos',
+		step: 'Retain macOS Lua timing diagnostics',
+		artifact:
+			'lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		path: '${{ runner.temp }}/macos-lua.json',
+		command:
+			'node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua'
+	}
+];
+
 /** Admits only each matrix include and its exact authored stage-plan producer. */
-function macMatrixReferences(source) {
-	if (macStageProblems(source).length !== 0) return [];
+/** Bind every human-lot output read to its exact adjacent producer and closed field. */
+function lotTransport(source, rel) {
+	const ranges = [];
+	const problems = [];
 	try {
 		const document = YAML.parse(source, { uniqueKeys: true });
-		const jobs = pipeline.jobsOfText(source, MACOS_BOX);
-		return [
-			['test-hs', 'e2e-hs', 'e2e', 'Resolve exact E2E stage roles'],
-			['package-macos', 'launch', 'testbuild', 'Resolve exact test-build stage roles']
-		].map(([producer, consumer, stage, name]) => {
-			const key = stage + '_matrix';
-			const expectedStep = { name, id: 'stage-plan' };
-			if (stage === 'testbuild')
-				expectedStep.env = { MACOS_LAUNCH_SCENARIOS: '${{ steps.profile.outputs.scenarios }}' };
-			expectedStep.run = 'node tools/ci/macos-stage-roles.cjs plan ' + stage;
+		const jobs = pipeline.jobsOfText(source, rel);
+		const routes =
+			rel === MACOS_BOX
+				? [
+						[
+							'test-hs',
+							'e2e-hs',
+							'stage-plan',
+							'e2e_matrix',
+							'e2e_metadata',
+							'Resolve exact E2E stage roles',
+							'node tools/ci/macos-stage-roles.cjs plan e2e'
+						],
+						[
+							'package-macos',
+							'launch',
+							'stage-plan',
+							'testbuild_matrix',
+							'testbuild_metadata',
+							'Resolve exact test-build stage roles',
+							'node tools/ci/macos-stage-roles.cjs plan testbuild'
+						]
+					]
+				: rel === COMMON_BOX
+					? [
+							[
+								'prepare-common',
+								'shared-validation',
+								'plan',
+								'matrix',
+								'metadata',
+								'Plan every canonical feature and additional suite',
+								'set -euo pipefail\nnode tools/ci/js-feature-matrix.cjs plan\n'
+							],
+							[
+								'common-e2e',
+								'common-build',
+								'site-plan',
+								'site_matrix',
+								'site_metadata',
+								'Plan both production site targets',
+								'node tools/ci/site-matrix.cjs plan'
+							],
+							[
+								'common-build',
+								'common-testbuild',
+								'site-plan',
+								'site_matrix',
+								'site_metadata',
+								'Admit the complete production site map',
+								'node tools/ci/site-matrix.cjs admit'
+							]
+						]
+					: rel === LINUX_BOX
+						? [
+								[
+									'package-linux',
+									'install-linux',
+									'install-plan',
+									'install_matrix',
+									'install_metadata',
+									'Plan every authored installation lot',
+									'node tools/ci/linux-install-matrix.cjs'
+								]
+							]
+						: [];
+		if (rel === MACOS_BOX) assert.deepEqual(macStageProblems(source), []);
+		for (const [producer, consumer, id, matrix, metadata, name, run] of routes) {
+			const preceding = document.jobs[producer],
+				receiving = document.jobs[consumer];
+			assert.deepEqual(receiving.needs, [producer], 'Exact immediate lot predecessor required');
+			const outputs =
+				id === 'site-plan' || id === 'install-plan' ? ['matrix', 'metadata'] : [matrix, metadata];
+			for (const [index, key] of [matrix, metadata].entries())
+				assert.equal(
+					preceding.outputs[key],
+					'${{ steps.' + id + '.outputs.' + outputs[index] + ' }}'
+				);
+			const expected = { name, id, run };
+			if (rel === MACOS_BOX && producer === 'package-macos')
+				expected.env = { MACOS_LAUNCH_SCENARIOS: '${{ steps.profile.outputs.scenarios }}' };
 			assert.deepEqual(
-				document.jobs[producer].steps.filter((step) => step.id === 'stage-plan'),
-				[expectedStep],
-				'One mandatory canonical stage-plan producer required'
+				preceding.steps.filter((step) => step.id === id),
+				[expected],
+				'Mandatory exact lot producer required'
 			);
-			assert.equal(
-				document.jobs[producer].outputs[key],
-				'${{ steps.stage-plan.outputs.' + key + ' }}'
-			);
-			const expression = '${{ fromJSON(needs.' + producer + '.outputs.' + key + ') }}';
-			assert.equal(document.jobs[consumer].strategy.matrix.include, expression);
+			const expression = '${{ fromJSON(needs.' + producer + '.outputs.' + matrix + ') }}';
+			assert.deepEqual(receiving.strategy, { 'fail-fast': false, matrix: expression });
+			const selected = 'fromJSON(needs.' + producer + '.outputs.' + metadata + ')[matrix.lot]';
+			const fields = [[6, 'matrix', expression]];
+			if (rel === MACOS_BOX) {
+				fields.push(
+					[4, 'runs-on', '${{ ' + selected + '.runner }}'],
+					[4, 'timeout-minutes', '${{ ' + selected + '.timeout_minutes }}']
+				);
+				const env = {
+					MACOS_STAGE_LOT: '${{ matrix.lot }}',
+					MACOS_STAGE_METADATA: '${{ needs.' + producer + '.outputs.' + metadata + ' }}',
+					MACOS_STAGE_CELL: '${{ toJSON(' + selected + ') }}',
+					...Object.fromEntries(
+						['role', 'runner', 'architecture', 'scenario'].map((field) => [
+							'MACOS_STAGE_' + field.toUpperCase(),
+							'${{ ' + selected + '.' + field + ' }}'
+						])
+					)
+				};
+				assert.deepEqual(receiving.env, env);
+				for (const [key, value] of Object.entries(env))
+					if (key !== 'MACOS_STAGE_LOT') fields.push([6, key, value]);
+			} else if (consumer === 'shared-validation') {
+				assert.equal(receiving.env.COMMON_LOT, '${{ matrix.lot }}');
+				assert.equal(receiving.env.COMMON_METADATA, '${{ needs.prepare-common.outputs.metadata }}');
+				fields.push([6, 'COMMON_METADATA', receiving.env.COMMON_METADATA]);
+				assert.deepEqual(
+					receiving.steps.filter((step) => step.id === 'common-lot'),
+					[
+						{
+							name: 'Admit the complete Common lot map',
+							id: 'common-lot',
+							run: 'node tools/ci/js-feature-matrix.cjs select'
+						}
+					]
+				);
+				assert.ok(
+					receiving.steps.findIndex((step) => step.id === 'common-lot') <
+						receiving.steps.findIndex((step) => step.name === 'Install native validation tools')
+				);
+			} else if (rel === COMMON_BOX) {
+				const env = {
+					SITE_LOT: '${{ matrix.lot }}',
+					SITE_METADATA: '${{ needs.' + producer + '.outputs.' + metadata + ' }}',
+					ERGOPTI_SITE_TARGET: '${{ ' + selected + '.target }}',
+					BASE_PATH: '${{ ' + selected + '.base_path }}',
+					ERGOPTI_SITE_SOURCE_SHA: '${{ github.sha }}'
+				};
+				assert.deepEqual(receiving.env, env);
+				for (const key of ['SITE_METADATA', 'ERGOPTI_SITE_TARGET', 'BASE_PATH'])
+					fields.push([6, key, env[key]]);
+				assert.deepEqual(
+					receiving.steps.filter((step) => step.id === 'site-plan'),
+					[
+						{
+							name: 'Admit the complete production site map',
+							id: 'site-plan',
+							run: 'node tools/ci/site-matrix.cjs admit'
+						}
+					]
+				);
+				assert.equal(
+					receiving.steps[3].id,
+					'site-plan',
+					'Admit the whole map before any production action'
+				);
+			} else {
+				const env = Object.fromEntries(
+					['id', 'kind', 'distro', 'image', 'prep', 'known'].map((field) => [
+						'INSTALL_' + field.toUpperCase(),
+						'${{ ' + selected + '.' + field + ' }}'
+					])
+				);
+				assert.deepEqual(receiving.env, env);
+				assert.equal(receiving.container, '${{ ' + selected + '.container }}');
+				fields.push(
+					[4, 'container', receiving.container],
+					...Object.entries(env).map(([key, value]) => [6, key, value])
+				);
+				assert.deepEqual(receiving.steps[0], {
+					name: 'Require a declared installation lot',
+					shell: 'sh',
+					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage) ;;\n  *) exit 1 ;;\nesac\n'
+				});
+				assert.equal(preceding.steps.at(-1).id, id, 'Plan only after mandatory packaging evidence');
+			}
 			const body = jobs.find((job) => job.id === consumer).body;
-			const field = '        include: ' + expression + '\n';
-			assert.equal(body.split(field).length, 2, 'One actual matrix include field required');
-			const start = source.indexOf(body) + body.indexOf(field) + '        include: '.length;
-			return { start, end: start + expression.length };
-		});
-	} catch {
-		return [];
+			for (const [indent, key, value] of fields) {
+				const line = ' '.repeat(indent) + key + ': ' + value + '\n';
+				assert.equal(body.split(line).length, 2, 'One exact metadata read field required');
+				const start = source.indexOf(body) + body.indexOf(line) + indent + key.length + 2;
+				ranges.push({ start, end: start + value.length });
+			}
+		}
+	} catch (error) {
+		problems.push(rel + ': human lot transport refused: ' + error.message);
+		return { ranges: [], problems };
 	}
+	return { ranges, problems };
 }
 
 /** Keep release-plan outputs at validate and feature matrices at their exact consumers. */
 function planReferenceProblems(files) {
 	const problems = [];
 	for (const file of files) {
-		const macReferences = file.rel === MACOS_BOX ? macMatrixReferences(file.text) : [];
+		const transport = lotTransport(file.text, file.rel);
+		problems.push(...transport.problems);
+		const macReferences = transport.ranges;
 		const consumers =
 			file.rel === COMMON_BOX
 				? pipeline.jobsOfText(file.text, file.rel).filter((job) => job.id === 'shared-validation')
@@ -1058,7 +1287,7 @@ for (const [producer, consumer, stage, roleStep, role] of [
 ]) {
 	const key = stage + '_matrix';
 	const reference = 'needs.' + producer + '.outputs.' + key;
-	const include = '        include: ${{ fromJSON(' + reference + ') }}\n';
+	const include = '      matrix: ${{ fromJSON(' + reference + ') }}\n';
 	const roleHead = '      - name: ' + roleStep + '\n';
 	const rolePrefix = macConditionalPrefix(roleHead, consumer);
 	assert.ok(rolePrefix.endsWith('        if: ' + macRole.condition(role) + '\n'));
@@ -1079,7 +1308,10 @@ for (const [producer, consumer, stage, roleStep, role] of [
 		[
 			'foreign role',
 			rolePrefix,
-			rolePrefix.replace("matrix.role == '" + role + "'", "matrix.role == 'foreign'")
+			rolePrefix.replace(
+				"env.MACOS_STAGE_ROLE == '" + role + "'",
+				"env.MACOS_STAGE_ROLE == 'foreign'"
+			)
 		],
 		[
 			'extra reader inside the legitimate consumer',
@@ -1141,7 +1373,6 @@ function rootProblems(files) {
 			? []
 			: rootSteps.slice(setupAt + 1).filter((step) => step.name !== 'Select native OS lanes');
 	const expected = [
-		...VALIDATE_CHECKS.map(([name]) => name),
 		DEEPEN_STEP,
 		...PLAN_STEPS,
 		'Select the proposed one-candidate native qualification',
@@ -1216,12 +1447,29 @@ function rootProblems(files) {
 			problems.push('Retained plan binding differs: ' + key);
 	if (bound.env.CI_OS_SELECTION !== "${{ inputs.os_lanes || 'all' }}")
 		problems.push('Retained plan selection differs.');
-	for (const [index, [name, command]] of VALIDATE_CHECKS.entries()) {
-		const run = pipeline.stepField(after[index].body, 'run');
-		if (run !== command)
-			problems.push(`${ROOT} step "${name}" must run exactly \`${command}\`, got: ${run}`);
+	for (const [name, command] of COMMON_FORMAT_CHECKS) {
+		const matches = files.flatMap((entry) =>
+			pipeline.jobsOfText(entry.text, entry.rel).flatMap((job) =>
+				pipeline
+					.steps(job.body)
+					.filter((step) => step.name === name)
+					.map((step) => ({ entry, job, step }))
+			)
+		);
+		if (
+			matches.length !== 1 ||
+			matches[0].entry.rel !== COMMON_BOX ||
+			matches[0].job.id !== 'shared-validation' ||
+			pipeline.stepField(matches[0].step.body, 'run') !== command ||
+			pipeline.stepField(matches[0].step.body, 'if') !==
+				"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}" ||
+			pipeline.stepField(matches[0].step.body, 'continue-on-error') !== null
+		)
+			problems.push(
+				'The real hotstring TOML check must run exactly once in its mandatory Common lot.'
+			);
 	}
-	const deepen = pipeline.runOf(after[VALIDATE_CHECKS.length].body) ?? [];
+	const deepen = pipeline.runOf(after[0].body) ?? [];
 	if (JSON.stringify(deepen) !== JSON.stringify(DEEPEN_SCRIPT)) {
 		const differs = deepen.findIndex((line, index) => line !== DEEPEN_SCRIPT[index]);
 		problems.push(
@@ -1385,6 +1633,7 @@ const COMMON_DISPATCH = [
 	'    js) npm run test:js -- --feature "$FEATURE" ;;',
 	'    properties) npm run test:properties ;;',
 	'    mutation) npm run test:mutation ;;',
+	'    hotstrings-format) test "${{ steps.hotstrings-format.outcome }}" = success ;;',
 	'    *) exit 1 ;;',
 	'esac'
 ].join('\n');
@@ -1411,8 +1660,8 @@ function commonSiteProblems(source) {
 		const build = doc.jobs['common-build'],
 			test = doc.jobs['common-testbuild'];
 		for (const [job, previous, name, timeout] of [
-			[build, 'common-e2e', 'Build site — ${{ matrix.target }}', 60],
-			[test, 'common-build', 'Testbuild site — ${{ matrix.target }}', 30]
+			[build, 'common-e2e', 'Build', 60],
+			[test, 'common-build', 'Install and launch', 30]
 		]) {
 			same(job.needs, [previous], 'adjacent production stage');
 			same(job.name, name, 'actual API stage name');
@@ -1422,26 +1671,44 @@ function commonSiteProblems(source) {
 				job.strategy,
 				{
 					'fail-fast': false,
-					matrix: {
-						include: [
-							{ target: 'main', base_path: '' },
-							{ target: 'dev', base_path: '/dev' }
-						]
-					}
+					matrix: '${{ fromJSON(needs.' + previous + '.outputs.site_matrix) }}'
 				},
 				'two exact independent production targets'
 			);
 			same(
 				job.env,
 				{
-					ERGOPTI_SITE_TARGET: '${{ matrix.target }}',
-					BASE_PATH: '${{ matrix.base_path }}',
+					SITE_LOT: '${{ matrix.lot }}',
+					SITE_METADATA: '${{ needs.' + previous + '.outputs.site_metadata }}',
+					ERGOPTI_SITE_TARGET:
+						'${{ fromJSON(needs.' + previous + '.outputs.site_metadata)[matrix.lot].target }}',
+					BASE_PATH:
+						'${{ fromJSON(needs.' + previous + '.outputs.site_metadata)[matrix.lot].base_path }}',
 					ERGOPTI_SITE_SOURCE_SHA: '${{ github.sha }}'
 				},
 				'actual source and separate target'
 			);
-			for (const key of ['if', 'continue-on-error', 'permissions', 'outputs'])
+			for (const key of ['if', 'continue-on-error', 'permissions'])
 				if (job[key] !== undefined) errors.push('production job ' + key);
+			same(
+				job.outputs,
+				job === build
+					? {
+							site_matrix: '${{ steps.site-plan.outputs.matrix }}',
+							site_metadata: '${{ steps.site-plan.outputs.metadata }}'
+						}
+					: undefined,
+				'whole map forwarding only from Build'
+			);
+			same(
+				job.steps[3],
+				{
+					name: 'Admit the complete production site map',
+					id: 'site-plan',
+					run: 'node tools/ci/site-matrix.cjs admit'
+				},
+				'admit the whole source map before production'
+			);
 			for (const step of job.steps)
 				for (const key of ['if', 'continue-on-error'])
 					if (step[key] !== undefined) errors.push('production step ' + key);
@@ -1458,20 +1725,20 @@ function commonSiteProblems(source) {
 				'actual production dependencies'
 			);
 		}
-		same(build.steps.length, 5, 'closed production build steps');
+		same(build.steps.length, 6, 'closed production build steps');
 		command(
 			build,
-			'Build and seal production site',
+			'Build and seal production site — ${{ matrix.lot }}',
 			'set -euo pipefail\nbundle="$RUNNER_TEMP/common-site-$ERGOPTI_SITE_TARGET"\nmkdir "$bundle"\nnpm run build\ncmp -- static/CNAME build/CNAME\nmv build "$bundle/site"\nnode tools/ci/site-artifact.cjs seal "$bundle/site" "$bundle/build.json"\n'
 		);
 		same(
-			build.steps[4],
+			build.steps[5],
 			{
 				name: 'Retain exact production site',
 				uses: 'actions/upload-artifact@v4',
 				with: {
-					name: 'common-site-build-${{ matrix.target }}',
-					path: '${{ runner.temp }}/common-site-${{ matrix.target }}/',
+					name: 'common-site-build-${{ env.ERGOPTI_SITE_TARGET }}',
+					path: '${{ runner.temp }}/common-site-${{ env.ERGOPTI_SITE_TARGET }}/',
 					'include-hidden-files': true,
 					'if-no-files-found': 'error',
 					overwrite: true
@@ -1479,9 +1746,9 @@ function commonSiteProblems(source) {
 			},
 			'retain complete sealed output'
 		);
-		same(test.steps.length, 7, 'closed production receiving steps');
+		same(test.steps.length, 8, 'closed production receiving steps');
 		same(
-			test.steps[3],
+			test.steps[4],
 			{
 				name: 'Install production site browsers',
 				run: 'node tools/ci/install-playwright.cjs chromium webkit'
@@ -1489,12 +1756,12 @@ function commonSiteProblems(source) {
 			'both production browser engines'
 		);
 		same(
-			test.steps[4],
+			test.steps[5],
 			{
 				name: 'Receive exact production site',
 				uses: 'actions/download-artifact@v4',
 				with: {
-					name: 'common-site-build-${{ matrix.target }}',
+					name: 'common-site-build-${{ env.ERGOPTI_SITE_TARGET }}',
 					path: '${{ runner.temp }}/received-site'
 				}
 			},
@@ -1502,16 +1769,16 @@ function commonSiteProblems(source) {
 		);
 		command(
 			test,
-			'Test received production site',
+			'Test received production site — ${{ matrix.lot }}',
 			'set -euo pipefail\nnode tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"\n'
 		);
 		same(
-			test.steps[6],
+			test.steps[7],
 			{
 				name: 'Retain production browser proof',
 				uses: 'actions/upload-artifact@v4',
 				with: {
-					name: 'common-site-testbuild-${{ matrix.target }}',
+					name: 'common-site-testbuild-${{ env.ERGOPTI_SITE_TARGET }}',
 					path: '${{ runner.temp }}/site-testbuild.json',
 					'if-no-files-found': 'error',
 					overwrite: true
@@ -1812,8 +2079,8 @@ const SITE_BUILD_REFUSALS = [
 	],
 	[
 		'skipped production browser',
-		'      - name: Test received production site\n',
-		'      - name: Test received production site\n        if: false\n'
+		'      - name: Test received production site — ${{ matrix.lot }}\n',
+		'      - name: Test received production site — ${{ matrix.lot }}\n        if: false\n'
 	],
 	['unverified domain', '          cmp -- static/CNAME build/CNAME\n', ''],
 	[
@@ -1828,12 +2095,12 @@ const SITE_BUILD_REFUSALS = [
 	],
 	[
 		'Testbuild rebuild fallback',
-		'      - name: Test received production site\n',
-		'      - run: npm run build\n\n      - name: Test received production site\n'
+		'      - name: Test received production site — ${{ matrix.lot }}\n',
+		'      - run: npm run build\n\n      - name: Test received production site — ${{ matrix.lot }}\n'
 	],
 	[
 		'wrong downloaded target',
-		'          name: common-site-build-${{ matrix.target }}\n          path: ${{ runner.temp }}/received-site',
+		'          name: common-site-build-${{ env.ERGOPTI_SITE_TARGET }}\n          path: ${{ runner.temp }}/received-site',
 		'          name: common-site-build-main\n          path: ${{ runner.temp }}/received-site'
 	],
 	[
@@ -1843,8 +2110,8 @@ const SITE_BUILD_REFUSALS = [
 	],
 	[
 		'false stable base',
-		"          - target: main\n            base_path: ''\n          - target: dev\n            base_path: '/dev'\n    env:\n      ERGOPTI_SITE_TARGET: ${{ matrix.target }}\n      BASE_PATH: ${{ matrix.base_path }}\n      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}\n    steps:\n      - uses: actions/checkout@v4\n\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n          cache: 'npm'\n\n      - run: npm ci\n\n      - name: Build and seal production site",
-		"          - target: main\n            base_path: '/dev'\n          - target: dev\n            base_path: '/dev'\n    env:\n      ERGOPTI_SITE_TARGET: ${{ matrix.target }}\n      BASE_PATH: ${{ matrix.base_path }}\n      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}\n    steps:\n      - uses: actions/checkout@v4\n\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n          cache: 'npm'\n\n      - run: npm ci\n\n      - name: Build and seal production site"
+		'      BASE_PATH: ${{ fromJSON(needs.common-e2e.outputs.site_metadata)[matrix.lot].base_path }}\n',
+		"      BASE_PATH: '/dev'\n"
 	]
 ];
 const SITE_DEPLOY_REFUSALS = [
@@ -1983,7 +2250,7 @@ function commonProblems(files) {
 	if (
 		!prepare ||
 		fieldBlock(prepare.body, 'outputs') !==
-			'    outputs:\n      matrix: ${{ steps.plan.outputs.matrix }}'
+			'    outputs:\n      matrix: ${{ steps.plan.outputs.matrix }}\n      metadata: ${{ steps.plan.outputs.metadata }}'
 	)
 		problems.push('Common must expose the actual prepared matrix');
 	const environment =
@@ -1992,7 +2259,16 @@ function commonProblems(files) {
 			.map((key) => `      ERGOPTI_DEV_RELEASE_${key}: \${{ inputs.${key.toLowerCase()} }}`)
 			.join('\n');
 	for (const job of [child, verdict])
-		if (!job || fieldBlock(job.body, 'env') !== environment)
+		if (
+			!job ||
+			fieldBlock(job.body, 'env') !==
+				(job === child
+					? environment.replace(
+							'    env:\n',
+							'    env:\n      COMMON_LOT: ${{ matrix.lot }}\n      COMMON_METADATA: ${{ needs.prepare-common.outputs.metadata }}\n'
+						)
+					: environment)
+		)
 			problems.push('Common must retain exact qualification input bindings');
 	if (common) {
 		if (/^concurrency:/m.test(common.text))
@@ -2040,15 +2316,22 @@ function commonProblems(files) {
 	const plan = exactStep(
 		prepare,
 		'Plan every canonical feature and additional suite',
-		'set -euo pipefail\nmatrix="$(node tools/ci/js-feature-matrix.cjs)"\necho "matrix=$matrix" >> "$GITHUB_OUTPUT"'
+		'set -euo pipefail\nnode tools/ci/js-feature-matrix.cjs plan'
 	);
 	if (!plan || pipeline.stepField(plan, 'id') !== 'plan')
 		problems.push('Common matrix output must come from its actual plan step');
+	const selected = exactStep(
+		child,
+		'Admit the complete Common lot map',
+		'node tools/ci/js-feature-matrix.cjs select'
+	);
+	if (!selected || pipeline.stepField(selected, 'id') !== 'common-lot')
+		problems.push('Common must admit the whole source-owned lot map before dispatch.');
 	const dispatch = exactStep(child, 'Run shared validation suite', COMMON_DISPATCH);
 	if (
 		!dispatch ||
 		pipeline.stepField(dispatch, 'env') !==
-			'SUITE: ${{ matrix.suite }} FEATURE: ${{ matrix.feature }}'
+			'SUITE: ${{ steps.common-lot.outputs.suite }} FEATURE: ${{ steps.common-lot.outputs.feature }}'
 	)
 		problems.push('Common must dispatch the exact suite and feature from its declared matrix');
 	const consumer = scoped.contract.receipt_consumers[0];
@@ -2115,8 +2398,8 @@ for (const [label, from, to] of [
 	],
 	[
 		'arbitrary job field in the legitimate consumer',
-		"    name: 'Unit — ${{ matrix.feature }}'\n",
-		"    name: 'Unit — ${{ matrix.feature }} ${{ needs.prepare-common.outputs.matrix }}'\n"
+		"    name: 'Unit tests'\n",
+		"    name: 'Unit tests ${{ needs.prepare-common.outputs.matrix }}'\n"
 	],
 	[
 		'foreign Common consumer',
@@ -2222,14 +2505,14 @@ for (const [what, file, from, to] of [
 	[
 		'Common substitutes matrix planner',
 		COMMON_BOX,
-		'node tools/ci/js-feature-matrix.cjs',
+		'node tools/ci/js-feature-matrix.cjs plan',
 		'node tools/ci/foreign-matrix.cjs'
 	],
 	['Common drops planner identity', COMMON_BOX, '        id: plan\n', '        id: foreign\n'],
 	[
 		'Common changes feature input',
 		COMMON_BOX,
-		'          FEATURE: ${{ matrix.feature }}\n',
+		'          FEATURE: ${{ steps.common-lot.outputs.feature }}\n',
 		'          FEATURE: foreign\n'
 	],
 	[
@@ -2449,6 +2732,12 @@ function graphProblems(files) {
 			if (job && rel !== MACOS_BOX && index > 0 && index < 4) {
 				const expectedOutputs = [
 					'    outputs:',
+					...(rel === LINUX_BOX && index === 2
+						? [
+								'      install_matrix: ${{ steps.install-plan.outputs.matrix }}',
+								'      install_metadata: ${{ steps.install-plan.outputs.metadata }}'
+							]
+						: []),
 					'      ci_predecessors: ${{ toJSON(needs) }}',
 					'      ci_source_sha: ${{ github.sha }}',
 					'      ci_run_id: ${{ github.run_id }}',
@@ -2517,7 +2806,10 @@ for (const role of [
 	for (const [label, altered] of [
 		['missing role', ''],
 		['duplicate role', first + '\n' + first],
-		['reassigned role', first.replace("matrix.role == '" + role + "'", "matrix.role == 'foreign'")],
+		[
+			'reassigned role',
+			first.replace("env.MACOS_STAGE_ROLE == '" + role + "'", "env.MACOS_STAGE_ROLE == 'foreign'")
+		],
 		['conditional role', first.replace(predicate, 'false')],
 		['forgiven role', first + '\n        continue-on-error: true'],
 		['broad manual admission', first.replace(predicate, 'always()')]
@@ -2556,14 +2848,22 @@ for (const [label, before, after] of [
 	[
 		'native runner authority',
 		pipeline.job('e2e-hs'),
-		pipeline.job('e2e-hs').replace('runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest')
+		pipeline
+			.job('e2e-hs')
+			.replace(
+				'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+				'runs-on: ubuntu-latest'
+			)
 	],
 	[
 		'native timeout authority',
 		pipeline.job('e2e-hs'),
 		pipeline
 			.job('e2e-hs')
-			.replace('timeout-minutes: ${{ matrix.timeout_minutes }}', 'timeout-minutes: 360')
+			.replace(
+				'timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
+				'timeout-minutes: 360'
+			)
 	]
 ])
 	mustCatch(label, MACOS_BOX, before, after, graphProblems);
@@ -2682,15 +2982,15 @@ for (const [what, rel, from, to] of [
 	[
 		'a third entry in the Linux lane',
 		LINUX_BOX,
-		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
-		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"
+		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
+		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n"
 	],
 	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [e2e-ahk]\n', ''],
 	[
 		'Windows packaging stops waiting for unit tests',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: ${{ toJSON(needs) }}\n",
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: success\n"
+		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: ${{ toJSON(needs) }}\n",
+		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: success\n"
 	],
 	[
 		'Windows packaging stops waiting for E2E tests',
@@ -2701,8 +3001,8 @@ for (const [what, rel, from, to] of [
 	[
 		'Windows E2E omits its unit prerequisite',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n",
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n"
+		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n",
+		"  e2e-ahk:\n    name: 'E2E tests'\n"
 	],
 	[
 		'a second exit in the macOS lane',
@@ -3193,14 +3493,14 @@ for (const condition of [
 	'',
 	'false',
 	'always()',
-	"matrix.kind == 'first'",
-	"matrix.kind == 'deb'"
+	"env.INSTALL_KIND == 'first'",
+	"env.INSTALL_KIND == 'deb'"
 ]) {
 	const head = '      - name: Verify source compiler and checkout\n';
 	mustCatch(
 		'source compiler condition ' + condition,
 		LINUX_BOX,
-		head + "        if: matrix.kind == 'install'\n",
+		head + "        if: env.INSTALL_KIND == 'install'\n",
 		head + (condition ? '        if: ' + condition + '\n' : ''),
 		stepProblems
 	);
@@ -3218,15 +3518,15 @@ for (const condition of [
 	'',
 	'false',
 	'success()',
-	"matrix.kind == 'install'",
+	"env.INSTALL_KIND == 'install'",
 	'always()',
-	"always() && matrix.kind == 'install'"
+	"always() && env.INSTALL_KIND == 'install'"
 ]) {
 	const head = '      - name: Upload the native distro unit log\n';
 	mustCatch(
 		'distro native unit raw log condition ' + condition,
 		LINUX_BOX,
-		head + "        if: ${{ !cancelled() && matrix.kind == 'install' }}\n",
+		head + "        if: ${{ !cancelled() && env.INSTALL_KIND == 'install' }}\n",
 		head + (condition ? '        if: ' + condition + '\n' : ''),
 		stepProblems
 	);
@@ -3749,11 +4049,11 @@ mustCatch(
 	'      - name: Omitted TIS evidence upload\n',
 	stepProblems
 );
-for (const condition of ['false', "matrix.kind == 'deb'"]) {
+for (const condition of ['false', "env.INSTALL_KIND == 'deb'"]) {
 	mustCatch(
 		`an AppImage launch routed through ${condition}`,
 		LINUX_BOX,
-		"      - name: Launch it\n        if: matrix.kind == 'appimage'\n",
+		"      - name: Launch it\n        if: env.INSTALL_KIND == 'appimage'\n",
 		`      - name: Launch it\n        if: ${condition}\n`,
 		stepProblems
 	);
@@ -3929,9 +4229,116 @@ for (const line of [
 	}
 }
 
+/** Exercise the real workflow fields; unknown source reads must never inherit admission. */
+function assertLotTransportControls() {
+	let count = 0;
+	for (const [rel, producer, consumer, matrix, metadata] of [
+		[COMMON_BOX, 'prepare-common', 'shared-validation', 'matrix', 'metadata'],
+		[COMMON_BOX, 'common-e2e', 'common-build', 'site_matrix', 'site_metadata'],
+		[COMMON_BOX, 'common-build', 'common-testbuild', 'site_matrix', 'site_metadata'],
+		[MACOS_BOX, 'test-hs', 'e2e-hs', 'e2e_matrix', 'e2e_metadata'],
+		[MACOS_BOX, 'package-macos', 'launch', 'testbuild_matrix', 'testbuild_metadata'],
+		[LINUX_BOX, 'package-linux', 'install-linux', 'install_matrix', 'install_metadata']
+	]) {
+		const source = pipeline.file(rel);
+		const job = pipeline.jobsOfText(source, rel).find((item) => item.id === consumer);
+		assert.ok(job, 'Actual human-lot consumer exists');
+		const matrixLine =
+			'      matrix: ${{ fromJSON(needs.' + producer + '.outputs.' + matrix + ') }}\n';
+		const metadataRef = 'needs.' + producer + '.outputs.' + metadata;
+		const metadataLine = job.body.split('\n').find((line) => line.includes(metadataRef));
+		assert.ok(metadataLine, 'Actual metadata owner read exists');
+		for (const [label, before, after] of [
+			['missing matrix', matrixLine, ''],
+			['foreign matrix producer', matrixLine, matrixLine.replace(producer, 'foreign')],
+			[
+				'foreign matrix key',
+				matrixLine,
+				matrixLine.replace('.outputs.' + matrix, '.outputs.foreign')
+			],
+			[
+				'foreign metadata producer',
+				metadataLine,
+				metadataLine.replace(metadataRef, 'needs.foreign.outputs.' + metadata)
+			],
+			[
+				'foreign metadata key',
+				metadataLine,
+				metadataLine.replace(metadataRef, 'needs.' + producer + '.outputs.foreign')
+			],
+			[
+				'unknown lot selector',
+				metadataLine,
+				metadataLine.includes('[matrix.lot]')
+					? metadataLine.replace('[matrix.lot]', '[matrix.foreign]')
+					: metadataLine.replace(metadataRef, metadataRef + '-foreign')
+			],
+			[
+				'extra script reader',
+				'    steps:\n',
+				'    steps:\n      - name: Foreign metadata reader\n        run: echo "${{ ' +
+					metadataRef +
+					' }}"\n'
+			]
+		]) {
+			assert.equal(job.body.split(before).length, 2, label + ' has exactly one real consumer seam');
+			const altered = source.replace(job.body, job.body.replace(before, after));
+			assert.notEqual(altered, source);
+			const files = pipeline
+				.files()
+				.map((entry) => (entry.rel === rel ? { ...entry, text: altered } : entry));
+			assert.ok(planReferenceProblems(files).length > 0, consumer + ': ' + label);
+			count++;
+		}
+	}
+	const common = pipeline.file(COMMON_BOX);
+	const formatter = pipeline.step(pipeline.job('shared-validation'), COMMON_FORMAT_CHECKS[0][0]);
+	for (const [label, changed] of [
+		['missing mandatory TOML', ''],
+		['duplicate mandatory TOML', formatter + '\n' + formatter],
+		[
+			'forgiven mandatory TOML',
+			formatter.replace('        if:', '        continue-on-error: true\n        if:')
+		],
+		['JS-only TOML row', formatter.replace("'hotstrings-format'", "'js'")]
+	]) {
+		const files = pipeline
+			.files()
+			.map((entry) =>
+				entry.rel === COMMON_BOX ? { ...entry, text: common.replace(formatter, changed) } : entry
+			);
+		assert.ok(rootProblems(files).length > 0, label);
+		count++;
+	}
+	for (const owner of LUA_TIMING_RETENTION) {
+		const source = pipeline.file(owner.file);
+		const uploader = pipeline.step(pipeline.job(owner.job), owner.step);
+		for (const changed of [
+			uploader.replace(owner.path, '${{ runner.temp }}/foreign.json'),
+			uploader.replace('if: ${{ !cancelled() }}', 'if: always()')
+		]) {
+			assert.notEqual(changed, uploader);
+			const files = pipeline
+				.files()
+				.map((entry) =>
+					entry.rel === owner.file ? { ...entry, text: source.replace(uploader, changed) } : entry
+				);
+			assert.ok(
+				namingProblems(files).some((problem) => problem.includes(owner.step)),
+				'Timing names cannot authorize altered evidence'
+			);
+			count++;
+		}
+	}
+	assert.equal(count, 50, 'Closed human-lot and mandatory-format source refusal census');
+	return count;
+}
+assertLotTransportControls();
+
 /** Checks the names GitHub renders after flattening all four workflows. */
 function namingProblems(files) {
 	const problems = [];
+	const admittedTiming = luaTimingRetentionProblems(files).length === 0;
 	for (const entry of files) {
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const name = (pipeline.field(candidate.body, 'name') ?? '').replace(/^(['"])(.*)\1$/, '$2');
@@ -3942,17 +4349,37 @@ function namingProblems(files) {
 						? { core: 'Common', macos: 'macOS', windows: 'Windows', linux: 'Linux' }[
 								candidate.id
 							] === name
-						: /^(Validate|Release) \/ [A-Z][^/]+$/.test(name)
+						: {
+								validate: 'Release plan',
+								'publication-plan': 'Release / Verify all lanes and original plan',
+								release: 'Release / Publish'
+							}[candidate.id] === name
 					: entry.rel === COMMON_BOX
 						? {
-								'prepare-common': 'Prepare feature inventory',
-								'shared-validation': 'Unit — ${{ matrix.feature }}',
+								'prepare-common': 'Check formatting and plan unit tests',
+								'shared-validation': 'Unit tests',
 								'common-unit-verdict': 'Verify complete unit inventory',
-								'common-e2e': 'E2E browser rendering',
-								'common-build': 'Build site — ${{ matrix.target }}',
-								'common-testbuild': 'Testbuild site — ${{ matrix.target }}'
+								'common-e2e': 'E2E tests',
+								'common-build': 'Build',
+								'common-testbuild': 'Install and launch'
 							}[candidate.id] === name
-						: /^[A-Z]/.test(name) && !name.includes(' / ');
+						: {
+								'test-hs': 'Unit tests',
+								'test-ahk': 'Unit tests',
+								'test-linux': 'Unit tests',
+								'e2e-hs': 'E2E tests',
+								'e2e-ahk': 'E2E tests',
+								'e2e-linux': 'E2E tests',
+								'package-macos': 'Build',
+								'package-windows': 'Build',
+								'package-linux': 'Build',
+								launch: 'Install and launch',
+								'launch-windows': 'Install and launch',
+								'install-linux': 'Install and launch',
+								'macos-ok': 'Verdict',
+								'windows-ok': 'Verdict',
+								'linux-ok': 'Verdict'
+							}[candidate.id] === name;
 			if (!valid)
 				problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
 			for (const found of pipeline.steps(candidate.body)) {
@@ -3962,7 +4389,14 @@ function namingProblems(files) {
 				if (
 					entry.rel !== ENTRY &&
 					/\b(?:macOS|Linux|Windows(?! Defender))\b/.test(found.name) &&
-					!isRetainedQualification(entry, candidate, found)
+					!isRetainedQualification(entry, candidate, found) &&
+					!(
+						admittedTiming &&
+						LUA_TIMING_RETENTION.some(
+							(owner) =>
+								owner.file === entry.rel && owner.job === candidate.id && owner.step === found.name
+						)
+					)
 				) {
 					problems.push(
 						`${entry.rel} job ${candidate.id} repeats its zone in a step: ${found.name}`
@@ -4010,7 +4444,7 @@ for (const [what, rel, from, to] of [
 	[
 		'an incorrect Common matrix name',
 		COMMON_BOX,
-		"name: 'Unit — ${{ matrix.feature }}'",
+		"name: 'Unit tests'",
 		"name: '${{ matrix.unknown }}'"
 	],
 	[
@@ -4019,7 +4453,7 @@ for (const [what, rel, from, to] of [
 		'  shared-validation:\n',
 		'  unknown-validation:\n'
 	],
-	['an unqualified root name', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate'"],
+	['an unqualified root name', ENTRY, "name: 'Release plan'", "name: 'Validate'"],
 	['a lowercase lane job', WINDOWS_BOX, "name: 'Unit tests'", "name: 'unit tests'"],
 	[
 		'a repeated lane prefix',
@@ -4028,12 +4462,7 @@ for (const [what, rel, from, to] of [
 		"  package-macos:\n    name: 'macOS / Build'\n"
 	],
 	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
-	[
-		'an extra root separator',
-		ENTRY,
-		"name: 'Validate / Checks and plan'",
-		"name: 'Validate / Checks / Plan'"
-	],
+	['an extra root separator', ENTRY, "name: 'Release plan'", "name: 'Validate / Checks / Plan'"],
 	[
 		'a repeated step zone',
 		LINUX_BOX,
@@ -4483,34 +4912,6 @@ for (const [rel, shell] of [
 }
 
 // Diagnostic timing JSON is retained separately from all qualification and role receipts.
-const LUA_TIMING_RETENTION = [
-	{
-		file: LINUX_BOX,
-		job: 'test-linux',
-		producer: 'Run the driver unit test suite',
-		after: 'Upload manual runtime acceptance evidence',
-		directory: 'static/ergopti_plus/linux',
-		step: 'Retain Linux Lua timing diagnostics',
-		artifact:
-			'lua-timings-linux-unit-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
-		path: '${{ runner.temp }}/linux-lua.json',
-		command:
-			'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"'
-	},
-	{
-		file: MACOS_BOX,
-		job: 'test-hs',
-		producer: 'Run unit + meta tests',
-		after: 'Run unit + meta tests',
-		directory: 'static/ergopti_plus/macos',
-		step: 'Retain macOS Lua timing diagnostics',
-		artifact:
-			'lua-timings-macos-unit-${{ matrix.role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
-		path: '${{ runner.temp }}/macos-lua.json',
-		command:
-			'node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua'
-	}
-];
 
 /** Binds each timing upload to its actual reporter file without granting qualification. */
 function luaTimingRetentionProblems(files) {
@@ -4740,7 +5141,7 @@ function manualLaneProblems(files) {
 	const steps = root ? pipeline.steps(root.body) : [];
 	const selectedAt = steps.findIndex((step) => step.name === 'Select native OS lanes');
 	const preparedAt = steps.findIndex((step) => step.name === VALIDATE_SETUP);
-	const checkedAt = steps.findIndex((step) => step.name === VALIDATE_CHECKS[0][0]);
+	const checkedAt = steps.findIndex((step) => step.name === DEEPEN_STEP);
 	if (!(preparedAt >= 0 && selectedAt === preparedAt + 1 && checkedAt === selectedAt + 1)) {
 		problems.push(
 			'selection must run after the checked-out Node setup and before the existing checks'
@@ -5005,7 +5406,7 @@ assert.ok(
 
 // This qualifies the shared renderer and recorded bridge, not physical input.
 const DISTRO_UNIT_COMMAND =
-	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}"';
+	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}"';
 const DISTRO_UNIT_HELPER = fs.readFileSync(
 	path.join(__dirname, 'prepare-linux-distro-unit.sh'),
 	'utf8'
@@ -5017,11 +5418,11 @@ const DISTRO_UNIT_SUITE =
 // Pin its shell ownership envelope separately from the existing direct form;
 // a comment, unreachable call or extra helper cannot satisfy this contract.
 const DISTRO_DIAGNOSTIC_COMMAND =
-	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ matrix.distro }}\' "$native_status" <<\'PYTHON\'';
+	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ env.INSTALL_DISTRO }}\' "$native_status" <<\'PYTHON\'';
 const DISTRO_DIAGNOSTIC_SHA256 = '2788cc3783304c8424e34de365bff105acd60068ca892a802ae6a273251da9dc';
 const DISTRO_LOGGED_ENVELOPE = [
 	'set -euo pipefail',
-	'case "${{ matrix.distro }}" in',
+	'case "${{ env.INSTALL_DISTRO }}" in',
 	'debian) apt-get install -y --no-install-recommends curl ;;',
 	'fedora) dnf install -y curl ;;',
 	'arch) pacman -Sy --noconfirm curl ;;',
@@ -5038,15 +5439,15 @@ const DISTRO_LOGGED_ENVELOPE = [
 	'chown -R ergopti-ci:ergopti-ci "$unit_root"',
 	'unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"',
 	'mkdir -p "$unit_log_dir"',
-	'unit_log="$unit_log_dir/${{ matrix.distro }}.log"',
+	'unit_log="$unit_log_dir/${{ env.INSTALL_DISTRO }}.log"',
 	'set +e',
 	'(cd "$unit_root/static/ergopti_plus/linux" &&',
-	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}") 2>&1 | tee "$unit_log"',
+	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}") 2>&1 | tee "$unit_log"',
 	'unit_pipeline_status=("${PIPESTATUS[@]}")',
 	'set -e',
 	'native_status="${unit_pipeline_status[0]}"',
 	'set +e',
-	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ matrix.distro }}\' "$native_status" <<\'PYTHON\'',
+	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ env.INSTALL_DISTRO }}\' "$native_status" <<\'PYTHON\'',
 	'PYTHON',
 	'diagnostic_status=$?',
 	'set -e',
@@ -5060,7 +5461,7 @@ function distroUnitDiagnostic(body) {
 	const script = pipeline.runOf(body) ?? [];
 	const opening = script
 		.map((line, index) =>
-			line.trim() === "'${{ matrix.distro }}' \"$native_status\" <<'PYTHON'" ? index : -1
+			line.trim() === "'${{ env.INSTALL_DISTRO }}' \"$native_status\" <<'PYTHON'" ? index : -1
 		)
 		.filter((index) => index >= 0);
 	const closing = script
@@ -5320,7 +5721,7 @@ assert.ok(
 // Preserve the incoming direct-command contract as a separately valid form.
 const directDistroUnitStep =
 	"      - name: The unit suite on this distribution's LuaJIT\n" +
-	"        if: matrix.kind == 'install'\n" +
+	"        if: env.INSTALL_KIND == 'install'\n" +
 	'        working-directory: static/ergopti_plus/linux\n' +
 	'        shell: bash\n        run: |\n          ' +
 	DISTRO_UNIT_COMMAND +
@@ -5504,7 +5905,7 @@ try {
 	const pipe = lines
 		.slice(start, end + 1)
 		.join('\n')
-		.replaceAll('${{ matrix.distro }}', '__guard_unsupported__');
+		.replaceAll('${{ env.INSTALL_DISTRO }}', '__guard_unsupported__');
 	const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 	const script =
 		'set -euo pipefail\nunit_root=' +
@@ -5550,7 +5951,7 @@ try {
 	const refusedLog = path.join(distroControlRoot, 'refused-log');
 	fs.mkdirSync(refusedLog);
 	const teePipe = pipe.replace(
-		DISTRO_UNIT_COMMAND.replaceAll('${{ matrix.distro }}', '__guard_unsupported__'),
+		DISTRO_UNIT_COMMAND.replaceAll('${{ env.INSTALL_DISTRO }}', '__guard_unsupported__'),
 		'printf "%s\\n" "controlled transport"'
 	);
 	assert.notEqual(teePipe, pipe, 'the transport-only producer replacement must be exact');
@@ -5639,13 +6040,16 @@ for (const [what, changed] of [
 	],
 	[
 		'disabled physical browser condition',
-		physicalBrowserBody.replace('        run:', "        if: matrix.suite == 'never'\n        run:")
+		physicalBrowserBody.replace(
+			'        run:',
+			"        if: steps.common-lot.outputs.suite == 'never'\n        run:"
+		)
 	],
 	[
 		'wrong physical browser lane',
 		physicalBrowserBody.replace(
 			'        run:',
-			"        if: matrix.suite == 'properties'\n        run:"
+			"        if: steps.common-lot.outputs.suite == 'properties'\n        run:"
 		)
 	],
 	[
@@ -6476,7 +6880,7 @@ const NUMBER_ROW_NATIVE_STEP = retainedManagedStep(
 	'      - name: Qualify actual selected number-row Carbon XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          evidence="$RUNNER_TEMP/number-row-source-evidence"\n          mkdir "$evidence"\n          transcript="$evidence/number-row-xctest.log"\n          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"\n          producer="static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          git show "$GITHUB_SHA:$source" | cmp - "$source"\n          git show "$GITHUB_SHA:$producer" | cmp - "$producer"\n          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          printf \'%s\\n\' "$GITHUB_SHA" > "$evidence/tested-sha.txt"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))\')"\n          set +e\n          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests([/.]|$)\' 2>&1 | tee "$transcript"\n          number_row_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#number_row_statuses[@]}" -eq 2\n          set +e\n          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \\\n            --class NumberRowSourceProbeTests --source "$evidence/NumberRowSourceProbeTests.swift" \\\n            --log "$transcript" --receipt "$evidence/number-row-verdict.json" \\\n            --test-exit "${number_row_statuses[0]}" --capture-exit "${number_row_statuses[1]}"\n          number_row_receipt_status=$?\n          node - "$evidence/number-row-verdict.json" "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" <<\'NODE\'\n          const fs = require(\'node:fs\');\n          const transport = require(\'./tools/diagnostics/tis_evidence_transport.cjs\');\n          const receipt = JSON.parse(fs.readFileSync(process.argv[2], \'utf8\'));\n          if (!receipt.passed || receipt.scope !== \'NumberRowSourceProbeTests\' || receipt.expected_count !== 12 || receipt.received_count !== 12) throw new Error(\'exact twelve-case number-row receiving refused\');\n          const session = transport.validate(process.argv[3], process.argv[4]);\n          const expectedSources = {\n            testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations: \'com.apple.keylayout.US\',\n            testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor: \'com.apple.keylayout.French\',\n            testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage: \'com.apple.keylayout.US\',\n            testActualUSCapsMaskChangesAnIndependentLetterExpectation: \'com.apple.keylayout.US\',\n            testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI: \'com.apple.keylayout.French\',\n            testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead: \'com.apple.keylayout.US\',\n            testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject: \'com.apple.keylayout.US\'\n          };\n          const expected = Object.keys(expectedSources).sort();\n          const observed = session.receipts.map((row) => {\n            if (row.test.state !== \'present\' || row.omittedEvents !== 0) throw new Error(\'native diagnostic identity refused\');\n            const match = /^(?:(?:\\w+\\.)?NumberRowSourceProbeTests\\.|-\\[(?:\\w+\\.)?NumberRowSourceProbeTests )(test\\w+)(?:\\])?:(com\\.apple\\.keylayout\\.(?:US|French))$/.exec(row.test.value);\n            if (!match || !Object.hasOwn(expectedSources, match[1]) || match[2] !== expectedSources[match[1]]) throw new Error(\'foreign native method fixture\');\n            const captures = row.events.filter((event) => event.phase === \'original.capture\');\n            if (captures.length !== 1 || captures[0].original?.id?.state !== \'present\' || typeof captures[0].original.id.value !== \'string\' || captures[0].original.id.value.length === 0) throw new Error(\'captured original source unavailable\');\n            const originalID = captures[0].original.id.value;\n            for (const phase of [\'restore.inner.after\', \'restore.outer.after\']) {\n              const events = row.events.filter((event) => event.phase === phase);\n              if (events.length !== 1 || events[0].status !== 0) throw new Error(\'native source restoration refused\');\n              if (events[0].original?.id?.state !== \'present\' || events[0].original.id.value !== originalID || events[0].current?.id?.state !== \'present\' || events[0].current.id.value !== originalID) throw new Error(\'sampled selected source restoration refused\');\n            }\n            return match[1];\n          }).sort();\n          if (!session.complete || JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error(\'exact seven native diagnostic closures refused\');\n          NODE\n          number_row_tis_status=$?\n          set -e\n          cmp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cmp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          test "$number_row_receipt_status" -eq 0\n          test "$number_row_tis_status" -eq 0\n        timeout-minutes: 10\n'
 );
 const NUMBER_ROW_NATIVE_RETENTION = retainedManagedStep(
-	'      - name: Retain selected number-row Carbon XCTest diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-carbon-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json\n            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json\n'
+	'      - name: Retain selected number-row Carbon XCTest diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-carbon-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json\n            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json\n'
 );
 function numberRowNativeReceivingProblems(files) {
 	const mac = files.find((entry) => entry.rel === MACOS_BOX)?.text ?? '';
@@ -6753,7 +7157,7 @@ for (const name of [
 		"${{ !cancelled() && steps.ollama-native-build.outcome != 'failure' }}",
 		"${{ !cancelled() && steps.ollama-native-build.conclusion == 'success' }}",
 		"${{ !cancelled() && steps.unrelated-native-build.outcome == 'success' }}",
-		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.architecture == 'arm64' }}"
+		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && env.MACOS_STAGE_ARCHITECTURE == 'arm64' }}"
 	])
 		refuses(
 			`model dependency condition ${changed || '(missing)'}`,
@@ -6971,7 +7375,7 @@ const SHORTCUTS_INDEPENDENT_OBSERVER = retainedManagedStep(
 		'          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \\',
 		'            --source-root "$GITHUB_WORKSPACE" \\',
 		'            --source-sha "$GITHUB_SHA" \\',
-		'            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}"',
+		'            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}"',
 		'        timeout-minutes: 2'
 	].join('\n')
 );
@@ -6981,10 +7385,10 @@ const SHORTCUTS_INDEPENDENT_RETENTION = retainedManagedStep(
 		"        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
 		'        uses: actions/upload-artifact@v4',
 		'        with:',
-		'          name: native-apple-shortcuts-independent-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		'          name: native-apple-shortcuts-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
 		'          retention-days: 7',
 		'          if-no-files-found: error',
-		'          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}'
+		'          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}'
 	].join('\n')
 );
 function shortcutsIndependentReceivingProblems(files) {
@@ -7144,7 +7548,7 @@ const shortcutsIndependentMutations = [
 		'unbound artifact architecture',
 		SHORTCUTS_INDEPENDENT_RETENTION,
 		SHORTCUTS_INDEPENDENT_RETENTION.replace(
-			'native-apple-shortcuts-independent-${{ matrix.architecture }}-',
+			'native-apple-shortcuts-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}-',
 			'native-apple-shortcuts-independent-'
 		)
 	],

@@ -28,6 +28,7 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 const { findRuntime, run: runLinux } = require('./run-linux-lua.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const pipeline = require('./ci-full-default.cjs');
+const installMatrix = require('../ci/linux-install-matrix.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MANIFEST = JSON.parse(
@@ -1369,34 +1370,124 @@ const INSTALL_ROWS = [
 	['smoke-rpm-install', 'rpm', 'fedora:latest'],
 	['smoke-appimage-run', 'appimage', '']
 ];
+const INSTALL_PREPARATIONS = {
+	'distro-debian':
+		'apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd ca-certificates git gcc libc6-dev linux-libc-dev',
+	'distro-fedora':
+		'dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers',
+	'distro-arch':
+		'pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers',
+	'distro-alpine':
+		'apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers',
+	'distro-opensuse':
+		"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow git gcc glibc-devel linux-glibc-devel",
+	'first-install-opensuse-tumbleweed':
+		"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo"
+};
+const installationPlan = installMatrix.loadPlan(ROOT);
+const installationMetadata = installationPlan.metadata;
+const installationLots = Object.keys(installationMetadata);
+const installProducer = pipeline.job('package-linux');
+
+/**
+ * Pin the original execution facts independently of the authored human titles.
+ * @param {object} metadata Complete installation lot map.
+ */
+function assertInstallRows(metadata) {
+	const actual = installMatrix.validateMap(metadata, MANIFEST);
+	assert.deepStrictEqual(actual.matrix, { lot: Object.keys(metadata) });
+	assert.strictEqual(actual.metadata, metadata);
+	assert.deepStrictEqual(
+		Object.values(metadata).map((row) => row.id),
+		INSTALL_ROWS.map((row) => row[0])
+	);
+	for (const [id, kind, image] of INSTALL_ROWS) {
+		const row = Object.values(metadata).find((candidate) => candidate.id === id);
+		const expected = { id, kind, container: ['install', 'rpm'].includes(kind) ? image : '' };
+		if (['install', 'first'].includes(kind)) {
+			expected.distro = id.replace(/^(distro-|first-install-)/, '');
+			expected.image = image;
+		}
+		if (Object.hasOwn(INSTALL_PREPARATIONS, id)) expected.prep = INSTALL_PREPARATIONS[id];
+		if (id.startsWith('first-install-fedora-')) expected.known = 'webkit';
+		assert.deepStrictEqual(row, expected, `${id} must retain its complete original execution cell`);
+	}
+}
+
+/**
+ * Require the genuine Package producer to emit both parts of the same plan.
+ * @param {string} body Package job body.
+ */
+function assertInstallProducer(body) {
+	const outputs = pipeline.field(body, 'outputs');
+	assert.ok(outputs);
+	assert.deepStrictEqual(
+		[...outputs.matchAll(/(?:^| )(install_matrix|install_metadata): (\$\{\{.*?\}\})/g)].map(
+			(match) => [match[1], match[2]]
+		),
+		[
+			['install_matrix', '${{ steps.install-plan.outputs.matrix }}'],
+			['install_metadata', '${{ steps.install-plan.outputs.metadata }}']
+		]
+	);
+	const producer = pipeline.step(body, 'Plan every authored installation lot');
+	assert.strictEqual(pipeline.stepField(producer, 'id'), 'install-plan');
+	assert.strictEqual(pipeline.stepField(producer, 'if'), null);
+	assert.strictEqual(pipeline.stepField(producer, 'continue-on-error'), null);
+	assert.deepStrictEqual(pipeline.runOf(producer), ['node tools/ci/linux-install-matrix.cjs']);
+	assert.strictEqual(pipeline.steps(body).at(-1).name, 'Plan every authored installation lot');
+	assert.ok(
+		body.indexOf(pipeline.step(body, 'Record mandatory package evidence')) < body.indexOf(producer)
+	);
+}
 
 /**
  * Assert the single matrix retains every scenario and its host/container split.
  * @param {string} body Installation job body.
+ * @param {object} metadata Complete authored installation map.
+ * @param {string} producer Genuine predecessor job body.
  */
-function assertInstallMatrix(body) {
-	assert.strictEqual(pipeline.field(body, 'container'), '${{ matrix.container }}');
+function assertInstallMatrix(body, metadata = installationMetadata, producer = installProducer) {
+	assertInstallRows(metadata);
+	assertInstallProducer(producer);
+	assert.strictEqual(pipeline.field(body, 'runs-on'), 'ubuntu-latest');
+	assert.strictEqual(pipeline.field(body, 'if'), null);
 	assert.deepStrictEqual(pipeline.needsOf(body), ['package-linux']);
-	assert.match(body, /^      fail-fast: false$/m);
-	const rows = [...body.matchAll(/^          - id: ([^\n]+)\n((?:            [^\n]*\n)+)/gm)];
-	assert.deepStrictEqual(
-		rows.map((row) => row[1]).sort(),
-		INSTALL_ROWS.map((row) => row[0]).sort()
+	assert.strictEqual(
+		pipeline.field(body, 'strategy'),
+		'fail-fast: false matrix: ${{ fromJSON(needs.package-linux.outputs.install_matrix) }}'
 	);
-	for (const [id, kind, image] of INSTALL_ROWS) {
-		const row = rows.find((candidate) => candidate[1] === id)[2];
-		const value = (key) =>
-			row.match(new RegExp(`^            ${key}: (.*)$`, 'm'))?.[1].replace(/^'(.*)'$/, '$1');
-		assert.strictEqual(value('kind'), kind, `${id} scenario`);
-		assert.strictEqual(
-			value('container'),
-			['install', 'rpm'].includes(kind) ? image : '',
-			`${id} container`
-		);
-		if (['install', 'first'].includes(kind))
-			assert.strictEqual(value('image'), image, `${id} image`);
-		if (id.startsWith('first-install-fedora-')) assert.strictEqual(value('known'), 'webkit');
-	}
+	assert.strictEqual(
+		pipeline.field(body, 'container'),
+		'${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].container }}'
+	);
+	assert.strictEqual(
+		pipeline.field(body, 'env'),
+		['id', 'kind', 'distro', 'image', 'prep', 'known']
+			.map(
+				(key) =>
+					`INSTALL_${key.toUpperCase()}: \${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].${key} }}`
+			)
+			.join(' ')
+	);
+	assert.doesNotMatch(body, /\bmatrix\.(?!lot\b)[A-Za-z_]+/);
+	assert.doesNotMatch(body, /^ {10}INSTALL_(?:ID|KIND|DISTRO|IMAGE|PREP|KNOWN):/m);
+	const select = pipeline.step(body, 'Require a declared installation lot');
+	assert.strictEqual(pipeline.steps(body)[0].name, 'Require a declared installation lot');
+	assert.strictEqual(pipeline.stepField(select, 'shell'), 'sh');
+	assert.strictEqual(pipeline.stepField(select, 'if'), null);
+	assert.strictEqual(pipeline.stepField(select, 'continue-on-error'), null);
+	assert.deepStrictEqual(pipeline.runOf(select), [
+		'set -eu',
+		'test -n "$INSTALL_ID"',
+		'case "$INSTALL_KIND" in',
+		'  install|first|deb|rpm|appimage) ;;',
+		'  *) exit 1 ;;',
+		'esac'
+	]);
+	const preparation = pipeline.step(body, 'Prepare the container');
+	assert.strictEqual(pipeline.stepField(preparation, 'if'), "env.INSTALL_KIND == 'install'");
+	assert.deepStrictEqual(pipeline.runOf(preparation), ['${{ env.INSTALL_PREP }}']);
 }
 
 const installJob = pipeline.job('install-linux');
@@ -1419,17 +1510,187 @@ for (const [id] of INSTALL_ROWS) {
 			1
 		);
 	}, /has no evidence for/);
-	assert.throws(() =>
-		assertInstallMatrix(
-			installJob.replace(`          - id: ${id}\n`, `          - id: lost-${id}\n`)
-		)
-	);
+	const changed = structuredClone(installationMetadata);
+	const lot = installationLots.find((name) => changed[name].id === id);
+	changed[lot].id = `lost-${id}`;
+	assert.throws(() => assertInstallMatrix(installJob, changed));
 }
+const changedHostContainer = structuredClone(installationMetadata);
+Object.values(changedHostContainer).find((row) => row.container === '').container = 'ubuntu:24.04';
+assert.throws(() => assertInstallMatrix(installJob, changedHostContainer));
+
+// These controls exercise the pure selector only. Containers use the genuine
+// producer's indexed outputs and the early shell refusal checked above.
+const installationTransport = JSON.stringify(installationMetadata);
+assert.deepStrictEqual(installationPlan.matrix, { lot: installationLots });
+for (const lot of installationLots) {
+	assert.strictEqual(
+		installMatrix.selectLot(installationPlan, lot, installationTransport),
+		installationMetadata[lot],
+		'every receiver keeps the complete original execution cell'
+	);
+	const missing = structuredClone(installationMetadata);
+	const untouchedLot = installationLots.find((candidate) => candidate !== lot);
+	delete missing[lot];
+	assert.throws(() => installMatrix.validateMap(missing, MANIFEST));
+	assert.throws(() =>
+		installMatrix.selectLot(installationPlan, untouchedLot, JSON.stringify(missing))
+	);
+	for (const key of Object.keys(installationMetadata[lot])) {
+		const changed = structuredClone(installationMetadata);
+		changed[lot][key] += '-changed';
+		assert.throws(() => assertInstallRows(changed), `${lot}: changed ${key}`);
+		assert.throws(() =>
+			installMatrix.selectLot(installationPlan, untouchedLot, JSON.stringify(changed))
+		);
+		const incomplete = structuredClone(installationMetadata);
+		delete incomplete[lot][key];
+		assert.throws(() => assertInstallRows(incomplete), `${lot}: missing ${key}`);
+	}
+}
+for (const invalid of [null, [], {}, 'foreign map']) {
+	assert.throws(() => installMatrix.validateMap(invalid, MANIFEST));
+}
+for (const invalid of [null, [], {}, 'foreign cell']) {
+	const changed = structuredClone(installationMetadata);
+	changed[installationLots[0]] = invalid;
+	assert.throws(() => installMatrix.validateMap(changed, MANIFEST));
+}
+for (const [key, value] of [
+	['id', 'foreign-subject'],
+	['kind', 'foreign-kind'],
+	['distro', ''],
+	['image', 42],
+	['container', null],
+	['prep', 'command\nforeign command'],
+	['prep', 'command\rforeign command'],
+	['prep', 'command\x00foreign command'],
+	['foreign', 'unowned field']
+]) {
+	const changed = structuredClone(installationMetadata);
+	changed[installationLots[0]][key] = value;
+	assert.throws(() => installMatrix.validateMap(changed, MANIFEST));
+}
+const invalidKnown = structuredClone(installationMetadata);
+Object.values(invalidKnown).find((row) => row.known === 'webkit').known = 'everything';
+assert.throws(() => installMatrix.validateMap(invalidKnown, MANIFEST));
+for (const label of ['', 'Foreign\nlot', 'Foreign/lot', 'Foreign ${{ expression }}']) {
+	const changed = Object.fromEntries(
+		Object.entries(installationMetadata).map(([lot, row], index) => [
+			index === 0 ? label : lot,
+			row
+		])
+	);
+	assert.throws(() => installMatrix.validateMap(changed, MANIFEST));
+}
+const duplicateSubject = structuredClone(installationMetadata);
+duplicateSubject[installationLots[1]] = structuredClone(duplicateSubject[installationLots[0]]);
+assert.throws(() => installMatrix.validateMap(duplicateSubject, MANIFEST));
+const additionalLot = {
+	...installationMetadata,
+	'Undeclared installation': installationMetadata[installationLots[0]]
+};
+assert.throws(() => installMatrix.validateMap(additionalLot, MANIFEST));
 assert.throws(() =>
-	assertInstallMatrix(
-		installJob.replace("            container: ''", '            container: ubuntu:24.04')
-	)
+	installMatrix.selectLot(installationPlan, installationLots[0], JSON.stringify(additionalLot))
 );
+const reorderedLots = Object.fromEntries(Object.entries(installationMetadata).reverse());
+assert.throws(() => installMatrix.validateMap(reorderedLots, MANIFEST));
+assert.throws(() =>
+	installMatrix.selectLot(installationPlan, installationLots[0], JSON.stringify(reorderedLots))
+);
+for (const lot of ['', 'Unknown installation', null, 0, installationLots[0] + ' ']) {
+	assert.throws(() => installMatrix.selectLot(installationPlan, lot, installationTransport));
+}
+const firstLot = JSON.stringify(installationLots[0]);
+const firstCell = JSON.stringify(installationMetadata[installationLots[0]]);
+for (const transport of [
+	undefined,
+	null,
+	installationMetadata,
+	'',
+	'{}',
+	'null',
+	installationTransport + '\n',
+	`{${firstLot}:${firstCell},${installationTransport.slice(1)}`,
+	installationTransport.replace('"id":', '"id":"foreign-subject","id":')
+]) {
+	assert.throws(() => installMatrix.selectLot(installationPlan, installationLots[0], transport));
+}
+
+const earlySelection = pipeline.step(installJob, 'Require a declared installation lot');
+for (const [before, after] of [
+	['runs-on: ubuntu-latest', 'runs-on: windows-latest'],
+	['needs: [package-linux]', 'needs: [e2e-linux]'],
+	['fail-fast: false', 'fail-fast: true'],
+	['needs.package-linux.outputs.install_matrix', 'needs.e2e-linux.outputs.install_matrix'],
+	['needs.package-linux.outputs.install_matrix', 'needs.package-linux.outputs.install_metadata'],
+	['needs.package-linux.outputs.install_metadata', 'needs.e2e-linux.outputs.install_metadata'],
+	['needs.package-linux.outputs.install_metadata', 'needs.package-linux.outputs.install_matrix'],
+	['[matrix.lot].container', '[matrix.id].container'],
+	['[matrix.lot].container', "['Debian: installed archive'].container"],
+	['[matrix.lot].id', '[matrix.lot].kind'],
+	['[matrix.lot].kind', '[matrix.lot].id'],
+	['[matrix.lot].distro', '[matrix.lot].image'],
+	['[matrix.lot].image', '[matrix.lot].distro'],
+	['[matrix.lot].prep', '[matrix.lot].known'],
+	['[matrix.lot].known', '[matrix.lot].prep'],
+	['${{ env.INSTALL_PREP }}', '${{ matrix.prep }}'],
+	["if: env.INSTALL_KIND == 'install'", "if: env.INSTALL_KIND == 'first'"],
+	[earlySelection, ''],
+	[
+		earlySelection,
+		earlySelection.replace('        shell: sh', '        if: false\n        shell: sh')
+	],
+	[
+		earlySelection,
+		earlySelection.replace(
+			'        shell: sh',
+			'        continue-on-error: true\n        shell: sh'
+		)
+	],
+	[
+		earlySelection,
+		earlySelection.replace(
+			'        shell: sh',
+			'        env:\n          INSTALL_ID: foreign\n        shell: sh'
+		)
+	],
+	[earlySelection, earlySelection.replace('test -n "$INSTALL_ID"', 'true')],
+	[earlySelection, earlySelection.replace('*) exit 1 ;;', '*) exit 0 ;;')],
+	[earlySelection, earlySelection.replace('set -eu', 'set -u')],
+	[
+		earlySelection,
+		'      - run: echo premature product work\n        shell: sh\n\n' + earlySelection
+	]
+]) {
+	const changed = installJob.replace(before, after);
+	assert.notStrictEqual(
+		changed,
+		installJob,
+		'every binding mutation changes the actual installation job'
+	);
+	assert.throws(() => assertInstallMatrix(changed));
+}
+for (const [before, after] of [
+	['steps.install-plan.outputs.matrix', 'steps.foreign-plan.outputs.matrix'],
+	['steps.install-plan.outputs.metadata', 'steps.foreign-plan.outputs.metadata'],
+	['steps.install-plan.outputs.matrix', 'steps.install-plan.outputs.metadata'],
+	['steps.install-plan.outputs.metadata', 'steps.install-plan.outputs.matrix'],
+	['id: install-plan', 'id: foreign-plan'],
+	['run: node tools/ci/linux-install-matrix.cjs', 'run: node tools/ci/foreign-plan.cjs'],
+	['id: install-plan', 'id: install-plan\n        if: false'],
+	['id: install-plan', 'id: install-plan\n        continue-on-error: true'],
+	[pipeline.step(installProducer, 'Plan every authored installation lot'), '']
+]) {
+	const changed = installProducer.replace(before, after);
+	assert.notStrictEqual(
+		changed,
+		installProducer,
+		'every producer mutation changes the actual Package job'
+	);
+	assert.throws(() => assertInstallMatrix(installJob, installationMetadata, changed));
+}
 const prepare = pipeline.step(installJob, 'Prepare the container');
 // --no-deps is deliberately preserved: these five source installs require a
 // compiler supplied by their caller, whereas first-run provisioning belongs
@@ -1441,13 +1702,11 @@ for (const [id, buildPackages] of [
 	['distro-alpine', ['gcc', 'musl-dev', 'linux-headers']],
 	['distro-opensuse', ['gcc', 'glibc-devel']]
 ]) {
-	const entry = installJob.match(
-		new RegExp(`^          - id: ${id}\\n([\\s\\S]*?)(?=^          - id:|^    container:)`, 'm')
-	);
+	const entry = Object.values(installationMetadata).find((row) => row.id === id);
 	assert.ok(entry, `Missing original source-install lane: ${id}`);
-	const prep = entry[1].match(/^            prep: (.+)$/m);
+	const prep = entry.prep;
 	assert.ok(prep, `Missing actual preparation: ${id}`);
-	const words = prep[1].split(/\s+/);
+	const words = prep.split(/\s+/);
 	for (const pkg of buildPackages)
 		assert.ok(words.includes(pkg), `${id} lacks source-build prerequisite ${pkg}`);
 	assert.ok(!words.includes('luajit'), `${id} preparation hides a missing runtime dependency`);
@@ -1488,7 +1747,10 @@ const createUser = pipeline.step(installJob, 'Create the installation user');
 assert.match(createUser, /test "\$\(id -u ergopti-ci\)" -ge 1000/);
 assert.ok(installJob.indexOf(createUser) < installJob.indexOf(installAsUser));
 for (const step of pipeline.steps(installJob)) {
-	if (pipeline.runOf(step.body) && step.name !== 'Prepare the container') {
+	if (
+		pipeline.runOf(step.body) &&
+		!['Prepare the container', 'Require a declared installation lot'].includes(step.name)
+	) {
 		assert.strictEqual(
 			pipeline.stepField(step.body, 'shell'),
 			'bash',

@@ -44,18 +44,23 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 	const index = job.steps.indexOf(owners[0]);
 	assert.deepEqual(
 		job.steps.slice(index, index + 2),
-		expected.jobs['managed-ollama-native'].steps.map((step) => ({
-			...step,
-			if: macRole.condition('managed-ollama-native', step.if),
-			env: {
-				GOTOOLCHAIN: 'local',
-				ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}",
-				ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}',
-				ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}',
-				ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}',
-				ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-			}
-		})),
+		expected.jobs['managed-ollama-native'].steps.map((step) =>
+			macRole.metadata(
+				{
+					...step,
+					if: macRole.condition('managed-ollama-native', step.if),
+					env: {
+						GOTOOLCHAIN: 'local',
+						ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}",
+						ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}',
+						ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}',
+						ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}',
+						ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
+					}
+				},
+				'managed-ollama-native'
+			)
+		),
 		'Actual two clock steps must equal the fixed reviewed producer input.'
 	);
 	assert.equal(
@@ -110,7 +115,7 @@ for (const [name, before, after] of [
 	],
 	[
 		'clock deferred artifact must remain skipped',
-		"        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}\n",
+		"        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}\n",
 		'        if: always()\n'
 	],
 	[
@@ -120,8 +125,8 @@ for (const [name, before, after] of [
 	],
 	[
 		'clock artifact attempt binding',
-		'          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n',
-		'          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}\n'
+		'          name: native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}\n',
+		'          name: native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}\n'
 	],
 	[
 		'clock capture status remains independently fatal',
@@ -168,11 +173,16 @@ check('profile wrapper retains the original immutable full clock body byte for b
 			return line.slice(4);
 		})
 		.join('\n');
-	const full = Scoped.unwrap(profile.trimEnd(), Scoped.contract.protocols[2]) + '\n';
+	const full =
+		Scoped.unwrap(
+			macRole.metadata(profile.trimEnd(), 'managed-ollama-native'),
+			Scoped.contract.protocols[2]
+		) + '\n';
+	const expectedBody = macRole.metadata(originalBody, 'managed-ollama-native');
 	assert.equal(
 		full,
-		originalBody,
-		'profile publication cannot rewrite the reviewed full clock body'
+		expectedBody,
+		'profile publication retains every reviewed clock byte after metadata projection'
 	);
 	assert.notEqual(full.replace('client_status=("${PIPESTATUS[@]}")', 'client_status=(0 0)'), full);
 	assert.notEqual(full.replace('if [ "$clock_status" -ne 0 ]; then status=1; fi', 'true'), full);
@@ -180,7 +190,7 @@ check('profile wrapper retains the original immutable full clock body byte for b
 		full.replace('client_status=("${PIPESTATUS[@]}")', 'client_status=(0 0)'),
 		full.replace('if [ "$clock_status" -ne 0 ]; then status=1; fi', 'true')
 	])
-		assert.throws(() => assert.equal(mutant, originalBody));
+		assert.throws(() => assert.equal(mutant, expectedBody));
 });
 check('raw loader and full view retain every exact source byte', () => {
 	const view = Full.fromFiles(source);
@@ -368,6 +378,77 @@ check('mandatory default predicates are the actual workflow predicates', () => {
 		macRole.condition('managed-ollama-native', '${{ !cancelled() }}')
 	);
 });
+check('Common TOML receiving retains its owned step, identity and check command', () => {
+	const rel = '.github/workflows/ci-common.yml';
+	const original = source.find((entry) => entry.rel === rel);
+	const job = Raw.jobsOfText(original.text, rel).find((entry) => entry.id === 'shared-validation');
+	const step = Raw.step(job.body, 'Check hotstring TOML files are sorted and formatted');
+	for (const mutant of [
+		'',
+		step.replace('id: hotstrings-format', 'id: foreign-format'),
+		step.replace('--hotstrings --all --check', '--hotstrings --all')
+	]) {
+		assert.notEqual(mutant, step, 'each TOML control changes the actual registered step');
+		assert.throws(() => Full.fromFiles(changed(rel, step, mutant)));
+	}
+});
+check('Unit refuses withdrawn, deferred, foreign or late human-lot selection', () => {
+	const original = source.find((entry) => entry.rel === MAC);
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'test-hs');
+	const step = Raw.step(job.body, 'Admit the authored unit lot');
+	for (const mutant of [
+		'',
+		step + '\n' + step,
+		step.replace('select unit', 'select e2e'),
+		step.replace('id: stage-selection', 'id: foreign-selection'),
+		step.replace('id: stage-selection', 'id: stage-selection\n        if: false'),
+		step.replace('id: stage-selection', 'id: stage-selection\n        continue-on-error: true'),
+		'      - run: echo premature product work\n' + step
+	]) {
+		assert.notEqual(mutant, step, 'each Unit selection control changes the actual step');
+		assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+	}
+	const record = Raw.step(job.body, 'Record actual stage role outcome');
+	const foreign = record.replace('steps.stage-selection.outputs.cell', 'matrix.lot');
+	assert.notEqual(foreign, record);
+	assert.throws(() => Full.fromFiles(changed(MAC, record, foreign)));
+});
+for (const [id, prior, predecessor, output] of [
+	['e2e-hs', 'unit', 'test-hs', 'e2e'],
+	['package-macos', 'e2e', null, null],
+	['launch', 'build', 'package-macos', 'testbuild']
+]) {
+	check(`${id} preserves the genuine receiver admission before products`, () => {
+		const original = source.find((entry) => entry.rel === MAC);
+		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === id);
+		const step = Raw.step(job.body, 'Admit complete successful predecessor stage');
+		for (const mutant of [
+			'',
+			step + '\n' + step,
+			step.replace(`admit ${prior}`, 'admit foreign'),
+			step.replace('${{ toJSON(needs) }}', '${{ toJSON(github) }}'),
+			step.replace('id: stage-admission', 'id: stage-admission\n        if: false'),
+			step.replace('id: stage-admission', 'id: stage-admission\n        continue-on-error: true'),
+			'      - run: echo premature product work\n' + step
+		]) {
+			assert.notEqual(mutant, step, 'each predecessor control changes the actual step');
+			assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+		}
+		if (predecessor) {
+			const binding = `      MACOS_STAGE_METADATA: \${{ needs.${predecessor}.outputs.${output}_metadata }}`;
+			for (const replacement of [
+				'',
+				binding.replace(predecessor, 'foreign'),
+				binding.replace(`${output}_metadata`, `${output}_matrix`),
+				binding.replace(' }}', '[matrix.lot] }}')
+			]) {
+				const mutant = job.body.replace(binding, replacement);
+				assert.notEqual(mutant, job.body, 'the whole-map binding mutation is effective');
+				assert.throws(() => Full.fromFiles(changed(MAC, job.body, mutant)));
+			}
+		}
+	});
+}
 for (const entry of source) {
 	for (const [name, fragment] of [
 		['public input', '      fast_prerelease: true\n'],
@@ -440,6 +521,21 @@ for (const lane of ['macos', 'windows', 'linux']) {
 		});
 }
 for (const [rel, id, name] of [
+	[
+		'.github/workflows/ci-common.yml',
+		'shared-validation',
+		'Check hotstring TOML files are sorted and formatted'
+	],
+	[
+		'.github/workflows/ci-common.yml',
+		'common-build',
+		'Build and seal production site — ${{ matrix.lot }}'
+	],
+	[
+		'.github/workflows/ci-common.yml',
+		'common-testbuild',
+		'Test received production site — ${{ matrix.lot }}'
+	],
 	[MAC, 'e2e-hs', 'Qualify actual selected number-row Carbon XCTest controls'],
 	[MAC, 'e2e-hs', 'Retain selected number-row Carbon XCTest diagnostics'],
 	[MAC, 'e2e-hs', 'Receive native final-byte number-row causal refusal'],
@@ -884,7 +980,10 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 		[
 			'ARM host authority wrong',
 			job.body,
-			job.body.replace('runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest')
+			job.body.replace(
+				'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+				'runs-on: ubuntu-latest'
+			)
 		],
 		[
 			'Intel plan absent',
@@ -914,7 +1013,10 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 		[
 			'native budget widened',
 			job.body,
-			job.body.replace('timeout-minutes: ${{ matrix.timeout_minutes }}', 'timeout-minutes: 360')
+			job.body.replace(
+				'timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
+				'timeout-minutes: 360'
+			)
 		]
 	])
 		check('lease silence: ' + label, () => {
@@ -1031,7 +1133,7 @@ check('v101 managed PAC admission retains Worker filter and exact collector auth
 	assert.equal(code.split(marker).length, 2);
 	const admission = code
 		.slice(0, code.indexOf(marker))
-		.replaceAll('${{ matrix.architecture }}', 'arm64');
+		.replaceAll('${{ env.MACOS_STAGE_ARCHITECTURE }}', 'arm64');
 	for (const mode of ['full', 'deferred']) {
 		const shell =
 			`set -euo pipefail
@@ -1077,7 +1179,7 @@ check('v101 HTTP receiver defers only wire and preserves both mandatory statuses
 		const step = Raw.step(job.body, name);
 		const code = Raw.runOf(step)
 			.join('\n')
-			.replaceAll('${{ matrix.architecture }}', 'arm64')
+			.replaceAll('${{ env.MACOS_STAGE_ARCHITECTURE }}', 'arm64')
 			.replaceAll('${{ github.sha }}', 'a'.repeat(40))
 			.replaceAll('${{ github.run_id }}', '123')
 			.replaceAll('${{ github.run_attempt }}', '2');
@@ -1291,7 +1393,7 @@ check('v101 AppleEvents records only exact transport rows and preserves installe
 	);
 	assert(
 		upload.includes(
-			'name: assets-qualification-launch-macos-${{ matrix.runner }}-${{ matrix.scenario }}'
+			'name: assets-qualification-launch-macos-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}'
 		)
 	);
 	assert(upload.includes('if-no-files-found: error'));

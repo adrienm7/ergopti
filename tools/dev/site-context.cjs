@@ -3,17 +3,41 @@
 /** Resolve an attached local branch or an explicit site target bound to the actual Git commit. */
 'use strict';
 
+const SITE_LOTS = Object.freeze({
+	'Stable site': Object.freeze({ target: 'main', base_path: '' }),
+	'Development site': Object.freeze({ target: 'dev', base_path: '/dev' })
+});
+
+/** Return the complete authored target map; matrix cells contain only its human keys. */
+function siteLots() {
+	return structuredClone(SITE_LOTS);
+}
+
+/** Resolve a deployment identity to its unique human-readable matrix lot. */
+function siteLot(target) {
+	const lot = Object.keys(SITE_LOTS).find((key) => SITE_LOTS[key].target === target);
+	requireContext(lot !== undefined, 'the target must be main or dev.');
+	return lot;
+}
+
+/** Refuse altered or incomplete predecessor metadata before using its selected row. */
+function selectSiteLot(lot, metadata) {
+	requireContext(
+		metadata === JSON.stringify(SITE_LOTS),
+		'the complete site lot metadata must match its authored source.'
+	);
+	requireContext(typeof lot === 'string' && Object.hasOwn(SITE_LOTS, lot), 'unknown site lot.');
+	return structuredClone(SITE_LOTS[lot]);
+}
+
 function requireContext(condition, message) {
 	if (!condition) throw new Error('Site build context refused: ' + message);
 }
 
 /** Validate the two actual site deployment targets without confusing them with a Git ref. */
 function resolveSiteTarget(branch, base) {
-	requireContext(branch === 'main' || branch === 'dev', 'the target must be main or dev.');
-	requireContext(
-		base === (branch === 'main' ? '' : '/dev'),
-		'the target and BASE_PATH must agree explicitly.'
-	);
+	const expected = SITE_LOTS[siteLot(branch)];
+	requireContext(base === expected.base_path, 'the target and BASE_PATH must agree explicitly.');
 	return { branch, base_path: base };
 }
 
@@ -50,4 +74,4 @@ function resolveSiteContext(env, git) {
 	return { branch, base_path: base, source_sha: actual };
 }
 
-module.exports = { resolveSiteContext, resolveSiteTarget };
+module.exports = { resolveSiteContext, resolveSiteTarget, siteLots, siteLot, selectSiteLot };

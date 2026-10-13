@@ -1,33 +1,33 @@
 {
-	"provenance": "Reviewed 144 original executable blocks, frozen Mac packet b09d1147; authored stage infrastructure. Never refresh from the workflow under test.",
+	"provenance": "Reviewed 144 original executable blocks, frozen Mac packet b09d1147; authored stage infrastructure. Never refresh from the workflow under test. Human-lot transport transposes only the reviewed metadata bindings and adds one genuine Unit map admission; never refresh from the workflow under test.",
 	"jobs": [
 		{
 			"id": "test-hs",
 			"metadata": {
-				"name": "Unit · Lua unit and meta · stubbed",
-				"runs-on": "${{ matrix.runner }}",
-				"timeout-minutes": "${{ matrix.timeout_minutes }}",
+				"name": "Unit tests",
+				"runs-on": "ubuntu-latest",
+				"timeout-minutes": 360,
 				"strategy": {
 					"fail-fast": false,
 					"matrix": {
-						"include": [
-							{
-								"role": "lua-unit-meta",
-								"runner": "ubuntu-latest",
-								"architecture": "stubbed",
-								"timeout_minutes": 360,
-								"scenario": ""
-							}
-						]
+						"lot": ["Lua unit and meta (stubbed)"]
 					}
 				},
 				"outputs": {
-					"e2e_matrix": "${{ steps.stage-plan.outputs.e2e_matrix }}"
+					"e2e_matrix": "${{ steps.stage-plan.outputs.e2e_matrix }}",
+					"e2e_metadata": "${{ steps.stage-plan.outputs.e2e_metadata }}"
+				},
+				"env": {
+					"MACOS_STAGE_LOT": "${{ matrix.lot }}"
 				}
 			},
 			"steps": [
 				{
 					"uses": "actions/checkout@v4"
+				},
+				{
+					"name": "Admit the authored unit lot",
+					"id": "stage-selection"
 				},
 				{
 					"name": "Install Lua 5.4 + luarocks"
@@ -70,15 +70,22 @@
 		{
 			"id": "e2e-hs",
 			"metadata": {
-				"name": "E2E · ${{ matrix.role }} · ${{ matrix.architecture }}",
+				"name": "E2E tests",
 				"needs": ["test-hs"],
-				"runs-on": "${{ matrix.runner }}",
-				"timeout-minutes": "${{ matrix.timeout_minutes }}",
+				"runs-on": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
+				"timeout-minutes": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}",
 				"strategy": {
 					"fail-fast": false,
-					"matrix": {
-						"include": "${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}"
-					}
+					"matrix": "${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}"
+				},
+				"env": {
+					"MACOS_STAGE_LOT": "${{ matrix.lot }}",
+					"MACOS_STAGE_METADATA": "${{ needs.test-hs.outputs.e2e_metadata }}",
+					"MACOS_STAGE_CELL": "${{ toJSON(fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot]) }}",
+					"MACOS_STAGE_ROLE": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].role }}",
+					"MACOS_STAGE_RUNNER": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
+					"MACOS_STAGE_ARCHITECTURE": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].architecture }}",
+					"MACOS_STAGE_SCENARIO": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].scenario }}"
 				}
 			},
 			"steps": [
@@ -95,318 +102,318 @@
 				},
 				{
 					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}"
 				},
 				{
 					"name": "Install the E2E interpreter",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}"
 				},
 				{
 					"name": "Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}",
 					"timeout-minutes": 5,
 					"working-directory": "static/ergopti_plus/macos"
 				},
 				{
 					"name": "Retain source-bound e2e-hs qualification receipts",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}"
 				},
 				{
 					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"uses": "actions/setup-python@v5",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"name": "Prepare independent pixel observer",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"name": "Acquire the pinned official Hammerspoon runtime",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"name": "Observe actual production canvas pixels and retire its native owner",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"name": "Retain native captures, source, provisioning and retirement receipts",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' && (always()) }}"
 				},
 				{
 					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}"
 				},
 				{
 					"uses": "actions/setup-python@v5",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}"
 				},
 				{
 					"name": "Receive selected-release shell corpus and native guardian cancellation",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Retain selected-release native ownership receiving",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Admit the canonical native toolchain and public inputs",
 					"id": "ollama-toolchain",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Build the actual launcher native transport roles",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native launcher compiler diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Prepare locked native HTTP receiving clients",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Receive actual private-session and numeric TLS peer controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
 					"timeout-minutes": 5,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain actual private-session and numeric TLS peer diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Qualify actual SDK accepted-owner and deadline XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native SDK XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Qualify actual selected number-row Carbon XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain selected number-row Carbon XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Receive native final-byte number-row causal refusal",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain native final-byte number-row causal diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Qualify actual native PAC source ownership XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Qualify actual native PAC and WPAD XCTest controls",
 					"id": "managed-ollama-pac-receiving",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native PAC XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Receive actual independent managed HTTP native clients",
 					"id": "native_http_clock",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"timeout-minutes": 5,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native HTTP clock receiving",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}"
 				},
 				{
 					"name": "Qualify actual explicit curl stream ownership",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"timeout-minutes": 2,
 					"shell": "bash"
 				},
 				{
 					"name": "Prepare genuine pinned Go toolchain",
 					"uses": "actions/setup-go@v5",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}"
 				},
 				{
 					"name": "Acquire and verify genuine pinned upstream inputs",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Build and admit the actual native source asset",
 					"id": "ollama-native-build",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Receive actual native model create, pull, inference and retirement",
 					"id": "managed-ollama-model-receiving",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Retain passive security service logs after native receiving failure",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure')) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure')) }}",
 					"timeout-minutes": 3,
 					"shell": "bash"
 				},
 				{
 					"name": "Upload qualified native inputs for the application catalogue",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}"
 				},
 				{
 					"name": "Upload the actual managed native release asset",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release) }}"
 				},
 				{
 					"name": "Retain actual native producer, catalogue and receiving evidence",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Retain source-bound managed-ollama-native qualification receipts",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
 					"name": "Observe installed Shortcuts Events metadata without launch",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled()) }}",
 					"timeout-minutes": 2,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain installed Shortcuts Events metadata diagnostic",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"name": "Observe independent native Apple Shortcuts SDK preflight and discovery",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}",
 					"timeout-minutes": 2,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native Apple Shortcuts SDK observation",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"name": "Run scoped item 36 evidence controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"uses": "actions/setup-python@v5",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"name": "Admit scoped item 36 native prerequisites",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Cache scoped SwiftPM dependencies",
 					"uses": "actions/cache@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"name": "Install scoped Sparkle signing tool",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Qualify scoped item 36 native archive XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
 					"timeout-minutes": 20,
 					"shell": "bash"
 				},
 				{
 					"name": "Observe the actual no-prompt SDK permission API independently",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (!cancelled()) }}",
 					"timeout-minutes": 3,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain scoped item 36 native diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
 				},
 				{
 					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"name": "Receive closed lease silence transcript controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
 				{
 					"name": "Execute the actual paired native silence control",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Retain exact paired-process native receiving",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
 				},
 				{
-					"name": "Record actual stage role outcome",
+					"name": "Record actual stage role outcome — ${{ matrix.lot }}",
 					"if": "always()"
 				},
 				{
@@ -425,7 +432,8 @@
 				"timeout-minutes": 45,
 				"outputs": {
 					"scenarios": "${{ steps.profile.outputs.scenarios }}",
-					"testbuild_matrix": "${{ steps.stage-plan.outputs.testbuild_matrix }}"
+					"testbuild_matrix": "${{ steps.stage-plan.outputs.testbuild_matrix }}",
+					"testbuild_metadata": "${{ steps.stage-plan.outputs.testbuild_metadata }}"
 				},
 				"env": {
 					"ERGOPTI_DEV_RELEASE_RELEASE": "${{ inputs.release }}",
@@ -718,15 +726,22 @@
 		{
 			"id": "launch",
 			"metadata": {
-				"name": "Test build · ${{ matrix.role }} · ${{ matrix.runner }} · ${{ matrix.scenario }}",
+				"name": "Install and launch",
 				"needs": ["package-macos"],
-				"runs-on": "${{ matrix.runner }}",
-				"timeout-minutes": "${{ matrix.timeout_minutes }}",
+				"runs-on": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}",
+				"timeout-minutes": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}",
 				"strategy": {
 					"fail-fast": false,
-					"matrix": {
-						"include": "${{ fromJSON(needs.package-macos.outputs.testbuild_matrix) }}"
-					}
+					"matrix": "${{ fromJSON(needs.package-macos.outputs.testbuild_matrix) }}"
+				},
+				"env": {
+					"MACOS_STAGE_LOT": "${{ matrix.lot }}",
+					"MACOS_STAGE_METADATA": "${{ needs.package-macos.outputs.testbuild_metadata }}",
+					"MACOS_STAGE_CELL": "${{ toJSON(fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot]) }}",
+					"MACOS_STAGE_ROLE": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].role }}",
+					"MACOS_STAGE_RUNNER": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}",
+					"MACOS_STAGE_ARCHITECTURE": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].architecture }}",
+					"MACOS_STAGE_SCENARIO": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].scenario }}"
 				}
 			},
 			"steps": [
@@ -743,95 +758,95 @@
 				},
 				{
 					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Fetch the older release whose files seed the user state",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Download the package built by this run",
 					"uses": "actions/download-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Download the independent CI archive source",
 					"uses": "actions/download-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Install the package the way a user does",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Record the launch qualification scope",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Retain source-bound AppleEvent launch qualification receipt",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' && (matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config') }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config') }}"
 				},
 				{
 					"name": "Launch over the user state and judge it",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Record mandatory launch evidence",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Retain launch evidence",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (always()) }}"
 				},
 				{
 					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}"
 				},
 				{
 					"uses": "actions/setup-python@v5",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}"
 				},
 				{
 					"name": "Require actual arm64 cold runtime prerequisites",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Build independent signed cold application",
 					"id": "cold-app",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Receive actual isolated cold native MLX bootstrap",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}",
 					"timeout-minutes": 35,
 					"shell": "bash"
 				},
 				{
 					"name": "Receive actual official cold Ollama without stock Python",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' && (!cancelled() && steps.cold-app.outcome == 'success') }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (!cancelled() && steps.cold-app.outcome == 'success') }}",
 					"timeout-minutes": 35,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain official cold Ollama receipt only",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}"
 				},
 				{
 					"name": "Retain native cold bootstrap evidence",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}"
 				},
 				{
-					"name": "Record actual stage role outcome",
+					"name": "Record actual stage role outcome — ${{ matrix.lot }}",
 					"if": "always()"
 				},
 				{

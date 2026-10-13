@@ -59,20 +59,18 @@ env:
 
 jobs:
   test-hs:
-    name: Unit · Lua unit and meta · stubbed
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ matrix.timeout_minutes }}
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - role: lua-unit-meta
-            runner: ubuntu-latest
-            architecture: stubbed
-            timeout_minutes: 360
-            scenario: ''
+        lot: ['Lua unit and meta (stubbed)']
+    env:
+      MACOS_STAGE_LOT: ${{ matrix.lot }}
     outputs:
       e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}
+      e2e_metadata: ${{ steps.stage-plan.outputs.e2e_metadata }}
     steps:
       # Enough history for test_no_coauthor_in_commits.lua, which scans
       # HEAD~20..HEAD. The default checkout is a depth-1 clone, so that range does
@@ -82,6 +80,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 25
+
+      - name: Admit the authored unit lot
+        id: stage-selection
+        run: node tools/ci/macos-stage-roles.cjs select unit
 
       - name: Install Lua 5.4 + luarocks
         run: |
@@ -130,7 +132,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: lua-timings-macos-unit-${{ matrix.role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/macos-lua.json
           if-no-files-found: warn
           retention-days: 7
@@ -139,7 +141,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-test-hs-${{ matrix.architecture || 'stubbed' }}
+          name: assets-qualification-test-hs-${{ fromJSON(steps.stage-selection.outputs.cell).architecture || 'stubbed' }}
           path: ${{ runner.temp }}/stable-macos-*.json
           if-no-files-found: warn
 
@@ -149,29 +151,36 @@ jobs:
       - name: Record actual stage role outcome
         if: always()
         env:
-          MACOS_STAGE_CELL: ${{ toJSON(matrix) }}
+          MACOS_STAGE_CELL: ${{ steps.stage-selection.outputs.cell }}
           MACOS_STAGE_RESULT: ${{ job.status }}
         run: node tools/ci/macos-stage-roles.cjs record unit - "$RUNNER_TEMP/macos-stage-output/receipt.json"
       - name: Retain exact stage role outcome
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-stage-unit-${{ matrix.role }}-${{ matrix.runner }}-${{ matrix.scenario || 'default' }}-${{ github.run_id }}
+          name: macos-stage-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ fromJSON(steps.stage-selection.outputs.cell).runner }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario || 'default' }}-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-output/receipt.json
           if-no-files-found: error
           retention-days: 7
           overwrite: true
 
   e2e-hs:
-    name: E2E · ${{ matrix.role }} · ${{ matrix.architecture }}
+    name: E2E tests
     needs:
       - test-hs
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ matrix.timeout_minutes }}
+    runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}
+    timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}
     strategy:
       fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}
+      matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}
+    env:
+      MACOS_STAGE_LOT: ${{ matrix.lot }}
+      MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_metadata }}
+      MACOS_STAGE_CELL: ${{ toJSON(fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot]) }}
+      MACOS_STAGE_ROLE: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].role }}
+      MACOS_STAGE_RUNNER: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}
+      MACOS_STAGE_ARCHITECTURE: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].architecture }}
+      MACOS_STAGE_SCENARIO: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].scenario }}
     steps:
       - uses: actions/checkout@v4
       - name: Download exact prior stage receipts
@@ -186,10 +195,10 @@ jobs:
         run: node tools/ci/macos-stage-roles.cjs admit unit "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
       # Retained original role: e2e-hs
       - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
 
       - name: Install the E2E interpreter
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-filesystem
 
@@ -206,7 +215,7 @@ jobs:
       # and interpreter are independent of the unit job; both must pass before
       # packaging or native tooltip observation.
       - name: Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
         # Exercises Registry + Expander via the stub layer against
         # hardcoded scenarios and all corpus vectors.
         # Exit 0 = all pass, 1 = at least one failure.
@@ -228,33 +237,33 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain source-bound e2e-hs qualification receipts
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'e2e-hs' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-e2e-hs-${{ matrix.architecture || 'stubbed' }}
+          name: assets-qualification-e2e-hs-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}
           path: ${{ runner.temp }}/stable-macos-*.json
           if-no-files-found: warn
 
       # Retained original role: tooltip-canvas
       - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
       - uses: actions/setup-node@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
         with:
           node-version-file: '.node-version'
       - uses: actions/setup-python@v5
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
         with:
           python-version: '3.13'
       - name: Prepare independent pixel observer
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/tooltip-provisioning"
           python3 -m pip install Pillow==11.3.0
           node tools/test/run-macos-tooltip-canvas-tests.cjs
       - name: Acquire the pinned official Hammerspoon runtime
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
         run: |
           set -euo pipefail
           version=$(sed -nE 's/^HAMMERSPOON_VERSION="\$\{HAMMERSPOON_VERSION:-([^}]+)\}"$/\1/p' tools/build/build_macos_app.sh)
@@ -274,7 +283,7 @@ jobs:
           # while the independently pinned official archive binds selected bytes.
           spctl --assess --type execute --verbose=4 "$app" > "$RUNNER_TEMP/tooltip-provisioning/gatekeeper.stdout" 2> "$RUNNER_TEMP/tooltip-provisioning/gatekeeper.stderr"
       - name: Observe actual production canvas pixels and retire its native owner
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
         run: |
           set -euo pipefail
           git rev-parse HEAD > "$RUNNER_TEMP/tooltip-provisioning/tested-sha.txt"
@@ -283,7 +292,7 @@ jobs:
             --app "$RUNNER_TEMP/tooltip-hammerspoon/Hammerspoon.app" \
             --output "$RUNNER_TEMP/tooltip-canvas-evidence"
       - name: Retain native captures, source, provisioning and retirement receipts
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'tooltip-canvas' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: macos-tooltip-canvas-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -316,8 +325,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
       - uses: actions/setup-node@v4
         env:
           GOTOOLCHAIN: 'local'
@@ -325,8 +334,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         with:
           node-version-file: '.node-version'
       - uses: actions/setup-python@v5
@@ -336,8 +345,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         with:
           python-version: '3.13'
       # This independent Darwin job executes the frozen portable corpus through
@@ -349,8 +358,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -364,14 +373,14 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: selected-release-native-ownership-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: selected-release-native-ownership-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 7
           if-no-files-found: error
-          path: ${{ runner.temp }}/native-selected-release-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/native-selected-release-${{ env.MACOS_STAGE_ARCHITECTURE }}
 
       - name: Admit the canonical native toolchain and public inputs
         env:
@@ -380,8 +389,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         id: ollama-toolchain
         shell: bash
         run: |
@@ -430,8 +439,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -450,12 +459,12 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: managed-ollama-launcher-build-${{ matrix.architecture }}-${{ github.run_id }}
+          name: managed-ollama-launcher-build-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}
           if-no-files-found: warn
           retention-days: 7
           path: ${{ runner.temp }}/managed-ollama-launcher-build.log
@@ -466,8 +475,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -482,8 +491,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -525,12 +534,12 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: managed-ollama-native-python-${{ matrix.architecture }}-${{ github.run_id }}
+          name: managed-ollama-native-python-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}
           if-no-files-found: warn
           retention-days: 7
           path: |
@@ -545,8 +554,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -608,12 +617,12 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: managed-ollama-sdk-xctest-${{ matrix.architecture }}-${{ github.run_id }}
+          name: managed-ollama-sdk-xctest-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}
           if-no-files-found: warn
           retention-days: 7
           path: |
@@ -631,8 +640,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -708,11 +717,11 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: number-row-carbon-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: number-row-carbon-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           retention-days: 7
           path: |
@@ -732,8 +741,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -844,11 +853,11 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: number-row-causal-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: number-row-causal-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           retention-days: 7
           path: |
@@ -881,8 +890,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -908,13 +917,13 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         id: managed-ollama-pac-receiving
         shell: bash
         run: |
           set -euo pipefail
-          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"
+          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ env.MACOS_STAGE_ARCHITECTURE }}.json"
           mkdir -p "$(dirname "$receipt")"
           node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"
           mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"
@@ -957,12 +966,12 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: managed-http-pac-xctest-${{ matrix.architecture }}-${{ github.run_id }}
+          name: managed-http-pac-xctest-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}
           if-no-files-found: warn
           retention-days: 7
           path: |
@@ -978,13 +987,13 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         id: native_http_clock
         shell: bash
         run: |
           set -euo pipefail
-          receipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"
+          receipt="$RUNNER_TEMP/stable-macos-native-http-${{ env.MACOS_STAGE_ARCHITECTURE }}.json"
           mkdir -p "$(dirname "$receipt")"
           node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"
           mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"
@@ -1003,7 +1012,7 @@ jobs:
               set -euo pipefail
               status=0
               echo "clock_expected=true" >> "$GITHUB_OUTPUT"
-              clock_root="$RUNNER_TEMP/native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}"
+              clock_root="$RUNNER_TEMP/native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}"
               mkdir -m 700 "$clock_root" "$clock_root/private-cache"
               clock_status=0
               set +e
@@ -1012,7 +1021,7 @@ jobs:
               "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"
               public_status=("${PIPESTATUS[@]}")
               set -e
-              node tools/ci/native_http_clock_evidence.cjs begin "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ matrix.architecture }}" "$clock_root/source-before.json" || clock_status=1
+              node tools/ci/native_http_clock_evidence.cjs begin "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ env.MACOS_STAGE_ARCHITECTURE }}" "$clock_root/source-before.json" || clock_status=1
               set +e
               ERGOPTI_NATIVE_CLOCK_EVIDENCE="$clock_root/payload" "$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"
               client_status=("${PIPESTATUS[@]}")
@@ -1021,7 +1030,7 @@ jobs:
                   if [ "$code" -ne 0 ]; then status=1; fi
               done
               node -e '    const fs = require('"'"'node:fs'"'"');'$'\n''    const args = process.argv.slice(2);'$'\n''    if (args.length !== 7 || args.slice(1).some(value => !/^(?:0|[1-9][0-9]{0,2})$/.test(value) || Number(value) > 255)) process.exit(1);'$'\n''    fs.writeFileSync(args[0], JSON.stringify({schema:1, owned_process:{command:Number(args[1]),capture:Number(args[2])},public_native:{command:Number(args[3]),capture:Number(args[4])},independent_client:{command:Number(args[5]),capture:Number(args[6])}}) + '"'"'\n'"'"', {flag:'"'"'wx'"'"',mode:0o600});'$'\n' - "$clock_root/native-statuses.json" "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}" || clock_status=1
-              node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ matrix.architecture }}" "$clock_root/clock-verdict.json" || clock_status=1
+              node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ env.MACOS_STAGE_ARCHITECTURE }}" "$clock_root/clock-verdict.json" || clock_status=1
               if [ "$clock_status" -ne 0 ]; then status=1; fi
               exit "$status"
           else
@@ -1037,13 +1046,13 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
-          path: ${{ runner.temp }}/native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Qualify actual explicit curl stream ownership
         env:
           GOTOOLCHAIN: 'local'
@@ -1051,8 +1060,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1065,8 +1074,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         uses: actions/setup-go@v5
         with:
           go-version: ${{ steps.ollama-toolchain.outputs.version }}
@@ -1079,8 +1088,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1118,8 +1127,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         id: ollama-native-build
         shell: bash
         run: |
@@ -1150,13 +1159,13 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}
         id: managed-ollama-model-receiving
         shell: bash
         run: |
           set -euo pipefail
-          receipt="$RUNNER_TEMP/stable-macos-native-model-receiving-${{ matrix.architecture }}.json"
+          receipt="$RUNNER_TEMP/stable-macos-native-model-receiving-${{ env.MACOS_STAGE_ARCHITECTURE }}.json"
           node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --receipt "$receipt"
           mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --validate-scope-receipt "$receipt")"
           if [ "$mode" = deferred ]; then
@@ -1182,8 +1191,8 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure')) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure')) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1201,12 +1210,12 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: managed-ollama-inputs-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}
+          name: managed-ollama-inputs-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}
           if-no-files-found: error
           retention-days: ${{ inputs.release && 7 || 1 }}
           path: |
@@ -1219,12 +1228,12 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (inputs.release) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release) }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: assets-managed-ollama-${{ matrix.architecture }}
+          name: assets-managed-ollama-${{ env.MACOS_STAGE_ARCHITECTURE }}
           if-no-files-found: error
           retention-days: 7
           path: ${{ env.ERGOPTI_OLLAMA_ASSET }}
@@ -1236,11 +1245,11 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: managed-ollama-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           retention-days: ${{ inputs.release && 7 || 1 }}
           path: |
@@ -1267,11 +1276,11 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-managed-ollama-native-${{ matrix.architecture || 'stubbed' }}
+          name: assets-qualification-managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}
           path: ${{ runner.temp }}/stable-macos-*.json
           if-no-files-found: warn
 
@@ -1284,13 +1293,13 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled()) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled()) }}
         shell: bash
         run: |
           set -euo pipefail
           diagnostic="tools/diagnostics/apple_shortcuts_installed_target"
-          evidence="$RUNNER_TEMP/group3-shortcuts-installed-target-${{ matrix.architecture }}"
+          evidence="$RUNNER_TEMP/group3-shortcuts-installed-target-${{ env.MACOS_STAGE_ARCHITECTURE }}"
           mkdir -m 700 "$evidence"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           for name in resolve_installed_target.swift installed_target_reader.py collect_installed_target.py test_installed_target_reader.py test_collector_source_binding.py run_controls.py portable_cases.json; do
@@ -1347,12 +1356,12 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
         uses: actions/upload-artifact@v4
         with:
-          name: shortcuts-installed-target-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/group3-shortcuts-installed-target-${{ matrix.architecture }}
+          name: shortcuts-installed-target-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/group3-shortcuts-installed-target-${{ env.MACOS_STAGE_ARCHITECTURE }}
           if-no-files-found: error
           retention-days: 7
 
@@ -1363,15 +1372,15 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
         shell: bash
         run: |
           set -euo pipefail
           python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \
             --source-root "$GITHUB_WORKSPACE" \
             --source-sha "$GITHUB_SHA" \
-            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}"
+            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}"
         timeout-minutes: 2
 
       - name: Retain independent native Apple Shortcuts SDK observation
@@ -1381,14 +1390,14 @@ jobs:
           ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-apple-shortcuts-independent-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: native-apple-shortcuts-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 7
           if-no-files-found: error
-          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}
 
       # ─────────────────────────────────────────────────
       # 1) Hammerspoon unit and contract tests
@@ -1398,22 +1407,22 @@ jobs:
       # clean launch additionally qualifies the real native delayed-timer API.
       # Retained original role: item36-native
       - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
       - uses: actions/setup-node@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:
           node-version-file: '.node-version'
       - name: Run scoped item 36 evidence controls
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         run: |
           npm ci --ignore-scripts
           node tools/test/test-macos-dev-qualification-deferral.cjs
       - uses: actions/setup-python@v5
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:
           python-version: '3.13'
       - name: Admit scoped item 36 native prerequisites
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1433,7 +1442,7 @@ jobs:
           command -v brew
           mkdir -m 700 "$RUNNER_TEMP/swift-launcher-evidence"
       - name: Cache scoped SwiftPM dependencies
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         uses: actions/cache@v4
         with:
           path: |
@@ -1444,7 +1453,7 @@ jobs:
           restore-keys: |
             swiftpm-${{ runner.os }}-${{ runner.arch }}-
       - name: Install scoped Sparkle signing tool
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         shell: bash
         env:
           SPARKLE_VERSION: '2.9.2'
@@ -1456,7 +1465,7 @@ jobs:
           tar -xJf "$RUNNER_TEMP/Sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle-dist"
           echo "SIGN_UPDATE=$RUNNER_TEMP/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
       - name: Qualify scoped item 36 native archive XCTest controls
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         shell: bash
         env:
           SWIFT_BACKTRACE: enable=yes
@@ -1479,7 +1488,7 @@ jobs:
           node tools/diagnostics/item36_xctest_evidence.cjs judge "$transcript" "${item36_statuses[0]}" "${item36_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/item36-verdict.json"
         timeout-minutes: 20
       - name: Observe the actual no-prompt SDK permission API independently
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (!cancelled()) }}
         shell: bash
         env:
           SWIFT_BACKTRACE: enable=yes
@@ -1499,7 +1508,7 @@ jobs:
           node tools/diagnostics/sdk_permission_xctest_evidence.cjs judge "$transcript" "${sdk_statuses[0]}" "${sdk_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/sdk-permission-verdict.json"
         timeout-minutes: 3
       - name: Retain scoped item 36 native diagnostics
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: item36-native-diagnostics-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1517,23 +1526,23 @@ jobs:
       # It supplements every full/package/install gate and never publishes assets.
       # Retained original role: lease-silence-native
       - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
       - uses: actions/setup-node@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:
           node-version-file: '.node-version'
       - name: Receive closed lease silence transcript controls
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         run: node tools/test/test-lease-silence-xctest-evidence.cjs
       - name: Execute the actual paired native silence control
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         shell: bash
-        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'
+        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ env.MACOS_STAGE_ARCHITECTURE }}'
       - name: Retain exact paired-process native receiving
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: lease-silence-native-${{ github.sha }}-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 7
           if-no-files-found: error
           path: |
@@ -1546,17 +1555,17 @@ jobs:
 
       # Native producer and receiving run independently of the Brew/package branch.
       # Both advertised architectures are mandatory even for unpublished manual CI.
-      - name: Record actual stage role outcome
+      - name: Record actual stage role outcome — ${{ matrix.lot }}
         if: always()
         env:
-          MACOS_STAGE_CELL: ${{ toJSON(matrix) }}
+          MACOS_STAGE_CELL: ${{ env.MACOS_STAGE_CELL }}
           MACOS_STAGE_RESULT: ${{ job.status }}
         run: node tools/ci/macos-stage-roles.cjs record e2e "$RUNNER_TEMP/macos-stage-prior.json" "$RUNNER_TEMP/macos-stage-output/receipt.json"
       - name: Retain exact stage role outcome
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-stage-e2e-${{ matrix.role }}-${{ matrix.runner }}-${{ matrix.scenario || 'default' }}-${{ github.run_id }}
+          name: macos-stage-e2e-${{ env.MACOS_STAGE_ROLE }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO || 'default' }}-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-output/receipt.json
           if-no-files-found: error
           retention-days: 7
@@ -1571,6 +1580,7 @@ jobs:
     outputs:
       scenarios: ${{ steps.profile.outputs.scenarios }}
       testbuild_matrix: ${{ steps.stage-plan.outputs.testbuild_matrix }}
+      testbuild_metadata: ${{ steps.stage-plan.outputs.testbuild_metadata }}
     env:
       ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
       ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
@@ -2353,15 +2363,22 @@ jobs:
           overwrite: true
 
   launch:
-    name: Test build · ${{ matrix.role }} · ${{ matrix.runner }} · ${{ matrix.scenario }}
+    name: Install and launch
     needs:
       - package-macos
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ matrix.timeout_minutes }}
+    runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}
+    timeout-minutes: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}
     strategy:
       fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.package-macos.outputs.testbuild_matrix) }}
+      matrix: ${{ fromJSON(needs.package-macos.outputs.testbuild_matrix) }}
+    env:
+      MACOS_STAGE_LOT: ${{ matrix.lot }}
+      MACOS_STAGE_METADATA: ${{ needs.package-macos.outputs.testbuild_metadata }}
+      MACOS_STAGE_CELL: ${{ toJSON(fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot]) }}
+      MACOS_STAGE_ROLE: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].role }}
+      MACOS_STAGE_RUNNER: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}
+      MACOS_STAGE_ARCHITECTURE: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].architecture }}
+      MACOS_STAGE_SCENARIO: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].scenario }}
     steps:
       - uses: actions/checkout@v4
       - name: Download exact prior stage receipts
@@ -2378,36 +2395,36 @@ jobs:
       - uses: actions/checkout@v4
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
 
       - name: Fetch the older release whose files seed the user state
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         run: git fetch --no-tags --depth=1 origin "+refs/tags/$SEED_TAG:refs/tags/$SEED_TAG"
 
       - name: Download the package built by this run
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         uses: actions/download-artifact@v4
         with:
           name: assets-macos
@@ -2416,13 +2433,13 @@ jobs:
       - name: Download the independent CI archive source
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         uses: actions/download-artifact@v4
         with:
           name: ci-macos-archive-source
@@ -2434,13 +2451,13 @@ jobs:
       - name: Install the package the way a user does
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         run: |
           set -euo pipefail
           test ! -e /Applications/ErgoptiPlus.app
@@ -2465,19 +2482,19 @@ jobs:
       - name: Record the launch qualification scope
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         run: |
           set -euo pipefail
           node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents \
-              --scenario "${{ matrix.scenario }}" --runner "${{ matrix.runner }}" \
+              --scenario "${{ env.MACOS_STAGE_SCENARIO }}" --runner "${{ env.MACOS_STAGE_RUNNER }}" \
               --receipt "$RUNNER_TEMP/launch-qualification.json"
-          node - "$RUNNER_TEMP/launch-qualification.json" "${{ matrix.scenario }}" "${{ matrix.runner }}" <<'NODE'
+          node - "$RUNNER_TEMP/launch-qualification.json" "${{ env.MACOS_STAGE_SCENARIO }}" "${{ env.MACOS_STAGE_RUNNER }}" <<'NODE'
           const fs = require('node:fs');
           const policy = require('./tools/ci/dev-release-qualification.cjs');
           const scenario = process.argv[3], runner = process.argv[4];
@@ -2492,44 +2509,44 @@ jobs:
       - name: Retain source-bound AppleEvent launch qualification receipt
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' && (matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config') }}
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-launch-macos-${{ matrix.runner }}-${{ matrix.scenario }}
-          path: ${{ runner.temp }}/stable-macos-launch-appleevents-${{ matrix.scenario }}-${{ matrix.runner }}.json
+          name: assets-qualification-launch-macos-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}
+          path: ${{ runner.temp }}/stable-macos-launch-appleevents-${{ env.MACOS_STAGE_SCENARIO }}-${{ env.MACOS_STAGE_RUNNER }}.json
           if-no-files-found: error
 
       - name: Launch over the user state and judge it
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         run: >
           python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app
-          "$RUNNER_TEMP/launch-gate" "${{ matrix.scenario }}" --seed-tag "$SEED_TAG"
+          "$RUNNER_TEMP/launch-gate" "${{ env.MACOS_STAGE_SCENARIO }}" --seed-tag "$SEED_TAG"
           --qualification-receipt "$RUNNER_TEMP/launch-qualification.json"
 
       - name: Record mandatory launch evidence
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         run: >
           node tools/test/desktop-ci-evidence.cjs record-macos
           "$RUNNER_TEMP/launch-gate/result.json"
@@ -2539,16 +2556,16 @@ jobs:
       - name: Retain launch evidence
         env:
           SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ matrix.runner }}'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
           ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
           ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'launch' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: launch-gate-${{ inputs.release && 'release' || 'ci' }}-${{ matrix.runner }}-${{ matrix.scenario }}
+          name: launch-gate-${{ inputs.release && 'release' || 'ci' }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}
           overwrite: true
           path: ${{ runner.temp }}/launch-gate
           if-no-files-found: warn
@@ -2557,20 +2574,20 @@ jobs:
       # app receives the cold runtime; this job never publishes a release.
       # Retained original role: cold-bootstrap-native
       - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
 
       - uses: actions/setup-node@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         with:
           node-version-file: '.node-version'
 
       - uses: actions/setup-python@v5
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         with:
           python-version: '3.13'
 
       - name: Require actual arm64 cold runtime prerequisites
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -2582,7 +2599,7 @@ jobs:
           node --version
 
       - name: Build independent signed cold application
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         id: cold-app
         shell: bash
         env:
@@ -2602,7 +2619,7 @@ jobs:
           codesign --verify --deep --strict build/macos/ErgoptiPlus.app 2>&1 | tee -a "$RUNNER_TEMP/cold-bootstrap-application-build.log"
 
       - name: Receive actual isolated cold native MLX bootstrap
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
         shell: bash
         timeout-minutes: 35
         run: |
@@ -2617,7 +2634,7 @@ jobs:
       # The official runtime boot is separate from the optional rebuilt daemon
       # model receiver. It still runs if the preceding MLX cold boot refuses.
       - name: Receive actual official cold Ollama without stock Python
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' && (!cancelled() && steps.cold-app.outcome == 'success') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (!cancelled() && steps.cold-app.outcome == 'success') }}
         shell: bash
         timeout-minutes: 35
         run: |
@@ -2694,7 +2711,7 @@ jobs:
           PY
 
       - name: Retain official cold Ollama receipt only
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -2704,7 +2721,7 @@ jobs:
           path: ${{ runner.temp }}/native-cold-ollama-bootstrap/receipt.json
 
       - name: Retain native cold bootstrap evidence
-        if: ${{ steps.stage-admission.outcome == 'success' && matrix.role == 'cold-bootstrap-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -2719,17 +2736,17 @@ jobs:
             ${{ runner.temp }}/native-cold-bootstrap/cold-runtime.sb
             ${{ runner.temp }}/native-cold-bootstrap/cold-bootstrap-evidence.json
 
-      - name: Record actual stage role outcome
+      - name: Record actual stage role outcome — ${{ matrix.lot }}
         if: always()
         env:
-          MACOS_STAGE_CELL: ${{ toJSON(matrix) }}
+          MACOS_STAGE_CELL: ${{ env.MACOS_STAGE_CELL }}
           MACOS_STAGE_RESULT: ${{ job.status }}
         run: node tools/ci/macos-stage-roles.cjs record testbuild "$RUNNER_TEMP/macos-stage-prior.json" "$RUNNER_TEMP/macos-stage-output/receipt.json"
       - name: Retain exact stage role outcome
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-stage-testbuild-${{ matrix.role }}-${{ matrix.runner }}-${{ matrix.scenario || 'default' }}-${{ github.run_id }}
+          name: macos-stage-testbuild-${{ env.MACOS_STAGE_ROLE }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO || 'default' }}-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-output/receipt.json
           if-no-files-found: error
           retention-days: 7

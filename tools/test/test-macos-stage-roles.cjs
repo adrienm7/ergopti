@@ -322,4 +322,388 @@ check('existing scope owner admits every retained Mac command after address relo
 	const projected = scoped.projectScopedSteps(source, '.github/workflows/ci-macos.yml');
 	assert.ok(projected.length > 0 && projected !== source);
 });
+
+assert.equal(controls, 84, 'all original stage and receipt controls remain present');
+check('Unit has one truthful display axis and the unchanged complete cell', () => {
+	assert.deepEqual(roles.displayPlan('unit', context), {
+		matrix: { lot: ['Lua unit and meta (stubbed)'] },
+		metadata: {
+			'Lua unit and meta (stubbed)': {
+				role: 'lua-unit-meta',
+				runner: 'ubuntu-latest',
+				architecture: 'stubbed',
+				timeout_minutes: 360,
+				scenario: ''
+			}
+		}
+	});
+	assert.deepEqual(
+		roles.selectUnitLot('Lua unit and meta (stubbed)', context),
+		roles.plan('unit', context)[0]
+	);
+	for (const name of [
+		undefined,
+		'lua-unit-meta',
+		'Lua unit and meta',
+		'Lua unit and meta (native)'
+	])
+		assert.throws(() => roles.selectUnitLot(name, context), /Missing or foreign human lot/);
+});
+check('E2E human lots retain native architectures and scoped manual roles', () => {
+	const push = [
+		'Virtual-keyboard replay (stubbed)',
+		'Tooltip canvas (Apple silicon)',
+		'Managed Ollama (Apple silicon)',
+		'Managed Ollama (Intel)'
+	];
+	assert.deepEqual(roles.displayPlan('e2e', context).matrix, { lot: push });
+	assert.deepEqual(
+		roles.displayPlan('e2e', { ...context, event_name: 'workflow_dispatch' }).matrix,
+		{
+			lot: [
+				...push,
+				'Archive update controls',
+				'Lease silence (Apple silicon)',
+				'Lease silence (Intel)'
+			]
+		}
+	);
+	assert.deepEqual(
+		roles.displayPlan('e2e', { ...context, event_name: 'workflow_dispatch', release: true }).matrix,
+		{ lot: push }
+	);
+});
+check('installed-app lots expose every exact scenario and release architecture', () => {
+	assert.deepEqual(roles.displayPlan('testbuild', context).matrix, {
+		lot: [
+			'Installed app: clean (Apple silicon)',
+			'Installed app: karabiner config (Apple silicon)',
+			'Installed app: upgraded (Apple silicon)',
+			'Cold native bootstrap (Apple silicon)'
+		]
+	});
+	assert.deepEqual(roles.displayPlan('testbuild', { ...context, release: true }).matrix, {
+		lot: [
+			'Installed app: clean (Apple silicon)',
+			'Installed app: karabiner config (Apple silicon)',
+			'Installed app: upgraded (Apple silicon)',
+			'Installed app: clean (Intel)',
+			'Installed app: karabiner config (Intel)',
+			'Installed app: upgraded (Intel)',
+			'Cold native bootstrap (Apple silicon)'
+		]
+	});
+});
+for (const [name, ctx] of [
+	['push', context],
+	['manual', { ...context, event_name: 'workflow_dispatch' }],
+	['release', { ...context, event_name: 'workflow_dispatch', release: true }]
+]) {
+	for (const stage of ['unit', 'e2e', 'testbuild']) {
+		check(name + ' ' + stage + ' maps each lot back to the complete old cell exactly once', () => {
+			const displayed = roles.displayPlan(stage, ctx);
+			const original = roles.plan(stage, ctx);
+			assert.deepEqual(Object.keys(displayed), ['matrix', 'metadata']);
+			assert.deepEqual(Object.keys(displayed.matrix), ['lot']);
+			assert.equal(displayed.matrix.lot.length, original.length);
+			assert.equal(new Set(displayed.matrix.lot).size, original.length);
+			assert.deepEqual(Object.keys(displayed.metadata), displayed.matrix.lot);
+			assert.deepEqual(Object.values(displayed.metadata), original);
+			assert.deepEqual(
+				displayed.matrix.lot.map((lot) => roles.selectLot(stage, lot, displayed.metadata, ctx)),
+				original
+			);
+			for (const lot of displayed.matrix.lot)
+				assert.doesNotMatch(lot, /e2e-hs|macos-|ubuntu-|timeout_minutes|\b360\b/);
+		});
+	}
+}
+check(
+	'human-lot renderer refuses foreign roles, stages, native architectures and scenarios',
+	() => {
+		const selected = roles.plan('e2e', context)[2];
+		assert.throws(() => roles.humanLot('unit', selected), /Unknown human lot stage or role/);
+		assert.throws(
+			() => roles.humanLot('e2e', { ...selected, architecture: 'host' }),
+			/Unknown human lot architecture/
+		);
+		assert.throws(
+			() => roles.humanLot('e2e', { ...selected, scenario: 'clean' }),
+			/Unexpected scenario/
+		);
+		assert.throws(
+			() => roles.humanLot('testbuild', { ...roles.plan('testbuild', context)[0], scenario: '' }),
+			/regular expression/
+		);
+		assert.throws(() => roles.displayPlan('build', context), /no human lot matrix/);
+	}
+);
+const lotContext = { ...context, event_name: 'workflow_dispatch', release: true };
+const lotStage = 'testbuild';
+const lotPlan = roles.displayPlan(lotStage, lotContext);
+const selectedLot = 'Installed app: clean (Apple silicon)';
+for (const [name, mutate] of [
+	['missing selected lot', (map) => delete map[selectedLot]],
+	['missing unselected lot', (map) => delete map['Installed app: clean (Intel)']],
+	['foreign lot alias', (map) => (map.foreign = structuredClone(map[selectedLot]))],
+	[
+		'duplicate cell under another authored lot',
+		(map) => (map['Installed app: clean (Intel)'] = structuredClone(map[selectedLot]))
+	],
+	['wrong role', (map) => (map[selectedLot].role = 'cold-bootstrap-native')],
+	['wrong runner', (map) => (map[selectedLot].runner = 'macos-latest')],
+	['wrong architecture', (map) => (map[selectedLot].architecture = 'amd64')],
+	['wrong runtime bound', (map) => map[selectedLot].timeout_minutes++],
+	['wrong scenario', (map) => (map[selectedLot].scenario = 'upgraded')],
+	['foreign cell field', (map) => (map[selectedLot].bypass = true)],
+	['missing cell field', (map) => delete map[selectedLot].scenario]
+]) {
+	check('whole lot metadata refuses ' + name, () => {
+		const metadata = structuredClone(lotPlan.metadata);
+		mutate(metadata);
+		assert.throws(
+			() => roles.selectLot(lotStage, selectedLot, metadata, lotContext),
+			/Complete human lot metadata map differs/
+		);
+	});
+}
+check('whole lot metadata refuses a foreign profile and duplicate wire keys', () => {
+	assert.throws(
+		() => roles.selectLot(lotStage, selectedLot, lotPlan.metadata, context),
+		/Complete human lot metadata map differs/
+	);
+	const { parseClosedJson } = require('../ci/dev-release-qualification.cjs');
+	const entry = JSON.stringify(selectedLot) + ':' + JSON.stringify(lotPlan.metadata[selectedLot]);
+	assert.throws(
+		() =>
+			roles.selectLot(
+				lotStage,
+				selectedLot,
+				parseClosedJson('{' + entry + ',' + entry + '}'),
+				lotContext
+			),
+		/Duplicate/
+	);
+});
+check('metadata key order has no meaning while the complete cell values remain exact', () => {
+	const reordered = Object.fromEntries(
+		Object.entries(lotPlan.metadata)
+			.reverse()
+			.map(([lot, selected]) => [lot, Object.fromEntries(Object.entries(selected).reverse())])
+	);
+	assert.deepEqual(
+		roles.selectLot(lotStage, selectedLot, reordered, lotContext),
+		lotPlan.metadata[selectedLot]
+	);
+});
+for (const lot of [
+	undefined,
+	null,
+	'',
+	'launch',
+	'Installed app: clean',
+	'Installed app: clean (ARM64)'
+])
+	check('closed lot selection refuses ' + JSON.stringify(lot), () => {
+		assert.throws(
+			() => roles.selectLot(lotStage, lot, lotPlan.metadata, lotContext),
+			/Missing or foreign human lot/
+		);
+	});
+for (const [priorStage, receiver] of [
+	['unit', 'e2e'],
+	['build', 'testbuild']
+]) {
+	check(receiver + ' validates the whole lot map before any predecessor access', () => {
+		const displayed = roles.displayPlan(receiver, context);
+		const metadata = structuredClone(displayed.metadata);
+		delete metadata[displayed.matrix.lot.at(-1)];
+		const needs = new Proxy(
+			{},
+			{
+				ownKeys() {
+					throw new Error('NEEDS_ACCESSED');
+				}
+			}
+		);
+		let reads = 0;
+		assert.throws(
+			() =>
+				roles.admit(priorStage, displayed.matrix.lot[0], metadata, needs, context, 1, () => {
+					reads++;
+					return completed.all[priorStage];
+				}),
+			/Complete human lot metadata map differs/
+		);
+		assert.equal(reads, 0);
+	});
+}
+for (const [index, stage] of ['unit', 'e2e', 'build'].entries()) {
+	const receiver = roles.STAGES[index + 1];
+	const displayed = receiver === 'build' ? undefined : roles.displayPlan(receiver, context);
+	const lot = displayed?.matrix.lot[0];
+	check(stage + ' admission retains aggregate custody and the exact prior proof', () => {
+		let reads = 0;
+		const proof = roles.admit(
+			stage,
+			lot,
+			displayed?.metadata,
+			{ [roles.JOBS[index]]: { result: 'success' } },
+			context,
+			1,
+			() => {
+				reads++;
+				return completed.all[stage];
+			}
+		);
+		assert.deepEqual(proof, roles.union(stage, completed.all[stage], 'success', context, 1));
+		assert.equal(reads, 1);
+	});
+	for (const result of ['failure', 'cancelled', 'skipped'])
+		check(stage + ' lot admission preserves ' + result + ' aggregate refusal before read', () => {
+			let reads = 0;
+			assert.throws(
+				() =>
+					roles.admit(
+						stage,
+						lot,
+						displayed?.metadata,
+						{ [roles.JOBS[index]]: { result } },
+						context,
+						1,
+						() => {
+							reads++;
+							return completed.all[stage];
+						}
+					),
+				/Direct predecessor aggregate/
+			);
+			assert.equal(reads, 0);
+		});
+}
+for (const stage of roles.STAGES) {
+	check(stage + ' lot recording preserves every original receipt field and complete cell', () => {
+		const displayed = stage === 'build' ? undefined : roles.displayPlan(stage, context);
+		for (const [index, selected] of roles.plan(stage, context).entries()) {
+			const original = completed.all[stage][index];
+			assert.deepEqual(
+				roles.recordLot(
+					stage,
+					selected,
+					'success',
+					{ context, chain: original.prior },
+					context,
+					host(selected),
+					1,
+					displayed?.matrix.lot[index],
+					displayed?.metadata
+				),
+				original
+			);
+		}
+	});
+	if (stage !== 'build')
+		check(stage + ' lot recording refuses a missing or foreign displayed lot', () => {
+			const selected = roles.plan(stage, context)[0];
+			const prior = { context, chain: completed.all[stage][0].prior };
+			const displayed = roles.displayPlan(stage, context);
+			for (const lot of [undefined, 'foreign'])
+				assert.throws(
+					() =>
+						roles.recordLot(
+							stage,
+							selected,
+							'success',
+							prior,
+							context,
+							host(selected),
+							1,
+							lot,
+							displayed.metadata
+						),
+					/Missing or foreign human lot/
+				);
+		});
+}
+check('recording refuses another valid cell under the selected human lot', () => {
+	const selected = roles.plan('e2e', context)[3];
+	const prior = { context, chain: completed.all.e2e[3].prior };
+	const displayed = roles.displayPlan('e2e', context);
+	assert.throws(
+		() =>
+			roles.recordLot(
+				'e2e',
+				selected,
+				'success',
+				prior,
+				context,
+				host(selected),
+				1,
+				'Managed Ollama (Apple silicon)',
+				displayed.metadata
+			),
+		/Selected human lot and receipt cell differ/
+	);
+});
+assert.equal(controls, 138, 'original controls and human lot transport controls all execute');
+check('role labels retain the independent authored human names without runtime metadata', () => {
+	for (const [stage, role, architecture, scenario, expected] of [
+		['unit', 'lua-unit-meta', 'stubbed', '', 'Lua unit and meta (stubbed)'],
+		['e2e', 'e2e-hs', 'stubbed', '', 'Virtual-keyboard replay (stubbed)'],
+		['e2e', 'tooltip-canvas', 'arm64', '', 'Tooltip canvas (Apple silicon)'],
+		['e2e', 'managed-ollama-native', 'arm64', '', 'Managed Ollama (Apple silicon)'],
+		['e2e', 'managed-ollama-native', 'amd64', '', 'Managed Ollama (Intel)'],
+		['e2e', 'item36-native', 'host', '', 'Archive update controls'],
+		['e2e', 'lease-silence-native', 'arm64', '', 'Lease silence (Apple silicon)'],
+		['e2e', 'lease-silence-native', 'amd64', '', 'Lease silence (Intel)'],
+		[
+			'testbuild',
+			'launch',
+			'arm64',
+			'karabiner_config',
+			'Installed app: karabiner config (Apple silicon)'
+		],
+		['testbuild', 'launch', 'amd64', 'upgraded', 'Installed app: upgraded (Intel)'],
+		['testbuild', 'cold-bootstrap-native', 'arm64', '', 'Cold native bootstrap (Apple silicon)']
+	])
+		assert.equal(roles.roleLot(stage, role, architecture, scenario), expected);
+});
+check(
+	'role labels refuse invalid argument types and foreign stage role architecture or scenario',
+	() => {
+		const args = ['e2e', 'managed-ollama-native', 'arm64', ''];
+		for (let index = 0; index < args.length; index++) {
+			for (const value of [undefined, null, 1, [], {}]) {
+				const changed = args.slice();
+				changed[index] = value;
+				assert.throws(() => roles.roleLot(...changed), /Invalid human lot/);
+			}
+		}
+		for (const changed of [
+			['unit', 'managed-ollama-native', 'arm64', ''],
+			['e2e', 'foreign', 'arm64', ''],
+			['e2e', 'managed-ollama-native', 'host', ''],
+			['e2e', 'managed-ollama-native', 'arm64', 'clean'],
+			['testbuild', 'launch', 'arm64', ''],
+			['testbuild', 'launch', 'arm64', 'clean forged']
+		])
+			assert.throws(() => roles.roleLot(...changed));
+	}
+);
+check('full-cell human labels still reject incomplete cells and foreign fields', () => {
+	assert.throws(
+		() =>
+			roles.humanLot('e2e', {
+				role: 'managed-ollama-native',
+				architecture: 'arm64',
+				scenario: ''
+			}),
+		/Closed stage receipt fields required/
+	);
+	assert.throws(
+		() => roles.humanLot('e2e', { ...roles.plan('e2e', context)[2], lot: 'forged' }),
+		/Closed stage receipt fields required/
+	);
+});
+assert.equal(controls, 141, 'all original, human lot transport and role-label controls execute');
 console.log('macos-stage-roles: ' + controls + ' controls passed');

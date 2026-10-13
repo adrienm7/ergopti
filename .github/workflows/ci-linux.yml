@@ -3519,7 +3519,7 @@ jobs:
           if-no-files-found: warn
 
   package-linux:
-    name: 'Package'
+    name: 'Build'
     runs-on: ubuntu-latest
     needs: [e2e-linux]
     if: ${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
@@ -3528,6 +3528,8 @@ jobs:
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
 
     outputs:
+      install_matrix: ${{ steps.install-plan.outputs.matrix }}
+      install_metadata: ${{ steps.install-plan.outputs.metadata }}
       ci_predecessors: ${{ toJSON(needs) }}
       ci_source_sha: ${{ github.sha }}
       ci_run_id: ${{ github.run_id }}
@@ -3810,6 +3812,10 @@ jobs:
           path: ${{ runner.temp }}/linux-ci-evidence/package-linux.json
           if-no-files-found: error
 
+      - name: Plan every authored installation lot
+        id: install-plan
+        run: node tools/ci/linux-install-matrix.cjs
+
   # ─────────────────────────────────────────────────
   # 3) Install and run every Linux distribution and package
   # ─────────────────────────────────────────────────
@@ -3821,118 +3827,20 @@ jobs:
   # LuaJIT, so dependency resolution and the bundled interpreter remain tested.
   # An empty scalar container means a host job in the GitHub runner.
   install-linux:
-    name: 'Install and launch · ${{ matrix.label }}'
+    name: 'Install and launch'
     runs-on: ubuntu-latest
     needs: [package-linux]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - id: distro-debian
-            kind: install
-            label: 'Install · debian'
-            distro: debian
-            container: debian:stable-slim
-            image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd ca-certificates git gcc libc6-dev linux-libc-dev
-          - id: distro-fedora
-            kind: install
-            label: 'Install · fedora'
-            distro: fedora
-            container: fedora:latest
-            image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers
-          - id: distro-arch
-            kind: install
-            label: 'Install · arch'
-            distro: arch
-            container: archlinux:latest
-            image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers
-          - id: distro-alpine
-            kind: install
-            label: 'Install · alpine'
-            distro: alpine
-            container: alpine:latest
-            image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers
-          - id: distro-opensuse
-            kind: install
-            label: 'Install · opensuse'
-            distro: opensuse
-            container: opensuse/tumbleweed:latest
-            image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow git gcc glibc-devel linux-glibc-devel
-          - id: first-install-ubuntu-22.04
-            kind: first
-            label: 'First install · ubuntu-22.04'
-            distro: ubuntu-22.04
-            container: ''
-            image: 'ubuntu:22.04'
-          - id: first-install-ubuntu-24.04
-            kind: first
-            label: 'First install · ubuntu-24.04'
-            distro: ubuntu-24.04
-            container: ''
-            image: 'ubuntu:24.04'
-          - id: first-install-debian-12
-            kind: first
-            label: 'First install · debian-12'
-            distro: debian-12
-            container: ''
-            image: 'debian:12'
-          - id: first-install-debian-13
-            kind: first
-            label: 'First install · debian-13'
-            distro: debian-13
-            container: ''
-            image: 'debian:13'
-          - id: first-install-fedora-41
-            kind: first
-            label: 'First install · fedora-41'
-            distro: fedora-41
-            container: ''
-            image: 'fedora:41'
-            known: webkit
-          - id: first-install-fedora-latest
-            kind: first
-            label: 'First install · fedora-latest'
-            distro: fedora-latest
-            container: ''
-            image: 'fedora:latest'
-            known: webkit
-          - id: first-install-arch
-            kind: first
-            label: 'First install · arch'
-            distro: arch
-            container: ''
-            image: 'archlinux:latest'
-          - id: first-install-opensuse-tumbleweed
-            kind: first
-            label: 'First install · opensuse-tumbleweed'
-            distro: opensuse-tumbleweed
-            container: ''
-            image: 'opensuse/tumbleweed:latest'
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo
-          - id: first-install-alpine
-            kind: first
-            label: 'First install · alpine'
-            distro: alpine
-            container: ''
-            image: 'alpine:latest'
-          - id: smoke-deb-install
-            kind: deb
-            label: 'Run · .deb'
-            container: ''
-          - id: smoke-rpm-install
-            kind: rpm
-            label: 'Run · .rpm'
-            container: fedora:latest
-          - id: smoke-appimage-run
-            kind: appimage
-            label: 'Run · AppImage'
-            container: ''
-    container: ${{ matrix.container }}
+      matrix: ${{ fromJSON(needs.package-linux.outputs.install_matrix) }}
+    container: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].container }}
+    env:
+      INSTALL_ID: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].id }}
+      INSTALL_KIND: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].kind }}
+      INSTALL_DISTRO: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].distro }}
+      INSTALL_IMAGE: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].image }}
+      INSTALL_PREP: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].prep }}
+      INSTALL_KNOWN: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].known }}
     outputs:
       ci_predecessors: ${{ toJSON(needs) }}
       ci_source_sha: ${{ github.sha }}
@@ -3940,13 +3848,23 @@ jobs:
       ci_attempt: ${{ github.run_attempt }}
 
     steps:
-      - name: Prepare the container
-        if: matrix.kind == 'install'
+      - name: Require a declared installation lot
         shell: sh
-        run: ${{ matrix.prep }}
+        run: |
+          set -eu
+          test -n "$INSTALL_ID"
+          case "$INSTALL_KIND" in
+            install|first|deb|rpm|appimage) ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Prepare the container
+        if: env.INSTALL_KIND == 'install'
+        shell: sh
+        run: ${{ env.INSTALL_PREP }}
 
       - name: Tools the job itself needs (rpm)
-        if: matrix.kind == 'rpm'
+        if: env.INSTALL_KIND == 'rpm'
         # Deliberately NOT luajit: the .rpm declares `Requires: luajit >= 2.1`,
         # so letting dnf resolve it from the package is what proves that
         # declaration is right. Pre-installing it would hide a wrong Requires.
@@ -3957,7 +3875,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Verify source compiler and checkout
-        if: matrix.kind == 'install'
+        if: env.INSTALL_KIND == 'install'
         shell: bash
         run: |
           set -euo pipefail
@@ -3967,7 +3885,7 @@ jobs:
           native_source_compile_probe "$GITHUB_WORKSPACE/static/ergopti_plus/linux/native/archive_output"
 
       - name: Create the installation user
-        if: matrix.kind == 'install'
+        if: env.INSTALL_KIND == 'install'
         shell: bash
         run: |
           set -euo pipefail
@@ -3982,7 +3900,7 @@ jobs:
           chmod 0440 /etc/sudoers.d/ergopti-ci
 
       - name: Install as an ordinary user without runtime dependencies
-        if: matrix.kind == 'install'
+        if: env.INSTALL_KIND == 'install'
         working-directory: static/ergopti_plus/linux
         # The installer owns user files; only its real permission helper gets
         # sudo. There is no user session bus, so startup must use XDG autostart.
@@ -3994,7 +3912,7 @@ jobs:
           sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER bash install.sh --no-deps
 
       - name: The installed tree is the one the daemon expects
-        if: matrix.kind == 'install'
+        if: env.INSTALL_KIND == 'install'
         shell: bash
         run: |
           export HOME=/tmp/ergopti-home
@@ -4037,14 +3955,14 @@ jobs:
       # LuaJIT is the production interpreter. A distribution lane without it is
       # not evidence about the driver and therefore cannot satisfy this gate.
       - name: The unit suite on this distribution's LuaJIT
-        if: matrix.kind == 'install'
+        if: env.INSTALL_KIND == 'install'
         working-directory: static/ergopti_plus/linux
         shell: bash
         run: |
           set -euo pipefail
           # Retain the suite's real supervised-curl prerequisite. The incoming
           # pinned native helper owns Python and ABI-compatible luv/lfs builds.
-          case "${{ matrix.distro }}" in
+          case "${{ env.INSTALL_DISTRO }}" in
             debian)   apt-get install -y --no-install-recommends curl ;;
             fedora)   dnf install -y curl ;;
             arch)     pacman -Sy --noconfirm curl ;;
@@ -4065,17 +3983,17 @@ jobs:
           chown -R ergopti-ci:ergopti-ci "$unit_root"
           unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"
           mkdir -p "$unit_log_dir"
-          unit_log="$unit_log_dir/${{ matrix.distro }}.log"
+          unit_log="$unit_log_dir/${{ env.INSTALL_DISTRO }}.log"
           set +e
           (cd "$unit_root/static/ergopti_plus/linux" &&
-            bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}") \
+            bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}") \
             2>&1 | tee "$unit_log"
           unit_pipeline_status=("${PIPESTATUS[@]}")
           set -e
           native_status="${unit_pipeline_status[0]}"
           set +e
           python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \
-            '${{ matrix.distro }}' "$native_status" <<'PYTHON'
+            '${{ env.INSTALL_DISTRO }}' "$native_status" <<'PYTHON'
           import pathlib
           import re
           import sys
@@ -4130,16 +4048,16 @@ jobs:
         timeout-minutes: 10
 
       - name: Upload the native distro unit log
-        if: ${{ !cancelled() && matrix.kind == 'install' }}
+        if: ${{ !cancelled() && env.INSTALL_KIND == 'install' }}
         uses: actions/upload-artifact@v4
         with:
-          name: linux-distro-unit-log-${{ matrix.distro }}
+          name: linux-distro-unit-log-${{ env.INSTALL_DISTRO }}
           retention-days: 7
-          path: ${{ runner.temp }}/linux-distro-unit-logs/${{ matrix.distro }}.log
+          path: ${{ runner.temp }}/linux-distro-unit-logs/${{ env.INSTALL_DISTRO }}.log
           if-no-files-found: warn
 
       - name: Record mandatory distro evidence
-        if: matrix.kind == 'install'
+        if: env.INSTALL_KIND == 'install'
         shell: bash
         run: |
           set -euo pipefail
@@ -4151,36 +4069,36 @@ jobs:
             '  "job": "install-linux",' \
             "  \"sha\": \"$GITHUB_SHA\"," \
             "  \"architecture\": \"$RUNNER_ARCH\"," \
-            '  "distro": "${{ matrix.distro }}",' \
+            '  "distro": "${{ env.INSTALL_DISTRO }}",' \
             '  "session": "container",' \
             '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "distro-${{ matrix.distro }}": 1 }' \
-            '}' > "$evidence_dir/${{ matrix.distro }}.json"
+            '  "subjects": { "distro-${{ env.INSTALL_DISTRO }}": 1 }' \
+            '}' > "$evidence_dir/${{ env.INSTALL_DISTRO }}.json"
 
       - name: Upload mandatory distro evidence
-        if: matrix.kind == 'install'
+        if: env.INSTALL_KIND == 'install'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: linux-ci-evidence-distro-${{ matrix.distro }}
+          name: linux-ci-evidence-distro-${{ env.INSTALL_DISTRO }}
           retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
+          path: ${{ runner.temp }}/linux-ci-evidence/${{ env.INSTALL_DISTRO }}.json
           if-no-files-found: error
 
-      - name: Install on ${{ matrix.image }} and verify the first run
-        if: matrix.kind == 'first'
+      - name: Install on ${{ env.INSTALL_IMAGE }} and verify the first run
+        if: env.INSTALL_KIND == 'first'
         timeout-minutes: 25
         shell: bash
         env:
-          ERGOPTI_E2E_PREP: ${{ matrix.prep || '' }}
+          ERGOPTI_E2E_PREP: ${{ env.INSTALL_PREP || '' }}
         run: |
           set -euo pipefail
-          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_PREP -e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
-          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
+          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_PREP -e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ env.INSTALL_KNOWN || '' }}"
+          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ env.INSTALL_IMAGE }}' \
             | tee "$RUNNER_TEMP/first-install.log"
 
       - name: Record mandatory first-install evidence
-        if: matrix.kind == 'first'
+        if: env.INSTALL_KIND == 'first'
         shell: bash
         run: |
           set -euo pipefail
@@ -4192,24 +4110,24 @@ jobs:
             '  "job": "install-linux",' \
             "  \"sha\": \"$GITHUB_SHA\"," \
             "  \"architecture\": \"$RUNNER_ARCH\"," \
-            '  "distro": "${{ matrix.distro }}",' \
+            '  "distro": "${{ env.INSTALL_DISTRO }}",' \
             '  "session": "container-first-install",' \
             '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "first-install-${{ matrix.distro }}": 1 }' \
-            '}' > "$evidence_dir/first-install-${{ matrix.distro }}.json"
+            '  "subjects": { "first-install-${{ env.INSTALL_DISTRO }}": 1 }' \
+            '}' > "$evidence_dir/first-install-${{ env.INSTALL_DISTRO }}.json"
 
       - name: Upload mandatory first-install evidence
-        if: matrix.kind == 'first'
+        if: env.INSTALL_KIND == 'first'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: linux-ci-evidence-first-install-${{ matrix.distro }}
+          name: linux-ci-evidence-first-install-${{ env.INSTALL_DISTRO }}
           retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
+          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ env.INSTALL_DISTRO }}.json
           if-no-files-found: error
 
       - name: Download the .deb built above (deb)
-        if: matrix.kind == 'deb'
+        if: env.INSTALL_KIND == 'deb'
         # assets-linux holds every Linux file of this run under its release
         # name; the find below picks its one .deb.
         uses: actions/download-artifact@v4
@@ -4218,7 +4136,7 @@ jobs:
           path: pkg
 
       - name: Install it the way a user would (deb)
-        if: matrix.kind == 'deb'
+        if: env.INSTALL_KIND == 'deb'
         # --no-install-recommends deliberately: the Recommends list names
         # libayatana-appindicator3-1 among others, which are optional at
         # runtime and not all in the Ubuntu archive. What is under test is that
@@ -4237,7 +4155,7 @@ jobs:
           dpkg -s ergopti
 
       - name: The package installed the files the daemon reads (deb)
-        if: matrix.kind == 'deb'
+        if: env.INSTALL_KIND == 'deb'
         shell: bash
         run: |
           set -euo pipefail
@@ -4256,7 +4174,7 @@ jobs:
           exit $fail
 
       - name: Launch the installed binary (deb)
-        if: matrix.kind == 'deb'
+        if: env.INSTALL_KIND == 'deb'
         # --help returns early, but only AFTER every file-scope require in the
         # daemon has run — so this is a real check of the require graph against
         # the INSTALLED layout, which the unit suite (run from the checkout)
@@ -4269,7 +4187,7 @@ jobs:
           /usr/bin/ergopti --help
 
       - name: The installed shared data tree resolves and opens (deb)
-        if: matrix.kind == 'deb'
+        if: env.INSTALL_KIND == 'deb'
         # --help returns before doing any work, so it proves the require graph
         # and nothing about the DATA tree — which is where the defect that
         # motivated this whole job actually lived. The check is a tracked file
@@ -4290,7 +4208,7 @@ jobs:
               /usr/lib/ergopti/_shared
 
       - name: Record mandatory .deb smoke evidence (deb)
-        if: matrix.kind == 'deb'
+        if: env.INSTALL_KIND == 'deb'
         shell: bash
         run: |
           node tools/test/linux-ci-evidence.cjs record \
@@ -4300,7 +4218,7 @@ jobs:
               --subject smoke-deb-install=1
 
       - name: Upload mandatory .deb smoke evidence (deb)
-        if: matrix.kind == 'deb'
+        if: env.INSTALL_KIND == 'deb'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -4310,7 +4228,7 @@ jobs:
           if-no-files-found: error
 
       - name: Download the .rpm built above (rpm)
-        if: matrix.kind == 'rpm'
+        if: env.INSTALL_KIND == 'rpm'
         # assets-linux holds every Linux file of this run under its release
         # name; the find below picks its one .rpm.
         uses: actions/download-artifact@v4
@@ -4319,7 +4237,7 @@ jobs:
           path: pkg
 
       - name: Install it the way a user would (rpm)
-        if: matrix.kind == 'rpm'
+        if: env.INSTALL_KIND == 'rpm'
         shell: bash
         run: |
           set -euo pipefail
@@ -4332,7 +4250,7 @@ jobs:
           rpm -q ergopti
 
       - name: Launch the installed binary (rpm)
-        if: matrix.kind == 'rpm'
+        if: env.INSTALL_KIND == 'rpm'
         shell: bash
         run: |
           set -euo pipefail
@@ -4344,7 +4262,7 @@ jobs:
           USER="$account" LOGNAME="$account" /usr/bin/ergopti --help
 
       - name: The installed shared data tree resolves and opens (rpm)
-        if: matrix.kind == 'rpm'
+        if: env.INSTALL_KIND == 'rpm'
         shell: bash
         run: |
           set -euo pipefail
@@ -4357,7 +4275,7 @@ jobs:
               /usr/lib/ergopti/_shared
 
       - name: Record mandatory .rpm smoke evidence (rpm)
-        if: matrix.kind == 'rpm'
+        if: env.INSTALL_KIND == 'rpm'
         shell: bash
         run: |
           set -euo pipefail
@@ -4376,7 +4294,7 @@ jobs:
             '}' > "$evidence_dir/smoke-rpm-install.json"
 
       - name: Upload mandatory .rpm smoke evidence (rpm)
-        if: matrix.kind == 'rpm'
+        if: env.INSTALL_KIND == 'rpm'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -4386,7 +4304,7 @@ jobs:
           if-no-files-found: error
 
       - name: Download the AppImage built above
-        if: matrix.kind == 'appimage'
+        if: env.INSTALL_KIND == 'appimage'
         # assets-linux holds every Linux file of this run under its release
         # name; the find below picks its one .AppImage.
         uses: actions/download-artifact@v4
@@ -4395,7 +4313,7 @@ jobs:
           path: pkg
 
       - name: Unpack it (no FUSE on this runner)
-        if: matrix.kind == 'appimage'
+        if: env.INSTALL_KIND == 'appimage'
         shell: bash
         run: |
           set -euo pipefail
@@ -4409,14 +4327,14 @@ jobs:
           test -x squashfs-root/AppRun
 
       - name: Launch it
-        if: matrix.kind == 'appimage'
+        if: env.INSTALL_KIND == 'appimage'
         # Explicitly --help: AppRun appends --tray when given no arguments, and
         # there is no display here for a tray to appear in.
         shell: bash
         run: ./squashfs-root/AppRun --help
 
       - name: The bundled shared data tree resolves and opens
-        if: matrix.kind == 'appimage'
+        if: env.INSTALL_KIND == 'appimage'
         # The AppImage is relocatable, so its root is wherever it was unpacked —
         # which is the point of checking it here rather than assuming a prefix.
         #
@@ -4438,7 +4356,7 @@ jobs:
               "$root/_shared"
 
       - name: Record mandatory AppImage smoke evidence
-        if: matrix.kind == 'appimage'
+        if: env.INSTALL_KIND == 'appimage'
         shell: bash
         run: |
           node tools/test/linux-ci-evidence.cjs record \
@@ -4448,7 +4366,7 @@ jobs:
               --subject smoke-appimage-run=1
 
       - name: Upload mandatory AppImage smoke evidence
-        if: matrix.kind == 'appimage'
+        if: env.INSTALL_KIND == 'appimage'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true

@@ -55,6 +55,24 @@ const JOBS = [
 ];
 const FULL_STEPS = [
 	[
+		'.github/workflows/ci-common.yml',
+		'shared-validation',
+		'Check hotstring TOML files are sorted and formatted',
+		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
+	],
+	[
+		'.github/workflows/ci-common.yml',
+		'common-build',
+		'Build and seal production site — ${{ matrix.lot }}',
+		null
+	],
+	[
+		'.github/workflows/ci-common.yml',
+		'common-testbuild',
+		'Test received production site — ${{ matrix.lot }}',
+		null
+	],
+	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive closed lease silence transcript controls',
@@ -487,7 +505,17 @@ function validateRaw(files) {
 	for (const [rel, id, name, condition] of FULL_STEPS) {
 		const job = jobs.find((entry) => entry.file === rel && entry.id === id);
 		const body = raw.step(job.body, name);
-		requireEqual(raw.stepField(body, 'if'), condition, `${id}/${name} full step condition`);
+		const expectedCondition =
+			rel === '.github/workflows/ci-macos.yml' ? macRole.metadata(condition, id) : condition;
+		requireEqual(raw.stepField(body, 'if'), expectedCondition, `${id}/${name} full step condition`);
+		if (name === 'Check hotstring TOML files are sorted and formatted') {
+			requireEqual(raw.stepField(body, 'id'), 'hotstrings-format', 'mandatory TOML step identity');
+			requireEqual(
+				raw.runOf(body)?.join('\n'),
+				'python tools/format_toml.py --hotstrings --all --check',
+				'mandatory TOML check command'
+			);
+		}
 		if (name === 'Build and admit the actual native source asset') {
 			requireEqual(
 				raw.stepField(body, 'id'),
@@ -531,17 +559,55 @@ function validateRaw(files) {
 	}
 	const macText = entries.get('.github/workflows/ci-macos.yml');
 	const macContract = require('./fixtures/macos-stage-contract.json');
+	const macJobs = YAML.parse(macText).jobs;
 	assert.deepEqual(
-		Object.entries(YAML.parse(macText).jobs).map(([id, job]) => ({
+		Object.entries(macJobs).map(([id, job]) => ({
 			id,
 			metadata: Object.fromEntries(Object.entries(job).filter(([key]) => key !== 'steps'))
 		})),
 		macContract.jobs.map(({ id, metadata }) => ({ id, metadata })),
 		'Mac stage metadata differs.'
 	);
+	const unitSelection = macJobs['test-hs'].steps.filter((step) => step.id === 'stage-selection');
+	assert.deepEqual(unitSelection, [
+		{
+			name: 'Admit the authored unit lot',
+			id: 'stage-selection',
+			run: 'node tools/ci/macos-stage-roles.cjs select unit'
+		}
+	]);
+	assert.equal(
+		macJobs['test-hs'].steps.indexOf(unitSelection[0]),
+		1,
+		'Unit selects before products'
+	);
+	const unitRecord = macJobs['test-hs'].steps.filter(
+		(step) => step.name === 'Record actual stage role outcome'
+	);
+	assert.equal(unitRecord.length, 1, 'Unit keeps one actual receipt writer');
+	assert.deepEqual(unitRecord[0].env, {
+		MACOS_STAGE_CELL: '${{ steps.stage-selection.outputs.cell }}',
+		MACOS_STAGE_RESULT: '${{ job.status }}'
+	});
+	for (const [id, prior] of [
+		['e2e-hs', 'unit'],
+		['package-macos', 'e2e'],
+		['launch', 'build']
+	]) {
+		const admissions = macJobs[id].steps.filter((step) => step.id === 'stage-admission');
+		assert.deepEqual(admissions, [
+			{
+				name: 'Admit complete successful predecessor stage',
+				id: 'stage-admission',
+				env: { MACOS_STAGE_NEEDS: '${{ toJSON(needs) }}' },
+				run: `node tools/ci/macos-stage-roles.cjs admit ${prior} "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"`
+			}
+		]);
+		assert.equal(macJobs[id].steps.indexOf(admissions[0]), 2, `${id} admits before products`);
+	}
 	const originalSilence = YAML.parse('job:\n' + LEASE_SILENCE_NATIVE_BODY).job;
 	const expectedSilenceSteps = originalSilence.steps.map((step) => ({
-		...step,
+		...macRole.metadata(step, 'lease-silence-native'),
 		if: macRole.condition('lease-silence-native', step.if ?? null)
 	}));
 	const silenceSteps = YAML.parse(macRole.body(macText, 'lease-silence-native')).steps;

@@ -516,7 +516,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   e2e-ahk:
-    name: 'E2E tests (engine)'
+    name: 'E2E tests'
     needs: [test-ahk]
     runs-on: windows-latest
     outputs:
@@ -657,7 +657,7 @@ jobs:
   # the launch on the image's own Defender configuration, which the test job
   # alters; nothing here disables or restores Defender.
   package-windows:
-    name: 'Package'
+    name: 'Build'
     needs: [e2e-ahk]
     runs-on: windows-latest
 

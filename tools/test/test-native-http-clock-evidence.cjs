@@ -627,8 +627,16 @@ try {
 			run_attempt: 2,
 			head_sha: v.source.candidate,
 			status: 'completed',
-			name: 'macOS / Managed Ollama native · arm64',
-			conclusion: 'failure'
+			name: 'macOS / E2E tests (Managed Ollama (Apple silicon))',
+			conclusion: 'failure',
+			steps: [
+				{
+					name: 'Record actual stage role outcome — Managed Ollama (Apple silicon)',
+					number: 2,
+					status: 'completed',
+					conclusion: 'success'
+				}
+			]
 		};
 		const receiving = {
 			job_api_path: '/repos/adrienm7/ergopti/actions/runs/123/attempts/2/jobs'
@@ -663,11 +671,22 @@ try {
 			)
 		);
 
-		// Literal parent-prefixed names come from actual ci.yml/API receiving,
-		// independent of the comparison implementation. Caller JSON stays modeled.
+		// Independently authored names model the selected single-lot matrix shape.
+		// Actual hosted rendering remains unreceived; caller JSON stays modeled.
 		const amdVerdict = { ...verdict, source: { ...verdict.source, architecture: 'amd64' } };
 		const amdArtifact = { ...artifact, name: 'native-http-clock-amd64-123-2' };
-		const amdJob = { ...job, name: 'macOS / Managed Ollama native · amd64' };
+		const amdJob = {
+			...job,
+			name: 'macOS / E2E tests (Managed Ollama (Intel))',
+			steps: [
+				{
+					name: 'Record actual stage role outcome — Managed Ollama (Intel)',
+					number: 2,
+					status: 'completed',
+					conclusion: 'success'
+				}
+			]
+		};
 		const amdResult = evidence.officialConsistency(
 			amdVerdict,
 			run,
@@ -727,6 +746,104 @@ try {
 				}),
 			/Attempt-scoped job receiving path refused/
 		);
+		for (const [selectedVerdict, selectedArtifact, selectedJob] of [
+			[verdict, artifact, job],
+			[amdVerdict, amdArtifact, amdJob]
+		]) {
+			for (const [name, mutate, reason] of [
+				[
+					'wrong human lot',
+					(row) => (row.name = 'macOS / E2E tests (Tooltip canvas (Apple silicon))'),
+					/Official job consistency refused/
+				],
+				[
+					'foreign caller with exact receipt marker',
+					(row) => (row.name = row.name.replace('macOS / ', 'Windows / ')),
+					/Official job consistency refused/
+				],
+				['foreign job attempt', (row) => (row.run_attempt = 3), /Official job consistency refused/],
+				[
+					'missing job attempt',
+					(row) => delete row.run_attempt,
+					/Official job consistency refused/
+				],
+				[
+					'missing marker steps',
+					(row) => delete row.steps,
+					/Official stage writer consistency refused/
+				],
+				[
+					'non-array marker steps',
+					(row) => (row.steps = {}),
+					/Official stage writer consistency refused/
+				],
+				[
+					'empty marker steps',
+					(row) => (row.steps = []),
+					/Official stage writer consistency refused/
+				],
+				[
+					'foreign receipt marker',
+					(row) =>
+						(row.steps[0].name = 'Record actual stage role outcome — Archive update controls'),
+					/Official stage writer consistency refused/
+				],
+				[
+					'other managed architecture receipt marker',
+					(row) =>
+						(row.steps[0].name = row.steps[0].name.includes('(Intel)')
+							? 'Record actual stage role outcome — Managed Ollama (Apple silicon)'
+							: 'Record actual stage role outcome — Managed Ollama (Intel)'),
+					/Official stage writer consistency refused/
+				],
+				[
+					'duplicate receipt marker',
+					(row) => row.steps.push({ ...row.steps[0], number: 3 }),
+					/Official stage writer consistency refused/
+				],
+				[
+					'prefixed receipt marker alias',
+					(row) => (row.steps[0].name = 'Foreign ' + row.steps[0].name),
+					/Official stage writer consistency refused/
+				],
+				[
+					'suffixed receipt marker alias',
+					(row) => (row.steps[0].name += ' forged'),
+					/Official stage writer consistency refused/
+				],
+				[
+					'failed receipt writer',
+					(row) => (row.steps[0].conclusion = 'failure'),
+					/Official stage writer consistency refused/
+				],
+				[
+					'skipped receipt writer',
+					(row) => (row.steps[0].conclusion = 'skipped'),
+					/Official stage writer consistency refused/
+				],
+				[
+					'incomplete receipt writer',
+					(row) => (row.steps[0].status = 'in_progress'),
+					/Official stage writer consistency refused/
+				]
+			]) {
+				const changed = structuredClone(selectedJob);
+				mutate(changed);
+				assert.throws(
+					() =>
+						evidence.officialConsistency(
+							selectedVerdict,
+							run,
+							selectedArtifact,
+							changed,
+							archive,
+							receiving
+						),
+					reason,
+					selectedVerdict.source.architecture + ': ' + name
+				);
+			}
+		}
 	});
 	control('actual fresh Git HEAD clean closure receives fixed nineteen inputs', () => {
 		const fixture = sourceFixture(),

@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
-const { resolveSiteTarget } = require('../dev/site-context.cjs');
+const { resolveSiteTarget, siteLot, siteLots } = require('../dev/site-context.cjs');
 const REPOSITORY = 'adrienm7/ergopti';
 const MAX_RECORDS = 1000;
 
@@ -122,36 +122,70 @@ async function admitProducer(selection, readApi) {
 		'producer workflow is not canonical CI.'
 	);
 	const target = run.head_branch;
-	const jobNames = ['Build site — ', 'Testbuild site — '].map(
-		(name) => 'Common / ' + name + target
+	const targets = Object.values(siteLots()).map((row) => row.target);
+	const stages = [
+		{ name: 'Common / Build', writer: 'Build and seal production site' },
+		{ name: 'Common / Install and launch', writer: 'Test received production site' }
+	];
+	const identities = stages.flatMap(({ name, writer }, stage) =>
+		targets.map((target) => ({
+			stage,
+			target,
+			name: name + ' (' + siteLot(target) + ')',
+			writer: writer + ' — ' + siteLot(target)
+		}))
 	);
 	const jobs = await collect(readApi, prefix + '/runs/' + runId + '/jobs?filter=all', 'jobs');
-	const selected = jobNames.map((name) => {
-		const leaf = name.slice('Common / '.length);
-		const matches = jobs.filter((job) => typeof job.name === 'string' && job.name.includes(leaf));
+	// Real receipt writers must agree with the human lot in the exact visible job name.
+	// Classify every row before choosing attempts so a failed rerun cannot hide old success.
+	const cells = stages.map(() => new Map(targets.map((name) => [name, []])));
+	for (const job of jobs) {
+		const identity = identities.find((row) => job.name === row.name);
+		const markers = Array.isArray(job.steps)
+			? job.steps.filter(
+					(step) =>
+						typeof step?.name === 'string' && stages.some((row) => step.name.includes(row.writer))
+				)
+			: [];
+		if (identity === undefined) {
+			refuse(markers.length === 0, 'foreign stage job name carries a reserved writer marker.');
+			continue;
+		}
 		refuse(
-			matches.length > 0 && matches.every((job) => job.name === name),
-			'missing, duplicate or foreign stage job name.'
+			Array.isArray(job.steps) && job.steps.length <= MAX_RECORDS && markers.length === 1,
+			'missing, duplicate or oversized stage writer metadata.'
 		);
-		for (const job of matches)
-			refuse(Number(number(job.run_attempt)) <= Number(attempt), 'future stage job attempt.');
-		const latest = Math.max(...matches.map((job) => Number(number(job.run_attempt))));
-		const current = matches.filter((job) => Number(number(job.run_attempt)) === latest);
-		refuse(current.length === 1, 'missing, duplicate or foreign stage job name.');
-		const job = current[0];
+		refuse(markers[0].name === identity.writer, 'unknown target or wrong-stage writer marker.');
+		refuse(Number(number(job.run_attempt)) <= Number(attempt), 'future stage job attempt.');
 		refuse(
-			number(job.run_id) === runId &&
-				job.head_sha === run.head_sha &&
-				job.status === 'completed' &&
-				job.conclusion === 'success',
+			number(job.run_id) === runId && job.head_sha === run.head_sha,
 			'stage job is not successful for this source/run.'
 		);
-		return job;
-	});
-	refuse(
-		Number(number(selected[0].run_attempt)) <= Number(number(selected[1].run_attempt)),
-		'stage attempt lineage runs backward.'
-	);
+		cells[identity.stage].get(identity.target).push({ job, writer: markers[0] });
+	}
+	for (const cellTarget of targets) {
+		const selected = cells.map((stage) => {
+			const matches = stage.get(cellTarget);
+			refuse(matches.length > 0, 'missing stage job name for an authored target.');
+			const latest = Math.max(...matches.map(({ job }) => Number(number(job.run_attempt))));
+			const current = matches.filter(({ job }) => Number(number(job.run_attempt)) === latest);
+			refuse(current.length === 1, 'duplicate stage job name for the chosen target/attempt.');
+			const { job, writer } = current[0];
+			refuse(
+				job.status === 'completed' && job.conclusion === 'success',
+				'stage job is not successful for this source/run.'
+			);
+			refuse(
+				writer.status === 'completed' && writer.conclusion === 'success',
+				'selected stage receipt writer is not successful.'
+			);
+			return job;
+		});
+		refuse(
+			Number(number(selected[0].run_attempt)) <= Number(number(selected[1].run_attempt)),
+			'stage attempt lineage runs backward.'
+		);
+	}
 	const artifacts = await collect(readApi, prefix + '/runs/' + runId + '/artifacts', 'artifacts');
 	const artifactIds = ['common-site-build-', 'common-site-testbuild-'].map((name) => {
 		const matches = artifacts.filter((row) => row.name === name + target);

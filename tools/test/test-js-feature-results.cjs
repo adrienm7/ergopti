@@ -9,7 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { validateFeatureJournals } = require('./lib/js-feature-results.cjs');
 const { collectJournals } = require('../ci/validate-js-feature-results.cjs');
-const { createMatrix } = require('../ci/js-feature-matrix.cjs');
+const { createMatrix, displayPlan, selectLot } = require('../ci/js-feature-matrix.cjs');
 
 const context = { source: 'a'.repeat(40), run_id: '123', run_attempt: '2', platform: 'linux' };
 const inventory = {
@@ -133,11 +133,12 @@ for (const ref of [
 		inventory.features
 	);
 	assert.equal(matrix.filter((row) => row.suite === 'properties').length, 1);
+	assert.equal(matrix.filter((row) => row.suite === 'hotstrings-format').length, 1);
 	assert.equal(
 		matrix.filter((row) => row.suite === 'mutation').length,
 		ref === 'refs/heads/main' ? 1 : 0
 	);
-	assert.equal(matrix.length, inventory.features.length + (ref === 'refs/heads/main' ? 2 : 1));
+	assert.equal(matrix.length, inventory.features.length + (ref === 'refs/heads/main' ? 3 : 2));
 }
 assert.throws(() => createMatrix(inventory, 'main'), /full GitHub ref/);
 assert.throws(() => createMatrix(inventory, 'refs/heads/'), /full GitHub ref/);
@@ -145,11 +146,59 @@ assert.throws(() => createMatrix(inventory, 'refs/heads/main\n'), /full GitHub r
 assert.throws(() => createMatrix({ features: [] }, 'refs/heads/main'), /empty/);
 assert.throws(() => createMatrix({ features: ['menus', 'menus'] }, 'refs/heads/main'), /unique/);
 assert.throws(() => createMatrix({ features: ['menus;echo'] }, 'refs/heads/main'), /slugs/);
-for (const feature of ['properties', 'mutation'])
+for (const feature of ['properties', 'mutation', 'hotstrings-format'])
 	assert.throws(
 		() => createMatrix({ features: [feature] }, 'refs/heads/main'),
 		/unique literal slugs/
 	);
+// The single human axis must resolve back to every original suite without a second roster.
+for (const ref of ['refs/heads/main', 'refs/heads/dev', 'refs/pull/42/merge']) {
+	const displayed = displayPlan(inventory, ref);
+	assert.deepEqual(Object.keys(displayed.matrix), ['lot']);
+	assert.deepEqual(displayed.matrix.lot, Object.keys(displayed.metadata));
+	assert.deepEqual(Object.values(displayed.metadata), createMatrix(inventory, ref).include);
+	const encoded = JSON.stringify(displayed.metadata);
+	for (const lot of displayed.matrix.lot)
+		assert.deepEqual(selectLot(inventory, ref, lot, encoded), displayed.metadata[lot]);
+	for (const lot of ['', 'foreign', undefined, null])
+		assert.throws(() => selectLot(inventory, ref, lot, encoded), /Unknown Common lot/);
+	for (const mutate of [
+		(value) => {
+			delete value.Menus;
+		},
+		(value) => {
+			value.Foreign = value.Menus;
+		},
+		(value) => {
+			value.Menus.feature = 'input';
+		},
+		(value) => {
+			value.Menus.suite = 'properties';
+		},
+		(value) => {
+			value.Menus.extra = true;
+		},
+		(value) => {
+			delete value['Hotstring TOML formatting'];
+		}
+	]) {
+		const changed = structuredClone(displayed.metadata);
+		mutate(changed);
+		assert.throws(
+			() => selectLot(inventory, ref, displayed.matrix.lot[0], JSON.stringify(changed)),
+			/complete authored inventory/
+		);
+	}
+	assert.throws(
+		() => selectLot(inventory, ref, displayed.matrix.lot[0], encoded.replace('{', '{"Menus":{},')),
+		/complete authored inventory/
+	);
+}
+assert.throws(
+	() => displayPlan({ features: ['property-tests'] }, 'refs/heads/dev'),
+	/human lot labels must be unique/
+);
+
 // Reused success is bound to the same immutable literal plan, not a fabricated plan attempt.
 const mixed = journals();
 mixed[0][0].ci_run_attempt = '1';

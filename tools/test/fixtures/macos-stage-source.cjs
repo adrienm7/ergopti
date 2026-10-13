@@ -23,19 +23,35 @@ function expression(value) {
 		.replace(/\s*\}\}$/, '')
 		.trim();
 }
+/** Transpose an independently authored old step's metadata to its admitted cell fields. */
+function metadata(value, role) {
+	assert.ok(Object.hasOwn(stage, role), 'Unknown Mac role');
+	if (typeof value === 'string')
+		return value.replace(/matrix\.(role|runner|architecture|scenario)/g, (_, field) =>
+			role === 'test-hs'
+				? 'fromJSON(steps.stage-selection.outputs.cell).' + field
+				: 'env.MACOS_STAGE_' + field.toUpperCase()
+		);
+	if (Array.isArray(value)) return value.map((part) => metadata(part, role));
+	if (value && typeof value === 'object')
+		return Object.fromEntries(
+			Object.entries(value).map(([key, part]) => [key, metadata(part, role)])
+		);
+	return value;
+}
 function condition(role, predicate = null) {
 	assert.ok(Object.hasOwn(stage, role), 'Unknown Mac role');
 	if (role === 'test-hs' || role === 'macos-ok') return predicate;
 	const parts = ["steps.stage-admission.outcome == 'success'"];
-	if (role !== 'package-macos') parts.push("matrix.role == '" + role + "'");
+	if (role !== 'package-macos') parts.push("env.MACOS_STAGE_ROLE == '" + role + "'");
 	if (['item36-native', 'lease-silence-native'].includes(role))
 		parts.push("(github.event_name == 'workflow_dispatch' && !inputs.release)");
-	if (predicate) parts.push('(' + expression(predicate) + ')');
+	if (predicate) parts.push('(' + expression(metadata(predicate, role)) + ')');
 	return '${{ ' + parts.join(' && ') + ' }}';
 }
 function selected(job, role) {
 	assert.ok(Object.hasOwn(stage, role), 'Unknown Mac role');
-	const marker = "matrix.role == '" + role + "'";
+	const marker = "env.MACOS_STAGE_ROLE == '" + role + "'";
 	const found = raw.steps(job).filter((step) => raw.stepField(step.body, 'if')?.includes(marker));
 	assert.ok(found.length > 0, 'Missing Mac role ' + role);
 	for (const step of found) {
@@ -61,4 +77,4 @@ function body(source, role) {
 			.join('\n')
 	);
 }
-module.exports = { stage, condition, selected, body };
+module.exports = { stage, metadata, condition, selected, body };
