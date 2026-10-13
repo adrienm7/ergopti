@@ -271,7 +271,58 @@ function checkQuotedParsing(line) {
 	);
 }
 
+function checkKeyboardLifecycle() {
+	const source = fs.readFileSync(path.join(root, 'src/lib/keyboard/Keyboard.js'), 'utf8');
+	const owner = parse(source, { ecmaVersion: 'latest', sourceType: 'module' }).body.find(
+		(node) => node.type === 'ExportNamedDeclaration' && node.declaration?.id?.name === 'Keyboard'
+	);
+	assert.ok(owner, 'the actual keyboard owner is present');
+	const listeners = new Set();
+	const store = {
+		subscribe(callback) {
+			const subscription = () => callback();
+			listeners.add(subscription);
+			callback();
+			return () => listeners.delete(subscription);
+		}
+	};
+	let element = null;
+	let lookups = 0;
+	let renders = 0;
+	const realm = vm.createContext({
+		stores_infos: { layoutData: store, fixture: store },
+		console: { info() {}, error() {} },
+		document: { getElementById: () => (++lookups, element) }
+	});
+	vm.runInContext(
+		source.slice(owner.declaration.start, owner.declaration.end) + '\nthis.Subject = Keyboard;',
+		realm
+	);
+	for (const name of ['updateKeys', 'updateKeyboardConfiguration', 'pressCurrentLayerModifiers'])
+		realm.Subject.prototype[name] = () => renders++;
+	const keyboard = new realm.Subject('fixture');
+	assert.equal(listeners.size, 0, 'construction must not subscribe before the DOM is mounted');
+	assert.equal(lookups, 0, 'construction must not inspect an absent DOM');
+	element = {};
+	keyboard.mount();
+	assert.equal(listeners.size, 2);
+	assert.equal(renders, 3, 'mount renders once after owning both subscriptions');
+	assert.throws(() => keyboard.mount(), /already|initialized/i);
+	const queued = [...listeners];
+	for (const callback of queued) callback();
+	assert.equal(renders, 9, 'both stores update the mounted keyboard');
+	keyboard.destroy();
+	assert.equal(listeners.size, 0, 'destroy retires both subscriptions');
+	for (const callback of queued) callback();
+	assert.equal(renders, 9, 'late queued callbacks cannot render the retired keyboard');
+	assert.equal(keyboard.location, null);
+	element = null;
+	assert.throws(() => new realm.Subject('fixture').mount(), /mount|element|DOM/i);
+	assert.equal(listeners.size, 0, 'failed mount leaves no subscriptions');
+}
+
 function checkLiteralDemo() {
+	checkKeyboardLifecycle();
 	const listeners = new Map();
 	const drive = { style: {}, textContent: '\u00a0' };
 	let markupWrites = 0;
