@@ -1,0 +1,140 @@
+name: ErgoptiPlus-Remap-Core-Observer
+
+targets:
+  ErgoptiPlus-Remap-Core:
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.ergoptiplus.remap.core
+      CODE_SIGN_ENTITLEMENTS: ''
+      CODE_SIGN_IDENTITY: '-'
+      CODE_SIGN_STYLE: Manual
+      HEADER_SEARCH_PATHS:
+        - include
+        - ../../share
+        - ../../../vendor/duktape-src
+        - ../../../vendor/duktape-2.7.0/extras/console
+        - ../../../vendor/duktape-2.7.0/extras/module-node
+      OTHER_LDFLAGS:
+        - $(inherited)
+        - ../../../vendor/duktape-src/build/Release/libduktape.a
+        - -lbsm
+      OTHER_SWIFT_FLAGS: '-warnings-as-errors'
+      SWIFT_OBJC_BRIDGING_HEADER: swift/Bridging-Header.h
+      SYSTEM_HEADER_SEARCH_PATHS:
+        - ../../../vendor/Karabiner-DriverKit-VirtualHIDDevice/include
+        - ../../../vendor/vendor/include
+      DEAD_CODE_STRIPPING: 'YES'
+    # It needs to be built as an application rather than a tool in order to appear in the Input Monitoring list in System Settings.
+    type: application
+    platform: macOS
+    deploymentTarget: 13.0
+    sources:
+      - path: observer-support/OwnedRuntimeLifecycleContract.c
+      - path: src
+        compilerFlags:
+          - -Wall
+          - -Werror
+          - '-std=c++23'
+      - path: ../../../vendor/vendor/src/pqrs/osx/accessibility
+      - path: ../../../vendor/vendor/src/pqrs/osx/application
+      - path: ../../../vendor/vendor/src/pqrs/osx/cg_event
+      - path: ../../../vendor/vendor/src/pqrs/osx/process_info
+      - path: ../../../vendor/vendor/src/pqrs/osx/workspace
+      - path: Resources
+        excludes:
+          - .gitignore
+          - '*.orig.png'
+          - '*.plist.in'
+      - path: ../../apps/share/Resources/app.icns
+    dependencies:
+      - sdk: Carbon.framework
+      - sdk: AppKit.framework
+      - sdk: Security.framework
+
+  Core-NativeObserver-Positive:
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.ergoptiplus.remap.core
+      CODE_SIGN_ENTITLEMENTS: ''
+      CODE_SIGN_IDENTITY: '-'
+      CODE_SIGN_STYLE: Manual
+      HEADER_SEARCH_PATHS:
+        - include
+        - ../../share
+        - ../../../vendor/duktape-src
+        - ../../../vendor/duktape-2.7.0/extras/console
+        - ../../../vendor/duktape-2.7.0/extras/module-node
+      OTHER_LDFLAGS:
+        - $(inherited)
+        - ../../../vendor/duktape-src/build/Release/libduktape.a
+        - -lbsm
+      OTHER_SWIFT_FLAGS: '-warnings-as-errors'
+      SWIFT_OBJC_BRIDGING_HEADER: swift/Bridging-Header.h
+      SYSTEM_HEADER_SEARCH_PATHS:
+        - ../../../vendor/Karabiner-DriverKit-VirtualHIDDevice/include
+        - ../../../vendor/vendor/include
+      DEAD_CODE_STRIPPING: 'YES'
+      GCC_PREPROCESSOR_DEFINITIONS:
+        - $(inherited)
+        - ERGOPTIPLUS_OWNED_RUNTIME_TEST_ONLY
+    # It needs to be built as an application rather than a tool in order to appear in the Input Monitoring list in System Settings.
+    type: tool
+    platform: macOS
+    deploymentTarget: 13.0
+    sources:
+      - path: observer-support/OwnedRuntimeLifecycleContract.c
+      - path: observer-controls/positive.cpp
+        compilerFlags:
+          - -Wall
+          - -Werror
+          - '-std=c++23'
+      - path: ../../../vendor/vendor/src/pqrs/osx/accessibility
+      - path: ../../../vendor/vendor/src/pqrs/osx/application
+      - path: ../../../vendor/vendor/src/pqrs/osx/cg_event
+      - path: ../../../vendor/vendor/src/pqrs/osx/process_info
+      - path: ../../../vendor/vendor/src/pqrs/osx/workspace
+    dependencies:
+      - sdk: Carbon.framework
+      - sdk: AppKit.framework
+      - sdk: Security.framework
+
+  Core-NativeObserver-Production-Negative:
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.ergoptiplus.remap.core
+      CODE_SIGN_ENTITLEMENTS: ''
+      CODE_SIGN_IDENTITY: '-'
+      CODE_SIGN_STYLE: Manual
+      HEADER_SEARCH_PATHS:
+        - include
+        - ../../share
+        - ../../../vendor/duktape-src
+        - ../../../vendor/duktape-2.7.0/extras/console
+        - ../../../vendor/duktape-2.7.0/extras/module-node
+      OTHER_LDFLAGS:
+        - $(inherited)
+        - ../../../vendor/duktape-src/build/Release/libduktape.a
+        - -lbsm
+      OTHER_SWIFT_FLAGS: '-warnings-as-errors'
+      SWIFT_OBJC_BRIDGING_HEADER: swift/Bridging-Header.h
+      SYSTEM_HEADER_SEARCH_PATHS:
+        - ../../../vendor/Karabiner-DriverKit-VirtualHIDDevice/include
+        - ../../../vendor/vendor/include
+      DEAD_CODE_STRIPPING: 'YES'
+    # It needs to be built as an application rather than a tool in order to appear in the Input Monitoring list in System Settings.
+    type: tool
+    platform: macOS
+    deploymentTarget: 13.0
+    sources:
+      - path: observer-support/OwnedRuntimeLifecycleContract.c
+      - path: observer-controls/production_negative.cpp
+        compilerFlags:
+          - -Wall
+          - -Werror
+          - '-std=c++23'
+      - path: ../../../vendor/vendor/src/pqrs/osx/accessibility
+      - path: ../../../vendor/vendor/src/pqrs/osx/application
+      - path: ../../../vendor/vendor/src/pqrs/osx/cg_event
+      - path: ../../../vendor/vendor/src/pqrs/osx/process_info
+      - path: ../../../vendor/vendor/src/pqrs/osx/workspace
+    dependencies:
+      - sdk: Carbon.framework
+      - sdk: AppKit.framework
+      - sdk: Security.framework

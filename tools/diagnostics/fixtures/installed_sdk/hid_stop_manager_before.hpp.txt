@@ -1,0 +1,357 @@
+#pragma once
+
+// pqrs::osx::iokit_hid_manager v6.1.0
+
+// (C) Copyright Takayama Fumihiko 2018.
+// Distributed under the Boost Software License, Version 1.0.
+// (See https://www.boost.org/LICENSE_1_0.txt)
+
+// `pqrs::osx::iokit_hid_manager` can be used safely in a multi-threaded environment.
+
+#include <IOKit/hid/IOHIDDevice.h>
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <pqrs/cf/number.hpp>
+#include <pqrs/gsl.hpp>
+#include <pqrs/hid.hpp>
+#include <pqrs/osx/iokit_service_monitor.hpp>
+#include <unordered_map>
+#include "ergopti-owned-native-inventory.hpp"
+#include <unordered_set>
+#include <vector>
+
+namespace krbn::core_service::daemon { class device_grabber; }
+
+namespace pqrs::osx {
+class iokit_hid_manager final : public dispatcher::extra::dispatcher_client {
+public:
+  // Signals (invoked from the dispatcher thread)
+
+  nod::signal<void(iokit_registry_entry_id::value_t, cf::cf_ptr<IOHIDDeviceRef>)> device_matched;
+  nod::signal<void(iokit_registry_entry_id::value_t)> device_terminated;
+  nod::signal<void(const std::string&, kern_return)> error_occurred;
+
+  nod::signal<void(const std::vector<iokit_registry_entry_id::value_t>&, bool, bool)> ergopti_inventory_changed;
+
+  // Methods
+
+  iokit_hid_manager(const iokit_hid_manager&) = delete;
+
+  iokit_hid_manager(std::weak_ptr<dispatcher::dispatcher> weak_dispatcher,
+                    pqrs::not_null_shared_ptr_t<cf::run_loop_thread> run_loop_thread,
+                    const std::vector<cf::cf_ptr<CFDictionaryRef>>& matching_dictionaries,
+                    pqrs::dispatcher::duration device_matched_delay = pqrs::dispatcher::duration(0))
+      : dispatcher_client(weak_dispatcher),
+        run_loop_thread_(run_loop_thread),
+        matching_dictionaries_(matching_dictionaries),
+        device_matched_delay_(device_matched_delay) {
+  }
+
+  ~iokit_hid_manager() override {
+    detach_from_dispatcher([this] {
+      stop();
+    });
+  }
+
+  void async_start() {
+    enqueue_to_dispatcher([this] {
+      start();
+    });
+  }
+
+  void async_stop() {
+    enqueue_to_dispatcher([this] {
+      stop();
+    });
+  }
+
+  void async_set_device_matched_delay(pqrs::dispatcher::duration value) {
+    enqueue_to_dispatcher([this, value] {
+      device_matched_delay_ = value;
+    });
+  }
+
+  [[nodiscard]] static cf::cf_ptr<CFDictionaryRef> make_matching_dictionary(hid::usage_page::value_t hid_usage_page,
+                                                                            hid::usage::value_t hid_usage) {
+    if (auto matching_dictionary = IOServiceMatching(kIOHIDDeviceKey)) {
+      if (auto number = cf::make_cf_number(type_safe::get(hid_usage_page))) {
+        CFDictionarySetValue(matching_dictionary,
+                             CFSTR(kIOHIDDeviceUsagePageKey),
+                             *number);
+      }
+      if (auto number = cf::make_cf_number(type_safe::get(hid_usage))) {
+        CFDictionarySetValue(matching_dictionary,
+                             CFSTR(kIOHIDDeviceUsageKey),
+                             *number);
+      }
+
+      return cf::adopt_cf_ptr(static_cast<CFDictionaryRef>(matching_dictionary));
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] static cf::cf_ptr<CFDictionaryRef> make_matching_dictionary(hid::usage_page::value_t hid_usage_page) {
+    if (auto matching_dictionary = IOServiceMatching(kIOHIDDeviceKey)) {
+      if (auto number = cf::make_cf_number(type_safe::get(hid_usage_page))) {
+        CFDictionarySetValue(matching_dictionary,
+                             CFSTR(kIOHIDDeviceUsagePageKey),
+                             *number);
+      }
+
+      return cf::adopt_cf_ptr(static_cast<CFDictionaryRef>(matching_dictionary));
+    }
+
+    return nullptr;
+  }
+
+private:
+  friend class ::krbn::core_service::daemon::device_grabber;
+  class owned_registration final {
+    friend class iokit_hid_manager;
+    friend class ::krbn::core_service::daemon::device_grabber;
+    std::vector<std::shared_ptr<const iokit_service_monitor::owned_registration>> monitors_;
+    std::atomic<bool> invalidated_{false};
+    bool completed_=false,failed_=false;
+    std::size_t expected_=0,pending_matches_=0;
+    std::function<void(std::shared_ptr<const owned_registration>)> completion_;
+    explicit owned_registration(std::function<void(std::shared_ptr<const owned_registration>)> value)
+      :completion_(std::move(value)) {}
+    bool current() const noexcept {
+      if (!completed_ || failed_ || invalidated_.load(std::memory_order_acquire) ||
+          expected_==0 || monitors_.size()!=expected_) return false;
+      for (const auto& monitor:monitors_) if (!monitor || !monitor->current()) return false;
+      return true;
+    }
+  };
+  std::shared_ptr<owned_registration> owned_registration_;
+  std::function<bool()> owned_input_scope_;
+  bool owned_input_current() const noexcept {
+    try { return !owned_registration_ || (owned_input_scope_ && owned_input_scope_()); }
+    catch (...) { return false; }
+  }
+  bool rebind_owned_input_scope(std::function<bool()> scope) {
+    if (!dispatcher_thread() || !scope || !owned_registration_ || !owned_registration_->current()) return false;
+    bool current=false;
+    try { current=scope(); } catch (...) {}
+    if (!current) return false;
+    owned_input_scope_=std::move(scope);
+    return true;
+  }
+  bool async_owned_start(std::function<bool()> scope,
+      std::function<void(std::shared_ptr<const owned_registration>)> completion) {
+    if (!dispatcher_thread() || !scope || !completion || owned_registration_) return false;
+    if (!service_monitors_.empty()) return false;
+    auto receipt=std::shared_ptr<owned_registration>(new owned_registration(std::move(completion)));
+    for (const auto& dictionary:matching_dictionaries_) if (dictionary) ++receipt->expected_;
+    if (!receipt->expected_) return false;
+    owned_registration_=receipt;
+    owned_input_scope_=scope;
+    return enqueue_to_dispatcher([this,scope,receipt] {
+      bool permitted=false;
+      try { permitted=scope(); } catch (...) {}
+      if (!permitted) { receipt->failed_=true; progress_owned_start(); return; }
+      start(scope);
+    });
+  }
+  void progress_owned_start() {
+    auto receipt=owned_registration_;
+    if (!receipt || receipt->completed_ || receipt->pending_matches_!=0) return;
+    if (!receipt->failed_ && receipt->monitors_.size()!=receipt->expected_) return;
+    receipt->completed_=true;
+    auto completion=std::move(receipt->completion_);
+    if (completion) completion(receipt->current() ? receipt : nullptr);
+  }
+  void settle_owned_match(const std::shared_ptr<owned_registration>& receipt) {
+    if (!receipt) return;
+    if (receipt->pending_matches_==0) { receipt->failed_=true; }
+    else --receipt->pending_matches_;
+    progress_owned_start();
+  }
+  // This method is executed in the dispatcher thread.
+  void start(const std::function<bool()>& owned_scope={}) {
+    if (!service_monitors_.empty()) {
+      // already started
+      return;
+    }
+
+    ergopti_inventory_live_ = std::make_shared<bool>(true);
+    ergopti_watcher_count_ = matching_dictionaries_.size();
+    for (const auto& matching_dictionary : matching_dictionaries_) {
+      if (matching_dictionary) {
+        pqrs::not_null_shared_ptr_t<iokit_service_monitor> monitor = std::make_shared<iokit_service_monitor>(weak_dispatcher_,
+                                                                                                             run_loop_thread_,
+                                                                                                             *matching_dictionary);
+
+        monitor->ergopti_initial_inventory.connect([this, weak = std::weak_ptr<bool>(ergopti_inventory_live_), identity = pqrs::unwrap_not_null(monitor).get()](bool success) {
+          const auto live = weak.lock();
+          if (!live || !*live) return;
+          if (!success) ergopti_failed_ = true;
+          try { ergopti_completed_watchers_.insert(identity); } catch (...) { ergopti_failed_ = true; }
+          ergopti_publish();
+        });
+        monitor->ergopti_inventory_failed.connect([this, weak = std::weak_ptr<bool>(ergopti_inventory_live_)] { const auto live = weak.lock(); if (live && *live) { ergopti_failed_ = true; ergopti_publish(); } });
+        monitor->service_matched.connect([this](auto&& registry_entry_id, auto&& service_ptr) {
+          if (devices_.find(registry_entry_id) == std::end(devices_)) {
+            ergopti_publish(false);
+            if (!owned_input_current()) {
+              if (owned_registration_) owned_registration_->failed_=true;
+              error_occurred("Installed native input discovery scope is no longer current.",kIOReturnError);
+              progress_owned_start();
+              return;
+            }
+            if (auto device = IOHIDDeviceCreate(kCFAllocatorDefault, *service_ptr)) {
+              auto device_ptr = cf::adopt_cf_ptr(device);
+              devices_[registry_entry_id] = device_ptr;
+
+              auto when = when_now() + device_matched_delay_;
+              const auto receipt=owned_registration_ && !owned_registration_->completed_ ? owned_registration_ : nullptr;
+              if (receipt) ++receipt->pending_matches_;
+              const auto admitted=enqueue_to_dispatcher(
+                  [this, registry_entry_id, device_ptr, receipt, weak = std::weak_ptr<bool>(ergopti_inventory_live_)] {
+                    const auto live = weak.lock();
+                    if (!live || !*live) return;
+                    auto it = devices_.find(registry_entry_id);
+                    if (it == std::end(devices_)) {
+                      // device is already terminated.
+                      settle_owned_match(receipt);
+                      return;
+                    }
+
+                    try {
+                      device_matched(registry_entry_id, device_ptr);
+                      device_matched_called_ids_.insert(registry_entry_id);
+                      ergopti_publish();
+                    } catch (...) {
+                      ergopti_failed_=true;
+                      ergopti_publish();
+                      if (receipt) receipt->failed_=true;
+                      settle_owned_match(receipt);
+                      throw;
+                    }
+                    settle_owned_match(receipt);
+                  },
+                  when);
+              if (!admitted) {
+                ergopti_failed_ = true;
+                ergopti_publish();
+              }
+              if (!admitted && receipt) {
+                receipt->failed_=true;
+                settle_owned_match(receipt);
+              }
+            } else {
+              ergopti_failed_ = true;
+              ergopti_publish();
+              if (owned_registration_) {
+                owned_registration_->failed_=true;
+                error_occurred("IOHIDDeviceCreate returned null for owned native discovery.",kIOReturnError);
+                progress_owned_start();
+              }
+            }
+          }
+        });
+
+        monitor->service_terminated.connect([this](auto&& registry_entry_id) {
+          auto it = devices_.find(registry_entry_id);
+          if (it != std::end(devices_)) {
+            ergopti_publish(false);
+            devices_.erase(registry_entry_id);
+
+            auto it = device_matched_called_ids_.find(registry_entry_id);
+            if (it == std::end(device_matched_called_ids_)) {
+              // `device_matched` is not called yet.
+              // (The device is disconnected before `deviec_matched` is called.)
+              ergopti_publish();
+              return;
+            }
+
+            device_terminated(registry_entry_id);
+            device_matched_called_ids_.erase(registry_entry_id);
+            ergopti_publish();
+          }
+        });
+
+        monitor->error_occurred.connect([this](auto&& message, auto&& r) {
+          ergopti_failed_ = true;
+          ergopti_publish();
+          error_occurred(message, r);
+        });
+
+        if (owned_scope) {
+          const auto receipt=owned_registration_;
+          const auto admitted=monitor->async_owned_start(owned_scope,[this,receipt](auto registration) {
+            if (!receipt || receipt!=owned_registration_ || receipt->completed_) return;
+            if (!registration || !registration->current()) receipt->failed_=true;
+            receipt->monitors_.push_back(std::move(registration));
+            progress_owned_start();
+          });
+          if (!admitted) receipt->failed_=true;
+        } else monitor->async_start();
+
+        service_monitors_.push_back(monitor);
+      } else {
+        ergopti_failed_ = true;
+      }
+    }
+    ergopti_publish();
+    if (owned_scope) progress_owned_start();
+  }
+
+  // This method is executed in the dispatcher thread.
+  void stop() {
+    if (owned_registration_) owned_registration_->invalidated_.store(true,std::memory_order_release);
+    ergopti_inventory_live_.reset();
+    ergopti_inventory_changed({}, false, ergopti_failed_);
+    service_monitors_.clear();
+    devices_.clear();
+    device_matched_called_ids_.clear();
+    ergopti_completed_watchers_.clear();
+    ergopti_watcher_count_ = 0;
+    ergopti_failed_ = false;
+    // The original service-monitor destructors have now waited for their
+    // native run-loop close fences. Settle cancelled startup only afterward.
+    const auto receipt=owned_registration_;
+    if (receipt && !receipt->completed_) {
+      receipt->failed_=true;
+      receipt->completed_=true;
+      auto completion=std::move(receipt->completion_);
+      if (completion) completion(nullptr);
+    }
+  }
+
+  void ergopti_publish(bool may_settle = true) noexcept {
+    bool settled = may_settle && ergopti_watcher_count_ && ergopti_completed_watchers_.size() == ergopti_watcher_count_;
+    if (devices_.size() > ergoptiplus::remap::native_interface_capacity) ergopti_failed_ = true;
+    // Both ledgers describe the same native inventory. A failed legacy
+    // observation must revoke the retained installed registration as well.
+    if (ergopti_failed_ && owned_registration_) owned_registration_->failed_=true;
+    try {
+      std::vector<iokit_registry_entry_id::value_t> identities;
+      if (!ergopti_failed_) {
+        identities.reserve(devices_.size());
+        for (const auto& [identity, device] : devices_) {
+          settled = settled && device_matched_called_ids_.contains(identity);
+          identities.push_back(identity);
+        }
+      }
+      ergopti_inventory_changed(identities, settled && !ergopti_failed_, ergopti_failed_);
+    } catch (...) {
+      ergopti_failed_ = true;
+      ergopti_inventory_changed({}, false, true);
+    }
+  }
+
+  std::shared_ptr<bool> ergopti_inventory_live_;
+  std::unordered_set<const iokit_service_monitor*> ergopti_completed_watchers_;
+  std::size_t ergopti_watcher_count_ = 0;
+  bool ergopti_failed_ = false;
+  pqrs::not_null_shared_ptr_t<cf::run_loop_thread> run_loop_thread_;
+  std::vector<cf::cf_ptr<CFDictionaryRef>> matching_dictionaries_;
+  pqrs::dispatcher::duration device_matched_delay_;
+  std::vector<pqrs::not_null_shared_ptr_t<iokit_service_monitor>> service_monitors_;
+  std::unordered_map<iokit_registry_entry_id::value_t, cf::cf_ptr<IOHIDDeviceRef>> devices_;
+  std::unordered_set<iokit_registry_entry_id::value_t> device_matched_called_ids_;
+};
+} // namespace pqrs::osx
