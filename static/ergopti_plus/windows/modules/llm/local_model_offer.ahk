@@ -81,7 +81,7 @@ _LLM_LocalModelOfferPublished(Receipt, Callback := 0, *) {
 _LLM_LocalModelOfferSchedule(Receipt, Callback, Delay) {
 	if !_LLM_LocalModelOfferCurrent(Receipt)
 		return false
-	SetTimer(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)
+	TimerSetCallback(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)
 	return true
 }
 
