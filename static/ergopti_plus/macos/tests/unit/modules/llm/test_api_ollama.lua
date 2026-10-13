@@ -373,6 +373,90 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		end)
 	end
 
+	helpers.it("(ollama-inventory-withdrawal) rechecks cache custody after its endpoint getter forgets or replaces inventory", function()
+		for _, replacement in ipairs({ false, true }) do
+			with_owned_responses(function(api, fixture)
+				fixture.request()
+				fixture.tags(1, { { name = "qwen2.5:7b" } })
+				local storage = require("adapters.storage")
+				local read_setting = storage.get
+				storage.get = function(key)
+					if key ~= "llm.ollama_port" then return read_setting(key) end
+					storage.get = read_setting
+					api.forget_local_models()
+					if replacement then
+						api.refresh_local_models()
+						fixture.tags(2, { { name = "replacement-model" } })
+					end
+					return read_setting(key)
+				end
+				local ok, installed = pcall(api.local_model_installed, "qwen2.5:7b")
+				helpers.assert_true(ok, "a withdrawn receipt must not dereference a now-nil global cache")
+				helpers.assert_eq(installed, nil, "the original observation cannot borrow replacement inventory")
+				if replacement then
+					helpers.assert_eq(api.local_model_installed("replacement-model"), true,
+						"a fresh observation retains the replacement's acknowledged cache")
+				else
+					helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
+				end
+			end)
+		end
+	end)
+
+	helpers.it("(ollama-inventory-withdrawal) refuses a tags acquisition withdrawn by its first source read", function()
+		with_owned_responses(function(api, fixture)
+			local read_origin = api.get_base_url
+			local reads = 0
+			api.get_base_url = function()
+				reads = reads + 1
+				if reads == 2 then
+					api.get_base_url = read_origin
+					api.forget_local_models()
+				end
+				return read_origin()
+			end
+			local result, reason
+			api.refresh_local_models(function(ok, why) result, reason = ok, why end)
+			helpers.assert_eq(#fixture.gets, 0, "a withdrawn inventory epoch cannot send a tags acquisition")
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(reason, "model_list_unavailable")
+		end)
+	end)
+
+	helpers.it("(ollama-inventory-withdrawal) refuses final tags delivery withdrawn inside its last source read", function()
+		for _, operation in ipairs({ "refresh", "verify" }) do
+			with_owned_responses(function(api, fixture)
+				local results = {}
+				if operation == "refresh" then
+					api.refresh_local_models(function(value, reason) results[#results + 1] = { value, reason } end)
+				else
+					api.verify_local_model("qwen2.5:7b", function(value, reason) results[#results + 1] = { value, reason } end)
+				end
+				local debug_log = fixture.logger.debug
+				fixture.logger.debug = function(scope, text, ...)
+					if text == "The local server returned a readable model list." then
+						fixture.logger.debug = debug_log
+						local read_origin = api.get_base_url
+						api.get_base_url = function()
+							api.get_base_url = read_origin
+							api.forget_local_models()
+							return read_origin()
+						end
+					end
+					return debug_log(scope, text, ...)
+				end
+				fixture.tags(1, { { name = "qwen2.5:7b" } })
+				helpers.assert_eq(#results, 1)
+				local expected = nil
+				if operation == "refresh" then expected = false end
+				helpers.assert_eq(results[1][1], expected,
+					"final delivery cannot publish a withdrawn inventory")
+				helpers.assert_eq(results[1][2], "model_list_unavailable")
+				helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
+			end)
+		end
+	end)
+
 	helpers.it("(ollama-response-service-affinity) refuses held tags from a retired same-origin daemon", function()
 		for _, names in ipairs({ {}, { { name = "qwen2.5:7b" } } }) do
 			with_owned_responses(function(api, fixture)
