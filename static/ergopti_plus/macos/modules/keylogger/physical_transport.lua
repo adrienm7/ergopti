@@ -2,6 +2,7 @@
 
 --- Owns a physical stream until its exact task settles, including failed delivery.
 local M = {}
+local Protocol = require("modules.keylogger.physical_protocol")
 local unpack_values = table.unpack or unpack
 local function pack(...) return { n = select("#", ...), ... } end
 
@@ -80,9 +81,11 @@ function M.new(dependencies)
 		local sequence, baseline_page
 		if not identity then
 			-- Admission may invoke external code; retain the original wire identity.
-			local candidate = { incarnation = frame.incarnation, lease = frame.lease }
+			local candidate = { incarnation = frame.incarnation, lease = frame.lease, coverage = frame.coverage }
 			receiver.open(frame)
 			identity, sequence = candidate, "0"
+		elseif frame.kind == "lost" then
+			Protocol.loss(frame, identity)
 		elseif frame.kind == "baseline" or frame.kind == "baseline_ready" then
 			sequence, baseline_page = receiver.baseline(frame), true
 		else

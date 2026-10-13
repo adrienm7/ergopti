@@ -29,7 +29,7 @@ local function delivery(overrides)
 			observed.mappings = observed.mappings + 1
 			return Frames.keycode(...)
 		end,
-		emit = function(press) observed.presses[#observed.presses + 1] = press end,
+		emit = function(press) observed.presses[#observed.presses + 1] = press; return true end,
 	}
 	for name, value in pairs(overrides or {}) do dependencies[name] = value end
 	return Delivery.new(dependencies), observed, dependencies
@@ -41,6 +41,7 @@ local function transport(behavior)
 	local receiver = delivery({ emit = function(press)
 		observed.presses[#observed.presses + 1] = press
 		if behavior.emit then return behavior.emit(observed) end
+		return true
 	end })
 	observed.receiver = receiver
 	local task = {}
