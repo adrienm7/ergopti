@@ -91,6 +91,12 @@ global KLE_LevelIndex := Map()
 ; Dead-key state -> native character -> resolved transition, built at load.
 global KLE_Compositions := Map()
 global KLE_Registered := false
+; Captured reset metadata is unavailable after partial registration. No rollback
+; of already installed hotkeys, native consumption or replay admission is implied.
+global _KLE_ResetObserverRegistering := 0
+global _KLE_ResetObserverCohort := 0
+global _KLE_ResetObserverCapture := 0
+global _KLE_ResetObserverGeneration := 0
 
 
 
@@ -446,7 +452,122 @@ KeylayoutEmulation_ShortcutChar(Sc) {
 
 KeylayoutEmulation_ResetDeadKey(*) {
 	global KLE_State, KEYLAYOUT_NEUTRAL_STATE
-	KLE_State := KEYLAYOUT_NEUTRAL_STATE
+	KLE_State := _KLE_ResetDeadKeyTransition()
+}
+
+; Shared physical/pure transition. It performs no emission or observer dispatch.
+_KLE_ResetDeadKeyTransition() => KEYLAYOUT_NEUTRAL_STATE
+
+/**
+ * Captures a callable, non-emitting reset recipe from the exact successful
+ * passthrough registration. Its private proof is retained by the BoundFunc;
+ * it grants no native FIFO ownership, consumption or production admission.
+ */
+KeylayoutEmulation_CaptureResetObserver(Sc) {
+	global _KLE_ResetObserverCapture
+	Factory := _KLE_ResetObserverCapture
+	return Factory is BoundFunc && !Object.Prototype.HasOwnProp.Call(Factory, "Call")
+		? Factory.Call(Sc) : 0
+}
+
+_KLE_CaptureResetObserverOwned(OwnedCohort, OwnedBindings, ExpectedBindings, Generation, Sc) {
+	global _KLE_ResetObserverCohort, _KLE_ResetObserverCapture, KLE_Model, KLE_Id, KLE_State
+	global KEYLAYOUT_NEUTRAL_STATE, KLE_INPUT_LEVEL
+	Cohort := _KLE_ResetObserverCohort
+	if Cohort != OwnedCohort || !_KLE_ResetObserverPlainMap(Cohort) || Cohort.Get("generation", 0) != Generation
+			|| Cohort.Get("bindings", 0) != OwnedBindings
+		return 0
+	if !(Sc is String) || !RegExMatch(Sc, "^SC[0-9A-F]{3}$") || !(Cohort is Map) || !(KLE_Model is Map)
+			|| !(KLE_Id is String) || KLE_Id == "" || !(KLE_State is String)
+			|| KLE_State == KEYLAYOUT_NEUTRAL_STATE
+			|| !(Cohort.Get("bindings", 0) is Map) || !Cohort["bindings"].Has(Sc)
+		return 0
+	Binding := Cohort["bindings"][Sc]
+	if !_KLE_ResetObserverPlainMap(Binding) || ExpectedBindings.Get(Sc, 0) != Binding
+		return 0
+	Proof := Map("cohort", Cohort, "generation", Generation, "factory", _KLE_ResetObserverCapture,
+		"bindings", OwnedBindings, "binding", Binding, "scan", Sc, "name", "~" . Sc,
+		"callback", KeylayoutEmulation_ResetDeadKey,
+		"criterion", _KLE_PendingDeadKeyCriterion, "options", KLE_INPUT_LEVEL,
+		"model", KLE_Model, "layout", KLE_Id, "state", KLE_State,
+		"neutral", KEYLAYOUT_NEUTRAL_STATE)
+	if !_KLE_ResetObserverCurrent(Proof)
+		return 0
+	try Active := Proof["criterion"].Call()
+	catch
+		return 0
+	if !(Active is Integer) || Active != 1 || !_KLE_ResetObserverCurrent(Proof)
+		return 0
+	return _KLE_StepCapturedResetObserver.Bind(Proof)
+}
+
+; Only the feature's native Maps may carry retained registration metadata.
+; Method/property replacement must not execute an opaque getter during fencing.
+_KLE_ResetObserverPlainMap(Value) {
+	if !(Value is Map) || ObjGetBase(Value) != Map.Prototype
+		return false
+	for Name in ["Get", "Has", "__Item", "__Enum", "Count"]
+		if Object.Prototype.HasOwnProp.Call(Value, Name)
+			return false
+	return true
+}
+
+/** Checks copied registration/source identity without invoking a current handler. */
+_KLE_ResetObserverCurrent(Proof) {
+	global _KLE_ResetObserverCohort, _KLE_ResetObserverRegistering, KLE_Registered
+	global _KLE_ResetObserverCapture, _KLE_ResetObserverGeneration
+	global KLE_Model, KLE_Id, KLE_State, KEYLAYOUT_NEUTRAL_STATE, KLE_INPUT_LEVEL
+	Cohort := Proof["cohort"], Binding := Proof["binding"]
+	if !_KLE_ResetObserverPlainMap(Cohort) || !_KLE_ResetObserverPlainMap(Binding)
+			|| !_KLE_ResetObserverPlainMap(Proof["bindings"])
+			|| Object.Prototype.HasOwnProp.Call(Proof["factory"], "Call")
+		return false
+	if IsObject(_KLE_ResetObserverRegistering) || !(KLE_Registered is Integer)
+			|| KLE_Registered != 1 || _KLE_ResetObserverCohort != Cohort
+			|| !(Cohort.Get("generation", 0) is Integer)
+			|| Cohort["generation"] != Proof["generation"] || Proof["generation"] <= 0
+			|| _KLE_ResetObserverGeneration != Proof["generation"]
+			|| _KLE_ResetObserverCapture != Proof["factory"]
+			|| Cohort.Get("bindings", 0) != Proof["bindings"]
+			|| Proof["bindings"].Get(Proof["scan"], 0) != Binding
+			|| KLE_Model != Proof["model"] || !(KLE_Id is String)
+			|| !(KLE_Id == Proof["layout"]) || !(KLE_State is String)
+			|| !(KLE_State == Proof["state"]) || !(KEYLAYOUT_NEUTRAL_STATE == Proof["neutral"])
+			|| !(KLE_INPUT_LEVEL == Proof["options"])
+		return false
+	for Name in ["scan", "name", "options"]
+		if !(Binding.Get(Name, 0) is String) || !(Binding[Name] == Proof[Name])
+			return false
+	for Name in ["callback", "criterion"]
+		if Binding.Get(Name, 0) != Proof[Name] || !HasMethod(Proof[Name], "Call")
+			return false
+	return true
+}
+
+/** Pure down-edge interpretation; repeated calls do not consume an edge. */
+_KLE_StepCapturedResetObserver(Proof, Event, State) {
+	if !(Event is Map) || !(State is String) || !(State == Proof["state"])
+			|| !_KLE_ResetObserverCurrent(Proof)
+		throw ValueError("The captured reset observer source is unavailable.")
+	CapturedEvent := Map()
+	for Name in ["scan", "origin", "key_up", "repeat"] {
+		if !Event.Has(Name)
+			throw ValueError("The captured reset observer event is malformed.")
+		Value := Event[Name]
+		if !(Value is Integer)
+			throw ValueError("The captured reset observer event is malformed.")
+		CapturedEvent[Name] := Value
+	}
+	if CapturedEvent["scan"] != Integer("0x" . SubStr(Proof["scan"], 3))
+			|| CapturedEvent["origin"] < 1 || CapturedEvent["origin"] > 2
+			|| CapturedEvent["key_up"] != 0 || CapturedEvent["repeat"] < 0 || CapturedEvent["repeat"] > 1
+		throw ValueError("The captured reset observer edge is unsupported.")
+	Next := _KLE_ResetDeadKeyTransition()
+	if !(Next == Proof["neutral"]) || !_KLE_ResetObserverCurrent(Proof)
+		throw ValueError("The captured reset observer changed its source.")
+	return Map("Next", Next, "Output", "", "metadata_only", true,
+		"cohort_complete", false, "transformed_output_enabled", false,
+		"native_consumed", false)
 }
 
 _KLE_Emit(Sc, Shift, Option) {
@@ -556,8 +677,22 @@ KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, 
 		BrokerFn := MagicEditorRecordLayoutFallback) {
 	global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
 	global KLE_DEAD_RESET_KEYS, KLE_ALTGR_SC, KLE_INPUT_LEVEL, KLE_ALT_INPUT_LEVEL
+	global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverGeneration
+	global _KLE_ResetObserverCapture
 	if KLE_Registered
 		throw Error("The layout emulation hotkeys are already registered.")
+	if IsObject(_KLE_ResetObserverRegistering) {
+		_KLE_ResetObserverRegistering["invalid"] := true
+		throw Error("Layout emulation registration is already in progress.")
+	}
+	; A failed attempt may leave physical bindings installed. No captured
+	; observer is published until the complete original registration returns.
+	_KLE_ResetObserverCohort := 0, _KLE_ResetObserverCapture := 0
+	_KLE_ResetObserverGeneration += 1
+	if _KLE_ResetObserverGeneration <= 0
+		throw Error("Reset observer registration identity overflowed.")
+	Registration := Map("generation", _KLE_ResetObserverGeneration, "bindings", Map())
+	Guard := Map("invalid", false)
 	ScanCodes := []
 	for Key in KeycodeTable["keys"]
 		ScanCodes.Push(Key["ahk"])
@@ -565,6 +700,7 @@ KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, 
 	; HotIf is process-wide: a timer thread registering another layer must not
 	; interleave with this sequence, and the criterion is reset even on a throw.
 	_AtCrit := Critical("On")
+	_KLE_ResetObserverRegistering := Guard
 	try {
 		for Sc in ScanCodes {
 			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, false, ForegroundFn))
@@ -589,16 +725,33 @@ KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, 
 			HotkeyFn.Call(KLE_ALTGR_SC . " & " . Sc, _KLE_OnAltGr.Bind(Sc), KLE_INPUT_LEVEL)
 			Count += 1
 		}
-		HotIfFn.Call(_KLE_PendingDeadKeyCriterion)
+		ResetCriterion := _KLE_PendingDeadKeyCriterion
+		HotIfFn.Call(ResetCriterion)
 		for Key in KLE_DEAD_RESET_KEYS {
-			HotkeyFn.Call("~" . Key, KeylayoutEmulation_ResetDeadKey, KLE_INPUT_LEVEL)
+			Binding := Map("scan", Key, "name", "~" . Key,
+				"callback", KeylayoutEmulation_ResetDeadKey,
+				"criterion", ResetCriterion, "options", KLE_INPUT_LEVEL)
+			HotkeyFn.Call(Binding["name"], Binding["callback"], Binding["options"])
+			Registration["bindings"][Key] := Binding
 			Count += 1
 		}
 	} finally {
-		HotIfFn.Call()
-		Critical(_AtCrit)
+		try HotIfFn.Call()
+		finally {
+			try Critical(_AtCrit)
+			finally {
+				if _KLE_ResetObserverRegistering != Guard
+					Guard["invalid"] := true
+				_KLE_ResetObserverRegistering := 0
+			}
+		}
 	}
 	KLE_Registered := true
+	if !Guard["invalid"] && Registration["bindings"].Count == KLE_DEAD_RESET_KEYS.Length {
+		_KLE_ResetObserverCohort := Registration
+		_KLE_ResetObserverCapture := _KLE_CaptureResetObserverOwned.Bind(Registration,
+			Registration["bindings"], Registration["bindings"].Clone(), _KLE_ResetObserverGeneration)
+	}
 	return Count
 }
 

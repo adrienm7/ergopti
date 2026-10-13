@@ -2831,6 +2831,89 @@ static bool TestTerminalRouteSnapshotsRetainExactSuffix(void)
 		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count)
 		== ERGOPTI_NAV_STATUS_OK);
 	TEST_ASSERT(name, output_count == 5);
+	/* Exact half-DWORD distances are ambiguous; raw FIFO ownership survives
+	 * metadata refusal, and the next authentic edge uses the retained anchor. */
+	{
+		static const struct {
+			uint32_t anchor, tick, next;
+			uint64_t lifted, next_lifted;
+			int32_t status;
+		} bounds[] = {
+			{0u, 0x80000000u, 1u, 0x80000000ull, 1ull, ERGOPTI_REPLAY_STALE_EVENT},
+			{0x80000000u, 0u, 0x80000001u, 0ull, 0x80000001ull, ERGOPTI_REPLAY_STALE_EVENT},
+			{0u, 0x7FFFFFFFu, 0x80000000u, 0x7FFFFFFFull, 0x80000000ull, ERGOPTI_REPLAY_OK},
+			{0u, 0x80000001u, 1u, 0x80000001ull, 1ull, ERGOPTI_REPLAY_STALE_EVENT},
+			{0x7FFFFFFFu, 0u, 0x80000000u, 0ull, 0x80000000ull, ERGOPTI_REPLAY_STALE_EVENT},
+			{0x80000001u, 0u, 1u, 0x100000000ull, 0x100000001ull, ERGOPTI_REPLAY_OK},
+			{UINT32_MAX, 0u, 1u, 0x100000000ull, 0x100000001ull, ERGOPTI_REPLAY_OK}
+		};
+		const ErgoptiReplay_Route natural[2] = {
+			{ .recipe_id = 9001, .route_id = 1, .code = VK_LSHIFT,
+				.axis = ERGOPTI_REPLAY_VK, .kind = ERGOPTI_REPLAY_MODIFIER,
+				.target_vk = VK_LSHIFT, .effective_modifiers_lr = ERGOPTI_REPLAY_LSHIFT },
+			{ .recipe_id = 9002, .route_id = 2, .code = VK_RSHIFT,
+				.axis = ERGOPTI_REPLAY_VK, .kind = ERGOPTI_REPLAY_MODIFIER,
+				.target_vk = VK_RSHIFT, .effective_modifiers_lr = ERGOPTI_REPLAY_RSHIFT }
+		};
+		for (uint32_t boundary = 0; boundary < sizeof(bounds) / sizeof(bounds[0]); ++boundary) {
+			const uint32_t times[5] = { bounds[boundary].anchor, bounds[boundary].tick,
+				bounds[boundary].next, bounds[boundary].next + 1u, bounds[boundary].next + 2u };
+			const uint16_t keys[5] = { VK_LSHIFT, VK_LSHIFT, VK_LSHIFT, VK_RSHIFT, VK_RSHIFT };
+			const uint16_t codes[5] = { 0x2A, 0x2A, 0x2A, 0x36, 0x36 };
+			const uint8_t edges[5] = { ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP,
+				ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP };
+			TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+			TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11,
+				natural, 2) == ERGOPTI_REPLAY_OK);
+			TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == ERGOPTI_NAV_STATUS_OK);
+			for (uint32_t edge_index = 0; edge_index < 5; ++edge_index) {
+				TEST_ASSERT(name, ErgoptiNav_TestSetHookTime(times[edge_index]) == ERGOPTI_NAV_STATUS_OK);
+				TEST_ASSERT(name, TestHookFlow(name, keys[edge_index], codes[edge_index],
+					edges[edge_index], ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+					&result, &mask, &passed, &ordered));
+				TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+			}
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 1, &peek) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, peek.route.status == bounds[boundary].status);
+			TEST_ASSERT(name, peek.route.event.timestamp == bounds[boundary].lifted);
+			TEST_ASSERT(name, peek.route.event.vk == VK_LSHIFT && peek.route.event.key_up == 1);
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 2, &peek) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, peek.route.event.timestamp == bounds[boundary].next_lifted);
+			TEST_ASSERT(name, peek.route.status == (bounds[boundary].status == ERGOPTI_REPLAY_STALE_EVENT
+				? ERGOPTI_REPLAY_OK : ERGOPTI_REPLAY_ORPHAN_EDGE));
+			if (bounds[boundary].status == ERGOPTI_REPLAY_STALE_EVENT) {
+				TEST_ASSERT(name, peek.route.modifiers_lr_before == ERGOPTI_REPLAY_LSHIFT);
+				TEST_ASSERT(name, peek.route.modifiers_lr_after == 0);
+			}
+			retained_count = UINT32_MAX;
+			TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
+				retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count) == ERGOPTI_NAV_STATUS_BUSY);
+			TEST_ASSERT(name, retained_count == UINT32_MAX);
+			TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+				ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, 2, output, 8, &output_count) == ERGOPTI_NAV_STATUS_OS_ERROR);
+			TEST_ASSERT(name, output_count == 2 && output[0].vk == 0 && output[0].sc == 0x2A
+				&& output[0].kind == ERGOPTI_NAV_EVENT_DOWN
+				&& output[1].vk == 0 && output[1].sc == 0x2A && output[1].kind == ERGOPTI_NAV_EVENT_UP);
+			TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &capture) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, capture.queued == 3 && capture.replayed == 2);
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &peek) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, peek.route.event.timestamp == bounds[boundary].next_lifted);
+			TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+				ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, output, 8, &output_count) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, output_count == 3 && output[0].vk == 0 && output[0].sc == 0x2A
+				&& output[0].kind == ERGOPTI_NAV_EVENT_UP
+				&& output[1].vk == 0 && output[1].sc == 0x36 && output[1].kind == ERGOPTI_NAV_EVENT_DOWN
+				&& output[2].vk == 0 && output[2].sc == 0x36 && output[2].kind == ERGOPTI_NAV_EVENT_UP);
+			TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &capture) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, capture.queued == 0 && capture.replayed == 5
+				&& capture.phase == ERGOPTI_NAV_TERMINAL_IDLE);
+			TEST_ASSERT(name, ErgoptiNav_ListTerminalHeldRecipes(TEST_OWNER_A,
+				retained, ERGOPTI_REPLAY_MAX_HELD_KEYS, &retained_count) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, retained_count == 0);
+		}
+	}
 	return true;
 }
 
@@ -2967,6 +3050,289 @@ static bool TestTerminalOutputPreviewIsAuthenticatedAndGuarded(void)
 
 
 /** Couples accepted output prefixes to exactly one authenticated FIFO edge. */
+/** Literal INPUT data expectation independent of the bridge and pure serializer. */
+static bool TestSerializedOutputPacket(const char *name,
+	const ErgoptiOutput_Win32Input *packet, uint16_t vk, uint16_t scan, uint32_t flags)
+{
+	const ErgoptiOutput_Win32Input expected = {
+		.type = 1, .vk = vk, .scan = scan, .flags = flags,
+		.extra_info = 0x4552475054524D31ull
+	};
+	TEST_ASSERT(name, memcmp(packet, &expected, 40) == 0);
+	return true;
+}
+
+/** Serialization cannot observe raw release as a new attempt or write outputs. */
+typedef struct NavOutputSerializeReleaseProbe {
+	ErgoptiOutput_Key key;
+	uint64_t attempt;
+	uint32_t observations;
+	bool preserved;
+} NavOutputSerializeReleaseProbe;
+
+static void TestSerializedOutputDuringRelease(void *context)
+{
+	NavOutputSerializeReleaseProbe *probe = context;
+	ErgoptiOutput_Win32Input inputs[4], before[4]; uint32_t count = 99;
+	memset(inputs, 0xA5, sizeof(inputs)); memcpy(before, inputs, sizeof(inputs));
+	int32_t status = ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+		&probe->key, probe->attempt, inputs, 4, &count);
+	++probe->observations;
+	probe->preserved = probe->preserved && status == ERGOPTI_NAV_STATUS_BUSY
+		&& count == 99 && memcmp(before, inputs, sizeof(inputs)) == 0;
+}
+
+/** Uses the real native FIFO/planner to cover every UTF-16 accepted prefix. */
+static bool TestTerminalSerializedOutputUnicode(const char *name)
+{
+	static const struct { uint16_t text[3]; uint32_t length; } vectors[] = {
+		{{0x0061},1}, {{0x00E9},1}, {{0x0065,0x0301},2},
+		{{0xD83D,0xDE00},2}, {{0x0000},1}, {{0x0061,0xD83D,0xDE00},3}
+	};
+	for (uint32_t v = 0; v < 6; ++v) {
+		uint32_t total = vectors[v].length * 2;
+		for (uint32_t prefix = 0; prefix <= total; ++prefix) {
+			ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+			ErgoptiReplay_Route route = {.recipe_id = 2200, .route_id = 2,
+				.code = 0x1E, .axis = ERGOPTI_REPLAY_SCAN, .kind = ERGOPTI_REPLAY_CHARACTER};
+			ErgoptiNav_DispatchResult result; ErgoptiNav_TerminalRouteSnapshot head, after_head;
+			ErgoptiNav_TerminalCaptureSnapshot before, after;
+			ErgoptiOutput_Key key; ErgoptiOutput_Unit units[6];
+			ErgoptiOutput_Win32Input inputs[6]; uint64_t generation = 0, attempt, old_attempt;
+			uint32_t count; uint8_t mask = 0, passed = 0, ordered = 0;
+			TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+			TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == 0);
+			TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0) == 0);
+			TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11, &route, 1) == 0);
+			TEST_ASSERT(name, ErgoptiNav_TestAdmitTerminalOutput(1) == 0);
+			TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == 0);
+			TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E, ERGOPTI_NAV_EVENT_DOWN,
+				ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+			TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E, ERGOPTI_NAV_EVENT_UP,
+				ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &head) == 0);
+			TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+				head.sequence, vectors[v].text, vectors[v].length, &key) == 0);
+			count = 99; memset(inputs, 0xA5, sizeof(inputs));
+			TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+				&key, 1, inputs, 6, &count) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+			TEST_ASSERT(name, count == 99 && inputs[0].type == 0xA5A5A5A5u);
+			TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A,
+				&key, units, 6, &count, &attempt) == 0);
+			old_attempt = attempt;
+			TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &before) == 0);
+			TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+				&key, attempt, inputs, 6, &count) == 0);
+			TEST_ASSERT(name, count == total);
+			for (uint32_t i = 0; i < count; ++i)
+				TEST_ASSERT(name, TestSerializedOutputPacket(name, &inputs[i], 0,
+					vectors[v].text[i / 2], i % 2 ? 6 : 4));
+			inputs[0].scan = 0x007A;
+			TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+				&key, attempt, inputs, 6, &count) == 0);
+			TEST_ASSERT(name, TestSerializedOutputPacket(name, &inputs[0], 0, vectors[v].text[0], 4));
+			TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after) == 0);
+			TEST_ASSERT(name, memcmp(&before, &after, sizeof(before)) == 0);
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &after_head) == 0);
+			TEST_ASSERT(name, memcmp(&head, &after_head, sizeof(head)) == 0);
+			TEST_ASSERT(name, ErgoptiNav_CancelTerminalOutput(TEST_OWNER_A, &key) == ERGOPTI_NAV_STATUS_BUSY);
+			TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, prefix) == 0);
+			count = 99; memset(inputs, 0xA5, sizeof(inputs));
+			TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+				&key, old_attempt, inputs, 6, &count) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+			TEST_ASSERT(name, count == 99 && inputs[0].type == 0xA5A5A5A5u);
+			if (prefix < total) {
+				TEST_ASSERT(name, ErgoptiNav_ConsumeTerminalOutput(TEST_OWNER_A, &key) == ERGOPTI_NAV_STATUS_BUSY);
+				TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A,
+					&key, units, 6, &count, &attempt) == 0);
+				TEST_ASSERT(name, attempt != old_attempt);
+				TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+					&key, old_attempt, inputs, 6, &count) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+				TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+					&key, attempt, inputs, 6, &count) == 0);
+				TEST_ASSERT(name, count == total - prefix);
+				for (uint32_t i = 0; i < count; ++i) {
+					uint32_t original = prefix + i;
+					TEST_ASSERT(name, TestSerializedOutputPacket(name, &inputs[i], 0,
+						vectors[v].text[original / 2], original % 2 ? 6 : 4));
+				}
+				TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, count) == 0);
+			}
+			TEST_ASSERT(name, ErgoptiNav_ConsumeTerminalOutput(TEST_OWNER_A, &key) == 0);
+			count = 99; memset(inputs, 0xA5, sizeof(inputs));
+			TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+				&key, attempt, inputs, 6, &count) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+			TEST_ASSERT(name, count == 99 && inputs[0].type == 0xA5A5A5A5u);
+			ErgoptiNav_TestEvent replayed; uint32_t replayed_count;
+			TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+				ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, &replayed, 1, &replayed_count) == 0);
+			TEST_ASSERT(name, replayed_count == 1 && replayed.kind == ERGOPTI_NAV_EVENT_UP);
+		}
+	}
+	return true;
+}
+
+/** Native capture, real routing and literal VK/SCAN expectations for all LR keys. */
+static bool TestTerminalSerializedOutputNative(const char *name)
+{
+	static const struct { uint16_t vk, scan; uint8_t lr; uint32_t flags; } vectors[] = {
+		{0xA2,0x01D,0x01,8}, {0xA3,0x11D,0x02,9}, {0xA4,0x038,0x04,8},
+		{0xA5,0x138,0x08,9}, {0xA0,0x02A,0x10,8}, {0xA1,0x036,0x20,8},
+		{0x5B,0x15B,0x40,9}, {0x5C,0x15C,0x80,9}
+	};
+	for (uint32_t v = 0; v < 8; ++v) for (uint32_t axis = 1; axis <= 2; ++axis) {
+		ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+		ErgoptiReplay_Route route = {.recipe_id = 2200, .route_id = 2,
+			.kind = ERGOPTI_REPLAY_MODIFIER, .axis = (uint8_t)axis,
+			.effective_modifiers_lr = vectors[v].lr};
+		route.code = axis == 1 ? vectors[v].vk : vectors[v].scan;
+		if (axis == 1) route.target_vk = vectors[v].vk; else route.target_scan = vectors[v].scan;
+		uint64_t generation = 0; uint8_t mask = 0, passed = 0, ordered = 0;
+		ErgoptiNav_DispatchResult result;
+		TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+		TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == 0);
+		TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0) == 0);
+		TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11, &route, 1) == 0);
+		TEST_ASSERT(name, ErgoptiNav_TestAdmitTerminalOutput(1) == 0);
+		TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == 0);
+		for (uint32_t up = 0; up < 2; ++up) {
+			ErgoptiNav_TerminalRouteSnapshot head; ErgoptiOutput_Key key;
+			ErgoptiOutput_Unit unit; ErgoptiOutput_Win32Input packet;
+			uint32_t count; uint64_t attempt;
+			TEST_ASSERT(name, TestHookFlow(name, vectors[v].vk, vectors[v].scan,
+				up ? ERGOPTI_NAV_EVENT_UP : ERGOPTI_NAV_EVENT_DOWN,
+				ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &head) == 0);
+			TEST_ASSERT(name, head.route.status == ERGOPTI_REPLAY_OK);
+			TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+				head.sequence, NULL, 0, &key) == 0);
+			TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A, &key, &unit, 1, &count, &attempt) == 0);
+			TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt, &packet, 1, &count) == 0);
+			TEST_ASSERT(name, count == 1);
+			if (axis == 1) TEST_ASSERT(name, TestSerializedOutputPacket(name, &packet, vectors[v].vk, 0, up ? 2 : 0));
+			else TEST_ASSERT(name, TestSerializedOutputPacket(name, &packet, 0,
+				vectors[v].scan & 0xFFu, vectors[v].flags | (up ? 2 : 0)));
+			TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, 1) == 0);
+			TEST_ASSERT(name, ErgoptiNav_ConsumeTerminalOutput(TEST_OWNER_A, &key) == 0);
+		}
+		ErgoptiNav_TestEvent replayed; uint32_t count;
+		TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+			ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, &replayed, 1, &count) == 0);
+		TEST_ASSERT(name, count == 0);
+	}
+	return true;
+}
+
+/** Public refusals leave the complete packet storage, receipt and head untouched. */
+static bool TestTerminalSerializedOutputRefusals(const char *name)
+{
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiReplay_Route route = {.recipe_id = 2200, .route_id = 2,
+		.code = 0x1E, .axis = ERGOPTI_REPLAY_SCAN, .kind = ERGOPTI_REPLAY_CHARACTER};
+	ErgoptiNav_DispatchResult result; uint8_t mask = 0, passed = 0, ordered = 0;
+	uint64_t generation = 0, attempt; uint32_t count;
+	ErgoptiNav_TerminalRouteSnapshot head, observed;
+	ErgoptiNav_TerminalCaptureSnapshot before, after;
+	ErgoptiOutput_Key key, foreign; ErgoptiOutput_Unit units[4];
+	ErgoptiOutput_Win32Input inputs[4], unchanged[4]; const uint16_t text[2] = {0xD83D,0xDE00};
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == 0);
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0) == 0);
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11, &route, 1) == 0);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == 0);
+	TEST_ASSERT(name, TestHookFlow(name, 'A', 0x1E, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &head) == 0);
+	/* Refused production admission does not mint serializable output custody. */
+	count = 99; memset(inputs, 0xA5, sizeof(inputs)); memcpy(unchanged, inputs, sizeof(inputs));
+	key = (ErgoptiOutput_Key){TEST_OWNER_B,head.sequence,1};
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, 1,
+		inputs, 4, &count) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, ErgoptiNav_TestAdmitTerminalOutput(1) == 0);
+	TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B, head.sequence, text, 2, &key) == 0);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A, &key, units, 4, &count, &attempt) == 0);
+	count = 99;
+	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &before) == 0);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(0, &key, attempt, inputs, 4, &count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_B, &key, attempt, inputs, 4, &count) == ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+	for (uint32_t i = 0; i < 3; ++i) {
+		foreign = key;
+		if (i == 0) ++foreign.token;
+		if (i == 1) ++foreign.sequence;
+		if (i == 2) ++foreign.plan_id;
+		TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &foreign, attempt,
+			inputs, 4, &count) == (i == 0 ? ERGOPTI_NAV_STATUS_OWNER_MISMATCH : ERGOPTI_NAV_STATUS_INVALID_STATE));
+	}
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt + 1, inputs, 4, &count) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, 0, inputs, 4, &count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, NULL, attempt, inputs, 4, &count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt, NULL, 4, &count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt, inputs, 4, NULL) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt, inputs, 3, &count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt, inputs, 2049, &count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt,
+		(ErgoptiOutput_Win32Input *)&key, 4, &count) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A, &key, attempt,
+		inputs, 4, &inputs[0].type) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, count == 99 && memcmp(inputs, unchanged, sizeof(inputs)) == 0);
+	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after) == 0);
+	TEST_ASSERT(name, memcmp(&before, &after, sizeof(before)) == 0);
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &observed) == 0);
+	TEST_ASSERT(name, memcmp(&head, &observed, sizeof(head)) == 0);
+	TEST_ASSERT(name, ErgoptiNav_CancelTerminalOutput(TEST_OWNER_A, &key) == ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, 0) == 0);
+	TEST_ASSERT(name, ErgoptiNav_CancelTerminalOutput(TEST_OWNER_A, &key) == 0);
+	NavOutputSerializeReleaseProbe probe = {key,attempt,0,true};
+	ErgoptiNav_TestEvent replayed; uint32_t replayed_count;
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCaptureObserved(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, &replayed, 1, &replayed_count,
+		TestSerializedOutputDuringRelease, &probe) == 0);
+	TEST_ASSERT(name, probe.observations != 0 && probe.preserved && replayed_count == 1);
+	return true;
+}
+
+/** Public aliases cannot consume the original immutable key or output attempt. */
+static bool TestTerminalOutputPublicAliases(const char *name,
+	const ErgoptiOutput_Key *key, ErgoptiOutput_Unit *units)
+{
+	union {
+		ErgoptiOutput_Key key;
+		ErgoptiOutput_Unit units[4];
+		uint32_t words[32];
+		uint64_t longs[16];
+	} storage, saved, pairs, saved_pairs;
+	uint32_t count = 99;
+	uint64_t attempt = 99;
+	ErgoptiOutput_Key original = *key;
+	ErgoptiOutput_Unit unchanged[4];
+	memset(&storage, 0xA5, sizeof(storage));
+	storage.key = *key;
+	memcpy(&saved, &storage, sizeof(storage));
+	memset(&pairs, 0xA5, sizeof(pairs));
+	memcpy(&saved_pairs, &pairs, sizeof(pairs));
+	memcpy(unchanged, units, sizeof(unchanged));
+	for (uint32_t index = 0; index < 6; ++index) {
+		ErgoptiOutput_Unit *target = units;
+		uint32_t *count_target = &count;
+		uint64_t *attempt_target = &attempt;
+		if (index == 0) target = storage.units;
+		if (index == 1) count_target = storage.words;
+		if (index == 2) attempt_target = storage.longs;
+		if (index == 3) { target = pairs.units; count_target = &pairs.words[1]; }
+		if (index == 4) { target = pairs.units; attempt_target = &pairs.longs[1]; }
+		if (index == 5) count_target = (uint32_t *)&attempt;
+		TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A,
+			&storage.key, target, 4, count_target, attempt_target)
+			== ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+		TEST_ASSERT(name, memcmp(&storage, &saved, sizeof(storage)) == 0);
+		TEST_ASSERT(name, memcmp(&pairs, &saved_pairs, sizeof(pairs)) == 0);
+		TEST_ASSERT(name, memcmp(units, unchanged, sizeof(unchanged)) == 0);
+		TEST_ASSERT(name, memcmp(key, &original, sizeof(original)) == 0);
+		TEST_ASSERT(name, count == 99 && attempt == 99);
+	}
+	return true;
+}
+
 static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 {
 	const char *name = "terminal output custody settles exact FIFO head (todo49-output-custody)";
@@ -3009,6 +3375,13 @@ static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 		head.sequence, text, 2, &key) == ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
 	TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
 		next.sequence, text, 2, &key) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+	union { ErgoptiOutput_Key key; uint16_t text[12]; } aliased, preserved;
+	memset(&aliased, 0xA5, sizeof(aliased));
+	aliased.text[0] = 0x78; aliased.text[1] = 0x79;
+	memcpy(&preserved, &aliased, sizeof(aliased));
+	TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+		head.sequence, aliased.text, 2, &aliased.key) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, memcmp(&aliased, &preserved, sizeof(aliased)) == 0);
 	TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
 		head.sequence, text, 2, &key) == 0);
 	stale = key; ++stale.plan_id;
@@ -3022,6 +3395,7 @@ static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 	TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A, &key,
 		units, 3, &count, &attempt) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
 	TEST_ASSERT(name, count == 99 && attempt == 99 && units[0].reserved == 0xA5);
+	TEST_ASSERT(name, TestTerminalOutputPublicAliases(name, &key, units));
 	TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A, &key,
 		units, 4, &count, &attempt) == 0);
 	TEST_ASSERT(name, count == 4 && attempt != 0);
@@ -3114,6 +3488,9 @@ static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
 		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, replayed, 4, &replayed_count) == 0);
 	TEST_ASSERT(name, replayed_count == 1);
+	TEST_ASSERT(name, TestTerminalSerializedOutputUnicode(name));
+	TEST_ASSERT(name, TestTerminalSerializedOutputNative(name));
+	TEST_ASSERT(name, TestTerminalSerializedOutputRefusals(name));
 	return true;
 }
 
@@ -3165,6 +3542,18 @@ static bool TestTerminalOutputCustodyPreservesFaultDebt(void)
 	TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A, &key,
 		units, 2, &count, &attempt) == 0);
 	TEST_ASSERT(name, count == 1 && units[0].utf16 == 0x78 && units[0].key_up == 1);
+	/* Existing FAULTED debt remains serializable for its exact final Unicode UP. */
+	{
+		ErgoptiOutput_Win32Input inputs[2]; uint32_t serialized = 99;
+		ErgoptiNav_TerminalCaptureSnapshot before_copy, after_copy;
+		TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &before_copy) == 0);
+		TEST_ASSERT(name, ErgoptiNav_SerializeTerminalOutputAttempt(TEST_OWNER_A,
+			&key, attempt, inputs, 2, &serialized) == 0);
+		TEST_ASSERT(name, serialized == 1 && TestSerializedOutputPacket(name, &inputs[0], 0, 0x78, 6));
+		TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after_copy) == 0);
+		TEST_ASSERT(name, memcmp(&before_copy, &after_copy, sizeof(before_copy)) == 0);
+	}
+
 	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &observed_head) == 0);
 	TEST_ASSERT(name, memcmp(&head, &observed_head, sizeof(head)) == 0);
 	TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, 1) == 0);

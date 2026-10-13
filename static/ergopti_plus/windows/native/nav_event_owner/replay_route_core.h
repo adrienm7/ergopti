@@ -241,6 +241,9 @@ int32_t ErgoptiReplay_Register(
  * Repeats retain the held recipe. A changed composition requiring another
  * recipe returns UNSUPPORTED until the captured KLE model adapter resolves it.
  * Native modifier/prefix keys must be explicitly registered by that adapter.
+ * The event may overlap the snapshot output; it is copied before output clearing.
+ * A snapshot output overlapping any state bytes, or whose address span wraps,
+ * returns INVALID_ARGUMENT before any write, including a refusal status write.
  */
 int32_t ErgoptiReplay_Step(
 	ErgoptiReplay_State *state, uint64_t owner,
@@ -251,6 +254,9 @@ int32_t ErgoptiReplay_Step(
  * Unsupported/unregistered snapshots never authorize a guessed output edge.
  * This prepares output only; the native FIFO remains responsible for delivery
  * and acknowledgements, and no OS output is emitted here.
+ * An edge output overlapping any state or supplied snapshot bytes, or whose
+ * address span wraps, returns INVALID_ARGUMENT without writing either buffer.
+ * Other refusals retain the ordinary zeroed output behavior.
  */
 int32_t ErgoptiReplay_PrepareNativeEdge(
 	const ErgoptiReplay_State *state, uint64_t owner,

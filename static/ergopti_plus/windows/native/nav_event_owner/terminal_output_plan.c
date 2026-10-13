@@ -167,10 +167,17 @@ int32_t ErgoptiOutput_Plan(
 			ErgoptiReplay_NativeKeyEdge edge;
 			if (length != 0) return ERGOPTI_OUTPUT_INVALID;
 			if (ErgoptiReplay_PrepareNativeEdge(routes, owner, &frozen, &edge) == 0) {
-				eligible = 1; count = 1;
-				units[0].kind = ERGOPTI_OUTPUT_NATIVE_EDGE;
-				units[0].vk = edge.vk; units[0].scan = edge.scan;
-				units[0].key_up = edge.key_up; units[0].repeat = edge.repeat;
+				eligible = 1;
+				/* Source-owned holds are unioned by the routing core. Releasing
+				 * one source cannot clear a modifier retained by another, and a
+				 * repeated/redundant DOWN has no effective transition to emit. */
+				if (((frozen.modifiers_lr_before ^ frozen.modifiers_lr_after)
+						& frozen.route.effective_modifiers_lr) != 0) {
+					count = 1;
+					units[0].kind = ERGOPTI_OUTPUT_NATIVE_EDGE;
+					units[0].vk = edge.vk; units[0].scan = edge.scan;
+					units[0].key_up = edge.key_up; units[0].repeat = edge.repeat;
+				}
 			}
 		}
 	}
@@ -215,6 +222,85 @@ int32_t ErgoptiOutput_BeginAttempt(
 	*count = remaining; *attempt_id = state->attempt_id;
 	return ERGOPTI_OUTPUT_OK;
 }
+/** Data layout only: selecting a native send backend remains a separate task. */
+static int OutputWin32LayoutSupported(void)
+{
+#if (defined(_M_X64) || defined(_M_ARM64) || defined(__x86_64__) \
+		|| defined(__aarch64__)) && UINTPTR_MAX == UINT64_MAX \
+		&& !defined(__AARCH64EB__) \
+		&& (!defined(__BYTE_ORDER__) || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+	return 1;
+#else
+	return 0;
+#endif
+}
+
+/** Reject writable aliases before any caller output or custody is touched. */
+static int OutputRangesOverlap(const void *a, size_t an, const void *b, size_t bn)
+{
+	uintptr_t ap = (uintptr_t)a, bp = (uintptr_t)b;
+	if (an > UINTPTR_MAX - ap || bn > UINTPTR_MAX - bp) return 1;
+	return ap < bp + bn && bp < ap + an;
+}
+
+/** Validates units independently of byte construction to make refusal atomic. */
+static int OutputWin32UnitValid(const ErgoptiOutput_Unit *unit)
+{
+	if (unit->reserved != 0 || unit->key_up > 1 || unit->repeat > 1
+			|| (unit->key_up && unit->repeat)) return 0;
+	if (unit->kind == ERGOPTI_OUTPUT_UNICODE)
+		return unit->vk == 0 && unit->scan == 0;
+	if (unit->kind != ERGOPTI_OUTPUT_NATIVE_EDGE || unit->utf16 != 0
+			|| unit->vk > 255 || unit->scan > 511 || (unit->vk && unit->scan)) return 0;
+	return unit->vk != 0 || (unit->scan & 0xFFu) != 0;
+}
+
+int32_t ErgoptiOutput_SerializeAttempt(
+	const ErgoptiOutput_State *state, uint64_t owner, const ErgoptiOutput_Key *key,
+	uint64_t attempt_id, ErgoptiOutput_Win32Input *packets,
+	uint32_t capacity, uint32_t *count)
+{
+	int32_t status = CheckKey(state, owner, key);
+	size_t bytes;
+	if (status != 0) return status;
+	if (!state->dispatchable) return ERGOPTI_OUTPUT_DIAGNOSTIC;
+	if (!state->attempting || attempt_id == 0 || attempt_id != state->attempt_id)
+		return ERGOPTI_OUTPUT_STALE;
+	if (!OutputWin32LayoutSupported() || packets == NULL || count == NULL
+			|| capacity > ERGOPTI_OUTPUT_MAX_UNITS) return ERGOPTI_OUTPUT_INVALID;
+	if (state->count > ERGOPTI_OUTPUT_MAX_UNITS || state->accepted >= state->count
+			|| state->attempt_count != state->count - state->accepted)
+		return ERGOPTI_OUTPUT_INVALID;
+	if (capacity < state->attempt_count) return ERGOPTI_OUTPUT_CAPACITY;
+	bytes = state->attempt_count * sizeof(packets[0]);
+	if (OutputRangesOverlap(packets, bytes, state, sizeof(*state))
+			|| OutputRangesOverlap(packets, bytes, key, sizeof(*key))
+			|| OutputRangesOverlap(packets, bytes, count, sizeof(*count))
+			|| OutputRangesOverlap(count, sizeof(*count), state, sizeof(*state))
+			|| OutputRangesOverlap(count, sizeof(*count), key, sizeof(*key)))
+		return ERGOPTI_OUTPUT_INVALID;
+	for (uint32_t i = 0; i < state->attempt_count; ++i)
+		if (!OutputWin32UnitValid(&state->units[state->accepted + i]))
+			return ERGOPTI_OUTPUT_INVALID;
+	for (uint32_t i = 0; i < state->attempt_count; ++i) {
+		const ErgoptiOutput_Unit *unit = &state->units[state->accepted + i];
+		ErgoptiOutput_Win32Input packet = {0};
+		packet.type = 1; /* INPUT_KEYBOARD. */
+		packet.extra_info = ERGOPTI_NAV_TERMINAL_REPLAY_MARKER;
+		packet.flags = unit->key_up ? 2u : 0u; /* KEYEVENTF_KEYUP. */
+		if (unit->kind == ERGOPTI_OUTPUT_UNICODE) {
+			packet.scan = unit->utf16;
+			packet.flags |= 4u; /* KEYEVENTF_UNICODE; literal UTF-16 code unit. */
+		} else if (unit->scan != 0) {
+			packet.scan = unit->scan & 0xFFu;
+			packet.flags |= 8u | ((unit->scan & 0x100u) ? 1u : 0u);
+		} else packet.vk = unit->vk;
+		memcpy(&packets[i], &packet, sizeof(packet));
+	}
+	*count = state->attempt_count;
+	return ERGOPTI_OUTPUT_OK;
+}
+
 int32_t ErgoptiOutput_Acknowledge(
 	ErgoptiOutput_State *state, uint64_t owner, const ErgoptiOutput_Key *key,
 	uint64_t attempt_id, uint32_t accepted)

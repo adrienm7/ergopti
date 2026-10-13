@@ -22,6 +22,19 @@
 #include "editor_replace.h"
 #include "hook_trace.h"
 
+/* A genuine Windows build pins the pure x64/ARM64 wire shape to its own SDK. */
+_Static_assert(sizeof(INPUT) == sizeof(ErgoptiOutput_Win32Input), "SDK INPUT size changed.");
+_Static_assert(offsetof(INPUT, type) == offsetof(ErgoptiOutput_Win32Input, type), "SDK INPUT type changed.");
+_Static_assert(offsetof(INPUT, ki.wVk) == offsetof(ErgoptiOutput_Win32Input, vk), "SDK VK offset changed.");
+_Static_assert(offsetof(INPUT, ki.wScan) == offsetof(ErgoptiOutput_Win32Input, scan), "SDK scan offset changed.");
+_Static_assert(offsetof(INPUT, ki.dwFlags) == offsetof(ErgoptiOutput_Win32Input, flags), "SDK flags offset changed.");
+_Static_assert(offsetof(INPUT, ki.time) == offsetof(ErgoptiOutput_Win32Input, time), "SDK time offset changed.");
+_Static_assert(offsetof(INPUT, ki.dwExtraInfo) == offsetof(ErgoptiOutput_Win32Input, extra_info), "SDK marker offset changed.");
+#if !defined(ERGOPTI_NAV_TESTING)
+_Static_assert(INPUT_KEYBOARD == 1 && KEYEVENTF_EXTENDEDKEY == 1 && KEYEVENTF_KEYUP == 2
+	&& KEYEVENTF_UNICODE == 4 && KEYEVENTF_SCANCODE == 8, "SDK keyboard flag values changed.");
+#endif
+
 
 
 
@@ -852,7 +865,7 @@ static bool NavLiftTerminalClockLocked(NavState *state, uint32_t tick, uint64_t 
 				return false;
 			state->terminal_clock_epoch += 0x100000000ull;
 			*timestamp = state->terminal_clock_epoch + tick;
-		} else if (tick - state->terminal_clock_tick > 0x80000000u) {
+		} else if (tick - state->terminal_clock_tick >= 0x80000000u) {
 			if (state->terminal_clock_epoch >= 0x100000000ull)
 				*timestamp -= 0x100000000ull;
 			return false;
@@ -3308,6 +3321,23 @@ static int32_t NavCheckTerminalOutputLocked(
 	return ERGOPTI_NAV_STATUS_OK;
 }
 
+/** Refuses overlapping or overflowing spans before any pointer is dereferenced. */
+static bool NavTerminalOutputRangesOverlap(const void *a, size_t an,
+	const void *b, size_t bn)
+{
+	uintptr_t ap = (uintptr_t)a, bp = (uintptr_t)b;
+	if (an > UINTPTR_MAX - ap || bn > UINTPTR_MAX - bp) return true;
+	if (an == 0 || bn == 0) return false;
+	return ap < bp + bn && bp < ap + an;
+}
+
+/** Caller writes cannot overlap any owner field, including lock/FIFO/routes. */
+static bool NavTerminalOutputAliasesState(const void *output, size_t bytes)
+{
+	return NavTerminalOutputRangesOverlap(output, bytes,
+		&g_nav_state, sizeof(g_nav_state));
+}
+
 /** Installs one canonical plan transactionally against the FIFO head only. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
 	uint64_t owner, uint64_t token, uint64_t sequence,
@@ -3318,6 +3348,10 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
 	int32_t status;
 	if (owner == 0 || token == 0 || sequence == 0 || out_key == NULL
 			|| length > ERGOPTI_OUTPUT_MAX_UTF16 || (length != 0 && text == NULL))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (NavTerminalOutputAliasesState(out_key, sizeof(*out_key))
+			|| NavTerminalOutputRangesOverlap(out_key, sizeof(*out_key),
+				text, length * sizeof(*text)))
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	if (!NavEnsureInitialized()) return ERGOPTI_NAV_STATUS_OS_ERROR;
 	EnterCriticalSection(&g_nav_state.lock);
@@ -3363,12 +3397,44 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalOutputAttempt(
 	if (owner == 0 || key == NULL || units == NULL || out_count == NULL
 			|| out_attempt == NULL || capacity > ERGOPTI_OUTPUT_MAX_UNITS)
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (NavTerminalOutputAliasesState(units, capacity * sizeof(*units))
+			|| NavTerminalOutputAliasesState(out_count, sizeof(*out_count))
+			|| NavTerminalOutputAliasesState(out_attempt, sizeof(*out_attempt))
+			|| NavTerminalOutputRangesOverlap(units, capacity * sizeof(*units), key, sizeof(*key))
+			|| NavTerminalOutputRangesOverlap(out_count, sizeof(*out_count), key, sizeof(*key))
+			|| NavTerminalOutputRangesOverlap(out_attempt, sizeof(*out_attempt), key, sizeof(*key))
+			|| NavTerminalOutputRangesOverlap(units, capacity * sizeof(*units), out_count, sizeof(*out_count))
+			|| NavTerminalOutputRangesOverlap(units, capacity * sizeof(*units), out_attempt, sizeof(*out_attempt))
+			|| NavTerminalOutputRangesOverlap(out_count, sizeof(*out_count), out_attempt, sizeof(*out_attempt)))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	if (!NavEnsureInitialized()) return ERGOPTI_NAV_STATUS_OS_ERROR;
 	EnterCriticalSection(&g_nav_state.lock);
 	status = NavCheckTerminalOutputLocked(&g_nav_state, owner, key);
 	if (status == ERGOPTI_NAV_STATUS_OK)
 		status = NavTerminalOutputStatus(ErgoptiOutput_BeginAttempt(
 			&g_nav_state.terminal_output, owner, key, units, capacity, out_count, out_attempt));
+	LeaveCriticalSection(&g_nav_state.lock);
+	return status;
+}
+
+/** Copies owned INPUT data while the same lock pins FIFO and attempt identity. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt(
+	uint64_t owner, const ErgoptiOutput_Key *key, uint64_t attempt,
+	ErgoptiOutput_Win32Input *out_inputs, uint32_t capacity, uint32_t *out_count)
+{
+	int32_t status;
+	if (owner == 0 || key == NULL || attempt == 0 || out_inputs == NULL
+			|| out_count == NULL || capacity > ERGOPTI_OUTPUT_MAX_UNITS)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (NavTerminalOutputAliasesState(out_inputs, capacity * sizeof(out_inputs[0]))
+			|| NavTerminalOutputAliasesState(out_count, sizeof(*out_count)))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	if (!NavEnsureInitialized()) return ERGOPTI_NAV_STATUS_OS_ERROR;
+	EnterCriticalSection(&g_nav_state.lock);
+	status = NavCheckTerminalOutputLocked(&g_nav_state, owner, key);
+	if (status == ERGOPTI_NAV_STATUS_OK)
+		status = NavTerminalOutputStatus(ErgoptiOutput_SerializeAttempt(
+			&g_nav_state.terminal_output, owner, key, attempt, out_inputs, capacity, out_count));
 	LeaveCriticalSection(&g_nav_state.lock);
 	return status;
 }

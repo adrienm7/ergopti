@@ -52,6 +52,37 @@ Down admission retain FIFO/privacy and ergonomic callback signatures. Actual
 InputHook delivery, IME/composition, physical pairing and hook order remain open;
 macOS/Linux do not have this Windows cross-callback hint cache.
 
+#### Windows terminal source and native artifact receiving
+
+The exact nineteen-path terminal union is received on Windows with official
+MSVC/SDK: replay eight matrices, output eleven, trace six and all 44 native-owner
+cases, followed by hardened x64 PE, exact 41 exports and source/DLL/recipe
+provenance verification. Plan and Begin originally fail genuine public alias
+regressions; their corrected wrappers reject whole-owner, immutable input/key,
+pairwise output and overflowing spans before initialization, locks or writes.
+The production-inclusion harness receives 170 cold/initialized/FIFO/planned/
+attempted-state refusal vectors, preserving the full singleton and caller bytes.
+
+All 667 terminal AHK cases pass under their six exact filters, plus 91 KLE reset
+observer and ten existing layout-emulation cases, each natural exit 0 without
+failure/skip. These Windows controlled ports do not establish user32 output or
+hook delivery. The completed preregistration candidate receives all 91 draft,
+nine original metadata and twenty added model-builder custody cases. The latter
+are native 0/20 original-red and 20/20 fixed-green, preserving old model cells
+and the actual newly allocated cell before callbacks; unknown native effects
+retain their original candidate and refuse retry. The source guards retain their
+original inverses and add controls without dropping assertions.
+
+Item 49 remains partial: complete non-hook cohort migration, production emitter
+selection/recovery and a real uncertain-registration settlement contract remain
+software/native contract work. Production cohort/transformed-output admission
+stays false. The standalone user32 fixture and SendEvent/SendInput comparison are
+UNRUN because the personal resident input owner must remain active. No forced
+output or process stop is used to obtain an acknowledgement. Full composed
+unit/E2E/startup/build and installed collector receiving remain separate gates.
+The existing collector receives 13 AHK owner cases and 30 stock PowerShell5.1
+controls, including actual archive integrity and private/successor-file refusal.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
