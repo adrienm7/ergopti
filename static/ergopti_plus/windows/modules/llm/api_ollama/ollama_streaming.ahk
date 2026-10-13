@@ -21,7 +21,8 @@
 /**
  * Non-blocking Ollama generation. Returns immediately; calls
  * ``on_success(text)`` when the model finishes responding, or ``on_fail()``
- * on any HTTP / parse failure. Mirrors hs.http.asyncPost on the HS side.
+ * on HTTP / parse failure while the captured origin remains current.
+ * Origin supersession retires custody without public delivery.
  *
  * The transport is a curl child process, not WinHTTP: WinHTTP's async ``Send()``
  * returned HTTP 200 with an empty ``content`` on this driver despite valid JSON
@@ -34,7 +35,7 @@
  * @param {string}   user_text     - User context.
  * @param {number}   temperature   - Sampling temperature.
  * @param {function} on_success    - Callback receiving the generated text.
- * @param {function} on_fail       - Callback fired on any failure.
+ * @param {function} on_fail       - Failure callback while the captured origin is current.
  * @param {string}   payload       - A complete /api/chat body the caller wrote
  *                                   (LLM_OllamaChat_Async); "" builds it from
  *                                   the other parameters.
@@ -75,8 +76,8 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 	if (_LLM_Ollama_Async.Count > 0) {
 		; Latest-only coalescing keeps a single pending slot. If a previous job
 		; is already waiting there, it is being superseded and will never run —
-		; honour the async contract (exactly one of on_success / on_fail fires)
-		; by failing the displaced job before overwriting it. Without this a
+		; settle the displaced job only while its captured origin is current.
+		; Origin supersession remains silent. Without current-origin settlement a
 		; future consumer that advances a state machine on the callback would
 		; stall forever on the dropped job.
 		displaced := ""
@@ -101,7 +102,7 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
  * callbacks as LLM_OllamaGenerate_Async.
  * @param {string}   payload    - The complete JSON body.
  * @param {function} on_success - Callback receiving the generated text.
- * @param {function} on_fail    - Callback fired on any failure.
+ * @param {function} on_fail    - Failure callback while the captured origin is current.
  * @returns {Integer} The request id.
  */
 LLM_OllamaChat_Async(payload, on_success, on_fail) {
@@ -447,7 +448,7 @@ LLM_OllamaCancelAllAsync() {
 	; _LLM_Ollama_DrainPending() which re-dispatches the pending job — a fresh
 	; curl POST + PII temp-file write — AFTER the driver was suspended (the engine
 	; calls this from Ergopti_OnSuspendEnter -> LLM_Engine_StopGeneration). Honour
-	; the async contract by failing the displaced job exactly once before dropping.
+	; the async contract by failing the displaced job once while its origin remains current.
 	if (_LLM_Ollama_Pending is Map) {
 		displaced := _LLM_Ollama_Pending.Has("on_fail") ? _LLM_Ollama_Pending["on_fail"] : ""
 		; Drop the slot before firing so a callback that re-enters the dispatcher

@@ -1,6 +1,26 @@
 ﻿; static/ergopti_plus/windows/tests/unit/test_buffered_data_snapshot_owner.ahk
 #Requires AutoHotkey v2.0
 
+/** Detached image facts never install a native container prototype on an Object. */
+_B91S_ImageBaseIsData() {
+	Owner := BufferedDataSnapshotOwner()
+	Source := Map("keys", ["Escape"])
+	Token := Owner.Capture(Source)
+	Image := Owner._images[Token]
+	AssertEqual(Object.Prototype, ObjGetBase(Image), "The image keeps ordinary Object inheritance.")
+	AssertTrue(Image.HasOwnProp("OriginalBase"), "The source prototype is an explicit data fact.")
+	AssertEqual(Map.Prototype, Image.OriginalBase)
+	Nested := Image.Entries[1].Value
+	AssertEqual(Object.Prototype, ObjGetBase(Nested))
+	AssertTrue(Nested.HasOwnProp("OriginalBase"))
+	AssertEqual(Array.Prototype, Nested.OriginalBase)
+	AssertTrue(Owner.Matches(Source, Token))
+	Source["keys"][1] := "Enter"
+	AssertFalse(Owner.Matches(Source, Token), "Detached source facts still fence a real mutation.")
+	Owner.Release(Token)
+}
+Test("windows91 snapshots: source prototype stays image data (snapshot-base-data)", _B91S_ImageBaseIsData)
+
 ; Handwritten data/source oracles. These never call action callbacks or output.
 ; The ordinary runner must include the actual owner, writer and TOML helpers.
 _B91S_UnchangedComposite() {
@@ -19,8 +39,9 @@ _B91S_UnchangedComposite() {
 
 _B91S_MapMode() {
 	Owner := BufferedDataSnapshotOwner()
-	Source := Map("Alpha", "Value")
+	Source := Map()
 	Source.CaseSense := "On"
+	Source["Alpha"] := "Value"
 	Token := Owner.Capture(Source)
 	AssertTrue(Owner.Matches(Source, Token))
 	Source.Clear()

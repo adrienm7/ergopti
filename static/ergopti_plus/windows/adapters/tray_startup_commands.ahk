@@ -20,7 +20,21 @@ class TrayStartupCommands {
 		this.ScheduleFn := HasMethod(ScheduleFn, "Call") ? ScheduleFn : SetTimer
 		this.Pending := ""
 		this.Active := true
+		this.ReadyObserved := false
 		this.DispatchFn := ObjBindMethod(this, "Dispatch")
+	}
+
+	/** Completed input initialization survives repaint; only Retire revokes this owner. */
+	InputReady() {
+		if !this.Active
+			return false
+		if !this.ReadyObserved {
+			Ready := this.ReadyFn.Call()
+			if !(Ready is Integer) || (Ready != false && Ready != true)
+				throw TypeError("Startup readiness requires an exact Boolean")
+			this.ReadyObserved := Ready
+		}
+		return this.ReadyObserved
 	}
 
 	Request(Id, *) {
@@ -29,16 +43,17 @@ class TrayStartupCommands {
 		if Id != "suspend" && Id != "reload" && Id != "quit"
 			throw ValueError("Unknown startup command", -1, Id)
 		this.Pending := Id
+		Ready := this.InputReady()
 		try LoggerInfo("BootProfile", Format("Native startup command '{1}' admitted (input_ready={2}).",
-			Id, this.ReadyFn.Call()))
+			Id, Ready))
 		; Reload uses its ordinary guarded owner to recover a stalled startup.
-		if Id = "reload" || this.ReadyFn.Call()
+		if Id = "reload" || Ready
 			this.ScheduleFn.Call(this.DispatchFn, -1)
 		return true
 	}
 
 	NotifyReady() {
-		if !this.Active || !this.ReadyFn.Call()
+		if !this.Active || !this.InputReady()
 			return false
 		if this.Pending != ""
 			this.ScheduleFn.Call(this.DispatchFn, -1)
@@ -46,7 +61,7 @@ class TrayStartupCommands {
 	}
 
 	Dispatch() {
-		if !this.Active || (this.Pending != "reload" && !this.ReadyFn.Call()) || this.Pending == ""
+		if !this.Active || (this.Pending != "reload" && !this.InputReady()) || this.Pending == ""
 			return false
 		Id := this.Pending
 		this.Pending := ""

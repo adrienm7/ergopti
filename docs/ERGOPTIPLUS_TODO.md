@@ -14,6 +14,25 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ### October 13 Windows receiving checkpoint
 
+The continued complete JS command now reaches its natural exit: 407/425 checks
+PASS, eighteen FAIL, exit 1. The Lua return and registry location guards pass.
+The attempt remains FAILED: required Linux/cc execution, Windows symlink
+privilege, unsupported SDK filesystem controls, platform-specific process/trust
+controls and CI admission checks remain red. Its fresh-config startup also fails
+with native owner OS_ERROR status 6; that failure is retained, not classified as
+unrelated or erased by a later pass. Source edits occurred during this long
+attempt, so it is not an immutable committed-source receipt.
+
+The six atomic continuation corrections preserve fresh published dev
+`612f572310af9eb292bb56e7c9ab3f0ef8169491` and all incoming commits. After rebase,
+seven exact Windows selections pass: startup lifecycle five, snapshots seventeen,
+presence thirteen, pending cancellation one, model custody twenty, registration
+custody ninety-one and origin custody seventeen. Each natural exit is 0 with no
+failure/skip. E2E receives seventy engine/native-Edit cases, and all nine isolated
+full-startup scenarios pass with exit 0. Authenticated good/bad/full-entry compiler
+controls remain 0/17/0. These targeted receipts do not replace the failed broad
+unit/JS or native macOS/Linux qualification gates.
+
 The isolated Windows continuation rebased the fifteen atomic AI corrections from
 `012ce5ef9886906d6e174227628a79db3fd93f26` onto fresh dev
 `13cf4ad8bf824027bde3a640b8fc0bab3cd2a701`, preserving their commit boundaries.
@@ -92,7 +111,7 @@ The actual full Windows unit runner reaches its existing 7,200,000 ms watchdog:
 The full unit receipt is FAILED_INCOMPLETE. Two old Ollama presence cases expect
 an obsolete public failure callback after an auxiliary epoch change; the newer
 origin-custody contract requires stale callbacks to remain silent. This explicit
-contract conflict remains RED; no wrapper bypass or test relaxation is applied.
+contract conflict was RED at that receipt; no wrapper bypass is applied.
 Other observed failures, including TOML publication, buffered snapshots, native
 transport cleanup, source guards and purity ratchets, remain recorded for triage.
 
@@ -115,6 +134,32 @@ remaining Lua gsub and keyboard-registry Core JS failures have identical source
 and test blobs at the incoming baseline and published Windows source; they stay
 open rather than being relabelled as successful.
 
+The Lua single-return source guard is now received against the actual loopback
+endpoint function. Concatenation adjusts its final `gsub` result to one value;
+the former greedy regex wrongly reported two. The corrected token/grouping
+classification passes all 14 positive/negative controls and scans 954 production
+Lua files, retaining 75 protected grouped sites. The original complete guard
+exits 1 on unchanged actual source; the corrected guard exits 0, and withdrawing
+the concatenation into an actual-source grouped-receiver `gsub` exits 1.
+Portable Lua5.4 executes the extracted actual function and both inverses:
+one/one/two return values, natural exit 0. This is language/source evidence,
+not native macOS or Linux receiving.
+
+The registry location guard now distinguishes pure `find_entry` consumers from
+the actual settings constructors. The actual macOS owner still reads both shared
+defaults; its lookup-only sibling no longer has to duplicate these reads. All
+twelve checks pass with exit 0, retaining every platform's client census,
+template/host/folder checks and packaging refusal. The original complete guard
+exits 1 on that pure lookup; withdrawing either input from the actual settings
+owner independently makes the corrected complete guard exit 1. Constructor
+controls cover direct/grouped imports and simple aliases; comments and literal
+decorations cannot create a settings owner. This remains source/packaging evidence.
+The same detector also retains Lua's bracketed `registry["resolve"]` spelling,
+including grouped direct imports. Added controls first reject the unchanged
+dot-only detector with exit 1, then all twelve checks pass with exit 0. Bracketed
+pure lookups remain excluded; this closes a guard-coverage gap without changing
+any driver or qualification claim.
+
 The official native builder now loads its hashing dependency from the executing
 PowerShell host. A Node launcher can retain a PowerShell7 module path when it
 starts PowerShell5.1: the wrong Utility manifest exposes ordinary cmdlets but
@@ -133,6 +178,49 @@ cases and all three platform-API family ratchets exit 0; the source oracle adds
 an inverse that restores the original direct OS call and rejects it. Other
 full-unit failures stay open. Unchanged source blobs alone are not a same-host
 native baseline reproduction.
+
+Native startup lifecycle requests now retain completed input initialization across
+temporary tray repaint. The ordinary readiness getter can become false only
+while rebuilding menus after initialization; reading it twice at admission or
+again at delivery stranded accepted Quit/Suspend commands. Explicit retirement
+still revokes this owner, and the ordinary suspend/reload/exit owners still gate
+execution. The initial four causal cases receive one PASS/three FAIL before the
+fix (exit 1); all five current cases pass, including cold Request/NotifyReady and
+later repaint, exactly-once delivery and retirement. Existing menu startup 19,
+tray bootstrap 13 and engine/native-Edit E2E 70 pass, each natural exit 0 without
+failure/skip. Authenticated full-entry compilation, BOM/LF encoding, conventions
+and all nine actual isolated source-startup scenarios also pass. These receipts
+do not qualify physical input or the live managed AI workflow.
+
+Buffered source snapshots now store captured prototypes in `OriginalBase`.
+An object initializer's `Base` changes inheritance, so a Map/Array prototype
+caused `Invalid base` instead of becoming an image fact. The actual old public
+Capture/Matches owner receives 0/2 native Map/Array controls (exit 1); the
+corrected owner receives 2/2 (exit 0). The existing sixteen snapshot cases
+originally receive one PASS/fifteen FAIL. The field correction resolves fourteen
+old failures; the remaining Map fixture had to set CaseSense before inserting
+its unchanged data, as required by the actual AHK runtime. All seventeen current
+cases now pass with exit 0 and no skip, including the new nested image identity
+and mutation inverse. No existing assertion is removed. Original source identity,
+builtin-port custody and exact image cleanup remain covered. This AHK-only owner
+does not replace other drivers' snapshot implementations. The recorded broad
+95-failure unit receipt is still FAILED_INCOMPLETE until a complete rerun.
+
+The two superseded Ollama presence tests now receive the accepted origin-custody
+contract through the actual public chat API. Their original thirteen-case cohort
+receives eleven PASS/two FAIL (exit 1). All thirteen current cases pass (exit 0,
+no skip), retaining the original internal `request_superseded` classification
+through a delegating observer around the original public fence. The tests acquire
+an actual auxiliary-owner timer through an injected scheduler, require exact
+zero-period cancellation and one delegated finalizer, and use public invalidation
+and ordinary coalesced queue draining. Replayed old tags/timer/preflight callbacks
+cannot affect a current successor's exact slot or owner; its genuine current
+missing-model result still invokes the public failure callback exactly once.
+Fixture teardown and successor finish explicitly reject unresolved cleanup debt
+before restoring caller state. Existing cancellation-refusal coverage is retained.
+All seventeen original-origin cases still pass. Production changes only clarify
+callback documentation: no executable fence, admission or transport code changes.
+These controlled ports do not qualify native inference or managed installation.
 
 The local committed Windows build at `7e3da5567183914502e977d720e818e337e1dd49`
 compiles with the authenticated AutoHotkey2.0.26/Ahk2Exe toolchain. Actual

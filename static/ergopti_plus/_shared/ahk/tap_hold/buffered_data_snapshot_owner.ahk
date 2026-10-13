@@ -176,7 +176,8 @@ class BufferedDataSnapshotOwner {
 			throw ValueError("Cyclic original data snapshot")
 		Active[Value] := true
 		try {
-			Image := { Kind: Kind, Reference: Value, Base: Base, Entries: [] }
+			; Base in an object initializer changes inheritance rather than storing data.
+			Image := { Kind: Kind, Reference: Value, OriginalBase: Base, Entries: [] }
 			if Kind = "Map" || Kind = "Array" {
 				for _, Name in this._arrayEnum.Call(["__Enum", "__Item", "Get", "Has", "Count",
 					"CaseSense", "Length", "Push", "Delete", "Clear"], 2)
@@ -238,7 +239,7 @@ class BufferedDataSnapshotOwner {
 			return false
 		if Left.HasOwnProp("Value")
 			return this._mapGet.Call(this._methods, "_Scalar").Call(this, Left, Right)
-		if Left.Reference != Right.Reference || Left.Base != Right.Base || Left.Length != Right.Length
+		if Left.Reference != Right.Reference || Left.OriginalBase != Right.OriginalBase || Left.Length != Right.Length
 			|| (Left.Kind = "Map" && Left.Mode != Right.Mode)
 			return false
 		for Index, Entry in this._arrayEnum.Call(Left.Entries, 2) {
