@@ -3171,7 +3171,7 @@ function M.download_model(model_tag, label, on_done)
 	local base_url = M.get_base_url()
 	local ok_download, Download = pcall(require, "modules.llm.model_download")
 	if not current() or not base_url or not ok_download or type(Download.start) ~= "function" then return false end
-	return Download.start(base_url, model_tag, label, function(succeeded, tag)
+	return (Download.start(base_url, model_tag, label, function(succeeded, tag)
 		if not current() then return end
 		if succeeded then
 			M.refresh_models()
@@ -3179,7 +3179,7 @@ function M.download_model(model_tag, label, on_done)
 		end
 		if _runtime_closed or _scope_owner then return end
 		if type(on_done) == "function" then on_done(succeeded, tag) end
-	end, current)
+	end, current))
 end
 
 --- Cancels a model pull owned by this engine.

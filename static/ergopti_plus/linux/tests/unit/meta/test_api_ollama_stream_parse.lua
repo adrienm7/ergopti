@@ -362,7 +362,7 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 		local state = { installs = {}, notices = 0, approved = true, successors = 0 }
 		local installer = { start = function(base_url, model, label, done, current)
 			state.installs[#state.installs + 1] = { base_url = base_url, model = model, done = done, current = current }
-			return true
+			return true, true
 		end }
 		package.loaded[names[2]] = installer
 		local Offer = require(names[1])
@@ -414,7 +414,9 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 	helpers.it("linux-model-consent-affinity: accepted original installer retains origin and retry admission", function()
 		with_affinity(function(Offer, state, installer)
 			local failure = require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
-			helpers.assert_true(Offer.handle(failure))
+			local handled, downloading = Offer.handle(failure)
+			helpers.assert_true(handled)
+			helpers.assert_eq(downloading, true, "The default installer port proves actual acquisition, not only handled focus.")
 			helpers.assert_eq(#state.installs, 1)
 			helpers.assert_eq(state.installs[1].base_url, "http://127.0.0.1:11434")
 			helpers.assert_eq(state.installs[1].model, "qwen:2b")

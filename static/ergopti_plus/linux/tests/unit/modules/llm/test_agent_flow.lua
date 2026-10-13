@@ -567,3 +567,64 @@ helpers.describe("AI agent: superseded model consent settlement", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("AI agent: existing model pull is focus without new consent custody", function()
+	for _, origin in ipairs({ "same", "different" }) do
+		helpers.it("linux-model-consent-focus: existing same-tag pull on " .. origin .. " origin grants no successor holder", function()
+			Scenario.run({ local_backend = true, selection = SELECTION,
+				stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
+				local names = { "modules.llm.model_download", "ui.download_window.bridge" }
+				local saved = {}
+				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+				local old_done, old_retired, completed, focused, admission = 0, 0, 0, 0, nil
+				local controls = {}
+				require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], controls)
+				package.loaded["ui.download_window.bridge"] = {
+					show = function() return 29 end,
+					update = function() return true end,
+					complete = function() completed = completed + 1; return true end,
+					session_id = function() return 29 end,
+					retire = function(id) return id == 29 end,
+					focus = function(id) focused = focused + 1; return id == 29 end,
+				}
+				local Download = require("modules.llm.model_download")
+				local ok, err = xpcall(function()
+					helpers.assert_true(Download.start(world.base_url, "qwen2.5:7b", "Existing pull",
+						function() old_done = old_done + 1 end, nil, function() old_retired = old_retired + 1 end))
+					local handled, acquired = Download.start(world.base_url, "qwen2.5:7b", "Existing pull")
+					helpers.assert_eq(handled, true, "Existing menu focus behavior remains handled.")
+					local menu_receipt = { world.engine.download_model("qwen2.5:7b", "Existing pull") }
+					helpers.assert_eq(#menu_receipt, 1, "The public menu download API returns one Boolean only.")
+					helpers.assert_eq(menu_receipt[1], true)
+					local start = Download.start
+					Download.start = function(base_url, tag, label, on_done, current, on_retired)
+						admission = current
+						return start(base_url, tag, label, on_done, current, on_retired)
+					end
+					require("modules.llm.local_model_offer")._reset_for_test({
+						confirm = function() return true end, notify = function() return true end,
+					})
+					if origin == "different" then world.base_url = "http://127.0.0.1:11435" end
+					helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+					world.scheduler.test.advance(1)
+					world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+					helpers.assert_eq(type(admission), "function")
+					helpers.assert_eq(admission(), false, "A focused old pull cannot orphan a successor consent owner.")
+					helpers.assert_eq(acquired, false, "Focus does not retain the new callbacks or grant new operation custody.")
+					helpers.assert_eq(#world.posts, 1, "No additional HTTP operation is admitted.")
+					helpers.assert_eq(world.posts[1].url, "http://127.0.0.1:11434/api/pull")
+					helpers.assert_eq(focused, 3, "All focus-only actions remain directed to the existing window.")
+					world.posts[1].on_chunk('{"status":"success"}\n')
+					world.posts[1].callback({ ok = true, status = 200 })
+					helpers.assert_eq(old_done, 1, "The original operation keeps its original completion callback.")
+					helpers.assert_eq(completed, 1)
+					helpers.assert_true(Download.shutdown())
+					helpers.assert_eq(old_retired, 1, "The original cleanup callback remains retained.")
+				end, debug.traceback)
+				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+end)

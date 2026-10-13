@@ -192,11 +192,12 @@ end
 --- @param on_done function|nil
 --- @param admission function|nil Current consent, rechecked after native UI creation and on every retry.
 --- @param on_retired function|nil Exact cleanup notification after retained transport and UI retirement.
---- @return boolean
+--- @return boolean handled Existing menu focus remains a handled action.
+--- @return boolean|nil acquired True only for a newly dispatched owned pull.
 function M.start(base_url, tag, label, on_done, admission, on_retired)
 	if _active then
 		if _active.creating or _active.acquiring or _active.cancelled then return false end
-		if _active.tag == tag then return DownloadWindow.focus(_active.session_id) end
+		if _active.tag == tag then return DownloadWindow.focus(_active.session_id), false end
 		return false
 	end
 	if _retained and not settled(_retained) then return false end
@@ -243,7 +244,8 @@ function M.start(base_url, tag, label, on_done, admission, on_retired)
 		if _retained == request then _retained = nil end
 		return false
 	end
-	return dispatch(request)
+	local dispatched = dispatch(request)
+	return dispatched, dispatched == true
 end
 
 --- Cancels the exact owned curl process group.
