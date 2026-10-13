@@ -827,6 +827,47 @@ console.log(
 	'Manual requester source currency: 19 causal source inverses passed; 25 added AHK cases UNRUN.'
 );
 
+// The picker must bind both retained arguments before the actual candidate callback.
+function validateAgentPickerTail(actionSource, menuSource, transactionSource) {
+	const assert = require('node:assert/strict');
+	const declaration = actionSource.match(/^_LLM_Agent_ApplyCommitted\(([^\n]*)\) \{/m);
+	assert.ok(declaration, 'Actual shared agent live tail must exist.');
+	assert.deepEqual(
+		declaration[1].split(',').map((value) => value.trim()),
+		['Key', 'Previous', 'Candidate']
+	);
+	const save = menuSource.match(/^LLM_Agent_OnAppPickerSave\([^\n]*\) \{\n([\s\S]*?)\n\}/m);
+	assert.ok(save, 'Actual application-picker save must exist.');
+	assert.match(save[1], /_LLM_Agent_ApplyCommitted\.Bind\("agent_disabled_apps", Previous\)/);
+	assert.match(save[1], /Previous := LLM_Agent_Setting\("agent_disabled_apps"\)/);
+	assert.match(save[1], /Committed := Commit\.Call/);
+	assert.match(save[1], /if !\(Committed is Integer\) \|\| Committed != true/);
+	const tail = transactionSource.indexOf('try Applied := ApplyFn.Call(CandidateMenu)');
+	const durable = transactionSource.indexOf('if !ConfigCommitBorrowedUpdates(');
+	assert.ok(
+		durable >= 0 && tail > durable,
+		'Actual durable transaction supplies exactly the final candidate.'
+	);
+}
+const pickerTransactions = read('ui/menu/menu_llm/transactions.ahk');
+validateAgentPickerTail(agentAction, agentMenu, pickerTransactions);
+for (const [original, replacement] of [
+	[
+		'_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps", Previous)',
+		'_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps")'
+	],
+	['if !(Committed is Integer) || Committed != true', 'if !Committed'],
+	['Previous := LLM_Agent_Setting("agent_disabled_apps")', 'Previous := 0']
+]) {
+	const assert = require('node:assert/strict');
+	const changed = agentMenu.replace(original, replacement);
+	assert.notEqual(changed, agentMenu, 'Picker inverse must withdraw its real production seam.');
+	assert.throws(() => validateAgentPickerTail(agentAction, changed, pickerTransactions));
+}
+console.log(
+	'Agent app-picker callback: PASS (3 causal source inverses; authored native AHK cases UNRUN).'
+);
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Windows rewrite prompt wiring:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);

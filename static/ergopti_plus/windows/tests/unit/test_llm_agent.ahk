@@ -2696,3 +2696,36 @@ _LAG_RequesterRejectsUntypedCommit() {
 	}
 }
 Test("LLM agent: requester commit requires typed admission (todo46-manual-requester)", _LAG_RequesterRejectsUntypedCommit)
+
+/** The actual app-picker save binds the shared tail's previous value and candidate. */
+_LAG_AppPickerLiveTail(Mode) {
+	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(""), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Menu, _LLM_Agent_CommitFn, _LLM_Agent_Generation
+		Generation := _LLM_Agent_Generation
+		Selected := Mode == "same" ? [] : ["Slack.EXE"]
+		Receipt := AppPicker_IssueReceipt("agent:disabled_apps", Mode == "stale" ? ["other.exe"] : [])
+		try {
+			if Mode == "refused"
+				_LLM_Agent_CommitFn := (*) => false
+			else if Mode == "float"
+				_LLM_Agent_CommitFn := (*) => 1.0
+			else if Mode == "string"
+				_LLM_Agent_CommitFn := (*) => "accepted"
+			Accepted := Mode == "accepted" || Mode == "same"
+			AssertEqual(Accepted, LLM_Agent_OnAppPickerSave(Selected, Receipt))
+			AssertEqual(Accepted ? 1 : 0, Fx.Rebuilds, "Only an exact acknowledged tail rebuilds the tray.")
+			AssertEqual(Generation, _LLM_Agent_Generation, "App exclusions do not retire an unrelated manual requester.")
+			Expected := Mode == "accepted" ? ["slack.exe"] : []
+			AssertEqual("", _LVS_DeepEqual(Expected, _LLM_Menu["agent_disabled_apps"]))
+			if Accepted {
+				AssertEqual(1, Fx.Commits.Length, "The real candidate and shared live tail complete once.")
+				AssertFalse(LLM_Agent_OnAppPickerSave(Selected, Receipt), "An accepted picker receipt cannot be reused.")
+				AssertEqual(1, Fx.Rebuilds)
+			}
+		} finally AppPicker_RetireReceipt(Receipt)
+	}
+}
+for _LAG_AppPickerMode in ["accepted", "same", "refused", "stale", "float", "string"]
+	Test("LLM agent app picker: actual live tail " . _LAG_AppPickerMode . " (agent-app-picker-tail)",
+		_LAG_AppPickerLiveTail.Bind(_LAG_AppPickerMode))
