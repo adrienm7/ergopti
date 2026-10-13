@@ -1229,6 +1229,7 @@ end
 local function listing_current(receipt)
 	return type(receipt) == "table" and receipt.epoch == _model_listing_epoch
 		and source_current(receipt.origin, receipt.service_current)
+		and receipt.epoch == _model_listing_epoch
 end
 
 --- Asks the local server which models it holds and records the answer.
@@ -1279,7 +1280,7 @@ local function list_models(client, on_done, origin, service_current)
 			receipt.models = names
 			_listed_models = receipt
 			Logger.debug(LOG, "The local server returned a readable model list.")
-			if not listing_current(receipt) then
+			if _listed_models ~= receipt or not listing_current(receipt) or _listed_models ~= receipt then
 				on_done(nil, "model_list_unavailable")
 				return
 			end
@@ -1292,9 +1293,10 @@ end
 --- @param model string The model name.
 --- @return boolean|nil installed nil while no listing succeeded.
 function M.local_model_installed(model)
+	local receipt = _listed_models
 	local name = normalize_model_name(model)
-	if name == nil or not listing_current(_listed_models) then return nil end
-	return _listed_models.models[name] == true
+	if name == nil or not listing_current(receipt) or _listed_models ~= receipt then return nil end
+	return receipt.models[name] == true
 end
 
 --- Lists the local server's models again, for the menus.
