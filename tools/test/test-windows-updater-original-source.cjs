@@ -33,6 +33,7 @@ const templateFiles = new Set([
 	collectorPath,
 	modulePath,
 	sealerPath,
+	'tools/lib/owned-descriptor-read.cjs',
 	sdkPath,
 	sdkContractPath,
 	inputPath,
