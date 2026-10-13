@@ -9,6 +9,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const pipeline = require('./ci-pipeline.cjs');
+const linuxInstall = require('./fixtures/linux-install-source.cjs');
 const root = path.resolve(__dirname, '../..');
 const args = process.argv.slice(2);
 assert.ok(
@@ -22,26 +23,23 @@ const producerPath =
 		? args[1]
 		: path.join(root, 'static/ergopti_plus/linux/tests/distro/e2e_install.sh');
 const workflow = fs.readFileSync(workflowPath, 'utf8');
+const { plan } = linuxInstall.read(root, workflow);
 const originPrep =
 	"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo";
-function wiring(source) {
-	const jobs = pipeline
-		.jobsOfText(source, '.github/workflows/ci-linux.yml')
-		.filter((job) => job.id === 'install-linux');
-	assert.equal(jobs.length, 1);
-	const job = jobs[0].body;
-	const rows = [
-		...job.matchAll(
-			/          - id: first-install-opensuse-tumbleweed\n((?:            [^\n]*\n)+)/g
-		)
-	];
-	assert.equal(rows.length, 1);
+function wiring(source, selectedPlan = plan) {
+	const { job } = linuxInstall.admit(source, selectedPlan);
+	const row = linuxInstall.row(selectedPlan, 'first-install-opensuse-tumbleweed');
+	assert.equal(row.kind, 'first');
+	assert.equal(row.image, 'opensuse/tumbleweed:latest');
 	assert.ok(
-		rows[0][1].includes('            prep: ' + originPrep + '\n'),
+		row.prep === originPrep,
 		'actual openSUSE first-install row must own coherent-origin preparation'
 	);
-	const step = pipeline.step(job, 'Install on ${{ matrix.image }} and verify the first run');
-	assert.match(step, /        env:\n          ERGOPTI_E2E_PREP: \$\{\{ matrix\.prep \|\| '' \}\}/);
+	const step = pipeline.step(job, 'Install on ${{ env.INSTALL_IMAGE }} and verify the first run');
+	assert.match(
+		step,
+		/        env:\n          ERGOPTI_E2E_PREP: \$\{\{ env\.INSTALL_PREP \|\| '' \}\}/
+	);
 	const script = pipeline.runOf(step).join('\n');
 	assert.ok(
 		script.includes('-e ERGOPTI_E2E_PREP '),
@@ -50,14 +48,16 @@ function wiring(source) {
 	return script;
 }
 const hostedScript = wiring(workflow);
+const missingPrep = structuredClone(plan);
+delete linuxInstall.row(missingPrep, 'first-install-opensuse-tumbleweed').prep;
+assert.throws(() => wiring(workflow, missingPrep), assert.AssertionError, 'missing first-row prep');
 for (const [label, from, to] of [
-	['missing first-row prep', '            prep: ' + originPrep + '\n', ''],
-	['missing prep environment', "          ERGOPTI_E2E_PREP: ${{ matrix.prep || '' }}\n", ''],
+	['missing prep environment', "          ERGOPTI_E2E_PREP: ${{ env.INSTALL_PREP || '' }}\n", ''],
 	['missing Docker environment transfer', '-e ERGOPTI_E2E_PREP ', ''],
 	[
 		'wrong prep environment',
-		"          ERGOPTI_E2E_PREP: ${{ matrix.prep || '' }}",
-		"          WRONG_PREP: ${{ matrix.prep || '' }}"
+		"          ERGOPTI_E2E_PREP: ${{ env.INSTALL_PREP || '' }}",
+		"          WRONG_PREP: ${{ env.INSTALL_PREP || '' }}"
 	]
 ]) {
 	assert.equal(workflow.split(from).length, 2, label + ': unique real owner');
@@ -93,8 +93,8 @@ try {
 	fs.chmodSync(docker, 0o755);
 	const launch = path.join(scratch, 'hosted.sh');
 	const expanded = hostedScript
-		.replaceAll('${{ matrix.image }}', 'opensuse/tumbleweed:latest')
-		.replaceAll("${{ matrix.known || '' }}", '');
+		.replaceAll('${{ env.INSTALL_IMAGE }}', 'opensuse/tumbleweed:latest')
+		.replaceAll("${{ env.INSTALL_KNOWN || '' }}", '');
 	assert.ok(
 		!expanded.includes('${{'),
 		'all hosted script expressions have exact controlled values'

@@ -9,6 +9,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const pipeline = require('./ci-pipeline.cjs');
+const linuxInstall = require('./fixtures/linux-install-source.cjs');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
 const root = path.resolve(__dirname, '../..');
 const driver = path.join(root, 'static/ergopti_plus/linux');
@@ -189,23 +190,106 @@ bash ${quote(path.join(clone, builderRelative))} --source-directory ${quote(actu
 assert.equal(data.archive_build_packages.xbps, null);
 assert.equal(data.network_runtime.providers.dnf, null);
 assert.ok(data.network_runtime.source_luv_build_packages.dnf.includes('luajit-devel'));
-const job = pipeline.job('install-linux');
-const managers = {
-	'distro-debian': 'apt',
-	'distro-fedora': 'dnf',
-	'distro-arch': 'pacman',
-	'distro-alpine': 'apk',
-	'distro-opensuse': 'zypper'
-};
-const rows = [...job.matchAll(/^          - id: (distro-[^\n]+)\n((?:            [^\n]*\n)+)/gm)];
-assert.equal(rows.length, 5);
-for (const row of rows) {
-	const prep = row[2].match(/^            prep: (.*)$/m)[1];
-	assert.match(prep, /\bgit\b/, 'pre-checkout Git is mandatory');
-	assert.ok(
-		prep.endsWith('git ' + data.archive_build_packages[managers[row[1]]].join(' ')),
-		'CI caller prerequisites match the canonical package vector'
+const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci-linux.yml'), 'utf8');
+const { plan } = linuxInstall.read(root, workflow);
+function sourcePrerequisites(source, selectedPlan, recipe) {
+	const { job } = linuxInstall.admit(source, selectedPlan);
+	const managers = {
+		'distro-debian': 'apt',
+		'distro-fedora': 'dnf',
+		'distro-arch': 'pacman',
+		'distro-alpine': 'apk',
+		'distro-opensuse': 'zypper'
+	};
+	const rows = Object.values(selectedPlan.metadata).filter((row) => row.kind === 'install');
+	assert.equal(rows.length, 5);
+	assert.deepEqual(
+		rows.map((row) => row.id),
+		Object.keys(managers)
 	);
+	for (const row of rows) {
+		const prep = row.prep;
+		assert.match(prep, /\bgit\b/, 'pre-checkout Git is mandatory');
+		assert.ok(
+			prep.endsWith('git ' + recipe.archive_build_packages[managers[row.id]].join(' ')),
+			'CI caller prerequisites match the canonical package vector'
+		);
+	}
+	return { job, rows };
+}
+const { job, rows } = sourcePrerequisites(workflow, plan, data);
+function sourceTransportControls(source, selectedPlan) {
+	const cuts = [
+		['missing producer', '        id: install-plan\n', ''],
+		[
+			'foreign producer',
+			'run: node tools/ci/linux-install-matrix.cjs',
+			'run: node tools/ci/foreign.cjs'
+		],
+		[
+			'conditional producer',
+			'        id: install-plan\n',
+			'        id: install-plan\n        if: success()\n'
+		],
+		[
+			'matrix writer',
+			'install_matrix: ${{ steps.install-plan.outputs.matrix }}',
+			'install_matrix: ${{ steps.install-plan.outputs.metadata }}'
+		],
+		[
+			'metadata writer',
+			'install_metadata: ${{ steps.install-plan.outputs.metadata }}',
+			'install_metadata: ${{ steps.install-plan.outputs.matrix }}'
+		],
+		['adjacent receiver', '    needs: [package-linux]\n', '    needs: [e2e-linux]\n'],
+		[
+			'matrix receiver',
+			'matrix: ${{ fromJSON(needs.package-linux.outputs.install_matrix) }}',
+			'matrix: ${{ fromJSON(needs.package-linux.outputs.install_metadata) }}'
+		],
+		[
+			'container receiver',
+			'container: ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].container }}',
+			'container: ubuntu:latest'
+		],
+		...['id', 'kind', 'distro', 'image', 'prep', 'known'].map((field) => [
+			'foreign selected ' + field,
+			'INSTALL_' +
+				field.toUpperCase() +
+				': ${{ fromJSON(needs.package-linux.outputs.install_metadata)[matrix.lot].' +
+				field +
+				' }}',
+			'INSTALL_' + field.toUpperCase() + ': foreign'
+		]),
+		['withdraw lot refusal', '            *) exit 1 ;;', '            *) exit 0 ;;'],
+		['archive prep bypass', '        run: ${{ env.INSTALL_PREP }}', '        run: true'],
+		['Docker prep transfer', '-e ERGOPTI_E2E_PREP ', ''],
+		[
+			'Docker image',
+			"run_in_docker.sh '${{ env.INSTALL_IMAGE }}'",
+			"run_in_docker.sh 'foreign:latest'"
+		],
+		[
+			'Docker known limitations',
+			"ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ env.INSTALL_KNOWN || '' }}",
+			'ERGOPTI_E2E_KNOWN_LIMITATIONS=foreign'
+		]
+	];
+	for (const [label, from, to] of cuts) {
+		assert.equal(source.split(from).length, 2, label + ': unique actual source seam');
+		assert.throws(
+			() => linuxInstall.admit(source.replace(from, to), selectedPlan),
+			assert.AssertionError,
+			label
+		);
+	}
+	return cuts.length;
+}
+assert.equal(sourceTransportControls(workflow, plan), 19);
+for (const id of rows.map((row) => row.id)) {
+	const changed = structuredClone(plan);
+	linuxInstall.row(changed, id).prep = 'true';
+	assert.throws(() => sourcePrerequisites(workflow, changed, data), assert.AssertionError, id);
 }
 const check = pipeline.step(job, 'Verify source compiler and checkout');
 const verification = pipeline.runOf(check).join('\n');
@@ -230,9 +314,9 @@ ${checkoutAssertions[0]}`);
 	assert.equal(result.status, expected, label + ': actual workflow assertion must retain refusal');
 }
 console.log('Actual CI Git/SHA controls: 3 passed; process seam is a model.');
-const debianRow = rows.find((row) => row[1] === 'distro-debian');
+const debianRow = rows.find((row) => row.id === 'distro-debian');
 assert.ok(debianRow, 'the actual Debian container preparation is present');
-const debianPrep = debianRow[2].match(/^            prep: (.*)$/m)[1];
+const debianPrep = debianRow.prep;
 for (const [label, packageStatus, materializeCa, expected] of [
 	['HTTPS checkout prerequisites', 0, true, 0],
 	['package success without CA capability', 0, false, 1],

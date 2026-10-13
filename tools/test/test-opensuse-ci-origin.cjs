@@ -15,12 +15,14 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const pipeline = require('./ci-pipeline.cjs');
+const linuxInstall = require('./fixtures/linux-install-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-// Each source that installs packages in an openSUSE container. The Linux box is
-// read through the loader, which throws when its distro job is missing.
+// The install lane admits its canonical map through the actual adjacent transport.
+// The separate layout workflow still owns its inline distribution matrix.
+const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-linux.yml'), 'utf8');
+const { plan } = linuxInstall.read(ROOT, workflow);
 const sources = [
-	['.github/workflows/ci-linux.yml (job install-linux)', pipeline.job('install-linux')],
 	[
 		'.github/workflows/linux-layout.yml',
 		fs.readFileSync(path.join(ROOT, '.github/workflows/linux-layout.yml'), 'utf8')
@@ -29,6 +31,23 @@ const sources = [
 const originRewrite =
 	"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' " +
 	'/etc/zypp/repos.d/*.repo && zypper --non-interactive install';
+
+function coherentInstallOrigin(source, selectedPlan) {
+	linuxInstall.admit(source, selectedPlan);
+	const row = linuxInstall.row(selectedPlan, 'distro-opensuse');
+	assert.strictEqual(row.kind, 'install');
+	assert.strictEqual(row.image, 'opensuse/tumbleweed:latest');
+	assert(
+		row.prep.startsWith(originRewrite),
+		'.github/workflows/ci-linux.yml must bypass download.opensuse.org mirror redirects before zypper install'
+	);
+}
+coherentInstallOrigin(workflow, plan);
+for (const field of ['id', 'kind', 'image', 'prep']) {
+	const changed = structuredClone(plan);
+	linuxInstall.row(changed, 'distro-opensuse')[field] = 'foreign';
+	assert.throws(() => coherentInstallOrigin(workflow, changed), assert.AssertionError, field);
+}
 
 for (const [workflow, source] of sources) {
 	const tumbleweed = source.match(/image: opensuse\/tumbleweed:latest\r?\n\s+prep: ([^\r\n]+)/);
