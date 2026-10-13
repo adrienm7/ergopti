@@ -11901,6 +11901,21 @@ The real named Ctrl+J route demonstrates the defect without enabling physical
 assignments. Whole-source/installed/native output qualification remains open;
 item 97 stays partial.
 
+The macOS physical-editor host now requires the original Window's literal
+retirement acknowledgement before deleting its native view or detaching the
+page bridge. False, nil and throwing retirement retain that exact owner for
+retry. Shared Window construction and post-bridge geometry/options are protected
+through their actual acquisition phases, so provider exceptions unwind the
+construction reservation and allow same-owner closure or a healthy successor.
+Controlled Lua 5.4 replay preserves all 17 original cases and adds thirteen
+causal cases: original host17 passes /13 failures, corrected host30 passes /0
+failures, prior proposals26/4 and27/3, and a literal-acknowledgement omission21/9.
+All five complete30-case comparisons match independently frozen names/order and
+failures. The real missing-label shared constructor assertion is reproduced
+before native acquisition. These observations do not qualify native GUI,
+physical capture/output or installed acceptance; whole selected gates and
+native receiving remain required, and item97 stays partial.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
