@@ -2690,7 +2690,7 @@ function graphProblems(files) {
 	if (
 		!verdict ||
 		JSON.stringify(pipeline.needsOf(verdict.body)) !==
-			JSON.stringify(['core', 'macos', 'windows', 'linux'])
+			JSON.stringify(['macos', 'windows', 'linux', 'core'])
 	) {
 		problems.push('the manual verdict must wait for the root, shared core and every OS result');
 	}
@@ -2944,7 +2944,7 @@ for (const [what, rel, from, to] of [
 	[
 		'release that no longer waits for a lane',
 		ENTRY,
-		'    needs:\n      - core\n      - macos\n      - windows\n      - linux\n',
+		'    needs:\n      - macos\n      - windows\n      - linux\n      - core\n',
 		'    needs: [core, macos, windows]\n'
 	],
 	[

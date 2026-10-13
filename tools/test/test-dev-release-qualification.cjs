@@ -472,7 +472,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 {
 	const pipeline = require('./ci-pipeline.cjs');
 	const workflows = {
-		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'publication-plan', 'release'],
+		'ci.yml': ['validate', 'macos', 'windows', 'linux', 'core', 'publication-plan', 'release'],
 		'ci-common.yml': [
 			'prepare-common',
 			'shared-validation',
@@ -584,7 +584,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert.deepEqual(pipeline.needsOf(release.body), ['publication-plan']);
 	const publicationPlan = rootJobs.find((job) => job.id === 'publication-plan');
 	assert(publicationPlan, 'the ordinary source-bound publication preflight is retained');
-	assert.deepEqual(pipeline.needsOf(publicationPlan.body), ['core', 'macos', 'windows', 'linux']);
+	assert.deepEqual(pipeline.needsOf(publicationPlan.body), ['macos', 'windows', 'linux', 'core']);
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-retired-fast-cli-'));
 	try {
 		for (const event of ['push', 'pull_request', 'workflow_dispatch']) {

@@ -664,7 +664,7 @@ check('release keeps real full predicates and implicit successful dependency adm
 	);
 	const preflight = Raw.job('publication-plan');
 	assert.equal(Raw.field(preflight, 'if'), 'always() && !cancelled()');
-	assert.deepEqual(Raw.needsOf(preflight), ['core', 'macos', 'windows', 'linux']);
+	assert.deepEqual(Raw.needsOf(preflight), ['macos', 'windows', 'linux', 'core']);
 	assert.deepEqual(Raw.needsOf(Raw.job('release')), ['publication-plan']);
 	const names = ['validate', 'core', 'macos', 'windows', 'linux'];
 	let cases = 0;

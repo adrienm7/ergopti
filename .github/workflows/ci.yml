@@ -343,19 +343,6 @@ jobs:
   # ─────────────────────────────────────────────────
   # 2.0) Common — shared JavaScript, property and mutation suites
   # ─────────────────────────────────────────────────
-  core:
-    name: 'Common'
-    needs: [validate]
-    uses: ./.github/workflows/ci-common.yml
-    with:
-      release: ${{ needs.validate.outputs.release == 'true' }}
-      version: ${{ needs.validate.outputs.version }}
-      tag: ${{ needs.validate.outputs.tag }}
-      prerelease: ${{ needs.validate.outputs.prerelease }}
-      channel: ${{ needs.validate.outputs.channel }}
-
-  # 2.1) macOS — Hammerspoon, Swift launcher, ErgoptiPlus.app + launch gate
-
   macos:
     name: 'macOS'
     needs: [validate]
@@ -410,13 +397,26 @@ jobs:
 
   # Every run proves its selected lanes before receiving the original plan.
   # Missing retained artifacts or outputs fail this read-only preflight.
+  core:
+    name: 'Common'
+    needs: [validate]
+    uses: ./.github/workflows/ci-common.yml
+    with:
+      release: ${{ needs.validate.outputs.release == 'true' }}
+      version: ${{ needs.validate.outputs.version }}
+      tag: ${{ needs.validate.outputs.tag }}
+      prerelease: ${{ needs.validate.outputs.prerelease }}
+      channel: ${{ needs.validate.outputs.channel }}
+
+  # 2.1) macOS — Hammerspoon, Swift launcher, ErgoptiPlus.app + launch gate
+
   publication-plan:
     name: 'Release / Verify all lanes and original plan'
     needs:
-      - core
       - macos
       - windows
       - linux
+      - core
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     outputs:
