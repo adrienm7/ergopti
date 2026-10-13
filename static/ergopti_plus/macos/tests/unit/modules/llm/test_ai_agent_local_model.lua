@@ -27,6 +27,30 @@ local DEFAULT_MODEL = CONFIG.default_models["local"]
 local TWO_ACTIONS = World.TWO_ACTIONS
 local build_world, trigger = World.build_world, World.trigger
 
+--- Requires an exact refusal from a production callback.
+local function assert_false(value, message)
+	helpers.assert_eq(value, false, message)
+end
+
+--- Drives the real offer and configured endpoint through held native UI ports.
+--- @param scenario function
+local function with_consent_world(scenario)
+	local world = build_world({ system2 = "local" })
+	local offer = require("modules.llm.local_model_offer")
+	local api = require("modules.llm.api_ollama")
+	local storage = require("adapters.storage")
+	local before = storage.get("llm.ollama_port")
+	local function port(value)
+		helpers.assert_true(storage.set("llm.ollama_port", value))
+		helpers.assert_eq(api.get_base_url(), "http://127.0.0.1:" .. tostring(value))
+	end
+	port(11470)
+	world.alert_answer = "first"
+	local ok, err = xpcall(function() scenario(world, offer, api, port) end, debug.traceback)
+	storage.set("llm.ollama_port", before)
+	if not ok then error(err, 0) end
+end
+
 --- Answers a captured local chat request with a model's text.
 --- @param post table
 --- @param content string
@@ -51,6 +75,227 @@ local function assert_selection_never_logged(world)
 end
 
 helpers.describe("AI agent local model (ai-agent-local-model)", function()
+	helpers.it("(local-model-consent-affinity) refuses a held Download after the actual configured endpoint changes", function()
+		with_consent_world(function(world, offer, _, port)
+			local dialog = require("infra.dialog_util")
+			local previous = dialog.block_alert
+			dialog.block_alert = function(...)
+				port(11471)
+				return previous(...)
+			end
+			assert_false(offer.offer(DEFAULT_MODEL), "A's consent must not acquire B's download")
+			helpers.assert_eq(#world.installs, 0)
+			dialog.block_alert = previous
+			helpers.assert_true(offer.offer(DEFAULT_MODEL))
+			helpers.assert_eq(#world.installs, 1, "a fresh B consent still downloads normally")
+		end)
+	end)
+
+	helpers.it("(local-model-consent-affinity) refuses installer replacement and same-function registration ABA during a dialog", function()
+		for _, reset in ipairs({ false, true }) do
+			with_consent_world(function(world, offer)
+				local old_calls, new_calls = 0, 0
+				local original = function() old_calls = old_calls + 1; return true end
+				offer.set_installer(original)
+				local dialog = require("infra.dialog_util")
+				local previous = dialog.block_alert
+				dialog.block_alert = function(...)
+					if reset then offer.reset(); offer.set_installer(original)
+					else offer.set_installer(function() new_calls = new_calls + 1; return true end) end
+					return previous(...)
+				end
+				assert_false(offer.offer(DEFAULT_MODEL))
+				helpers.assert_eq(old_calls, 0)
+				helpers.assert_eq(new_calls, 0)
+				dialog.block_alert = previous
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-consent-affinity) fences stale notification clicks while a new endpoint receives its own offer", function()
+		with_consent_world(function(world, offer, _, port)
+			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+			local old = world.notifications[1]
+			port(11471)
+			old.on_click()
+			helpers.assert_eq(#world.alerts, 0, "an A notification must not open B's consent")
+			helpers.assert_eq(#world.installs, 0)
+			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+			helpers.assert_eq(#world.notifications, 2, "notification deduplication belongs to its origin")
+			assert_false(offer.offer(DEFAULT_MODEL, { automatic = true }))
+			world.notifications[2].on_click()
+			helpers.assert_eq(#world.alerts, 1)
+			helpers.assert_eq(#world.installs, 1)
+		end)
+	end)
+
+	helpers.it("(local-model-consent-affinity) fences replaced notification registrations without starving their successor", function()
+		with_consent_world(function(world, offer)
+			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+			local old = world.notifications[1]
+			local calls = 0
+			offer.set_installer(function() calls = calls + 1; return true end)
+			old.on_click()
+			helpers.assert_eq(#world.alerts, 0)
+			helpers.assert_eq(calls, 0)
+			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+			world.notifications[2].on_click()
+			helpers.assert_eq(calls, 1)
+		end)
+	end)
+
+	helpers.it("(local-model-notice-admission) refuses retained clicks from unacknowledged notifications", function()
+		for _, response in ipairs({ false, "accepted", "throw", true }) do
+			with_consent_world(function(world, offer)
+				local notify = require("infra.notifications")
+				local retained
+				notify.notify = function(_, _, _, on_click)
+					retained = on_click
+					on_click()
+					helpers.assert_eq(#world.installs, 0, "an early callback cannot manufacture send admission")
+					if response == "throw" then error("private-notification-secret") end
+					return response
+				end
+				helpers.assert_eq(offer.offer(DEFAULT_MODEL, { automatic = true }), response == true)
+				if response == true then
+					helpers.assert_eq(#world.installs, 1, "an accepted send delivers its queued current click once")
+					retained()
+					helpers.assert_eq(#world.installs, 1)
+				else
+					retained()
+					helpers.assert_eq(#world.alerts, 0)
+					helpers.assert_eq(#world.installs, 0)
+				end
+				for _, line in ipairs(world.logs) do
+					assert_false(line.text:find("private-notification-secret", 1, true) ~= nil)
+				end
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-consent-affinity) keeps a late A completion from invalidating B's cache or notification", function()
+		with_consent_world(function(world, offer, api, port)
+			local forgets = 0
+			api.forget_local_models = function() forgets = forgets + 1 end
+			helpers.assert_true(offer.install(DEFAULT_MODEL))
+			port(11471)
+			helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+			world.installs[1].on_done(true)
+			helpers.assert_eq(forgets, 0, "A's completion cannot invalidate B's acknowledged cache")
+			assert_false(offer.offer(DEFAULT_MODEL, { automatic = true }), "B's notice is still owned")
+		end)
+	end)
+
+	helpers.it("(local-model-notice-affinity) keeps a newer same-source notice after an older pull succeeds", function()
+		for _, earlier_notice in ipairs({ false, true }) do
+			with_consent_world(function(world, offer)
+				if earlier_notice then
+					helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+					helpers.assert_true(offer.install(DEFAULT_MODEL))
+				end
+				helpers.assert_true(offer.install(DEFAULT_MODEL))
+				local older_pull = world.installs[#world.installs]
+				if earlier_notice then world.installs[1].on_done(true) end
+				helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }))
+				local newer_notice = world.notifications[#world.notifications]
+				older_pull.on_done(true)
+				assert_false(offer.offer(DEFAULT_MODEL, { automatic = true }),
+					"an old success must not clear a notice posted after its installation admission")
+				newer_notice.on_click()
+				world.installs[#world.installs].on_done(true)
+				helpers.assert_true(offer.offer(DEFAULT_MODEL, { automatic = true }),
+					"the exact current notice is cleared by its own completed download")
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-consent-affinity) accepts one current completion and ignores repeats or registration replacement", function()
+		with_consent_world(function(world, offer, api)
+			local forgets = 0
+			api.forget_local_models = function() forgets = forgets + 1 end
+			helpers.assert_true(offer.install(DEFAULT_MODEL))
+			world.installs[1].on_done(true)
+			world.installs[1].on_done(true)
+			helpers.assert_eq(forgets, 1, "the registered callback is one-shot")
+			helpers.assert_true(offer.install(DEFAULT_MODEL))
+			offer.set_installer(function() return true end)
+			world.installs[2].on_done(true)
+			helpers.assert_eq(forgets, 1, "a replaced installer cannot affect its successor's cache")
+		end)
+	end)
+
+	helpers.it("(local-model-consent-affinity) publishes synchronous completion only after exact installer admission", function()
+		with_consent_world(function(_, offer, api)
+			local forgets = 0
+			api.forget_local_models = function() forgets = forgets + 1 end
+			offer.set_installer(function(_, done) done(true); return false end)
+			assert_false(offer.install(DEFAULT_MODEL))
+			helpers.assert_eq(forgets, 0, "a callback cannot manufacture refused installation admission")
+			offer.set_installer(function(_, done) done(true); return true end)
+			helpers.assert_true(offer.install(DEFAULT_MODEL))
+			helpers.assert_eq(forgets, 1)
+			offer.set_installer(function() return false end)
+			assert_false(offer.offer(DEFAULT_MODEL), "the Download button reports dispatch refusal truthfully")
+		end)
+	end)
+
+	helpers.it("(local-model-consent-affinity) refuses malformed endpoint acquisition without leaking its error", function()
+		with_consent_world(function(world, offer, api)
+			api.get_base_url = function() error("private-endpoint-secret") end
+			assert_false(offer.offer(DEFAULT_MODEL))
+			helpers.assert_eq(#world.alerts, 0)
+			helpers.assert_eq(#world.installs, 0)
+			for _, line in ipairs(world.logs) do
+				assert_false(line.text:find("private-endpoint-secret", 1, true) ~= nil)
+			end
+		end)
+		for _, malformed in ipairs({ false, 17, "" }) do
+			with_consent_world(function(world, offer, api)
+				api.get_base_url = function() return malformed end
+				assert_false(offer.offer(DEFAULT_MODEL))
+				helpers.assert_eq(#world.alerts, 0)
+				helpers.assert_eq(#world.installs, 0)
+			end)
+		end
+		with_consent_world(function(world, offer, api)
+			local old = api.get_base_url
+			api.get_base_url = function()
+				api.get_base_url = old
+				return old()
+			end
+			assert_false(offer.offer(DEFAULT_MODEL), "endpoint reader replacement during acquisition is refused")
+			helpers.assert_eq(#world.alerts, 0)
+			helpers.assert_eq(#world.installs, 0)
+			helpers.assert_true(offer.offer(DEFAULT_MODEL), "the stable reader permits fresh consent")
+			helpers.assert_eq(#world.installs, 1)
+		end)
+		for _, reader in ipairs({
+			function() return nil end,
+			function() return false end,
+			function() error("private-service-secret") end,
+			function() return function() return nil end end,
+			function() return function() return false end end,
+			function() return function() error("private-service-secret") end end,
+		}) do
+			with_consent_world(function(world, offer, api)
+				api.capture_service_owner = reader
+				assert_false(offer.offer(DEFAULT_MODEL))
+				helpers.assert_eq(#world.alerts, 0)
+				helpers.assert_eq(#world.installs, 0)
+				for _, line in ipairs(world.logs) do
+					assert_false(line.text:find("private-service-secret", 1, true) ~= nil)
+				end
+			end)
+		end
+		with_consent_world(function(world, offer)
+			world.alert_answer = "cancel"
+			helpers.assert_true(offer.offer(DEFAULT_MODEL))
+			helpers.assert_eq(#world.installs, 0, "cancellation does not dispatch")
+			world.alert_answer = "first"
+			helpers.assert_true(offer.offer(DEFAULT_MODEL))
+			helpers.assert_eq(#world.installs, 1, "cancellation releases the dialog owner")
+		end)
+	end)
 	helpers.it("(ai-agent-local-model) sends nothing before the local server lists the model, then posts it", function()
 		helpers.assert_eq(DEFAULT_MODEL, "qwen2.5:7b", "agent.json's local default, the model of the report")
 		local world = build_world({ system2 = "local" })

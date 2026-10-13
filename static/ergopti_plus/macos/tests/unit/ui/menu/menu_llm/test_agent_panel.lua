@@ -52,6 +52,8 @@ local function with_panel(state, scenario, language)
 		}
 		package.loaded["modules.llm.api_ollama"] = {
 			MODEL_MISSING = "model_missing",
+			get_base_url = function() return "http://127.0.0.1:11470" end,
+			capture_service_owner = function() return function() return true end end,
 			local_model_installed = function(model)
 				if world.listed == nil then return nil end
 				return world.listed[model] == true

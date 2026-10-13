@@ -317,6 +317,76 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		end)
 	end
 
+	helpers.it("(local-model-service-consent) refuses same-origin daemon replacement during held model consent", function()
+		with_startup({}, function(api, fixture)
+			helpers.with_stub_scope({ "modules.llm.local_model_offer", "infra.dialog_util" }, function()
+				helpers.assert_true(api.ensure_running())
+				local original = fixture.tasks[1]
+				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+				local origin = api.get_base_url()
+				local installs, answered = 0, false
+				package.loaded["infra.i18n"].format = function(key) return key end
+				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, download)
+					if not answered then
+						answered = true
+						helpers.assert_eq(api.stop_owned_server(), false)
+						original.complete(0, original.frame("RETIRED 0"))
+						helpers.assert_true(api.ensure_running())
+						local successor = fixture.tasks[2]
+						successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
+					end
+					return download
+				end }
+				local offer = require("modules.llm.local_model_offer")
+				offer.set_installer(function() installs = installs + 1; return true end)
+				helpers.assert_eq(offer.offer("fixture-model"), false,
+					"unchanged URL and menu installer do not transfer consent to a successor daemon")
+				helpers.assert_eq(installs, 0)
+				helpers.assert_eq(api.get_base_url(), origin)
+				helpers.assert_eq(#fixture.tasks, 2)
+				helpers.assert_true(original.completed)
+				helpers.assert_true(fixture.tasks[2].running)
+				helpers.assert_true(offer.offer("fixture-model"), "fresh consent names the live successor")
+				helpers.assert_eq(installs, 1)
+			end)
+		end)
+	end)
+
+	helpers.it("(local-model-service-consent) retains accepted async consent and fences a replaced daemon's late result", function()
+		with_startup({}, function(api, fixture)
+			helpers.with_stub_scope({ "modules.llm.local_model_offer" }, function()
+				helpers.assert_true(api.ensure_running())
+				local original = fixture.tasks[1]
+				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+				local offer = require("modules.llm.local_model_offer")
+				local done, current, forgets
+				forgets = 0
+				api.forget_local_models = function() forgets = forgets + 1 end
+				offer.set_installer(function(_, callback, is_current)
+					done, current = callback, is_current
+					return true
+				end)
+				helpers.assert_true(offer.install("fixture-model"))
+				helpers.assert_eq(type(current), "function", "the actual installer receives the captured owner")
+				helpers.assert_true(current(), "modal return does not revoke an accepted asynchronous download")
+				helpers.assert_eq(api.stop_owned_server(), false)
+				helpers.assert_eq(current(), false, "retirement revokes the original consent before exit")
+				original.complete(0, original.frame("RETIRED 0"))
+				helpers.assert_true(api.ensure_running())
+				local successor = fixture.tasks[2]
+				successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
+				helpers.assert_eq(current(), false, "a READY successor cannot revive the old owner")
+				done(true)
+				helpers.assert_eq(forgets, 0)
+				helpers.assert_true(offer.install("fixture-model"))
+				helpers.assert_true(current())
+				done(true)
+				helpers.assert_eq(forgets, 1)
+				helpers.assert_eq(current(), true, "terminal publication does not impersonate native retirement")
+			end)
+		end)
+	end)
+
 	helpers.it("(ollama-owned-retirement) closes only its published daemon and retains receipt debt", function()
 		with_startup({}, function(api, fixture)
 			helpers.assert_true(api.ensure_running())
