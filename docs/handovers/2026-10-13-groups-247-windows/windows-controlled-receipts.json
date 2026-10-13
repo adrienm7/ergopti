@@ -203,7 +203,7 @@
 	"trace_matrices": 6,
 	"dll_exports": 41,
 	"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
-	"native_source_fingerprint": "C174264C9C8675E9B6530F4C0AD561043D574D9085C39E984C5B550ED9021C22",
+	"native_source_fingerprint": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
 	"private_alias_vectors": 170,
 	"registration_model_original": {
 		"failed": 20,
@@ -216,5 +216,39 @@
 	"native_macos": "UNRUN",
 	"physical": "UNRUN",
 	"user32_fixture": "UNRUN resident preserved",
-	"production_cohort_enabled": false
+	"production_cohort_enabled": false,
+	"full_unit": {
+		"watchdog_ms": 7200000,
+		"exit": 2,
+		"failures": 95,
+		"completed": 11222,
+		"status": "FAILED_INCOMPLETE",
+		"selected": 12567
+	},
+	"full_startup": {
+		"exit": 0,
+		"status": "PASS",
+		"scope": "Actual isolated source startup, not installed build"
+	},
+	"host_module_dependency": {
+		"fixed_exit": 0,
+		"module_path_preserved": true,
+		"original_hash_available": false,
+		"scope": "Actual Node-launched PowerShell5.1 with inherited PowerShell7 module paths",
+		"fixed_hash_available": true,
+		"original_exit": 1,
+		"builder_update_exit": 0,
+		"builder_verify_exit": 0
+	},
+	"hosted_ci": {
+		"linux_software_package_install": "PASS",
+		"windows_unit": "FAIL",
+		"status": "FAIL",
+		"macos_native_managed_ollama": "FAIL",
+		"windows_engine_e2e": "PASS",
+		"core_js": "FAIL",
+		"run_id": 38424106990,
+		"macos_portable_stubbed": "PASS",
+		"source_sha": "e43f3e6384093f2eaef0f1620259cc6b1a47db69"
+	}
 }

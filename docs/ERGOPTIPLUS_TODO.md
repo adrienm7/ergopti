@@ -83,6 +83,57 @@ unit/E2E/startup/build and installed collector receiving remain separate gates.
 The existing collector receives 13 AHK owner cases and 30 stock PowerShell5.1
 controls, including actual archive integrity and private/successor-file refusal.
 
+#### Composed Windows and CI receiving
+
+Published source `e43f3e6384093f2eaef0f1620259cc6b1a47db69` preserves incoming
+macOS capture changes through `d0949426a5eb86ae2ddbde8647ade0fcd583a38a`.
+The actual full Windows unit runner reaches its existing 7,200,000 ms watchdog:
+11,222 of 12,567 cases finish, including 95 failures, then natural exit 2.
+The full unit receipt is FAILED_INCOMPLETE. Two old Ollama presence cases expect
+an obsolete public failure callback after an auxiliary epoch change; the newer
+origin-custody contract requires stale callbacks to remain silent. This explicit
+contract conflict remains RED; no wrapper bypass or test relaxation is applied.
+Other observed failures, including TOML publication, buffered snapshots, native
+transport cleanup, source guards and purity ratchets, remain recorded for triage.
+
+[CI 38424106990](https://github.com/adrienm7/ergopti/actions/runs/38424106990)
+is failed: Windows unit admission rejects Snapshot16 because warning stdout is
+not the exact TAP transport; Core JS and native macOS managed Ollama also fail.
+Windows engine E2E, macOS portable/stubbed tests and Linux software/package/install
+jobs pass. Those hosted receipts do not qualify personal Linux/macOS or physical
+Windows. The actual local full-startup smoke exits 0 across fresh, reloaded,
+independent, suspend-marker, extension opt-in, script-chord, retired-Metrics,
+neutral-default and older-release boots, with no error logged.
+
+The terminal SendInput factory is now included by the production entrypoint;
+its function definitions expose the explicitly chosen primitive without selecting
+an emitter, admitting transformed output or enabling a production cohort. All
+211 existing explicit-SendInput cases exit 0, and the actual full entry compiles.
+The architecture diagram is regenerated through its owner. Adapter reachability,
+architecture, generated-output drift and their coverage controls now pass. The
+remaining Lua gsub and keyboard-registry Core JS failures have identical source
+and test blobs at the incoming baseline and published Windows source; they stay
+open rather than being relabelled as successful.
+
+The official native builder now loads its hashing dependency from the executing
+PowerShell host. A Node launcher can retain a PowerShell7 module path when it
+starts PowerShell5.1: the wrong Utility manifest exposes ordinary cmdlets but
+omits the PowerShell5.1 `Get-FileHash` function. The actual original probe exits
+1 with hashing unavailable; current-host dependency loading exits 0 and preserves
+the inherited module path. Direct Node-launched official UpdateTracked and verify
+both exit 0 with all 44 native cases, eight/eleven/six matrices and 41 exports.
+The regenerated recipe fingerprint is
+`B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036`; the DLL
+remains `C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E`.
+
+The offer's delayed rebuild now delegates its retained callback and exact period
+to the existing timer adapter. This removes the introduced direct-timer family
+ratchet regression without raising any baseline. All 35 native offer-affinity
+cases and all three platform-API family ratchets exit 0; the source oracle adds
+an inverse that restores the original direct OS call and rejects it. Other
+full-unit failures stay open. Unchanged source blobs alone are not a same-host
+native baseline reproduction.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
