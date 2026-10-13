@@ -135,6 +135,11 @@ exits 1 on that pure lookup; withdrawing either input from the actual settings
 owner independently makes the corrected complete guard exit 1. Constructor
 controls cover direct/grouped imports and simple aliases; comments and literal
 decorations cannot create a settings owner. This remains source/packaging evidence.
+The same detector also retains Lua's bracketed `registry["resolve"]` spelling,
+including grouped direct imports. Added controls first reject the unchanged
+dot-only detector with exit 1, then all twelve checks pass with exit 0. Bracketed
+pure lookups remain excluded; this closes a guard-coverage gap without changing
+any driver or qualification claim.
 
 The official native builder now loads its hashing dependency from the executing
 PowerShell host. A Node launcher can retain a PowerShell7 module path when it

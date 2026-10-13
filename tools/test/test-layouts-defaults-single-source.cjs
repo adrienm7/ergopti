@@ -189,7 +189,12 @@ function constructsLuaRegistrySettings(source) {
 		tokens[start - 1]?.value === '=' && tokens[start - 2]?.kind === 'identifier'
 			? tokens[start - 2].value
 			: null;
-	const resolves = (end) => tokens[end + 1]?.value === '.' && tokens[end + 2]?.value === 'resolve';
+	const resolves = (end) =>
+		(tokens[end + 1]?.value === '.' && tokens[end + 2]?.value === 'resolve') ||
+		(tokens[end + 1]?.value === '[' &&
+			tokens[end + 2]?.kind === 'string' &&
+			tokens[end + 2].value === 'resolve' &&
+			tokens[end + 3]?.value === ']');
 	for (let at = 0; at < tokens.length; at++) {
 		if (
 			tokens[at].value !== 'require' ||
@@ -238,6 +243,10 @@ check('registry configuration ownership excludes pure lookup and decorative refe
 		false
 	);
 	assert.strictEqual(
+		constructsLuaRegistrySettings('return require("layouts.registry")["find_entry"](index, id)'),
+		false
+	);
+	assert.strictEqual(
 		constructsLuaRegistrySettings(
 			'local R = require("layouts.registry")\nreturn R.find_entry(index, id)'
 		),
@@ -264,6 +273,8 @@ check('registry configuration ownership excludes pure lookup and decorative refe
 		true
 	);
 	for (const source of [
+		'local R = require("layouts.registry")\nreturn R["resolve"](layouts, updater)',
+		'return (require("layouts.registry"))["resolve"](layouts, updater)',
 		'local R = (require("layouts.registry"))\nreturn R.resolve(layouts, updater)',
 		'return (require("layouts.registry")).resolve(layouts, updater)',
 		'local R = ((require("layouts.registry")))\nlocal Other = (R)\nreturn (Other).resolve(layouts, updater)',
