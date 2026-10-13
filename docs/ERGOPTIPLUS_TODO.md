@@ -14,6 +14,25 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ### October 13 Windows receiving checkpoint
 
+The continued complete JS command now reaches its natural exit: 407/425 checks
+PASS, eighteen FAIL, exit 1. The Lua return and registry location guards pass.
+The attempt remains FAILED: required Linux/cc execution, Windows symlink
+privilege, unsupported SDK filesystem controls, platform-specific process/trust
+controls and CI admission checks remain red. Its fresh-config startup also fails
+with native owner OS_ERROR status 6; that failure is retained, not classified as
+unrelated or erased by a later pass. Source edits occurred during this long
+attempt, so it is not an immutable committed-source receipt.
+
+The six atomic continuation corrections preserve fresh published dev
+`612f572310af9eb292bb56e7c9ab3f0ef8169491` and all incoming commits. After rebase,
+seven exact Windows selections pass: startup lifecycle five, snapshots seventeen,
+presence thirteen, pending cancellation one, model custody twenty, registration
+custody ninety-one and origin custody seventeen. Each natural exit is 0 with no
+failure/skip. E2E receives seventy engine/native-Edit cases, and all nine isolated
+full-startup scenarios pass with exit 0. Authenticated good/bad/full-entry compiler
+controls remain 0/17/0. These targeted receipts do not replace the failed broad
+unit/JS or native macOS/Linux qualification gates.
+
 The isolated Windows continuation rebased the fifteen atomic AI corrections from
 `012ce5ef9886906d6e174227628a79db3fd93f26` onto fresh dev
 `13cf4ad8bf824027bde3a640b8fc0bab3cd2a701`, preserving their commit boundaries.
