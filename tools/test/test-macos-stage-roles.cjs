@@ -47,8 +47,12 @@ check('exact five visible jobs with only immediate predecessor edges', () => {
 		const ids = workflow.jobs[id].steps.filter((step) => step.id).map((step) => step.id);
 		assert.equal(ids.length, new Set(ids).size, 'Merged roles must retain unique step IDs');
 	}
-	for (const id of ['test-hs', 'e2e-hs', 'launch'])
+	for (const id of ['e2e-hs', 'launch'])
 		assert.equal(workflow.jobs[id].strategy['fail-fast'], false);
+	assert.equal(workflow.jobs['test-hs'].strategy, undefined);
+	assert.deepEqual(workflow.jobs['test-hs'].env, {
+		MACOS_STAGE_LOT: 'Lua unit and meta (stubbed)'
+	});
 	assert.equal(
 		workflow.jobs['package-macos'].outputs.scenarios,
 		'${{ steps.profile.outputs.scenarios }}'
@@ -324,7 +328,7 @@ check('existing scope owner admits every retained Mac command after address relo
 });
 
 assert.equal(controls, 84, 'all original stage and receipt controls remain present');
-check('Unit has one truthful display axis and the unchanged complete cell', () => {
+check('Unit retains its canonical lot metadata and unchanged complete cell', () => {
 	assert.deepEqual(roles.displayPlan('unit', context), {
 		matrix: { lot: ['Lua unit and meta (stubbed)'] },
 		metadata: {
@@ -706,4 +710,239 @@ check('full-cell human labels still reject incomplete cells and foreign fields',
 	);
 });
 assert.equal(controls, 141, 'all original, human lot transport and role-label controls execute');
+/** Admit one literal Unit lot while preserving its complete receipt-producing source chain. */
+function assertLiteralUnit(source) {
+	const job = YAML.parse(source, { uniqueKeys: true }).jobs['test-hs'];
+	assert.ok(job && Array.isArray(job.steps), 'Missing actual Unit job');
+	assert.deepEqual(
+		Object.fromEntries(Object.entries(job).filter(([key]) => key !== 'steps')),
+		{
+			name: 'Unit tests',
+			'runs-on': 'ubuntu-latest',
+			'timeout-minutes': 360,
+			env: { MACOS_STAGE_LOT: 'Lua unit and meta (stubbed)' },
+			outputs: {
+				e2e_matrix: '${{ steps.stage-plan.outputs.e2e_matrix }}',
+				e2e_metadata: '${{ steps.stage-plan.outputs.e2e_metadata }}'
+			}
+		},
+		'Unit must be one ordinary job with its literal canonical lot'
+	);
+	function exact(name, expected) {
+		const matches = job.steps.filter((step) => step.name === name);
+		assert.equal(matches.length, 1, 'Missing or duplicate Unit custody step');
+		assert.deepEqual(matches[0], { name, ...expected }, 'Unit receipt custody source differs');
+	}
+	exact('Admit the authored unit lot', {
+		id: 'stage-selection',
+		run: 'node tools/ci/macos-stage-roles.cjs select unit'
+	});
+	exact('Resolve exact E2E stage roles', {
+		id: 'stage-plan',
+		run: 'node tools/ci/macos-stage-roles.cjs plan e2e'
+	});
+	exact('Record actual stage role outcome', {
+		if: 'always()',
+		env: {
+			MACOS_STAGE_CELL: '${{ steps.stage-selection.outputs.cell }}',
+			MACOS_STAGE_RESULT: '${{ job.status }}'
+		},
+		run: 'node tools/ci/macos-stage-roles.cjs record unit - "$RUNNER_TEMP/macos-stage-output/receipt.json"'
+	});
+	exact('Retain exact stage role outcome', {
+		if: 'always()',
+		uses: 'actions/upload-artifact@v4',
+		with: {
+			name: "macos-stage-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ fromJSON(steps.stage-selection.outputs.cell).runner }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario || 'default' }}-${{ github.run_id }}",
+			path: '${{ runner.temp }}/macos-stage-output/receipt.json',
+			'if-no-files-found': 'error',
+			'retention-days': 7,
+			overwrite: true
+		}
+	});
+	const selectAt = job.steps.findIndex((step) => step.id === 'stage-selection');
+	const testAt = job.steps.findIndex((step) => step.name === 'Run unit + meta tests');
+	const planAt = job.steps.findIndex((step) => step.id === 'stage-plan');
+	const recordAt = job.steps.findIndex((step) => step.name === 'Record actual stage role outcome');
+	assert.ok(
+		selectAt >= 0 && selectAt < testAt && testAt < planAt && planAt < recordAt,
+		'Unit selection and real tests must precede its plan and receipt'
+	);
+	return job;
+}
+
+const literalUnitSource = fs.readFileSync(
+	path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'),
+	'utf8'
+);
+check('actual Unit source has no singleton matrix and retains its exact custody', () => {
+	assertLiteralUnit(literalUnitSource);
+});
+for (const [name, mutate] of [
+	[
+		'old singleton matrix',
+		(job) => {
+			job.strategy = { 'fail-fast': false, matrix: { lot: ['Lua unit and meta (stubbed)'] } };
+		}
+	],
+	[
+		'empty matrix strategy',
+		(job) => {
+			job.strategy = {};
+		}
+	],
+	[
+		'unbound matrix lot',
+		(job) => {
+			job.env.MACOS_STAGE_LOT = '${{ matrix.lot }}';
+		}
+	],
+	[
+		'missing lot',
+		(job) => {
+			delete job.env.MACOS_STAGE_LOT;
+		}
+	],
+	[
+		'foreign lot',
+		(job) => {
+			job.env.MACOS_STAGE_LOT = 'Lua unit and meta (native)';
+		}
+	],
+	[
+		'wrong runner',
+		(job) => {
+			job['runs-on'] = 'macos-latest';
+		}
+	],
+	[
+		'changed timeout',
+		(job) => {
+			job['timeout-minutes']++;
+		}
+	],
+	[
+		'matrix-style API title',
+		(job) => {
+			job.name += ' (Lua unit and meta (stubbed))';
+		}
+	],
+	[
+		'missing selection',
+		(job) => {
+			job.steps = job.steps.filter((step) => step.id !== 'stage-selection');
+		}
+	],
+	[
+		'duplicate selection',
+		(job) => {
+			job.steps.push(structuredClone(job.steps.find((step) => step.id === 'stage-selection')));
+		}
+	],
+	[
+		'forgiven selection',
+		(job) => {
+			job.steps.find((step) => step.id === 'stage-selection')['continue-on-error'] = true;
+		}
+	],
+	[
+		'foreign selection command',
+		(job) => {
+			job.steps.find((step) => step.id === 'stage-selection').run += ' || true';
+		}
+	],
+	[
+		'foreign E2E plan',
+		(job) => {
+			job.steps.find((step) => step.id === 'stage-plan').run =
+				'node tools/ci/macos-stage-roles.cjs plan testbuild';
+		}
+	],
+	[
+		'foreign receipt cell',
+		(job) => {
+			job.steps.find(
+				(step) => step.name === 'Record actual stage role outcome'
+			).env.MACOS_STAGE_CELL = '${{ toJSON(matrix) }}';
+		}
+	],
+	[
+		'wrong receipt stage',
+		(job) => {
+			job.steps.find((step) => step.name === 'Record actual stage role outcome').run =
+				'node tools/ci/macos-stage-roles.cjs record e2e - receipt.json';
+		}
+	],
+	[
+		'missing receipt file forgiven',
+		(job) => {
+			job.steps.find((step) => step.name === 'Retain exact stage role outcome').with[
+				'if-no-files-found'
+			] = 'warn';
+		}
+	],
+	[
+		'receipt before tests',
+		(job) => {
+			const at = job.steps.findIndex((step) => step.name === 'Record actual stage role outcome');
+			job.steps.unshift(job.steps.splice(at, 1)[0]);
+		}
+	]
+])
+	check('literal Unit source refuses ' + name, () => {
+		const changed = YAML.parse(literalUnitSource, { uniqueKeys: true });
+		mutate(changed.jobs['test-hs']);
+		assert.throws(() => assertLiteralUnit(YAML.stringify(changed)));
+	});
+check('literal Unit lot produces the unchanged complete role and receipt', () => {
+	const job = assertLiteralUnit(literalUnitSource),
+		lot = job.env.MACOS_STAGE_LOT;
+	const selected = roles.selectUnitLot(lot, context);
+	assert.deepEqual(selected, roles.plan('unit', context)[0]);
+	const receipt = roles.recordLot(
+		'unit',
+		selected,
+		'success',
+		{ context, chain: [] },
+		context,
+		{ os: 'linux', architecture: 'x64' },
+		1,
+		lot,
+		undefined
+	);
+	assert.deepEqual(
+		receipt,
+		roles.record(
+			'unit',
+			selected,
+			'success',
+			{ context, chain: [] },
+			context,
+			{ os: 'linux', architecture: 'x64' },
+			1
+		)
+	);
+	const proof = roles.union('unit', [receipt], 'success', context, 1);
+	assert.deepEqual(proof.chain[0].cells[0].cell, selected);
+	for (const cell of [
+		{ ...selected, role: 'e2e-hs' },
+		{ ...selected, architecture: 'arm64' },
+		{ ...selected, timeout_minutes: 359 }
+	])
+		assert.throws(() =>
+			roles.recordLot(
+				'unit',
+				cell,
+				'success',
+				{ context, chain: [] },
+				context,
+				{ os: 'linux', architecture: 'x64' },
+				1,
+				lot,
+				undefined
+			)
+		);
+});
+assert.equal(controls, 160, 'all prior 141 controls and 19 literal Unit controls execute');
+
 console.log('macos-stage-roles: ' + controls + ' controls passed');
