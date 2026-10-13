@@ -373,6 +373,78 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		end)
 	end
 
+	-- The original daemon predicate remains the genuine lexical service fence.
+	-- Only endpoint reads and the requester callback are instrumented here.
+	local function with_reentrant_requester(boundary, outcome, scenario)
+		with_owned_responses(function(api, fixture)
+			helpers.with_fresh_modules({ "modules.llm.local_model_offer", "infra.dialog_util",
+				"infra.notifications", "infra.i18n" }, function()
+				local world = { dialogs = 0, notices = 0, installs = 0, replaced = false }
+				package.loaded["infra.i18n"] = { get = function(key) return key end,
+					format = function(key) return key end }
+				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, first)
+					world.dialogs = world.dialogs + 1; return first
+				end }
+				package.loaded["infra.notifications"] = { notify = function()
+					world.notices = world.notices + 1; return true
+				end }
+				local offer = require("modules.llm.local_model_offer")
+				offer.set_installer(function() world.installs = world.installs + 1; return true end)
+				local original_origin = api.get_base_url
+				local reads = 0
+				api.get_base_url = function() reads = reads + 1; return original_origin() end
+				local function current()
+					if reads == boundary and not world.replaced then
+						world.replaced = true
+						fixture.replace_service()
+						if outcome == "throw" then error("private-requester-service-secret") end
+						return outcome
+					end
+					return true
+				end
+				scenario(offer, current, world)
+				helpers.assert_true(world.replaced, "the actual original native service must have been replaced")
+				helpers.assert_eq(#fixture.tasks, 2)
+				helpers.assert_true(fixture.tasks[1].completed)
+				helpers.assert_true(fixture.tasks[2].running)
+				for _, row in ipairs(fixture.logs) do
+					helpers.assert_true(not row.text:find("private-requester-service-secret", 1, true))
+				end
+			end)
+		end)
+	end
+
+	helpers.it("(local-model-requester-service-reentry) refuses dispatch after the final requester predicate retires its captured service", function()
+		for _, outcome in ipairs({ true, false, 17, "throw" }) do
+			with_reentrant_requester(2, outcome, function(offer, current, world)
+				helpers.assert_eq(offer.install("qwen2.5:7b", { current = current }), false)
+				helpers.assert_eq(world.installs, 0, "old service consent cannot dispatch to its same-origin successor")
+				helpers.assert_true(offer.install("qwen2.5:7b"), "fresh successor ownership remains admitted")
+				helpers.assert_eq(world.installs, 1)
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-requester-service-reentry) refuses notification custody after its final requester predicate replaces the service", function()
+		with_reentrant_requester(2, true, function(offer, current, world)
+			helpers.assert_eq(offer.offer("qwen2.5:7b", { automatic = true, current = current }), false)
+			helpers.assert_eq(world.notices + world.dialogs + world.installs, 0)
+			helpers.assert_true(offer.offer("qwen2.5:7b", { automatic = true }))
+			helpers.assert_eq(world.notices, 1, "fresh automatic notices keep their source policy")
+		end)
+	end)
+
+	helpers.it("(local-model-requester-service-reentry) refuses a source receipt invalidated inside its final acquisition predicate", function()
+		with_reentrant_requester(1, true, function(offer, current, world)
+			local capture = get_upvalue(offer.install, "capture_owner")
+			helpers.assert_eq(type(capture), "function")
+			helpers.assert_eq(capture({ current = current }), nil,
+				"actual acquisition must not grant an already retired native owner")
+			helpers.assert_eq(world.notices + world.dialogs + world.installs, 0)
+			helpers.assert_true(offer.install("qwen2.5:7b"))
+		end)
+	end)
+
 	helpers.it("(ollama-inventory-withdrawal) rechecks cache custody after its endpoint getter forgets or replaces inventory", function()
 		for _, replacement in ipairs({ false, true }) do
 			with_owned_responses(function(api, fixture)
