@@ -1,0 +1,25 @@
+{
+	"files": {
+		"tools/build/core_sdk/source/src/share/hs274-installed-cli.hpp": {
+			"bytes": 19653,
+			"lines": 397,
+			"mode": "100644",
+			"sha256": "d199e2319476113829719e1dafc797b4271a4cb188d1c55eba1274e83f5282d3"
+		},
+		"tools/build/core_sdk/source/src/share/hs274-installed-intent.hpp": {
+			"bytes": 6891,
+			"lines": 111,
+			"mode": "100644",
+			"sha256": "479cb79864707bc017ecea2ea65aaf8104426943140b26292eafe868049e2273"
+		}
+	},
+	"generator": "tools/build/core_sdk/generate_installed_cli_source.py",
+	"input": {
+		"bytes": 26425,
+		"path": "tools/build/core_sdk/inputs/hs274-installed-cli.source.hpp",
+		"sha256": "a63fc1a38688a3c74fddaa2b7281adf930947031870c25bc0d1aa950023bb721"
+	},
+	"kind": "g5_sdk_source_inventory",
+	"native_qualification": "NONE; source preparation only; real Core/driver/readiness producer and SDK integration required",
+	"schema": 1
+}

@@ -88,6 +88,12 @@ local function wire(Source, state, end_selection)
 		key_text = function(code) return code == KEY_J and "j" or nil end,
 		defer = function(fn, delay_ms)
 			calls.deferred[#calls.deferred + 1] = { fn = fn, delay_ms = delay_ms }
+			if delay_ms == 0 then
+				if state.answer == "throw" then error("Controlled answer queue refusal") end
+				if state.answer == "premature" then fn() end
+				if state.answer == "refuse" then return false end
+				if state.answer_pause then state.answer_pause() end
+			end
 			return true
 		end,
 	})
@@ -1166,5 +1172,301 @@ helpers.describe("physical magic notice fixture lifecycle", function()
 		helpers.assert_true(rawequal(owner.native_presentation, lookup))
 		helpers.assert_eq(locale.current_locale(), previous)
 		assert_magic_notice_cache_restored(saved)
+	end)
+end)
+
+helpers.describe("magic key source: capture answer queue admission", function()
+	for _, mode in ipairs({ "refuse", "throw", "premature" }) do
+		helpers.it("keeps the physical key native and the capture retryable after " .. mode, function()
+			with_source(nil, function(Source, Preferences, path)
+				local state = { active = true, replace = true, typed_ok = true, answer = mode }
+				local calls = wire(Source, state)
+				local chosen, refused = {}, {}
+				local handlers = {
+					on_chosen = function(value) chosen[#chosen + 1] = value end,
+					on_refused = function(reason) refused[#refused + 1] = reason end,
+				}
+				helpers.assert_true(Source.capture(handlers))
+				helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false)
+				run_due(calls)
+				helpers.assert_eq(chosen, {})
+				helpers.assert_eq(refused, {})
+				helpers.assert_eq(Source.get(), "auto")
+				local handle = io.open(path, "rb")
+				if handle then handle:close() end
+				helpers.assert_nil(handle, "refused scheduling creates no preference document")
+				helpers.assert_eq(Source.capture(handlers), false, "the original timed capture remains owned")
+				state.answer = nil
+				helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+				helpers.assert_eq(chosen, {}, "persistence remains outside the key callback")
+				run_due(calls)
+				helpers.assert_eq(chosen, { "KeyJ" })
+				helpers.assert_eq(Source.get(), "KeyJ")
+				helpers.assert_eq(#calls.typed, 0)
+				helpers.assert_eq(#calls.dispatched, 0)
+				Source._reset_for_test()
+			end)
+		end)
+	end
+end)
+
+--- Compiles the genuine daemon pause callback over explicit non-input ports.
+--- The ScriptActions owner still executes its real toggle/notification path.
+--- @param Source table Actual initialized magic-key owner.
+--- @param state table Live activity observed by the recording input ports.
+--- @return table controller Actual script-actions controller.
+local function capture_pause_controller(Source, state)
+	local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+	local source = file:read("*a"); assert(file:close())
+	local marker = "on_pause_change = function(paused)"
+	local first, last = source:find(marker, 1, true)
+	assert(first and last, "The genuine daemon pause callback must exist")
+	local finish = assert(source:find("\n\t\tend,\n\t})", last + 1, true))
+	local body = source:sub(last + 1, finish - 1)
+	local callback = assert(load("return function(paused)" .. body .. "\nend", "genuine-daemon-pause", "t", {
+		MagicKeySource = Source,
+		TapHold = { set_paused = function() end },
+		package = { loaded = {} },
+	}))()
+	return require("modules.shortcuts.script_actions").new({
+		reset = function() end, reload = function() end, quit = function() end,
+		on_pause_change = function(paused)
+			state.active = not paused
+			callback(paused)
+		end,
+	})
+end
+
+helpers.describe("magic key source: genuine pause notification retires captures", function()
+	for _, stage in ipairs({ "waiting", "answered", "roundtrip" }) do
+		helpers.it("discards a " .. stage .. " capture at the real daemon pause callback", function()
+			with_source(nil, function(Source, Preferences, path)
+				local state = { active = true, replace = true, typed_ok = true }
+				local calls = wire(Source, state)
+				local controller = capture_pause_controller(Source, state)
+				local chosen = {}
+				local handlers = { on_chosen = function(value) chosen[#chosen + 1] = value end, on_refused = function() end }
+				helpers.assert_true(Source.capture(handlers))
+				if stage ~= "waiting" then helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} })) end
+				controller.toggle_pause()
+				if stage == "roundtrip" then controller.toggle_pause() end
+				if stage == "waiting" then helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false) end
+				run_due(calls)
+				helpers.assert_eq(chosen, {})
+				helpers.assert_eq(Source.get(), "auto")
+				local file = io.open(path, "rb"); if file then file:close() end
+				helpers.assert_nil(file, "retired capture cannot create preferences")
+				if stage ~= "roundtrip" then controller.toggle_pause() end
+				helpers.assert_true(Source.capture(handlers), "resume permits a fresh capture, not the old choice")
+				helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+				run_due(calls)
+				helpers.assert_eq(chosen, { "KeyJ" })
+				Source._reset_for_test()
+			end)
+		end)
+	end
+
+	for _, stage in ipairs({ "before_press", "after_answer" }) do
+		helpers.it("refuses capture input after grab loss " .. stage, function()
+			with_source(nil, function(Source)
+				local state = { active = true, replace = true, typed_ok = true }
+				local calls = wire(Source, state)
+				local chosen = {}
+				local handlers = { on_chosen = function(value) chosen[#chosen + 1] = value end, on_refused = function() end }
+				helpers.assert_true(Source.capture(handlers))
+				if stage == "after_answer" then helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} })) end
+				state.grab = false
+				if stage == "before_press" then helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false) end
+				run_due(calls)
+				helpers.assert_eq(chosen, {})
+				helpers.assert_eq(Source.get(), "auto")
+				state.grab = true
+				helpers.assert_true(Source.capture(handlers))
+				Source._reset_for_test()
+			end)
+		end)
+	end
+
+	helpers.it("leaves the physical key native if pause and resume occur inside deferred submission", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true }
+			local calls = wire(Source, state)
+			local controller = capture_pause_controller(Source, state)
+			local chosen = {}
+			local handlers = { on_chosen = function(value) chosen[#chosen + 1] = value end, on_refused = function() end }
+			helpers.assert_true(Source.capture(handlers))
+			state.answer_pause = function() controller.toggle_pause(); controller.toggle_pause() end
+			helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false)
+			run_due(calls)
+			helpers.assert_eq(chosen, {})
+			helpers.assert_eq(Source.get(), "auto")
+			helpers.assert_true(Source.capture(handlers))
+			Source._reset_for_test()
+		end)
+	end)
+end)
+
+
+helpers.describe("magic key source: newer admitted capture requests fence queued predecessors", function()
+	local function handlers(chosen)
+		return { on_chosen = function(value) chosen[#chosen + 1] = value end,
+			on_refused = function() error("This declared candidate should not be refused") end }
+	end
+	helpers.it("a fresh admitted B fences queued A while preserving B and its later answer", function()
+		with_source(nil, function(Source, Preferences, path)
+			local calls = wire(Source, { active = true, replace = true, typed_ok = true })
+			local a, b = {}, {}
+			helpers.assert_true(Source.capture(handlers(a)))
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			helpers.assert_true(Source.capture(handlers(b)), "a fresh request can start after A answer admission")
+			run_due(calls)
+			helpers.assert_eq(a, {}, "the superseded A callback must not notify")
+			helpers.assert_eq(b, {})
+			helpers.assert_eq(Source.get(), "auto", "the superseded A callback must not persist")
+			local file = io.open(path, "rb"); if file then file:close() end
+			helpers.assert_nil(file, "A cannot create a preference document after B admission")
+			helpers.assert_eq(Source.capture(handlers({})), false, "B remains the exact pending capture")
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			run_due(calls)
+			helpers.assert_eq(a, {})
+			helpers.assert_eq(b, { "KeyJ" })
+			Source._reset_for_test()
+		end)
+	end)
+	helpers.it("a refused B timeout grants no generation authority over acknowledged A", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true, fail_arm = false }
+			local actual_init = Source.init
+			Source.init = function(dependencies)
+				local actual_defer = dependencies.defer
+				dependencies.defer = function(callback, delay)
+					if delay > 0 and state.fail_arm then return false end
+					return actual_defer(callback, delay)
+				end
+				return actual_init(dependencies)
+			end
+			local calls = wire(Source, state); Source.init = actual_init
+			local a, b = {}, {}
+			helpers.assert_true(Source.capture(handlers(a)))
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			state.fail_arm = true
+			helpers.assert_eq(Source.capture(handlers(b)), false)
+			run_due(calls)
+			helpers.assert_eq(a, { "KeyJ" }, "unadmitted B cannot invalidate the accepted prior answer")
+			helpers.assert_eq(b, {})
+			Source._reset_for_test()
+		end)
+	end)
+	helpers.it("stale A submission cannot cancel B created by a reentrant answer callback", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true }
+			local calls = wire(Source, state)
+			local a, b = {}, {}
+			helpers.assert_true(Source.capture(handlers(a)))
+			state.answer_pause = function()
+				state.answer_pause = nil
+				Source.cancel_capture()
+				helpers.assert_true(Source.capture(handlers(b)), "reentrant B must actually be admitted")
+			end
+			helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false)
+			helpers.assert_eq(Source.capture(handlers({})), false, "the stale mismatch path must preserve B")
+			run_due(calls)
+			helpers.assert_eq(a, {})
+			helpers.assert_eq(Source.get(), "auto")
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			run_due(calls)
+			helpers.assert_eq(a, {})
+			helpers.assert_eq(b, { "KeyJ" })
+			Source._reset_for_test()
+		end)
+	end)
+end)
+
+
+helpers.describe("magic key source: native timeout throw is a refused capture admission", function()
+	local function timed_throw_source(Source, state)
+		local init = Source.init
+		Source.init = function(dependencies)
+			local actual_defer = dependencies.defer
+			dependencies.defer = function(callback, delay)
+				if delay > 0 and state.throw_arm then
+					if state.reentrant then state.reentrant() end
+					error("Controlled native timeout submission refusal")
+				end
+				return actual_defer(callback, delay)
+			end
+			return init(dependencies)
+		end
+		local calls = wire(Source, state); Source.init = init
+		return calls
+	end
+	local function answer(chosen)
+		return { on_chosen = function(value) chosen[#chosen + 1] = value end,
+			on_refused = function() error("Timed admission failure must not publish a choice") end }
+	end
+	helpers.it("returns false instead of propagating an initial native timeout exception", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true, throw_arm = true }
+			timed_throw_source(Source, state)
+			local called, started = pcall(Source.capture, answer({}))
+			helpers.assert_true(called, "native timer refusal must remain a typed false result")
+			helpers.assert_eq(started, false, "a thrown timeout was not admitted")
+			Source._reset_for_test()
+		end)
+	end)
+	helpers.it("does not leak the capture slot after a throwing initial timeout", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true, throw_arm = true }
+			local calls = timed_throw_source(Source, state)
+			local failed, fresh = {}, {}
+			pcall(Source.capture, answer(failed))
+			state.throw_arm = false
+			helpers.assert_true(Source.capture(answer(fresh)), "the failed candidate must release only its own slot")
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			run_due(calls)
+			helpers.assert_eq(failed, {})
+			helpers.assert_eq(fresh, { "KeyJ" })
+			Source._reset_for_test()
+		end)
+	end)
+	helpers.it("preserves queued A generation when B timeout submission throws", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true, throw_arm = false }
+			local calls = timed_throw_source(Source, state)
+			local a, b = {}, {}
+			helpers.assert_true(Source.capture(answer(a)))
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			state.throw_arm = true
+			local called, started = pcall(Source.capture, answer(b))
+			run_due(calls)
+			helpers.assert_eq(a, { "KeyJ" }, "B acquired no generation authority over the prior acknowledged A")
+			helpers.assert_eq(b, {})
+			helpers.assert_true(called)
+			helpers.assert_eq(started, false)
+			state.throw_arm = false
+			helpers.assert_true(Source.capture(answer({})), "failed B must leave no hidden capture debt")
+			Source._reset_for_test()
+		end)
+	end)
+	helpers.it("failed A timeout cannot cancel reentrant admitted B", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true, throw_arm = true }
+			local calls = timed_throw_source(Source, state)
+			local a, b = {}, {}
+			state.reentrant = function()
+				state.reentrant, state.throw_arm = nil, false
+				Source.cancel_capture()
+				helpers.assert_true(Source.capture(answer(b)))
+			end
+			local called, started = pcall(Source.capture, answer(a))
+			helpers.assert_true(called)
+			helpers.assert_eq(started, false)
+			helpers.assert_eq(Source.capture(answer({})), false, "reentrant B remains the exact admitted owner")
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			run_due(calls)
+			helpers.assert_eq(a, {})
+			helpers.assert_eq(b, { "KeyJ" })
+			Source._reset_for_test()
+		end)
 	end)
 end)
