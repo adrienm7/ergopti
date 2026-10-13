@@ -3326,6 +3326,21 @@ remain required, separately from the local gates.
   chosen-folder writers and rerun preservation. Remaining acceptance includes
   the installed fresh/existing/moved-folder wizard and actual trigger/runtime
   restart on each OS; portable or historical CI alone does not complete it.
+  The macOS initial-page host now retains an initialization request for the
+  exact window and configuration source when native timer construction/start
+  refuses. Same-source reopening retries deferred admission; pending and active
+  initialization coalesce, and source changes during encoding cannot submit the
+  old values. Cleanup-only and retired windows cannot initialize a successor.
+  Configured Lua receiving passes the complete 67-case delivery module (all 52
+  original subjects plus 15 new), 14 focus-owner cases and nine window-outcome
+  cases. The literal predecessor with the same tests fails ten delivery cases;
+  restoring the correction passes all 90 again. These tests use the genuine
+  DeferredWork and TimerScheduler with native-port doubles. The complete local
+  macOS unit suite passes 19,013 tests across 1,576 modules; E2E passes 101/101
+  with one host/driver-specific scenario skipped. Formatting passes; JS remains
+  422/426 with the four previously observed failures. Current macOS CI,
+  Cocoa interaction, packaging, installation and installed restart remain
+  unqualified; this bounded correction does not complete item 7 or item 38.
   The macOS wizard now requires a committed native import timeout before
   acquiring navigation-layer or remap work. A refused timer start takes the
   existing translated notice and reload continuation for answers already saved;
@@ -3908,6 +3923,31 @@ Hosted Lua owner tests do not qualify physical input.
   keys without a macOS keycode (play/pause, track skips, brightness), and a
   VirtualHIDDevice version-skew policy. About 30-40 agent-days plus maintainer
   hardware time.
+
+  FileSystem transaction receipts now retain their original private issuer,
+  publication chain and current source view; replacement after admission is
+  refused, including an unchanged-byte publication. The six independent
+  software controls receive 0 PASS / 6 FAIL on the original issuer, 6 / 0 on
+  the correction, and the same 0 / 6 after restoration. The cold fixture sets
+  its existing logger stub before resolving its Hammerspoon stub. Real I/O,
+  held descriptors and restoration are observed; HS metadata remains modeled.
+  This narrow slice does not qualify Config bindings, the production runtime,
+  native macOS installation or the customer lease failure. Those requirements
+  remain open under this item.
+
+WP3 delivery/transport captures its original admission ports, requires literal
+completion of an optional original baseline observer, and keeps task settlement
+pending through active emission and error-report callbacks. The original 18
+delivery and 10 transport controls remain unchanged; eight frozen regressions
+receive 28 passes / 8 failures before, 36 / 0 current, and 28 / 8 after the exact
+inverse. All source, Git, child-group and mask/debt checks remain whole. The
+complete private receiver nevertheless returns 1: twelve diagnostic lines differ
+only in dictionary key order between before and restored raw output. That
+refusal is preserved without normalization or a shared formatter change.
+Full native packaging, installed capture and physical acceptance remain pending.
+These Hammerspoon Lua software/model controls do not qualify native capture,
+Core/installed runtime, other drivers or the customer exit73 incident. TODO31
+remains partial.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
@@ -11651,6 +11691,19 @@ exact-boolean regressions also pass the focused runner.
   effective category/section changes through their persistence owners;
   retain unrelated choices and fence refused writes/runtime publication.
   Replay the same full-enable/full-disable behavior on every driver.
+  Shared Lua metadata preparation now classifies exact canonical stored types
+  before the filtered hotstring projection can conceal an invalid leaf. The
+  selected invalid field and scalar/array ancestors refuse edits and clearing;
+  safe neighbours preserve the foreign source bytes. The unchanged Windows
+  owner receives eight native parity cases. Focused Lua coverage is 47/47 on
+  each supported helper, against the original 32/15; the independent parent
+  judge is 16/16 under Lua 5.4 and LuaJIT, against 12 original failures each.
+  Corrected canonical Linux units pass 13568/13568 (521 modules), and E2E
+  pass 193/193 plus six digest controls, each exit 0. Targeted macOS portable
+  adoption/preservation pass 19/19 and 47/47; the preceding full macOS run's
+  refusal-order failure was fixed without changing its assertion. Full JS is
+  424/426, exit 1, with two unchanged Root-owned source guard failures.
+  Windows AHK and native macOS/UI acceptance remain UNRUN; TODO 102 stays open. See the executable [stored-type continuation](handovers/2026-10-12-dev-consolidation/personal-metadata-types.md).
   The macOS lifecycle helper now rejects the preference owner's returned
   refusal as well as a thrown publication error. Three regressions first
   showed false acknowledgements after false/nil/throwing writer results;

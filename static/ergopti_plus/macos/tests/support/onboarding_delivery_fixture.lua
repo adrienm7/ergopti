@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
-local function with_delivery(callback)
+local function with_delivery(callback, native_timers)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
 		"adapters.file_system", "infra.config_paths", "platform.remap", "json" }, function()
 		-- Distinctive rule: a wizard that derived the path itself cannot match it.
@@ -71,9 +71,48 @@ local function with_delivery(callback)
 				return { mode = "directory", dev = 1, ino = 1 }
 			end
 			hs.fs.pathToAbsolute = function(path) return path end
-			package.loaded["infra.deferred_work"].after = function(_, fn)
-				pending[#pending + 1] = fn
-				return true
+			local native_timer_new, owned_timers, scheduler
+			if native_timers then
+				owned_timers, state.timer_attempts, state.read_paths = {}, 0, {}
+				native_timer_new = hs.timer.new
+				hs.timer.new = function(_, callback)
+					state.timer_attempts = state.timer_attempts + 1
+					if state.timer_refusal == "new" then return false end
+					local timer = { callback = callback, active = false, stops = 0 }
+					function timer:start()
+						if state.timer_refusal == "start" then return false end
+						self.active = true
+						if state.on_timer_start then state.on_timer_start() end
+						if state.timer_synchronous then self.callback() end
+						return self
+					end
+					function timer:running() return self.active end
+					function timer:stop()
+						self.stops = self.stops + 1
+						self.active = false
+						return self
+					end
+					owned_timers[#owned_timers + 1] = timer
+					return timer
+				end
+				package.loaded["adapters.timer_scheduler"] = nil
+				scheduler = require("adapters.timer_scheduler")
+				package.loaded["infra.deferred_work"] = nil
+				require("infra.deferred_work")
+				package.loaded["ui.onboarding"] = nil
+				onboarding = require("ui.onboarding")
+				state.focus_attempts = 0
+				package.loaded["ui.ui_builder"].force_focus = function(view, _, options)
+					state.focus_attempts = state.focus_attempts + 1
+					return options.is_current() == true and state.view == view
+				end
+				state.native_timers, state.scheduler = owned_timers, scheduler
+				state.fire_timer = function(index) owned_timers[index].callback() end
+			else
+				package.loaded["infra.deferred_work"].after = function(_, fn)
+					pending[#pending + 1] = fn
+					return true
+				end
 			end
 			package.loaded["infra.logger"].error = function(_, message, ...)
 				errors[#errors + 1] = string.format(message, ...)
@@ -81,7 +120,8 @@ local function with_delivery(callback)
 			end
 			local original_open = io.open
 			local ok, err = xpcall(function()
-				io.open = function(_, mode)
+				io.open = function(path, mode)
+					if native_timers then state.read_paths[#state.read_paths + 1] = path end
 					helpers.assert_eq(mode, "r", "fixture must never authorize config writes")
 					return { read = function() return "fixture" end, close = function() return true end }
 				end
@@ -98,8 +138,30 @@ local function with_delivery(callback)
 				open()
 				callback(onboarding, state, pending, errors, evaluations, open)
 			end, debug.traceback)
+			local cleanup_errors = {}
+			if native_timers then
+				state.refused, state.on_error = false, nil
+				local function cleanup(operation)
+					local cleaned, detail = pcall(operation)
+					if not cleaned then cleanup_errors[#cleanup_errors + 1] = tostring(detail) end
+				end
+				local owned_view = state.view
+				-- Native close retires page authority before exact fixture disposal.
+				cleanup(function() owned_view.options.on_close() end)
+				cleanup(function() owned_view:delete() end)
+				for _, timer in ipairs(owned_timers) do
+					cleanup(function() timer.callback() end)
+					cleanup(function() timer:stop() end)
+				end
+				cleanup(function() helpers.assert_eq(scheduler.activeCount(), 0, "owned native timers retire") end)
+				hs.timer.new = native_timer_new
+			end
 			io.open = original_open
-			if not ok then error(err, 0) end
+			if not ok then
+				if #cleanup_errors > 0 then pcall(function() io.stderr:write(table.concat(cleanup_errors, "\n") .. "\n") end) end
+				error(err, 0)
+			end
+			if #cleanup_errors > 0 then error(table.concat(cleanup_errors, "\n"), 0) end
 		end)
 	end)
 end
