@@ -445,3 +445,62 @@ for (const [surface, retained, replacement] of originInverses) {
 process.stdout.write(
 	`Windows original-origin custody: PASS (${originInverses.length} source inverses; authored AHK UNRUN).\n`
 );
+
+/** Exact operation custody is distinct from the service's unchanged origin tuple. */
+function assertFinalAuxCurrency(httpSource) {
+	const terminal = originBody(httpSource, '_LLM_OllamaInvokeAuxResult');
+	const currency = terminal.indexOf('LLM_OllamaOriginCustodyCurrent');
+	const final = terminal.lastIndexOf('if !LLM_AuxIsCurrent(Owner)');
+	const invoke = terminal.indexOf('_LLM_InvokeCallback');
+	assert.ok(
+		currency >= 0 && final > currency && invoke > final,
+		'Original operation must remain current after the opaque native origin reader.'
+	);
+	const callback = originBody(httpSource, '_LLM_OllamaInvokeCurrentAuxCallback');
+	assert.match(callback, /if !LLM_AuxIsCurrent\(Owner\)/);
+	assert.match(callback, /_LLM_InvokeCallback\(Callback, "on_result", Value\)/);
+	for (const name of [
+		'LLM_OllamaIsRunning_Async',
+		'LLM_OllamaListModels_Async',
+		'LLM_OllamaDeleteModel_Async'
+	]) {
+		const body = originBody(httpSource, name);
+		assert.match(
+			body,
+			/LLM_OllamaInvokeOriginCurrent\.Bind[\s\S]*?_LLM_OllamaInvokeCurrentAuxCallback\.Bind\(Owner, on_result\)/,
+			'Inner native currency validation must deliver through the exact captured operation.'
+		);
+	}
+}
+assertFinalAuxCurrency(originHttp);
+const finalAuxInverses = [
+	['	if !LLM_AuxIsCurrent(Owner)\n		return false\n	try _LLM_InvokeCallback', '	try _LLM_InvokeCallback'],
+	[
+		'_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {\n	if !LLM_AuxIsCurrent(Owner)',
+		'_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {\n	if false'
+	],
+	['_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result)', 'on_result']
+];
+for (const [original, replacement] of finalAuxInverses) {
+	const changed = originHttp.replace(original, replacement);
+	assert.notEqual(
+		changed,
+		originHttp,
+		'Final Aux inverse must withdraw its actual production seam.'
+	);
+	assert.throws(() => assertFinalAuxCurrency(changed));
+}
+// Independently withdraw the two remaining producer binders, not only the first match.
+const auxBinder = '_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result)';
+const auxBindings = originHttp.split(auxBinder);
+assert.equal(auxBindings.length, 4, 'Exactly ping, tags and delete retain the delivery owner.');
+for (const withdrawn of [1, 2]) {
+	const changed = auxBindings
+		.map((part, index) => part + (index < 3 ? (index === withdrawn ? 'on_result' : auxBinder) : ''))
+		.join('');
+	assert.notEqual(changed, originHttp);
+	assert.throws(() => assertFinalAuxCurrency(changed));
+}
+process.stdout.write(
+	'Windows exact auxiliary result: PASS (5 causal source inverses; authored AHK UNRUN).\n'
+);
