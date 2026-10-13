@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-13. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
+Updated: 2026-10-14. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
 at `63cf3d005d371edb4e4093a906da276ced487182`, published and verified by the
 publication owner with [CI 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226).
 This checklist is the current handoff; older workflow task-status files are
@@ -11,6 +11,48 @@ Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+### October 14 Windows regression follow-up
+
+Eight atomic fixture corrections retain every original assertion while receiving
+the actual current schema boot, prompt input port, valid personal TOML, metadata
+scalar/table shape, local-server alias rules, cancelled-slot successor, semantic
+writer admission and valid empty numbered captions. Twelve exact selections
+receive 141 cases with natural exit 0, zero failures/skips. This includes three
+new native-start diagnostic cases and the original stop-diagnostic case. These
+controlled callbacks do not qualify real DLL teardown or native inference.
+
+Native Start now reads its original Win32 error before cleanup resets the native
+semantic state. The original production-function probe receives one PASS/two
+FAIL (exit 1); the corrected integrated runner receives three PASS (exit 0),
+including cleanup lookup failure retaining both errors. The underlying previously
+observed OS_ERROR status 6 remains unresolved; preserving its code is not a fix
+for its cause. Authenticated valid/invalid/full-entry compiler controls receive
+0/17/0, engine/native-Edit E2E receives 70/70 and the actual isolated startup smoke
+passes. The exact gate receipts retain their commands and natural exits.
+
+The immutable complete Windows attempt at
+`51176f8744124460d685a6eba58a03c1b5aa4a20` remains
+FAILED_INCOMPLETE_WATCHDOG: 5,853 PASS, six FAIL, zero SKIP, 5,859 completed of
+12,574 planned; case 5,860 was in flight when its existing 7,200,000 ms watchdog
+exited 2. The subsequent selected corrections do not turn that attempt green or
+qualify the cases it never ran. The fresh complete JS command reaches natural
+exit 1: 408/425 PASS, 17 FAIL; its status remains
+FAILED. Sources were frozen throughout this follow-up command.
+
+[CI 38463374686](https://github.com/adrienm7/ergopti/actions/runs/38463374686)
+refuses Snapshot16 source admission before launching any Windows unit child.
+The genuine snapshot prototype correction changes both sealed source images and
+adds a seventeenth case. The exact two hashes, retained original-red receipt and
+seventeen-case local receipt are prepared for the CI owner's review. No seal,
+TAP requirement, CI workflow or qualification flag is relaxed.
+
+Item 49 still needs an authenticated native-lifetime retirement contract for
+uncertain registrations, complete cohort conversion and production emitter
+policy. Managed Windows AI installation/model/stream/warmup and actual installed
+application receiving remain open. Windows hosted CI VM evidence, this host's
+controlled native software receipts and physical keyboard/display/UIA acceptance
+remain distinct. Native macOS and unavailable Linux remain UNRUN here.
 
 ### October 13 Windows receiving checkpoint
 
