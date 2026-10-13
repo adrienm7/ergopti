@@ -150,6 +150,41 @@ host completion/quit outcome; a corrected installed rerun is still pending.
 The stock collector's 30 PowerShell controls pass again at the same source SHA.
 User metadata refresh and installed receiving are not isolated-suite evidence.
 
+#### Actual compiled diagnostic archive receiving
+
+The corrected local development build at
+`e235a917e2eaab4ab53569e631a9c631acc1b067` compiles successfully. Its exact
+11,037,184-byte executable SHA256 is
+`ef96387dc8efbaedee9d3ca06370ce044ef9e35443244ba61849488a8ec92c6d`.
+The obsolete no-download explanation is removed from both availability notices
+in all 21 locales; download consent and installation behavior are unchanged.
+
+Actual Diagnostics collection is received from the compiled button, first in
+native fallback and subsequently in the WebView after reopening. Closing the
+view at guided 10/14 leaves the exact original session active without creating
+cancellation control. Reopening exposes its acknowledged archive; a second
+collection receives an explicit physical-skip action and exposes its archive.
+The host's archive action is enabled only after its existing digest-bound terminal
+acknowledgement. No separate raw host exit-code receipt was captured by the UI
+observer; worker archive existence alone is not used as host completion proof.
+
+The reviewed second archive `diagnostic-Windows-e235a917e2.zip` is 7,956 bytes,
+SHA256 `965e2d7309251977e8009001446e83f6e8f7b38e550d689ba806ea732ed1526a`.
+ZIP CRC, closed entry allowlist, redaction review, exact source and every one of
+six component hashes/sizes pass. Its genuine installed-binary identity describes
+this local compiled artifact, not a published or installer-qualified release.
+It records six PASS (redaction, component identity, synthetic UIA, synthetic render,
+component stability and worker-owned cleanup), six functional UNRUN and two
+physical SKIP. The manifest retains both production and physical qualification
+as false. The archive and private evidence remain outside Git.
+
+The cold Diagnostics WebView reports cache invalidation TimeoutError and uses
+its real native fallback; reopening successfully renders the shared page. This
+error stays open. Windows full-unit/CI failures, actual managed AI receiving,
+cohort conversion and production backend policy, personal Linux native receiving,
+macOS native/device acceptance and physical keyboard/display scenarios remain
+open. This collector receipt does not promote any of them to PASS.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
@@ -11912,6 +11947,17 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   all 51 prior cases with nine appended controls. Native GUI, capture, assignment
   and output qualification remain required; physical delivery stays unavailable.
 
+The Linux keyboard consumer now grants a deferred action only after its original
+queue returns literal true and the dispatcher remains current. Inline callbacks,
+failed/throwing queues and later callbacks from refused queues remain inert;
+accepted delivery is spent before reentrant action callbacks. All 80 original
+keyboard-shortcut cases remain unchanged. Both LuaJIT and Lua 5.4 receive nine
+failures on the original source and 89 passes on the correction; three frozen
+omissions fail their independently predicted 1, 7 and 2 cases on both ABIs.
+The real named Ctrl+J route demonstrates the defect without enabling physical
+assignments. Whole-source/installed/native output qualification remains open;
+item 97 stays partial.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -12650,6 +12696,27 @@ omissions fail independently. Discovery, native availability and the 20-second
 fence remain unchanged. Full selected and native/installed qualification remain
 required; these component receipts do not complete item 106.
 
+The query owner retains construction until the transport start acknowledgement.
+An already retired failed startup still delivers the original single closed
+query_refused notification after that acknowledgement resolves; it cannot publish
+a catalogue even if a refused transport supplied a valid packet. Cancellation
+retains late cleanup debt, and settlement rechecks the exact active owner before
+clearing it. All 77 original cases, original native fixtures and invocation code
+remain unchanged. Controlled Lua 5.4 receiving passes 93/93; original source
+receives 83 passed / 10 failed, and the first correction receives 85/8. Three
+single-span omissions receive 91/2, 86/7 and 92/1 respectively. The first full
+selected gate's 19,008 passes / 2 original native-fixture failures remain recorded;
+Corrected selected receiving passes formatting (392 files), all 19,014 Lua unit
+tests and 101 simulated E2E checks, with one original host skip. JavaScript receives
+423 passes / 3 failures: two retained Root-owned source guards and an uninstall
+fixture placed beneath the protected /tmp Git checkout. The unchanged uninstall
+test reproduces that refusal under /tmp and passes in the owned temporary root
+outside Git; both source/index/HEAD frames and fixture cleanup remain exact.
+The whole selected gate remains failed; this isolated receiving does not replace
+a final CI verdict. Current helpers require table.pack, so the new cases remain
+unexecuted under LuaJIT without a shim. Native discovery, invocation, permissions
+and installed reception remain open.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
@@ -12777,6 +12844,18 @@ Hosted native expected-failure receiving, forced output, installation and
 physical delivery remain required. Neither source enrollment nor diagnostic
 SDK constants qualify the native Swift Shortcuts product or remote invocation.
 
+The current-network source companion additionally retains the four reviewed
+HTTP build inputs at e94153e8, the two approved Group5 Remap inputs and the
+other 93 historical inputs in the original 99-path recipe. Its 31 controlled
+software cases pass on the exact final fixture; three independently predicted
+omissions fail 5, 1 and 1 cases respectively. The original core, historical
+53/51 controls, native twelve expectations and TIS closure checks are unchanged.
+[The standalone companion command](../tools/diagnostics/fixtures/number-row-current-network/README.md)
+is available, but its Common inventory enrollment remains owned by Root and
+pending. Current committed Git-generation, hosted native expected-failure
+receiving, forced output, installed acceptance and physical delivery remain
+unqualified. Item 107 stays partial.
+
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
   Win/Super on Windows/Linux. Implemented: one ordinary editable conditional
@@ -12863,6 +12942,20 @@ SDK constants qualify the native Swift Shortcuts product or remote invocation.
   waiver. Raw LuaJIT remains unqualified because its existing command-lines
   dependency requires table.pack; native Hammerspoon is unrun. This does not
   finish live retargeting, collision or installed acceptance.
+
+The Linux layout consumer now renews an automatic X11 inverse after an
+acknowledged group change in the same original map, session and issuer.
+Character resolution and new plans use that distinct inverse; all old plans
+remain revoked. Explicit overrides, equal-group epoch replacement, unknown
+source, reset and reentrant publication keep their original refusals. All 118
+original keyboard-layout cases remain unchanged; the appended twelve yield
+130 passes on both LuaJIT and Lua 5.4. Original source receives 125 passes and
+five failures. Consumer omission retains those five failures; four bounded
+omissions each fail their independently predicted new case. The full-prefix
+same-group omission also fails its pre-existing refusal case; that extra red
+is preserved separately. No capture reset, modifier clearing or output grant
+is added. Hosted native group changes, editor-key retargeting, collision and
+installed/physical acceptance remain required; item 108 stays partial.
 
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:
