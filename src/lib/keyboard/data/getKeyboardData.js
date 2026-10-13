@@ -1,6 +1,8 @@
+import { base } from '$app/paths';
+
 export async function getKeyboardData(version) {
 	const fileName = `ergopti_v${version}`;
-	const filePath = `/layouts/visualisation/${fileName}.json`;
+	const filePath = `${base}/layouts/visualisation/${fileName}.json`;
 
 	console.info(`[KeyboardData] Trying to load file at path "${filePath}"`);
 
