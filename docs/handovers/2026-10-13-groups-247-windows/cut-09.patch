@@ -1,0 +1,105 @@
+--- a/static/ergopti_plus/windows/ui/menu/menu_llm/menu_agent.ahk
++++ b/static/ergopti_plus/windows/ui/menu/menu_llm/menu_agent.ahk
+@@ -235,9 +235,11 @@
+ LLM_Agent_OnAppPickerSave(Selected, Receipt) {
+ 	global _LLM_Agent_CommitFn
+ 	Commit := HasMethod(_LLM_Agent_CommitFn, "Call") ? _LLM_Agent_CommitFn : LLM_Menu_CommitMutation
+-	if !Commit.Call("the AI agent excluded applications",
++	Previous := LLM_Agent_Setting("agent_disabled_apps")
++	Committed := Commit.Call("the AI agent excluded applications",
+ 			_LLM_Agent_ApplyPickerSelection.Bind(Selected, Receipt),
+-			_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps"))
++			_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps", Previous))
++	if !(Committed is Integer) || Committed != true
+ 		return false
+ 	LLM_Agent_RefreshTray()
+ 	return true
+--- a/static/ergopti_plus/windows/tests/unit/test_llm_agent.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_llm_agent.ahk
+@@ -2696,3 +2696,36 @@
+ 	}
+ }
+ Test("LLM agent: requester commit requires typed admission (todo46-manual-requester)", _LAG_RequesterRejectsUntypedCommit)
++
++/** The actual app-picker save binds the shared tail's previous value and candidate. */
++_LAG_AppPickerLiveTail(Mode) {
++	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(""), Body)
++	Body(Fx, Lines, Sent) {
++		global _LLM_Menu, _LLM_Agent_CommitFn, _LLM_Agent_Generation
++		Generation := _LLM_Agent_Generation
++		Selected := Mode == "same" ? [] : ["Slack.EXE"]
++		Receipt := AppPicker_IssueReceipt("agent:disabled_apps", Mode == "stale" ? ["other.exe"] : [])
++		try {
++			if Mode == "refused"
++				_LLM_Agent_CommitFn := (*) => false
++			else if Mode == "float"
++				_LLM_Agent_CommitFn := (*) => 1.0
++			else if Mode == "string"
++				_LLM_Agent_CommitFn := (*) => "accepted"
++			Accepted := Mode == "accepted" || Mode == "same"
++			AssertEqual(Accepted, LLM_Agent_OnAppPickerSave(Selected, Receipt))
++			AssertEqual(Accepted ? 1 : 0, Fx.Rebuilds, "Only an exact acknowledged tail rebuilds the tray.")
++			AssertEqual(Generation, _LLM_Agent_Generation, "App exclusions do not retire an unrelated manual requester.")
++			Expected := Mode == "accepted" ? ["slack.exe"] : []
++			AssertEqual("", _LVS_DeepEqual(Expected, _LLM_Menu["agent_disabled_apps"]))
++			if Accepted {
++				AssertEqual(1, Fx.Commits.Length, "The real candidate and shared live tail complete once.")
++				AssertFalse(LLM_Agent_OnAppPickerSave(Selected, Receipt), "An accepted picker receipt cannot be reused.")
++				AssertEqual(1, Fx.Rebuilds)
++			}
++		} finally AppPicker_RetireReceipt(Receipt)
++	}
++}
++for _LAG_AppPickerMode in ["accepted", "same", "refused", "stale", "float", "string"]
++	Test("LLM agent app picker: actual live tail " . _LAG_AppPickerMode . " (agent-app-picker-tail)",
++		_LAG_AppPickerLiveTail.Bind(_LAG_AppPickerMode))
+--- a/tools/test/test-windows-rewrite-prompt-wiring.cjs
++++ b/tools/test/test-windows-rewrite-prompt-wiring.cjs
+@@ -827,6 +827,47 @@
+ 	'Manual requester source currency: 19 causal source inverses passed; 25 added AHK cases UNRUN.'
+ );
+ 
++// The picker must bind both retained arguments before the actual candidate callback.
++function validateAgentPickerTail(actionSource, menuSource, transactionSource) {
++	const assert = require('node:assert/strict');
++	const declaration = actionSource.match(/^_LLM_Agent_ApplyCommitted\(([^\n]*)\) \{/m);
++	assert.ok(declaration, 'Actual shared agent live tail must exist.');
++	assert.deepEqual(
++		declaration[1].split(',').map((value) => value.trim()),
++		['Key', 'Previous', 'Candidate']
++	);
++	const save = menuSource.match(/^LLM_Agent_OnAppPickerSave\([^\n]*\) \{\n([\s\S]*?)\n\}/m);
++	assert.ok(save, 'Actual application-picker save must exist.');
++	assert.match(save[1], /_LLM_Agent_ApplyCommitted\.Bind\("agent_disabled_apps", Previous\)/);
++	assert.match(save[1], /Previous := LLM_Agent_Setting\("agent_disabled_apps"\)/);
++	assert.match(save[1], /Committed := Commit\.Call/);
++	assert.match(save[1], /if !\(Committed is Integer\) \|\| Committed != true/);
++	const tail = transactionSource.indexOf('try Applied := ApplyFn.Call(CandidateMenu)');
++	const durable = transactionSource.indexOf('if !ConfigCommitBorrowedUpdates(');
++	assert.ok(
++		durable >= 0 && tail > durable,
++		'Actual durable transaction supplies exactly the final candidate.'
++	);
++}
++const pickerTransactions = read('ui/menu/menu_llm/transactions.ahk');
++validateAgentPickerTail(agentAction, agentMenu, pickerTransactions);
++for (const [original, replacement] of [
++	[
++		'_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps", Previous)',
++		'_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps")'
++	],
++	['if !(Committed is Integer) || Committed != true', 'if !Committed'],
++	['Previous := LLM_Agent_Setting("agent_disabled_apps")', 'Previous := 0']
++]) {
++	const assert = require('node:assert/strict');
++	const changed = agentMenu.replace(original, replacement);
++	assert.notEqual(changed, agentMenu, 'Picker inverse must withdraw its real production seam.');
++	assert.throws(() => validateAgentPickerTail(agentAction, changed, pickerTransactions));
++}
++console.log(
++	'Agent app-picker callback: PASS (3 causal source inverses; authored native AHK cases UNRUN).'
++);
++
+ if (errors.length > 0) {
+ 	console.error('\x1b[31m[ERROR] Windows rewrite prompt wiring:\x1b[0m');
+ 	for (const e of errors) console.error('    - ' + e);

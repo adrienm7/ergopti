@@ -309,6 +309,18 @@ source/DLL provenance and production admission are unchanged. Full cohort
 migration, preregistration and production emission still have software work;
 no backend choice, native or physical qualification is inferred.
 
+The Windows continuation now retains fifteen atomic three-driver AI corrections
+on `codex/groups-247-completion`, with exact source inventory and
+[local continuation](handovers/2026-10-13-groups-247-windows/README.md).
+The current composed focused receiving passes 175 Mac portable cases, 29 Linux
+managed-response and seven Linux getter cases, both Windows source guards and
+AHK encoding, each exit 0. These do not replace complete composition or native
+receiving: 88 added Windows AI cases remain UNRUN. TODO 46/47/48/88 stay partial.
+The same handover preserves the unfinished preregistration draft, the separate
+G6-overlap observer candidate and the unimplemented C Begin/Plan writable-output
+alias gap. TODO 49 remains software-incomplete as well as native/device-unqualified;
+no complete cohort, production backend or physical acceptance is inferred.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)

@@ -1,0 +1,17 @@
+{
+	"required_predecessor_sha256": "187a016bd32a393a31db19663e61618b90419a5a41b8d6386f02032c58ccefe5",
+	"paths": [
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/api_ollama.lua",
+			"base_sha256": "aab98b74faa5cc9b553989257f0b0af5e1f0fc98b7991765d35de0551aaa7d60",
+			"after_sha256": "81edaac29048f1d9e388406a29de17e5875cc3230cc84f54a68dc823aea9282a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua",
+			"base_sha256": "6b162ae9157cfe16754690393711f0daf962378e7c76bda9b06ea95decdebfc7",
+			"after_sha256": "f862005d9e7a4b38a8e2fd2dab7cb659c598ff0c29c49443dc8b372e246256cc",
+			"all_old_lines_assertions_preserved": true
+		}
+	],
+	"patch_sha256": "b063128034898bde6cb6fd5515914c5a0f125e43e0f351adb90aee4e06439f3e"
+}

@@ -1,0 +1,33 @@
+{
+	"depends_on_frozen_b3b_sha256": "b3b04e8bc35cd7a295333c3e8c1e668cc29f94bc5a41f50ee57e6bd792e0212b",
+	"depends_transitively_on_exact_Linux_A_B_C": true,
+	"patch_sha256": "270ab3664a4c811c0dec47719f3cb100c51239dc9c21c3d96fdbf64293d2e7d6",
+	"files": [
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/profiles.lua",
+			"before_sha256": "b01791dd2e3e685a4764ae598257a8daa3f216f6ad39e614402343fac18d4bda",
+			"after_sha256": "acc608ae42b154873da12d9ebfada240d6706228f74e7c34e350212ad839ccdb",
+			"all_original_test_bytes_exact_prefix": null,
+			"original_assert_call_sites": 3,
+			"final_assert_call_sites": 3
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/test_runtime_engine_acquisition.lua",
+			"before_sha256": "35ae5e32edaf1ad14c6a8158a3c76fd214af820f20b54f477b175d4774ae60b7",
+			"after_sha256": "c4522f1f962d7560770916c6958b98802b0e5254d9e9db120a1ba96976a88ee0",
+			"all_original_test_bytes_exact_prefix": true,
+			"original_assert_call_sites": 170,
+			"final_assert_call_sites": 206
+		}
+	],
+	"cases_added": 7,
+	"proof": "actual Lua5.4 and LuaJIT production graph over existing controlled native/service/HTTP ports; no live/native desktop claim",
+	"baseline_each_ABI": "2PASS/5FAIL",
+	"corrected_each_ABI": "7PASS/0FAIL",
+	"complete_acquisition_each_ABI": "49PASS/0FAIL",
+	"canonical_preferences_each_ABI": "5PASS/0FAIL",
+	"native_desktop_live_ollama": "UNRUN",
+	"shared_controller_production_changes": false,
+	"roster_runner_CI_vendor_source_changes": false,
+	"raw_cache_census": "Only profiles owns _available_models. get_current_model returns configured selection separately; Engine/UI/model browser use public getter."
+}
