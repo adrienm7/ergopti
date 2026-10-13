@@ -352,3 +352,108 @@ helpers.describe("local model presence: native consent and download owner", func
 		helpers.assert_eq(effects, 0)
 	end)
 end)
+
+
+helpers.describe("local model offer: origin and installer consent affinity", function()
+	local function with_affinity(body)
+		local names = { "modules.llm.local_model_offer", "modules.llm.model_download" }
+		local old = {}
+		for _, name in ipairs(names) do old[name] = package.loaded[name]; package.loaded[name] = nil end
+		local state = { installs = {}, notices = 0, approved = true, successors = 0 }
+		local installer = { start = function(base_url, model, label, done, current)
+			state.installs[#state.installs + 1] = { base_url = base_url, model = model, done = done, current = current }
+			return true
+		end }
+		package.loaded[names[2]] = installer
+		local Offer = require(names[1])
+		local deps = {
+			confirm = function() if state.during_confirm then state.during_confirm() end; return state.approved end,
+			notify = function() state.notices = state.notices + 1; return true end,
+		}
+		Offer._reset_for_test(deps)
+		local ok, err = xpcall(function() body(Offer, state, installer, deps) end, debug.traceback)
+		Offer._reset_for_test()
+		for _, name in ipairs(names) do package.loaded[name] = old[name] end
+		if not ok then error(err, 0) end
+	end
+
+	for _, mutation in ipairs({ "origin", "model", "installer", "installer-owner", "admission" }) do
+		helpers.it("linux-model-consent-affinity: refuses modal replacement of " .. mutation, function()
+			with_affinity(function(Offer, state, installer)
+				local failure = require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
+				local opts = { current = function() return true end }
+				state.during_confirm = function()
+					if mutation == "origin" then failure.base_url = "http://127.0.0.1:11435"
+					elseif mutation == "model" then failure.model = "successor:3b"
+					elseif mutation == "installer" then installer.start = function() state.successors = state.successors + 1; return true end
+					elseif mutation == "installer-owner" then
+						package.loaded["modules.llm.model_download"] = { start = function() state.successors = state.successors + 1; return true end }
+					else opts.current = function() return true end end
+				end
+				helpers.assert_true(Offer.handle(failure, opts))
+				helpers.assert_eq(#state.installs, 0, "Consent must refuse a replaced origin, model, installer or requesting callback.")
+				helpers.assert_eq(state.successors, 0, "The replacement installer must never be invoked.")
+			end)
+		end)
+	end
+
+	helpers.it("linux-model-consent-affinity: effectful admission cannot replace installer between checks", function()
+		with_affinity(function(Offer, state, installer)
+			local modal_returned = false
+			state.during_confirm = function() modal_returned = true end
+			local opts = { current = function()
+				if modal_returned then installer.start = function() state.successors = state.successors + 1; return true end end
+				return true
+			end }
+			helpers.assert_true(Offer.handle(require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434"), opts))
+			helpers.assert_eq(#state.installs, 0)
+			helpers.assert_eq(state.successors, 0)
+		end)
+	end)
+
+	helpers.it("linux-model-consent-affinity: accepted original installer retains origin and retry admission", function()
+		with_affinity(function(Offer, state, installer)
+			local failure = require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
+			helpers.assert_true(Offer.handle(failure))
+			helpers.assert_eq(#state.installs, 1)
+			helpers.assert_eq(state.installs[1].base_url, "http://127.0.0.1:11434")
+			helpers.assert_eq(state.installs[1].model, "qwen:2b")
+			helpers.assert_true(state.installs[1].current())
+			installer.start = function() return true end
+			helpers.assert_eq(state.installs[1].current(), false, "A retry cannot borrow a successor installer.")
+		end)
+	end)
+
+	helpers.it("linux-model-consent-affinity: notification suppression belongs to its exact origin", function()
+		with_affinity(function(Offer, state)
+			local Policy = require("llm.local_model_policy")
+			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11434"), { automatic = true })
+			Offer.handle(Policy.failure("QWEN:2b", "http://127.0.0.1:11434"), { automatic = true })
+			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
+			helpers.assert_eq(state.notices, 2, "The same model on another endpoint needs its own delivered notice.")
+		end)
+	end)
+
+	helpers.it("linux-model-consent-affinity: completed original pull cannot clear a successor origin notice", function()
+		with_affinity(function(Offer, state)
+			local Policy = require("llm.local_model_policy")
+			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11434"))
+			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
+			state.installs[1].done(true)
+			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
+			helpers.assert_eq(state.notices, 1, "An old successful pull does not invalidate a successor endpoint's notice.")
+		end)
+	end)
+
+	helpers.it("linux-model-consent-affinity: completed pull cannot clear a notice delivered after its consent", function()
+		with_affinity(function(Offer, state)
+			local Policy = require("llm.local_model_policy")
+			local failure = Policy.failure("qwen:2b", "http://127.0.0.1:11434")
+			Offer.handle(failure)
+			Offer.handle(failure, { automatic = true })
+			state.installs[1].done(true)
+			Offer.handle(failure, { automatic = true })
+			helpers.assert_eq(state.notices, 1, "Completion cannot clear a warning created by a later failure.")
+		end)
+	end)
+end)
