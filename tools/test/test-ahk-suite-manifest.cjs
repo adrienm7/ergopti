@@ -9,6 +9,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 const pipeline = require('./ci-pipeline.cjs');
+const { partitionLocalShadowOutput } = require('./support/ahk-local-shadow-output.cjs');
 
 // Hosted logs may be unavailable independently of check-run annotations.
 // A source-contract or fixture assertion must remain diagnosable as well.
@@ -935,7 +936,7 @@ function snapshot16ExitSeal(result) {
 }
 
 /** Receive full closed bytes, including the framework's disk-only BOM. */
-function snapshot16Receive(bytes, mode) {
+function snapshot16Receive(bytes, mode, source) {
 	for (const key of ['tap', 'stdout', 'stderr']) {
 		assert.ok(Buffer.isBuffer(bytes[key]), `snapshot16 missing ${key} capture`);
 	}
@@ -945,7 +946,11 @@ function snapshot16Receive(bytes, mode) {
 	);
 	const text = bytes.tap.toString('utf8');
 	assert.ok(Buffer.from(text, 'utf8').equals(bytes.tap), 'snapshot16 malformed UTF-8');
-	assert.ok(bytes.stdout.equals(bytes.tap.subarray(3)), 'snapshot16 complete stdout differs');
+	const advisory = partitionLocalShadowOutput(bytes.stdout, bytes.tap, source);
+	assert.ok(
+		bytes.stdout.equals(Buffer.concat([advisory.prefix, bytes.tap.subarray(3)])),
+		'snapshot16 complete stdout differs'
+	);
 	assert.equal(bytes.stderr.length, 0, 'snapshot16 stderr is not empty');
 	const lines = text
 		.replace(/^\uFEFF/, '')
@@ -966,7 +971,11 @@ function snapshot16Receive(bytes, mode) {
 		assert.equal(lines.filter((line) => /^1\.\./.test(line)).join('\n'), '1..17');
 		assert.equal(lines.filter((line) => line === '# dry-run - skipping execution.').length, 1);
 		assert.doesNotMatch(text, /^(?:RUNNING |ok |not ok |# duration_ms|# \d+ passed,)/m);
-		return { registered_total: Number(selection[1]), dry_loaded: true };
+		return {
+			registered_total: Number(selection[1]),
+			dry_loaded: true,
+			advisory_output: advisory.manifest
+		};
 	}
 	assert.equal(mode, 'run');
 	assert.doesNotMatch(text, /^# dry-run/m);
@@ -981,7 +990,7 @@ function snapshot16Receive(bytes, mode) {
 		manifest.executed.map((entry) => entry.name),
 		SNAPSHOT16_NAMES
 	);
-	return { registered_total: Number(selection[1]), manifest };
+	return { registered_total: Number(selection[1]), manifest, advisory_output: advisory.manifest };
 }
 
 /** Ports are controlled in JS; only the Windows host below can issue native evidence. */
@@ -1001,7 +1010,11 @@ function receiveSnapshot16(ports) {
 			source,
 			'snapshot16 source changed during child'
 		);
-		const received = snapshot16Receive(ports.read(packet), mode);
+		const received = snapshot16Receive(
+			ports.read(packet, JSON.parse(source)),
+			mode,
+			JSON.parse(source)
+		);
 		assert.equal(
 			snapshot16ExitSeal(packet.result),
 			exit,
@@ -1271,6 +1284,145 @@ assert.equal(
 );
 console.log(`Snapshot17 receiving: ${snapshot16Controls} controlled non-native cases passed.`);
 
+// Advisory output is retained raw debt, never discarded or full-suite qualification.
+{
+	const source = {
+		head: 'a'.repeat(40),
+		source_root: String.raw`C:\fixtures\snapshot16`,
+		inputs: [{ path: SNAPSHOT16_TEST, sha256: SNAPSHOT16_FIXED_IMAGES[SNAPSHOT16_TEST] }]
+	};
+	const reported = path.win32.join(source.source_root, SNAPSHOT16_TEST);
+	const warning =
+		`${reported} (8) : ==> Warning: This local variable has the same name as a global variable.\n` +
+		'     Specifically: Source  (in function _B91S_UnchangedComposite)\n';
+	const second = warning.replace('Specifically: Source', 'Specifically: État');
+	const prefix = Buffer.from(warning + second);
+	let controls = 0;
+	for (const [mode, text] of [
+		['dry', snapshot16Dry],
+		['run', snapshot16Tap]
+	]) {
+		const bytes = {
+			tap: Buffer.from('\uFEFF' + text),
+			stdout: Buffer.concat([prefix, Buffer.from(text)]),
+			stderr: Buffer.alloc(0)
+		};
+		const observed = snapshot16Receive(bytes, mode, source);
+		assert.equal(observed.advisory_output.count, 2);
+		assert.equal(observed.advisory_output.prefix_bytes, prefix.length);
+		assert.equal(observed.advisory_output.original_relation_observed, false);
+		assert.equal(observed.advisory_output.full_suite_qualified, false);
+		assert.equal(observed.advisory_output.source_head, source.head);
+		assert.deepEqual(
+			observed.advisory_output.records.map((record) => record.source_ref),
+			[SNAPSHOT16_TEST, SNAPSHOT16_TEST]
+		);
+		const partition = partitionLocalShadowOutput(bytes.stdout, bytes.tap, source);
+		assert.ok(partition.prefix.equals(prefix));
+		assert.ok(bytes.stdout.equals(Buffer.concat([partition.prefix, bytes.tap.subarray(3)])));
+		assert.equal(partition.manifest.records[0].byte_start, 0);
+		assert.equal(partition.manifest.records[0].byte_end, Buffer.byteLength(warning));
+		assert.equal(partition.manifest.records[1].byte_start, Buffer.byteLength(warning));
+		assert.equal(partition.manifest.records[1].byte_end, prefix.length);
+		assert.equal(snapshot16CaptureFacts(bytes, mode).original_relation_observed, false);
+		controls += 1;
+	}
+	const receivedPorts = snapshot16Controlled((ports, state) => {
+		state.frame.source_root = source.source_root;
+		const read = ports.read;
+		ports.read = (packet) => {
+			const bytes = read(packet);
+			bytes.stdout = Buffer.concat([prefix, bytes.stdout]);
+			return bytes;
+		};
+	});
+	const received = receiveSnapshot16(receivedPorts.ports);
+	assert.equal(received.full_suite_qualified, false);
+	assert.equal(received.phases.length, 2);
+	assert.equal(received.phases[1].manifest.passed, 16);
+	assert(received.phases.every((phase) => phase.advisory_output.count === 2));
+	controls += 1;
+	const tap = Buffer.from('\uFEFF' + snapshot16Tap);
+	const stdout = Buffer.concat([prefix, tap.subarray(3)]);
+	for (const changed of [
+		warning.replace('same name as a global variable', 'appears to never be assigned a value'),
+		warning.replace('Warning:', 'Error:'),
+		warning.replace(reported, String.raw`C:\foreign\test_buffered_data_snapshot_owner.ahk`),
+		warning.replace(reported, path.win32.join(source.source_root, 'static/unknown.ahk')),
+		warning.replace(reported, 'test_buffered_data_snapshot_owner.ahk'),
+		warning.replace('(8)', '(0)'),
+		warning.replace('(8)', '(9007199254740992)'),
+		warning.replace('     Specifically:', '    Specifically:'),
+		warning.slice(0, -1),
+		warning.replace('  (in function _B91S_UnchangedComposite)', ''),
+		warning.replace('_B91S_UnchangedComposite', '_B91S\0UnchangedComposite'),
+		warning.replace('_B91S_UnchangedComposite', ' '),
+		'garbage\n' + warning,
+		warning + 'unassigned bytes\n',
+		warning.split('\n')[1] + '\n'
+	]) {
+		assert.throws(() =>
+			partitionLocalShadowOutput(
+				Buffer.concat([Buffer.from(changed), tap.subarray(3)]),
+				tap,
+				source
+			)
+		);
+		controls += 1;
+	}
+	for (const changed of [
+		Buffer.concat([tap.subarray(3), prefix]),
+		Buffer.concat([prefix, tap.subarray(3, -1)]),
+		Buffer.concat([prefix, tap.subarray(3), Buffer.from('late\n')]),
+		Buffer.concat([Buffer.from([255]), prefix, tap.subarray(3)])
+	]) {
+		assert.throws(() => partitionLocalShadowOutput(changed, tap, source));
+		controls += 1;
+	}
+	for (const changed of [
+		null,
+		{ ...source, source_root: 'relative' },
+		{ ...source, head: 'foreign' },
+		{ ...source, inputs: [] },
+		{ ...source, inputs: [{ ...source.inputs[0], sha256: 'unsealed' }] },
+		{ ...source, inputs: [...source.inputs, { ...source.inputs[0] }] }
+	]) {
+		assert.throws(() => partitionLocalShadowOutput(stdout, tap, changed));
+		controls += 1;
+	}
+	assert.throws(() =>
+		snapshot16Receive({ tap, stdout, stderr: Buffer.from('warning\n') }, 'run', source)
+	);
+	controls += 1;
+	const first = partitionLocalShadowOutput(stdout, tap, source);
+	first.prefix[0] = 0;
+	first.manifest.records[0].source_ref = 'foreign';
+	const final = partitionLocalShadowOutput(stdout, tap, source);
+	assert.ok(final.prefix.equals(prefix));
+	assert.equal(final.manifest.records[0].source_ref, SNAPSHOT16_TEST);
+	assert.throws(() =>
+		partitionLocalShadowOutput(
+			Buffer.concat([prefix, Buffer.from('bad'), tap.subarray(3)]),
+			tap,
+			source
+		)
+	);
+	assert.ok(partitionLocalShadowOutput(stdout, tap, source).prefix.equals(prefix));
+	controls += 1;
+	const changed = Buffer.concat([
+		Buffer.from(warning.replace('Specifically: Source', 'Specifically: Other')),
+		tap.subarray(3)
+	]);
+	const changedPartition = partitionLocalShadowOutput(changed, tap, source);
+	assert.equal(changedPartition.manifest.records[0].reported_variable, 'Other');
+	assert.notEqual(changedPartition.manifest.prefix_sha256, final.manifest.prefix_sha256);
+	assert.ok(changed.equals(Buffer.concat([changedPartition.prefix, tap.subarray(3)])));
+	controls += 1;
+	console.log(
+		`Snapshot16 advisory output: ${controls} complete-byte partition/refusal controls passed; warnings retained as debt.`
+	);
+}
+
 /** These facts observe closed bytes; they never normalize or admit a transcript. */
 function snapshot16CaptureFacts(bytes, mode) {
 	const crypto = require('node:crypto');
@@ -1430,6 +1582,7 @@ if (ahkIndex !== -1) {
 			'static/ergopti_plus/_shared/',
 			'tools/test/test-ahk-suite-manifest.cjs',
 			'tools/test/support/file-backed-native-runner.cjs',
+			'tools/test/support/ahk-local-shadow-output.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
 			'tools/test/test-ahk-test-coverage.cjs'
 		]);
@@ -1449,6 +1602,7 @@ if (ahkIndex !== -1) {
 		for (const file of [
 			'tools/test/test-ahk-suite-manifest.cjs',
 			'tools/test/support/file-backed-native-runner.cjs',
+			'tools/test/support/ahk-local-shadow-output.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
 			'tools/test/test-ahk-test-coverage.cjs'
 		])
@@ -1482,7 +1636,7 @@ if (ahkIndex !== -1) {
 			);
 			return { path: file, sha256: digest(bytes) };
 		});
-		return { head, ahk_sha256: digest(fs.readFileSync(ahk)), inputs };
+		return { head, source_root: root, ahk_sha256: digest(fs.readFileSync(ahk)), inputs };
 	}
 	// These closed, data-only children have no process-spawning cases. The
 	// synchronous transport owns the exact direct child and capture descriptors;
@@ -1512,7 +1666,7 @@ if (ahkIndex !== -1) {
 				launches.push(packet);
 				return packet;
 			},
-			read: (packet) => {
+			read: (packet, frame) => {
 				const bytes = {
 					tap: fs.readFileSync(packet.tap),
 					stdout: fs.readFileSync(packet.captures.stdout),
@@ -1523,14 +1677,22 @@ if (ahkIndex !== -1) {
 				} catch (error) {
 					packet.capture_observation = { observation_error: String(error.message) };
 				}
+				const advisory = partitionLocalShadowOutput(bytes.stdout, bytes.tap, frame);
+				packet.advisory_output = advisory.manifest;
+				packet.advisory_prefix = path.join(path.dirname(packet.tap), 'advisory-prefix.bin');
+				fs.writeFileSync(packet.advisory_prefix, advisory.prefix, { flag: 'wx' });
 				return bytes;
 			}
 		});
 		receipt = {
 			schema: 1,
-			qualified: true,
+			qualified: observed.phases.every((phase) => phase.advisory_output.count === 0),
+			capture_contract_complete: true,
+			data_cases_complete: true,
 			official_ci: process.env.GITHUB_ACTIONS === 'true',
 			...observed,
+			qualification_scope: 'SNAPSHOT16_DATA_CASES_ONLY_NOT_FULL_SUITE_OR_NATIVE_ACTIONS',
+			advisory_warning_debt: observed.phases.some((phase) => phase.advisory_output.advisory_debt),
 			direct_child_exit_and_capture_closed: true,
 			native_actions_qualified: false
 		};
@@ -1556,13 +1718,17 @@ if (ahkIndex !== -1) {
 			tap: packet.tap,
 			tap_capture: snapshot16OptionalCapture(packet.tap, describeNativeCapture),
 			capture_observation: packet.capture_observation,
+			advisory_output: packet.advisory_output,
+			advisory_prefix: packet.advisory_prefix
+				? describeNativeCapture(packet.advisory_prefix)
+				: null,
 			stdout: describeNativeCapture(packet.captures.stdout),
 			stderr: describeNativeCapture(packet.captures.stderr)
 		}));
 		fs.writeFileSync(path.join(evidence, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n', {
 			flag: 'wx'
 		});
-		if (receipt.qualified === false)
+		if (receipt.error !== undefined)
 			snapshot16EmitCaptureFailure(receipt, (line) => process.stderr.write(line));
 		console.log(`Snapshot16 closed supplemental evidence: ${evidence}`);
 	}
