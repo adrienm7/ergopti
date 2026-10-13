@@ -162,6 +162,88 @@ function M.run(helpers)
 			helpers.assert_contains(line, "\\u000a")
 			helpers.assert_true(not line:find("\n", 1, true))
 		end)
+		local function output_fixture(mode)
+			local source = debug.getinfo(Timing.capture, "S").source
+			assert(source:sub(1, 1) == "@", "actual timing module source is required")
+			local output, pending, writes, flushes = "", "", 0, 0
+			local stream = {}
+			function stream:write(text)
+				writes = writes + 1
+				if mode == "write-failure" then return nil, "owned write failure" end
+				pending = pending .. text
+				while #pending >= 111 do
+					output = output .. pending:sub(1, 111)
+					pending = pending:sub(112)
+				end
+				return self
+			end
+			function stream:flush()
+				flushes = flushes + 1
+				if mode == "flush-failure" then return nil, "owned flush failure" end
+				output, pending = output .. pending, ""
+				return true
+			end
+			local now = 0
+			local environment = setmetatable({
+				io = { stdout = stream },
+				print = function(text) assert(stream:write(text .. "\n")) end,
+				require = function(name)
+					assert(name == "luv", "no other module or native provider is admitted")
+					return { hrtime = function() now = now + 1000000; return now end }
+				end,
+			}, { __index = _G })
+			local loader
+			if setfenv then
+				loader = assert(loadfile(source:sub(2)))
+				setfenv(loader, environment)
+			else
+				loader = assert(loadfile(source:sub(2), "t", environment))
+			end
+			local recorder = loader().capture("fixture")
+			return recorder, {
+				child = function(text) output = output .. text end,
+				pending = function() return pending end,
+				output = function() return output end,
+				counts = function() return writes, flushes end,
+				replace = function() environment.io.stdout = {}; environment.print = function() error("rebound print") end end,
+			}
+		end
+
+		helpers.it("Lua timing: flushes each complete default frame before the next child's raw diagnostics", function()
+			local recorder, sink = output_fixture()
+			recorder.measure("case", "first owned timing frame", function() end, "owner")
+			local pending_before_child = sink.pending()
+			recorder.measure("case", "second owned timing frame", function()
+				sink.child("START actual controlled child\nPASS actual controlled child\n")
+			end, "owner")
+			helpers.assert_eq(pending_before_child, "")
+			helpers.assert_eq(sink.pending(), "")
+			local output = sink.output()
+			helpers.assert_contains(output, '}\nSTART actual controlled child\nPASS actual controlled child\n# lua_timing ')
+			local writes, flushes = sink.counts()
+			helpers.assert_eq(writes, 2)
+			helpers.assert_eq(flushes, 2)
+			helpers.assert_true(not recorder.has_errors())
+		end)
+
+		helpers.it("Lua timing: retains captured output handle and functions after fixture rebinding", function()
+			local recorder, sink = output_fixture()
+			sink.replace()
+			local ok = recorder.measure("case", "captured sink", function() end)
+			helpers.assert_true(ok and not recorder.has_errors())
+			helpers.assert_eq(sink.pending(), "")
+		end)
+
+		for _, mode in ipairs({ "write-failure", "flush-failure" }) do
+			helpers.it("Lua timing: " .. mode .. " preserves primary verdict and marks diagnostics incomplete", function()
+				local recorder = output_fixture(mode)
+				local sentinel = {}
+				local ok, err = recorder.measure("case", "primary failure", function() error(sentinel) end)
+				helpers.assert_true(not ok and rawequal(err, sentinel))
+				helpers.assert_true(recorder.has_errors())
+			end)
+		end
+
 	end)
 end
 
