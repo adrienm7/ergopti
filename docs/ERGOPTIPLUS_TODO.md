@@ -11649,6 +11649,17 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   all 51 prior cases with nine appended controls. Native GUI, capture, assignment
   and output qualification remain required; physical delivery stays unavailable.
 
+The Linux keyboard consumer now grants a deferred action only after its original
+queue returns literal true and the dispatcher remains current. Inline callbacks,
+failed/throwing queues and later callbacks from refused queues remain inert;
+accepted delivery is spent before reentrant action callbacks. All 80 original
+keyboard-shortcut cases remain unchanged. Both LuaJIT and Lua 5.4 receive nine
+failures on the original source and 89 passes on the correction; three frozen
+omissions fail their independently predicted 1, 7 and 2 cases on both ABIs.
+The real named Ctrl+J route demonstrates the defect without enabling physical
+assignments. Whole-source/installed/native output qualification remains open;
+item 97 stays partial.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
