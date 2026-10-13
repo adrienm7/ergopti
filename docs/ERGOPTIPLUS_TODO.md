@@ -126,6 +126,16 @@ Portable Lua5.4 executes the extracted actual function and both inverses:
 one/one/two return values, natural exit 0. This is language/source evidence,
 not native macOS or Linux receiving.
 
+The registry location guard now distinguishes pure `find_entry` consumers from
+the actual settings constructors. The actual macOS owner still reads both shared
+defaults; its lookup-only sibling no longer has to duplicate these reads. All
+twelve checks pass with exit 0, retaining every platform's client census,
+template/host/folder checks and packaging refusal. The original complete guard
+exits 1 on that pure lookup; withdrawing either input from the actual settings
+owner independently makes the corrected complete guard exit 1. Constructor
+controls cover direct/grouped imports and simple aliases; comments and literal
+decorations cannot create a settings owner. This remains source/packaging evidence.
+
 The official native builder now loads its hashing dependency from the executing
 PowerShell host. A Node launcher can retain a PowerShell7 module path when it
 starts PowerShell5.1: the wrong Utility manifest exposes ordinary cmdlets but
