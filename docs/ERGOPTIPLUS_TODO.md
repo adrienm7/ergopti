@@ -4305,6 +4305,18 @@ full Common run retains 421/426: four existing environment/source admissions
 and the old ten-case census; the complete focused cohort passes after that
 census correction. Final exact-source Common and native receiving remain open.
 
+Exact manual run `38464565467` on `95965e7ac` is terminal: 27 jobs succeeded,
+eight failed and four were skipped. Common receives 424/426; the two retained
+source guards are unrelated to the wire projection. Native ARM and Intel now
+pass the former sigaction compiler boundary but stop while compiling the
+installed-peer test's String-to-C-pointer argument mapping. Two explicit
+scoped CString borrows preserve its original vectors, strdup allocations,
+terminators, frees, spawn calls and all 42 assertions. Independent source
+review is clear; successor native compilation and XCTest execution remain
+unqualified. Native HTTP deadline/offline failures and refused trust restoration
+also remain open under their networking owner. Customer lease recovery is not
+claimed.
+
 ## Remaining work after the 2026-09-30 releases
 
 The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.
