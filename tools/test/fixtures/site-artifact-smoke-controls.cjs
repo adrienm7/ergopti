@@ -510,6 +510,236 @@ async function run() {
 			'desktop navigation stays outside the closed mobile menu'
 		);
 	});
+	await check(
+		'complete browser transport admits only exact authored external fixtures',
+		async () => {
+			const fs = require('node:fs');
+			const { createRequire } = require('node:module');
+			const sourceFile = path.join(__dirname, '../browser/site-artifact-smoke.playwright.cjs');
+			const source = fs.readFileSync(sourceFile, 'utf8');
+			const sourceRoot = path.resolve(path.dirname(sourceFile), '../../..');
+			const html = fs.readFileSync(path.join(sourceRoot, 'src/app.html'), 'utf8');
+			const resources = [
+				[
+					'https://fonts.googleapis.com/css2?family=Noto+Sans:wght@100..900&display=swap',
+					'text/css',
+					'/* Inert smoke fixture; live fonts are unqualified. */'
+				],
+				[
+					'https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:wght@100..900&display=swap',
+					'text/css',
+					'/* Inert smoke fixture; live fonts are unqualified. */'
+				],
+				[
+					'https://www.googletagmanager.com/gtag/js?id=G-KG5MR2RZSH',
+					'text/javascript',
+					'/* Inert smoke fixture; live analytics are unqualified. */'
+				]
+			];
+			const authored = [];
+			for (const match of html
+				.replace(/<!--[\s\S]*?-->/g, '')
+				.matchAll(/<(link|script)\b[^>]*>/g)) {
+				const attribute = (name) => {
+					const values = [
+						...match[0].matchAll(new RegExp('\\b' + name + '\\s*=\\s*(["\'])(.*?)\\1', 'g'))
+					];
+					assert.ok(values.length <= 1, 'authored resource attribute must be unique');
+					return values[0]?.[2];
+				};
+				const url =
+					match[1] === 'script'
+						? attribute('src')
+						: attribute('rel') === 'stylesheet'
+							? attribute('href')
+							: null;
+				if (url && /^https?:\/\//.test(url)) authored.push(url);
+			}
+			assert.deepEqual(
+				authored,
+				resources.map(([url]) => url),
+				'closed app.html external script/style roster'
+			);
+			const unknown = [
+				...resources.flatMap(([url]) => [
+					url + '&extra=1',
+					url.replace('https:', 'http:'),
+					url.replace('.com/', '.com.foreign.invalid/'),
+					url.replace('?', '/extra?'),
+					url.replace('?', '?unknown=1&')
+				]),
+				'https://fonts.gstatic.com/foreign.woff2',
+				'https://www.googletagmanager.com/gtag/js?id=G-FOREIGN',
+				'https://fonts.googleapis.com/css2?family=Foreign&display=swap'
+			];
+			const realRequire = createRequire(sourceFile);
+			for (const fault of [
+				null,
+				...unknown,
+				'console-error',
+				'page-error',
+				'local-http-error',
+				'local-request-failed'
+			]) {
+				const events = [],
+					fulfilled = [],
+					continued = [],
+					aborted = [];
+				let transport,
+					injected = false;
+				const origin = 'http://127.0.0.1:12345';
+				const server = {
+					listening: false,
+					once(name) {
+						assert.equal(name, 'error');
+						return this;
+					},
+					listen(port, host, ready) {
+						assert.equal(port, 0);
+						assert.equal(host, '127.0.0.1');
+						this.listening = true;
+						events.push('server-listen');
+						ready();
+					},
+					address() {
+						return { port: 12345 };
+					},
+					close(done) {
+						this.listening = false;
+						events.push('server-close');
+						done();
+					}
+				};
+				const loaded = { exports: {} };
+				const requirePort = (name) =>
+					name === 'node:http'
+						? {
+								createServer(handler) {
+									assert.equal(typeof handler, 'function');
+									events.push('server-create');
+									return server;
+								}
+							}
+						: realRequire(name);
+				// Compile the complete actual module, with only HTTP replaced by a finite non-listening port.
+				new Function('require', 'module', 'exports', '__filename', '__dirname', source)(
+					requirePort,
+					loaded,
+					loaded.exports,
+					sourceFile,
+					path.dirname(sourceFile)
+				);
+				const engine = {
+					async launch(options) {
+						assert.deepEqual(options, { headless: true });
+						events.push('launch');
+						return {
+							async newContext(options) {
+								assert.deepEqual(options, {
+									serviceWorkers: 'block',
+									viewport: { width: 1440, height: 900 }
+								});
+								return {
+									async newPage() {
+										const page = pagePort(),
+											handlers = {};
+										const goto = page.goto;
+										return {
+											...page,
+											setDefaultTimeout(value) {
+												assert.equal(value, 15000);
+											},
+											on(name, handler) {
+												assert.equal(handlers[name], undefined);
+												handlers[name] = handler;
+											},
+											async route(pattern, handler) {
+												assert.equal(pattern, '**/*');
+												transport = handler;
+											},
+											async goto(url) {
+												assert.ok(
+													transport,
+													'the complete runBrowsers must register its actual transport'
+												);
+												const requests = [
+													origin + '/dev/_app/start.js',
+													...resources.map(([url]) => url)
+												];
+												if (fault && !injected) {
+													injected = true;
+													if (fault === 'console-error')
+														handlers.console({
+															type: () => 'error',
+															text: () => 'controlled console error'
+														});
+													else if (fault === 'page-error')
+														handlers.pageerror(new Error('controlled page error'));
+													else if (fault === 'local-http-error')
+														handlers.response({
+															url: () => origin + '/dev/missing.json',
+															status: () => 404
+														});
+													else if (fault === 'local-request-failed')
+														handlers.requestfailed({ url: () => origin + '/dev/missing.json' });
+													else requests.push(fault);
+												}
+												for (const request of requests)
+													await transport({
+														request: () => ({ url: () => request }),
+														async continue() {
+															continued.push(request);
+														},
+														async fulfill(response) {
+															fulfilled.push({ url: request, response });
+														},
+														async abort() {
+															aborted.push(request);
+														}
+													});
+												return goto(url);
+											}
+										};
+									},
+									async close() {
+										events.push('context-close');
+									}
+								};
+							},
+							async close() {
+								events.push('browser-close');
+							}
+						};
+					}
+				};
+				const invoke = () =>
+					loaded.exports.runBrowsers('recorded-site', '/dev', { chromium: engine, webkit: engine });
+				if (fault) await assert.rejects(invoke, /Browser failures|Local resource failures/);
+				else {
+					const result = await invoke();
+					assert.deepEqual(
+						result.map((row) => row.name),
+						['chromium', 'webkit']
+					);
+					assert.equal(fulfilled.length, resources.length * smoke.SITE_ROUTES.length * 2);
+					assert.equal(continued.length, smoke.SITE_ROUTES.length * 2);
+				}
+				for (const { url, response } of fulfilled) {
+					const resource = resources.find(([value]) => value === url);
+					assert.ok(resource, 'no foreign fixture response');
+					assert.deepEqual(response, { status: 200, contentType: resource[1], body: resource[2] });
+				}
+				assert.ok(continued.length > 0, 'actual local route must remain live');
+				assert.ok(continued.every((url) => new URL(url).origin === origin));
+				assert.deepEqual(aborted, unknown.includes(fault) ? [fault] : []);
+				assert.equal(events.filter((event) => event === 'context-close').length, fault ? 1 : 2);
+				assert.equal(events.filter((event) => event === 'browser-close').length, fault ? 1 : 2);
+				assert.equal(events.at(-1), 'server-close');
+				assert.equal(server.listening, false);
+			}
+		}
+	);
+
 	return checks;
 }
 

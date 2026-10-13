@@ -122,6 +122,24 @@ function githubFixture(url) {
 	return null;
 }
 
+/** Exact app.html resources are inert fixtures; fonts and analytics remain unqualified. */
+function authoredExternalFixture(url) {
+	if (
+		url === 'https://fonts.googleapis.com/css2?family=Noto+Sans:wght@100..900&display=swap' ||
+		url === 'https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:wght@100..900&display=swap'
+	)
+		return {
+			contentType: 'text/css',
+			body: '/* Inert smoke fixture; live fonts are unqualified. */'
+		};
+	if (url === 'https://www.googletagmanager.com/gtag/js?id=G-KG5MR2RZSH')
+		return {
+			contentType: 'text/javascript',
+			body: '/* Inert smoke fixture; live analytics are unqualified. */'
+		};
+	return null;
+}
+
 /** Genuine client navigation must preserve the document and use this artifact's target prefix. */
 async function exerciseNavigation(page, origin, basePath) {
 	const target = origin + basePath + '/utilisation';
@@ -268,6 +286,8 @@ async function runBrowsers(site, basePath, engines) {
 								headers: { 'Access-Control-Allow-Origin': '*' },
 								body: JSON.stringify(fixture)
 							});
+						const external = authoredExternalFixture(url);
+						if (external !== null) return route.fulfill({ status: 200, ...external });
 						errors.page.push('Unexpected remote request: ' + url);
 						return route.abort();
 					});
@@ -327,7 +347,7 @@ async function main(args = process.argv.slice(2)) {
 		flag: 'wx'
 	});
 	console.log(
-		'Received site artifact: Chromium and WebKit routes/hydration/interaction PASS; GitHub API responses are inert fixtures.'
+		'Received site artifact: Chromium and WebKit routes/hydration/interaction PASS; GitHub API, authored fonts and analytics use inert fixtures; live external services remain unqualified.'
 	);
 }
 
@@ -337,6 +357,7 @@ module.exports = {
 	resolveRequest,
 	serveRequest,
 	githubFixture,
+	authoredExternalFixture,
 	fixtureDownload,
 	exerciseNavigation,
 	exerciseDownloads,
