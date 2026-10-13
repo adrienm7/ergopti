@@ -21,22 +21,31 @@ local KEYCODE_ESCAPE = 53
 local MODULES = {
 	"ui.menu.magic_key_source_menu", "adapters.timer_scheduler", "infra.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
-	"adapters.keyboard_geometry",
+	"adapters.keyboard_geometry", "adapters.event_provenance",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
 --- event tap recorded.
 --- @param body function body(Menu, world)
-local function with_menu(body)
+local function with_menu(body, faults)
 	helpers.with_fresh_modules(MODULES, function()
-		local world = { timers = {}, notices = {}, taps = {} }
+		local world = { timers = {}, notices = {}, taps = {}, faults = faults or {}, cancellations = {} }
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn }
+				local mode = delay == 0 and world.faults.answer or world.faults.deadline
+				if mode == "throw" then error("Controlled timer construction refusal") end
 				world.timers[#world.timers + 1] = handle
-				return handle, true
+				if mode == "premature" then fn() end
+				return handle, mode ~= "refuse"
 			end,
-			cancel = function(handle) handle.cancelled = true return true end,
+			cancel = function(handle)
+				world.cancellations[#world.cancellations + 1] = handle
+				if world.faults.cancel == "throw" then error("Controlled cancellation refusal") end
+				if world.faults.cancel == "refuse" then return false end
+				handle.cancelled = true
+				return true
+			end,
 		}
 		package.loaded["infra.notifications"] = {
 			notify = function(title, body, kind)
@@ -44,13 +53,40 @@ local function with_menu(body)
 				return true
 			end,
 		}
+		if world.faults.provenance then
+			local original = require("adapters.event_provenance")
+			local recording = {}
+			for key, value in pairs(original) do recording[key] = value end
+			recording.classify_with_fence = function(event, consumer)
+				if world.faults.fence then return nil, nil, world.faults.fence end
+				return original.classify_with_fence(event, consumer)
+			end
+			package.loaded["adapters.event_provenance"] = recording
+		end
+
 		local base = require("tests.stubs.hs").eventtap
 		local eventtap = {}
 		for key, value in pairs(base) do eventtap[key] = value end
 		eventtap.new = function(types, callback)
-			local tap = { types = types, callback = callback, running = false }
-			function tap:start() self.running = true return self end
-			function tap:stop() self.running = false return self end
+			if world.faults.construct == "throw" then error("Controlled tap construction refusal") end
+			local tap = { types = types, callback = callback, running = false, stops = 0 }
+			function tap:start()
+				self.running = world.faults.start ~= "inactive"
+				if world.faults.start == "throw" then error("Controlled tap activation refusal") end
+				if world.faults.start == "refuse" then return false end
+				return self
+			end
+			function tap:stop()
+				self.stops = self.stops + 1
+				if world.faults.stop == "throw" then error("Controlled tap stop refusal") end
+				if world.faults.stop == "refuse" then return false end
+				self.running = world.faults.stop == "active"
+				return self
+			end
+			function tap:isEnabled()
+				if world.faults.observation == "throw" then error("Controlled tap state refusal") end
+				return self.running
+			end
 			world.taps[#world.taps + 1] = tap
 			return tap
 		end
@@ -330,4 +366,150 @@ helpers.describe("magic key source menu: physical labels without an event", func
 			helpers.assert_eq(labels["j   (KeyJ)"], true, "a stable physical key retains its real input-source glyph")
 		end)
 	end)
+end)
+
+helpers.describe("magic key source menu: native capture admission", function()
+	for _, spec in ipairs({
+		{ field = "construct", mode = "throw" },
+		{ field = "deadline", mode = "refuse" },
+		{ field = "deadline", mode = "throw" },
+		{ field = "deadline", mode = "premature" },
+		{ field = "start", mode = "refuse" },
+		{ field = "start", mode = "throw" },
+		{ field = "start", mode = "inactive" },
+		{ field = "observation", mode = "throw" },
+	}) do
+		helpers.it("refuses " .. spec.field .. " " .. spec.mode .. " without admitting capture or a choice", function()
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				helpers.assert_eq(Menu.capture(ctx), false)
+				helpers.assert_eq(ctx.saves, 0)
+				helpers.assert_eq(ctx.applied, {})
+				helpers.assert_eq(#world.notices, 0)
+				if world.taps[1] then
+					helpers.assert_eq(world.taps[1].callback(key_down(KEYCODE_J)), false)
+				end
+				world.faults[spec.field] = nil
+				helpers.assert_true(Menu.capture(ctx), "an exact cleanup retry permits a new capture")
+				local tap = world.taps[#world.taps]
+				helpers.assert_true(tap:isEnabled())
+				tap.callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
+				helpers.assert_eq(Menu.capturing(), false)
+			end, { [spec.field] = spec.mode })
+		end)
+	end
+end)
+
+helpers.describe("magic key source menu: deferred answer admission", function()
+	for _, mode in ipairs({ "refuse", "throw", "premature" }) do
+		helpers.it("lets the physical key through after answer timer " .. mode .. " and accepts a later retry", function()
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				helpers.assert_true(Menu.capture(ctx))
+				local tap = world.taps[1]
+				helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), false)
+				run_deferred(world)
+				helpers.assert_eq(ctx.saves, 0)
+				helpers.assert_eq(ctx.state.magic_key_source, "auto")
+				helpers.assert_true(Menu.capturing())
+				world.faults.answer = nil
+				helpers.assert_true(tap.callback(key_down(KEYCODE_J)))
+				run_deferred(world)
+				helpers.assert_eq(ctx.saves, 1)
+				helpers.assert_eq(ctx.applied, { "KeyJ" })
+				helpers.assert_eq(Menu.capturing(), false)
+			end, { answer = mode })
+		end)
+	end
+end)
+
+helpers.describe("magic key source menu: exact native retirement", function()
+	for _, spec in ipairs({
+		{ field = "stop", mode = "refuse" },
+		{ field = "stop", mode = "throw" },
+		{ field = "stop", mode = "active" },
+		{ field = "cancel", mode = "refuse" },
+		{ field = "cancel", mode = "throw" },
+	}) do
+		helpers.it("retains " .. spec.field .. " " .. spec.mode .. " debt before a successor or persistence", function()
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				helpers.assert_true(Menu.capture(ctx))
+				local tap = world.taps[1]
+				helpers.assert_true(tap.callback(key_down(KEYCODE_J)))
+				run_deferred(world)
+				helpers.assert_eq(ctx.saves, 0)
+				helpers.assert_eq(ctx.applied, {})
+				helpers.assert_eq(ctx.state.magic_key_source, "auto")
+				helpers.assert_true(Menu.capturing(), "cleanup debt retains its exact owner")
+				helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), false, "retired generation cannot consume")
+				helpers.assert_eq(Menu.capture(ctx), false)
+				helpers.assert_eq(#world.taps, 1, "no replacement tap while retirement is unsettled")
+				world.faults[spec.field] = nil
+				helpers.assert_true(Menu.capture(ctx))
+				helpers.assert_eq(#world.taps, 2)
+				helpers.assert_eq(tap.running, false)
+				helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), false)
+				world.taps[2].callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
+				helpers.assert_eq(Menu.capturing(), false)
+				helpers.assert_eq(ctx.saves, 0, "a failed retirement never replays the discarded choice")
+			end, { [spec.field] = spec.mode })
+		end)
+	end
+
+	helpers.it("retains a rejected answer timer when its exact cancellation fails", function()
+		with_menu(function(Menu, world)
+			local ctx = context(true)
+			helpers.assert_true(Menu.capture(ctx))
+			local tap = world.taps[1]
+			helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), false)
+			local rejected = world.timers[#world.timers]
+			helpers.assert_eq(Menu.capture(ctx), false)
+			helpers.assert_eq(#world.taps, 1)
+			helpers.assert_true(Menu.capturing())
+			helpers.assert_nil(rejected.cancelled)
+			rejected.fn()
+			helpers.assert_eq(ctx.saves, 0)
+			world.faults.answer, world.faults.cancel = nil, nil
+			helpers.assert_true(Menu.capture(ctx))
+			helpers.assert_true(rejected.cancelled, "the same rejected handle retires before replacement")
+			helpers.assert_eq(#world.taps, 2)
+			world.taps[2].callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
+			helpers.assert_eq(Menu.capturing(), false)
+		end, { answer = "refuse", cancel = "refuse" })
+	end)
+end)
+
+helpers.describe("magic key source menu: retained event provenance fences", function()
+	for _, retiring in ipairs({ false, true }) do
+		helpers.it("preserves owned synthetic fences while " .. (retiring and "retiring" or "answered"), function()
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				helpers.assert_true(Menu.capture(ctx))
+				local tap = world.taps[1]
+				helpers.assert_true(tap.callback(key_down(KEYCODE_J)))
+				if retiring then
+					world.faults.stop = "refuse"
+					run_deferred(world)
+				end
+				local replacement = { key_down(KEYCODE_SPACE) }
+				world.faults.fence = { consume_original = true, events = replacement }
+				local consumed, events = tap.callback(key_down(KEYCODE_J))
+				helpers.assert_true(consumed, "the original owned provenance fence remains authoritative")
+				helpers.assert_true(events == replacement)
+				world.faults.fence = { consume_original = false, events = replacement }
+				consumed, events = tap.callback(key_down(KEYCODE_J))
+				helpers.assert_eq(consumed, false)
+				helpers.assert_true(events == replacement, "retired user capture still forwards fence events")
+				world.faults.fence, world.faults.stop = nil, nil
+				if retiring then
+					helpers.assert_true(Menu.capture(ctx))
+					world.taps[2].callback(key_down(KEYCODE_ESCAPE))
+				end
+				run_deferred(world)
+				helpers.assert_eq(ctx.saves, retiring and 0 or 1)
+				helpers.assert_eq(Menu.capturing(), false)
+			end, { provenance = true })
+		end)
+	end
 end)
