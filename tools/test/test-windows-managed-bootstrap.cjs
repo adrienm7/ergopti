@@ -171,3 +171,135 @@ for (const name of [
 process.stdout.write(
 	'Windows managed bootstrap production composition: PASS (portable source checks only).\n'
 );
+
+// Missing-model consent must remain bound to the exact admitted origin and
+// installer owner. These causal controls are source evidence, not AHK execution.
+const modelOffer = fs.readFileSync(path.join(root, 'modules/llm/local_model_offer.ahk'), 'utf8');
+function assertModelOfferAffinity(source, managedSource) {
+	assert.doesNotMatch(source, /Failure\["base_url"\] != LLM_OLLAMA_BASE_URL/);
+	assert.match(source, /return Value is Integer && Value == true/);
+	assert.match(
+		source,
+		/Receipt := Map\("origin", Failure\["base_url"\], "model", Failure\["model"\]/
+	);
+	assert.match(source, /"generation", LLM_AuxGeneration\(\), "flow", _LLM_ManagedBootstrap/);
+	assert.match(source, /Receipt\["flow"\] == _LLM_ManagedBootstrap/);
+	assert.match(source, /Receipt\["port"\] == _LLM_LocalModelOfferPort/);
+	assert.match(source, /Receipt\["notified"\] == _LLM_LocalModelNotified/);
+	assert.match(source, /if !LLM_OllamaOriginMatches\(Receipt\["origin"\]\)/);
+	for (const fn of ['confirm', 'notify', 'install']) {
+		assert.ok(source.includes(`!= Receipt["${fn}"]`), `Fence captured ${fn} registration.`);
+	}
+	assert.match(source, /Receipt := _LLM_LocalModelOfferCapture\(Failure, CurrentFn\)/);
+	assert.match(
+		source,
+		/NoticeKey := Receipt\["origin"\] \. "`n" \. LLM_LocalModelNormalize\(Model\)/
+	);
+	assert.match(
+		source,
+		/if _LLM_LocalModelTrue\(Accepted\) && _LLM_LocalModelOfferCurrent\(Receipt\)\s+Receipt\["notified"\]\[NoticeKey\] := true/
+	);
+	assert.match(source, /if !Accepted \|\| !_LLM_LocalModelOfferCurrent\(Receipt\)\s+return true/);
+	assert.match(
+		source,
+		/return Flow\.PullModel\(Receipt\["model"\], _LLM_LocalModelOfferPublished\.Bind\(Receipt\),\s+_LLM_LocalModelOfferCurrent\.Bind\(Receipt\)\)/
+	);
+	assert.match(
+		source,
+		/SetTimer\(_LLM_LocalModelOfferPublished\.Bind\(Receipt, Callback\), Delay\)/
+	);
+	assert.match(
+		source,
+		/_LLM_LocalModelOfferPublished\(Receipt, Callback := 0, \*\) \{\s+if !_LLM_LocalModelOfferCurrent\(Receipt\)\s+return false/
+	);
+	assert.match(managedSource, /PullModel\(Model, OnDone := 0, CurrentFn := 0\)/);
+	assert.match(managedSource, /"source_current", CurrentFn/);
+	assert.match(managedSource, /SourceCurrent := Operation\.Get\("source_current", 0\)/);
+	assert.match(
+		managedSource,
+		/if HasMethod\(SourceCurrent, "Call"\) && !this\._True\(SourceCurrent\.Call\(\)\) \{\s+this\._MenuPullRetire\(Operation\)\s+return false/
+	);
+	assert.match(
+		managedSource,
+		/; A source callback may pump a modal or replace the exact operation\.\s+if this\.MenuPull != Operation \|\| Operation\["failed"\]/
+	);
+	const pull = managedSource.slice(
+		managedSource.indexOf('\tPullModel('),
+		managedSource.indexOf('\t_MenuPullRetire(')
+	);
+	assert.match(pull, /this\.MenuPull := Operation\s+if !this\._MenuPullCurrent\(Operation\)/);
+	assert.match(
+		pull,
+		/if !this\._Consent\("model", Tag\)[\s\S]+if !this\._MenuPullCurrent\(Operation\)[\s\S]+Done := ObjBindMethod/
+	);
+	const completed = managedSource.slice(managedSource.indexOf('\t_MenuPullModels('));
+	assert.match(
+		completed,
+		/if !this\._MenuPullCurrent\(Operation\)[\s\S]+OnDone := Operation\["callback"\]/
+	);
+}
+assertModelOfferAffinity(modelOffer, flow);
+const offerControls = [
+	['typed ACK', 'return Value is Integer && Value == true', 'return Value == true'],
+	[
+		'actual origin',
+		'LLM_OllamaOriginMatches(Receipt["origin"])',
+		'Receipt["origin"] == LLM_OLLAMA_BASE_URL'
+	],
+	['exact flow', 'Receipt["flow"] == _LLM_ManagedBootstrap', 'true'],
+	['exact installer registration', '!= Receipt["install"]', '!= Receipt["confirm"]'],
+	[
+		'post-notice scope',
+		'_LLM_LocalModelTrue(Accepted) && _LLM_LocalModelOfferCurrent(Receipt)',
+		'_LLM_LocalModelTrue(Accepted)'
+	],
+	['post-modal scope', 'if !Accepted || !_LLM_LocalModelOfferCurrent(Receipt)', 'if !Accepted'],
+	[
+		'captured managed dispatch',
+		'return Flow.PullModel(Receipt["model"]',
+		'return _LLM_ManagedBootstrap.PullModel(Receipt["model"]'
+	],
+	[
+		'delayed origin scope',
+		'SetTimer(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)',
+		'SetTimer(Callback, Delay)'
+	]
+];
+for (const [name, before, after] of offerControls) {
+	const mutant = modelOffer.replace(before, after);
+	assert.notEqual(mutant, modelOffer, `Withdraw actual ${name} production guard.`);
+	assert.throws(() => assertModelOfferAffinity(mutant, flow), { code: 'ERR_ASSERTION' }, name);
+	assertModelOfferAffinity(modelOffer, flow);
+}
+const flowControls = [
+	['second consent', '"source_current", CurrentFn', '"source_current", 0'],
+	['typed scoped ACK', '!this._True(SourceCurrent.Call())', '!SourceCurrent.Call()'],
+	[
+		'operation after callback',
+		'; A source callback may pump a modal or replace the exact operation.\n\t\tif this.MenuPull != Operation || Operation["failed"]',
+		'; A source callback may pump a modal or replace the exact operation.\n\t\tif false'
+	]
+];
+for (const [name, before, after] of flowControls) {
+	const mutant = flow.replace(before, after);
+	assert.notEqual(mutant, flow, `Withdraw actual ${name} production guard.`);
+	assert.throws(
+		() => assertModelOfferAffinity(modelOffer, mutant),
+		{ code: 'ERR_ASSERTION' },
+		name
+	);
+	assertModelOfferAffinity(modelOffer, flow);
+}
+assert.equal((nativeCases.match(/Test\("managed model offer:/g) || []).length, 35);
+for (const name of [
+	'_G4B_OfferModal',
+	'_G4B_OfferSecondConsent',
+	'_G4B_OfferNotification',
+	'_G4B_OfferCompletion',
+	'_G4B_OfferExternal'
+]) {
+	assert.ok(nativeCases.includes(name), `Retain authored production callback ${name}.`);
+}
+process.stdout.write(
+	'Windows model-offer affinity: PASS (11 causal source inverses; 35 authored AHK cases UNRUN).\n'
+);
