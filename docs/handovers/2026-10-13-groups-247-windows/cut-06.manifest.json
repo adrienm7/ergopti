@@ -1,0 +1,32 @@
+{
+	"base_head": "cc943054c7433b1e6eede166f7ecb28c5820d574",
+	"canonical_head_at_freeze": "46abcb682bdfda86e4a7456bbb4df82a2bb94a9a",
+	"patch_sha256": "75356660b04198ec5279587cfa9a03bb92b2b3d099d13a1e55434d2bb0ddb82c",
+	"paths": [
+		{
+			"path": "static/ergopti_plus/windows/modules/llm/local_model_offer.ahk",
+			"before_sha256": "8b5d306a878e7e48d5fd12498305248cba4b092f0d159fe2a760a4ca7d903115",
+			"after_sha256": "210654f24e6bcb1a1d7619f2416e2958499d3cc21e8a16b9b037f16f8b2c7135"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk",
+			"before_sha256": "42f7a10b50dfcfb4bb974d506d5ac177c0070afb8ac5417542b70ef2fd0d4b85",
+			"after_sha256": "dede9e4e0d458ae1351cbed6725f23cd4f009dbb73a98f3930c082c7818a8ec2"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/test_ollama_managed_bootstrap.ahk",
+			"before_sha256": "85d3ef478572d01fd471fc156343167cb0cdd633aa2921003c02c9a8f1f26495",
+			"after_sha256": "d47821d761529c1324fd7a070c5cca5c455108f97ddc4ead1db98c424e6849a1"
+		},
+		{
+			"path": "tools/test/test-windows-managed-bootstrap.cjs",
+			"before_sha256": "7e4656927d43353af79b9c90098fbd7f0153dc53dfb48f48419e4041a97ca257",
+			"after_sha256": "24d131ac59c98db6fd9193b75a886a08b323ffd8d132dbebe8ff5926361dd6b5"
+		}
+	],
+	"qualification": "PORTABLE_SOURCE_ONLY; 35 additional authored AHK callbacks UNRUN; Windows managed service/listener integration UNRUN",
+	"preserved_exact_original_test_prefix": true,
+	"authored_ahk_cases_unrun": 35,
+	"causal_source_inverses": 11,
+	"git_apply_check_status": 0
+}

@@ -1,0 +1,74 @@
+{
+	"base": "ae684ed723c82bb158dd873a9e928be2e105a9c1 + affinity + continuation",
+	"depends_on_continuation_patch_sha256": "488e61b34d7991908b6cca2e76ef046414cf5e404d1b857dbe28d9a0591f53e5",
+	"patch_sha256": "8d6c6a2231939ff19b20838b8916e82c60e1a25fb9127eac628e61f43dcdfd9e",
+	"files": [
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/model_download.lua",
+			"before_sha256": "85402e76082dde48a3133a10c35af2467f9adf54ab14af03bc73880ad4d9883d",
+			"after_sha256": "84b27b049a5fe6029d537d50a1628df1192a2259c0568a76ddb9deca46d4ed3c"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/local_model_offer.lua",
+			"before_sha256": "f0bdaf4e607361506816d34da63ae803f910d765b47b150ac12013dd3056146c",
+			"after_sha256": "990a085afe8cb78e12f3dcc57ea782bce854a0c3e2355e2aede2582eb1fe288f"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+			"before_sha256": "a32cbf1e27051cdc8859473412e99a4480886b94ebd981edb3c108dcdb6a21d1",
+			"after_sha256": "8f8bb00d08c6f4f2be937ead776caf43215d32f1dad82adb693523c1e9512af6"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_flow.lua",
+			"before_sha256": "fc8a23f6459a5079248e6635d0ea34bc42f2936734c5d5672a61cc0222ddc6f2",
+			"after_sha256": "a4b9d338d1d6705a0e561d83e4ee3126c048ffe70943f32b4101484619606e0e",
+			"predecessor_assertion_calls": 134,
+			"added_assertion_calls": 15,
+			"predecessor_test_prefix_byte_identical": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/meta/test_api_ollama_stream_parse.lua",
+			"before_sha256": "d51c42e9f32714fb5b6f17f3317916eb5cad7d5db006312f172133660ac09b43",
+			"after_sha256": "e80ee3517b84c777cc2b333b294e38ed6e0dfb6f3a3b121aea2c048a580b507e",
+			"predecessor_assertion_calls": 88,
+			"added_assertion_calls": 1,
+			"original_baseline_prefix_byte_identical": true,
+			"original_baseline_assertion_calls": 73,
+			"new_affinity_fixture_changes": "Explicit true,true acquisition port; positive case additionally asserts exact downloading receipt."
+		}
+	],
+	"proof": {
+		"original_graph": "0 passed / 2 failed, exit 1; failed assertion is successor current()==true",
+		"corrected_graph": "2 passed / 0 failed, exit 0",
+		"complete_modules_Lua54_and_LuaJIT": "28 + 38 + 23 = 89 passed / 0 failed; each natural exit0",
+		"causal_mutations": [
+			{
+				"name": "focus-forged-custody",
+				"exit": 1,
+				"summary": "RESULT 0 passed / 2 failed"
+			},
+			{
+				"name": "offer-borrows-handled",
+				"exit": 1,
+				"summary": "RESULT 0 passed / 2 failed"
+			},
+			{
+				"name": "fresh-dispatch-custody-refused",
+				"exit": 1,
+				"summary": "RESULT 9 passed / 1 failed"
+			},
+			{
+				"name": "menu-custody-leaked",
+				"exit": 1,
+				"summary": "RESULT 0 passed / 2 failed"
+			},
+			{
+				"name": "false-acquired-fixture",
+				"exit": 1,
+				"summary": "RESULT 9 passed / 1 failed",
+				"kind": "Actual Lua false acquisition receipt through default installer port; positive case must reject."
+			}
+		]
+	},
+	"native_desktop_or_live_Ollama": "UNRUN"
+}

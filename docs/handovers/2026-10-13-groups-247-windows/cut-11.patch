@@ -1,0 +1,216 @@
+--- a/static/ergopti_plus/linux/modules/llm/local_model_offer.lua
++++ b/static/ergopti_plus/linux/modules/llm/local_model_offer.lua
+@@ -4,7 +4,8 @@
+ --- MODULE: Missing Local Model Offer
+ --- DESCRIPTION:
+ --- Names a missing Ollama model and offers its existing download manager after
+---- explicit manual consent. Automatic typing only posts a notification.
++--- explicit manual consent bound to its original origin and installer. Automatic
++--- typing only posts a notification owned by that endpoint.
+ --- ==============================================================================
+ 
+ local M = {}
+@@ -61,16 +62,31 @@
+ end
+ 
+ --- Resolves native effects without acquiring ownership until needed.
++--- @param automatic boolean Notifications do not acquire a download owner.
+ --- @return table
+-local function dependencies()
+-	local deps = _deps or {}
++local function dependencies(automatic)
++	local owner = _deps
++	local deps = owner or {}
++	local install, download = deps.install, nil
++	if not automatic and install == nil then
++		download = require("modules.llm.model_download")
++		install = download.start
++	end
+ 	return {
+ 		confirm = deps.confirm or confirm,
+ 		notify = deps.notify or function(text, title)
+ 			return require("adapters.application_notifier").send(text, { title = title, level = "warning" })
+ 		end,
+-		install = deps.install or function(base_url, model, on_done, current)
+-			return require("modules.llm.model_download").start(base_url, model, model, on_done, current)
++		install = download and function(base_url, model, on_done, current)
++			return install(base_url, model, model, on_done, current)
++		end or install,
++		current = function()
++			if _deps ~= owner then return false end
++			if automatic then return true end
++			if download then
++				return package.loaded["modules.llm.model_download"] == download and download.start == install
++			end
++			return deps.install == install
+ 		end,
+ 	}
+ end
+@@ -91,19 +107,32 @@
+ --- @return boolean handled
+ function M.handle(failure, opts)
+ 	if not Policy.is_missing(failure) then return false end
++	local model, base_url, reason = failure.model, failure.base_url, failure.reason
++	local requesting = type(opts) == "table" and opts.current or nil
++	local automatic = type(opts) == "table" and opts.automatic == true
++	local deps = dependencies(automatic)
++	local function bound()
++		return failure.model == model and failure.base_url == base_url and failure.reason == reason
++			and (type(opts) ~= "table" or opts.current == requesting) and deps.current()
++	end
+ 	local function current()
+-		if type(opts) ~= "table" or type(opts.current) ~= "function" then return true end
+-		local ok, admitted = pcall(opts.current)
+-		return ok and admitted == true
++		if not bound() then return false end
++		if type(requesting) ~= "function" then return true end
++		local ok, admitted = pcall(requesting)
++		return ok and admitted == true and bound()
+ 	end
+ 	if not current() then return true end
+-	local model, title = failure.model, I18n.get("llm.local_model.missing_title")
+-	local deps = dependencies()
++	local title = I18n.get("llm.local_model.missing_title")
+ 	local name = Policy.normalize(model)
+-	if type(opts) == "table" and opts.automatic == true then
+-		if not Policy.should_notify(_notified, model) then return true end
++	local notices = _notified[base_url]
++	if not notices then notices = {}; _notified[base_url] = notices end
++	local notice = notices[name]
++	if automatic then
++		if notice ~= nil then return true end
+ 		local ok, sent = pcall(deps.notify, label("llm.local_model.missing_notice", model), title)
+-		if ok and sent == true then _notified[name] = true end
++		if ok and sent == true and current() and _notified[base_url] == notices and notices[name] == nil then
++			notices[name] = {}
++		end
+ 		if not ok or sent ~= true then Logger.warn(LOG, "Missing-model notification was refused: %s.", model) end
+ 		return true
+ 	end
+@@ -119,9 +148,13 @@
+ 	end
+ 	if accepted ~= true then return true end
+ 	Logger.start(LOG, "Downloading explicitly requested local model '%s'…", model)
+-	local installed, admitted = pcall(deps.install, failure.base_url, model, function(done)
++	if not current() then return true end
++	local installed, admitted = pcall(deps.install, base_url, model, function(done)
++		if not current() then return end
+ 		if done == true then
+-			_notified[name] = nil
++			if _notified[base_url] == notices and notice ~= nil and notices[name] == notice then
++				notices[name] = nil
++			end
+ 			Logger.success(LOG, "Local model '%s' downloaded.", model)
+ 		else
+ 			Logger.warn(LOG, "Local model '%s' download failed.", model)
+--- a/static/ergopti_plus/linux/tests/unit/meta/test_api_ollama_stream_parse.lua
++++ b/static/ergopti_plus/linux/tests/unit/meta/test_api_ollama_stream_parse.lua
+@@ -352,3 +352,108 @@
+ 		helpers.assert_eq(effects, 0)
+ 	end)
+ end)
++
++
++helpers.describe("local model offer: origin and installer consent affinity", function()
++	local function with_affinity(body)
++		local names = { "modules.llm.local_model_offer", "modules.llm.model_download" }
++		local old = {}
++		for _, name in ipairs(names) do old[name] = package.loaded[name]; package.loaded[name] = nil end
++		local state = { installs = {}, notices = 0, approved = true, successors = 0 }
++		local installer = { start = function(base_url, model, label, done, current)
++			state.installs[#state.installs + 1] = { base_url = base_url, model = model, done = done, current = current }
++			return true
++		end }
++		package.loaded[names[2]] = installer
++		local Offer = require(names[1])
++		local deps = {
++			confirm = function() if state.during_confirm then state.during_confirm() end; return state.approved end,
++			notify = function() state.notices = state.notices + 1; return true end,
++		}
++		Offer._reset_for_test(deps)
++		local ok, err = xpcall(function() body(Offer, state, installer, deps) end, debug.traceback)
++		Offer._reset_for_test()
++		for _, name in ipairs(names) do package.loaded[name] = old[name] end
++		if not ok then error(err, 0) end
++	end
++
++	for _, mutation in ipairs({ "origin", "model", "installer", "installer-owner", "admission" }) do
++		helpers.it("linux-model-consent-affinity: refuses modal replacement of " .. mutation, function()
++			with_affinity(function(Offer, state, installer)
++				local failure = require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
++				local opts = { current = function() return true end }
++				state.during_confirm = function()
++					if mutation == "origin" then failure.base_url = "http://127.0.0.1:11435"
++					elseif mutation == "model" then failure.model = "successor:3b"
++					elseif mutation == "installer" then installer.start = function() state.successors = state.successors + 1; return true end
++					elseif mutation == "installer-owner" then
++						package.loaded["modules.llm.model_download"] = { start = function() state.successors = state.successors + 1; return true end }
++					else opts.current = function() return true end end
++				end
++				helpers.assert_true(Offer.handle(failure, opts))
++				helpers.assert_eq(#state.installs, 0, "Consent must refuse a replaced origin, model, installer or requesting callback.")
++				helpers.assert_eq(state.successors, 0, "The replacement installer must never be invoked.")
++			end)
++		end)
++	end
++
++	helpers.it("linux-model-consent-affinity: effectful admission cannot replace installer between checks", function()
++		with_affinity(function(Offer, state, installer)
++			local modal_returned = false
++			state.during_confirm = function() modal_returned = true end
++			local opts = { current = function()
++				if modal_returned then installer.start = function() state.successors = state.successors + 1; return true end end
++				return true
++			end }
++			helpers.assert_true(Offer.handle(require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434"), opts))
++			helpers.assert_eq(#state.installs, 0)
++			helpers.assert_eq(state.successors, 0)
++		end)
++	end)
++
++	helpers.it("linux-model-consent-affinity: accepted original installer retains origin and retry admission", function()
++		with_affinity(function(Offer, state, installer)
++			local failure = require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
++			helpers.assert_true(Offer.handle(failure))
++			helpers.assert_eq(#state.installs, 1)
++			helpers.assert_eq(state.installs[1].base_url, "http://127.0.0.1:11434")
++			helpers.assert_eq(state.installs[1].model, "qwen:2b")
++			helpers.assert_true(state.installs[1].current())
++			installer.start = function() return true end
++			helpers.assert_eq(state.installs[1].current(), false, "A retry cannot borrow a successor installer.")
++		end)
++	end)
++
++	helpers.it("linux-model-consent-affinity: notification suppression belongs to its exact origin", function()
++		with_affinity(function(Offer, state)
++			local Policy = require("llm.local_model_policy")
++			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11434"), { automatic = true })
++			Offer.handle(Policy.failure("QWEN:2b", "http://127.0.0.1:11434"), { automatic = true })
++			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
++			helpers.assert_eq(state.notices, 2, "The same model on another endpoint needs its own delivered notice.")
++		end)
++	end)
++
++	helpers.it("linux-model-consent-affinity: completed original pull cannot clear a successor origin notice", function()
++		with_affinity(function(Offer, state)
++			local Policy = require("llm.local_model_policy")
++			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11434"))
++			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
++			state.installs[1].done(true)
++			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
++			helpers.assert_eq(state.notices, 1, "An old successful pull does not invalidate a successor endpoint's notice.")
++		end)
++	end)
++
++	helpers.it("linux-model-consent-affinity: completed pull cannot clear a notice delivered after its consent", function()
++		with_affinity(function(Offer, state)
++			local Policy = require("llm.local_model_policy")
++			local failure = Policy.failure("qwen:2b", "http://127.0.0.1:11434")
++			Offer.handle(failure)
++			Offer.handle(failure, { automatic = true })
++			state.installs[1].done(true)
++			Offer.handle(failure, { automatic = true })
++			helpers.assert_eq(state.notices, 1, "Completion cannot clear a warning created by a later failure.")
++		end)
++	end)
++end)

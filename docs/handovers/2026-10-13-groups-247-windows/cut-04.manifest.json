@@ -1,0 +1,57 @@
+{
+	"patch_sha256": "2138317eed8b3e2c953d42e4f245c5b31b379ba3f753a976168f25a300924c9b",
+	"files": [
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/agent_runner.lua",
+			"before_sha256": "d3c7bd768bca1ffb2479443c4ea7381ec93087f9a7b4caa58bf71b1858ff157f",
+			"after_sha256": "c72e298f211ae73ccd82de0581c557723d5eeea8958cb7a22d78ff35b2ec6c12",
+			"current_root_sha256": "d3c7bd768bca1ffb2479443c4ea7381ec93087f9a7b4caa58bf71b1858ff157f",
+			"original_test_lines_preserved": null
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/local_model_offer.lua",
+			"before_sha256": "973bc0af36acdb4f7d4013fc7821b6f73ebe3a14a2d52392f6a71ba73ab05af1",
+			"after_sha256": "9176982dfed3001b2b9ae00f3f86b54d4b5fb6b8c8c6d4d879e77bf7e6d5ac89",
+			"current_root_sha256": "6e0f4bed694582a64d306954ba2bdf121eddd1bea989dbfd2fc7b90a1eb03daf",
+			"original_test_lines_preserved": null
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/screen_answer.lua",
+			"before_sha256": "df269e026444a597184252de8a4926d88a44c50e0c7160c893f24ddc0946637c",
+			"after_sha256": "8fabc5618a128c69453cd8969e130ed947d31aed7a8c44f531c3f1a20dbab20e",
+			"current_root_sha256": "df269e026444a597184252de8a4926d88a44c50e0c7160c893f24ddc0946637c",
+			"original_test_lines_preserved": null
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/llm/test_ai_agent_local_model.lua",
+			"before_sha256": "001823f6dae96ebf6d3f35814344324a02f15a255743570af7c9378acbf68c1c",
+			"after_sha256": "4b9d3d7ea3f657eab206a67421f1fa32f21a4528d7a7118630a6f90326fb93d2",
+			"current_root_sha256": "20006d0ae63d5c7115928b669bb9cc1118a231b19b87d23f2127319aa1718701",
+			"original_test_lines_preserved": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/llm/test_screen_answer_end_to_end.lua",
+			"before_sha256": "e6e47729913f4dd1e891879aa92f82fc197be478f41827ae47db78875afb65a7",
+			"after_sha256": "0b8e9ab2a5ef5685b8ca2ef9398e0b32a426ed5bc5fbbb0dccf9145cd2761547",
+			"current_root_sha256": "e6e47729913f4dd1e891879aa92f82fc197be478f41827ae47db78875afb65a7",
+			"original_test_lines_preserved": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_agent_panel.lua",
+			"before_sha256": "c803f0adacbe8f7aa93f67f15b198d2b33d715baf87ccbc195aef89b3efcaed4",
+			"after_sha256": "bb92b67fc8ebf9b8fcc0a40edcd3bc05baed82009e2a6b2d04a77ae256677c7d",
+			"current_root_sha256": "69e48f817e6822a175e27000a025e4e550a1b3e56edee581b9036a58484b2c88",
+			"original_test_lines_preserved": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua",
+			"before_sha256": "5ba60e4cd284be71a7f63e49344e08edca9e2972f2a0dbd07468f92b3c6558c4",
+			"after_sha256": "0e23e51d4cd0e829a7e0036916d046370739abe7a7686b71667b49059be0d7fc",
+			"current_root_sha256": "5ba60e4cd284be71a7f63e49344e08edca9e2972f2a0dbd07468f92b3c6558c4",
+			"original_test_lines_preserved": null
+		}
+	],
+	"depends_on": ["7b9bc657b70f73a44f23c990c3f642f2c20ddf2341b7fa5853d76279d7dcc56d"],
+	"receiving_api_dependency": "b063128034898bde6cb6fd5515914c5a0f125e43e0f351adb90aee4e06439f3e",
+	"native_macos": "UNRUN"
+}

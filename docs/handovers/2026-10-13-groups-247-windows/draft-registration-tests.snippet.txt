@@ -1,0 +1,106 @@
+
+/** Original registration authority survives callback replacement and actual effects. */
+_LNTR_RegistrationCustody(Phase, Mutation, Outcome) {
+	_LNTR_WithState(Body)
+	Body() {
+		global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
+		global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+		global _LLM_NavEventOwnerTerminalRouteCoverage, _LLM_NavEventOwnerTerminalRouteUnknown
+		State := _LNTR_PortState()
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+		Owner := _LLM_NavEventOwnerTerminalRouteOwner
+		Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
+		Route := Recipes[17]["route"], Recipe := Recipes[17]["recipe"], Model := Recipe["model"]
+		Changed := 0, HeldCalls := 0, OriginalCoverage := _LLM_NavEventOwnerTerminalRouteCoverage
+		if Phase == "source"
+			State.Port["terminal_route_source"] := Source
+		else if Phase == "register"
+			State.Port["register_terminal_routes"] := Register
+		else
+			State.Port["list_terminal_held_recipes"] := Held
+		AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
+		AssertEqual(1, Changed)
+		AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map)
+		Unknown := _LLM_NavEventOwnerTerminalRouteUnknown
+		AssertEqual(Owner, Unknown["owner"], "A foreign successor cannot inherit the old native owner.")
+		AssertTrue(Unknown["recipes"] == Recipes), AssertTrue(Unknown["models"] == Models)
+		AssertTrue(Unknown["route_objects"][17]["route"] == Route)
+		AssertTrue(Unknown["route_objects"][17]["recipe"] == Recipe)
+		AssertTrue(Unknown["route_objects"][17]["model"] == Model)
+		AssertEqual(Phase != "source", Unknown["native_attempted"])
+		if Phase != "source" {
+			AssertTrue(Unknown["candidate"] is Map)
+			AssertEqual(20, Unknown["candidate"]["recipes"].Count)
+			AssertEqual(800, Unknown["bindings"].Size)
+			AssertEqual(Owner, State.Calls[2]["owner"])
+		}
+		AssertEqual(Phase == "source" ? 1 : 2, State.Calls.Length)
+		AssertEqual(Phase == "held" ? 1 : 0, HeldCalls)
+		AssertEqual(Phase == "held" ? 2 : 1, Unknown["coverage"]["generation"])
+		Calls := State.Calls.Length
+		; Restoring public pointers never settles an unknown real registration.
+		_LLM_NavEventOwnerTerminalRouteOwner := Owner
+		_LLM_NavEventOwnerTerminalRouteGeneration := Unknown["generation"]
+		_LLM_NavEventOwnerTerminalRouteRecipes := Recipes
+		_LLM_NavEventOwnerTerminalRouteModels := Models
+		_LLM_NavEventOwnerTerminalRouteCoverage := Unknown["coverage"]
+		AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
+		AssertEqual(Calls, State.Calls.Length), AssertEqual(Phase == "held" ? 1 : 0, HeldCalls)
+		AssertFalse(LLM_NavEventOwner_TerminalRouteCoverage()["cohort_complete"])
+		AssertFalse(LLM_NavEventOwner_TerminalRouteCoverage()["transformed_output_enabled"])
+		Source() {
+			Result := _LNTR_Source(State)
+			Change()
+			return Result
+		}
+		Register(OwnerArg, Generation, Layout, Bindings, Count) {
+			AssertEqual(Owner, OwnerArg)
+			_LNTR_Register(State, OwnerArg, Generation, Layout, Bindings, Count)
+			if Mutation == "bindings-byte"
+				NumPut("UChar", NumGet(Bindings, 0, "UChar") ^ 1, Bindings, 0)
+			else if Mutation == "bindings-size"
+				Bindings.Size := 1
+			Change()
+			return Outcome == "busy" ? -11 : Outcome == "unknown" ? "0" : 0
+		}
+		Held(OwnerArg, BufferArg, Capacity) {
+			HeldCalls += 1
+			AssertEqual(Owner, OwnerArg)
+			Result := _LNTR_Held(State, OwnerArg, BufferArg, Capacity)
+			Change()
+			return Result
+		}
+		Change() {
+			Changed += 1
+			switch Mutation {
+				case "owner": _LLM_NavEventOwnerTerminalRouteOwner += 7
+				case "generation": _LLM_NavEventOwnerTerminalRouteGeneration += 7
+				case "recipes": _LLM_NavEventOwnerTerminalRouteRecipes := Recipes.Clone()
+				case "models": _LLM_NavEventOwnerTerminalRouteModels := Models.Clone()
+				case "coverage": _LLM_NavEventOwnerTerminalRouteCoverage := _LLM_NavEventOwnerTerminalRouteCoverage.Clone()
+				case "recipe-cell": Recipes[17] := Recipes[17].Clone()
+				case "route-object": Recipes[17]["route"] := Route.Clone()
+				case "route-field": Route["code"] += 1
+				case "recipe-object": Recipes[17]["recipe"] := Recipe.Clone()
+				case "recipe-field": Recipe["index"] += 1
+				case "recipe-model": Recipe["model"] := Model.Clone()
+			}
+			if Outcome == "throw"
+				throw Error("Injected callback failure after possible native registration.")
+		}
+	}
+}
+for _LNTR_CustodyPhase in ["source", "register", "held"]
+	for _LNTR_CustodyMutation in ["owner", "generation", "recipes", "models", "coverage", "recipe-cell",
+		"route-object", "route-field", "recipe-object", "recipe-field", "recipe-model"]
+		for _LNTR_CustodyOutcome in ["normal", "throw"]
+			Test("terminal registration custody: " . _LNTR_CustodyPhase . ":" . _LNTR_CustodyMutation
+				. ":" . _LNTR_CustodyOutcome . " (todo49-registration-custody)",
+				_LNTR_RegistrationCustody.Bind(_LNTR_CustodyPhase, _LNTR_CustodyMutation, _LNTR_CustodyOutcome))
+for _LNTR_RefusedMutation in ["owner", "recipes", "generation", "bindings-byte", "bindings-size"]
+	for _LNTR_RefusedOutcome in ["busy", "unknown"]
+		Test("terminal registration custody: refused " . _LNTR_RefusedMutation . ":" . _LNTR_RefusedOutcome
+			. " (todo49-registration-custody)", _LNTR_RegistrationCustody.Bind("register", _LNTR_RefusedMutation, _LNTR_RefusedOutcome))
+for _LNTR_ByteMutation in ["bindings-byte", "bindings-size"]
+	Test("terminal registration custody: acknowledged " . _LNTR_ByteMutation . " (todo49-registration-custody)",
+		_LNTR_RegistrationCustody.Bind("register", _LNTR_ByteMutation, "normal"))

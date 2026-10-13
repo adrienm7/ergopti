@@ -1,0 +1,82 @@
+{
+	"base": "ae684ed723c82bb158dd873a9e928be2e105a9c1",
+	"depends_on": "4a4074f9c10b0085078fa61fc196cf33b22fa4aaf06246fa8b7d7c244bf97e45",
+	"patch_sha256": "488e61b34d7991908b6cca2e76ef046414cf5e404d1b857dbe28d9a0591f53e5",
+	"files": [
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/local_model_offer.lua",
+			"before_sha256": "40ba011ad8708a9866504e8a4b9bb2263c4d63a9c25fb2d6b6a470c4a9014d7c",
+			"after_sha256": "f0bdaf4e607361506816d34da63ae803f910d765b47b150ac12013dd3056146c"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+			"before_sha256": "55ff8b86efcfaffb767f4c6f6a7ba89651b92303965b5f505dc26a6fa2447a56",
+			"after_sha256": "a32cbf1e27051cdc8859473412e99a4480886b94ebd981edb3c108dcdb6a21d1"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/model_download.lua",
+			"before_sha256": "90af4cc386002e795928605955973460ee697aa87545d3ecbf8aa29a900778b8",
+			"after_sha256": "85402e76082dde48a3133a10c35af2467f9adf54ab14af03bc73880ad4d9883d"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_flow.lua",
+			"before_sha256": "4e31272d3c6c8aa700f853bff98a10658a48aa316b3c089bdc80346c9aba604c",
+			"after_sha256": "fc8a23f6459a5079248e6635d0ea34bc42f2936734c5d5672a61cc0222ddc6f2",
+			"original_test_prefix_byte_identical": true,
+			"old_assertion_calls": 108,
+			"new_assertion_calls": 26
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/test_model_download.lua",
+			"before_sha256": "f32e09753652d7f7890a5fda269be788f9d8c7f1529852679fcb13d56c5c829d",
+			"after_sha256": "5014c18cac354ef2fef8faa0aca9f36e9e7743e6569679a1d1ada56a7d46928f",
+			"original_test_prefix_byte_identical": true,
+			"old_assertion_calls": 131,
+			"new_assertion_calls": 14
+		}
+	],
+	"proof": {
+		"original_engine_new_cases": "4 passed / 6 failed, exit 1",
+		"original_download_new_cases": "0 passed / 2 failed, exit 1",
+		"corrected_new_cases": "12 passed / 0 failed, exit 0",
+		"corrected_full_modules_Lua54_and_LuaJIT": "28 + 36 + 23 = 87 passed / 0 failed, each exit 0",
+		"causal_mutations": [
+			{
+				"name": "installer-identity-check-omitted",
+				"exit": 1,
+				"summary": "RESULT 6 passed / 4 failed"
+			},
+			{
+				"name": "new-notice-cleared",
+				"exit": 1,
+				"summary": "RESULT 9 passed / 1 failed"
+			},
+			{
+				"name": "early-caller-clear",
+				"exit": 1,
+				"summary": "RESULT 4 passed / 6 failed"
+			},
+			{
+				"name": "truthy-installer-admission",
+				"exit": 1,
+				"summary": "RESULT 8 passed / 2 failed"
+			},
+			{
+				"name": "premature-retirement-notification",
+				"exit": 1,
+				"summary": "RESULT 0 passed / 2 failed"
+			},
+			{
+				"name": "retirement-notification-omitted",
+				"exit": 1,
+				"summary": "RESULT 0 passed / 2 failed"
+			},
+			{
+				"name": "stale-retirement-clears-successor",
+				"exit": 1,
+				"summary": "RESULT 9 passed / 1 failed"
+			}
+		]
+	},
+	"native_dialog_http_receiving": "UNRUN"
+}

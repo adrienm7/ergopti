@@ -1,0 +1,32 @@
+{
+	"base": "ae684ed723c82bb158dd873a9e928be2e105a9c1",
+	"paths": {
+		"static/ergopti_plus/windows/modules/keylogger/keylogger_hook.ahk": {
+			"before_sha256": "85f00e6cb04d9c5d1ba27404a954aeccd17beb38d009675c3a034fbc2b1b3b31",
+			"after_sha256": "4fe975b663a2f868d6002e66a5d387b5bb757716d7b101b83b1b2017731e953a",
+			"bom_lf_utf8": true
+		},
+		"static/ergopti_plus/windows/tests/unit/test_keylogger_session_close_retry.ahk": {
+			"before_sha256": "22e7dea33ae81ba87fb643cce10ce5a8dbbe7928939308315f5c85d1a9bc808f",
+			"after_sha256": "2a3d29bf7c2708928f5175028729ebb8ca9877d593e13dc209a1e15cc1482493",
+			"bom_lf_utf8": true
+		}
+	},
+	"patch_sha256": "e0bed5075add9e73dd59dfeb99f1b1db5f5477ec50c27e77eaa2d0a7553cfa49",
+	"original_assert_occurrences": 227,
+	"final_assert_occurrences": 253,
+	"old_test_bytes_preserved_except_two_faithful_fixture_stamp_additions": true,
+	"authored_additional_ahk_cases": 7,
+	"ahk_execution": "UNRUN",
+	"actual_source_controls": {
+		"original_red": true,
+		"corrected_green": true,
+		"causal_inverses": 7
+	},
+	"syntax_antipatterns_scoped_files": 2,
+	"loop_capture_findings": 0,
+	"loop_capture_selftests": 14,
+	"windows_only_reason": "Windows InputHook separates down identity from OnChar; Mac derives keycode from its same event, Linux consumes explicit scancode callback argument. No matched cached-pair mechanism in those paths.",
+	"production_capture_admission_changed": false,
+	"source_control_script_sha256": "af79f72936ce2f6b96dc3982f1a9b83632328b578f9d6d6ff41b7dffb1d5eb4f"
+}
