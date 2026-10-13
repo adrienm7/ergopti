@@ -552,3 +552,34 @@ _PFC_MetadataCaseAliasesRefuse() {
 }
 Test("personal-file-metadata: case-alias fields refuse while safe neighboring controls remain available",
 	_PFC_MetadataCaseAliasesRefuse)
+
+
+/** Invalid canonical stored types cannot acquire ownership by disappearing from a projection. */
+_PFC_StoredMetadataTypesRefuse(Vector) {
+	Fixture := _PFC_Fixture()
+	try {
+		Source := Vector["source"]
+		Section := Vector.Has("section") ? Vector["section"] : ""
+		Field := Vector["field"]
+		AssertFalse(Fixture.owner.MetadataAvailable(Section, Field, Source))
+		Refused := false
+		try Fixture.owner.PatchMetadata(Section, Field, Vector["value"], Source)
+		catch ValueError
+			Refused := true
+		AssertTrue(Refused, "a filtered invalid value is not an absent owned field")
+		AssertTrue(Fixture.owner.MetadataAvailable(Section, Vector["safe_field"], Source))
+		Candidate := Fixture.owner.PatchMetadata(Section, Vector["safe_field"], Vector["safe_value"], Source)
+		Parsed := TOML_ParseDocument(Candidate)["_meta"]
+		if Section != ""
+			Parsed := Parsed["sections"][Section]
+		AssertEqual(Vector["safe_value"], Parsed[Vector["safe_field"]], "the available neighbor is actually edited")
+		AssertContains(Candidate, Vector["preserve"], "safe neighboring edits preserve the exact invalid leaf and comment")
+		AssertContains(Candidate, 'future = { untouched = [], enabled = false }')
+		AssertEqual(Fixture.content, FSReadUtf8Exact(Fixture.file), "read-only preparation never writes the physical source")
+	} finally _PFC_Cleanup(Fixture)
+}
+for _PFC_MetadataVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\personal_metadata_types.json", "UTF-8"))["vectors"] {
+	if _PFC_MetadataVector.Has("native_refusal") && _PFC_MetadataVector["native_refusal"]
+		Test("personal-file-metadata: (personal-metadata-source-type) " . _PFC_MetadataVector["name"],
+			_PFC_StoredMetadataTypesRefuse.Bind(_PFC_MetadataVector))
+}

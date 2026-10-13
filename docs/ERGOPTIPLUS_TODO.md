@@ -11691,6 +11691,19 @@ exact-boolean regressions also pass the focused runner.
   effective category/section changes through their persistence owners;
   retain unrelated choices and fence refused writes/runtime publication.
   Replay the same full-enable/full-disable behavior on every driver.
+  Shared Lua metadata preparation now classifies exact canonical stored types
+  before the filtered hotstring projection can conceal an invalid leaf. The
+  selected invalid field and scalar/array ancestors refuse edits and clearing;
+  safe neighbours preserve the foreign source bytes. The unchanged Windows
+  owner receives eight native parity cases. Focused Lua coverage is 47/47 on
+  each supported helper, against the original 32/15; the independent parent
+  judge is 16/16 under Lua 5.4 and LuaJIT, against 12 original failures each.
+  Corrected canonical Linux units pass 13568/13568 (521 modules), and E2E
+  pass 193/193 plus six digest controls, each exit 0. Targeted macOS portable
+  adoption/preservation pass 19/19 and 47/47; the preceding full macOS run's
+  refusal-order failure was fixed without changing its assertion. Full JS is
+  424/426, exit 1, with two unchanged Root-owned source guard failures.
+  Windows AHK and native macOS/UI acceptance remain UNRUN; TODO 102 stays open. See the executable [stored-type continuation](handovers/2026-10-12-dev-consolidation/personal-metadata-types.md).
   The macOS lifecycle helper now rejects the preference owner's returned
   refusal as well as a thrown publication error. Three regressions first
   showed false acknowledgements after false/nil/throwing writer results;
