@@ -6,7 +6,8 @@
 	const keyboard = new KeyboardEmulation('emulation');
 	onMount(() => {
 		keyboard.textarea = document.getElementById('input-text');
-		keyboard.updateKeyboard();
+		keyboard.mount();
+		return () => keyboard.destroy();
 	});
 </script>
 

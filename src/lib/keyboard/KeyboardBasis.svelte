@@ -6,7 +6,8 @@
 	export let id;
 	const keyboard = new Keyboard(id);
 	onMount(() => {
-		keyboard.updateKeyboard();
+		keyboard.mount();
+		return () => keyboard.destroy();
 	});
 </script>
 
