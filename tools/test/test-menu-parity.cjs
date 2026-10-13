@@ -8531,3 +8531,78 @@ function languageParentSource(source, driver) {
 		'[OK] personal-folder caption: entire original traversal and real fill/late total path retained; optional count observation cannot move.'
 	);
 }
+
+// Producer ASTs are immutable; parsing them again adds no receiving obligation.
+// Count actual parser calls so both repeated work and a stale cross-call cache fail.
+{
+	const assert = require('node:assert/strict');
+	const Module = require('node:module');
+	const bindingFile = path.resolve(__dirname, '../lib/menu-native-llm-parent-binding.cjs');
+	const source = fs.readFileSync(bindingFile, 'utf8');
+	const parserDeclaration = 'function luaProducerTree(source) {';
+	assert.equal(source.split(parserDeclaration).length - 1, 1, 'actual producer parser exists once');
+	const receivingSource =
+		source.replace(parserDeclaration, 'function originalLuaProducerTree(source) {') +
+		`\nconst receivedProducerTrees = [];
+function luaProducerTree(source) {
+	const tree = originalLuaProducerTree(source);
+	receivedProducerTrees.push({ source, tree, original: JSON.stringify(tree) });
+	return tree;
+}
+module.exports.receivedProducerTrees = receivedProducerTrees;
+module.exports.receivingParser = luaPublicationParser;
+`;
+	const receivingModule = new Module(bindingFile);
+	const actualRequire = Module.createRequire(bindingFile);
+	receivingModule.require = (name) => {
+		assert(
+			['./script-source.cjs', './menu-native-personal-info-binding.cjs', 'node:util'].includes(
+				name
+			),
+			'producer receiving refuses an unreviewed import: ' + name
+		);
+		return actualRequire(name);
+	};
+	receivingModule._compile(receivingSource, bindingFile);
+	const receiving = receivingModule.exports;
+	const parser = receiving.receivingParser();
+	const producers = [
+		parser.body(
+			parser.lex(linuxAiSources['linux/ui/menu/agent_rows.lua']),
+			'function M.build(ctx, dialogs)'
+		),
+		parser.body(
+			parser.lex(linuxAiSources['linux/ui/menu/menu_builder.lua']),
+			'local function _build_llm(ctx)'
+		)
+	];
+	assert(
+		producers.every((unit) => unit && unit.text.length > 0),
+		'both actual complete producers exist'
+	);
+	assert.notEqual(producers[0].text, producers[1].text, 'producer texts are independent');
+	for (const kind of ['agent', 'llm']) {
+		for (let invocation = 0; invocation < 2; invocation++) {
+			receiving.receivedProducerTrees.length = 0;
+			assert.equal(
+				receiving.nativeLinuxAiParentPublication(linuxAiSources, manifest, kind, 'linux'),
+				true,
+				'complete genuine ' + kind + ' publication remains admitted'
+			);
+			for (const producer of producers) {
+				assert.equal(
+					receiving.receivedProducerTrees.filter((row) => row.source === producer.text).length,
+					1,
+					'parse each complete producer exactly once in every invocation; no repeated work or stale store'
+				);
+			}
+			assert(
+				receiving.receivedProducerTrees.every((row) => JSON.stringify(row.tree) === row.original),
+				'all structural visitors preserve their shared producer ASTs'
+			);
+		}
+	}
+	console.log(
+		'[OK] native menu sources: one producer AST per source and a fresh receiving store per invocation.'
+	);
+}
