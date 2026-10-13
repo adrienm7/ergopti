@@ -292,6 +292,23 @@ proof. The 41-export source guard retains all original assertions and adds
 live source/DLL provenance and closed admission are unchanged. Backend delivery
 and complete observer conversion remain software work, so item 49 stays open.
 
+Item 49 now retains the coherent [nineteen-path source bundle](handovers/2026-10-12-dev-consolidation/pending-terminal-complete-union.patch)
+with [exact preimages and postimages](handovers/2026-10-12-dev-consolidation/terminal-complete-union.manifest.json)
+and [executable receiving](handovers/2026-10-12-dev-consolidation/terminal-complete-receiving.md).
+Its ten C afterimages exactly match the sanitized 8 core / 11 output / 43 owner
+composition. The captured receiver now retains immutable original authority
+through opaque callbacks, and the explicitly supplied sender keeps separate
+owned bytes and authentic partial-output debt. The actual copy-observer key is
+corrected in 48 authority vectors. The KLE reset factory publishes only after
+complete registration and produces read-only metadata under the original
+binding/model/layout identity. Source controls pass 119 custody and 27 bridge
+inverses, exit 0. All 667 terminal cases, 91 new KLE cases and two opt-in user32
+receiving vectors remain native UNRUN. Apply the union once; its 41-export
+adapter requires an official matching Windows SDK/MSVC DLL rebuild. Active
+source/DLL provenance and production admission are unchanged. Full cohort
+migration, preregistration and production emission still have software work;
+no backend choice, native or physical qualification is inferred.
+
 ### Historical v1.0.0 publication checkpoint
 
 Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
