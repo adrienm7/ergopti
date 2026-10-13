@@ -15,7 +15,7 @@
 ---    (its models manager and download window) when it is built; this module
 ---    never pulls a model by itself.
 --- 3. Never while typing: a request of the automatic mode posts one
----    notification per model, whose click opens the dialog, instead of a modal
+---    notification per endpoint and model, whose click opens the dialog, instead of a modal
 ---    dialog that would take the keystrokes.
 --- ==============================================================================
 
@@ -28,13 +28,14 @@ local Notifications = require("infra.notifications")
 
 local LOG = "llm.local_model_offer"
 
--- fn(model, on_done) -> boolean accepted; on_done(ok, reason) once the download settled
+-- fn(model, on_done, is_current) -> boolean accepted; on_done(ok, reason) settles once
 local _installer = nil
+local _installer_generation = 0
 
 -- The dialog is modal: a second failure while it is open asks nothing more
-local _asking = false
+local _asking = nil
 
--- Models whose notification the automatic mode already posted
+-- Endpoint and model notifications retained by their original registration
 local _notified = {}
 
 
@@ -69,6 +70,102 @@ local function show_notice(text)
 end
 
 
+--- Captures the original configured endpoint and download registration.
+--- @return table|nil owner
+local function capture_owner()
+	local owner = { installer = _installer, generation = _installer_generation }
+	local ok, api = pcall(require, "modules.llm.api_ollama")
+	if not ok or type(api) ~= "table" or type(api.get_base_url) ~= "function"
+		or type(api.capture_service_owner) ~= "function" then return nil end
+	owner.api, owner.origin_reader, owner.service_reader = api, api.get_base_url, api.capture_service_owner
+	local service_ok, service_current = pcall(owner.service_reader)
+	if not service_ok or type(service_current) ~= "function" then return nil end
+	owner.service_current = service_current
+	local current_ok, current = pcall(owner.service_current)
+	if not current_ok or current ~= true then return nil end
+	local read_ok, origin = pcall(owner.origin_reader)
+	current_ok, current = pcall(owner.service_current)
+	if not current_ok or current ~= true or not read_ok or type(origin) ~= "string" or origin == ""
+		or owner.installer ~= _installer or owner.generation ~= _installer_generation
+		or package.loaded["modules.llm.api_ollama"] ~= api or api.get_base_url ~= owner.origin_reader
+		or api.capture_service_owner ~= owner.service_reader then return nil end
+	owner.origin = origin
+	return owner
+end
+
+--- A held consent cannot borrow a successor endpoint, API or installer.
+--- @param owner table
+--- @return boolean current
+local function owner_current(owner)
+	if type(owner) ~= "table" or owner.installer ~= _installer
+		or owner.generation ~= _installer_generation then return false end
+	local ok, api = pcall(require, "modules.llm.api_ollama")
+	if not ok or api ~= owner.api or api.get_base_url ~= owner.origin_reader
+		or api.capture_service_owner ~= owner.service_reader then return false end
+	local current_ok, current = pcall(owner.service_current)
+	if not current_ok or current ~= true then return false end
+	local read_ok, origin = pcall(owner.origin_reader)
+	current_ok, current = pcall(owner.service_current)
+	return current_ok and current == true and read_ok and origin == owner.origin
+		and owner.installer == _installer and owner.generation == _installer_generation
+		and package.loaded["modules.llm.api_ollama"] == api and api.get_base_url == owner.origin_reader
+		and api.capture_service_owner == owner.service_reader
+end
+
+--- Clears only the exact notice captured before download acquisition.
+local function forget_notification(owner, model, original_rows, original_receipt)
+	local rows = _notified[owner.origin]
+	if rows and rows == original_rows and rows[model] == original_receipt then rows[model] = nil end
+end
+
+--- Dispatches exactly the owner whose consent was accepted.
+--- @return boolean accepted
+local function install_owned(model, owner)
+	if not owner_current(owner) then
+		Logger.warn(LOG, "Local model download consent expired after its source changed.")
+		return false
+	end
+	if type(owner.installer) ~= "function" then
+		Logger.error(LOG, "Local model '%s' cannot be downloaded: no installer is registered.", model)
+		show_notice(i18n.format("llm.local_model.missing_notice", model))
+		return false
+	end
+	local original_rows = _notified[owner.origin]
+	local original_receipt = original_rows and original_rows[model]
+	local admitted, terminal, pending = false, false, nil
+	local function publish(done, reason)
+		if terminal then return end
+		terminal = true
+		if not owner_current(owner) then return end
+		if type(owner.api.forget_local_models) == "function" then owner.api.forget_local_models() end
+		if not owner_current(owner) then return end
+		if done == true then
+			forget_notification(owner, model, original_rows, original_receipt)
+			Logger.success(LOG, "Local model '%s' downloaded.", model)
+		else
+			Logger.warn(LOG, "Local model '%s' was not downloaded (%s).", model, tostring(reason))
+		end
+	end
+	Logger.start(LOG, "Downloading local model '%s'…", model)
+	local ok, accepted = pcall(owner.installer, model, function(done, reason)
+		if terminal then return end
+		if not admitted then
+			if pending == nil then pending = { done, reason } end
+			return
+		end
+		publish(done, reason)
+	end, function() return owner_current(owner) end)
+	if not ok or accepted ~= true or not owner_current(owner) then
+		terminal = true
+		Logger.error(LOG, "The download of local model '%s' was refused.", model)
+		return false
+	end
+	admitted = true
+	if pending then publish(pending[1], pending[2]) end
+	return true
+end
+
+
 
 
 -- =====================================
@@ -78,12 +175,13 @@ end
 -- =====================================
 
 --- Registers the owner of model downloads (the AI menu's models manager).
---- @param installer function|nil fn(model, on_done) -> boolean accepted, where
----        on_done(ok, reason) runs once the download settled; nil clears it.
+--- @param installer function|nil fn(model, on_done, is_current) -> boolean accepted, where
+---        on_done(ok, reason) settles once and is_current retains original consent; nil clears it.
 function M.set_installer(installer)
 	if installer ~= nil and type(installer) ~= "function" then
 		error("local_model_offer.set_installer: a function or nil is required")
 	end
+	_installer_generation = _installer_generation + 1
 	_installer = installer
 	Logger.debug(LOG, "Local model installer %s.", installer and "registered" or "cleared")
 end
@@ -94,56 +192,51 @@ end
 --- @return boolean accepted
 function M.install(model)
 	require_model(model, "install")
-	if _installer == nil then
-		-- The AI menu registers it when built: without it, only the name is left to show
-		Logger.error(LOG, "Local model '%s' cannot be downloaded: no installer is registered.", model)
-		show_notice(i18n.format("llm.local_model.missing_notice", model))
+	local owner = capture_owner()
+	if owner == nil then
+		Logger.warn(LOG, "Local model download refused: its endpoint identity is unavailable.")
 		return false
 	end
-	Logger.start(LOG, "Downloading local model '%s'…", model)
-	local ok, accepted = pcall(_installer, model, function(done, reason)
-		-- What the server holds changed: the next request lists it again
-		local ok_ollama, Ollama = pcall(require, "modules.llm.api_ollama")
-		if ok_ollama and type(Ollama) == "table" and type(Ollama.forget_local_models) == "function" then
-			Ollama.forget_local_models()
-		end
-		if done == true then
-			_notified[model] = nil
-			Logger.success(LOG, "Local model '%s' downloaded.", model)
-		else
-			Logger.warn(LOG, "Local model '%s' was not downloaded (%s).", model, tostring(reason))
-		end
-	end)
-	if not ok or accepted ~= true then
-		Logger.error(LOG, "The download of local model '%s' was refused: %s.", model, tostring(accepted))
-		return false
-	end
-	return true
+	return install_owned(model, owner)
 end
 
 --- Tells the user that a model is not installed and offers its download.
 --- @param model string The model name, as the local server names it.
 --- @param opts table|nil { automatic = true } for a request of the automatic
----        mode: a notification, once per model, whose click opens the dialog.
+---        mode: a notification per source and model, bound to that source.
 --- @return boolean offered
-function M.offer(model, opts)
-	require_model(model, "offer")
+local function offer_owned(model, opts, owner)
+	if not owner_current(owner) then
+		Logger.warn(LOG, "Local model offer expired after its source changed.")
+		return false
+	end
 	local title = i18n.get("llm.local_model.missing_title")
 	if type(opts) == "table" and opts.automatic == true then
-		if _notified[model] then
+		local rows = _notified[owner.origin] or {}
+		_notified[owner.origin] = rows
+		if rows[model] and owner_current(rows[model]) then
 			Logger.debug(LOG, "Local model '%s' is still missing; its notification was already posted.", model)
 			return false
 		end
-		_notified[model] = true
+		rows[model] = owner
 		Logger.warn(LOG, "Local model '%s' is not installed; notifying the user.", model)
+		local admitted, closed, pending_click = false, false, false
+		local function on_click()
+			if closed then return false end
+			if not admitted then pending_click = true; return false end
+			closed = true
+			return offer_owned(model, nil, owner)
+		end
 		local ok, sent = pcall(Notifications.notify, title, i18n.format("llm.local_model.missing_click", model),
-			"warning", function() M.offer(model) end)
+			"warning", on_click)
 		if not ok or sent ~= true then
-			Logger.error(LOG, "The missing-model notification for '%s' was not posted: %s.", model, tostring(sent))
-			-- The next request tries again
-			_notified[model] = nil
+			closed = true
+			Logger.error(LOG, "The missing-model notification for '%s' was not posted.", model)
+			if rows[model] == owner then rows[model] = nil end
 			return false
 		end
+		admitted = true
+		if pending_click then on_click() end
 		return true
 	end
 	if _asking then
@@ -152,12 +245,17 @@ function M.offer(model, opts)
 	end
 	Logger.warn(LOG, "Local model '%s' is not installed; offering its download.", model)
 	local download = i18n.get("menu.llm.btn_download")
-	_asking = true
+	local asking = { owner = owner }
+	_asking = asking
 	local ok, choice = pcall(Dialog.block_alert, title, i18n.format("llm.local_model.missing_body", model),
 		download, i18n.get("common.cancel"), "warning")
-	_asking = false
+	if _asking == asking then _asking = nil end
+	if not owner_current(owner) then
+		Logger.warn(LOG, "Local model download consent expired after its source changed.")
+		return false
+	end
 	if not ok then
-		Logger.error(LOG, "The missing-model dialog for '%s' could not be shown: %s.", model, tostring(choice))
+		Logger.error(LOG, "The missing-model dialog for '%s' could not be shown.", model)
 		show_notice(i18n.format("llm.local_model.missing_notice", model))
 		return false
 	end
@@ -165,8 +263,17 @@ function M.offer(model, opts)
 		Logger.info(LOG, "Download of local model '%s' declined.", model)
 		return true
 	end
-	M.install(model)
-	return true
+	return install_owned(model, owner)
+end
+
+function M.offer(model, opts)
+	require_model(model, "offer")
+	local owner = capture_owner()
+	if owner == nil then
+		Logger.warn(LOG, "Local model offer refused: its endpoint identity is unavailable.")
+		return false
+	end
+	return offer_owned(model, opts, owner)
 end
 
 --- Tells whether a failure reason of the local transport is a missing model.
@@ -181,7 +288,8 @@ end
 
 --- Forgets the posted notifications and the installer, for tests and a fresh start.
 function M.reset()
-	_installer, _asking, _notified = nil, false, {}
+	_installer_generation = _installer_generation + 1
+	_installer, _asking, _notified = nil, nil, {}
 end
 
 return M

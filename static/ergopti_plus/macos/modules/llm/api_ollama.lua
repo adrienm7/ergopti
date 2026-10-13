@@ -121,6 +121,19 @@ local _warmup_resume_observers = {}
 local _warmup_client_recovery_token = nil
 local WARMUP_RESUME_COMMIT_DELAY_SEC = 0.05
 
+--- Captures daemon custody for a held model consent without starting a service.
+--- The predicate grants no readiness or signalling authority and never joins a
+--- successor occupying the same endpoint after native retirement.
+--- @return function current Exact original daemon generation and retained slots.
+function M.capture_service_owner()
+	local generation = _ollama_start_generation
+	local serve, ambiguous = _ollama_serve_task, _ollama_ambiguous_task
+	return function()
+		return generation == _ollama_start_generation
+			and serve == _ollama_serve_task and ambiguous == _ollama_ambiguous_task
+	end
+end
+
 --- Reads ScriptControl's exact public pause state and epoch without requiring it
 --- through the LLM dependency cycle.
 local function read_script_pause_state()
