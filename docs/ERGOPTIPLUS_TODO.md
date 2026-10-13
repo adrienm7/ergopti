@@ -4247,6 +4247,15 @@ POSIX disposition/child controls pass on Linux. Successor Swift compilation
 and native test execution remain pending; no customer lease-73 repair is
 claimed.
 
+The independent native HTTP/model compiler owners now stage every genuine
+public umbrella dependency, preserving the original six headers and appending
+the signature, installed-configuration and child-disposition suppliers. All
+33 builder and five standalone compiler controls pass; Linux Clang admits the
+complete current headers and refuses each of eight individual omissions. The
+G6 frozen four-path handoff and original held-source assertions remain intact.
+Darwin fixture compilation, model inference and trust restoration are still
+separate native gates; this dependency correction is not a lease repair.
+
 ## Remaining work after the 2026-09-30 releases
 
 The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.
