@@ -52,6 +52,95 @@ LLM_OllamaManagedOriginRequired() {
 	return _LLM_ManagedBootstrap is OllamaManagedBootstrap && _LLM_ManagedBootstrap.Runtime.HasOwner()
 }
 
+/** Captures currency before the origin reader can pump a replacement owner. */
+LLM_OllamaCaptureOriginCustody(Reader := 0) {
+	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
+	Flow := _LLM_ManagedBootstrap, Configured := LLM_OLLAMA_BASE_URL
+	AuxGeneration := LLM_AuxGeneration()
+	Runtime := Flow is OllamaManagedBootstrap ? Flow.Runtime : 0
+	Record := IsObject(Runtime) && Runtime.HasOwnProp("Record") ? Runtime.Record : 0
+	Target := Flow is OllamaManagedBootstrap ? Flow.Target : 0
+	RecordTarget := Record is Map ? Record.Get("target", 0) : 0
+	Task := Record is Map ? Record.Get("task", 0) : 0
+	Generation := IsObject(Runtime) && Runtime.HasOwnProp("Generation") ? Runtime.Generation : 0
+	Tickets := Map()
+	if Target is Map
+		for Name in ["origin", "runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256"]
+			Tickets[Name] := Target.Get(Name, "")
+	Owned := IsObject(Runtime) && Runtime.HasOwner()
+	if !(Owned is Integer) || (Owned != false && Owned != true)
+		throw ValueError("Managed origin ownership must return an exact Boolean.")
+	Origin := Owned && Tickets.Has("origin") ? Tickets["origin"] : Configured
+	ReadFn := HasMethod(Reader, "Call") ? Reader : LLM_OllamaRequestOrigin
+	if Reader != 0 && !HasMethod(Reader, "Call")
+		throw TypeError("Origin reader must be callable.")
+	if !Bound()
+		throw Error("Origin ownership changed before its reader.")
+	Observed := ReadFn.Call()
+	if !Bound() || !(Observed is String) || !(Observed == Origin)
+		throw Error("Origin reader replaced its captured ownership.")
+	return Currency
+
+	Bound() {
+		global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
+		if AuxGeneration != LLM_AuxGeneration() || !(LLM_OLLAMA_BASE_URL == Configured) || !(Origin is String) || Origin == ""
+			return false
+		if !Owned {
+			Active := _LLM_ManagedBootstrap
+			ActiveRuntime := Active is OllamaManagedBootstrap ? Active.Runtime : 0
+			ActiveOwned := IsObject(ActiveRuntime) && ActiveRuntime.HasOwner()
+			return Active == _LLM_ManagedBootstrap && (!(Active is OllamaManagedBootstrap) || Active.Runtime == ActiveRuntime)
+				&& ActiveOwned is Integer && ActiveOwned == false
+				&& LLM_OLLAMA_BASE_URL == Configured && AuxGeneration == LLM_AuxGeneration()
+		}
+		if _LLM_ManagedBootstrap != Flow || !(Record is Map) || !(Target is Map) || !(RecordTarget is Map)
+				|| Flow.Runtime != Runtime || Runtime.Record != Record || Flow.Target != Target
+				|| Record.Get("target", 0) != RecordTarget || Record.Get("task", 0) != Task
+				|| !Runtime.HasOwnProp("Generation") || !(Generation is Integer) || Generation <= 0 || Runtime.Generation != Generation
+			return false
+		for Name, Value in Tickets {
+			if !(Value is String) || Value == "" || !(Target.Get(Name, "") == Value) || !(RecordTarget.Get(Name, "") == Value)
+				return false
+		}
+		return true
+	}
+
+	Currency(Action, Expected := "") {
+		if Action == "owned"
+			return Owned
+		try Valid := Bound() && LLM_OllamaRequestOrigin() == Origin && Bound()
+		catch
+			Valid := false
+		if Action == "current"
+			return Valid && Expected is String && Expected == Origin
+		if Action != "origin"
+			throw ValueError("Unknown origin currency operation.")
+		if !Valid
+			throw Error("The original origin owner is no longer current.")
+		return Origin
+	}
+}
+
+/** A currency receipt reads its captured closure, never grants readiness. */
+LLM_OllamaOriginCustodyCurrent(Custody, Origin) {
+	if !HasMethod(Custody, "Call")
+		return false
+	try {
+		Valid := Custody.Call("current", Origin)
+		return Valid is Integer && Valid == true
+	}
+	catch
+		return false
+}
+
+/** Retains the lexical receipt across native readers, cleanup and delivery callbacks. */
+LLM_OllamaInvokeOriginCurrent(Custody, Origin, Callback, Name, Args*) {
+	if !LLM_OllamaOriginCustodyCurrent(Custody, Origin)
+		return false
+	_LLM_InvokeCallback(Callback, Name, Args*)
+	return true
+}
+
 LLM_OllamaOriginMatches(Origin) {
 	try return Origin is String && StrCompare(Origin, LLM_OllamaRequestOrigin(), true) == 0
 	catch
@@ -63,7 +152,9 @@ LLM_OllamaProbeOriginCurrent(Owner, Origin) {
 		return false
 	if LLM_ManagedBootstrapOriginIsCurrent(Owner, Origin)
 		return true
-	try return StrCompare(Origin, LLM_OllamaRequestOrigin(), true) == 0
+	if Owner.Has("origin_custody")
+		return LLM_OllamaOriginCustodyCurrent(Owner["origin_custody"], Origin)
+	try return !LLM_OllamaManagedOriginRequired() && StrCompare(Origin, LLM_OllamaRequestOrigin(), true) == 0
 	catch
 		return false
 }

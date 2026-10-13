@@ -1497,3 +1497,28 @@ _OllamaPresenceNativeScheduleContract() {
 }
 Test("Ollama local presence: native preflight timer owns one-shot and cancel semantics (todo-46-local-model)",
 	_OllamaPresenceNativeScheduleContract)
+
+
+/** Drives actual chat presence through retained source currency and transport ports. */
+_G4O_Presence(Mode, F) {
+	Other := _G4B_Fixture()
+	try _OllamaPresenceWithFixture(Receive)
+	finally Other.Close()
+	Receive(State) {
+		global _LLM_ManagedBootstrap
+		if Mode == "replacement" {
+			AssertTrue(F.Flow.Cancel())
+			Other.Start(), Other.Runtime.PublishReady()
+			_LLM_ManagedBootstrap := Other.Flow
+		}
+		Names := Mode == "installed" ? Map("qwen2.5:latest", true) : Map()
+		State["callback"].Call(Map("ok", true, "names", Names))
+		AssertEqual(Mode == "installed" ? 1 : 0, State["posts"])
+		AssertEqual(Mode == "missing" ? 1 : 0, State["failures"].Length)
+		if Mode == "missing"
+			AssertTrue(LLM_LocalModelIsMissing(State["failures"][1]))
+	}
+}
+for _G4O_PresenceMode in ["installed", "missing", "replacement"]
+	Test("Ollama managed origin: actual preflight " . _G4O_PresenceMode . " (managed-origin-custody)",
+		_G4O_WithManaged.Bind(_G4O_Presence.Bind(_G4O_PresenceMode)))
