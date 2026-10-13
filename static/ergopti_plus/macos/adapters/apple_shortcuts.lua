@@ -140,10 +140,12 @@ function M.new(ports)
 		active = entry
 		local function complete()
 			if entry.constructing or active ~= entry or not entry.completed or not settled(entry) then return end
+			-- A settlement observer may retire this entry and admit a successor.
+			if active ~= entry then return end
 			active = nil
 			if entry.cancelled or generation ~= entry.epoch then return end
 			local refused = not entry.reply or entry.code ~= 0 or entry.errors ~= "" or not same(cli)
-				or not qualified("discovery")
+				or not qualified("discovery") or entry.start_refused
 			if entry.cancelled or generation ~= entry.epoch then return end
 			if refused then finish(nil, "query_refused"); return end
 			local value, reason = packet(entry.reply, request)
@@ -164,11 +166,28 @@ function M.new(ports)
 			return false, "transport_refused"
 		end
 		entry.handle = handle
+		local function refuse(reason)
+			-- Cancellation marks the entry before native callbacks; later settlement
+			-- must still clear retained debt after a refused startup.
+			entry.constructing = false
+			cancel(entry)
+			return false, reason
+		end
 		local watching, observed = pcall(handle.onSettled, complete)
-		entry.constructing = false
-		if not watching or observed ~= true or entry.cancelled then cancel(entry); return false, "transport_refused" end
+		if not watching or observed ~= true or entry.cancelled then return refuse("transport_refused") end
 		local started, receipt = pcall(handle.start)
-		if not started or receipt ~= true then cancel(entry); return false, "start_refused" end
+		if not started or receipt ~= true then
+			-- A known closed failure may notify only after the start ACK resolves.
+			-- Even a valid buffered reply cannot turn this rejected start into success.
+			entry.start_refused = true
+			entry.constructing = false
+			complete()
+			-- finish may have admitted a successor; cancel only the captured old entry.
+			cancel(entry)
+			return false, "start_refused"
+		end
+		-- A terminal callback cannot outrun the literal query start acknowledgement.
+		entry.constructing = false
 		complete()
 		return true
 	end

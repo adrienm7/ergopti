@@ -1094,3 +1094,72 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		end)
 	end)
 end)
+
+
+helpers.describe("Keyboard consumption queue acknowledgement", function()
+	for _, scenario in ipairs({ "inline true", "inline false", "inline throw",
+		"retained false", "retained nil", "retained unknown", "retained throw" }) do
+		helpers.it("(consume-queue-ack) refuses " .. scenario .. " before any action", function()
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local gestures = require("modules.gestures.manager")
+			local execute, pending, fired, before_ack = gestures.execute_action, nil, {}, nil
+			gestures.execute_action = function(action) fired[#fired + 1] = action end
+			local checked, failure = pcall(function()
+				local called, consumed, slot = pcall(shortcuts.consume, chord("j", { ctrl = true }), {
+					defer = function(callback)
+						pending = callback
+						if scenario:match("^inline") then callback() end
+						before_ack = #fired
+						if scenario:match("throw$") then error("controlled queue refusal", 0) end
+						if scenario == "inline true" then return true end
+						if scenario == "retained nil" then return nil end
+						if scenario == "retained unknown" then return "accepted" end
+						return false
+					end,
+				})
+				helpers.assert_eq(called, true, "A queue refusal returns through the existing consume contract")
+				helpers.assert_eq(consumed, false, "The original key remains available for normal forwarding")
+				helpers.assert_eq(slot, nil)
+				helpers.assert_eq(before_ack, 0, "No configured action runs before the queue resolves")
+				helpers.assert_eq(fired, {})
+				helpers.assert_eq(type(pending), "function", "The actual consumer supplied its original callback")
+				pending()
+				pending()
+				helpers.assert_eq(fired, {}, "A refused or early callback cannot gain rights after return")
+			end)
+			gestures.execute_action = execute
+			drop_config()
+			if not checked then error(failure, 0) end
+		end)
+	end
+
+	for _, scenario in ipairs({ "duplicate delivery", "reentrant delivery" }) do
+		helpers.it("(consume-queue-ack) acknowledges one action under " .. scenario, function()
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local gestures = require("modules.gestures.manager")
+			local execute, pending, fired, reentered = gestures.execute_action, nil, {}, false
+			gestures.execute_action = function(action)
+				fired[#fired + 1] = action
+				if scenario == "reentrant delivery" and not reentered then reentered = true; pending() end
+			end
+			local checked, failure = pcall(function()
+				local consumed, slot = shortcuts.consume(chord("j", { ctrl = true }), {
+					defer = function(callback)
+						pending = callback
+						helpers.assert_eq(fired, {}, "The original positive ACK precedes execution")
+						return true
+					end,
+				})
+				helpers.assert_eq(consumed, true)
+				helpers.assert_eq(slot, "ctrl_j")
+				helpers.assert_eq(fired, {})
+				pending()
+				pending()
+				helpers.assert_eq(fired, { "select_line" }, "Only the first post-ACK callback may execute this press")
+			end)
+			gestures.execute_action = execute
+			drop_config()
+			if not checked then error(failure, 0) end
+		end)
+	end
+end)
