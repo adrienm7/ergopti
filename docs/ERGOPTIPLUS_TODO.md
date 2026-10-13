@@ -12560,6 +12560,20 @@ unqualified. Item 107 stays partial.
   dependency requires table.pack; native Hammerspoon is unrun. This does not
   finish live retargeting, collision or installed acceptance.
 
+The Linux layout consumer now renews an automatic X11 inverse after an
+acknowledged group change in the same original map, session and issuer.
+Character resolution and new plans use that distinct inverse; all old plans
+remain revoked. Explicit overrides, equal-group epoch replacement, unknown
+source, reset and reentrant publication keep their original refusals. All 118
+original keyboard-layout cases remain unchanged; the appended twelve yield
+130 passes on both LuaJIT and Lua 5.4. Original source receives 125 passes and
+five failures. Consumer omission retains those five failures; four bounded
+omissions each fail their independently predicted new case. The full-prefix
+same-group omission also fails its pre-existing refusal case; that extra red
+is preserved separately. No capture reset, modifier clearing or output grant
+is added. Hosted native group changes, editor-key retargeting, collision and
+installed/physical acceptance remain required; item 108 stays partial.
+
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:
   generated AHK/Lua/Swift composers, translated bare captions and live retitles
