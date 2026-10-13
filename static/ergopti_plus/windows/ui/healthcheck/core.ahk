@@ -1068,7 +1068,10 @@ _HC_PublishProbe(WindowEpoch, Id, Result, Sections) {
 ; Converts an AHK value to JSON: Maps become objects, Arrays arrays, numbers
 ; stay numbers (true and false are the 1 and 0 AHK stores).
 _HC_ValueToJson(Val) {
+	global JSON_NULL
 	if !IsSet(Val)
+		return "null"
+	if IsObject(Val) && ObjPtr(Val) == ObjPtr(JSON_NULL)
 		return "null"
 	if (Val is String)
 		return _HC_JsStr(Val)

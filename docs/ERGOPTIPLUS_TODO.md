@@ -134,6 +134,57 @@ an inverse that restores the original direct OS call and rejects it. Other
 full-unit failures stay open. Unchanged source blobs alone are not a same-host
 native baseline reproduction.
 
+The local committed Windows build at `7e3da5567183914502e977d720e818e337e1dd49`
+compiles with the authenticated AutoHotkey2.0.26/Ahk2Exe toolchain. Actual
+operator-opted user32 receiving exits 0 with two owned Edit vectors and two
+native calls, retaining injected plan/serializer scope: no native FIFO, physical
+keyboard, complete cohort or production backend policy is qualified.
+
+Actual compiled Diagnostics collection exposes a separate transport defect:
+nullable failed-worker receipts decode to the Windows JSON_NULL sentinel, but
+the page serializer tries to stringify that sentinel as an arbitrary object.
+The new causal test naturally fails 0/1 before the fix; exact-sentinel encoding
+preserves JSON null and all 14 collection state cases now pass with exit 0.
+The original compiled attempt remains FAILED, with an archive and an unresolved
+host completion/quit outcome; a corrected installed rerun is still pending.
+The stock collector's 30 PowerShell controls pass again at the same source SHA.
+User metadata refresh and installed receiving are not isolated-suite evidence.
+
+#### Actual compiled diagnostic archive receiving
+
+The corrected local development build at
+`e235a917e2eaab4ab53569e631a9c631acc1b067` compiles successfully. Its exact
+11,037,184-byte executable SHA256 is
+`ef96387dc8efbaedee9d3ca06370ce044ef9e35443244ba61849488a8ec92c6d`.
+The obsolete no-download explanation is removed from both availability notices
+in all 21 locales; download consent and installation behavior are unchanged.
+
+Actual Diagnostics collection is received from the compiled button, first in
+native fallback and subsequently in the WebView after reopening. Closing the
+view at guided 10/14 leaves the exact original session active without creating
+cancellation control. Reopening exposes its acknowledged archive; a second
+collection receives an explicit physical-skip action and exposes its archive.
+The host's archive action is enabled only after its existing digest-bound terminal
+acknowledgement. No separate raw host exit-code receipt was captured by the UI
+observer; worker archive existence alone is not used as host completion proof.
+
+The reviewed second archive `diagnostic-Windows-e235a917e2.zip` is 7,956 bytes,
+SHA256 `965e2d7309251977e8009001446e83f6e8f7b38e550d689ba806ea732ed1526a`.
+ZIP CRC, closed entry allowlist, redaction review, exact source and every one of
+six component hashes/sizes pass. Its genuine installed-binary identity describes
+this local compiled artifact, not a published or installer-qualified release.
+It records six PASS (redaction, component identity, synthetic UIA, synthetic render,
+component stability and worker-owned cleanup), six functional UNRUN and two
+physical SKIP. The manifest retains both production and physical qualification
+as false. The archive and private evidence remain outside Git.
+
+The cold Diagnostics WebView reports cache invalidation TimeoutError and uses
+its real native fallback; reopening successfully renders the shared page. This
+error stays open. Windows full-unit/CI failures, actual managed AI receiving,
+cohort conversion and production backend policy, personal Linux native receiving,
+macOS native/device acceptance and physical keyboard/display scenarios remain
+open. This collector receipt does not promote any of them to PASS.
+
 ### October 12 consolidation and macOS issue 94
 
 The maintainer explicitly authorized consolidating the published `main` and
