@@ -427,5 +427,333 @@
 		"physical_qualified": false,
 		"native_macos": "UNRUN here",
 		"native_linux": "UNRUN here; maintainer Linux unavailable"
+	},
+	"windows_regression_followup": {
+		"date": "2026-10-14",
+		"received_source_sha": "413c3eae3ec0e2616a36fb292fc06c2d45e92401",
+		"integrated_source_sha": "aa7b55123acc95a2b50c9d1af5468d54d353382a",
+		"windows_rebase_identity": {
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"received_head": "413c3eae3ec0e2616a36fb292fc06c2d45e92401",
+			"rebased_head": "aa7b55123acc95a2b50c9d1af5468d54d353382a",
+			"incoming_dev": "6321d3796d0152db8bb2ec14e58a0a377fdeba75",
+			"changed_paths": []
+		},
+		"rebase_native_controls": [
+			{
+				"receipt": "native-start-error-rebased-6321",
+				"filter": "native-start-error-custody",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "snapshots-rebased-6321",
+				"filter": "windows91 snapshots:",
+				"passed": 17,
+				"expected": 17,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "startup-ready-rebased-6321",
+				"filter": "startup-command-ready-repaint",
+				"passed": 5,
+				"expected": 5,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		],
+		"scope": "Actual Windows controlled AutoHotkey execution; no physical keyboard, installed app, native AI or production output qualification",
+		"selected": [
+			{
+				"receipt": "deletion-admission-fixed",
+				"filter": "toml config deletion ancestry",
+				"passed": 14,
+				"expected": 14,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "api-name-port-fixed",
+				"filter": "api-entry-auto-name",
+				"passed": 5,
+				"expected": 5,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "personal-stage-session-fixed",
+				"filter": "personal-toml-pre-rename-guard",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "personal-opening-valid-metadata-fixed",
+				"filter": "personal-opening-source",
+				"passed": 22,
+				"expected": 22,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "local-publication-absence-fixed",
+				"filter": "Local server publication: proved absence creates",
+				"passed": 1,
+				"expected": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "local-server-cancelled-slot-fixed",
+				"filter": "local server composition",
+				"passed": 16,
+				"expected": 16,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "semantic-document-boot-fixed",
+				"filter": "toml config document writer",
+				"passed": 23,
+				"expected": 23,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "semantic-inline-boot-fixed",
+				"filter": "toml config inline source spans",
+				"passed": 28,
+				"expected": 28,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "agent-caption-control-fixed",
+				"filter": "agent-apps-command",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "numbered-caption-census-22-fixed",
+				"filter": "numbered caption:",
+				"passed": 22,
+				"expected": 22,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "native-start-error-integrated-fixed",
+				"filter": "native-start-error-custody",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "native-stop-diagnostics-retained",
+				"filter": "native-stop-diagnostics",
+				"passed": 1,
+				"expected": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			}
+		],
+		"selected_passed": 141,
+		"full_windows_unit": {
+			"skipped": 0,
+			"source_immutable": true,
+			"exit": 2,
+			"footer_present": false,
+			"watchdog_ms": 7200000,
+			"full_suite_qualified": false,
+			"passed": 5853,
+			"source_head": "51176f8744124460d685a6eba58a03c1b5aa4a20",
+			"running": 5860,
+			"failed": 6,
+			"planned": 12574,
+			"status": "FAILED_INCOMPLETE_WATCHDOG"
+		},
+		"complete_js": {
+			"command": "node tools/test/run-js-suite.cjs",
+			"selected": 425,
+			"passed": 408,
+			"failed": 17,
+			"exit": 1,
+			"status": "FAILED",
+			"frozen_worktree_head": "89752d4b5dfe96f8e841bb0f4647afbb73a0dbef",
+			"includes_uncommitted_native_start_diagnostic_fix": true,
+			"agent_source_edits_during_attempt": false,
+			"failed_checks": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"receipt": "full-js-fixture-followup-v1.log"
+		},
+		"composed_gates": [
+			{
+				"produced": true,
+				"exit": 0,
+				"accepted": true,
+				"case": "good",
+				"expected": 0,
+				"gate": "compiler"
+			},
+			{
+				"produced": false,
+				"exit": 17,
+				"accepted": true,
+				"case": "bad",
+				"expected": 17,
+				"gate": "compiler"
+			},
+			{
+				"produced": true,
+				"exit": 0,
+				"accepted": true,
+				"case": "entry",
+				"expected": 0,
+				"gate": "compiler"
+			},
+			{
+				"scope": "Engine and owned native Edit controls; no physical input qualification",
+				"gate": "e2e",
+				"failed": 0,
+				"expected": 70,
+				"skipped": 0,
+				"passed": 70,
+				"accepted": true,
+				"exit": 0
+			},
+			{
+				"exit": 0,
+				"gate": "test-ahk-full-startup-smoke.cjs",
+				"accepted": true
+			},
+			{
+				"exit": 0,
+				"gate": "test-ahk-encoding.cjs",
+				"accepted": true
+			},
+			{
+				"exit": 0,
+				"gate": "test-ahk-loop-capture.cjs",
+				"accepted": true
+			}
+		],
+		"startup_receipt": "native-start-error-test-ahk-full-startup-smoke.log",
+		"startup_receipt_sha256": "9add88f1498a50b584ace7781a031cc13c86c0d4873bc8eb555e0261bf751105",
+		"original_native_start": {
+			"passed": 1,
+			"failed": 2,
+			"exit": 1,
+			"scope": "Extracted original production functions with actual DllCall callbacks; controlled proof only"
+		},
+		"fixed_native_start": {
+			"passed": 3,
+			"failed": 0,
+			"exit": 0,
+			"scope": "Actual integrated runner with local DllCall callbacks, no real DLL or hook"
+		},
+		"snapshot_ci_review": {
+			"status": "REFUSED_REQUIRES_CI_OWNER_REVIEW",
+			"ci_run": "https://github.com/adrienm7/ergopti/actions/runs/38463374686",
+			"sources": [
+				{
+					"path": "static/ergopti_plus/_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk",
+					"current_sha256": "c2c26f6b4a8d3bd9c86153b17ffcc919a1ad47ec57c45043dfd5cd8ba2589ab1",
+					"prior_reviewed_sha256": "d049972c3566def451dedd9e9a34747e4a0dc7c3dcac600dabc419de02c84e97"
+				},
+				{
+					"path": "static/ergopti_plus/windows/tests/unit/test_buffered_data_snapshot_owner.ahk",
+					"current_sha256": "bada83f6a7d6a17c7f0a39c995ba6b8551c114a9a905474c45ba78ae31bc28c9",
+					"prior_reviewed_sha256": "411e9a737b5f65be9e9eec59f7e96075130c7fd5a72e6c08fdabc7493169d992"
+				}
+			],
+			"selected_case_names": [
+				"windows91 snapshots: source prototype stays image data (snapshot-base-data)",
+				"windows91 snapshots: original scalar comparison refuses clones while unchanged composite source remains current",
+				"windows91 snapshots: Map mode and string case remain exact",
+				"windows91 snapshots: integer and string key slots remain distinct",
+				"windows91 snapshots: Array holes and order remain exact",
+				"windows91 snapshots: real TOML Boolean mutation and integer substitution refuse",
+				"windows91 snapshots: genuine generated action Fn Key and Mods fields are detached observations",
+				"windows91 snapshots: equivalent caller and nested replacement cannot borrow original source identity",
+				"windows91 snapshots: cyclic source publishes no image",
+				"windows91 snapshots: substituted data getter refuses without execution",
+				"windows91 snapshots: substituted container enumerator refuses without execution",
+				"windows91 snapshots: original recursive helper revocation refuses and retains exact image cleanup",
+				"windows91 snapshots: own helper getter cannot execute at terminal currentness",
+				"windows91 snapshots: explicit image release carries no native lifecycle claim",
+				"windows91 snapshots: original Current own Call replacement refuses without invocation",
+				"windows91 snapshots: original recursive helper own Call replacement refuses without invocation",
+				"windows91 snapshots: original generated function own Call replacement refuses without invocation"
+			],
+			"review_requirements": [
+				"Review genuine production OriginalBase repair, Map fixture initialization order and additive composite prototype control.",
+				"Retain every original case name/assertion, append the genuine seventeenth case and update both exact reviewed byte images only after review.",
+				"Keep strict stdout/TAP/manifest/source/exit controls; a new seal alone is not completed native receiving.",
+				"Do not infer full-suite, physical input, hook, installed-app or release qualification from this selected data cohort."
+			],
+			"current_census": 17,
+			"ci_file_modified": false
+		},
+		"preserved_failed_attempts": [
+			"personal-opening-crlf-fixed: 21 PASS/1 FAIL, exit 1; duplicate scalar/table metadata fixture corrected subsequently",
+			"numbered-caption-valid-empty-retained: actual 22 PASS/exit 0, caller expected 28, receipt refused",
+			"full-js-fixture-followup: wrong nonexistent runner path, exit 1, no JS checks executed"
+		],
+		"terminal_unknown_retirement": "OPEN; reviewed design only; no injected Stop return may establish genuine C lifetime retirement",
+		"physical_qualified": false,
+		"native_macos": "UNRUN here; hosted CI observations remain separate",
+		"native_linux": "UNRUN here; maintainer Linux unavailable",
+		"managed_ai_receiving": "UNRUN; personal installation and servers preserved"
 	}
 }
