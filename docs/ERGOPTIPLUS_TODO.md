@@ -1431,6 +1431,44 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **Maintainer request, October 13: configuration in diagnostic reports.**
+      Include the user's TOML configuration files and their resolution order in
+      system diagnostics and generated GitHub error reports. Preserve exact
+      non-secret settings, identify missing or unreadable inputs explicitly, and
+      redact credentials before any report is shared. Receive the same contract on
+      Windows, macOS and Linux with controlled configuration fixtures; do not upload
+      personal configuration automatically.
+- [ ] **Maintainer request, October 13: independent number-row source and order.**
+      Add a custom-layout option to emulate the number row's base and Shift levels
+      independently of the remaining layout. The any-layout digits-first and
+      symbols-first choices must reorder the actual user's native row when row
+      emulation is off, and the selected emulated row when it is on. Do not require
+      layout emulation to expose native row ordering, substitute hardcoded AZERTY
+      or QWERTY symbols, or change AltGr and other layout levels. Receive native
+      and emulated source selection, live layout refresh and independent toggles
+      across Windows, macOS and Linux. Fix missing unavailable-reason text and
+      translate all new menu labels through the shared locale owner.
+- [ ] **Maintainer request, October 13: neutral installation and persistent layout UI.**
+      A new installation must enable no layout emulation, change no system layout
+      and apply no number-row inversion. Preserve explicitly configured existing
+      installations. The configuration wizard's layout step must offer the emulated
+      layout (including None and Ergopti), independent base/Shift number-row
+      emulation and digits/symbols ordering through persistent checkboxes and
+      dropdowns, without closing or reloading the configuration UI on each change.
+      Use one shared settings/default/schema and UI definition on every OS, with
+      explicit capability reasons: driver layout emulation is currently AHK-only
+      and future ports may implement the same contract. Coordinate this work with
+      Group 1's configuration/menu ownership before changing the shared wizard.
+- [ ] **Reported Windows number-row precedence, October 13.** With an emulated
+      layout selected and "Digits first" enabled, Shift reportedly still produces
+      the Windows AZERTY symbols instead of the selected layout's symbols. The
+      reporter says the first option changes the ordering correctly. The exact
+      emulated and Windows layouts, option name, physical key outputs in all three
+      modes, expected symbols and startup/change trigger have been requested.
+      Investigate the source of both levels and the intended override priority,
+      check the other drivers, and fix a confirmed discrepancy with a causal
+      regression. The report is pending reproduction, not a confirmed root cause.
+
 - [~] **L5.** Linux asynchronous process-group teardown: deadlines and shell
   cancellation now signal descendants even after libuv reaps their leader.
   The three native fork/pipe/process-group regressions failed before the fix
