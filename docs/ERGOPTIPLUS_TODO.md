@@ -92,7 +92,7 @@ The actual full Windows unit runner reaches its existing 7,200,000 ms watchdog:
 The full unit receipt is FAILED_INCOMPLETE. Two old Ollama presence cases expect
 an obsolete public failure callback after an auxiliary epoch change; the newer
 origin-custody contract requires stale callbacks to remain silent. This explicit
-contract conflict remains RED; no wrapper bypass or test relaxation is applied.
+contract conflict was RED at that receipt; no wrapper bypass is applied.
 Other observed failures, including TOML publication, buffered snapshots, native
 transport cleanup, source guards and purity ratchets, remain recorded for triage.
 
@@ -181,6 +181,22 @@ and mutation inverse. No existing assertion is removed. Original source identity
 builtin-port custody and exact image cleanup remain covered. This AHK-only owner
 does not replace other drivers' snapshot implementations. The recorded broad
 95-failure unit receipt is still FAILED_INCOMPLETE until a complete rerun.
+
+The two superseded Ollama presence tests now receive the accepted origin-custody
+contract through the actual public chat API. Their original thirteen-case cohort
+receives eleven PASS/two FAIL (exit 1). All thirteen current cases pass (exit 0,
+no skip), retaining the original internal `request_superseded` classification
+through a delegating observer around the original public fence. The tests acquire
+an actual auxiliary-owner timer through an injected scheduler, require exact
+zero-period cancellation and one delegated finalizer, and use public invalidation
+and ordinary coalesced queue draining. Replayed old tags/timer/preflight callbacks
+cannot affect a current successor's exact slot or owner; its genuine current
+missing-model result still invokes the public failure callback exactly once.
+Fixture teardown and successor finish explicitly reject unresolved cleanup debt
+before restoring caller state. Existing cancellation-refusal coverage is retained.
+All seventeen original-origin cases still pass. Production changes only clarify
+callback documentation: no executable fence, admission or transport code changes.
+These controlled ports do not qualify native inference or managed installation.
 
 The local committed Windows build at `7e3da5567183914502e977d720e818e337e1dd49`
 compiles with the authenticated AutoHotkey2.0.26/Ahk2Exe toolchain. Actual
