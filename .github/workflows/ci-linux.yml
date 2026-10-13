@@ -118,14 +118,16 @@ jobs:
           else
               exit 1
           fi
-      # A failed unit receipt stays red; this artifact keeps only its public log.
+      # Keep the parsed timing errors beside the public log of the same failed run.
       - name: Upload failed unit log
         if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-unit-failure-log
           retention-days: 7
-          path: ${{ runner.temp }}/linux-unit.log
+          path: |
+            ${{ runner.temp }}/linux-unit.log
+            ${{ runner.temp }}/linux-lua.json
           if-no-files-found: error
 
       # The original red unit run owns this public assertion; no rerun is substituted.
