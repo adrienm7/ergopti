@@ -27,9 +27,14 @@ end
 ---@param dependencies table admit, context, keycode and emit callbacks; batch_limit.
 ---@return table receiver
 function M.new(dependencies)
+	local ports = {}
 	for _, name in ipairs({ "admit", "context", "keycode", "emit" }) do
 		assert(type(dependencies[name]) == "function", "Missing physical delivery callback: " .. name)
+		ports[name] = dependencies[name]
 	end
+	local baseline_ready = rawget(dependencies, "baseline_ready")
+	assert(baseline_ready == nil or type(baseline_ready) == "function", "Invalid physical baseline observer")
+	ports.baseline_ready = baseline_ready
 	local limit = dependencies.batch_limit
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "Invalid physical batch limit")
 	local state, ownership, sequence = "new", nil, "0"
@@ -39,7 +44,14 @@ function M.new(dependencies)
 
 	--- Returns whether this receiver still owns delivery.
 	---@return boolean
-	function receiver.active() return state == "baselining" or state == "active" or state == "delivering" end
+	function receiver.active()
+		return state == "baselining" or state == "completing" or state == "active" or state == "delivering"
+	end
+
+	--- Reports this receiver's completed baseline during its owned observer.
+	--- Raw delivery remains fenced until the observer acknowledges literal true.
+	---@return boolean
+	function receiver.ready() return state == "completing" or state == "active" or state == "delivering" end
 
 	--- Revokes delivery before any successor capture can begin.
 	function receiver.stop() state, ownership, initial = "stopped", nil, nil end
@@ -68,7 +80,7 @@ function M.new(dependencies)
 		decimal(frame.lease, true)
 		initial = Baseline.new(frame.baseline)
 		local owner = { incarnation = frame.incarnation, lease = frame.lease, coverage = frame.coverage }
-		local capture = dependencies.admit(frame)
+		local capture = ports.admit(frame)
 		assert(type(capture) == "string" and capture ~= "", "Physical coverage was not admitted")
 		assert(state == "failed", "Physical admission was revoked")
 		owner.capture = capture
@@ -86,7 +98,16 @@ function M.new(dependencies)
 				and frame.incarnation == ownership.incarnation and frame.lease == ownership.lease
 				and frame.coverage == ownership.coverage, "Physical capture ownership changed or ended")
 			local cursor = initial.accept(frame)
-			if initial.ready() then state = "active" end
+			if initial.ready() then
+				if ports.baseline_ready then
+					local owner = ownership
+					state = "completing"
+					local accepted = ports.baseline_ready()
+					assert(state == "completing" and ownership == owner, "Physical baseline completion was revoked")
+					assert(accepted == true, "Physical baseline observer refused completion")
+				end
+				state = "active"
+			end
 			return cursor
 		end)
 		if not ok then state, ownership, initial = "failed", nil, nil; error(result, 0) end
@@ -128,14 +149,14 @@ function M.new(dependencies)
 					and row.page % 1 == 0 and row.usage % 1 == 0, "Invalid physical usage")
 				if initial.press(row) then
 					local keyboard_type = initial.keyboard_type(row.device)
-					local keycode, reason = dependencies.keycode(row.page, row.usage, keyboard_type, row.device)
+					local keycode, reason = ports.keycode(row.page, row.usage, keyboard_type, row.device)
 					if keycode ~= nil then
 						assert(type(keycode) == "number" and keycode >= 0 and keycode % 1 == 0,
 							"Invalid physical keycode")
 					else
 						assert(type(reason) == "string" and reason ~= "", "Uncounted physical usage has no reason")
 					end
-					local context = dependencies.context(row.timestamp, row.device)
+					local context = ports.context(row.timestamp, row.device)
 					assert(type(context) == "table" and type(context.allowed) == "boolean",
 						"Physical event context is unavailable")
 					if context.allowed then
@@ -154,7 +175,7 @@ function M.new(dependencies)
 			end
 			for _, press in ipairs(pending) do
 				assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
-				dependencies.emit(press)
+				ports.emit(press)
 			end
 			assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
 			for _, press in ipairs(pending_uncounted) do
