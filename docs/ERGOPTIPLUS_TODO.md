@@ -3300,6 +3300,21 @@ remain required, separately from the local gates.
   chosen-folder writers and rerun preservation. Remaining acceptance includes
   the installed fresh/existing/moved-folder wizard and actual trigger/runtime
   restart on each OS; portable or historical CI alone does not complete it.
+  The macOS initial-page host now retains an initialization request for the
+  exact window and configuration source when native timer construction/start
+  refuses. Same-source reopening retries deferred admission; pending and active
+  initialization coalesce, and source changes during encoding cannot submit the
+  old values. Cleanup-only and retired windows cannot initialize a successor.
+  Configured Lua receiving passes the complete 67-case delivery module (all 52
+  original subjects plus 15 new), 14 focus-owner cases and nine window-outcome
+  cases. The literal predecessor with the same tests fails ten delivery cases;
+  restoring the correction passes all 90 again. These tests use the genuine
+  DeferredWork and TimerScheduler with native-port doubles. The complete local
+  macOS unit suite passes 19,013 tests across 1,576 modules; E2E passes 101/101
+  with one host/driver-specific scenario skipped. Formatting passes; JS remains
+  422/426 with the four previously observed failures. Current macOS CI,
+  Cocoa interaction, packaging, installation and installed restart remain
+  unqualified; this bounded correction does not complete item 7 or item 38.
   The macOS wizard now requires a committed native import timeout before
   acquiring navigation-layer or remap work. A refused timer start takes the
   existing translated notice and reload continuation for answers already saved;

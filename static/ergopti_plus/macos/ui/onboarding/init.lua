@@ -121,11 +121,15 @@ end
 --- @param view userdata|table Captured native window.
 --- @param method string Fixed frontend function name.
 --- @param payload table|string Frontend payload, never included in diagnostics.
-local function submit_data(owner, view, method, payload)
-	if not publication_is_current(owner, view) then return false end
+--- @param config_path string|nil Captured initialization source, absent for other publications.
+local function submit_data(owner, view, method, payload, config_path)
+	local function current()
+		return publication_is_current(owner, view) and (config_path == nil or _config_path == config_path)
+	end
+	if not current() then return false end
 	owner.javascript_failures = owner.javascript_failures or {}
 	local function report(category)
-		if not publication_is_current(owner, view) then return end
+		if not current() then return end
 		local key = method .. ":" .. category
 		if owner.javascript_failures[key] then return end
 		owner.javascript_failures[key] = true
@@ -137,17 +141,18 @@ local function submit_data(owner, view, method, payload)
 	local encoded, json = pcall(Json.encode, payload)
 	local arguments = encoded and type(json) == "string" and json or nil
 	if not arguments or arguments:match("^%s*$") then report("encoding failed"); return false end
-	if not publication_is_current(owner, view) then return false end
+	if not current() then return false end
 	local admitted, settled, pending, failed = false, false, nil, false
 	local function complete(_, script_error)
 		if settled then return end
 		if not admitted then pending = pending or { error = script_error }; return end
 		settled = true
-		if not publication_is_current(owner, view) then return end
+		if not current() then return end
 		if WebviewResult.is_error(script_error) then failed = true; report("execution failed"); return end
 		Logger.debug(LOG, "Onboarding JavaScript completed (%s).", method)
 	end
 	local ok, candidate = pcall(function()
+		if not current() then return nil end
 		return view:evaluateJavaScript("window." .. method .. "(" .. arguments .. ")", complete)
 	end)
 	if not ok or candidate ~= view then
@@ -157,7 +162,7 @@ local function submit_data(owner, view, method, payload)
 	end
 	admitted = true
 	if pending then complete(nil, pending.error) end
-	return not failed and publication_is_current(owner, view)
+	return not failed and current(), admitted
 end
 
 --- Retitles the native window. WKWebView never mirrors document.title onto the
@@ -326,8 +331,7 @@ end
 
 --- Sends the initData payload (locale, strings, folders and the values in
 --- force) so the first step renders correctly on open.
-local function inject_init_data()
-	local owner, view = _focus_owner, _webview
+local function inject_init_data(owner, view, config_path)
 	if not publication_is_current(owner, view) then return end
 
 	local current_locale = i18n.get_locale()
@@ -355,8 +359,9 @@ local function inject_init_data()
 		if type(v) == "string" then system_layout = v end
 	end)
 
-	local values = current_values(_config_path)
-	if not values then return end
+	if not publication_is_current(owner, view) or _config_path ~= config_path then return end
+	local values = current_values(config_path)
+	if not values or not publication_is_current(owner, view) or _config_path ~= config_path then return end
 
 	local config_dir = (cur_config_dir ~= default_config_dir) and cur_config_dir or ""
 	local resolved, metrics_path = pcall(M._metrics_path_for, config_dir)
@@ -366,7 +371,7 @@ local function inject_init_data()
 	end
 
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
-	submit_data(owner, view, "initData", {
+	local _, admitted = submit_data(owner, view, "initData", {
 		platform           = CATALOGUE_DRIVER,
 		locale             = current_locale,
 		strings            = strings,
@@ -378,9 +383,63 @@ local function inject_init_data()
 		system_layout      = system_layout,
 		current            = values,
 		metrics_path       = metrics_path,
-	})
+	}, config_path)
 	-- initData resets the page to the current locale; keep the window in step.
 	retitle(owner, view, strings[WINDOW_TITLE_KEY] or WINDOW_TITLE_KEY)
+	return admitted == true
+end
+
+
+--- Reserves deferred initialization before native scheduling can reenter.
+--- Scheduling refusal retains only the exact owner's original-source retry.
+--- @param owner table Captured wizard owner.
+--- @param label string Deferred work diagnostic label.
+--- @return boolean reserved True when deferred work is reserved or already pending.
+local function schedule_init_data(owner, label)
+	if owner == nil or _focus_owner ~= owner then return false end
+	local path = _config_path
+	local active = owner.init_delivery
+	if active ~= nil then
+		if active.path == path then
+			active.followup = nil
+			owner.init_retry = active
+		else
+			local followup = { path = path, label = label }
+			active.followup = followup
+			owner.init_retry = followup
+		end
+		return true
+	end
+	local previous = owner.init_request
+	if previous ~= nil then
+		previous.path = path
+		owner.init_retry = previous
+		return true
+	end
+	local request = { path = path, view = _webview }
+	owner.init_request = request
+	owner.init_retry = request
+	local called, committed = pcall(DeferredWork.after, 0.05, function()
+		if owner.init_request ~= request then return end
+		owner.init_request = nil
+		if _config_path ~= request.path or not publication_is_current(owner, request.view) then return end
+		owner.init_delivery = request
+		local delivered, admitted = pcall(inject_init_data, owner, request.view, request.path)
+		if owner.init_delivery == request then owner.init_delivery = nil end
+		if not delivered then error(admitted, 0) end
+		if admitted == true and owner.init_retry == request
+			and _config_path == request.path and publication_is_current(owner, request.view) then
+			owner.init_retry = nil
+		end
+		local followup = request.followup
+		if followup ~= nil and owner.init_retry == followup and _config_path == followup.path
+			and publication_is_current(owner, request.view) then
+			schedule_init_data(owner, followup.label)
+		end
+	end, label)
+	if owner.init_request == request and (not called or committed ~= true) then owner.init_request = nil end
+	if not called then error(committed, 0) end
+	return committed == true
 end
 
 
@@ -776,9 +835,7 @@ local function handle_message(body)
 
 	if action == "ready" then
 		-- JS page finished loading — inject initial data
-		DeferredWork.after(0.05, function()
-			if publication_is_current(owner, view) then inject_init_data() end
-		end, "onboarding.ready")
+		schedule_init_data(owner, "onboarding.ready")
 
 	elseif action == "previewLocale" then
 		-- User hovered/clicked a language row — inject its strings live
@@ -946,6 +1003,9 @@ function M.run(config_path)
 		require("ui.ui_builder").force_focus(view, false, { is_current = function()
 			return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
 		end })
+		if focus_owner ~= nil and focus_owner.init_retry ~= nil and focus_owner.init_retry.path == config_path then
+			schedule_init_data(focus_owner, "onboarding.reopen")
+		end
 		return true
 	end
 	if _usercontent and close_webview() ~= true then
@@ -1042,9 +1102,7 @@ function M.run(config_path)
 				if _focus_owner ~= focus_owner or closed then return false end
 				if action == "didFinishNavigation" then
 					Logger.debug(LOG, "Navigation finished — injecting initData.")
-					DeferredWork.after(0.05, function()
-						if publication_is_current(focus_owner, webview) then inject_init_data() end
-					end, "onboarding.navigation")
+					schedule_init_data(focus_owner, "onboarding.navigation")
 				end
 				return true
 			end,
@@ -1070,6 +1128,7 @@ function M.run(config_path)
 	end
 	_usercontent = uc
 	_webview = webview
+	if focus_owner.init_request ~= nil then focus_owner.init_request.view = webview end
 
 	Logger.success(LOG, "Onboarding wizard opened.")
 	return true
