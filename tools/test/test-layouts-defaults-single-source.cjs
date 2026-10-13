@@ -28,6 +28,7 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -160,8 +161,130 @@ check('no driver source spells the registry host or folder', () => {
 });
 
 // The Lua drivers share one registry client, which receives the decoded
-// defaults; each driver module that uses it reads the two files itself.
+// defaults; each driver settings constructor reads the two files itself.
 const SHARED_LUA_CLIENT = path.join(SP, '_shared', 'lua', 'layouts', 'registry.lua');
+
+/** Finds settings constructors through their real module binding, not pure lookups. */
+function constructsLuaRegistrySettings(source) {
+	const tokens = scriptTokens(source, '.lua');
+	const owners = new Set();
+	const closes = new Map(),
+		stack = [];
+	for (let at = 0; at < tokens.length; at++) {
+		if (tokens[at].kind !== 'symbol') continue;
+		if (tokens[at].value === '(') stack.push(at);
+		else if (tokens[at].value === ')' && stack.length) {
+			const open = stack.pop();
+			closes.set(open, at);
+		}
+	}
+	const envelope = (start, end) => {
+		while (tokens[start - 1]?.value === '(' && closes.get(start - 1) === end + 1) {
+			start--;
+			end++;
+		}
+		return [start, end];
+	};
+	const assigns = (start) =>
+		tokens[start - 1]?.value === '=' && tokens[start - 2]?.kind === 'identifier'
+			? tokens[start - 2].value
+			: null;
+	const resolves = (end) => tokens[end + 1]?.value === '.' && tokens[end + 2]?.value === 'resolve';
+	for (let at = 0; at < tokens.length; at++) {
+		if (
+			tokens[at].value !== 'require' ||
+			tokens[at + 1]?.value !== '(' ||
+			tokens[at + 2]?.kind !== 'string' ||
+			tokens[at + 2].value !== 'layouts.registry' ||
+			tokens[at + 3]?.value !== ')'
+		)
+			continue;
+		const [start, end] = envelope(at, at + 3);
+		const owner = assigns(start);
+		if (owner) owners.add(owner);
+		if (resolves(end)) return true;
+	}
+	// Conservatively follow simple aliases; rebinding cannot erase an earlier
+	// settings owner from this source guard's necessary-defaults contract.
+	let previous;
+	do {
+		previous = owners.size;
+		for (let at = 0; at < tokens.length; at++) {
+			if (tokens[at].kind !== 'identifier' || !owners.has(tokens[at].value)) continue;
+			const [start, end] = envelope(at, at);
+			if (resolves(end)) return true;
+			const owner = assigns(start);
+			if (owner) owners.add(owner);
+		}
+	} while (owners.size !== previous);
+	return false;
+}
+
+/** A settings constructor must retain both independent shared configuration inputs. */
+function assertRegistryDefaults(source, label) {
+	assert.ok(
+		source.includes('modules/layouts/defaults.json'),
+		`${label} does not read the layouts defaults`
+	);
+	assert.ok(
+		source.includes('modules/updater/defaults.json'),
+		`${label} does not read owner/repo from the updater defaults`
+	);
+}
+
+check('registry configuration ownership excludes pure lookup and decorative references', () => {
+	assert.strictEqual(
+		constructsLuaRegistrySettings('return require("layouts.registry").find_entry(index, id)'),
+		false
+	);
+	assert.strictEqual(
+		constructsLuaRegistrySettings(
+			'local R = require("layouts.registry")\nreturn R.find_entry(index, id)'
+		),
+		false
+	);
+	assert.strictEqual(
+		constructsLuaRegistrySettings(
+			'-- local R = require("layouts.registry")\nreturn Other.resolve(settings)'
+		),
+		false
+	);
+	assert.strictEqual(
+		constructsLuaRegistrySettings('local text = [[require("layouts.registry").resolve(settings)]]'),
+		false
+	);
+	assert.strictEqual(
+		constructsLuaRegistrySettings(
+			'local R = require("layouts.registry")\nreturn R.resolve(layouts, updater)'
+		),
+		true
+	);
+	assert.strictEqual(
+		constructsLuaRegistrySettings('return require("layouts.registry").resolve(layouts, updater)'),
+		true
+	);
+	for (const source of [
+		'local R = (require("layouts.registry"))\nreturn R.resolve(layouts, updater)',
+		'return (require("layouts.registry")).resolve(layouts, updater)',
+		'local R = ((require("layouts.registry")))\nlocal Other = (R)\nreturn (Other).resolve(layouts, updater)',
+		'local R = require("layouts.registry")\nlocal Other = R\nreturn Other.resolve(layouts, updater)'
+	])
+		assert.strictEqual(constructsLuaRegistrySettings(source), true, source);
+});
+
+check('the actual settings owner refuses withdrawal of either shared defaults input', () => {
+	const source = fs.readFileSync(path.join(SP, 'macos/modules/keymap/layout_registry.lua'), 'utf8');
+	assert.strictEqual(constructsLuaRegistrySettings(source), true);
+	assertRegistryDefaults(source, 'actual macOS owner');
+	for (const input of ['modules/layouts/defaults.json', 'modules/updater/defaults.json']) {
+		const mutant = source.replaceAll(input, 'withdrawn/defaults.json');
+		assert.notStrictEqual(mutant, source, `Withdraw the actual ${input} read`);
+		assert.strictEqual(constructsLuaRegistrySettings(mutant), true);
+		assert.throws(() => assertRegistryDefaults(mutant, 'withdrawn actual owner'), {
+			code: 'ERR_ASSERTION'
+		});
+	}
+});
 
 check(
 	'every registry client reads the URL template and owner/repo from the shared defaults',
@@ -179,20 +302,12 @@ check(
 		);
 		for (const [platform, files] of Object.entries(platforms)) {
 			const clients = files.filter(
-				(file) =>
-					/require\(\s*"layouts\.registry"\s*\)/.test(code(file)) || templateUsers.includes(file)
+				(file) => constructsLuaRegistrySettings(code(file)) || templateUsers.includes(file)
 			);
 			assert.ok(clients.length >= 1, `the ${platform} driver has no registry client`);
 			for (const file of clients) {
 				const rel = path.relative(ROOT, file);
-				assert.ok(
-					code(file).includes('modules/layouts/defaults.json'),
-					`${rel} does not read the layouts defaults`
-				);
-				assert.ok(
-					code(file).includes('modules/updater/defaults.json'),
-					`${rel} does not read owner/repo from the updater defaults`
-				);
+				assertRegistryDefaults(code(file), rel);
 			}
 		}
 		const strays = templateUsers.filter((file) => !Object.values(platforms).flat().includes(file));
