@@ -28,6 +28,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# A non-PowerShell launcher can inherit another host's module search path.
+# Resolve the hashing dependency from this executing host before autoloading.
+Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -ErrorAction Stop
+
 
 
 
