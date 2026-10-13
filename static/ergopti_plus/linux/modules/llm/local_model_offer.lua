@@ -78,7 +78,8 @@ local function dependencies(automatic)
 			return require("adapters.application_notifier").send(text, { title = title, level = "warning" })
 		end,
 		install = download and function(base_url, model, on_done, current, on_retired)
-			return install(base_url, model, model, on_done, current, on_retired)
+			local handled, acquired = install(base_url, model, model, on_done, current, on_retired)
+			return handled == true and acquired == true
 		end or install,
 		current = function()
 			if _deps ~= owner then return false end
