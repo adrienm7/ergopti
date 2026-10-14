@@ -12139,6 +12139,19 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   oracle are retained. This supplies no native Snapshot, whole-suite or
   updater outcome; the later Group 3 handover retains exact receiving.
 
+  Current published snapshot receiving now joins the actual `b6e132afe`
+  prototype-data correction and requires all seventeen original data cases:
+  the new first regression plus the sixteen retained names, order and assertions.
+  Exact owner/test source pins replace the obsolete images; selection, result,
+  timing, native exit, full stdout/TAP equality and the thirty-second budget
+  stay mandatory. All26 portable receiver controls, seven closed diagnostic
+  controls and five real-child output controls pass on Linux. Three controlled
+  old-receiver counterexamples fail as expected. Hosted Windows run38631963788
+  refused the obsolete pin before any child launch; current native seventeen,
+  full-unit, E2E, compiled and installed receiving remain required. The existing
+  Root contract/budget prefix is byte-exact. This receiver correction grants no
+  simultaneous-input, physical AltGr, output or whole-suite qualification.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
