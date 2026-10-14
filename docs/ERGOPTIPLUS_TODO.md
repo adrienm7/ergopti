@@ -4534,6 +4534,17 @@ and model inverses. These do not qualify Darwin concurrency, installed capture,
 physical delivery, signed factory outputs or the customer lease cause. Full
 selected source qualification and hosted receiving remain required.
 
+Ordinary launcher child environments now discard an inherited installed-capture
+control marker before launching Hammerspoon. Fresh-owned selected launches add
+only their original newly issued marker after that boundary. The three frozen
+empty, stale and foreign inherited-marker controls each hit the first native
+loader on the old helper and each avoid it after correction, reaching the
+ordinary callback once. This receiving executes the actual Lua trampoline with
+controlled loader ports; Swift environment evaluation remains a source model.
+The added original launcher XCTest is unexecuted locally and requires macOS
+receiving. Selected-profile startup construction, full installed execution and
+customer lease recovery remain separate unfinished work.
+
 ## Remaining work after the 2026-09-30 releases
 
 The source-bound build supplier follow-up now restores the actual native installer, validator, installed-physical-source module and lifecycle/signature headers. Sixteen new source files include the inert native signature actor; the existing launcher constants stay exact. Lifecycle publisher admission delegates to the original strict CMS/all-architecture/exact-leaf policy for the two existing owned launcher and installer roles, preserving ad-hoc and unrelated-role refusal. The portable build controls cover source custody and command planning; Darwin compilation, signed ARM/Intel actor receiving, installation, service activation and physical capture remain unqualified. These suppliers do not enable default owned-runtime startup or resolve the stock lease PONG/READY/exit73 incident.
