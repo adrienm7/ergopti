@@ -505,3 +505,106 @@ Source work. The proposed SDK helper has source-only header identity, not loader
 or native qualification. Root owns workflow cache admission, receiver clocks
 and the strict Windows Job adapter. Existing direct-child close cannot prove
 all descendants retired. No stopped trust/account/PAC/curl experiment is rerun.
+
+## Source-authenticated Windows SDK admission
+
+The next independent source slice requires an explicit absolute
+`ERGOPTI_WINDOWS_AHK_ARCHIVE`, authenticates the canonical pinned archive before
+ZIP parsing, receives one exact `AutoHotkey64.exe` member and compares it with
+the acquired interpreter image. It rejects nonregular members, Windows aliases,
+invalid ranges/descriptors/CRC and wrong AMD64/PE32+ executable header flags.
+The supplied FileVersion is explicitly unqualified metadata; headers are not
+Windows loader or executed-image authority.
+
+Initial and repeated SDK admission precede the complete cohort loop; final SDK
+receiving follows the original final guards. The rejected intermediate placed
+its repeat inside a catch-and-continue and could attempt two later children.
+An actual same-byte inode replacement reproduces that refusal transition; the
+corrected outer guard produces zero mocked launches and all cohorts UNRUN.
+Original missing-archive code similarly attempts three mocked children; the
+corrected code attempts none. No mock is counted as native execution.
+
+The final canonical-formatted helper has SHA256
+`975971064a7772f09656b229bfa0e8540ad6c021f55b03581e9236d1a4e7fd02`.
+Its complete normalized program AST equals independently reviewed
+`6e3cf247ed24ba6cadadf39790b6bc842ab19b47eb7298f467141d77bd9564b6`.
+Actual final52 pure controls, registered22 controls and genuine official2.0.26
+inert archive/image joins pass in independent receiving. The pinned archive
+SHA256 is `43522aa3122a57784ac5db30abf85c2244475c36acd7796e2c993355f9e926ae`;
+all37 CRCs and selected image
+`a2a54b8abc476d7671d4de0771bb54bf5f2373d79ff6871d0ba6a62c3b88ae00`
+were independently received as data. No interpreter was installed or executed.
+
+All33 original collector predicates,88 prior assertions,2307-byte child,22
+registrations,21 source pins and independent23-label oracle remain intact.
+Root must supply and authenticate the archive even on cache hits, compose the
+existing held-image/whole-tree owner and enroll the clean original23 launcher.
+Those are separate source prerequisites. Actual Windows APIs, SDK execution,
+process-tree closure, complete Unit/E2E/build/install and macOS/enterprise
+receiving remain unqualified. Source tests do not close36/62 or16/38.
+
+## Archive descriptor receiving and dependency closure
+
+Producer and publication archive readers share the new
+`tools/lib/owned-descriptor-read.cjs`. It preserves exact primary and closure
+failures in order, including thrown falsy values, and closes once without retry.
+Both callers add nonblocking open before their original regular-file checks.
+ENOENT fallback, format selection, signature and installation remain unchanged.
+
+Independent receiving preserves all52 fixture and51 packaging assertions.
+The existing callback passes246 POSIX subcases including two physical FIFO
+readers; the private Windows model passes244 with no FIFO/native execution.
+Original paired errors fail by assertion; actual original FIFO readers block
+and are physically reaped at the unchanged external test bound. The original
+new assertion also failed when Windows lacks O_NONBLOCK: zero versus undefined.
+Its correction normalizes the platform flag while still requiring a nonzero
+bit on POSIX. Models do not qualify Windows or Darwin native behavior.
+
+Two literal source inventory additions bind the helper and seed its actual
+bytes for Source22. All other SDK bodies, predicates and assertions are exact.
+Actual receiving binds the helper, refuses absence, and proves the old roster
+admitted a missing dependency. Composed registered22 controls pass.
+No source pin, independent oracle, registration or Root workflow was changed.
+Root authentic host/held bridge acquisition and process-adapter enrollment,
+actual archive/signature/Brew6, installation and enterprise acceptance remain
+open. Items36/62 and transversal16/38 are retained.
+
+## Archive work and temporary cleanup failures (October 13)
+
+The separate three-code-path source tranche retains initial archive creation or
+CI installation refusal when temporary-root cleanup also refuses. A private
+common outcome powers `runWithOwnedCleanup` and the existing descriptor
+wrapper, preserving exact falsy/single/paired errors, order and one attempt.
+Both producer work and cleanup bodies remain unchanged after unwrapping;
+the successful installer's `published` guard still retains the launch payload.
+A cleanup refusal never emits a successful API/CLI receipt or proves retirement.
+
+Independent final source capsule81258B/36regulars SHA256
+`7746af98f835eacaf093ee6f2dbb9dceada6423c65c09ff0e9a1e5add3e09c83`
+passes334 actual API/CLI portable cleanup subcases and130 descriptor equivalence
+controls. All76 previous packaging assertions and the full old test program
+remain preserved. The old producer fails the paired-error assertion; eight
+causal route records retain the owned temporary debt. Native executors and
+cleanup failures are modeled, not Windows/Darwin acceptance. The same normal
+callback retains its prior7 workflow,22 native-owner portable and246 descriptor
+subcases, including two POSIX FIFO children. No inventory declaration is added.
+
+The helper is a required full-source root, not one of the independent21 frozen
+input tuples. No pin/oracle regeneration, cache admission, workflow, runner,
+clock or shared Windows process-owner edit is included. Root's authentic
+pre-host primitive, bridge/enrollment composition and held macOS query/staged
+receiving remain real source dependencies. Final native Windows/macOS, archive25,
+Brew6, signing/install and corporate-network acceptance remain unqualified.
+Items36/62 and16/38 stay open;22 remains excluded.
+
+## Durable inactive owner and Source22 preparation
+
+[INACTIVE-ORIGINAL23-SOURCE.md](INACTIVE-ORIGINAL23-SOURCE.md) binds the strict
+65078-byte/15-member code-only packet and literal composition/reproduction.
+It preserves the reviewed owner, held bridge/source lease and Source22 models
+without changing canonical Root code, enrollment or native authority. The
+unimplemented first-host provider and current/frozen helper difference are
+explicit. There is no environment log, executable vendor data or generated
+source seal in the saved packet. Root must reconcile source roles and provide
+the genuine pre-host primitive before activation; current native acceptance
+and items36/62/16/38 remain open.

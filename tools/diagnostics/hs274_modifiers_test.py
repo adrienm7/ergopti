@@ -144,7 +144,7 @@ class ModifierTests(unittest.TestCase):
             overlap=overlap,
             combinations=combinations,
         )
-        stream = validate_stream(evidence["stream_output"], capture)
+        stream = validate_stream(evidence["stream_output"], capture, historical_baseline=True)
         self.assertEqual(len(stream["records"]), 80 if combinations else 62 if overlap else 52)
         drain = modifier_drain(device, overlap=overlap, combinations=combinations)
         self.assertTrue(drain(stream))

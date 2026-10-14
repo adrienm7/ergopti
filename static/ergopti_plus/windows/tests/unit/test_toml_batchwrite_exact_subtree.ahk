@@ -253,7 +253,11 @@ _TBES_ConfigDeletionAncestorVector(Vector) {
 	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
-		_TBUI_AdmitCurrentFixture(Path, Source)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+			"the real boot owner must admit the current schema fixture")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source),
+			"schema admission must preserve the independent physical image")
 		FileSetTime("20000101000000", Path, "M")
 		BeforeTime := FileGetTime(Path, "M")
 		Cached := ParseTomlFile(Path)

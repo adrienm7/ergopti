@@ -51,7 +51,6 @@ extern "C" {
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_BASE 0xFFC3D44Du
 #define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY 8192u
 #define ERGOPTI_NAV_TERMINAL_ROUTE_BUSY (-11)
-#define ERGOPTI_NAV_TERMINAL_REPLAY_MARKER 0x4552475054524D31ull
 
 /** Return codes shared by every fallible API entry point. */
 typedef enum ErgoptiNav_Status {
@@ -449,6 +448,19 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PlanTerminalOutput(
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalOutputAttempt(
 	uint64_t owner, const ErgoptiOutput_Key *key, ErgoptiOutput_Unit *units,
 	uint32_t capacity, uint32_t *out_count, uint64_t *out_attempt);
+
+/**
+ * Copies exactly the retained attempt as immutable x64/ARM64 INPUT40 data.
+ * The same critical section authenticates the current FIFO head, owner, token,
+ * sequence, plan and attempt. No sender, new attempt, ACK or consumption occurs.
+ * Capacity is in packets, one per logical unit; count is UInt32. Failure leaves
+ * both caller outputs and custody unchanged. Existing fault debt can be copied
+ * for settlement, never converted into new admission. The preceding DLL lacks
+ * this export: a real official build/manifest must precede any consumer binding.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt(
+	uint64_t owner, const ErgoptiOutput_Key *key, uint64_t attempt,
+	ErgoptiOutput_Win32Input *out_inputs, uint32_t capacity, uint32_t *out_count);
 
 /** Reports the exact accepted prefix; zero leaves every output unit retryable. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AcknowledgeTerminalOutput(

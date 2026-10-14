@@ -709,6 +709,23 @@ _TestHC_CollectionState(TestCase) {
 	}
 }
 Test("Diagnostics collection contains pre-spawn failure (groups247-collection)", (*) => _TestHC_CollectionState("launch-failure"))
+
+/** Replays the worker's nullable failure receipt through the actual page serializer. */
+_TestHC_CollectionNullableProgress() {
+	global JSON_NULL
+	D := DiagnosticCollectionWindows()
+	Raw := '{"schema_version":1,"session_id":"' . D.Id . '","phase":"collecting","completed":1,"total":'
+		. D.Contract["checks"].Length . ',"results":[{"id":"native_uia","status":"FAIL","evidence_class":"native_synthetic","receipt":null}]}'
+	AssertTrue(D.AcceptProgress(JsonParse(Raw)))
+	Published := JsonParse(_HC_ValueToJson(Map("type", "collection", "collection", D.Result)))
+	Row := Published["collection"]["results"][1]
+	AssertEqual("FAIL", Row["status"], "Transporting a missing receipt cannot promote the native failure.")
+	AssertTrue(IsObject(Row["receipt"]) && ObjPtr(Row["receipt"]) == ObjPtr(JSON_NULL),
+		"The worker's JSON null retains its exact sentinel through page publication.")
+	AssertTrue(Published["collection"]["owner_pending"])
+	AssertFalse(Published["collection"]["archive_created"])
+}
+Test("Diagnostics collection publishes actual nullable worker receipts (groups247-collection)", _TestHC_CollectionNullableProgress)
 Test("Diagnostics collection cancellation retains acknowledgement ownership (groups247-collection)", (*) => _TestHC_CollectionState("cancel"))
 Test("Diagnostics collection skipped physical checks never pass (groups247-collection)", (*) => _TestHC_CollectionState("skip"))
 Test("Diagnostics collection validates progress and refuses resurrection (groups247-collection)", (*) => _TestHC_CollectionState("progress"))

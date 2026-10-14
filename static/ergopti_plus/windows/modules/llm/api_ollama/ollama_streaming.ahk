@@ -21,7 +21,8 @@
 /**
  * Non-blocking Ollama generation. Returns immediately; calls
  * ``on_success(text)`` when the model finishes responding, or ``on_fail()``
- * on any HTTP / parse failure. Mirrors hs.http.asyncPost on the HS side.
+ * on HTTP / parse failure while the captured origin remains current.
+ * Origin supersession retires custody without public delivery.
  *
  * The transport is a curl child process, not WinHTTP: WinHTTP's async ``Send()``
  * returned HTTP 200 with an empty ``content`` on this driver despite valid JSON
@@ -34,7 +35,7 @@
  * @param {string}   user_text     - User context.
  * @param {number}   temperature   - Sampling temperature.
  * @param {function} on_success    - Callback receiving the generated text.
- * @param {function} on_fail       - Callback fired on any failure.
+ * @param {function} on_fail       - Failure callback while the captured origin is current.
  * @param {string}   payload       - A complete /api/chat body the caller wrote
  *                                   (LLM_OllamaChat_Async); "" builds it from
  *                                   the other parameters.
@@ -61,9 +62,12 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		"payload", payload
 	)
 	try {
+		job["origin_custody"] := LLM_OllamaCaptureOriginCustody()
 		job["presence_generation"] := LLM_AuxGeneration()
-		job["base_url"] := LLM_OllamaRequestOrigin()
-		job["origin_owned"] := LLM_OllamaManagedOriginRequired()
+		job["base_url"] := job["origin_custody"].Call("origin")
+		job["origin_owned"] := job["origin_custody"].Call("owned")
+		job["on_success"] := LLM_OllamaInvokeOriginCurrent.Bind(job["origin_custody"], job["base_url"], on_success, "on_success")
+		job["on_fail"] := LLM_OllamaInvokeOriginCurrent.Bind(job["origin_custody"], job["base_url"], on_fail, "on_fail")
 	} catch {
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		return req_id
@@ -72,8 +76,8 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 	if (_LLM_Ollama_Async.Count > 0) {
 		; Latest-only coalescing keeps a single pending slot. If a previous job
 		; is already waiting there, it is being superseded and will never run —
-		; honour the async contract (exactly one of on_success / on_fail fires)
-		; by failing the displaced job before overwriting it. Without this a
+		; settle the displaced job only while its captured origin is current.
+		; Origin supersession remains silent. Without current-origin settlement a
 		; future consumer that advances a state machine on the callback would
 		; stall forever on the dropped job.
 		displaced := ""
@@ -98,7 +102,7 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
  * callbacks as LLM_OllamaGenerate_Async.
  * @param {string}   payload    - The complete JSON body.
  * @param {function} on_success - Callback receiving the generated text.
- * @param {function} on_fail    - Callback fired on any failure.
+ * @param {function} on_fail    - Failure callback while the captured origin is current.
  * @returns {Integer} The request id.
  */
 LLM_OllamaChat_Async(payload, on_success, on_fail) {
@@ -145,7 +149,8 @@ _LLM_Ollama_DispatchAsync(job) {
 		"cancelled", false, "start_tick", A_TickCount,
 		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "",
 		"redact", job.Get("payload", "") != "",
-		"base_url", job.Get("base_url", LLM_OllamaRequestOrigin()),
+		"base_url", job.Get("base_url", ""),
+		"origin_custody", job.Get("origin_custody", 0),
 		"origin_owned", job.Get("origin_owned", false),
 		"presence_generation", job.Get("presence_generation", LLM_AuxGeneration()))
 	if job.Get("payload", "") != "" {
@@ -189,12 +194,12 @@ _LLM_Ollama_Preflight(req_id, payload, job, Port := 0) {
 		return
 	}
 	if Entry.Get("presence_generation", 0) != LLM_AuxGeneration()
-			|| Entry.Get("base_url", "") != LLM_OllamaRequestOrigin() {
+			|| !_LLM_Ollama_PresenceStillCurrent(Entry) {
 		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
 		return
 	}
 	Owner := LLM_AuxBegin("ollama_chat_presence:" . req_id,
-		Map("backend", "ollama", "endpoint", Entry["base_url"], "identity", Model))
+		Map("backend", "ollama", "endpoint", Entry["base_url"], "origin_custody", Entry.Get("origin_custody", 0), "identity", Model))
 	Entry["presence_owner"] := Owner
 	Entry["presence_pending"] := true
 	Owner["on_retired"] := _LLM_Ollama_PresenceRetired.Bind(req_id, Entry)
@@ -232,7 +237,7 @@ _LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt)
 		return
 	if Entry["cancelled"] || A_IsSuspended || !LLM_AuxIsCurrent(Owner)
 			|| Entry["presence_generation"] != LLM_AuxGeneration()
-			|| Entry["base_url"] != LLM_OllamaRequestOrigin() {
+			|| !_LLM_Ollama_PresenceStillCurrent(Entry) {
 		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
 		return
 	}
@@ -253,8 +258,12 @@ _LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt)
 }
 
 _LLM_Ollama_PresenceStillCurrent(Entry) {
-	global LLM_OLLAMA_BASE_URL
-	if !Entry.Get("presence_admitted", false) && !Entry.Get("origin_owned", false) && !LLM_OllamaManagedOriginRequired()
+	if Entry.Has("origin_custody")
+		return Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
+			&& LLM_OllamaOriginCustodyCurrent(Entry["origin_custody"], Entry.Get("base_url", ""))
+	if Entry.Get("origin_owned", false) || LLM_OllamaManagedOriginRequired()
+		return false
+	if !Entry.Get("presence_admitted", false)
 		return true
 	return Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
 		&& LLM_OllamaOriginMatches(Entry.Get("base_url", ""))
@@ -329,7 +338,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 						. _LLM_CurlMaxFileSizeArg() . '-X POST '
 						. '-H "Content-Type: application/json" '
 						. '--data-binary @' . _Q(tmp_payload) . ' '
-						. _Q(LLM_OllamaRequestOrigin() . "/api/chat") . ' '
+						. _Q(entry["base_url"] . "/api/chat") . ' '
 						. '-o ' . _Q(tmp_stdout)
 					cmdLine := _LLM_CurlOwnedCommand(cmdLine,
 						entry["tmp_status"], entry["tmp_exit"])
@@ -439,7 +448,7 @@ LLM_OllamaCancelAllAsync() {
 	; _LLM_Ollama_DrainPending() which re-dispatches the pending job — a fresh
 	; curl POST + PII temp-file write — AFTER the driver was suspended (the engine
 	; calls this from Ergopti_OnSuspendEnter -> LLM_Engine_StopGeneration). Honour
-	; the async contract by failing the displaced job exactly once before dropping.
+	; the async contract by failing the displaced job once while its origin remains current.
 	if (_LLM_Ollama_Pending is Map) {
 		displaced := _LLM_Ollama_Pending.Has("on_fail") ? _LLM_Ollama_Pending["on_fail"] : ""
 		; Drop the slot before firing so a callback that re-enters the dispatcher
@@ -489,6 +498,8 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 		on_success := entry["on_success"]
 		on_fail := entry["on_fail"]
 		body := Terminal["body"]
+		if !_LLM_Ollama_PresenceStillCurrent(entry)
+			entry["cancelled"] := true
 		_LLM_Ollama_CleanupCurlFiles(entry)
 		_LLM_Ollama_Async.Delete(req_id)
 		if !_LLM_CurlTerminalOk(Terminal) or body == "" {
@@ -544,6 +555,8 @@ _LLM_Ollama_CleanupCurlFiles(entry) {
  * Ollama's /api/generate reply and hands the unescaped text to on_success.
  */
 _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
+	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
+		return
 	text := LLM_ParseOllamaChatResponse(body)
 	; LLM_ParseOllamaChatResponse returns a structured Map("error", true, ...)
 	; on a JSON parse failure (malformed body) instead of an empty string, so
@@ -568,8 +581,11 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 	Redact := (entry is Map) && entry.Get("redact", false)
 	snip := Redact ? "…" : (StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text)
 	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
+	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
+		return
 	try LLM_OllamaNoteInferenceSuccess()
-	_LLM_InvokeCallback(on_success, "on_success", text)
+	if !(entry is Map) || _LLM_Ollama_PresenceStillCurrent(entry)
+		_LLM_InvokeCallback(on_success, "on_success", text)
 }
 
 /**
@@ -709,6 +725,15 @@ _LLM_Ollama_TrimAsyncRegistry() {
  *                   to LLM_OllamaCancelStream to terminate the curl process.
  */
 LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", Port := 0) {
+	try Custody := LLM_OllamaCaptureOriginCustody()
+	catch {
+		_LLM_InvokeCallback(on_fail, "on_fail")
+		return { Pid: 0, ProcessOwner: 0, Cancelled: true }
+	}
+	Origin := Custody.Call("origin")
+	on_partial := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_partial, "on_partial")
+	on_success := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_success, "on_success")
+	on_fail := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_fail, "on_fail")
 	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
 	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
 	curl_exe := A_WinDir . "\System32\curl.exe"
@@ -729,9 +754,10 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; the private-directory creation and payload write can pump messages; without
 	; this reservation a later keystroke can cancel the current generation, then
 	; this stack resumes and launches its stale POST after the cancellation.
+
 	handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: "", TmpStdout: "", Origin: LLM_OllamaRequestOrigin(),
-		OriginGeneration: LLM_AuxGeneration(), OriginOwned: LLM_OllamaManagedOriginRequired() }
+		TmpPayload: "", TmpStdout: "", Origin: Origin, OriginCustody: Custody,
+		OriginGeneration: LLM_AuxGeneration(), OriginOwned: Custody.Call("owned") }
 	global _LLM_Ollama_ActiveStreams
 	_LLM_Ollama_ActiveStreams.Push(handle)
 
@@ -814,11 +840,14 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 }
 
 _LLM_Ollama_StreamOriginCurrent(Handle) {
+	if Handle.HasOwnProp("OriginCustody")
+		return Handle.OriginGeneration == LLM_AuxGeneration()
+			&& LLM_OllamaOriginCustodyCurrent(Handle.OriginCustody, Handle.Origin)
 	if !Handle.HasOwnProp("Origin")
 		return !LLM_OllamaManagedOriginRequired()
-	if !Handle.OriginOwned && !LLM_OllamaManagedOriginRequired()
-		return true
-	return Handle.OriginGeneration == LLM_AuxGeneration() && LLM_OllamaOriginMatches(Handle.Origin)
+	if Handle.OriginOwned || LLM_OllamaManagedOriginRequired()
+		return false
+	return true
 }
 
 ; Read a growing JSONL file without asking the UTF-8 decoder to cross a
@@ -945,6 +974,11 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 ; message pump keeps pumping. Bounded by _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES.
 _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES, _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS
+	if !_LLM_Ollama_StreamOriginCurrent(handle) {
+		_LLM_Ollama_CleanupStreamFiles(handle)
+		_LLM_Ollama_RemoveStreamHandle(handle)
+		return
+	}
 	try {
 		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state, true)
 		if chunk != ""
@@ -990,12 +1024,19 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		state["leftover"] := ""
 		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state, on_partial)
 	}
+	if !_LLM_Ollama_StreamOriginCurrent(handle) {
+		_LLM_Ollama_CleanupStreamFiles(handle)
+		_LLM_Ollama_RemoveStreamHandle(handle)
+		return
+	}
 	Result := _LLM_Ollama_StreamTerminalResult(state)
 	hint := ""
 	if !Result["ok"] and Result["error"] == "Streaming finished with empty response."
 		hint := _LLM_Ollama_StreamFailHint(handle.TmpStdout)
 	_LLM_Ollama_CleanupStreamFiles(handle)
 	_LLM_Ollama_RemoveStreamHandle(handle)
+	if !_LLM_Ollama_StreamOriginCurrent(handle)
+		return
 	if !Result["ok"] {
 		try LoggerWarn("LLM.ollama", "{1}{2}", Result["error"],
 			hint != "" ? " " . hint : "")
@@ -1003,7 +1044,8 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		return
 	}
 	try LLM_OllamaNoteInferenceSuccess()
-	_LLM_InvokeCallback(on_success, "on_success", Result["text"])
+	if _LLM_Ollama_StreamOriginCurrent(handle)
+		_LLM_InvokeCallback(on_success, "on_success", Result["text"])
 }
 
 _LLM_Ollama_StreamTerminalResult(state) {

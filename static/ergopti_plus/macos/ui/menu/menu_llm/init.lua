@@ -2105,11 +2105,11 @@ local function create_menu(deps)
 		-- The local models the agent and the screen reading name are
 		-- downloaded by this menu's models manager, in its download window;
 		-- a completed download changes what the AI agent menu shows.
-		require("modules.llm.local_model_offer").set_installer(function(model, on_done)
+		require("modules.llm.local_model_offer").set_installer(function(model, on_done, is_current)
 				return models_mgr.pull_ollama_model(model, function()
 						on_done(true)
 						if type(update_menu) == "function" then pcall_log("update_menu(local model pulled)", update_menu) end
-				end, function(reason) on_done(false, reason) end)
+				end, function(reason) on_done(false, reason) end, { is_current = is_current })
 		end)
 		-- A repaired MLX runtime restarts the model it could not load, as
 		-- selecting that model does; the repair offer owns the button.

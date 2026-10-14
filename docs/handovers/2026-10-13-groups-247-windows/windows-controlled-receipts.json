@@ -1,0 +1,2874 @@
+{
+	"schema_version": 1,
+	"scope": "Actual Windows controlled software receiving; no physical or installed release qualification",
+	"base": "13cf4ad8bf824027bde3a640b8fc0bab3cd2a701",
+	"node": "22.22.2",
+	"ahk": "2.0.26 x64",
+	"powershell": "5.1",
+	"selected": [
+		{
+			"passed": 20,
+			"expected": 20,
+			"filter": "todo49-model-build-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 91,
+			"expected": 91,
+			"filter": "todo49-registration-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 9,
+			"expected": 9,
+			"filter": "todo49-route-adapter",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 35,
+			"expected": 35,
+			"filter": "groups247-offer-affinity",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 17,
+			"expected": 17,
+			"filter": "managed-origin-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 25,
+			"expected": 25,
+			"filter": "todo46-manual-requester",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 6,
+			"expected": 6,
+			"filter": "agent-app-picker-tail",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 5,
+			"expected": 5,
+			"filter": "aux-final-origin-currency",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 8,
+			"expected": 8,
+			"filter": "personal-metadata-source-type",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 212,
+			"expected": 212,
+			"filter": "todo49-packet-receiving",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 98,
+			"expected": 98,
+			"filter": "todo49-natural-custody",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 12,
+			"expected": 12,
+			"filter": "todo49-output-custody-adapter",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 11,
+			"expected": 11,
+			"filter": "todo49-output-consumer",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 123,
+			"expected": 123,
+			"filter": "todo49-frozen-authority",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 211,
+			"expected": 211,
+			"filter": "todo49-explicit-sendinput",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 91,
+			"expected": 91,
+			"filter": "kle-reset-observer",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 10,
+			"expected": 10,
+			"filter": "layout-registry-emulation",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 7,
+			"expected": 7,
+			"filter": "todo49-observer-hints",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 16,
+			"expected": 0,
+			"filter": "keylogger arrival FIFO",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 13,
+			"expected": 0,
+			"filter": "groups247-collection",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		},
+		{
+			"passed": 1,
+			"expected": 1,
+			"filter": "keylogger-shutdown-close-chain",
+			"failed": 0,
+			"accepted": true,
+			"exit": 0,
+			"skipped": 0
+		}
+	],
+	"selected_passed": 1021,
+	"native_owner_cases": 44,
+	"replay_matrices": 8,
+	"output_matrices": 11,
+	"trace_matrices": 6,
+	"dll_exports": 41,
+	"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+	"native_source_fingerprint": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+	"private_alias_vectors": 170,
+	"registration_model_original": {
+		"failed": 20,
+		"passed": 0,
+		"exit": 1
+	},
+	"collector_powershell_controls": 30,
+	"full_js": "CANCELLED_INCOMPLETE",
+	"native_linux": "UNRUN unavailable",
+	"native_macos": "UNRUN",
+	"physical": "UNRUN",
+	"user32_fixture": "UNRUN resident preserved",
+	"production_cohort_enabled": false,
+	"full_unit": {
+		"watchdog_ms": 7200000,
+		"exit": 2,
+		"failures": 95,
+		"completed": 11222,
+		"status": "FAILED_INCOMPLETE",
+		"selected": 12567
+	},
+	"full_startup": {
+		"exit": 0,
+		"status": "PASS",
+		"scope": "Actual isolated source startup, not installed build"
+	},
+	"host_module_dependency": {
+		"fixed_exit": 0,
+		"module_path_preserved": true,
+		"original_hash_available": false,
+		"scope": "Actual Node-launched PowerShell5.1 with inherited PowerShell7 module paths",
+		"fixed_hash_available": true,
+		"original_exit": 1,
+		"builder_update_exit": 0,
+		"builder_verify_exit": 0
+	},
+	"hosted_ci": {
+		"linux_software_package_install": "PASS",
+		"windows_unit": "FAIL",
+		"status": "FAIL",
+		"macos_native_managed_ollama": "FAIL",
+		"windows_engine_e2e": "PASS",
+		"core_js": "FAIL",
+		"run_id": 38424106990,
+		"macos_portable_stubbed": "PASS",
+		"source_sha": "e43f3e6384093f2eaef0f1620259cc6b1a47db69"
+	},
+	"compiled_collection": {
+		"schema_version": 1,
+		"source_sha": "e235a917e2eaab4ab53569e631a9c631acc1b067",
+		"session_id": "ergopti-diagnostic-0ed1933bd2119046b7693564e6e05fbe",
+		"archive_name": "diagnostic-Windows-e235a917e2.zip",
+		"bytes": 7956,
+		"sha256": "965e2d7309251977e8009001446e83f6e8f7b38e550d689ba806ea732ed1526a",
+		"scope": "Actual compiled Diagnostics collection; no functional or physical qualification",
+		"zip_crc": "PASS",
+		"entry_allowlist": "PASS",
+		"redaction_review": "PASS",
+		"component_hashes": "PASS",
+		"passed": 6,
+		"unrun": 6,
+		"skipped": 2,
+		"failed": 0,
+		"webview_cold_open": "FAIL cache invalidation TimeoutError; native fallback worked; reopen worked"
+	},
+	"local_build": {
+		"channel": "dev",
+		"compiler_exit": 0,
+		"bytes": 11037184,
+		"version": "0.0.0-dev",
+		"source_sha": "e235a917e2eaab4ab53569e631a9c631acc1b067",
+		"artifact": "ErgoptiPlus-e235a917e2.exe",
+		"scope": "Local compiled development artifact; not a release verdict",
+		"sha256": "ef96387dc8efbaedee9d3ca06370ce044ef9e35443244ba61849488a8ec92c6d"
+	},
+	"collection_close_reopen": {
+		"same_session": true,
+		"reopened_original_archive": true,
+		"close_completed": 10,
+		"close_phase": "guided",
+		"second_explicit_skip_archive": true,
+		"no_forced_cleanup": true,
+		"host_exit_code": "Not separately captured by observer",
+		"cancel_control_created": false,
+		"archive_open_action_invoked": true,
+		"archive_open_confirmed": true
+	},
+	"continued_receiving": {
+		"scope": "Windows controlled native AutoHotkey execution; injected transport/schedule ports; no physical input or native inference qualification",
+		"received_source_sha": "50301a62500b5a55ddf8af39f6f2774b51761c7a",
+		"integrated_dev_sha": "612f572310af9eb292bb56e7c9ab3f0ef8169491",
+		"serial_selections": [
+			{
+				"failed": 0,
+				"filter": "startup-command-ready-repaint",
+				"passed": 5,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 5,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "windows91 snapshots:",
+				"passed": 17,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 17,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "Ollama local presence:",
+				"passed": 13,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 13,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "ollama-pending-survives-suspend",
+				"passed": 1,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 1,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "todo49-model-build-custody",
+				"passed": 20,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 20,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "todo49-registration-custody",
+				"passed": 91,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 91,
+				"accepted": true
+			},
+			{
+				"failed": 0,
+				"filter": "managed-origin-custody",
+				"passed": 17,
+				"exit": 0,
+				"skipped": 0,
+				"expected": 17,
+				"accepted": true
+			}
+		],
+		"startup_ready_original": {
+			"selected": 4,
+			"passed": 1,
+			"failed": 3,
+			"exit": 1
+		},
+		"snapshot_original": {
+			"selected": 16,
+			"passed": 1,
+			"failed": 15,
+			"exit": 1
+		},
+		"snapshot_capture_original": {
+			"selected": 2,
+			"passed": 0,
+			"failed": 2,
+			"exit": 1,
+			"error": "Invalid base"
+		},
+		"snapshot_capture_fixed": {
+			"selected": 2,
+			"passed": 2,
+			"failed": 0,
+			"exit": 0
+		},
+		"presence_original": {
+			"selected": 13,
+			"passed": 11,
+			"failed": 2,
+			"exit": 1,
+			"scope": "Superseded public callback premise; current original-origin contract is retained"
+		},
+		"compiler": {
+			"good_exit": 0,
+			"bad_exit": 17,
+			"production_entry_exit": 0
+		},
+		"e2e": {
+			"passed": 70,
+			"failed": 0,
+			"skipped": 0,
+			"exit": 0,
+			"scope": "engine and owned native Edit messages; physical hooks/SendInput not qualified"
+		},
+		"startup": {
+			"scenarios": 9,
+			"exit": 0,
+			"scope": "actual isolated source startup; installed production release not qualified"
+		},
+		"complete_js_attempt": {
+			"selected": 425,
+			"passed": 407,
+			"failed": 18,
+			"exit": 1,
+			"status": "FAILED",
+			"source_snapshot_consistent": false,
+			"source_edits_during_attempt": true,
+			"startup_failure": {
+				"phase": "fresh-config",
+				"status": 6,
+				"kind": "native owner OS_ERROR",
+				"cause": "UNRESOLVED"
+			}
+		},
+		"physical_qualified": false,
+		"native_macos": "UNRUN here",
+		"native_linux": "UNRUN here; maintainer Linux unavailable"
+	},
+	"windows_regression_followup": {
+		"date": "2026-10-14",
+		"received_source_sha": "413c3eae3ec0e2616a36fb292fc06c2d45e92401",
+		"integrated_source_sha": "aa7b55123acc95a2b50c9d1af5468d54d353382a",
+		"windows_rebase_identity": {
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"received_head": "413c3eae3ec0e2616a36fb292fc06c2d45e92401",
+			"rebased_head": "aa7b55123acc95a2b50c9d1af5468d54d353382a",
+			"incoming_dev": "6321d3796d0152db8bb2ec14e58a0a377fdeba75",
+			"changed_paths": []
+		},
+		"rebase_native_controls": [
+			{
+				"receipt": "native-start-error-rebased-6321",
+				"filter": "native-start-error-custody",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "snapshots-rebased-6321",
+				"filter": "windows91 snapshots:",
+				"passed": 17,
+				"expected": 17,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "startup-ready-rebased-6321",
+				"filter": "startup-command-ready-repaint",
+				"passed": 5,
+				"expected": 5,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		],
+		"scope": "Actual Windows controlled AutoHotkey execution; no physical keyboard, installed app, native AI or production output qualification",
+		"selected": [
+			{
+				"receipt": "deletion-admission-fixed",
+				"filter": "toml config deletion ancestry",
+				"passed": 14,
+				"expected": 14,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "api-name-port-fixed",
+				"filter": "api-entry-auto-name",
+				"passed": 5,
+				"expected": 5,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "personal-stage-session-fixed",
+				"filter": "personal-toml-pre-rename-guard",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "personal-opening-valid-metadata-fixed",
+				"filter": "personal-opening-source",
+				"passed": 22,
+				"expected": 22,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "local-publication-absence-fixed",
+				"filter": "Local server publication: proved absence creates",
+				"passed": 1,
+				"expected": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "local-server-cancelled-slot-fixed",
+				"filter": "local server composition",
+				"passed": 16,
+				"expected": 16,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "semantic-document-boot-fixed",
+				"filter": "toml config document writer",
+				"passed": 23,
+				"expected": 23,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "semantic-inline-boot-fixed",
+				"filter": "toml config inline source spans",
+				"passed": 28,
+				"expected": 28,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "agent-caption-control-fixed",
+				"filter": "agent-apps-command",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "numbered-caption-census-22-fixed",
+				"filter": "numbered caption:",
+				"passed": 22,
+				"expected": 22,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "native-start-error-integrated-fixed",
+				"filter": "native-start-error-custody",
+				"passed": 3,
+				"expected": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"receipt": "native-stop-diagnostics-retained",
+				"filter": "native-stop-diagnostics",
+				"passed": 1,
+				"expected": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0,
+				"accepted": true
+			}
+		],
+		"selected_passed": 141,
+		"full_windows_unit": {
+			"skipped": 0,
+			"source_immutable": true,
+			"exit": 2,
+			"footer_present": false,
+			"watchdog_ms": 7200000,
+			"full_suite_qualified": false,
+			"passed": 5853,
+			"source_head": "51176f8744124460d685a6eba58a03c1b5aa4a20",
+			"running": 5860,
+			"failed": 6,
+			"planned": 12574,
+			"status": "FAILED_INCOMPLETE_WATCHDOG"
+		},
+		"complete_js": {
+			"command": "node tools/test/run-js-suite.cjs",
+			"selected": 425,
+			"passed": 408,
+			"failed": 17,
+			"exit": 1,
+			"status": "FAILED",
+			"frozen_worktree_head": "89752d4b5dfe96f8e841bb0f4647afbb73a0dbef",
+			"includes_uncommitted_native_start_diagnostic_fix": true,
+			"agent_source_edits_during_attempt": false,
+			"failed_checks": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"receipt": "full-js-fixture-followup-v1.log"
+		},
+		"composed_gates": [
+			{
+				"produced": true,
+				"exit": 0,
+				"accepted": true,
+				"case": "good",
+				"expected": 0,
+				"gate": "compiler"
+			},
+			{
+				"produced": false,
+				"exit": 17,
+				"accepted": true,
+				"case": "bad",
+				"expected": 17,
+				"gate": "compiler"
+			},
+			{
+				"produced": true,
+				"exit": 0,
+				"accepted": true,
+				"case": "entry",
+				"expected": 0,
+				"gate": "compiler"
+			},
+			{
+				"scope": "Engine and owned native Edit controls; no physical input qualification",
+				"gate": "e2e",
+				"failed": 0,
+				"expected": 70,
+				"skipped": 0,
+				"passed": 70,
+				"accepted": true,
+				"exit": 0
+			},
+			{
+				"exit": 0,
+				"gate": "test-ahk-full-startup-smoke.cjs",
+				"accepted": true
+			},
+			{
+				"exit": 0,
+				"gate": "test-ahk-encoding.cjs",
+				"accepted": true
+			},
+			{
+				"exit": 0,
+				"gate": "test-ahk-loop-capture.cjs",
+				"accepted": true
+			}
+		],
+		"startup_receipt": "native-start-error-test-ahk-full-startup-smoke.log",
+		"startup_receipt_sha256": "9add88f1498a50b584ace7781a031cc13c86c0d4873bc8eb555e0261bf751105",
+		"original_native_start": {
+			"passed": 1,
+			"failed": 2,
+			"exit": 1,
+			"scope": "Extracted original production functions with actual DllCall callbacks; controlled proof only"
+		},
+		"fixed_native_start": {
+			"passed": 3,
+			"failed": 0,
+			"exit": 0,
+			"scope": "Actual integrated runner with local DllCall callbacks, no real DLL or hook"
+		},
+		"snapshot_ci_review": {
+			"status": "REFUSED_REQUIRES_CI_OWNER_REVIEW",
+			"ci_run": "https://github.com/adrienm7/ergopti/actions/runs/38463374686",
+			"sources": [
+				{
+					"path": "static/ergopti_plus/_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk",
+					"current_sha256": "c2c26f6b4a8d3bd9c86153b17ffcc919a1ad47ec57c45043dfd5cd8ba2589ab1",
+					"prior_reviewed_sha256": "d049972c3566def451dedd9e9a34747e4a0dc7c3dcac600dabc419de02c84e97"
+				},
+				{
+					"path": "static/ergopti_plus/windows/tests/unit/test_buffered_data_snapshot_owner.ahk",
+					"current_sha256": "bada83f6a7d6a17c7f0a39c995ba6b8551c114a9a905474c45ba78ae31bc28c9",
+					"prior_reviewed_sha256": "411e9a737b5f65be9e9eec59f7e96075130c7fd5a72e6c08fdabc7493169d992"
+				}
+			],
+			"selected_case_names": [
+				"windows91 snapshots: source prototype stays image data (snapshot-base-data)",
+				"windows91 snapshots: original scalar comparison refuses clones while unchanged composite source remains current",
+				"windows91 snapshots: Map mode and string case remain exact",
+				"windows91 snapshots: integer and string key slots remain distinct",
+				"windows91 snapshots: Array holes and order remain exact",
+				"windows91 snapshots: real TOML Boolean mutation and integer substitution refuse",
+				"windows91 snapshots: genuine generated action Fn Key and Mods fields are detached observations",
+				"windows91 snapshots: equivalent caller and nested replacement cannot borrow original source identity",
+				"windows91 snapshots: cyclic source publishes no image",
+				"windows91 snapshots: substituted data getter refuses without execution",
+				"windows91 snapshots: substituted container enumerator refuses without execution",
+				"windows91 snapshots: original recursive helper revocation refuses and retains exact image cleanup",
+				"windows91 snapshots: own helper getter cannot execute at terminal currentness",
+				"windows91 snapshots: explicit image release carries no native lifecycle claim",
+				"windows91 snapshots: original Current own Call replacement refuses without invocation",
+				"windows91 snapshots: original recursive helper own Call replacement refuses without invocation",
+				"windows91 snapshots: original generated function own Call replacement refuses without invocation"
+			],
+			"review_requirements": [
+				"Review genuine production OriginalBase repair, Map fixture initialization order and additive composite prototype control.",
+				"Retain every original case name/assertion, append the genuine seventeenth case and update both exact reviewed byte images only after review.",
+				"Keep strict stdout/TAP/manifest/source/exit controls; a new seal alone is not completed native receiving.",
+				"Do not infer full-suite, physical input, hook, installed-app or release qualification from this selected data cohort."
+			],
+			"current_census": 17,
+			"ci_file_modified": false
+		},
+		"preserved_failed_attempts": [
+			"personal-opening-crlf-fixed: 21 PASS/1 FAIL, exit 1; duplicate scalar/table metadata fixture corrected subsequently",
+			"numbered-caption-valid-empty-retained: actual 22 PASS/exit 0, caller expected 28, receipt refused",
+			"full-js-fixture-followup: wrong nonexistent runner path, exit 1, no JS checks executed"
+		],
+		"terminal_unknown_retirement": "OPEN; reviewed design only; no injected Stop return may establish genuine C lifetime retirement",
+		"physical_qualified": false,
+		"native_macos": "UNRUN here; hosted CI observations remain separate",
+		"native_linux": "UNRUN here; maintainer Linux unavailable",
+		"managed_ai_receiving": "UNRUN; personal installation and servers preserved"
+	},
+	"terminal_lifecycle_followup": {
+		"date": "2026-10-14",
+		"integrated_source_sha": "6c407ed372ae8a3281ec24d422a4c8e2a84799bb",
+		"scope": "Actual Windows AutoHotkey controlled callbacks and engine/native-Edit E2E; no genuine registration-retirement, physical keyboard or installed-application qualification",
+		"selected": [
+			{
+				"receipt": "terminal-lifecycle-integrated",
+				"filter": "terminal-lifecycle-admission",
+				"passed": 6,
+				"expected": 6,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-registration-retained",
+				"filter": "todo49-registration-custody",
+				"passed": 91,
+				"expected": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-model-retained",
+				"filter": "todo49-model-build-custody",
+				"passed": 20,
+				"expected": 20,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-route-retained",
+				"filter": "todo49-route-adapter",
+				"passed": 9,
+				"expected": 9,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-stop-diagnostics-retained",
+				"filter": "native-stop-diagnostics",
+				"passed": 1,
+				"expected": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		],
+		"selected_passed": 127,
+		"causal": [
+			{
+				"flavor": "original",
+				"exit": 1,
+				"passed": 1,
+				"failed": 5,
+				"running": 6,
+				"skipped": 0,
+				"accepted": true,
+				"scope": "Actual original test include graph and production adapter copies; controlled ports only, no native C lifetime or physical qualification"
+			},
+			{
+				"flavor": "revised",
+				"exit": 0,
+				"passed": 6,
+				"failed": 0,
+				"running": 6,
+				"skipped": 0,
+				"accepted": true,
+				"scope": "Actual original test include graph and production adapter copies; controlled ports only, no native C lifetime or physical qualification"
+			}
+		],
+		"composed_gates": [
+			{
+				"case": "good",
+				"gate": "compiler",
+				"produced": true,
+				"expected": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"case": "bad",
+				"gate": "compiler",
+				"produced": false,
+				"expected": 17,
+				"exit": 17,
+				"accepted": true
+			},
+			{
+				"case": "entry",
+				"gate": "compiler",
+				"produced": true,
+				"expected": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"accepted": true,
+				"expected": 70,
+				"passed": 70,
+				"exit": 0,
+				"gate": "e2e",
+				"failed": 0,
+				"skipped": 0,
+				"scope": "Engine and owned native Edit controls; no physical input qualification"
+			},
+			{
+				"gate": "test-ahk-full-startup-smoke.cjs",
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"gate": "test-ahk-encoding.cjs",
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"gate": "test-ahk-loop-capture.cjs",
+				"exit": 0,
+				"accepted": true
+			}
+		],
+		"complete_js": {
+			"command": "node tools/test/run-js-suite.cjs",
+			"selected": 425,
+			"failed": 18,
+			"exit": 1,
+			"status": "FAILED",
+			"frozen_source": {
+				"owned_images": [
+					{
+						"path": "static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk",
+						"sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7"
+					},
+					{
+						"path": "static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk",
+						"sha256": "aff7f7e01be48e3530277890740f19e7e453d7c91f0c858d421e070ac5a86e60"
+					}
+				],
+				"scope": "Frozen current source plus two controlled terminal lifecycle edits; no physical qualification",
+				"head": "329bb4a2457c80634542d707b002294f9d13b3d2"
+			},
+			"owned_source_images_unchanged": true,
+			"agent_source_edits_during_attempt": false,
+			"failed_checks": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"full AHK startup smoke (real auto-execute to ready, isolated config)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"receipt": "full-js-terminal-lifecycle-v1.log",
+			"passed": 407
+		},
+		"startup_failure_followup": {
+			"full_js": "FAIL: extension-enabled timed out after ConfigIO pending-full-save path refusal and unacknowledged existing generation",
+			"serial_current": {
+				"receipt": "terminal-lifecycle-startup-after-js",
+				"exit": 0,
+				"complete_ready_receipt": true,
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			"exact_adapter_baseline": {
+				"receipt": "terminal-lifecycle-startup-baseline-329",
+				"exit": 1,
+				"complete_ready_receipt": false,
+				"stderr_sha256": "58eaf82cc6f713240c53bb09cf89555bde866ff9d706849e47d360438ff7f3ac"
+			},
+			"baseline_source": "329bb4a2457c80634542d707b002294f9d13b3d2",
+			"baseline_scope": "Canonical private startup code fixture with only the exact original production adapter substituted; no checkout or personal-state rewrite",
+			"baseline_same_refusal_observed": true,
+			"cause": "OPEN; the original adapter also reproduces the same path refusal and generation failure in an older-release fixture; neither this baseline failure nor serial current PASS erases the failed full-suite receiving"
+		},
+		"hosted_ci": {
+			"source": "329bb4a2457c80634542d707b002294f9d13b3d2",
+			"run": 38487450400,
+			"conclusion": "failure",
+			"windows_unit": "FAIL: Snapshot16 source admission refuses changed genuine snapshot sources before native unit launch",
+			"windows_e2e_engine": "PASS on hosted Windows runner; no physical-input qualification",
+			"core_js": "PASS on hosted runner; local complete JS outcome remains separate",
+			"linux_unit_e2e_package_install": "PASS on hosted Linux runners; maintainer native Linux remains unavailable",
+			"macos_managed_ollama": "FAIL on amd64 and arm64: actual trust-settings add deadline and removal exit 1; restoration failed",
+			"release_publish": "SKIPPED",
+			"ci_source_seals_or_policy_modified": false
+		},
+		"broad_windows_unit": "FAILED_INCOMPLETE_WATCHDOG; previous immutable full attempt and its unexecuted cases remain open",
+		"authenticated_unknown_retirement": "OPEN; private candidate remains UNRUN and unapplied",
+		"managed_ai_storage": {
+			"command": "node read-ollama-zip-inventory.cjs",
+			"exit": 1,
+			"status": "UNRECEIVED_HTTP_501",
+			"requested_scope": "Bounded ZIP central-directory metadata only; reject any full runtime response",
+			"pinned_archive_bytes": 2069313829,
+			"metadata_body_bytes_accepted": 0,
+			"runtime_downloaded": false,
+			"runtime_installed": false,
+			"model_downloaded": false,
+			"expanded_size_received": false,
+			"free_c_bytes_observed": 8655609856,
+			"free_d_bytes_observed": 32427393024,
+			"space_qualification": "OPEN: active installer root is actual LocalApplicationData on C; compressed size alone does not establish sufficient extraction space",
+			"full_runtime_consent": "NOT_REQUESTED_OR_RECEIVED"
+		},
+		"managed_ai_install_model_receiving": "OPEN; no runtime/model acquisition consent or native receiving",
+		"latest_preceding_build": "ErgoptiPlus-329bb4a245.exe; previous e235 Diagnostics archive remains bound to its original source",
+		"physical_windows": "UNRUN",
+		"native_macos_here": "UNRUN",
+		"native_linux_here": "UNRUN",
+		"rebase_native_source_identity": {
+			"received_head": "3d2be977ea6e7c9fd2a3ffa7910ac1b6e1a7efd7",
+			"rebased_head": "a9f76f421c9dca6484cd4a1ea68be4e43f77a991",
+			"incoming_head": "a07cec9b587cc427eadc94b6c4225d0b5b98dbb9",
+			"changed_paths": [],
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"new_mac_linux_receiving": "NOT_QUALIFIED_BY_PREVIOUS_WINDOWS_OR_JS_RECEIPTS"
+		},
+		"rebase_native_controls": [
+			{
+				"receipt": "terminal-lifecycle-rebased-a07",
+				"filter": "terminal-lifecycle-admission",
+				"expected": 6,
+				"passed": 6,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-registration-rebased-a07",
+				"filter": "todo49-registration-custody",
+				"expected": 91,
+				"passed": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "snapshots-rebased-a07",
+				"filter": "windows91 snapshots:",
+				"expected": 17,
+				"passed": 17,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "startup-ready-rebased-a07",
+				"filter": "startup-command-ready-repaint",
+				"expected": 5,
+				"passed": 5,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		]
+	},
+	"native_registration_retirement_followup": {
+		"source_commit": "52feb4552ccdb425626611ab8e4de5fad1562f04",
+		"adapter_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+		"metadata_tests_sha256": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+		"original_adapter_sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7",
+		"callback_causal_receipt": [
+			{
+				"flavor": "original",
+				"exit": 1,
+				"passed": 1,
+				"failed": 18,
+				"running": 19,
+				"skipped": 0,
+				"complete": true,
+				"accepted": true,
+				"scope": "Actual AHK include graph and controlled callback ports only; no genuine DLL issuance or physical qualification"
+			},
+			{
+				"flavor": "revised",
+				"exit": 0,
+				"passed": 19,
+				"failed": 0,
+				"running": 19,
+				"skipped": 0,
+				"complete": true,
+				"accepted": true,
+				"scope": "Actual AHK include graph and controlled callback ports only; no genuine DLL issuance or physical qualification"
+			}
+		],
+		"genuine_positive": {
+			"artifact": "native-retirement-v3-receiving/genuine-child-0b9776c6-2fd0-49c7-9338-7d49abdc70a4/receipts.json",
+			"children": [
+				{
+					"mode": "observed",
+					"flavor": "original",
+					"exit": 1,
+					"causal": true,
+					"raw_exact": true,
+					"events": [
+						"ErgoptiNav_ListTerminalHeldRecipes|8",
+						"ErgoptiNav_RegisterTerminalRoutes|0",
+						"ErgoptiNav_ListTerminalHeldRecipes|0",
+						"ErgoptiNav_Stop|0"
+					],
+					"native_or_physical_qualification": false
+				},
+				{
+					"mode": "observed",
+					"flavor": "revised",
+					"exit": 0,
+					"causal": true,
+					"raw_exact": true,
+					"events": [
+						"ErgoptiNav_ListTerminalHeldRecipes|8",
+						"ErgoptiNav_RegisterTerminalRoutes|0",
+						"ErgoptiNav_ListTerminalHeldRecipes|0",
+						"ErgoptiNav_Stop|0",
+						"ErgoptiNav_RegisterTerminalRoutes|0",
+						"ErgoptiNav_ListTerminalHeldRecipes|0",
+						"ErgoptiNav_Stop|0"
+					],
+					"native_or_physical_qualification": false
+				},
+				{
+					"mode": "exact",
+					"flavor": "original",
+					"exit": 1,
+					"causal": true,
+					"raw_exact": true,
+					"events": [],
+					"native_or_physical_qualification": false
+				},
+				{
+					"mode": "exact",
+					"flavor": "revised",
+					"exit": 0,
+					"causal": true,
+					"raw_exact": true,
+					"events": [],
+					"native_or_physical_qualification": false
+				}
+			]
+		},
+		"genuine_negative": {
+			"artifact": "native-retirement-v3-receiving/negative-parent-1b16fe5d-9152-4549-9ce3-21f527097499/receipts.json",
+			"cases": [
+				{
+					"case": "custom-true",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "custom-map",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "module-zero",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "module-load",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "exports-clone",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "exports-pointer",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"FOREIGN_TARGET|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "exports-facade",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "epoch",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "lower-counter",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "unknown-before-get",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "unknown-report",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				}
+			]
+		},
+		"actual_registered_selections": [
+			{
+				"receipt": "native-retirement-integrated-callback-v2",
+				"filter": "native-retirement-owner:",
+				"expected": 19,
+				"passed": 19,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-parent-v3",
+				"filter": "terminal-native-retirement:",
+				"expected": 12,
+				"passed": 12,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-registration",
+				"filter": "todo49-registration-custody",
+				"expected": 91,
+				"passed": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-model",
+				"filter": "todo49-model-build-custody",
+				"expected": 20,
+				"passed": 20,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-route",
+				"filter": "todo49-route-adapter",
+				"expected": 9,
+				"passed": 9,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-lifecycle",
+				"filter": "terminal-lifecycle-admission",
+				"expected": 6,
+				"passed": 6,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-stop-diagnostic",
+				"filter": "native-stop-diagnostics",
+				"expected": 1,
+				"passed": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-start-error",
+				"filter": "native-start-error-custody",
+				"expected": 3,
+				"passed": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-packet",
+				"filter": "todo49-packet-receiving",
+				"expected": 212,
+				"passed": 212,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-natural",
+				"filter": "todo49-natural-custody",
+				"expected": 98,
+				"passed": 98,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-output-adapter",
+				"filter": "todo49-output-custody-adapter",
+				"expected": 12,
+				"passed": 12,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-output-consumer",
+				"filter": "todo49-output-consumer",
+				"expected": 11,
+				"passed": 11,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-authority",
+				"filter": "todo49-frozen-authority",
+				"expected": 123,
+				"passed": 123,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-sendinput",
+				"filter": "todo49-explicit-sendinput",
+				"expected": 211,
+				"passed": 211,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-kle",
+				"filter": "kle-reset-observer",
+				"expected": 91,
+				"passed": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-layout",
+				"filter": "layout-registry-emulation",
+				"expected": 10,
+				"passed": 10,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-observer",
+				"filter": "todo49-observer-hints",
+				"expected": 7,
+				"passed": 7,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		],
+		"composed_gates": [
+			{
+				"gate": "compiler",
+				"accepted": true,
+				"case": "good",
+				"exit": 0,
+				"expected": 0,
+				"produced": true
+			},
+			{
+				"gate": "compiler",
+				"accepted": true,
+				"case": "bad",
+				"exit": 17,
+				"expected": 17,
+				"produced": false
+			},
+			{
+				"gate": "compiler",
+				"accepted": true,
+				"case": "entry",
+				"exit": 0,
+				"expected": 0,
+				"produced": true
+			},
+			{
+				"expected": 70,
+				"passed": 70,
+				"exit": 0,
+				"accepted": true,
+				"skipped": 0,
+				"scope": "Engine and owned native Edit controls; no physical input qualification",
+				"gate": "e2e",
+				"failed": 0
+			},
+			{
+				"gate": "test-ahk-full-startup-smoke.cjs",
+				"accepted": true,
+				"exit": 0
+			},
+			{
+				"gate": "test-ahk-encoding.cjs",
+				"accepted": true,
+				"exit": 0
+			},
+			{
+				"gate": "test-ahk-loop-capture.cjs",
+				"accepted": true,
+				"exit": 0
+			}
+		],
+		"final_module_specific_source_controls": [
+			{
+				"gate": "test-windows-terminal-output-custody-adapter",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-windows-hook-trace-source",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-no-pinned-source-reads",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			}
+		],
+		"source_consumer_transition": "All 32 original preregistration source inverses retained at the private factory/original dispatcher; eight new inverses added. Hook source gate retains exact 41 exports and all 27 original/additive inverses. Pinned source reads remain 380/380 through the existing fresh symbol resolver; no ratchet baseline changed.",
+		"failed_receiving_attempts_preserved": [
+			"genuine-child-d3e0450e-c988-40cf-bb41-62dc45b8b961: external-root launcher failed before any case executed",
+			"native-retirement-integrated-parent-v1: 0 PASS/12 FAIL, exit 1, invalid A_Pid before child launch",
+			"Concurrent convention scanner: ENOENT after an owned ephemeral child was removed; quiet serial rerun exits 0"
+		],
+		"full_js": {
+			"artifact": "full-js-native-retirement-v1",
+			"source_base": "de2a669f6c1bed4712d34ea7ee0395ac49816d5d",
+			"passed": 405,
+			"total": 425,
+			"failed": 20,
+			"exit": null,
+			"status": "FAILED_FOOTER_EXIT_UNCAPTURED",
+			"failures": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows terminal output custody adapter preserves exact native bindings and closed admission",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows hook tracing remains opt-in, isolated and bound to native source inputs",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"no new location-pinned source reads in AHK tests (ratchet)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"source_images_unchanged": true,
+			"source_images": {
+				"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+				"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "e0b3f6f3bc2ce38a29af436cad28b43d78bcf6c21c6b4b0b78923a74f9d3afc4"
+			},
+			"exit_audit": {
+				"attempt": "full-js-native-retirement-v1",
+				"source_images_unchanged": true,
+				"footer": {
+					"total": 425,
+					"passed": 405,
+					"failed": 20
+				},
+				"child_exit": null,
+				"wrapper_exit": 0,
+				"exit_file_bytes": 0,
+				"status": "FAILED_FOOTER_EXIT_UNCAPTURED",
+				"qualification": false,
+				"reason": "PowerShell 5.1 Start-Process -PassThru followed by WaitForExit did not retain ExitCode. The wrapper's zero cannot qualify the child. Keep the original source/exit files and failing footer unchanged.",
+				"subsequent_changes": "Two module-specific source consumers and the new pinned source read were corrected after this immutable attempt; their direct targeted receiving is separate. No updated whole-JS success is claimed."
+			},
+			"subsequent_source_controls": "Three related failures corrected and separately received with natural exits 0; no new whole-suite qualification inferred"
+		},
+		"incoming_source_identity": {
+			"before": "41d4c8f17141f589573a43d04ab4603bb3d063f4",
+			"incoming": "de2a669f6c1bed4712d34ea7ee0395ac49816d5d",
+			"changed_paths": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
+			],
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"owned_uncommitted_images": "UNCHANGED",
+			"incoming_linux_native_here": "UNRUN"
+		},
+		"incoming_macos_source_identity": {
+			"before": "de2a669f6c1bed4712d34ea7ee0395ac49816d5d",
+			"incoming": "d5ee362cb50f782bf53551aac3409cbfd136a453",
+			"changed_paths": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+				"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift",
+				"tools/build/core_sdk/operational_core_source.py",
+				"tools/build/core_sdk/receive_core_sdk.py",
+				"tools/build/core_sdk/run_core_sdk.py",
+				"tools/build/fixtures/owned_runtime_dispatcher_test.cpp",
+				"tools/build/fixtures/owned_runtime_queue_ports.hpp",
+				"tools/build/fixtures/owned_runtime_queue_test.cpp",
+				"tools/build/owned_runtime_product_build.py",
+				"tools/build/remap_runtime_build.py",
+				"tools/build/remap_runtime_queue_test.py",
+				"tools/build/remap_runtime_source.py",
+				"tools/build/vhd_driver_resource_build_test.py",
+				"tools/build/vhd_driver_resource_callback_test.py",
+				"tools/build/vhd_driver_resource_custody_test.py",
+				"tools/build/vhd_driver_resource_entry_query_test.py",
+				"tools/build/vhd_driver_resource_source_test.py",
+				"tools/build/vhd_driver_resource_sources_close_test.py"
+			],
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"owned_images": {
+				"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "B3291C2CC9F6F6FBBEDB239369EBDB54BA94EDD5074CE7B6266D604D006E9745",
+				"tools/test/test-windows-hook-trace-source.cjs": "4C6CD29992BDD2F1CB9A5BDFEA1C3E9C84FB24B097AB5A291D1BEAC933D28D57",
+				"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "AE93DB40A65363F1AC18FB33446983B32BF97CE9B9164CFE4D80E7AB251677A3",
+				"tools/test/test-windows-terminal-output-custody-adapter.cjs": "51CBA9025E700850D7101F937EF367464B9E2A977CF9196A90C763B634611E76"
+			},
+			"incoming_mac_build_receiving_here": "UNRUN"
+		},
+		"ci_preceding_published_source": {
+			"source": "41d4c8f17141f589573a43d04ab4603bb3d063f4",
+			"run": 38496233833,
+			"conclusion": "failure",
+			"windows_units": "Snapshot16 admission refused before the whole unit suite launches",
+			"windows_engine_e2e": "PASS hosted VM",
+			"core_js": "PASS hosted runner",
+			"linux_e2e": "FAIL during owned logger ENOSPC receiving; underlying cause OPEN, not a maintainer-native receipt",
+			"macos_managed_ollama": "FAIL amd64 and arm64; trust add deadline, removal exit 1 and restoration failure",
+			"release_publication": "SKIPPED"
+		},
+		"remaining": {
+			"full_windows_units": "FAILED_INCOMPLETE_WATCHDOG; previous frozen attempt is not superseded by selected passes",
+			"underlying_native_start_os_error_6": "OPEN",
+			"previous_full_js_startup_same_path_refusal": "OPEN; serial startup passes do not erase it",
+			"genuine_joined_stop10": "UNRUN",
+			"physical_windows": "UNRUN",
+			"native_macos_here": "UNRUN",
+			"native_linux_here": "UNRUN",
+			"missing_public_unknown_genuine_branch": "UNRUN; private-custody path reviewed, not independently executed here",
+			"source_builder_without_genuine_default_provenance": "OPEN",
+			"cohort_conversion_and_production_emitter": "OPEN",
+			"managed_windows_ai_runtime_model_receiving": "OPEN; no acquisition consent, no runtime/model downloaded",
+			"new_build_diagnostics_menu_archive": "OPEN; preserved resident e235 build and its source-bound archive"
+		}
+	},
+	"missing_native_publication_followup": {
+		"source_commit": "f647fd9d7098ed5a552b9799f378a51b8c94ad80",
+		"status": "PASS_CONTROLLED_NATIVE_NO_HOOK",
+		"genuine_child_artifact": "native-retirement-v3-receiving/missing-publication-43d60fc3-904b-48e3-b1db-07fc20b38f77/receipts.json",
+		"genuine_children": [
+			{
+				"mode": "observed",
+				"flavor": "original",
+				"natural_exit": true,
+				"exit": 1,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [
+					"ErgoptiNav_ListTerminalHeldRecipes|8",
+					"ErgoptiNav_RegisterTerminalRoutes|0",
+					"ErgoptiNav_ListTerminalHeldRecipes|0",
+					"ErgoptiNav_Stop|0"
+				],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7",
+				"child_sha256": "4ad7c970e03d606595a1097994bb382bf30fe8449bf2119bed0984b8c42065c2",
+				"lexical_dllcall_sites_changed": 33,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+				"physical_or_joined_stop10_qualification": false
+			},
+			{
+				"mode": "observed",
+				"flavor": "revised",
+				"natural_exit": true,
+				"exit": 0,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [
+					"ErgoptiNav_ListTerminalHeldRecipes|8",
+					"ErgoptiNav_RegisterTerminalRoutes|0",
+					"ErgoptiNav_ListTerminalHeldRecipes|0",
+					"ErgoptiNav_Stop|0"
+				],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+				"child_sha256": "60b075dd67b286b6caa6fd8f5b28aff941b482400a38a984041b3ccacad11f75",
+				"lexical_dllcall_sites_changed": 35,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+				"physical_or_joined_stop10_qualification": false
+			},
+			{
+				"mode": "exact",
+				"flavor": "original",
+				"natural_exit": true,
+				"exit": 1,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7",
+				"child_sha256": "ccfd4ca0a7c01b1e0a64567039db275910b3b1f1e1847decff170fcd7c035de9",
+				"lexical_dllcall_sites_changed": 0,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+				"physical_or_joined_stop10_qualification": false
+			},
+			{
+				"mode": "exact",
+				"flavor": "revised",
+				"natural_exit": true,
+				"exit": 0,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+				"child_sha256": "600b74facc96a0b44b1c6af116edb0f99b0bd27db2c670af95c12ef92df57f97",
+				"lexical_dllcall_sites_changed": 0,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+				"physical_or_joined_stop10_qualification": false
+			}
+		],
+		"actual_registered_parent": {
+			"failed": 0,
+			"skipped": 0,
+			"running": 13,
+			"passed": 13,
+			"filter": "terminal-native-retirement:",
+			"tap": "D:\\Ergopti247Evidence\\continuation-20261013\\missing-publication-integrated-parent-v1.tap",
+			"expected": 13,
+			"exit": 0,
+			"accepted": true
+		},
+		"module_source_controls": [
+			{
+				"gate": "test-windows-terminal-output-custody-adapter",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "b936129c46c712a4db42b3b3a7e8d640b9caf79d433dd32f443b7d0ffcc1a65d",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-windows-hook-trace-source",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "b936129c46c712a4db42b3b3a7e8d640b9caf79d433dd32f443b7d0ffcc1a65d",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-no-pinned-source-reads",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "b936129c46c712a4db42b3b3a7e8d640b9caf79d433dd32f443b7d0ffcc1a65d",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			}
+		],
+		"mechanism": "A missing public Unknown slot does not discard private genuine registration debt. A custom stopped Map is refused without teardown; the original module Stop0 retires the debt without reconstructing the public slot, while preserving original and foreign holder contents.",
+		"supersedes": "Only the missing_public_unknown_genuine_branch UNRUN entry in native_registration_retirement_followup; all earlier receipts remain historical.",
+		"full_windows_units": "FAILED_INCOMPLETE_WATCHDOG; selected receiving does not supersede the incomplete full attempt",
+		"whole_js": "FAILED_FOOTER_EXIT_UNCAPTURED on the earlier frozen attempt; module controls are separate",
+		"genuine_joined_stop10": "UNRUN",
+		"physical_windows": "UNRUN",
+		"native_macos_here": "UNRUN",
+		"native_linux_here": "UNRUN",
+		"downloads_performed": false,
+		"production_adapter_changed": false,
+		"native_dll_changed": false
+	},
+	"source_preregistration_retirement": {
+		"source_commit": "bdc84b9c4032beb8302de0e9863440bdd99036b8",
+		"status": "PASS_CONTROLLED_NATIVE_SOURCE_RETIREMENT",
+		"adapter_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+		"metadata_sha256": "8a3a4b1992d10b74d816c441b729bcb5aa9fae24f0348dc4db67a2f65d5d3a3f",
+		"mechanism": "An original private frame is marked uncertain before public retention. Source and builder withdrawal before default C registration now retains custody. Actual loaded-module retirement requires a real same-module Stop receipt; local unissued callback ports gain no C authority. Settlement is checked before epoch/worker teardown; original and foreign holder contents survive.",
+		"phase_receiving": [
+			{
+				"artifact": "preregistration-fix-v1/preregistration-builder-b3e3809f-aef5-4dbc-b619-ddd87b33425c/receipts.json",
+				"children": [
+					{
+						"mode": "observed",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "7183d0ef1222dc9083a60732ca570204da9e2c82e2081facdb5dfe3ba768beaf",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "observed",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "f7715ca757baeb7f716087d2aa6f592131fe5eff4c3a657006260bee2d722dfd",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "848e1e2e81171af41ad579ce820e63d2983991c201ac17a76ed8b2c0b1168bdc",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "5192ce0e30772fdd1f8d6d3888538f8ee99920357d57e70ef76acc01fde57999",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					}
+				]
+			},
+			{
+				"artifact": "preregistration-fix-v1/preregistration-builder-capture-409e82f8-1a60-46ea-95db-d6b61bc2f402/receipts.json",
+				"children": [
+					{
+						"mode": "observed",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "ce7fef72ae5ec8efdd75b04b4a51a26c5ff8742695e1376ca9e3a83dfc5c469d",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "observed",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "ba2718800e7d548097d29028de9573ca2785dd80aa157033c1fae39d4853797f",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "848e1e2e81171af41ad579ce820e63d2983991c201ac17a76ed8b2c0b1168bdc",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "5192ce0e30772fdd1f8d6d3888538f8ee99920357d57e70ef76acc01fde57999",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					}
+				]
+			},
+			{
+				"artifact": "preregistration-fix-v1/preregistration-builder-recipe-88a6a262-b3fd-44af-9174-bea2ebc7a32d/receipts.json",
+				"children": [
+					{
+						"mode": "observed",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "fb01ad0096ad643e66f3b718bdb0475ffde21c5fb30965fd4163fd89e16c886a",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "observed",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "d5f7ab17c48a40acb2678b16e9916ab89af6b68792e3a7ef627c059cfd5d1811",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "848e1e2e81171af41ad579ce820e63d2983991c201ac17a76ed8b2c0b1168bdc",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "5192ce0e30772fdd1f8d6d3888538f8ee99920357d57e70ef76acc01fde57999",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					}
+				]
+			},
+			{
+				"artifact": "preregistration-fix-v1/preregistration-source-dd65d4d4-bda1-4824-8fce-b4909dfd4a78/receipts.json",
+				"children": [
+					{
+						"mode": "observed",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "1615631204c72cec8bcc6600ef5ade153c0de34fb79d25724dee1e5f18f089c7",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "observed",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "cec07c4e130daefbf28d221501fc230383bc46f589526ebbd1b7bfdb2eeb8330",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "848e1e2e81171af41ad579ce820e63d2983991c201ac17a76ed8b2c0b1168bdc",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "5192ce0e30772fdd1f8d6d3888538f8ee99920357d57e70ef76acc01fde57999",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					}
+				]
+			},
+			{
+				"artifact": "preregistration-fix-v1/preregistration-source-get-4e027c91-305f-428a-a823-c019ea09f50c/receipts.json",
+				"children": [
+					{
+						"mode": "observed",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "7c798da6d27ea1cfabbd856a329db79dcf48968be82b9beb5e3a37ae091658a9",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "observed",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_ListTerminalHeldRecipes|8",
+							"ErgoptiNav_Stop|0"
+						],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "8c4b57da518234b329f94f7b6c9544cbebc47c1a1efcc1b80739e4f685964b03",
+						"lexical_dllcall_sites_changed": 35,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "original",
+						"natural_exit": true,
+						"exit": 1,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+						"child_sha256": "848e1e2e81171af41ad579ce820e63d2983991c201ac17a76ed8b2c0b1168bdc",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					},
+					{
+						"mode": "exact",
+						"flavor": "revised",
+						"natural_exit": true,
+						"exit": 0,
+						"exact_plan": true,
+						"running": 1,
+						"skipped": 0,
+						"causal": true,
+						"raw_exact": true,
+						"events": [],
+						"unchanged": true,
+						"accepted": true,
+						"source_sha256": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+						"child_sha256": "5192ce0e30772fdd1f8d6d3888538f8ee99920357d57e70ef76acc01fde57999",
+						"lexical_dllcall_sites_changed": 0,
+						"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+						"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+						"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+						"physical_or_joined_stop10_qualification": false
+					}
+				]
+			}
+		],
+		"integrated_selections": [
+			{
+				"skipped": 0,
+				"exit": 0,
+				"running": 18,
+				"failed": 0,
+				"tap": "D:\\Ergopti247Evidence\\continuation-20261013\\preregistration-integrated-parent-v2.tap",
+				"expected": 18,
+				"filter": "terminal-native-retirement:",
+				"passed": 18,
+				"accepted": true
+			},
+			{
+				"tap": "D:\\Ergopti247Evidence\\continuation-20261013\\preregistration-integrated-registration-v1.tap",
+				"passed": 91,
+				"expected": 91,
+				"filter": "todo49-registration-custody",
+				"skipped": 0,
+				"accepted": true,
+				"failed": 0,
+				"running": 91,
+				"exit": 0
+			},
+			{
+				"accepted": true,
+				"running": 19,
+				"filter": "native-retirement-owner:",
+				"skipped": 0,
+				"exit": 0,
+				"failed": 0,
+				"passed": 19,
+				"tap": "D:\\Ergopti247Evidence\\continuation-20261013\\preregistration-integrated-callback-v1.tap",
+				"expected": 19
+			},
+			{
+				"accepted": true,
+				"running": 6,
+				"filter": "terminal-lifecycle-admission:",
+				"skipped": 0,
+				"exit": 0,
+				"failed": 0,
+				"passed": 6,
+				"tap": "D:\\Ergopti247Evidence\\continuation-20261013\\preregistration-integrated-lifecycle-v1.tap",
+				"expected": 6
+			}
+		],
+		"module_source_controls": [
+			{
+				"gate": "test-windows-terminal-output-custody-adapter",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "8a3a4b1992d10b74d816c441b729bcb5aa9fae24f0348dc4db67a2f65d5d3a3f",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-windows-hook-trace-source",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "8a3a4b1992d10b74d816c441b729bcb5aa9fae24f0348dc4db67a2f65d5d3a3f",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-no-pinned-source-reads",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "3eea5bd5570aa24b1a5c7cfd36205e0e8aa85ddda284b66b5d95d275728fdff8",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "8a3a4b1992d10b74d816c441b729bcb5aa9fae24f0348dc4db67a2f65d5d3a3f",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			}
+		],
+		"compiler": {
+			"valid_exit": 0,
+			"invalid_exit": 17,
+			"full_entry_exit": 0
+		},
+		"engine_e2e": {
+			"passed": 70,
+			"failed": 0,
+			"skipped": 0,
+			"exit": 0,
+			"physical_qualification": false
+		},
+		"full_startup": {
+			"status": "FAILED",
+			"exit": 1,
+			"native_status": 6,
+			"win32_error": 126,
+			"phase": "fresh-config",
+			"baseline_same_failure": "full-js-missing-publication-v1 on b329 preimage before this fix",
+			"scope": "Native hook startup failure remains OPEN; targeted successes do not replace it."
+		},
+		"preceding_frozen_full_js": {
+			"status": "FAILED_NATURAL_EXIT_FIXED_INPUTS",
+			"original_receipt_preserved": true,
+			"natural_exit": true,
+			"exit": 1,
+			"total": 425,
+			"passed": 407,
+			"failed": 18,
+			"failures": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"full AHK startup smoke (real auto-execute to ready, isolated config)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"frozen_base": "f647fd9d7098ed5a552b9799f378a51b8c94ad80",
+			"published_head": "c793ea088be4c4d9f4bdbd3437b8a07c64156731",
+			"fixed_base_changed_paths": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"docs/handovers/2026-10-13-groups-247-windows/windows-controlled-receipts.json"
+			],
+			"actual_source_bytes_unchanged": true,
+			"original_wrapper_tracked_diff_unchanged": false,
+			"reason": "The wrapper compared the worktree diff to mutable HEAD; committing the identical doc bytes changes that diff representation without changing inputs. The fixed initial base plus the two exact documentation hashes and remaining source hashes prove the original composition. This audit retains the actual child exit and all failures.",
+			"physical_windows_or_other_native_qualification": false
+		},
+		"failed_attempts_preserved": [
+			"retained-registration-v1: 1 PASS/90 FAIL; public-only fixture restoration did not release private custody",
+			"preregistration-integrated-parent-v1: only seven completed cases, eighth in flight, no footer despite host exit0; concurrent canonical SingleInstance run interrupted it",
+			"owned cleanup launcher v1: wrong direct include assumption; no child ran"
+		],
+		"fixture_correction": "The metadata fixture now obtains Stop acknowledgement before restoring borrowed public globals; all original assertions remain. Primary errors retain cleanup errors. No private reset API or central runner/inventory change.",
+		"ci_c793": {
+			"run": 38511425167,
+			"windows_units": "FAIL Snapshot16 source admission before the whole suite",
+			"linux_lua": {
+				"passed": 13693,
+				"failed": 0,
+				"exit": 0
+			},
+			"linux_extra": "FAIL isolated LuaJIT XI2 ABI29/cookies3, no receiving artifact produced; cause OPEN",
+			"macos_managed_ollama": "FAIL observed arm64; other native receiving not qualified here"
+		},
+		"native_dll_changed": false,
+		"downloads_performed": false,
+		"remaining": {
+			"full_windows_units": "FAILED_INCOMPLETE_WATCHDOG",
+			"full_js": "FAILED 407/425, natural exit1 on preceding composition",
+			"native_hook_start": "OPEN status6 / Win32126",
+			"genuine_joined_stop10": "UNRUN",
+			"cohort_conversion_and_emitter": "OPEN",
+			"managed_ai": "OPEN; no acquisition consent",
+			"new_build_diagnostics": "OPEN",
+			"physical_windows": "UNRUN",
+			"native_macos_here": "UNRUN",
+			"native_linux_here": "UNRUN"
+		}
+	}
+}

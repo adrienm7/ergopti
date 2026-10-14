@@ -7,10 +7,15 @@ from hs274_capture import decimal, integer
 class BaselineFrames:
     """Decode one bounded baseline; the stream reader validates session identity."""
 
-    def __init__(self, descriptor):
+    def __init__(self, descriptor, *, historical_replay=False):
         if not isinstance(descriptor, dict) or set(descriptor) != {"version", "boundary", "rows"}:
             raise ValueError("Invalid baseline descriptor")
-        integer(descriptor["version"], "baseline version", 1, 1)
+        if type(historical_replay) is not bool:
+            raise ValueError("Invalid historical replay mode")
+        if historical_replay:
+            self.version = integer(descriptor["version"], "historical baseline version", 1, 2)
+        else:
+            self.version = integer(descriptor["version"], "baseline version", 2, 2)
         self.boundary = decimal(descriptor["boundary"])
         self.total = integer(descriptor["rows"], "baseline rows", 1, 64 * 1025)
         self.cursor = 0
@@ -19,8 +24,13 @@ class BaselineFrames:
         self.current = None
 
     def _device_complete(self):
-        if self.current is not None and len(self.current["keys"]) != self.current["elements"]:
-            raise ValueError("Incomplete baseline device inventory")
+        if self.current is not None:
+            if len(self.current["keys"]) != self.current["elements"]:
+                raise ValueError("Incomplete baseline device inventory")
+            if self.version == 2:
+                has_keyboard = any(key["page"] == 7 for key in self.current["keys"].values())
+                if has_keyboard != self.current["keyboard"]:
+                    raise ValueError("Baseline keyboard flag differs from its inventory")
 
     def accept(self, frame, envelope_fields):
         """Reject gaps, identity aliasing and raw admission before explicit completion."""
@@ -57,10 +67,10 @@ class BaselineFrames:
             device = decimal(row.get("device"), minimum=1)
             if row.get("kind") == "device":
                 self._device_complete()
-                if (
-                    set(row) != {"kind", "device", "keyboard", "elements"}
-                    or type(row["keyboard"]) is not bool
-                ):
+                device_fields = {"kind", "device", "keyboard", "elements"}
+                if self.version == 2:
+                    device_fields.add("keyboard_type")
+                if set(row) != device_fields or type(row["keyboard"]) is not bool:
                     raise ValueError("Invalid baseline device marker")
                 if device in self.devices or len(self.devices) == 64:
                     raise ValueError("Duplicated or excessive baseline devices")
@@ -68,24 +78,42 @@ class BaselineFrames:
                     row["elements"],
                     "baseline elements",
                     1 if row["keyboard"] else 0,
-                    1024 if row["keyboard"] else 0,
+                    1024 if self.version == 2 or row["keyboard"] else 0,
                 )
                 self.current = {"keyboard": row["keyboard"], "elements": count, "keys": {}}
+                if self.version == 2:
+                    expected_types = {"ansi", "iso", "jis"} if row["keyboard"] else {"none"}
+                    if (
+                        not isinstance(row["keyboard_type"], str)
+                        or row["keyboard_type"] not in expected_types
+                    ):
+                        raise ValueError("Invalid baseline keyboard type")
+                    self.current["keyboard_type"] = row["keyboard_type"]
                 self.devices[device] = self.current
             elif row.get("kind") == "key":
-                if set(row) != {"kind", "device", "usage", "cookie", "timestamp", "down"}:
+                key_fields = {"kind", "device", "usage", "cookie", "timestamp", "down"}
+                if self.version == 2:
+                    key_fields.add("page")
+                if set(row) != key_fields:
                     raise ValueError("Invalid baseline key fields")
                 if device not in self.devices or self.devices[device] is not self.current:
                     raise ValueError("Baseline key has no current device marker")
                 cookie = integer(row["cookie"], "baseline cookie", 0, (1 << 32) - 1)
-                usage = integer(row["usage"], "baseline usage", 1, 255)
+                page = 7
+                if self.version == 2:
+                    page = integer(row["page"], "baseline page", 1, 65535)
+                    if page not in (7, 12, 255, 65281):
+                        raise ValueError("Unsupported baseline key page")
+                usage = integer(row["usage"], "baseline usage", 1, 255 if page == 7 else 65535)
                 timestamp = decimal(row["timestamp"], maximum=self.boundary)
-                if type(row["down"]) is not bool or (usage <= 3 and row["down"]):
+                if type(row["down"]) is not bool or (page == 7 and usage <= 3 and row["down"]):
                     raise ValueError("Invalid baseline key value")
                 keys = self.current["keys"]
                 if cookie in keys or len(keys) >= self.current["elements"]:
                     raise ValueError("Duplicated or excessive baseline elements")
                 keys[cookie] = {"usage": usage, "timestamp": timestamp, "down": row["down"]}
+                if self.version == 2:
+                    keys[cookie]["page"] = page
             else:
                 raise ValueError("Unknown baseline row kind")
         self.cursor = next_cursor

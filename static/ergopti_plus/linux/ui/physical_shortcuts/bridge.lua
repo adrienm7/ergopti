@@ -105,57 +105,69 @@ function M.open(options)
 		local called, sent = pcall(eval_js, APP, script)
 		return called and sent == true and current()
 	end
-	candidate.window = Window.new({model=model,catalogue=Gestures,parameter_section="gesture_parameters",
-		positions=positions,translate=I18n.get,label=Gestures.get_action_label,position_field="evdev",
-		page_current=current,send=send,capture=scope.capture_editor_inventory,current=scope.editor_source_current,
-		commit=function(rows,receipt) return scope.edit(rows,receipt) end,
-		position_available=function()
-			if not observation_current() or type(position_available) ~= "function" then return false end
-			local called, available = pcall(position_available)
-			return called and available == true and observation_current()
-		end,
-		capture_position=function(guard, receive)
-			if not observation_current() or retire_observation() ~= true or type(capture_position) ~= "function" then return nil end
-			local function exact() return observation_current() and guard() == true and observation_current() end
-			local called, token = pcall(capture_position, exact, function(facts)
-				return exact() and receive(facts) == true and exact()
-			end)
-			if not called or type(token) ~= "table" then return nil end
-			candidate.position = token
-			if not exact() then retire_observation(); return nil end
-			return token
-		end,
-		cancel_position=function(token)
-			if candidate.position ~= nil and not rawequal(token, candidate.position) then return false end
-			if candidate.position == nil then
-				local called, retired = pcall(cancel_position, token)
-				return called and retired == true
-			end
-			return retire_observation()
-		end,
-		close=function()
-			if retire_observation() ~= true or not current() or Manager.hide(APP,candidate.epoch) ~= true then return false end
-			if session == candidate then session = nil end
-			return true
-		end,
-		picker=function(binding,action,on_confirm)
-			local items = Gestures.get_picker_items()
-			local fields = Gestures.get_picker_parameter_fields(items,binding)
-			fields.title, fields.current, fields.items = I18n.get("physical_shortcuts.window_title"), action, items
-			return require("ui.action_picker.bridge").open(fields,function(id,_,parameter)
-				local spec = Gestures.get_action_parameter_spec(id)
-				if spec and parameter == nil then
-					if spec == "app" then
-						parameter = require("ui.app_chooser").pick(require("adapters.shell_runner"),Gestures.get_action_parameter_prompt(id))
-					else
-						parameter = require("ui.text_prompt").ask(I18n.get("physical_shortcuts.window_title"),
-							Gestures.get_action_parameter_prompt(id),Gestures.get_action_parameter(binding,id))
-					end
+	local constructed, window = pcall(function()
+		return Window.new({model=model,catalogue=Gestures,parameter_section="gesture_parameters",
+			positions=positions,translate=I18n.get,label=Gestures.get_action_label,position_field="evdev",
+			page_current=current,send=send,capture=scope.capture_editor_inventory,current=scope.editor_source_current,
+			commit=function(rows,receipt) return scope.edit(rows,receipt) end,
+			position_available=function()
+				if not observation_current() or type(position_available) ~= "function" then return false end
+				local called, available = pcall(position_available)
+				return called and available == true and observation_current()
+			end,
+			capture_position=function(guard, receive)
+				if not observation_current() or retire_observation() ~= true or type(capture_position) ~= "function" then return nil end
+				local function exact() return observation_current() and guard() == true and observation_current() end
+				local called, token = pcall(capture_position, exact, function(facts)
+					return exact() and receive(facts) == true and exact()
+				end)
+				if not called or type(token) ~= "table" then return nil end
+				candidate.position = token
+				if not exact() then retire_observation(); return nil end
+				return token
+			end,
+			cancel_position=function(token)
+				if candidate.position ~= nil and not rawequal(token, candidate.position) then return false end
+				if candidate.position == nil then
+					local called, retired = pcall(cancel_position, token)
+					return called and retired == true
 				end
-				return on_confirm(id,parameter)
-			end)
-		end,
-	})
+				return retire_observation()
+			end,
+			close=function()
+				if retire_observation() ~= true or not current() or Manager.hide(APP,candidate.epoch) ~= true then return false end
+				if session == candidate then session = nil end
+				return true
+			end,
+			picker=function(binding,action,on_confirm)
+				local items = Gestures.get_picker_items()
+				local fields = Gestures.get_picker_parameter_fields(items,binding)
+				fields.title, fields.current, fields.items = I18n.get("physical_shortcuts.window_title"), action, items
+				return require("ui.action_picker.bridge").open(fields,function(id,_,parameter)
+					local spec = Gestures.get_action_parameter_spec(id)
+					if spec and parameter == nil then
+						if spec == "app" then
+							parameter = require("ui.app_chooser").pick(require("adapters.shell_runner"),Gestures.get_action_parameter_prompt(id))
+						else
+							parameter = require("ui.text_prompt").ask(I18n.get("physical_shortcuts.window_title"),
+								Gestures.get_action_parameter_prompt(id),Gestures.get_action_parameter(binding,id))
+						end
+					end
+					return on_confirm(id,parameter)
+				end)
+			end,
+		})
+	end)
+	if not constructed or type(window) ~= "table" or session ~= candidate or candidate.cancelled
+		or candidate.epoch ~= nil or candidate.position ~= nil then
+		candidate.constructing, candidate.cancelled = false, true
+		-- The genuine shared constructor acquires no native page or observation.
+		-- Clear only this still-unacquired reservation; unknown acquired state stays retained.
+		if session == candidate and candidate.epoch == nil and candidate.position == nil then session = nil end
+		Logger.error("ui.physical_shortcuts", "Physical shortcut editor construction refused.")
+		return false
+	end
+	candidate.window = window
 	local called, opened = pcall(Manager.show,APP)
 	candidate.constructing = false
 	if not called or opened ~= true then
@@ -198,11 +210,17 @@ function M.close()
 	local candidate = session
 	if not candidate then return true end
 	if candidate.constructing or candidate.epoch == nil then return false end
+	candidate.cancelled = true
 	if candidate.retire_observation() ~= true then return false end
-	local Manager = require("ui.webview_manager")
-	local called, accepted = pcall(Manager.hide, APP, candidate.epoch)
-	if not called or accepted ~= true then return false end
-	candidate.window.retire()
+	-- Only the original Manager's exact closed notification settles this phase.
+	-- A missing page or a refused hide cannot manufacture native retirement.
+	if candidate.closed_epoch ~= candidate.epoch then
+		local Manager = require("ui.webview_manager")
+		local called, accepted = pcall(Manager.hide, APP, candidate.epoch)
+		if not called or accepted ~= true then return false end
+	end
+	local retired, acknowledged = pcall(candidate.window.retire)
+	if not retired or acknowledged ~= true then return false end
 	if session == candidate then session = nil end
 	return true
 end
@@ -223,10 +241,32 @@ end
 --- @param epoch number Closed page identity.
 function M.on_window_closed(epoch)
 	local candidate = session
-	if not candidate or candidate.epoch ~= epoch then return end
-	candidate.cancelled = true
+	if not candidate or candidate.epoch ~= epoch or candidate.close_observing then return end
+	local Manager = package.loaded["ui.webview_manager"]
+	local current_epoch, page_current = candidate.current_epoch, candidate.page_current
+	local function same_owner()
+		return session == candidate and candidate.epoch == epoch
+			and rawequal(Manager, candidate.manager) and rawequal(package.loaded["ui.webview_manager"], Manager)
+			and rawequal(rawget(Manager, "current_epoch"), current_epoch)
+			and rawequal(rawget(Manager, "page_current"), page_current)
+			and rawequal(candidate.current_epoch, current_epoch) and rawequal(candidate.page_current, page_current)
+	end
+	if not same_owner() or type(current_epoch) ~= "function" or type(page_current) ~= "function" then return end
+	-- A notice while the exact page is still current is not a retirement ACK.
+	-- Query the original ports under a reservation; callbacks cannot adopt another session.
+	candidate.close_observing = true
+	local seen, observed = pcall(current_epoch, APP)
+	if not seen or (observed ~= nil and type(observed) ~= "number") or observed == epoch or not same_owner() then
+		candidate.close_observing = false
+		return
+	end
+	local checked, current = pcall(page_current, APP, epoch)
+	candidate.close_observing = false
+	if not checked or current ~= false or not same_owner() then return end
+	candidate.cancelled, candidate.closed_epoch = true, epoch
 	if candidate.retire_observation() ~= true then return end
-	candidate.window.retire()
+	local retired, acknowledged = pcall(candidate.window.retire)
+	if not retired or acknowledged ~= true then return end
 	if not candidate.constructing and session == candidate then session = nil end
 end
 return M

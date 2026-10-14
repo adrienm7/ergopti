@@ -648,6 +648,9 @@ class Receiver:
             "OwnedImageAliasCompatibility.h",
             "OwnedSuspendedImageCompatibility.h",
             "OwnedListenerEventCompatibility.h",
+            "OwnedRuntimeSignatureCompatibility.h",
+            "OwnedInstalledConfiguration.h",
+            "OwnedChildReapingCompatibility.h",
         ):
             relative = (
                 "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name

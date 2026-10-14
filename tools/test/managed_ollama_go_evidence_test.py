@@ -105,6 +105,65 @@ class NativeGoEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.receive(required=POLICY["required_passes"])
 
+        # These literal subjects are frozen from the original e941 source,
+        # independently of the candidate policy. Events below are only a model.
+        identities = json.loads(
+            (FROZEN.parent / "failure-stage-identities.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(identities["scope"], "model_only_closed_test_identity_fixture")
+        self.assertEqual(
+            identities["original_source_commit"], "e94153e87b698b24de86133239319bde4be12a90"
+        )
+        subjects = identities["identities"]
+        added = identities["required_failure_stage_subtests"]
+        self.assertEqual(len(subjects), 74)
+        self.assertEqual(len(set(subjects)), 74)
+        self.assertEqual(len(added), 17)
+        self.assertEqual(len(set(added)), 17)
+        events = [{"Action": "start", "Package": PACKAGE}]
+        for name in subjects:
+            events.extend(
+                {"Action": action, "Package": PACKAGE, "Test": name} for action in ("run", "pass")
+            )
+        events.append({"Action": "pass", "Package": PACKAGE})
+        try:
+            fact = self.receive(events, required=POLICY["required_passes"])
+        except ValueError:
+            self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
+        self.assertEqual(POLICY["required_passes"], subjects)
+        self.assertEqual(
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (74, 39, 35)
+        )
+        self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
+        for name in added:
+            for mutation in (
+                "missing",
+                "fail",
+                "skip",
+                "duplicate_run",
+                "duplicate_pass",
+                "foreign",
+            ):
+                with self.subTest(identity=name, mutation=mutation):
+                    changed = []
+                    for event in events:
+                        if event.get("Test") != name:
+                            changed.append(event)
+                        elif mutation == "missing":
+                            continue
+                        elif mutation in ("fail", "skip") and event["Action"] == "pass":
+                            changed.append(dict(event, Action=mutation))
+                        elif mutation == "duplicate_run" and event["Action"] == "run":
+                            changed.extend((event, dict(event)))
+                        elif mutation == "duplicate_pass" and event["Action"] == "pass":
+                            changed.extend((event, dict(event)))
+                        elif mutation == "foreign":
+                            changed.append(dict(event, Test=name + "/unenrolled"))
+                        else:
+                            changed.append(event)
+                    with self.assertRaises(ValueError):
+                        self.receive(changed, required=POLICY["required_passes"])
+
     def testFrozenLinux44CannotQualifySixAddedListenerEventIdentities(self):
         required = [
             "TestListenerEventRealUnixFrameHalfCloseAndGuardianEOF",

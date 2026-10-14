@@ -318,7 +318,12 @@ function loadArchiveProducer(
 					throw new Error('Native tools are forbidden by the archive contract fixture');
 				}
 			};
-		if (['node:path', 'node:crypto', '../lib/paths.cjs'].includes(name)) return resolve(name);
+		if (
+			['node:path', 'node:crypto', '../lib/paths.cjs', '../lib/owned-descriptor-read.cjs'].includes(
+				name
+			)
+		)
+			return resolve(name);
 		throw new Error('Unowned archive fixture dependency: ' + name);
 	};
 	local._compile(source, filename);
@@ -343,7 +348,12 @@ function loadPublicationProducer(filename, filesystem) {
 					throw new Error('Native publication tools are forbidden by the contract fixture');
 				}
 			};
-		if (['node:path', 'node:crypto', '../lib/paths.cjs'].includes(name)) return resolve(name);
+		if (
+			['node:path', 'node:crypto', '../lib/paths.cjs', '../lib/owned-descriptor-read.cjs'].includes(
+				name
+			)
+		)
+			return resolve(name);
 		throw new Error('Unowned publication fixture dependency: ' + name);
 	};
 	local._compile(source, filename);
