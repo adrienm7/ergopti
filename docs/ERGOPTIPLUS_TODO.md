@@ -4641,6 +4641,15 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
   run the same 34 cases with Python 3.12 or later on a real Windows runner;
   the current Windows CI lane does not enroll these Python tests. This fixture
   correction grants no Darwin consent or resolution of the lease incident.
+  Actual Windows Python 3.13 receiving of that first fixture checkpoint runs
+  all 34 cases without skips: 27 pass, six fail before Main admission and one
+  cannot create its real leaf symlink (WinError1314). The four real pipe and
+  retirement controls pass. The six synthetic-helper metadata fixtures now
+  scope an explicit executable-bit projection to that exact Windows helper,
+  reusing the unchanged production identity predicate and fresh native fields.
+  Source review, six counterfactual Main models and six metadata schedules pass;
+  actual receiving of this successor remains required. The real symlink case
+  is unchanged and needs a host with legitimate symlink-creation permission.
   Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
   are published (decision record, one accounting policy whose default `legacy`
