@@ -197,7 +197,6 @@ static uint32_t g_nav_test_hook_time;
 static uint8_t g_nav_test_os_modifiers_enabled;
 static uint8_t g_nav_test_os_modifiers;
 #endif
-static HINSTANCE g_nav_module;
 static DWORD g_nav_initialization_error;
 
 static LRESULT NavLowLevelKeyboardProcCore(
@@ -211,7 +210,7 @@ static uint8_t NavModifierBit(uint16_t vk, uint16_t sc);
 
 
 /**
- * Captures the module handle without performing work under the loader lock.
+ * Disables redundant thread notifications without work under the loader lock.
  *
  * @param module Module instance supplied by the Windows loader.
  * @param reason Loader notification reason.
@@ -222,7 +221,6 @@ BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID reserved)
 {
 	(void)reserved;
 	if (reason == DLL_PROCESS_ATTACH) {
-		g_nav_module = module;
 		DisableThreadLibraryCalls(module);
 	}
 	return TRUE;
@@ -2279,8 +2277,6 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	DWORD exit_os_error = 0;
 	int32_t exit_status = ERGOPTI_NAV_STATUS_OK;
 	bool stop_requested = false;
-	/* Low-level callbacks stay in this process; the resident owner pins this DLL. */
-	HINSTANCE module = NULL;
 
 	(void)parameter;
 	EnterCriticalSection(&g_nav_state.lock);
@@ -2301,10 +2297,14 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	}
 
 	PeekMessageW(&message, NULL, WM_USER, WM_USER, PM_NOREMOVE);
+	/* This hook remains desktop-wide, but low-level callbacks execute in this
+	 * owner thread instead of being injected into other processes. A DLL
+	 * module registration is unnecessary for this local callback execution.
+	 * The adapter retains this DLL for the entire process lifetime. */
 	hook = SetWindowsHookExW(
 		WH_KEYBOARD_LL,
 		NavLowLevelKeyboardProc,
-		module,
+		NULL,
 		0);
 	if (hook == NULL)
 		os_error = GetLastError();
