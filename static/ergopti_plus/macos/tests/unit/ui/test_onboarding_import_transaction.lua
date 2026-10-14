@@ -138,3 +138,135 @@ helpers.describe("onboarding configuration import transaction", function()
 		end)
 	end
 end)
+
+helpers.describe("onboarding empty configuration folder", function()
+	for _, mode in ipairs({ "success", "absent", "read_nil", "close_nil" }) do
+		helpers.it("(onboarding-empty-config-source) " .. mode .. " imports the retained destination", function()
+			fixture.with_delivery(function(_, state, _, errors, evaluations)
+				local reads, remap_paths = {}, {}
+				local current_path = "/virtual/config.toml"
+				local function content_for(path)
+					return path == current_path and "[hotstrings]\nenabled = true\n"
+						or "[hotstrings]\nenabled = false\n"
+				end
+				local inspect = hs.fs.symlinkAttributes
+				hs.fs.symlinkAttributes = function(path)
+					if mode == "absent" and path:match("/config%.toml$") then return nil end
+					local attributes = inspect(path)
+					if attributes and attributes.mode == "file" then attributes.size = #content_for(path) end
+					return attributes
+				end
+				package.loaded["infra.toml.codec"].decode = require("toml_codec").decode
+				package.loaded["platform.remap"].recommended_key_report = function(path)
+					remap_paths[#remap_paths + 1] = path
+					return { enabled = false, keys = {} }
+				end
+				io.open = function(path, access)
+					helpers.assert_eq(access, "r")
+					reads[#reads + 1] = path
+					return {
+						read = function()
+							if mode == "read_nil" then return nil, "PRIVATE_NATIVE_DETAIL", 5 end
+							return content_for(path)
+						end,
+						close = function()
+							if mode == "close_nil" then return nil, "PRIVATE_NATIVE_DETAIL", 5 end
+							return true
+						end,
+					}
+				end
+				state.receiver({ body = { action = "loadExistingConfig", config_dir = "", request = 7 } })
+				helpers.assert_eq(reads, mode == "absent" and {} or { current_path })
+				local admitted = mode == "success" or mode == "absent"
+				helpers.assert_eq(#evaluations, admitted and 1 or 0)
+				helpers.assert_eq(#errors, admitted and 0 or 1)
+				helpers.assert_eq(remap_paths, admitted and { "/virtual/config_karabiner.toml" } or {})
+				if admitted then
+					helpers.assert_eq(state.payload.request, 7)
+					helpers.assert_eq(state.payload.values, mode == "success" and { ["hotstrings.enabled"] = true } or {})
+				end
+				for _, message in ipairs(errors) do
+					helpers.assert_nil(message:find("PRIVATE_NATIVE_DETAIL", 1, true))
+				end
+			end)
+		end)
+	end
+
+	helpers.it("(onboarding-empty-config-source) an explicit folder still imports its own configuration", function()
+		fixture.with_delivery(function(_, state, _, errors, evaluations)
+			local reads = {}
+			local content = "[hotstrings]\nenabled = false\n"
+			local inspect = hs.fs.symlinkAttributes
+			hs.fs.symlinkAttributes = function(path)
+				local attributes = inspect(path)
+				if attributes and attributes.mode == "file" then attributes.size = #content end
+				return attributes
+			end
+			package.loaded["infra.toml.codec"].decode = require("toml_codec").decode
+			io.open = function(path, access)
+				helpers.assert_eq(access, "r")
+				reads[#reads + 1] = path
+				return { read = function() return content end,
+					close = function() return true end }
+			end
+			state.receiver({ body = { action = "loadExistingConfig", config_dir = "/virtual/chosen/", request = 8 } })
+			helpers.assert_eq(reads, { "/virtual/chosen/hammerspoon/config.toml" })
+			helpers.assert_eq(#evaluations, 1)
+			helpers.assert_eq(#errors, 0)
+			helpers.assert_eq(state.payload.request, 8)
+			helpers.assert_eq(state.payload.values, { ["hotstrings.enabled"] = false })
+		end)
+	end)
+end)
+
+helpers.describe("onboarding retained configuration source", function()
+	for _, phase in ipairs({ "read", "read_refusal", "close", "close_refusal", "decode", "decode_refusal", "remap", "remap_refusal", "remap_throw", "encode" }) do
+		helpers.it("(onboarding-empty-config-source) " .. phase .. " reentry cannot publish a retired source", function()
+			fixture.with_delivery(function(onboarding, state, _, errors, evaluations)
+				local view, replacements = state.view, 0
+				local function replace_source()
+					replacements = replacements + 1
+					helpers.assert_true(onboarding.run("/virtual/successor/config.toml"))
+					helpers.assert_true(state.view == view, "source replacement retains the same native window")
+				end
+				io.open = function()
+					return {
+						read = function()
+							if phase == "read" or phase == "read_refusal" then replace_source() end
+							if phase == "read_refusal" then return nil, "PRIVATE_NATIVE_DETAIL", 5 end
+							return "fixture"
+						end,
+						close = function()
+							if phase == "close" or phase == "close_refusal" then replace_source() end
+							if phase == "close_refusal" then return nil, "PRIVATE_NATIVE_DETAIL", 5 end
+							return true
+						end,
+					}
+				end
+				package.loaded["infra.toml.codec"].decode = function()
+					if phase == "decode" or phase == "decode_refusal" then replace_source() end
+					if phase == "decode_refusal" then error("PRIVATE_NATIVE_DETAIL") end
+					return {}
+				end
+				package.loaded["platform.remap"].recommended_key_report = function()
+					if phase == "remap" or phase == "remap_refusal" or phase == "remap_throw" then replace_source() end
+					if phase == "remap_refusal" then return nil, "PRIVATE_NATIVE_DETAIL" end
+					if phase == "remap_throw" then error("PRIVATE_NATIVE_DETAIL") end
+					return { enabled = false, keys = {} }
+				end
+				if phase == "encode" then
+					local encode = require("json").encode
+					state.encode = function(value)
+						state.encode = nil
+						replace_source()
+						return encode(value)
+					end
+				end
+				state.receiver({ body = { action = "loadExistingConfig", config_dir = "", request = 9 } })
+				helpers.assert_eq(replacements, 1, "the actual native boundary replaced the captured source")
+				helpers.assert_eq(#evaluations, 0, "retired configuration values never reach the successor")
+				helpers.assert_eq(#errors, 0, "retired-source failures do not diagnose the successor: " .. table.concat(errors, "\n"))
+			end, true)
+		end)
+	end
+end)

@@ -121,7 +121,7 @@ end
 --- @param view userdata|table Captured native window.
 --- @param method string Fixed frontend function name.
 --- @param payload table|string Frontend payload, never included in diagnostics.
---- @param config_path string|nil Captured initialization source, absent for other publications.
+--- @param config_path string|nil Captured configuration source, absent for unrelated publications.
 local function submit_data(owner, view, method, payload, config_path)
 	local function current()
 		return publication_is_current(owner, view) and (config_path == nil or _config_path == config_path)
@@ -269,11 +269,13 @@ end
 --- The wizard values of the tap-hold keys and switch the remap owner reports
 --- beside a config.toml: a configured key is shown as kept, never imported over.
 --- @param config_path string Absolute config.toml path.
+--- @param is_current function|nil Captured import authority.
 --- @return table|nil values nil when the remap settings cannot be read.
-local function tap_hold_values(config_path)
+local function tap_hold_values(config_path, is_current)
 	local ok, report, err = pcall(function()
 		return require("platform.remap").recommended_key_report(remap_settings_beside(config_path))
 	end)
+	if is_current and not is_current() then return nil end
 	if not ok or type(report) ~= "table" then
 		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
 		return nil
@@ -284,9 +286,10 @@ end
 --- Adds the tap-hold values beside a config.toml to its configured values.
 --- @param values table Values of config.toml, completed in place.
 --- @param config_path string Absolute config.toml path.
+--- @param is_current function|nil Captured import authority.
 --- @return table|nil values nil when the remap settings cannot be read.
-local function with_tap_hold_values(values, config_path)
-	local tap_holds = tap_hold_values(config_path)
+local function with_tap_hold_values(values, config_path, is_current)
+	local tap_holds = tap_hold_values(config_path, is_current)
 	if not tap_holds then return nil end
 	for path, value in pairs(tap_holds) do values[path] = value end
 	return values
@@ -894,23 +897,23 @@ local function handle_message(body)
 			return
 		end
 		local chosen = type(body.config_dir) == "string" and body.config_dir or ""
-		if chosen == "" then
-			-- Empty input = "use the OS default" — read from the resolved
-			-- default location so a returning user gets pre-fill regardless
-			-- of whether they left the input empty or typed the same path.
-			local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-			if ok_mp and menu_paths and menu_paths.get_default_config_dir then
-				local ok_v, v = pcall(menu_paths.get_default_config_dir)
-				if ok_v and type(v) == "string" then chosen = v end
-			end
-		end
+		-- Finish keeps the captured destination when the field is empty. Import
+		-- that same source instead of copying another folder's answers into it.
+		local cfg_path = _config_path
 		if chosen ~= "" then
 			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
-			local cfg_path = chosen .. "hammerspoon/config.toml"
-			if not publication_is_current(owner, view) then return false end
+			cfg_path = chosen .. "hammerspoon/config.toml"
+		end
+		local import_source = chosen == "" and cfg_path or nil
+		local function import_is_current()
+			return publication_is_current(owner, view)
+				and (import_source == nil or _config_path == import_source)
+		end
+		if type(cfg_path) == "string" and cfg_path ~= "" then
+			if not import_is_current() then return false end
 			local reported = false
 			local function import_failure(category)
-				if not publication_is_current(owner, view) then return end
+				if not import_is_current() then return end
 				reported = true
 				local categories = { inspect = true, open = true, read = true, close = true,
 					path_changed = true, identity_changed = true, validation = true,
@@ -926,28 +929,28 @@ local function handle_message(body)
 				Logger.error(LOG, "Onboarding existing configuration import failed (%s; content withheld; repeats suppressed).", label)
 			end
 			local read_ok, content, status = pcall(FileSystem.read_with_status, cfg_path, import_failure)
-			if not publication_is_current(owner, view) then return false end
+			if not import_is_current() then return false end
 			if not read_ok then import_failure("dependency"); return false end
 			if status == "absent" then
 				if not reported then import_failure("absent") end
-				local absent_values = with_tap_hold_values({}, cfg_path)
-				if not publication_is_current(owner, view) then return false end
+				local absent_values = with_tap_hold_values({}, cfg_path, import_is_current)
+				if not import_is_current() then return false end
 				if not absent_values then import_failure("answers"); return false end
-				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = absent_values })
+				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = absent_values }, import_source)
 			end
 			if status ~= "ok" or type(content) ~= "string" then
 				if not reported then import_failure("read") end
 				return false
 			end
 			local decoded, parsed = pcall(toml_codec.decode, content)
-			if not publication_is_current(owner, view) then return false end
+			if not import_is_current() then return false end
 			if not decoded or type(parsed) ~= "table" then import_failure("decode"); return false end
 			local projected, values = pcall(function()
-				return with_tap_hold_values(Answers.current_values(catalogue(), parsed), cfg_path)
+				return with_tap_hold_values(Answers.current_values(catalogue(), parsed), cfg_path, import_is_current)
 			end)
-			if not publication_is_current(owner, view) then return false end
+			if not import_is_current() then return false end
 			if not projected or type(values) ~= "table" then import_failure("answers"); return false end
-			return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = values })
+			return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = values }, import_source)
 		end
 
 	elseif action == "finish" then
