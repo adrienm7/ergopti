@@ -317,6 +317,515 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		end)
 	end
 
+	-- Real API, shared inventory parser, native lifecycle and ShellRunner; only
+	-- native HTTP, JSON and timer boundaries are controlled in this cohort.
+	local function with_owned_responses(callback)
+		with_startup({}, function(api, fixture)
+			fixture.gets, fixture.posts, fixture.logs = {}, {}, {}
+			local client = get_upvalue(api.request_chat, "_vision_client")
+			local listing = get_upvalue(api.refresh_local_models, "_listing_client")
+			local function get(url, _, done)
+				fixture.gets[#fixture.gets + 1] = { url = url, done = done }
+			end
+			client.get, listing.get = get, get
+			client.post = function(url, _, body, done)
+				fixture.posts[#fixture.posts + 1] = { url = url, body = body, done = done }
+			end
+			local json = require("json")
+			fixture.codec = package.loaded["adapters.json_codec"]
+			fixture.codec.encode, fixture.codec.decode = json.encode, json.decode
+			package.loaded["adapters.timer_scheduler"].now = function() return 1 end
+			package.loaded["modules.llm.parser"].strip_thinking = require("llm.parser").strip_thinking
+			package.loaded["modules.llm.api_common"].protected_call = function(fn, _, ...)
+				return package.loaded["infra.logger"].callback("fixture", "request callback", fn, ...)
+			end
+			fixture.logger = package.loaded["infra.logger"]
+			for _, kind in ipairs({ "info", "warn", "error" }) do
+				fixture.logger[kind] = function(_, text, ...)
+					fixture.logs[#fixture.logs + 1] = { kind = kind, text = string.format(text, ...) }
+				end
+			end
+			helpers.assert_true(api.ensure_running())
+			local original = fixture.tasks[1]
+			original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+			local origin = api.get_base_url()
+			function fixture.replace_service()
+				helpers.assert_eq(api.stop_owned_server(), false)
+				original.complete(0, original.frame("RETIRED 0"))
+				helpers.assert_true(api.ensure_running())
+				local successor = fixture.tasks[2]
+				successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
+				helpers.assert_eq(api.get_base_url(), origin, "the concrete replacement retains the same URL")
+				helpers.assert_true(original.completed)
+				helpers.assert_true(successor.running)
+			end
+			function fixture.request()
+				local result = { texts = {}, failures = {} }
+				api.request_chat({ model = "qwen2.5:7b", messages = {} },
+					function(text) result.texts[#result.texts + 1] = text end,
+					function(reason, detail) result.failures[#result.failures + 1] = { reason = reason, detail = detail } end)
+				return result
+			end
+			function fixture.tags(index, names)
+				fixture.gets[index].done({ status = 200, body = #names == 0 and '{"models":[]}' or json.encode({ models = names }) })
+			end
+			callback(api, fixture)
+		end)
+	end
+
+	-- The original daemon predicate remains the genuine lexical service fence.
+	-- Only endpoint reads and the requester callback are instrumented here.
+	local function with_reentrant_requester(boundary, outcome, scenario)
+		with_owned_responses(function(api, fixture)
+			helpers.with_fresh_modules({ "modules.llm.local_model_offer", "infra.dialog_util",
+				"infra.notifications", "infra.i18n" }, function()
+				local world = { dialogs = 0, notices = 0, installs = 0, replaced = false }
+				package.loaded["infra.i18n"] = { get = function(key) return key end,
+					format = function(key) return key end }
+				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, first)
+					world.dialogs = world.dialogs + 1; return first
+				end }
+				package.loaded["infra.notifications"] = { notify = function()
+					world.notices = world.notices + 1; return true
+				end }
+				local offer = require("modules.llm.local_model_offer")
+				offer.set_installer(function() world.installs = world.installs + 1; return true end)
+				local original_origin = api.get_base_url
+				local reads = 0
+				api.get_base_url = function() reads = reads + 1; return original_origin() end
+				local function current()
+					if reads == boundary and not world.replaced then
+						world.replaced = true
+						fixture.replace_service()
+						if outcome == "throw" then error("private-requester-service-secret") end
+						return outcome
+					end
+					return true
+				end
+				scenario(offer, current, world)
+				helpers.assert_true(world.replaced, "the actual original native service must have been replaced")
+				helpers.assert_eq(#fixture.tasks, 2)
+				helpers.assert_true(fixture.tasks[1].completed)
+				helpers.assert_true(fixture.tasks[2].running)
+				for _, row in ipairs(fixture.logs) do
+					helpers.assert_true(not row.text:find("private-requester-service-secret", 1, true))
+				end
+			end)
+		end)
+	end
+
+	helpers.it("(local-model-requester-service-reentry) refuses dispatch after the final requester predicate retires its captured service", function()
+		for _, outcome in ipairs({ true, false, 17, "throw" }) do
+			with_reentrant_requester(2, outcome, function(offer, current, world)
+				helpers.assert_eq(offer.install("qwen2.5:7b", { current = current }), false)
+				helpers.assert_eq(world.installs, 0, "old service consent cannot dispatch to its same-origin successor")
+				helpers.assert_true(offer.install("qwen2.5:7b"), "fresh successor ownership remains admitted")
+				helpers.assert_eq(world.installs, 1)
+			end)
+		end
+	end)
+
+	helpers.it("(local-model-requester-service-reentry) refuses notification custody after its final requester predicate replaces the service", function()
+		with_reentrant_requester(2, true, function(offer, current, world)
+			helpers.assert_eq(offer.offer("qwen2.5:7b", { automatic = true, current = current }), false)
+			helpers.assert_eq(world.notices + world.dialogs + world.installs, 0)
+			helpers.assert_true(offer.offer("qwen2.5:7b", { automatic = true }))
+			helpers.assert_eq(world.notices, 1, "fresh automatic notices keep their source policy")
+		end)
+	end)
+
+	helpers.it("(local-model-requester-service-reentry) refuses a source receipt invalidated inside its final acquisition predicate", function()
+		with_reentrant_requester(1, true, function(offer, current, world)
+			local capture = get_upvalue(offer.install, "capture_owner")
+			helpers.assert_eq(type(capture), "function")
+			helpers.assert_eq(capture({ current = current }), nil,
+				"actual acquisition must not grant an already retired native owner")
+			helpers.assert_eq(world.notices + world.dialogs + world.installs, 0)
+			helpers.assert_true(offer.install("qwen2.5:7b"))
+		end)
+	end)
+
+	helpers.it("(ollama-inventory-withdrawal) rechecks cache custody after its endpoint getter forgets or replaces inventory", function()
+		for _, replacement in ipairs({ false, true }) do
+			with_owned_responses(function(api, fixture)
+				fixture.request()
+				fixture.tags(1, { { name = "qwen2.5:7b" } })
+				local storage = require("adapters.storage")
+				local read_setting = storage.get
+				storage.get = function(key)
+					if key ~= "llm.ollama_port" then return read_setting(key) end
+					storage.get = read_setting
+					api.forget_local_models()
+					if replacement then
+						api.refresh_local_models()
+						fixture.tags(2, { { name = "replacement-model" } })
+					end
+					return read_setting(key)
+				end
+				local ok, installed = pcall(api.local_model_installed, "qwen2.5:7b")
+				helpers.assert_true(ok, "a withdrawn receipt must not dereference a now-nil global cache")
+				helpers.assert_eq(installed, nil, "the original observation cannot borrow replacement inventory")
+				if replacement then
+					helpers.assert_eq(api.local_model_installed("replacement-model"), true,
+						"a fresh observation retains the replacement's acknowledged cache")
+				else
+					helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
+				end
+			end)
+		end
+	end)
+
+	helpers.it("(ollama-inventory-withdrawal) refuses a tags acquisition withdrawn by its first source read", function()
+		with_owned_responses(function(api, fixture)
+			local read_origin = api.get_base_url
+			local reads = 0
+			api.get_base_url = function()
+				reads = reads + 1
+				if reads == 2 then
+					api.get_base_url = read_origin
+					api.forget_local_models()
+				end
+				return read_origin()
+			end
+			local result, reason
+			api.refresh_local_models(function(ok, why) result, reason = ok, why end)
+			helpers.assert_eq(#fixture.gets, 0, "a withdrawn inventory epoch cannot send a tags acquisition")
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(reason, "model_list_unavailable")
+		end)
+	end)
+
+	helpers.it("(ollama-inventory-withdrawal) refuses final tags delivery withdrawn inside its last source read", function()
+		for _, operation in ipairs({ "refresh", "verify" }) do
+			with_owned_responses(function(api, fixture)
+				local results = {}
+				if operation == "refresh" then
+					api.refresh_local_models(function(value, reason) results[#results + 1] = { value, reason } end)
+				else
+					api.verify_local_model("qwen2.5:7b", function(value, reason) results[#results + 1] = { value, reason } end)
+				end
+				local debug_log = fixture.logger.debug
+				fixture.logger.debug = function(scope, text, ...)
+					if text == "The local server returned a readable model list." then
+						fixture.logger.debug = debug_log
+						local read_origin = api.get_base_url
+						api.get_base_url = function()
+							api.get_base_url = read_origin
+							api.forget_local_models()
+							return read_origin()
+						end
+					end
+					return debug_log(scope, text, ...)
+				end
+				fixture.tags(1, { { name = "qwen2.5:7b" } })
+				helpers.assert_eq(#results, 1)
+				local expected = nil
+				if operation == "refresh" then expected = false end
+				helpers.assert_eq(results[1][1], expected,
+					"final delivery cannot publish a withdrawn inventory")
+				helpers.assert_eq(results[1][2], "model_list_unavailable")
+				helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
+			end)
+		end
+	end)
+
+	helpers.it("(ollama-response-service-affinity) refuses held tags from a retired same-origin daemon", function()
+		for _, names in ipairs({ {}, { { name = "qwen2.5:7b" } } }) do
+			with_owned_responses(function(api, fixture)
+				local result = fixture.request()
+				helpers.assert_eq(#fixture.gets, 1)
+				fixture.replace_service()
+				fixture.tags(1, names)
+				helpers.assert_eq(#fixture.posts, 0, "old inventory cannot admit a successor chat")
+				helpers.assert_eq(#result.texts, 0)
+				helpers.assert_eq(#result.failures, 1)
+				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable", "old empty inventory is not MODEL_MISSING")
+				helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
+			end)
+		end
+	end)
+
+	helpers.it("(ollama-response-service-affinity) captures a refresh owner before its opaque endpoint read", function()
+		with_owned_responses(function(api, fixture)
+			local read_origin = api.get_base_url
+			api.get_base_url = function()
+				api.get_base_url = read_origin
+				fixture.replace_service()
+				return read_origin()
+			end
+			local refreshed, reason
+			api.refresh_local_models(function(ok, why) refreshed, reason = ok, why end)
+			helpers.assert_eq(#fixture.gets, 0, "an endpoint read cannot lend the refresh its successor service")
+			helpers.assert_eq(refreshed, false)
+			helpers.assert_eq(reason, "model_list_unavailable")
+		end)
+	end)
+
+	helpers.it("(ollama-response-service-affinity) invalidates acknowledged inventory when its real service retires", function()
+		with_owned_responses(function(api, fixture)
+			fixture.request()
+			fixture.tags(1, { { name = "qwen2.5:7b" } })
+			helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), true)
+			fixture.replace_service()
+			helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil,
+				"a READY successor cannot inherit the old process's acknowledged model cache")
+			local fresh = fixture.request()
+			helpers.assert_eq(#fixture.gets, 2, "the successor must provide its own actual inventory receipt")
+			helpers.assert_eq(#fixture.posts, 1)
+			fixture.tags(2, { { name = "qwen2.5:7b" } })
+			helpers.assert_eq(#fixture.posts, 2)
+			fixture.posts[2].done({ status = 200, body = '{"message":{"content":"fresh source answer"}}' })
+			helpers.assert_eq(fresh.texts, { "fresh source answer" })
+			helpers.assert_eq(#fresh.failures, 0)
+		end)
+	end)
+
+	helpers.it("(ollama-response-service-affinity) refuses old chat success and missing-model failure after replacement", function()
+		for _, response in ipairs({
+			{ status = 200, body = '{"message":{"content":"old private answer"}}' },
+			{ status = 404, body = require("json").encode({ error = 'model "qwen2.5:7b" not found' }) },
+			{ status = 503, body = '{"error":"old service failure"}' },
+		}) do
+			with_owned_responses(function(api, fixture)
+				local result = fixture.request()
+				fixture.tags(1, { { name = "qwen2.5:7b" } })
+				fixture.replace_service()
+				api.refresh_local_models()
+				fixture.tags(2, { { name = "successor-model" } })
+				fixture.posts[1].done(response)
+				helpers.assert_eq(#result.texts, 0)
+				helpers.assert_eq(#result.failures, 1)
+				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
+				helpers.assert_eq(api.local_model_installed("successor-model"), true,
+					"an old HTTP404 cannot forget the successor's cache")
+				for _, line in ipairs(fixture.logs) do
+					helpers.assert_true(not line.text:find("old private answer", 1, true))
+					helpers.assert_true(not line.text:find("old service failure", 1, true))
+				end
+			end)
+		end
+	end)
+
+	helpers.it("(ollama-response-service-affinity) preserves an issued same-service chat through parallel inventory", function()
+		with_owned_responses(function(api, fixture)
+			local result = fixture.request()
+			fixture.tags(1, { { name = "qwen2.5:7b" } })
+			api.refresh_local_models()
+			fixture.tags(2, { { name = "newly-listed-model" } })
+			fixture.posts[1].done({ status = 200, body = '{"message":{"content":"valid original answer"}}' })
+			helpers.assert_eq(result.texts, { "valid original answer" })
+			helpers.assert_eq(#result.failures, 0, "global listing epoch is only a dispatch prerequisite")
+			helpers.assert_eq(api.local_model_installed("newly-listed-model"), true)
+		end)
+	end)
+
+	helpers.it("(ollama-response-service-affinity) binds the originating service before JSON encoding", function()
+		with_owned_responses(function(_, fixture)
+			local encode = fixture.codec.encode
+			fixture.codec.encode = function(body)
+				fixture.codec.encode = encode
+				fixture.replace_service()
+				return encode(body)
+			end
+			local result = fixture.request()
+			helpers.assert_eq(#fixture.gets, 0, "encode reentry cannot acquire a successor inventory")
+			helpers.assert_eq(#fixture.posts, 0)
+			helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
+		end)
+	end)
+
+	helpers.it("(ollama-response-service-affinity) rechecks service custody after response decoding and logging", function()
+		for _, boundary in ipairs({ "decode", "log" }) do
+			with_owned_responses(function(_, fixture)
+				local result = fixture.request()
+				fixture.tags(1, { { name = "qwen2.5:7b" } })
+				if boundary == "decode" then
+					local decode = fixture.codec.decode
+					fixture.codec.decode = function(body)
+						fixture.codec.decode = decode
+						fixture.replace_service()
+						return decode(body)
+					end
+				else
+					local info = fixture.logger.info
+					fixture.logger.info = function(scope, text, ...)
+						if text:find("answer of the local server received", 1, true) then
+							fixture.logger.info = info
+							fixture.replace_service()
+						end
+						return info(scope, text, ...)
+					end
+				end
+				fixture.posts[1].done({ status = 200, body = '{"message":{"content":"old decoded answer"}}' })
+				helpers.assert_eq(#result.texts, 0)
+				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
+			end)
+		end
+	end)
+
+	helpers.it("(ollama-response-service-affinity) suppresses old error logging when decoding retires its service", function()
+		with_owned_responses(function(_, fixture)
+			local result = fixture.request()
+			fixture.tags(1, { { name = "qwen2.5:7b" } })
+			local decode = fixture.codec.decode
+			fixture.codec.decode = function(body)
+				fixture.codec.decode = decode
+				fixture.replace_service()
+				return decode(body)
+			end
+			fixture.posts[1].done({ status = 404, body = '{"error":"model qwen not found OLD-SOURCE-MARKER"}' })
+			for _, line in ipairs(fixture.logs) do
+				helpers.assert_true(not line.text:find("OLD-SOURCE-MARKER", 1, true), "old response diagnostics cannot describe the successor")
+			end
+			helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
+		end)
+	end)
+
+	helpers.it("(ollama-response-service-affinity) suppresses stale tags diagnostics after decoder or logger reentry", function()
+		for _, boundary in ipairs({ "decode", "log" }) do
+			with_owned_responses(function(api, fixture)
+				local result = fixture.request()
+				if boundary == "decode" then
+					local decode = fixture.codec.decode
+					fixture.codec.decode = function(body)
+						fixture.codec.decode = decode
+						fixture.replace_service()
+						return decode(body)
+					end
+				else
+					local log = fixture.logger.error
+					fixture.logger.error = function(scope, text, ...)
+						fixture.logger.error = log
+						fixture.replace_service()
+						return log(scope, text, ...)
+					end
+				end
+				fixture.gets[1].done({ status = 503, body = '{"error":"OLD-TAGS-MARKER"}' })
+				helpers.assert_eq(#fixture.posts, 0)
+				helpers.assert_eq(result.failures[1].reason, "model_list_unavailable")
+				helpers.assert_eq(api.local_model_installed("qwen2.5:7b"), nil)
+				if boundary == "decode" then
+					for _, line in ipairs(fixture.logs) do
+						helpers.assert_true(not line.text:find("OLD-TAGS-MARKER", 1, true))
+					end
+				end
+			end)
+		end
+	end)
+
+	helpers.it("(ollama-response-request-affinity) rechecks current request before HTTP failure diagnostics", function()
+		with_owned_responses(function(_, fixture)
+			local original = fixture.request()
+			fixture.tags(1, { { name = "qwen2.5:7b" } })
+			local successor
+			local decode = fixture.codec.decode
+			fixture.codec.decode = function(body)
+				fixture.codec.decode = decode
+				successor = fixture.request()
+				return decode(body)
+			end
+			fixture.posts[1].done({ status = 503, body = '{"error":"OBSOLETE-REQUEST-MARKER"}' })
+			helpers.assert_eq(#fixture.posts, 2)
+			helpers.assert_eq(original.failures[1].reason, "model_list_unavailable")
+			for _, line in ipairs(fixture.logs) do
+				helpers.assert_true(not line.text:find("OBSOLETE-REQUEST-MARKER", 1, true))
+			end
+			fixture.posts[2].done({ status = 200, body = '{"message":{"content":"current answer"}}' })
+			helpers.assert_eq(successor.texts, { "current answer" })
+		end)
+	end)
+
+	helpers.it("(ollama-response-request-affinity) fences reentrant same-service request replacement without borrowing inventory epoch", function()
+		with_owned_responses(function(_, fixture)
+			local original = fixture.request()
+			fixture.tags(1, { { name = "qwen2.5:7b" } })
+			local successor
+			local decode = fixture.codec.decode
+			fixture.codec.decode = function(body)
+				fixture.codec.decode = decode
+				successor = fixture.request()
+				return decode(body)
+			end
+			fixture.posts[1].done({ status = 200, body = '{"message":{"content":"old answer"}}' })
+			helpers.assert_eq(#fixture.posts, 2)
+			helpers.assert_eq(#original.texts, 0)
+			helpers.assert_eq(original.failures[1].reason, "model_list_unavailable")
+			fixture.posts[2].done({ status = 200, body = '{"message":{"content":"successor answer"}}' })
+			helpers.assert_eq(successor.texts, { "successor answer" })
+			helpers.assert_eq(#successor.failures, 0)
+		end)
+	end)
+
+	helpers.it("(local-model-service-consent) refuses same-origin daemon replacement during held model consent", function()
+		with_startup({}, function(api, fixture)
+			helpers.with_stub_scope({ "modules.llm.local_model_offer", "infra.dialog_util" }, function()
+				helpers.assert_true(api.ensure_running())
+				local original = fixture.tasks[1]
+				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+				local origin = api.get_base_url()
+				local installs, answered = 0, false
+				package.loaded["infra.i18n"].format = function(key) return key end
+				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, download)
+					if not answered then
+						answered = true
+						helpers.assert_eq(api.stop_owned_server(), false)
+						original.complete(0, original.frame("RETIRED 0"))
+						helpers.assert_true(api.ensure_running())
+						local successor = fixture.tasks[2]
+						successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
+					end
+					return download
+				end }
+				local offer = require("modules.llm.local_model_offer")
+				offer.set_installer(function() installs = installs + 1; return true end)
+				helpers.assert_eq(offer.offer("fixture-model"), false,
+					"unchanged URL and menu installer do not transfer consent to a successor daemon")
+				helpers.assert_eq(installs, 0)
+				helpers.assert_eq(api.get_base_url(), origin)
+				helpers.assert_eq(#fixture.tasks, 2)
+				helpers.assert_true(original.completed)
+				helpers.assert_true(fixture.tasks[2].running)
+				helpers.assert_true(offer.offer("fixture-model"), "fresh consent names the live successor")
+				helpers.assert_eq(installs, 1)
+			end)
+		end)
+	end)
+
+	helpers.it("(local-model-service-consent) retains accepted async consent and fences a replaced daemon's late result", function()
+		with_startup({}, function(api, fixture)
+			helpers.with_stub_scope({ "modules.llm.local_model_offer" }, function()
+				helpers.assert_true(api.ensure_running())
+				local original = fixture.tasks[1]
+				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+				local offer = require("modules.llm.local_model_offer")
+				local done, current, forgets
+				forgets = 0
+				api.forget_local_models = function() forgets = forgets + 1 end
+				offer.set_installer(function(_, callback, is_current)
+					done, current = callback, is_current
+					return true
+				end)
+				helpers.assert_true(offer.install("fixture-model"))
+				helpers.assert_eq(type(current), "function", "the actual installer receives the captured owner")
+				helpers.assert_true(current(), "modal return does not revoke an accepted asynchronous download")
+				helpers.assert_eq(api.stop_owned_server(), false)
+				helpers.assert_eq(current(), false, "retirement revokes the original consent before exit")
+				original.complete(0, original.frame("RETIRED 0"))
+				helpers.assert_true(api.ensure_running())
+				local successor = fixture.tasks[2]
+				successor.emit(successor.frame("ACTIVE") .. successor.frame("READY"))
+				helpers.assert_eq(current(), false, "a READY successor cannot revive the old owner")
+				done(true)
+				helpers.assert_eq(forgets, 0)
+				helpers.assert_true(offer.install("fixture-model"))
+				helpers.assert_true(current())
+				done(true)
+				helpers.assert_eq(forgets, 1)
+				helpers.assert_eq(current(), true, "terminal publication does not impersonate native retirement")
+			end)
+		end)
+	end)
+
 	helpers.it("(ollama-owned-retirement) closes only its published daemon and retains receipt debt", function()
 		with_startup({}, function(api, fixture)
 			helpers.assert_true(api.ensure_running())

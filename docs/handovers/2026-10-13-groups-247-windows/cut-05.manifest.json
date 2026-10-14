@@ -1,0 +1,21 @@
+{
+	"patch_sha256": "9b0720a9bda4d0038a185c32ece65582b3b5a48412c80f9e5f2e671303f17a97",
+	"files": [
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/local_model_offer.lua",
+			"before_sha256": "9176982dfed3001b2b9ae00f3f86b54d4b5fb6b8c8c6d4d879e77bf7e6d5ac89",
+			"after_sha256": "7deb554154747e3a0baddc91b215d4f2f9dcdca345f2dfb545be0ed11512f6af",
+			"original_test_lines_preserved": null
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/llm/test_api_ollama.lua",
+			"before_sha256": "f862005d9e7a4b38a8e2fd2dab7cb659c598ff0c29c49443dc8b372e246256cc",
+			"after_sha256": "1bdc139f670da3a8690cdd108d14c3bb44da4952eeeffa2041982bade62241d3",
+			"original_test_lines_preserved": true
+		}
+	],
+	"depends_on": [
+		"2138317eed8b3e2c953d42e4f245c5b31b379ba3f753a976168f25a300924c9b",
+		"b063128034898bde6cb6fd5515914c5a0f125e43e0f351adb90aee4e06439f3e"
+	]
+}

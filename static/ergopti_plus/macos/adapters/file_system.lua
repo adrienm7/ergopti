@@ -1705,13 +1705,14 @@ end
 --- Ownership derives from this invocation's acquired mutex/rename, never from
 --- finding equal bytes later. No native lock handle or mutable owner is exposed.
 local function private_publication_receipt(path, resolved, chain, expected, candidate,
-		published, lock, staging_owner, on_error, source_identity)
+		published, lock, staging_owner, on_error, source_identity, unchanged, prior_identity, prior_verified)
 	local source = published and { status = "ok", content = candidate }
 		or { status = expected.status, content = expected.content }
 	local owner = { path = path, resolved = resolved, chain = chain,
 		expected = { status = expected.status, content = expected.content },
-		candidate = candidate, source = source, published = published,
-		lock = lock, staging = staging_owner, on_error = on_error }
+		candidate = candidate, source = source, published = published, unchanged = unchanged == true,
+		lock = lock, staging = staging_owner, on_error = on_error,
+		source_identity = source_identity, prior_identity = prior_identity, prior_verified = prior_verified == true }
 	local methods = {}
 	local receipt = setmetatable({}, {
 		__index = methods,
@@ -1721,10 +1722,10 @@ local function private_publication_receipt(path, resolved, chain, expected, cand
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	function methods.matches_source()
 		if revalidate_write_path(path, resolved, chain) ~= true then return false end
-		if source.status == "ok" and revalidate_read_identity(source_identity, source.content) ~= true then return false end
+		if source.status == "ok" and revalidate_read_identity(owner.source_identity, source.content) ~= true then return false end
 		local content, status = M.read_with_status(path, on_error)
 		return status == source.status and (status ~= "ok" or content == source.content)
-			and (status ~= "ok" or revalidate_read_identity(source_identity, source.content) == true)
+			and (status ~= "ok" or revalidate_read_identity(owner.source_identity, source.content) == true)
 			and revalidate_write_path(path, resolved, chain) == true
 	end
 	function methods.is_settled()
@@ -1753,6 +1754,7 @@ local function private_publication_receipt(path, resolved, chain, expected, cand
 		end
 		return cleanup and released and receipt.is_settled()
 	end
+	owner.matches_source = methods.matches_source
 	_publication_receipt_owners[receipt] = owner
 	return receipt
 end
@@ -1771,8 +1773,64 @@ function M.publication_receipt_view(receipt, path, expected, candidate, on_error
 		or owner.path ~= path or owner.candidate ~= candidate or type(expected) ~= "table"
 		or owner.expected.status ~= expected.status
 		or (expected.status == "ok" and owner.expected.content ~= expected.content) then return nil end
-	return { published = owner.published,
+	local view = { published = owner.published,
 		source = { status = owner.source.status, content = owner.source.content } }
+	if owner.unchanged == true then view.unchanged = true end
+	return view
+end
+
+--- Continues an original receipt only through this issuer's exact rename inverse.
+--- Equal bytes or a newly inspected inode can never substitute for the native chain.
+--- @param previous table Original private publication capability.
+--- @param forward table Genuine successor whose locked preimage was previous's inode.
+--- @param inverse table Genuine inverse whose locked preimage was forward's inode.
+--- @return boolean linked Actual issuer lineage and current inverse remain verified.
+function M.publication_receipt_chain_restore(previous, forward, inverse)
+	local first = type(previous) == "table" and _publication_receipt_owners[previous]
+	local next_owner = type(forward) == "table" and _publication_receipt_owners[forward]
+	local restored = type(inverse) == "table" and _publication_receipt_owners[inverse]
+	if not first or not next_owner or not restored or first == next_owner
+		or first == restored or next_owner == restored or restored.chain_consumed
+		or first.chaining or next_owner.chaining or restored.chaining then return false end
+	local function identity(left, right)
+		return type(left) == "table" and type(right) == "table"
+			and left.path == right.path and left.dev == right.dev and left.ino == right.ino
+	end
+	local function settled(owner)
+		return owner.lock == nil and (owner.staging == nil or owner.staging.released == true)
+	end
+	local function verified()
+		return first.path == next_owner.path and first.path == restored.path
+			and first.resolved == next_owner.resolved and first.resolved == restored.resolved
+			and first.source.status == "ok" and next_owner.source.status == "ok"
+			and restored.source.status == "ok"
+			and next_owner.expected.status == "ok" and restored.expected.status == "ok"
+			and next_owner.expected.content == first.source.content
+			and restored.expected.content == next_owner.source.content
+			and restored.source.content == first.source.content
+			and (next_owner.published == true or next_owner.unchanged == true)
+			and (restored.published == true or restored.unchanged == true)
+			and next_owner.prior_verified == true and restored.prior_verified == true
+			and identity(next_owner.prior_identity, first.source_identity)
+			and identity(restored.prior_identity, next_owner.source_identity)
+			and settled(first) and settled(next_owner) and settled(restored)
+	end
+	if not verified() then return false end
+	first.chaining, next_owner.chaining, restored.chaining = true, true, true
+	local old_identity = first.source_identity
+	local called, linked = pcall(function()
+		if restored.matches_source() ~= true or not verified() then return false end
+		-- This identity was minted by the actual inverse writer under its lock.
+		-- No post-mutation lstat/caller metadata is used to renew the old owner.
+		first.source_identity = restored.source_identity
+		if first.matches_source() ~= true or restored.matches_source() ~= true
+			or not settled(first) or not settled(next_owner) or not settled(restored) then return false end
+		return true
+	end)
+	if not called or linked ~= true then first.source_identity = old_identity end
+	if called and linked == true then restored.chain_consumed = true end
+	first.chaining, next_owner.chaining, restored.chaining = nil, nil, nil
+	return called and linked == true
 end
 
 --- Writes content to a file atomically (temp file + rename), overwriting any
@@ -1816,7 +1874,8 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 	local payload_published = false
 	local write_lock = nil
 	local expected_metadata = nil
-	local source_identity = nil
+	local source_identity, prior_identity, prior_verified = nil, nil, false
+	local unchanged_acknowledged = false
 	local private = type(on_error) == "function" and type(expected_source) == "table"
 	local function capture_identity(attributes, source_path)
 		if type(attributes) ~= "table" or attributes.mode ~= "file"
@@ -1917,6 +1976,7 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 		end
 		if private and destination_attributes ~= nil then
 			source_identity = capture_identity(destination_attributes, resolved_path)
+			prior_identity = source_identity -- Original locked preimage, never reacquired after mutation.
 			if source_identity == nil then
 				report("publication", "error", "write(): private source identity is unavailable.")
 				return false, "private source identity is unavailable"
@@ -1943,6 +2003,13 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 				report("publication", "error", "write(): publication admission refused.")
 				return false, "publication admission refused"
 			end
+			if private and prior_identity ~= nil then
+				if revalidate_read_identity(prior_identity, expected_source.content) ~= true then
+					return false, "private unchanged preimage identity changed"
+				end
+				prior_verified = true
+			end
+			unchanged_acknowledged = private
 			return true
 		end
 
@@ -2074,6 +2141,13 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 			report("publication", "error", "write(): publication admission refused.")
 			return fail_after_cleanup("publication admission refusal", "publication admission refused")
 		end
+		if private and prior_identity ~= nil then
+			if expected_source.status ~= "ok"
+				or revalidate_read_identity(prior_identity, expected_source.content) ~= true then
+				return fail_after_cleanup("private preimage identity failure", "private preimage identity changed")
+			end
+			prior_verified = true
+		end
 		local rename_ok, rename_err = os.rename(tmp_path, resolved_path)
 		if not rename_ok then
 			local reason = tostring(rename_err or "rename failed")
@@ -2155,9 +2229,9 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 	if lock_released then write_lock = nil end
 	local receipt, retry_cleanup
 	if private then
-		if native_lock and (payload_published or not lock_released or native_staging ~= nil) then
+		if native_lock and (payload_published or unchanged_acknowledged or not lock_released or native_staging ~= nil) then
 			receipt = private_publication_receipt(path, resolved_path, symlink_chain, expected_source, content,
-				payload_published, not lock_released and native_lock or nil, native_staging, on_error, source_identity)
+				payload_published, not lock_released and native_lock or nil, native_staging, on_error, source_identity, unchanged_acknowledged, prior_identity, prior_verified)
 			-- The opaque receipt becomes the sole retry owner of this operation.
 			write_lock = nil
 		end
@@ -2387,6 +2461,8 @@ local configuration_reader, configuration_writer, configuration_publisher =
 	rawget(M, "read_with_status"), rawget(M, "write_if_unchanged"), rawget(M, "write_if_unchanged_admitted")
 local configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete =
 	rawget(M, "remove_if_unchanged"), rawget(M, "remove_if_unchanged_admitted"), rawget(M, "remove_exact"), rawget(M, "delete")
+local configuration_receipt_view = rawget(M, "publication_receipt_view")
+local configuration_chain_restore = rawget(M, "publication_receipt_chain_restore")
 
 --- Returns this initializer's actual native method identities without IO.
 --- Public export replacement cannot change these captured values. Consumers
@@ -2399,9 +2475,12 @@ local configuration_remover, configuration_admitted_remover, configuration_exact
 --- @return function|nil admitted_remover
 --- @return function|nil exact_remover
 --- @return function delete
+--- @return function receipt_view Original opaque native issuer viewer.
+--- @return function chain_restore Original exact rename-inverse lineage issuer.
 function M.configuration_ports()
 	return M, configuration_reader, configuration_writer, configuration_publisher,
-		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete
+		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete,
+		configuration_receipt_view, configuration_chain_restore
 end
 
 return M

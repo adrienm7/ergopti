@@ -874,12 +874,13 @@ function M.new(deps)
 	--- @param model string Ollama model name.
 	--- @param on_success function|nil Called once the model is pulled.
 	--- @param on_cancel function|nil Receives the reason of a failed or cancelled pull.
+	--- @param opts table|nil Existing pull freshness and ownership options.
 	--- @return boolean accepted
-	function obj.pull_ollama_model(model, on_success, on_cancel)
+	function obj.pull_ollama_model(model, on_success, on_cancel, opts)
 		if type(model) ~= "string" or model == "" then
 			error("models_manager.pull_ollama_model: a model name is required")
 		end
-		return ollama.pull_model(model, model, on_success, on_cancel) == true
+		return ollama.pull_model(model, model, on_success, on_cancel, opts) == true
 	end
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(target_model, on_success, on_cancel, opts)

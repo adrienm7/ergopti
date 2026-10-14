@@ -400,6 +400,10 @@ const THIRD_PARTY_SOURCES = new Map([
 	[
 		'LuaJIT/LuaJIT',
 		'build-linux-flatpak.sh: the Flatpak runtime ships no LuaJIT, so the manifest builds it from upstream'
+	],
+	[
+		'pqrs-org/Karabiner-Elements',
+		'remap_runtime_build.py: the owned runtime authenticates and builds the pinned Karabiner-Elements upstream source'
 	]
 ]);
 

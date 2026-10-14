@@ -191,23 +191,26 @@ end
 --- @param label string Human-readable catalogue name.
 --- @param on_done function|nil
 --- @param admission function|nil Current consent, rechecked after native UI creation and on every retry.
---- @return boolean
-function M.start(base_url, tag, label, on_done, admission)
+--- @param on_retired function|nil Exact cleanup notification after retained transport and UI retirement.
+--- @return boolean handled Existing menu focus remains a handled action.
+--- @return boolean|nil acquired True only for a newly dispatched owned pull.
+function M.start(base_url, tag, label, on_done, admission, on_retired)
 	if _active then
 		if _active.creating or _active.acquiring or _active.cancelled then return false end
-		if _active.tag == tag then return DownloadWindow.focus(_active.session_id) end
+		if _active.tag == tag then return DownloadWindow.focus(_active.session_id), false end
 		return false
 	end
 	if _retained and not settled(_retained) then return false end
 	if type(base_url) ~= "string" or base_url == "" or not valid_tag(tag)
-			or type(label) ~= "string" or label == "" then
+			or type(label) ~= "string" or label == ""
+			or (on_retired ~= nil and type(on_retired) ~= "function") then
 		return false
 	end
 	local request = {
 		base_url = base_url,
 		tag = tag,
 		label = label,
-		on_done = on_done,
+		on_done = on_done, on_retired = on_retired,
 		admission = admission,
 		pending = "",
 		remote_error = nil,
@@ -241,7 +244,8 @@ function M.start(base_url, tag, label, on_done, admission)
 		if _retained == request then _retained = nil end
 		return false
 	end
-	return dispatch(request)
+	local dispatched = dispatch(request)
+	return dispatched, dispatched == true
 end
 
 --- Cancels the exact owned curl process group.
@@ -301,6 +305,11 @@ function M.cancel(expected)
 	if _retry_request == request then _retry_request = nil end
 	if _retained == request then _retained = nil end
 	Logger.info(LOG, "Ollama model pull cancelled for '%s'.", request.tag)
+	if type(request.on_retired) == "function" and not request.retirement_notified then
+		request.retirement_notified = true
+		local called, err = pcall(request.on_retired)
+		if not called then Logger.error(LOG, "Model-download retirement callback raised: %s", tostring(err)) end
+	end
 	return _active == nil and _retained == nil and _retry_request == nil
 end
 

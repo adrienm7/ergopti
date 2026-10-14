@@ -396,7 +396,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_test.py', 14]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 45]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_reader_test.py', 13]);
-	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 10]);
+	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 11]);
 	// Preserve the original 37 controls and add seven atomic-result receiving laws.
 	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 45]);
 } else {

@@ -128,7 +128,24 @@
 			"TestListenerEventMissingSessionCannotAcquireUnixConnection",
 			"TestListenerEventForeignGuardianCannotReceiveAnyFrame",
 			"TestListenerEventUnexpectedGuardianByteCannotPermitServe",
-			"TestListenerEventRepeatedPublicationCannotCreateSuccessor"
+			"TestListenerEventRepeatedPublicationCannotCreateSuccessor",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_policy_load",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_selection_bound",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_lookup",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_dictionary",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_route_empty",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_certificate_load",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_lookup_deadline",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_dispatch_deadline",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_session_terminal",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/0",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/1",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/2",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/3",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/4",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/5",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/6",
+			"TestFailureStageMetadataRefusesAmbiguousAndSuccessfulWire/7"
 		]
 	}
 }

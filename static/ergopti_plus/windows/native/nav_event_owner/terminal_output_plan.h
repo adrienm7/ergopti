@@ -17,6 +17,9 @@
 #define ERGOPTI_OUTPUT_MAX_UNITS (ERGOPTI_OUTPUT_MAX_UTF16 * 2u)
 #define ERGOPTI_OUTPUT_STATE_INIT {0}
 
+/* One marker owner shared by raw replay and retained output serialization. */
+#define ERGOPTI_NAV_TERMINAL_REPLAY_MARKER 0x4552475054524D31ull
+
 enum ErgoptiOutput_Status {
 	ERGOPTI_OUTPUT_OK = 0,
 	ERGOPTI_OUTPUT_DIAGNOSTIC = 1,
@@ -80,8 +83,10 @@ int32_t ErgoptiOutput_Initialize(ErgoptiOutput_State *state, uint64_t owner);
  * or cancelled sequence cannot be reused. Empty text and literal U+0000 are
  * valid; unpaired surrogates are rejected. Character UP plans zero units and
  * still requires explicit original-edge consumption. Natural modifiers use
- * PrepareNativeEdge; remapped modifiers/prefix/dead/uncertain metadata are
- * diagnostic only. This API never computes or guesses the canonical string.
+ * PrepareNativeEdge only when their source-owned effective bit changes. A
+ * repeated or crossed-source modifier edge with no effective transition plans
+ * zero units and still requires original-edge consumption. Remapped modifiers,
+ * prefix/dead/uncertain metadata are diagnostic only. This API never computes or guesses the canonical string.
  */
 int32_t ErgoptiOutput_Plan(
 	ErgoptiOutput_State *state, uint64_t owner, uint64_t token, uint64_t sequence,
@@ -111,6 +116,48 @@ int32_t ErgoptiOutput_BeginAttempt(
 	ErgoptiOutput_State *state, uint64_t owner, const ErgoptiOutput_Key *key,
 	ErgoptiOutput_Unit *units, uint32_t capacity, uint32_t *count,
 	uint64_t *attempt_id);
+
+/**
+ * Fixed x64/ARM64 Win32 INPUT representation, never a pointer into retained custody.
+ * Reserved bytes cover alignment and the unused MOUSEINPUT union tail. The
+ * Windows receiving build must additionally pin this against its SDK INPUT.
+ */
+typedef struct ErgoptiOutput_Win32Input {
+	uint32_t type;
+	uint32_t reserved0;
+	uint16_t vk;
+	uint16_t scan;
+	uint32_t flags;
+	uint32_t time;
+	uint32_t reserved1;
+	uint64_t extra_info;
+	uint64_t reserved2;
+} ErgoptiOutput_Win32Input;
+
+_Static_assert(sizeof(ErgoptiOutput_Win32Input) == 40, "Win32 INPUT size changed.");
+_Static_assert(offsetof(ErgoptiOutput_Win32Input, vk) == 8, "Win32 VK offset changed.");
+_Static_assert(offsetof(ErgoptiOutput_Win32Input, scan) == 10, "Win32 scan offset changed.");
+_Static_assert(offsetof(ErgoptiOutput_Win32Input, flags) == 12, "Win32 flags offset changed.");
+_Static_assert(offsetof(ErgoptiOutput_Win32Input, time) == 16, "Win32 time offset changed.");
+_Static_assert(offsetof(ErgoptiOutput_Win32Input, extra_info) == 24, "Win32 marker offset changed.");
+
+/**
+ * Serializes an existing immutable attempt without starting, sending, accepting
+ * or retiring it. Exactly one retained unit maps to one x64/ARM64 INPUT packet, so an
+ * eventual exact native accepted-prefix count can use Acknowledge unchanged.
+ * A suffix may begin with a stranded Unicode UP or low surrogate; never compose
+ * or discard it. No repeat expansion, surrogate aggregation or extra edges occur.
+ * Uses the existing native owner replay marker; callers cannot supply a foreign
+ * marker or send-level admission grant. Only x64/ARM64 pointer layouts qualify
+ * for construction; other host architectures refuse. This helper never emits.
+ * Capacity is at most MAX_UNITS. Refusal changes neither outputs nor state;
+ * outputs must not alias custody, the key, or each other. Concurrent access must
+ * be serialized by the same native owner that protects Plan/Begin/Acknowledge.
+ */
+int32_t ErgoptiOutput_SerializeAttempt(
+	const ErgoptiOutput_State *state, uint64_t owner, const ErgoptiOutput_Key *key,
+	uint64_t attempt_id, ErgoptiOutput_Win32Input *packets,
+	uint32_t capacity, uint32_t *count);
 
 /**
  * Commits only an exact accepted prefix. Zero acceptance closes the attempt

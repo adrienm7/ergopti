@@ -241,6 +241,7 @@ class _G4B_Runtime {
 		this.Starts := 0
 		this.Stops := 0
 		this.LiveIdentity := true
+		this.Generation := 1
 		this.Record := Map("ready_image_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	}
 	Start(Target, Authority, Ready, Exit) {
@@ -722,11 +723,12 @@ _G4B_RequestOrigin(State) {
 		AssertEqual(_LLM_Menu_EnableSnapshot()["origin"], "http://127.0.0.1:23456")
 		Owner := _LLM_OllamaAuxOwner(0, "g4_managed_consumer")
 		AssertEqual(Owner["endpoint"], "http://127.0.0.1:23456", "Post-enable auxiliary consumers capture the admitted listener.")
-		AssertTrue(_LLM_Ollama_PresenceStillCurrent(Map("presence_admitted", true,
+		Custody := LLM_OllamaCaptureOriginCustody()
+		AssertTrue(_LLM_Ollama_PresenceStillCurrent(Map("origin_custody", Custody, "presence_admitted", true,
 			"presence_generation", LLM_AuxGeneration(), "base_url", "http://127.0.0.1:23456")))
-		AssertFalse(_LLM_Ollama_PresenceStillCurrent(Map("presence_admitted", true,
+		AssertFalse(_LLM_Ollama_PresenceStillCurrent(Map("origin_custody", Custody, "presence_admitted", true,
 			"presence_generation", LLM_AuxGeneration(), "base_url", LLM_OLLAMA_BASE_URL)))
-		Handle := { Origin: "http://127.0.0.1:23456", OriginGeneration: LLM_AuxGeneration(), OriginOwned: true }
+		Handle := { Origin: "http://127.0.0.1:23456", OriginCustody: Custody, OriginGeneration: LLM_AuxGeneration(), OriginOwned: true }
 		AssertTrue(_LLM_Ollama_StreamOriginCurrent(Handle), "Actual streaming dispatch retains its admitted listener.")
 		F.CurrentValue := false
 		AssertFalse(_LLM_Ollama_StreamOriginCurrent(Handle))
@@ -1000,3 +1002,352 @@ Test("managed bootstrap: initial native factory throw still notifies failure (gr
 Test("managed bootstrap: initial native start false still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_false", true, true))
 Test("managed bootstrap: initial native start throw still notifies failure (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_throw", true, true))
 Test("managed bootstrap: READY reentrant cancellation retains native failure custody (groups247-native-dispatch)", (*) => _G4B_NativeDispatchFailure("start_withdraw"))
+
+
+; These cases exercise production callbacks with injected OS ports. They are
+; authored for pinned AutoHotkey 2.0.26 and are UNRUN in the Linux container.
+class _G4B_OfferFixture extends _G4B_Fixture {
+	__New(Mode := "stable") {
+		super.__New()
+		global _LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking
+		this.OfferSaved := [_LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking]
+		_LLM_ManagedBootstrap := 0
+		_LLM_LocalModelNotified := Map()
+		_LLM_LocalModelAsking := false
+		this.Mode := Mode
+		this.ConfirmAck := true
+		this.NotifyAck := true
+		this.Confirms := 0
+		this.Notices := 0
+		this.Downloads := 0
+		this.Done := 0
+		this.Published := 0
+		this.Start()
+		this.Runtime.PublishReady()
+		this.Model := "qwen3:0.6b"
+		this.Flow.Port["pull"] := ObjBindMethod(this, "HoldPull")
+		_LLM_ManagedBootstrap := this.Flow
+		this.OfferPort := Map("confirm", ObjBindMethod(this, "OfferConfirm"), "notify", ObjBindMethod(this, "OfferNotify"))
+		_LLM_LocalModelOfferPort := this.OfferPort
+		this.Failure := LLM_LocalModelFailure(this.Model, LLM_OllamaRequestOrigin())
+	}
+	ChangeSource() {
+		global _LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, LLM_OLLAMA_BASE_URL
+		switch this.Mode {
+			case "endpoint": LLM_OLLAMA_BASE_URL := "http://localhost:23457"
+			case "flow": _LLM_ManagedBootstrap := this.Flow.Clone()
+			case "port": _LLM_LocalModelOfferPort := this.OfferPort.Clone()
+			case "installer": this.OfferPort["install"] := (*) => this.Downloads += 1
+			case "failure": this.Failure["base_url"] := "http://localhost:23457", this.Failure["model"] := "foreign:latest"
+			case "cancel": this.Flow.Cancel()
+			case "throw": throw Error("Injected modal refusal.")
+		}
+	}
+	OfferConfirm(*) {
+		this.Confirms += 1
+		this.ChangeSource()
+		return this.ConfirmAck
+	}
+	OfferNotify(*) {
+		this.Notices += 1
+		this.ChangeSource()
+		return this.NotifyAck
+	}
+	HoldPull(Target, Model, Done) {
+		this.Pulls += 1
+		AssertEqual("http://127.0.0.1:23456", Target["origin"], "Dispatch uses the original managed listener, not configured localhost.")
+		AssertEqual(this.Model, Model, "The callback cannot replace the consented model through Failure mutation.")
+		this.Done := Done
+		return true
+	}
+	OfferClose() {
+		global _LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking
+		try this.Close()
+		finally {
+			_LLM_ManagedBootstrap := this.OfferSaved[1]
+			_LLM_LocalModelOfferPort := this.OfferSaved[2]
+			_LLM_LocalModelNotified := this.OfferSaved[3]
+			_LLM_LocalModelAsking := this.OfferSaved[4]
+		}
+	}
+}
+
+_G4B_OfferModal(Mode, ExpectedPulls, Ack := true) {
+	F := _G4B_OfferFixture(Mode)
+	global _LLM_LocalModelAsking
+	try {
+		F.ConfirmAck := Ack
+		BeforeConsents := F.Consents.Length
+		AssertTrue(LLM_LocalModelOffer(F.Failure), "A missing-model failure remains handled even when consent is stale.")
+		AssertEqual(1, F.Confirms)
+		AssertEqual(ExpectedPulls, F.Pulls)
+		AssertEqual(0, F.Downloads, "A callback-installed replacement installer is never dispatched.")
+		AssertFalse(_LLM_LocalModelAsking, "Every acceptance, refusal and thrown modal restores the asking guard.")
+		AssertEqual(BeforeConsents + ExpectedPulls, F.Consents.Length, "Managed model consent remains separate from offer consent.")
+		AssertEqual(0, F.FailedCalls, "A retired offer does not replay the bootstrap observer.")
+	} finally F.OfferClose()
+}
+
+_G4B_OfferSecondConsent(Mode) {
+	F := _G4B_OfferFixture(Mode)
+	try {
+		F.OfferPort["confirm"] := (*) => true
+		F.Flow.Port["consent"] := (*) => (F.ChangeSource(), true)
+		AssertTrue(LLM_LocalModelOffer(F.Failure))
+		AssertEqual(0, F.Pulls, "Withdrawal during the second model consent forbids dispatch.")
+		AssertFalse(F.Flow.MenuPull is Map, "Only the exact unsent operation retires logically.")
+		AssertEqual(0, F.FailedCalls)
+		if Mode != "cancel" {
+			AssertTrue(F.Runtime.HasOwner(), "Offer withdrawal alone does not kill the original READY runtime.")
+			AssertTrue(F.Flow.Ready)
+		}
+	} finally F.OfferClose()
+}
+
+_G4B_OfferNotification(Mode, Ack, ExpectedCount) {
+	F := _G4B_OfferFixture(Mode)
+	global _LLM_LocalModelNotified
+	try {
+		F.NotifyAck := Ack
+		AssertTrue(LLM_LocalModelOffer(F.Failure, true))
+		AssertEqual(1, F.Notices)
+		AssertEqual(ExpectedCount, _LLM_LocalModelNotified.Count, "Only exact typed acknowledgement for the original source stamps the notice.")
+		AssertEqual(0, F.Confirms, "A native notice has no invented TrayTip click consent.")
+		AssertEqual(0, F.Pulls)
+		if ExpectedCount {
+			AssertTrue(LLM_LocalModelOffer(LLM_LocalModelFailure("QWEN3:0.6b", F.Failure["base_url"]), true))
+			AssertEqual(1, F.Notices, "Model normalization still deduplicates notices at the same origin.")
+		}
+	} finally F.OfferClose()
+}
+
+_G4B_OfferCompletion(Mode) {
+	F := _G4B_OfferFixture("stable")
+	try {
+		Receipt := _LLM_LocalModelOfferCapture(F.Failure, 0)
+		AssertTrue(Receipt is Map)
+		AssertTrue(F.Flow.PullModel(F.Model, (*) => F.Published += 1, _LLM_LocalModelOfferCurrent.Bind(Receipt)))
+		F.Mode := Mode
+		if Mode != "stable"
+			F.ChangeSource()
+		F.Done.Call(0)
+		AssertEqual(Mode == "stable" ? 1 : 0, F.Published, "Late completion cannot publish for a successor source.")
+		AssertFalse(F.Flow.MenuPull is Map)
+		AssertEqual(0, F.FailedCalls)
+		AssertEqual(Mode == "cancel" ? 1 : 0, F.Runtime.Stops, "Only actual cancellation retires the held runtime.")
+		CallbackRuns := 0
+		_LLM_LocalModelOfferPublished(Receipt, (*) => CallbackRuns += 1)
+		AssertEqual(Mode == "stable" ? 1 : 0, CallbackRuns, "The delayed rebuild callback independently rechecks the original source.")
+	} finally F.OfferClose()
+}
+
+_G4B_OfferExternal() {
+	F := _G4B_OfferFixture("stable")
+	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
+	try {
+		_LLM_ManagedBootstrap := 0
+		F.Failure := LLM_LocalModelFailure(F.Model, LLM_OLLAMA_BASE_URL)
+		F.OfferPort["install"] := (Origin, Model) => (AssertEqual(LLM_OLLAMA_BASE_URL, Origin), AssertEqual(F.Model, Model), F.Downloads += 1, true)
+		AssertTrue(LLM_LocalModelOffer(F.Failure))
+		AssertEqual(1, F.Downloads)
+		AssertEqual(0, F.Pulls, "Configured external sources keep their captured command owner.")
+		AssertTrue(F.Runtime.HasOwner(), "The offer never stops an unrelated managed runtime.")
+		Receipt := _LLM_LocalModelOfferCapture(F.Failure, 0)
+		LLM_OLLAMA_BASE_URL := "http://localhost:23457"
+		AssertFalse(_LLM_LocalModelOfferSchedule(Receipt, (*) => F.Published += 1, -1))
+		AssertEqual(0, F.Published, "A stale external rebuild is rejected before scheduling.")
+	} finally F.OfferClose()
+}
+
+Test("managed model offer: modal stable retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 1))
+Test("managed model offer: modal failure retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("failure", 1))
+Test("managed model offer: modal endpoint retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("endpoint", 0))
+Test("managed model offer: modal flow retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("flow", 0))
+Test("managed model offer: modal port retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("port", 0))
+Test("managed model offer: modal installer retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("installer", 0))
+Test("managed model offer: modal cancel retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("cancel", 0))
+Test("managed model offer: modal throw retains source (groups247-offer-affinity)", _G4B_OfferModal.Bind("throw", 0))
+Test("managed model offer: refused consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, false))
+Test("managed model offer: string consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, "true"))
+Test("managed model offer: numeric-string consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, "1"))
+Test("managed model offer: float consent refuses dispatch (groups247-offer-affinity)", _G4B_OfferModal.Bind("stable", 0, 1.0))
+Test("managed model offer: second consent flow cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("flow"))
+Test("managed model offer: second consent endpoint cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("endpoint"))
+Test("managed model offer: second consent port cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("port"))
+Test("managed model offer: second consent cancel cannot borrow successor (groups247-offer-affinity)", _G4B_OfferSecondConsent.Bind("cancel"))
+Test("managed model offer: notice stable true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", true, 1))
+Test("managed model offer: notice stable false has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", false, 0))
+Test("managed model offer: notice stable string1string has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", "1", 0))
+Test("managed model offer: notice stable 1.0 has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("stable", 1.0, 0))
+Test("managed model offer: notice flow true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("flow", true, 0))
+Test("managed model offer: notice endpoint true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("endpoint", true, 0))
+Test("managed model offer: notice port true has exact source ACK (groups247-offer-affinity)", _G4B_OfferNotification.Bind("port", true, 0))
+Test("managed model offer: completion stable preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("stable"))
+Test("managed model offer: completion flow preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("flow"))
+Test("managed model offer: completion endpoint preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("endpoint"))
+Test("managed model offer: completion port preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("port"))
+Test("managed model offer: completion cancel preserves successor cache (groups247-offer-affinity)", _G4B_OfferCompletion.Bind("cancel"))
+Test("managed model offer: external source and delayed rebuild remain fenced (groups247-offer-affinity)", _G4B_OfferExternal)
+
+
+_G4B_OfferGenerationABA() {
+	F := _G4B_OfferFixture("stable")
+	global LLM_OLLAMA_BASE_URL, _LLM_AuxGeneration
+	SavedGeneration := _LLM_AuxGeneration
+	Confirm(*) {
+		global LLM_OLLAMA_BASE_URL, _LLM_AuxGeneration
+		LLM_OLLAMA_BASE_URL := "http://localhost:23457"
+		_LLM_AuxGeneration += 1
+		LLM_OLLAMA_BASE_URL := "http://localhost:23456"
+		return true
+	}
+	try {
+		F.OfferPort["confirm"] := Confirm
+		AssertTrue(LLM_LocalModelOffer(F.Failure))
+		AssertEqual(0, F.Pulls, "Restoring equal endpoint bytes cannot restore the old consent generation.")
+		AssertTrue(F.Runtime.HasOwner())
+	} finally {
+		_LLM_AuxGeneration := SavedGeneration
+		F.OfferClose()
+	}
+}
+
+_G4B_OfferCurrentAck(Ack) {
+	F := _G4B_OfferFixture("stable")
+	State := Map("ack", true)
+	Current() {
+		if State["ack"] == "throw"
+			throw Error("Injected source-current callback failure.")
+		return State["ack"]
+	}
+	try {
+		F.OfferPort["confirm"] := (*) => (State["ack"] := Ack, true)
+		AssertTrue(LLM_LocalModelOffer(F.Failure, false, Current))
+		AssertEqual(0, F.Pulls, "An untyped, refused or thrown source acknowledgement cannot renew consent.")
+		AssertEqual(0, F.FailedCalls)
+	} finally F.OfferClose()
+}
+
+_G4B_OfferNoticeOrigins() {
+	F := _G4B_OfferFixture("stable")
+	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL, _LLM_LocalModelNotified
+	try {
+		_LLM_ManagedBootstrap := 0
+		AssertTrue(LLM_LocalModelOffer(LLM_LocalModelFailure(F.Model, LLM_OLLAMA_BASE_URL), true))
+		LLM_OLLAMA_BASE_URL := "http://localhost:23457"
+		AssertTrue(LLM_LocalModelOffer(LLM_LocalModelFailure(F.Model, LLM_OLLAMA_BASE_URL), true))
+		AssertEqual(2, F.Notices, "The same missing model on another origin receives its own notice.")
+		AssertEqual(2, _LLM_LocalModelNotified.Count)
+		AssertEqual(0, F.Pulls)
+	} finally F.OfferClose()
+}
+Test("managed model offer: endpoint ABA cannot reuse consent generation (groups247-offer-affinity)", _G4B_OfferGenerationABA)
+Test("managed model offer: false current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind(false))
+Test("managed model offer: string current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind("1"))
+Test("managed model offer: float current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind(1.0))
+Test("managed model offer: thrown current ACK forbids dispatch (groups247-offer-affinity)", _G4B_OfferCurrentAck.Bind("throw"))
+Test("managed model offer: notice dedupe includes original origin (groups247-offer-affinity)", _G4B_OfferNoticeOrigins)
+
+
+/** Runs the real origin API over explicit managed runtime fixture capabilities. */
+_G4O_WithManaged(Body) {
+	_LEA_WithFixture(Run)
+	Run(State) {
+		global _LLM_ManagedBootstrap
+		Saved := _LLM_ManagedBootstrap
+		F := _G4B_Fixture()
+		try {
+			F.Start(), F.Runtime.PublishReady()
+			_LLM_ManagedBootstrap := F.Flow
+			Body.Call(F)
+		} finally {
+			F.Close()
+			_LLM_ManagedBootstrap := Saved
+		}
+	}
+}
+
+_G4O_Replacement(Mode, F) {
+	global _LLM_ManagedBootstrap, _LLM_AuxGeneration
+	Other := _G4B_Fixture(), Generation := _LLM_AuxGeneration
+	try {
+		Custody := LLM_OllamaCaptureOriginCustody()
+		Origin := Custody.Call("origin")
+		AssertTrue(LLM_OllamaOriginCustodyCurrent(Custody, Origin))
+		switch Mode {
+			case "flow":
+				AssertTrue(F.Flow.Cancel())
+				Other.Start(), Other.Runtime.PublishReady()
+				_LLM_ManagedBootstrap := Other.Flow
+				AssertEqual(Origin, LLM_OllamaRequestOrigin(), "Replacement deliberately keeps the exact URL.")
+			case "record": F.Runtime.Record := F.Runtime.Record.Clone()
+			case "target": F.Flow.Target := F.Flow.Target.Clone()
+			case "ticket": F.Flow.Target["runtime_ticket"] := "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+			case "generation": F.Runtime.Generation += 1
+			case "task": F.Runtime.Record["task"] := {}
+			case "retired": AssertTrue(F.Flow.Cancel())
+			case "aux": _LLM_AuxGeneration += 1
+		}
+		AssertFalse(LLM_OllamaOriginCustodyCurrent(Custody, Origin), "Old currency never borrows a successor owner or tuple.")
+	} finally {
+		Other.Close()
+		_LLM_AuxGeneration := Generation
+	}
+}
+for _G4O_Mode in ["flow", "record", "target", "ticket", "generation", "task", "retired", "aux"]
+	Test("Ollama managed origin: exact replacement " . _G4O_Mode . " (managed-origin-custody)",
+		_G4O_WithManaged.Bind(_G4O_Replacement.Bind(_G4O_Mode)))
+
+_G4O_BeforeReader(F) {
+	global _LLM_ManagedBootstrap
+	Other := _G4B_Fixture(), Origin := F.Flow.Target["origin"]
+	try {
+		AssertThrows(() => LLM_OllamaCaptureOriginCustody(Read), "Capture precedes a reentrant origin reader.")
+	} finally Other.Close()
+	Read() {
+		AssertTrue(F.Flow.Cancel())
+		Other.Start(), Other.Runtime.PublishReady()
+		_LLM_ManagedBootstrap := Other.Flow
+		return Origin
+	}
+}
+Test("Ollama managed origin: captures before foreign origin reader (managed-origin-custody)",
+	_G4O_WithManaged.Bind(_G4O_BeforeReader))
+
+_G4O_UnrelatedInventory(F) {
+	Custody := LLM_OllamaCaptureOriginCustody(), Origin := Custody.Call("origin")
+	Other := LLM_AuxBegin("unrelated_inventory", Map("endpoint", Origin))
+	Owner := _LLM_OllamaAuxOwner(0, "ordinary_tags")
+	try {
+		AssertTrue(LLM_OllamaOriginCustodyCurrent(Custody, Origin), "Inventory does not replace the managed daemon.")
+		AssertTrue(Owner.Has("origin_custody"), "The auxiliary owner retains its admitted lexical capability.")
+		AssertTrue(LLM_OllamaProbeOriginCurrent(Owner, Origin))
+	} finally {
+		LLM_AuxFinish(Owner)
+		LLM_AuxFinish(Other)
+	}
+}
+Test("Ollama managed origin: unrelated inventory keeps currency (managed-origin-custody)",
+	_G4O_WithManaged.Bind(_G4O_UnrelatedInventory))
+
+_G4O_Delivery(Kind, F) {
+	global _LLM_ManagedBootstrap
+	Other := _G4B_Fixture(), Calls := 0
+	Custody := LLM_OllamaCaptureOriginCustody(), Origin := Custody.Call("origin")
+	Delivery := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, Observe, Kind)
+	try {
+		Delivery.Call("original")
+		AssertEqual(1, Calls)
+		AssertTrue(F.Flow.Cancel())
+		Other.Start(), Other.Runtime.PublishReady()
+		_LLM_ManagedBootstrap := Other.Flow
+		Delivery.Call("late")
+		AssertEqual(1, Calls, "A held native delivery cannot cross a same-origin replacement.")
+	} finally Other.Close()
+	Observe(*) {
+		Calls += 1
+	}
+}
+for _G4O_Kind in ["on_result", "on_partial", "on_success", "on_fail"]
+	Test("Ollama managed origin: retained " . _G4O_Kind . " delivery (managed-origin-custody)",
+		_G4O_WithManaged.Bind(_G4O_Delivery.Bind(_G4O_Kind)))

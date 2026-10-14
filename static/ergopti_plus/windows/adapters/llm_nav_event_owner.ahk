@@ -78,6 +78,9 @@ global _LLM_NavEventOwnerTerminalRouteGeneration := 0
 global _LLM_NavEventOwnerTerminalRouteNextRecipe := 0
 global _LLM_NavEventOwnerTerminalRouteNextLayout := 1
 global _LLM_NavEventOwnerTerminalRouteRefreshing := false
+; An uncertain native registration retains its original candidate and owner.
+; No current-registration readback/settlement contract exists yet.
+global _LLM_NavEventOwnerTerminalRouteUnknown := 0
 global _LLM_NavEventOwnerTerminalRouteRecipes := Map()
 global _LLM_NavEventOwnerTerminalRouteModels := Map()
 global _LLM_NavEventOwnerTerminalRouteCoverage := Map(
@@ -308,149 +311,197 @@ _LLM_NavEventOwnerRollbackStart(StartTicket, FailureDetail,
 	return false
 }
 
-LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
-		ForceLifecycleReset := false) {
+LLM_NavEventOwner_Stop(PreserveResumeIntent := false, ForceLifecycleReset := false) {
 	global _LLM_NavEventOwnerProfileFailures
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
 	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartCancelled
-	global _LLM_NavEventOwnerStartRollbackPending
-	global _LLM_NavEventOwnerActiveStartTicket
+	global _LLM_NavEventOwnerStartRollbackPending, _LLM_NavEventOwnerActiveStartTicket
 	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
-	global _LLM_NavEventOwnerRuntimeEpoch
-	global _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteUnknown
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerPort
 	global _LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn
 	global _LLM_NavEventOwnerServiceFn, _LLM_NavEventOwnerServiceArmed
-	global _LLM_NavEventOwnerRecords
-	global _LLM_NavEventOwnerProfileOwners
-	global _LLM_NavEventOwnerActiveProfileToken
-	global _LLM_NavEventOwnerProfileEffectActive
-	global _LLM_NavEventOwnerShutdownFenced
-	global _LLM_NavEventOwnerClaimedReceipt
-	global _LLM_NavEventOwnerPendingRepaints
-	global _LLM_NavEventOwnerRepaintFailures
+	global _LLM_NavEventOwnerRecords, _LLM_NavEventOwnerProfileOwners
+	global _LLM_NavEventOwnerActiveProfileToken, _LLM_NavEventOwnerProfileEffectActive
+	global _LLM_NavEventOwnerShutdownFenced, _LLM_NavEventOwnerClaimedReceipt
+	global _LLM_NavEventOwnerPendingRepaints, _LLM_NavEventOwnerRepaintFailures
 	global _LLM_NavEventOwnerPreparedPlans, _LLM_NavEventOwnerCommittedPlan
-	global _LLM_NavEventOwnerLifecycleResumePlan
-	global _LLM_NavEventOwnerLifecycleResumePort
-	global _LLM_NavEventOwnerLifecycleQuiesced
-	global _LLM_NavEventOwnerModule
+	global _LLM_NavEventOwnerLifecycleResumePlan, _LLM_NavEventOwnerLifecycleResumePort
+	global _LLM_NavEventOwnerLifecycleQuiesced, _LLM_NavEventOwnerModule
 	global _LLM_NavEventOwnerLastQuarantineStopAttemptTick
-	PreserveLifecycle := false
-	PreviousCritical := Critical("On")
-	try {
-		if _LLM_NavEventOwnerStarting {
-			_LLM_NavEventOwnerStartCancelled := true
-			return false
-		}
-		if _LLM_NavEventOwnerStopping
-			return false
-		_LLM_NavEventOwnerStopping := true
-		WasPending := _LLM_NavEventOwnerStopPending
-		PreserveLifecycle := !ForceLifecycleReset
-			&& (PreserveResumeIntent
-				|| _LLM_NavEventOwnerLifecycleQuiesced)
-		if PreserveLifecycle
-				&& !(_LLM_NavEventOwnerLifecycleResumePlan is Array)
-				&& _LLM_NavEventOwnerCommittedPlan is Array {
-			_LLM_NavEventOwnerLifecycleResumePlan :=
-				_LLM_NavEventOwnerCommittedPlan
-			_LLM_NavEventOwnerLifecycleResumePort :=
-				_LLM_NavEventOwnerPort
-		}
-		ShouldStop := _LLM_NavEventOwnerStarted
-			|| (_LLM_NavEventOwnerPort is Map)
-			|| _LLM_NavEventOwnerModule != 0
-	} finally Critical(PreviousCritical)
-	StopResult := 1
-	StopFailure := ""
-	if ShouldStop {
-		try StopResult := _LLM_NavEventOwnerCall("stop",
-			_LLM_NavEventOwnerNativeStop)
-		catch as Err {
-			StopResult := 0
-			StopFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
-		}
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	static OriginalNativeStop := _LLM_NavEventOwnerNativeStop
+	StopScope := 0, PreserveLifecycle := false, AdmissionFailure := ""
+
+	GuardScope() {
+		if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+				|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			throw Error("The original native stop constructor was withdrawn.")
+		if !OriginalLoader.Call("owns_scope", StopScope)
+			throw Error("The native stop scope was not genuinely issued.")
 	}
-	Stopped := ((StopResult is Integer) && StopResult == 1)
-		|| (StopResult is Map && StopResult.Get("stopped", false) == true)
-	StopPending := StopResult is Map
-		&& StopResult.Get("pending", false) == true
-		&& StopResult.Get("stopped", false) != true
-	if StopPending {
-		; The stop signal is committed and native dispatch is draining fail-open.
-		; Keep wake/service/records connected until a later nonblocking retry joins
-		; the thread; publishing Started here would certify a runtime which can no
-		; longer accept new ownership.
+
+	try {
 		PreviousCritical := Critical("On")
 		try {
-			_LLM_NavEventOwnerStarted := false
-			_LLM_NavEventOwnerQuarantined := true
-			_LLM_NavEventOwnerStopPending := true
-			_LLM_NavEventOwnerStopping := false
+			if _LLM_NavEventOwnerStarting {
+				_LLM_NavEventOwnerStartCancelled := true
+				return false
+			}
+			if _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerTerminalRouteRefreshing
+				return false
+			_LLM_NavEventOwnerStopping := true
+			try {
+				if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+						|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+					throw Error("The original native stop constructor was withdrawn.")
+				RetirementFrame := _LLM_NavEventOwnerTerminalRouteUnknown
+				StopScope := OriginalLoader.Call("begin_stop", RetirementFrame)
+				GuardScope()
+				WasPending := _LLM_NavEventOwnerStopPending
+				PreserveLifecycle := !ForceLifecycleReset
+					&& (PreserveResumeIntent || _LLM_NavEventOwnerLifecycleQuiesced)
+				if PreserveLifecycle && !(_LLM_NavEventOwnerLifecycleResumePlan is Array)
+						&& _LLM_NavEventOwnerCommittedPlan is Array {
+					_LLM_NavEventOwnerLifecycleResumePlan := _LLM_NavEventOwnerCommittedPlan
+					_LLM_NavEventOwnerLifecycleResumePort := _LLM_NavEventOwnerPort
+				}
+				ShouldStop := _LLM_NavEventOwnerStarted || (_LLM_NavEventOwnerPort is Map)
+					|| _LLM_NavEventOwnerModule != 0
+			} catch as Err {
+				_LLM_NavEventOwnerStopping := false
+				AdmissionFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
+			}
 		} finally Critical(PreviousCritical)
-		if !WasPending
-			try LoggerDebug("LLM.nav", "stage=native_stop outcome=pending.")
-		return false
-	}
-	if !Stopped {
-		PreviousCritical := Critical("On")
-		try _LLM_NavEventOwnerStopping := false
-		finally Critical(PreviousCritical)
-		if StopFailure == ""
-			StopFailure := "stage=native_stop outcome=refused result_type="
-				. Type(StopResult) . " result_code="
-				. (StopResult is Integer ? StopResult : "unavailable")
-		_LLM_NavEventOwnerReport(StopFailure)
-		return false
-	}
-	; Keep the service and wake route alive until the native thread has actually
-	; acknowledged Stop. A refused teardown may still own suppressed receipts and
-	; must not be published as inert by disconnecting its only drain paths.
-	PreviousCritical := Critical("On")
-	try {
-		_LLM_NavEventOwnerSetServiceTimer(false)
-		if IsObject(_LLM_NavEventOwnerWakeFn)
-			try OnMessage(_LLM_NavEventOwnerWakeMessage,
-				_LLM_NavEventOwnerWakeFn, 0)
-		_LLM_NavEventOwnerRuntimeEpoch += 1
-		_LLM_NavEventOwnerStarted := false
-		_LLM_NavEventOwnerQuarantined := false
-		_LLM_NavEventOwnerStarting := false
-		_LLM_NavEventOwnerStopPending := false
-		_LLM_NavEventOwnerStartCancelled := false
-		_LLM_NavEventOwnerStartRollbackPending := false
-		_LLM_NavEventOwnerActiveStartTicket := 0
-		_LLM_NavEventOwnerPort := 0
-		_LLM_NavEventOwnerWakeFn := 0
-		_LLM_NavEventOwnerServiceFn := 0
-		_LLM_NavEventOwnerServiceArmed := false
-		_LLM_NavEventOwnerRecords := Map()
-		_LLM_NavEventOwnerProfileOwners := Map()
-		_LLM_NavEventOwnerActiveProfileToken := 0
-		_LLM_NavEventOwnerProfileEffectActive := false
-		_LLM_NavEventOwnerShutdownFenced := false
-		_LLM_NavEventOwnerClaimedReceipt := 0
-		_LLM_NavEventOwnerPendingRepaints := Map()
-		_LLM_NavEventOwnerRepaintFailures := Map()
-		_LLM_NavEventOwnerProfileFailures := Map()
-		_LLM_NavEventOwnerPreparedPlans := Map()
-		_LLM_NavEventOwnerCommittedPlan := 0
-		_LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
-		if !PreserveLifecycle {
-			_LLM_NavEventOwnerLifecycleResumePlan := 0
-			_LLM_NavEventOwnerLifecycleResumePort := 0
-			_LLM_NavEventOwnerLifecycleQuiesced := false
+		if AdmissionFailure != "" {
+			_LLM_NavEventOwnerReport(AdmissionFailure)
+			return false
 		}
+		StopResult := 1, StopFailure := ""
+		if ShouldStop {
+			try {
+				; Snapshot and construction already precede this first Port.Get.
+				SelectionCritical := Critical("On")
+				try {
+					GuardScope()
+					StopFn := _LLM_NavEventOwnerPortFn("stop")
+					GuardScope()
+					UseCustomStop := HasMethod(StopFn, "Call")
+					if UseCustomStop
+						StopScope["custom"].Call()
+				} finally Critical(SelectionCritical)
+				if UseCustomStop {
+					StopResult := StopFn.Call()
+				} else {
+					DispatchCritical := Critical("On")
+					try {
+						GuardScope()
+						if _LLM_NavEventOwnerNativeStop != OriginalNativeStop
+								|| Object.Prototype.HasOwnProp.Call(OriginalNativeStop, "Call")
+							throw Error("The original native stop helper was withdrawn.")
+						StopResult := OriginalNativeStop.Call(StopScope["native"])
+					} finally Critical(DispatchCritical)
+				}
+			} catch as Err {
+				StopResult := 0
+				StopFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
+			}
+		}
+		try {
+			Stopped := ((StopResult is Integer) && StopResult == 1)
+				|| (StopResult is Map && StopResult.Get("stopped", false) == true)
+			StopPending := StopResult is Map && StopResult.Get("pending", false) == true
+				&& StopResult.Get("stopped", false) != true
+		} catch as Err {
+			PreviousCritical := Critical("On")
+			try _LLM_NavEventOwnerStopping := false
+			finally Critical(PreviousCritical)
+			_LLM_NavEventOwnerReport(_LLM_NavEventOwnerStopExceptionDetail(Err))
+			return false
+		}
+		if StopPending {
+			PreviousCritical := Critical("On")
+			try {
+				_LLM_NavEventOwnerStarted := false
+				_LLM_NavEventOwnerQuarantined := true
+				_LLM_NavEventOwnerStopPending := true
+				_LLM_NavEventOwnerStopping := false
+			} finally Critical(PreviousCritical)
+			if !WasPending
+				try LoggerDebug("LLM.nav", "stage=native_stop outcome=pending.")
+			return false
+		}
+		if !Stopped {
+			PreviousCritical := Critical("On")
+			try _LLM_NavEventOwnerStopping := false
+			finally Critical(PreviousCritical)
+			if StopFailure == ""
+				StopFailure := "stage=native_stop outcome=refused result_type=" . Type(StopResult)
+					. " result_code=" . (StopResult is Integer ? StopResult : "unavailable")
+			_LLM_NavEventOwnerReport(StopFailure)
+			return false
+		}
+		PreviousCritical := Critical("On")
+		try {
+			try {
+				GuardScope()
+				if !StopScope["accept"].Call()
+					throw Error("Genuine retained registration requires an actual native stop receipt.")
+				GuardScope()
+				if !StopScope["settle"].Call()
+					throw Error("The retained terminal source could not be retired.")
+			} catch as Err {
+				_LLM_NavEventOwnerReport(_LLM_NavEventOwnerStopExceptionDetail(Err))
+				return false
+			}
+			_LLM_NavEventOwnerSetServiceTimer(false)
+			if IsObject(_LLM_NavEventOwnerWakeFn)
+				try OnMessage(_LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn, 0)
+			_LLM_NavEventOwnerRuntimeEpoch += 1
+			_LLM_NavEventOwnerStarted := false
+			_LLM_NavEventOwnerQuarantined := false
+			_LLM_NavEventOwnerStarting := false
+			_LLM_NavEventOwnerStopPending := false
+			_LLM_NavEventOwnerStartCancelled := false
+			_LLM_NavEventOwnerStartRollbackPending := false
+			_LLM_NavEventOwnerActiveStartTicket := 0
+			_LLM_NavEventOwnerPort := 0
+			_LLM_NavEventOwnerWakeFn := 0
+			_LLM_NavEventOwnerServiceFn := 0
+			_LLM_NavEventOwnerServiceArmed := false
+			_LLM_NavEventOwnerRecords := Map()
+			_LLM_NavEventOwnerProfileOwners := Map()
+			_LLM_NavEventOwnerActiveProfileToken := 0
+			_LLM_NavEventOwnerProfileEffectActive := false
+			_LLM_NavEventOwnerShutdownFenced := false
+			_LLM_NavEventOwnerClaimedReceipt := 0
+			_LLM_NavEventOwnerPendingRepaints := Map()
+			_LLM_NavEventOwnerRepaintFailures := Map()
+			_LLM_NavEventOwnerProfileFailures := Map()
+			_LLM_NavEventOwnerPreparedPlans := Map()
+			_LLM_NavEventOwnerCommittedPlan := 0
+			_LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
+			if !PreserveLifecycle {
+				_LLM_NavEventOwnerLifecycleResumePlan := 0
+				_LLM_NavEventOwnerLifecycleResumePort := 0
+				_LLM_NavEventOwnerLifecycleQuiesced := false
+			}
+		} finally {
+			_LLM_NavEventOwnerStopping := false
+			Critical(PreviousCritical)
+		}
+		Unloaded := true
+		try Unloaded := _LLM_NavEventOwnerNativeUnload()
+		catch
+			Unloaded := false
+		if ShouldStop && Unloaded
+			try LoggerDebug("LLM.nav", "stage=native_stop outcome=stopped.")
+		return Unloaded
 	} finally {
-		_LLM_NavEventOwnerStopping := false
-		Critical(PreviousCritical)
+		if StopScope is Map
+			; Original issuer cleanup only; no public own.Call or mutable scope method.
+			Func.Prototype.Call.Call(OriginalLoader, "close_scope", StopScope)
 	}
-	Unloaded := true
-	try Unloaded := _LLM_NavEventOwnerNativeUnload()
-	catch
-		Unloaded := false
-	if ShouldStop && Unloaded
-		try LoggerDebug("LLM.nav", "stage=native_stop outcome=stopped.")
-	return Unloaded
 }
 
 ; Callers hold Critical across this check and their terminal-recovery admission
@@ -2296,48 +2347,361 @@ _LLM_NavEventOwnerPublishCurrentProfileSurface(
  */
 LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 	global _LLM_NavEventOwnerTerminalRouteRefreshing
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
 	global _LLM_NavEventOwnerTerminalRouteGeneration
-	global _LLM_NavEventOwnerTerminalRouteOwner
-	global _LLM_NavEventOwnerTerminalRouteRecipes
-	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	static OriginalNativeRegister := _LLM_NavEventOwnerNativeRegisterTerminalRoutes
+	static OriginalUnknown := _LLM_NavEventOwnerTerminalRegistrationUnknown
+
+	GuardScope() {
+		if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+				|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			throw Error("The original registration constructor was withdrawn.")
+		if !OriginalLoader.Call("owns_scope", NativeScope)
+			throw Error("The registration scope was not genuinely issued.")
+	}
+
+	RetainUnknown() {
+		; Retention is mandatory cleanup, not native admission. Skip foreign own.Call.
+		Func.Prototype.Call.Call(OriginalLoader, "retain_frame", Frame)
+		Func.Prototype.Call.Call(OriginalUnknown, Frame)
+	}
+
+	CheckCurrent(CheckModels := true, CheckIds := true) {
+		try {
+			GuardScope()
+			Current := _LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, CheckModels, CheckIds)
+		} catch as Err {
+			RetainUnknown()
+			throw Err
+		}
+		if !Current
+			RetainUnknown()
+		return Current
+	}
+
 	PreviousCritical := Critical("On")
 	try {
-		if _LLM_NavEventOwnerTerminalRouteRefreshing
+		if _LLM_NavEventOwnerTerminalRouteRefreshing || _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
 			return false
+		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+			throw Error("Uncertain terminal registration retains its original native owner.")
 		_LLM_NavEventOwnerTerminalRouteRefreshing := true
 		try {
-			SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
-			Source := HasMethod(SourceFn, "Call")
-				? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
+			if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+					|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+				throw Error("The original registration constructor was withdrawn.")
+			NativeScope := OriginalLoader.Call("begin_frame")
+			GuardScope()
+			Frame := NativeScope["frame"]
+			try {
+				GuardScope()
+				SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
+				GuardScope()
+				Source := HasMethod(SourceFn, "Call") ? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
+				GuardScope()
+				if !(Source is Map) || ObjGetBase(Source) != Map.Prototype
+					throw ValueError("The terminal source must be an original plain Map.")
+				for Name in ObjOwnProps(Source)
+					throw ValueError("The terminal source cannot invoke a map observer.")
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+			} catch as Err {
+				CheckCurrent()
+				throw Err
+			}
 			_LLM_NavEventOwnerTerminalRouteGeneration += 1
 			if _LLM_NavEventOwnerTerminalRouteGeneration <= 0
 				throw Error("Terminal route registration generation overflowed.")
 			Generation := _LLM_NavEventOwnerTerminalRouteGeneration
-			Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation)
+			Frame["generation"] := Generation
+			try {
+				GuardScope()
+				Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame, NativeScope["guard"])
+			} catch as Err {
+				CheckCurrent(false, false)
+				throw Err
+			}
+			Frame["candidate"] := Candidate
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source)
+			if !CheckCurrent(false)
+				throw ValueError("The terminal source changed during recipe capture.")
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+			GuardScope()
 			Bindings := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
-			RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
-			Status := HasMethod(RegisterFn, "Call")
-				? RegisterFn.Call(_LLM_NavEventOwnerTerminalRouteOwner,
-					Generation, Candidate["layout_id"], Bindings, Candidate["routes"].Length)
-				: _LLM_NavEventOwnerNativeRegisterTerminalRoutes(
-					_LLM_NavEventOwnerTerminalRouteOwner, Generation,
-					Candidate["layout_id"], Bindings, Candidate["routes"].Length)
-			if !(Status is Integer)
-				throw Error("Terminal route registration returned a malformed ACK.")
+			GuardScope()
+			Witness := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
+			Frame["bindings"] := Witness
+			try {
+				GuardScope()
+				RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+			} catch as Err {
+				CheckCurrent()
+				throw Err
+			}
+			Frame["native_attempted"] := true
+			try {
+				GuardScope()
+				if HasMethod(RegisterFn, "Call") {
+					NativeScope["custom"].Call()
+					Status := RegisterFn.Call(Frame["owner"], Generation, Candidate["layout_id"], Bindings, Candidate["routes"].Length)
+				} else {
+					GuardScope()
+					if _LLM_NavEventOwnerNativeRegisterTerminalRoutes != OriginalNativeRegister
+							|| Object.Prototype.HasOwnProp.Call(OriginalNativeRegister, "Call")
+						throw Error("The original native registration helper was withdrawn.")
+					Status := OriginalNativeRegister.Call(Frame["owner"], Generation,
+						Candidate["layout_id"], Bindings, Candidate["routes"].Length, NativeScope["native"])
+				}
+			} catch as Err {
+				RetainUnknown()
+				throw Err
+			}
+			try {
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+				GuardScope()
+				if !_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Bindings, Witness)
+					throw ValueError("The registration callback changed the native descriptor bytes.")
+			} catch as Err {
+				RetainUnknown()
+				throw Err
+			}
+			GuardScope()
+			if !(Status is Integer) || !_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
+				RetainUnknown()
+				throw Error("Terminal route registration returned an unknown ACK.")
+			}
 			if Status == -11
 				return false
+			GuardScope()
 			_LLM_NavEventOwnerNativeRequireOk(Status, "Terminal route registration")
 			for RecipeId, Admission in Candidate["recipes"]
-				_LLM_NavEventOwnerTerminalRouteRecipes[RecipeId] := Admission
+				Frame["recipes"][RecipeId] := Admission
 			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
-				"generation", Generation, "layout_id", Candidate["layout_id"],
-				"registered", Candidate["routes"].Length,
-				"cohort_complete", false, "transformed_output_enabled", false,
-				"unconverted", Candidate["unconverted"])
-			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port)
+				"generation", Generation, "layout_id", Candidate["layout_id"], "registered", Candidate["routes"].Length,
+				"cohort_complete", false, "transformed_output_enabled", false, "unconverted", Candidate["unconverted"])
+			Frame["coverage"] := _LLM_NavEventOwnerTerminalRouteCoverage
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame)
+			if !CheckCurrent()
+				throw ValueError("The original registration owner changed during retirement.")
+			GuardScope()
+			NativeScope["complete"].Call()
 			return true
-		} finally _LLM_NavEventOwnerTerminalRouteRefreshing := false
+		} finally {
+			try {
+				if IsSet(NativeScope)
+					Func.Prototype.Call.Call(OriginalLoader, "close_scope", NativeScope)
+			} finally _LLM_NavEventOwnerTerminalRouteRefreshing := false
+		}
 	} finally Critical(PreviousCritical)
+}
+
+/** Exact private authority retained before source/registration callbacks. */
+_LLM_NavEventOwnerTerminalRegistrationCapture() {
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	Owner := _LLM_NavEventOwnerTerminalRouteOwner
+	Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+	Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
+	Coverage := _LLM_NavEventOwnerTerminalRouteCoverage
+	NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe, NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
+	if !(NextRecipe is Integer) || NextRecipe < 0 || !(NextLayout is Integer) || NextLayout <= 0
+			|| !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation < 0
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipes)
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Models)
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Coverage)
+		throw ValueError("The terminal registration authority is malformed.")
+	for RecipeId in Recipes
+		if !(RecipeId is Integer) || RecipeId <= 0 || RecipeId > NextRecipe
+			throw ValueError("The terminal recipe identity owner precedes its retained references.")
+	Frame := Map("owner", Owner, "generation", Generation, "recipes", Recipes,
+		"models", Models, "coverage", Coverage, "recipe_refs", Recipes.Clone(),
+		"model_refs", Models.Clone(), "candidate", 0, "bindings", 0, "native_attempted", false,
+		"next_recipe", NextRecipe, "next_layout", NextLayout)
+	_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+	return Frame
+}
+
+_LLM_NavEventOwnerTerminalRegistrationPlainMap(Value) {
+	if !(Value is Map) || ObjGetBase(Value) != Map.Prototype
+		return false
+	for Name in ["Get", "Has", "Clone", "__Item", "__Enum", "Count"]
+		if Object.Prototype.HasOwnProp.Call(Value, Name)
+			return false
+	return true
+}
+
+/** No callback may exchange dictionary cells and still retire their old holders. */
+_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Owned, Snapshot) {
+	if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Owned) || Owned.Count != Snapshot.Count
+		return false
+	for Id, Value in Snapshot
+		if !Owned.Has(Id) || Type(Owned[Id]) != Type(Value) || !(Owned[Id] == Value)
+			return false
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, CheckModels := true, CheckIds := true) {
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	return _LLM_NavEventOwnerTerminalRouteOwner is Integer
+		&& _LLM_NavEventOwnerTerminalRouteOwner == Frame["owner"]
+		&& _LLM_NavEventOwnerTerminalRouteGeneration is Integer
+		&& _LLM_NavEventOwnerTerminalRouteGeneration == Frame["generation"]
+		&& _LLM_NavEventOwnerTerminalRouteRecipes == Frame["recipes"]
+		&& _LLM_NavEventOwnerTerminalRouteModels == Frame["models"]
+		&& _LLM_NavEventOwnerTerminalRouteCoverage == Frame["coverage"]
+		&& (!CheckIds || (_LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextRecipe == Frame["next_recipe"]
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout == Frame["next_layout"]))
+		&& _LLM_NavEventOwnerTerminalRegistrationPlainMap(Frame["models"])
+		&& _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["recipes"], Frame["recipe_refs"])
+		&& (!CheckModels || _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["models"], Frame["model_refs"]))
+		&& _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels)
+}
+
+/** Only this build's contiguous recipe IDs and one new model may advance owners. */
+_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source) {
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	ExpectedRecipe := Frame["next_recipe"] + Candidate["routes"].Length
+	NewModel := Source["active"] && Source.Get("model", 0) is Map
+		&& !Frame["model_refs"].Has(ObjPtr(Source["model"]))
+	ExpectedLayout := Frame["next_layout"] + (NewModel ? 1 : 0)
+	Valid := _LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+		&& _LLM_NavEventOwnerTerminalRouteNextRecipe == ExpectedRecipe
+		&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+		&& _LLM_NavEventOwnerTerminalRouteNextLayout == ExpectedLayout
+	for Index, Route in Candidate["routes"]
+		if Route["recipe_id"] != Frame["next_recipe"] + Index
+			Valid := false
+	if !Valid {
+		_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+		throw ValueError("A callback changed the terminal registration identity owners.")
+	}
+	Frame["next_recipe"] := ExpectedRecipe, Frame["next_layout"] := ExpectedLayout
+}
+
+/** Keep selected original object references even if a callback mutates a cell. */
+_LLM_NavEventOwnerTerminalRegistrationRetain(Frame) {
+	Frame["recipe_refs"] := Frame["recipes"].Clone()
+	Frame["model_refs"] := Frame["models"].Clone()
+	Routes := Map(), Models := Map()
+	for Id, Admission in Frame["recipes"] {
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
+			throw ValueError("A retained terminal recipe cell is malformed.")
+		Recipe := Admission["recipe"]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission["route"])
+				|| (Recipe is Map && !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe))
+			throw ValueError("The retained terminal route/model recipe is malformed.")
+		Routes[Id] := Map("route", Admission["route"], "recipe", Recipe,
+			"model", Recipe is Map ? Recipe.Get("model", 0) : 0,
+			"route_fields", Admission["route"].Clone(),
+			"recipe_fields", Recipe is Map ? Recipe.Clone() : 0,
+			"generation", Admission["generation"], "layout_id", Admission["layout_id"])
+	}
+	for Id, Identity in Frame["models"] {
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				|| !(Identity.Get("id", 0) is Integer) || Identity["id"] <= 1
+				|| Identity["id"] > Frame["next_layout"]
+			throw ValueError("A retained terminal model cell is malformed.")
+		Models[Id] := Map("model", Identity["model"], "id", Identity["id"])
+	}
+	Frame["route_objects"] := Routes, Frame["model_objects"] := Models
+}
+
+_LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels) {
+	if !CheckModels && !_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent(Frame)
+		return false
+	for Id, Expected in Frame["route_objects"] {
+		if !Frame["recipes"].Has(Id)
+			return false
+		Admission := Frame["recipes"][Id]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
+			return false
+		for Name in ["route", "recipe", "generation", "layout_id"]
+			if Type(Admission.Get(Name, "")) != Type(Expected[Name]) || !(Admission.Get(Name, "") == Expected[Name])
+				return false
+		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Expected["route"], Expected["route_fields"])
+			return false
+		Recipe := Expected["recipe"]
+		if Recipe is Map && (!_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe)
+				|| Recipe.Get("model", 0) != Expected["model"]
+				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Recipe, Expected["recipe_fields"]))
+			return false
+	}
+	; A partial builder may add its captured identity, but cannot mutate old cells.
+	for Id, Expected in Frame["model_objects"] {
+		if !Frame["models"].Has(Id)
+			return false
+		Identity := Frame["models"][Id]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				|| Identity.Get("model", 0) != Expected["model"]
+				|| !(Identity.Get("id", 0) is Integer) || Identity["id"] != Expected["id"]
+			return false
+	}
+	return true
+}
+
+/** Preserve old cells and the one actual allocation before recapturing snapshots. */
+_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent(Frame) {
+	Models := Frame["models"], Original := Frame["model_refs"]
+	for Id, Identity in Original
+		if !Models.Has(Id) || Models[Id] != Identity
+			return false
+	Key := Frame.Get("build_model_key", 0)
+	NewModel := Key != 0 && !Original.Has(Key)
+	if Models.Count != Original.Count + (NewModel ? 1 : 0)
+		return false
+	if Key != 0 {
+		if !Models.Has(Key) || Models[Key] != Frame["build_model_cell"]
+			return false
+		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Models[Key], Frame["build_model_fields"])
+			return false
+	}
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRegistrationRequire(Frame) {
+	if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
+		throw ValueError("A callback withdrew the original terminal registration authority.")
+}
+
+_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Actual, Expected) {
+	if !(Actual is Buffer) || Actual.Size != Expected.Size
+		return false
+	Loop Expected.Size
+		if NumGet(Actual, A_Index - 1, "UChar") != NumGet(Expected, A_Index - 1, "UChar")
+			return false
+	return true
+}
+
+/** Only documented native registration refusals prove no candidate was accepted. */
+_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
+	return Status == 0 || Status == -1 || Status == -2 || Status == -3
+		|| Status == -4 || Status == -5 || Status == -6 || Status == -9 || Status == -11
+}
+
+/** Retains original references without restoring a foreign dictionary or guessing ACK. */
+_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame) {
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	if !IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+		_LLM_NavEventOwnerTerminalRouteUnknown := Frame
+	return false
 }
 
 /**
@@ -2346,40 +2710,70 @@ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
  * script from starting capture between publication and the held-identity query.
  * A failed or malformed query retains every reference for a later safe retry.
  */
-_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port) {
+_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame := 0) {
 	global _LLM_NavEventOwnerTerminalRouteOwner
 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	static OriginalUnknown := _LLM_NavEventOwnerTerminalRegistrationUnknown
+	GuardFrame() {
+		if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+				|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			throw Error("The original held-query constructor was withdrawn.")
+		if !OriginalLoader.Call("guard_frame", Frame)
+			throw Error("The original held-query Frame was withdrawn.")
+		if !(Source is Map) || ObjGetBase(Source) != Map.Prototype
+			throw Error("The held-query source is not a plain Map.")
+		for Name in ObjOwnProps(Source)
+			throw Error("The held-query source cannot invoke a map observer.")
+	}
+	RetainUnknown() {
+		Func.Prototype.Call.Call(OriginalUnknown, Frame)
+	}
+	if !(Frame is Map)
+		throw ValueError("Held-query pruning requires its already issued Frame.")
 	try {
+		GuardFrame()
+		_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+		GuardFrame()
 		HeldFn := _LLM_NavEventOwnerPortFn("list_terminal_held_recipes", Port)
-		; An injected registration without a held-reference boundary cannot prove
-		; retirement. Do not reach the real DLL through an incomplete test port.
-		if !HasMethod(HeldFn, "Call")
-				&& HasMethod(_LLM_NavEventOwnerPortFn("register_terminal_routes", Port), "Call")
-			return false
+		GuardFrame()
+		if !HasMethod(HeldFn, "Call") {
+			GuardFrame()
+			RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
+			GuardFrame()
+			if HasMethod(RegisterFn, "Call")
+				return false
+		}
 		HeldBuffer := Buffer(64 * 8, 0)
-		Reply := HasMethod(HeldFn, "Call")
-			? HeldFn.Call(_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
-			: _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
-				_LLM_NavEventOwnerTerminalRouteOwner, HeldBuffer, 64)
-		if !(Reply is Map) || !(Reply.Get("status", "") is Integer)
+		GuardFrame()
+		Reply := HasMethod(HeldFn, "Call") ? HeldFn.Call(Frame["owner"], HeldBuffer, 64)
+			: _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Frame["owner"], HeldBuffer, 64)
+		GuardFrame()
+		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
+			RetainUnknown()
+			throw ValueError("Held-query callback withdrew the original registration authority.")
+		}
+		if !(Reply is Map) || ObjGetBase(Reply) != Map.Prototype
+			throw Error("Held terminal recipe query returned a malformed ACK.")
+		for Name in ObjOwnProps(Reply)
+			throw Error("Held terminal recipe query cannot invoke a map observer.")
+		if !(Reply.Get("status", "") is Integer)
 			throw Error("Held terminal recipe query returned a malformed ACK.")
 		if Reply["status"] != 0
 			throw Error("Held terminal recipe query refused with status " . Reply["status"] . ".")
 		if !(Reply.Get("count", "") is Integer) || Reply["count"] < 0 || Reply["count"] > 64
 			throw Error("Held terminal recipe query returned an invalid count.")
-		Keep := Map()
+		GuardFrame()
+		Keep := Map(), Held := Map()
 		for RecipeId in Candidate["recipes"]
 			Keep[RecipeId] := true
-		Held := Map()
 		Loop Reply["count"] {
 			RecipeId := NumGet(HeldBuffer, (A_Index - 1) * 8, "UInt64")
-			if RecipeId <= 0 || Held.Has(RecipeId)
-					|| !_LLM_NavEventOwnerTerminalRouteRecipes.Has(RecipeId)
+			if RecipeId <= 0 || Held.Has(RecipeId) || !_LLM_NavEventOwnerTerminalRouteRecipes.Has(RecipeId)
 				throw Error("Held terminal recipe query returned an unknown or duplicate identity.")
-			Held[RecipeId] := true
-			Keep[RecipeId] := true
+			Held[RecipeId] := true, Keep[RecipeId] := true
 		}
-		; Compute both retirement sets before mutating either ownership map.
+		GuardFrame()
 		KeepModels := Map()
 		if Source.Get("model", 0) is Map
 			KeepModels[ObjPtr(Source["model"])] := true
@@ -2394,16 +2788,29 @@ _LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port) {
 				KeepModels[ObjPtr(Recipe["model"])] := true
 		}
 		RetireModels := []
-		for Identity in _LLM_NavEventOwnerTerminalRouteModels {
+		for Identity in _LLM_NavEventOwnerTerminalRouteModels
 			if !KeepModels.Has(Identity)
 				RetireModels.Push(Identity)
+		GuardFrame()
+		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
+			RetainUnknown()
+			throw ValueError("Retirement cannot borrow a successor registration owner.")
 		}
 		for RecipeId in RetireRecipes
 			_LLM_NavEventOwnerTerminalRouteRecipes.Delete(RecipeId)
 		for Identity in RetireModels
 			_LLM_NavEventOwnerTerminalRouteModels.Delete(Identity)
+		GuardFrame()
+		_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
 		return true
 	} catch Error as Err {
+		try {
+			GuardFrame()
+			if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
+				RetainUnknown()
+		} catch {
+			RetainUnknown()
+		}
 		_LLM_NavEventOwnerReport("Terminal route recipe retirement deferred: " . Err.Message)
 		return false
 	}
@@ -2463,15 +2870,34 @@ _LLM_NavEventOwnerTerminalRouteDescriptor(RecipeId, RouteId, Axis, Code,
 		"effective_modifiers_lr", EffectiveLR)
 }
 
-_LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
+_LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard := unset) {
 	global KEYLAYOUT_NEUTRAL_STATE
+	global _LLM_NavEventOwnerTerminalRouteModels
+	Guard() {
+		if IsSet(ScopeGuard)
+			ScopeGuard.Call()
+	}
+	Guard()
 	if !(Source is Map) || !Source.Has("active") || !Source.Has("caps")
 			|| !(Source["active"] is Integer) || Source["active"] < 0 || Source["active"] > 1
 			|| !(Source["caps"] is Integer) || Source["caps"] < 0 || Source["caps"] > 1
 			|| !(Generation is Integer) || Generation <= 0
 		throw ValueError("Terminal route source ownership is invalid.")
+	Guard()
 	LayoutId := Source["active"] && Source.Has("model") && Source["model"] is Map
 		? _LLM_NavEventOwnerTerminalRouteLayoutId(Source["model"]) : 1
+	if Frame is Map {
+		Frame["build_model_key"] := 0
+		if Source["active"] && Source.Has("model") && Source["model"] is Map {
+			Key := ObjPtr(Source["model"]), Identity := _LLM_NavEventOwnerTerminalRouteModels[Key]
+			Guard()
+			if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				throw ValueError("The allocated terminal model identity is malformed.")
+			Frame["build_model_key"] := Key
+			Frame["build_model_cell"] := Identity
+			Frame["build_model_fields"] := Identity.Clone()
+		}
+	}
 	Routes := []
 	Recipes := Map()
 	Unconverted := ["CapsLock", "AltGr", "dead-key sequences", "tap-hold transforms",
@@ -2482,7 +2908,9 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
 			[0xA1, 0x20, 0x036], [0x5B, 0x40, 0x15B], [0x5C, 0x80, 0x15C]] {
 		NaturalScans[Modifier[3]] := true
 		for Axis in [2, 1] {
+			Guard()
 			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
+			Guard()
 			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(
 				Id, Routes.Length + 1, Axis, Axis == 2 ? Modifier[3] : Modifier[1],
 				4, 0, Modifier[2], Axis == 1 ? Modifier[1] : 0, Axis == 2 ? Modifier[3] : 0)
@@ -2524,17 +2952,26 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
 			continue
 		}
 		for Shift in [0, 1] {
-			if !Source["eligible"].Call(Sc, Shift) {
+			Guard()
+			Eligible := Source["eligible"].Call(Sc, Shift)
+			Guard()
+			if !Eligible {
 				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":another owner")
 				continue
 			}
+			Guard()
 			Recipe := Source["capture"].Call(Sc, Shift, false, false)
+			Guard()
 			if !(Recipe is Map) || !Recipe.Has("model") || !(Recipe["model"] is Map)
 					|| ObjPtr(Recipe["model"]) != ObjPtr(Source["model"])
 					|| Recipe.Get("layout_id", 0) != Source["layout_name"]
 					|| Recipe.Get("scan", 0) != Sc
 				throw ValueError("KLE registration changed its model during capture.")
-			Resolved := Keylayout_Resolve(Recipe["model"], Recipe["index"], Recipe["keycode"])
+			; A borrowed recipe can observe Has/Get/__Item; authenticate after those reads.
+			RecipeModel := Recipe["model"], RecipeIndex := Recipe["index"], RecipeCode := Recipe["keycode"]
+			Guard()
+			Resolved := Keylayout_Resolve(RecipeModel, RecipeIndex, RecipeCode)
+			Guard()
 			if Resolved["Kind"] != "text" {
 				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":" . Resolved["Kind"])
 				continue
@@ -2543,8 +2980,10 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
 				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":registration capacity")
 				continue
 			}
+			Guard()
 			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
 			Kind := RegExMatch(Resolved["Text"], "^[0-9]$") ? 2 : 1
+			Guard()
 			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(
 				Id, Routes.Length + 1, 2, Integer("0x" . SubStr(Sc, 3)), Kind, Shift ? 4 : 0)
 			Routes.Push(Route)
@@ -2552,6 +2991,7 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation) {
 				"generation", Generation, "layout_id", LayoutId)
 		}
 	}
+	Guard()
 	return Map("layout_id", LayoutId, "routes", Routes,
 		"recipes", Recipes, "unconverted", Unconverted)
 }
@@ -2781,11 +3221,23 @@ LLM_NavEventOwner_StepTerminalRoute(Snapshot, State) {
 		"metadata_only", true, "cohort_complete", false, "transformed_output_enabled", false)
 }
 
-_LLM_NavEventOwnerNativeRegisterTerminalRoutes(Owner, Generation, LayoutId, Bindings, Count) {
+_LLM_NavEventOwnerNativeRegisterTerminalRoutes(Owner, Generation, LayoutId, Bindings, Count,
+		NativeOperation := unset) {
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+		throw Error("Native terminal registration cannot cross stop admission.")
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original native registration constructor was withdrawn.")
+	if !OriginalLoader.Call("allows_native_admission")
+		throw Error("Native terminal registration cannot cross private stop admission.")
 	if !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation <= 0
 			|| !(LayoutId is Integer) || LayoutId <= 0 || !(Count is Integer) || Count < 0
 			|| Count > 128 || !(Bindings is Buffer) || Bindings.Size != Count * 40
 		throw ValueError("The terminal route native registration ABI is invalid.")
+	if IsSet(NativeOperation)
+		return NativeOperation.Call(Owner, Generation, LayoutId, Bindings, Count)
 	return DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_RegisterTerminalRoutes"),
 		"UInt64", Owner, "UInt64", Generation, "UInt64", LayoutId,
 		"Ptr", Bindings, "UInt", Count, "Int")
@@ -2810,26 +3262,41 @@ _LLM_NavEventOwnerNativePeekTerminalRoute(Token, Index, Receipt) {
 ; unit tests can replace each boundary through a Map port without loading the
 ; DLL or installing a hook.
 _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+		throw Error("Native start cannot cross stop admission.")
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original native start constructor was withdrawn.")
+	if !OriginalLoader.Call("allows_native_admission")
+		throw Error("Native start cannot cross private stop admission.")
 	_LLM_NavEventOwnerNativeEnsureLoaded()
 	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_Start"),
 		"UInt64", Hwnd, "UInt", WakeMessage, "Int")
-	if Status != 0 {
-		DllCall(_LLM_NavEventOwnerNativeExport(
-			"ErgoptiNav_Stop"), "Int")
-	}
-	_LLM_NavEventOwnerNativeRequireOk(Status,
+	; Read the original Win32 error before Stop resets native semantic state.
+	try _LLM_NavEventOwnerNativeRequireOk(Status,
 		"Navigation owner start")
+	catch as StartError {
+		try DllCall(_LLM_NavEventOwnerNativeExport(
+			"ErgoptiNav_Stop"), "Int")
+		catch as CleanupError {
+			StartError.NativeCleanupError := CleanupError
+			StartError.Message .= "; native stop cleanup failed: " . CleanupError.Message
+		}
+		throw StartError
+	}
 	if !LLM_NavEventOwner_RefreshTerminalRoutes()
 		throw Error("Terminal route metadata registration was not admitted at startup.")
 	return 1
 }
 
-_LLM_NavEventOwnerNativeStop() {
+_LLM_NavEventOwnerNativeStop(NativeOperation := unset) {
 	global _LLM_NavEventOwnerModule
 	if !_LLM_NavEventOwnerModule
 		return 1
-	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_Stop"),
-		"Int")
+	Status := IsSet(NativeOperation) ? NativeOperation.Call()
+		: DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_Stop"), "Int")
 	if Status == 9
 		return Map("stopped", false, "pending", true)
 	if Status == 10 {
@@ -3215,58 +3682,446 @@ _LLM_NavEventOwnerNativeTestDispatch(Event) {
 		"seq", NumGet(Result, 4, "UInt64"))
 }
 
-_LLM_NavEventOwnerNativeEnsureLoaded() {
+_LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _VendorDir
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerStarting
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteUnknown
+	global _LLM_NavEventOwnerTerminalRouteGeneration, _LLM_NavEventOwnerTerminalRouteNextRecipe
+	global _LLM_NavEventOwnerTerminalRouteNextLayout, _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	static IssuedModule := 0, IssuedExports := 0, OriginalExports := 0
+	static ActiveFrame := 0, RetainedFrame := 0, ActiveStop := 0, Constructing := false
+	static Scopes := Map()
+	static OriginalOwners := [
+		_LLM_NavEventOwnerNativeEnsureLoaded, _LLM_NavEventOwnerNativeExport,
+		_LLM_NavEventOwnerNativeRegisterTerminalRoutes, _LLM_NavEventOwnerNativeStop,
+		_LLM_NavEventOwnerNativeStart,
+		_LLM_NavEventOwnerNativeRequireOk, _LLM_NavEventOwnerPortFn,
+		_LLM_NavEventOwnerTerminalRegistrationCapture, _LLM_NavEventOwnerTerminalRegistrationRetain,
+		_LLM_NavEventOwnerTerminalRegistrationPlainMap, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationUnknown,
+		_LLM_NavEventOwnerTerminalRegistrationRefsCurrent, _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent, _LLM_NavEventOwnerTerminalRegistrationBytesCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationStatusKnown, _LLM_NavEventOwnerTerminalRoutePrune,
+		_LLM_NavEventOwnerTerminalRegistrationAdvance, _LLM_NavEventOwnerTerminalRouteBuild,
+		_LLM_NavEventOwnerTerminalRouteMarshal,
+		_LLM_NavEventOwnerTerminalRouteSource, _LLM_NavEventOwnerTerminalRouteValidate,
+		_LLM_NavEventOwnerTerminalRouteNextRecipeId, _LLM_NavEventOwnerTerminalRouteDescriptor,
+		_LLM_NavEventOwnerTerminalRouteLayoutId, Keylayout_Resolve,
+		_LLM_NavEventOwnerNativeListTerminalHeldRecipes,
+		LLM_NavEventOwner_RefreshTerminalRoutes, LLM_NavEventOwner_Stop]
+
+	OwnersCurrent() {
+		Current := [_LLM_NavEventOwnerNativeEnsureLoaded, _LLM_NavEventOwnerNativeExport,
+			_LLM_NavEventOwnerNativeRegisterTerminalRoutes, _LLM_NavEventOwnerNativeStop,
+			_LLM_NavEventOwnerNativeStart,
+			_LLM_NavEventOwnerNativeRequireOk, _LLM_NavEventOwnerPortFn,
+			_LLM_NavEventOwnerTerminalRegistrationCapture, _LLM_NavEventOwnerTerminalRegistrationRetain,
+			_LLM_NavEventOwnerTerminalRegistrationPlainMap, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+			_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationUnknown,
+			_LLM_NavEventOwnerTerminalRegistrationRefsCurrent, _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent,
+			_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent, _LLM_NavEventOwnerTerminalRegistrationBytesCurrent,
+			_LLM_NavEventOwnerTerminalRegistrationStatusKnown, _LLM_NavEventOwnerTerminalRoutePrune,
+			_LLM_NavEventOwnerTerminalRegistrationAdvance, _LLM_NavEventOwnerTerminalRouteBuild,
+			_LLM_NavEventOwnerTerminalRouteMarshal,
+			_LLM_NavEventOwnerTerminalRouteSource, _LLM_NavEventOwnerTerminalRouteValidate,
+			_LLM_NavEventOwnerTerminalRouteNextRecipeId, _LLM_NavEventOwnerTerminalRouteDescriptor,
+			_LLM_NavEventOwnerTerminalRouteLayoutId, Keylayout_Resolve,
+			_LLM_NavEventOwnerNativeListTerminalHeldRecipes,
+			LLM_NavEventOwner_RefreshTerminalRoutes, LLM_NavEventOwner_Stop]
+		for Index, Owner in OriginalOwners
+			if Owner != Current[Index] || !(Owner is Func)
+					|| Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return true
+	}
+
+	PlainMap(Value) {
+		if !(Value is Map) || ObjGetBase(Value) != Map.Prototype
+			return false
+		for Name in ObjOwnProps(Value)
+			return false
+		return true
+	}
+
+	EpochCurrent(Value) {
+		return Value is Integer && Value >= 0 && _LLM_NavEventOwnerRuntimeEpoch is Integer
+			&& _LLM_NavEventOwnerRuntimeEpoch >= 0 && Value == _LLM_NavEventOwnerRuntimeEpoch
+	}
+
+	ExportsCurrent() {
+		if !OwnersCurrent() || !(IssuedModule is Integer) || IssuedModule <= 0
+				|| !(_LLM_NavEventOwnerModule is Integer) || _LLM_NavEventOwnerModule <= 0
+				|| _LLM_NavEventOwnerModule != IssuedModule
+				|| !PlainMap(IssuedExports) || _LLM_NavEventOwnerExports != IssuedExports
+			return false
+		if IssuedExports.Count != OriginalExports.Count || IssuedExports.CaseSense != OriginalExports.CaseSense
+			return false
+		for Name, Address in OriginalExports
+			if !(Address is Integer) || Address <= 0 || !IssuedExports.Has(Name)
+					|| !(IssuedExports[Name] is Integer) || IssuedExports[Name] != Address
+				return false
+		return true
+	}
+
+	CountersCurrent(State) {
+		return _LLM_NavEventOwnerTerminalRouteGeneration is Integer
+			&& _LLM_NavEventOwnerTerminalRouteGeneration >= State.Generation
+			&& _LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextRecipe >= State.NextRecipe
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout >= State.NextLayout
+	}
+
+	FrameNativeCurrent(State) {
+		return IsObject(State) && State.Genuine && ExportsCurrent()
+			&& State.Module is Integer && State.Module > 0 && State.Module == IssuedModule
+			&& State.Exports == IssuedExports && EpochCurrent(State.Epoch) && CountersCurrent(State)
+	}
+
+	RequiresNativeReceipt(State) {
+		return State.Genuine || State.Module > 0 || IssuedModule > 0
+	}
+
+	FrameCustodyCurrent(State) {
+		if !IsObject(State)
+			return false
+		; Unissued controlled ports own no C lifetime. Their validated Stop ACK
+		; retires local references even after a source invalidated its old epoch.
+		if !RequiresNativeReceipt(State)
+			return State.Module is Integer && State.Module == 0
+				&& State.Exports is Integer && State.Exports == 0
+		if !EpochCurrent(State.Epoch) || !CountersCurrent(State)
+			return false
+		if State.Genuine
+			return FrameNativeCurrent(State)
+		return State.Module is Integer && State.Module >= 0
+			&& (State.Module == 0 ? State.Exports is Integer && State.Exports == 0
+				: ExportsCurrent() && State.Module == IssuedModule && State.Exports == IssuedExports)
+	}
+
+	ScopeCurrent(Operations) {
+		if !PlainMap(Operations) || !Scopes.Has(Operations)
+			return false
+		Image := Scopes[Operations].Image
+		if Operations.Count != Image.Count || Operations.CaseSense != Image.CaseSense
+			return false
+		for Name, Value in Image {
+			if !Operations.Has(Name) || Type(Operations[Name]) != Type(Value) || Operations[Name] != Value
+				return false
+			if Name != "frame" && (!(Value is Func) || Object.Prototype.HasOwnProp.Call(Value, "Call"))
+				return false
+		}
+		return true
+	}
+
+	BuildFrame() {
+		if Constructing || !OwnersCurrent() || !A_IsCritical
+				|| !_LLM_NavEventOwnerTerminalRouteRefreshing || _LLM_NavEventOwnerStopping
+				|| _LLM_NavEventOwnerStopPending || IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+				|| IsObject(ActiveFrame) || IsObject(RetainedFrame) || IsObject(ActiveStop)
+			throw Error("The native registration scope cannot be issued.")
+		Constructing := true
+		try {
+			; Capture is invoked here, after the original-callable guard, never supplied.
+			if !OwnersCurrent()
+				throw Error("The original registration capture owner was withdrawn.")
+			Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
+			if !OwnersCurrent() || !PlainMap(Frame) || !EpochCurrent(_LLM_NavEventOwnerRuntimeEpoch)
+				throw Error("The original registration capture is invalid.")
+			CapturedNative := ExportsCurrent()
+			State := {Frame: Frame, Epoch: _LLM_NavEventOwnerRuntimeEpoch,
+				Recipes: Frame["recipes"], Models: Frame["models"], Mode: "unselected",
+				Genuine: false, Uncertain: false, Completed: false, Raw: "unobserved", Closed: false, Operations: 0,
+				Module: CapturedNative ? IssuedModule : 0, Exports: CapturedNative ? IssuedExports : 0,
+				Generation: Frame["generation"], NextRecipe: Frame["next_recipe"], NextLayout: Frame["next_layout"]}
+			Operations := Map("frame", Frame, "guard", GuardFrame, "custom", CustomRegistration,
+				"native", NativeRegistration, "complete", CompleteFrame, "close", CloseFrame)
+			Image := Operations.Clone()
+			Scopes[Operations] := {Image: Image, Close: CloseFrame}
+			State.Operations := Operations
+			; All closure/image allocation succeeds before the active identity publishes.
+			ActiveFrame := State
+			return Operations
+		} finally Constructing := false
+
+		GuardFrame() {
+			if ActiveFrame != State || State.Closed || !OwnersCurrent() || !ScopeCurrent(State.Operations)
+				throw Error("The original registration dispatcher was withdrawn.")
+		}
+
+		CustomRegistration() {
+			GuardFrame()
+			if State.Mode != "unselected"
+				throw Error("The registration scope already selected its boundary.")
+			State.Mode := "custom"
+		}
+
+		NativeRegistration(Owner, Generation, LayoutId, Bindings, Count) {
+			GuardFrame()
+			if State.Mode != "unselected" || !EpochCurrent(State.Epoch)
+					|| !_LLM_NavEventOwnerTerminalRouteRefreshing
+				throw Error("The original native registration scope was withdrawn.")
+			State.Mode := "default"
+			; Never repair or downgrade a revoked genuine issuance through public exports.
+			if IssuedModule && !ExportsCurrent()
+				throw Error("The issued native registration export image was withdrawn.")
+			if !OwnersCurrent()
+				throw Error("The original native loader owner was withdrawn.")
+			_LLM_NavEventOwnerNativeEnsureLoaded()
+			GenuineCall := ExportsCurrent()
+			if GenuineCall {
+				State.Module := IssuedModule, State.Exports := IssuedExports
+				if !(_LLM_NavEventOwnerTerminalRouteGeneration is Integer)
+						|| !(_LLM_NavEventOwnerTerminalRouteNextRecipe is Integer)
+						|| !(_LLM_NavEventOwnerTerminalRouteNextLayout is Integer)
+					throw Error("The native registration counter owners are invalid.")
+				State.Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+				State.NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe
+				State.NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
+				Address := OriginalExports["ErgoptiNav_RegisterTerminalRoutes"]
+			} else {
+				if IssuedModule || !OwnersCurrent()
+					throw Error("The issued native registration export image changed.")
+				Address := _LLM_NavEventOwnerNativeExport("ErgoptiNav_RegisterTerminalRoutes")
+			}
+			if !EpochCurrent(State.Epoch) || (IssuedModule && !ExportsCurrent())
+				throw Error("The registration lifetime changed before its native call.")
+			State.Genuine := GenuineCall
+			State.Raw := DllCall(Address, "UInt64", Owner, "UInt64", Generation,
+				"UInt64", LayoutId, "Ptr", Bindings, "UInt", Count, "Int")
+			return State.Raw
+		}
+
+		CompleteFrame() {
+			GuardFrame()
+			if !EpochCurrent(State.Epoch) || IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+					|| (State.Genuine && (!(State.Raw is Integer) || State.Raw != 0))
+				throw Error("The registration scope cannot certify its final closure.")
+			State.Completed := true
+		}
+
+		KnownRefusal() {
+			return State.Raw is Integer && (State.Raw == -1 || State.Raw == -2 || State.Raw == -3
+				|| State.Raw == -4 || State.Raw == -5 || State.Raw == -6 || State.Raw == -9 || State.Raw == -11)
+		}
+
+		CloseFrame() {
+			if ActiveFrame != State || State.Closed
+				throw Error("The original registration scope cannot close twice.")
+			State.Closed := true
+			; Failed publication is still custody: absence of global Unknown is no ACK.
+			if !State.Completed && (State.Uncertain || (State.Genuine && !KnownRefusal()))
+				RetainedFrame := State
+			ActiveFrame := 0
+			Scopes.Delete(State.Operations)
+			State.Operations := 0
+		}
+	}
+
+	BuildStop(Snapshot) {
+		if Constructing || !OwnersCurrent() || !A_IsCritical || !_LLM_NavEventOwnerStopping
+				|| _LLM_NavEventOwnerStarting || _LLM_NavEventOwnerTerminalRouteRefreshing
+				|| IsObject(ActiveFrame) || IsObject(ActiveStop) || !EpochCurrent(_LLM_NavEventOwnerRuntimeEpoch)
+			throw Error("The native stop scope cannot be issued.")
+		Ticket := {Frame: Snapshot, Snapshot: Snapshot, Missing: false,
+			Epoch: _LLM_NavEventOwnerRuntimeEpoch, Mode: "unselected",
+			Called: false, Raw: "unobserved", Genuine: false, Module: 0, Exports: 0,
+			Closed: false, Operations: 0, State: RetainedFrame}
+		if IsObject(RetainedFrame) && Snapshot is Integer && Snapshot == 0 {
+			; The real Frame remains private even if its public publication failed.
+			Ticket.Frame := RetainedFrame.Frame, Ticket.Missing := true
+		}
+		Operations := Map("guard", GuardStop, "custom", CustomStop, "native", NativeStop,
+			"accept", AcceptTeardown, "settle", SettleStop, "close", CloseStop)
+		Image := Operations.Clone()
+		Scopes[Operations] := {Image: Image, Close: CloseStop}
+		Ticket.Operations := Operations
+		ActiveStop := Ticket
+		return Operations
+
+		GuardStop() {
+			if ActiveStop != Ticket || Ticket.Closed || !OwnersCurrent() || !ScopeCurrent(Ticket.Operations)
+				throw Error("The original native stop dispatcher was withdrawn.")
+		}
+
+		CustomStop() {
+			GuardStop()
+			if Ticket.Mode != "unselected"
+				throw Error("The stop scope already selected its boundary.")
+			Ticket.Mode := "custom"
+		}
+
+		UnknownCurrent() {
+			if Ticket.Missing
+				return Ticket.Snapshot is Integer && Ticket.Snapshot == 0
+					&& _LLM_NavEventOwnerTerminalRouteUnknown is Integer && _LLM_NavEventOwnerTerminalRouteUnknown == 0
+			return Type(_LLM_NavEventOwnerTerminalRouteUnknown) == Type(Ticket.Snapshot)
+				&& _LLM_NavEventOwnerTerminalRouteUnknown == Ticket.Snapshot
+		}
+
+		NativeStop() {
+			GuardStop()
+			if Ticket.Mode != "unselected" || !_LLM_NavEventOwnerStopping
+					|| _LLM_NavEventOwnerTerminalRouteRefreshing || !EpochCurrent(Ticket.Epoch)
+					|| !UnknownCurrent()
+				throw Error("The original native stop scope was withdrawn.")
+			Ticket.Mode := "default", Ticket.Called := true
+			if IssuedModule && !ExportsCurrent()
+				throw Error("The issued native stop export image was withdrawn.")
+			Ticket.Genuine := ExportsCurrent()
+			if IsObject(Ticket.State)
+					&& (RetainedFrame != Ticket.State || Ticket.State.Frame != Ticket.Frame
+						|| !FrameCustodyCurrent(Ticket.State))
+				throw Error("The retained native registration lifetime changed.")
+			if Ticket.Genuine {
+				Ticket.Module := IssuedModule, Ticket.Exports := IssuedExports
+				Address := OriginalExports["ErgoptiNav_Stop"]
+			} else {
+				if IssuedModule || !OwnersCurrent()
+					throw Error("The issued native stop export image changed.")
+				Address := _LLM_NavEventOwnerNativeExport("ErgoptiNav_Stop")
+			}
+			Ticket.Raw := DllCall(Address, "Int")
+			return Ticket.Raw
+		}
+
+		ReceiptCurrent() {
+			return ActiveStop == Ticket && !Ticket.Closed && A_IsCritical
+				&& _LLM_NavEventOwnerStopping && !_LLM_NavEventOwnerTerminalRouteRefreshing
+				&& ScopeCurrent(Ticket.Operations) && Ticket.Mode == "default"
+				&& Ticket.Called && Ticket.Genuine && Ticket.Raw is Integer
+				&& (Ticket.Raw == 0 || Ticket.Raw == 10) && EpochCurrent(Ticket.Epoch)
+				&& ExportsCurrent() && Ticket.Module is Integer && Ticket.Module > 0
+				&& Ticket.Module == IssuedModule && Ticket.Exports == IssuedExports
+		}
+
+		AcceptTeardown() {
+			GuardStop()
+			if !A_IsCritical || !_LLM_NavEventOwnerStopping || _LLM_NavEventOwnerTerminalRouteRefreshing
+				return false
+			State := Ticket.State
+			if !IsObject(State)
+				return !IsObject(Ticket.Frame) && UnknownCurrent() && EpochCurrent(Ticket.Epoch)
+			return RetainedFrame == State && State.Frame == Ticket.Frame
+				&& UnknownCurrent() && FrameCustodyCurrent(State) && EpochCurrent(Ticket.Epoch)
+				&& (!RequiresNativeReceipt(State) || ReceiptCurrent())
+		}
+
+		SettleStop() {
+			GuardStop()
+			if !AcceptTeardown()
+				return false
+			State := Ticket.State
+			if !IsObject(State)
+				return true
+			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
+				"generation", 0, "layout_id", 0, "registered", 0,
+				"cohort_complete", false, "transformed_output_enabled", false,
+				"unconverted", ["native terminal owner retired"])
+			if _LLM_NavEventOwnerTerminalRouteRecipes == State.Recipes
+				_LLM_NavEventOwnerTerminalRouteRecipes := Map()
+			if _LLM_NavEventOwnerTerminalRouteModels == State.Models
+				_LLM_NavEventOwnerTerminalRouteModels := Map()
+			if !Ticket.Missing
+				_LLM_NavEventOwnerTerminalRouteUnknown := 0
+			RetainedFrame := 0
+			return true
+		}
+
+		CloseStop() {
+			if ActiveStop != Ticket || Ticket.Closed
+				throw Error("The original stop scope cannot close twice.")
+			Ticket.Closed := true
+			ActiveStop := 0
+			Scopes.Delete(Ticket.Operations)
+			Ticket.Operations := 0, Ticket.Frame := 0, Ticket.State := 0
+		}
+	}
+
+	; Retention grants no native authority and survives a withdrawn callable.
+	if Request == "retain_frame" {
+		if !IsObject(ActiveFrame) || ActiveFrame.Closed || ActiveFrame.Frame != Payload
+			return false
+		ActiveFrame.Uncertain := true
+		return true
+	}
+
+	; Cleanup uses only an issued scope identity and its private original closure.
+	; It grants no native receipt and can unwind after a public callable withdrawal.
+	if Request == "close_scope" {
+		if !Scopes.Has(Payload)
+			return false
+		Func.Prototype.Call.Call(Scopes[Payload].Close)
+		return true
+	}
+	if Request == "owns_scope"
+		return OwnersCurrent() && ScopeCurrent(Payload)
+	if Request == "guard_frame"
+		return OwnersCurrent() && IsObject(ActiveFrame) && PlainMap(Payload)
+			&& ActiveFrame.Frame == Payload && ScopeCurrent(ActiveFrame.Operations)
+	if Request == "allows_native_admission"
+		return OwnersCurrent() && !IsObject(ActiveStop) && !Constructing
+	if Request == "begin_frame" {
+		if !((Payload is Integer) && Payload == 0)
+			throw ValueError("Frame construction accepts no supplied authority.")
+		return BuildFrame()
+	}
+	if Request == "begin_stop"
+		return BuildStop(Payload)
+	if Request != "load"
+		throw ValueError("The native owner constructor request is invalid.")
+
+	; A real issuance is immutable for this process, including ordinary load calls.
+	; Public module zero or a foreign export image must never issue a new lifetime.
+	if IssuedModule {
+		if !ExportsCurrent()
+			throw Error("The process-resident native issuance was withdrawn.")
+		return true
+	}
+	; Preserve controlled unissued adapter calls; these confer no genuine authority.
 	if _LLM_NavEventOwnerModule
 		return true
+	if !OwnersCurrent()
+		throw Error("The original native loader owner was withdrawn.")
 	if A_PtrSize != 8
 		throw Error("Navigation owner requires a 64-bit process")
 	Path := _VendorDir . "\ergopti_nav_owner.dll"
 	Module := DllCall("Kernel32\LoadLibraryW", "Str", Path, "Ptr")
-	if !Module
+	if !(Module is Integer) || Module <= 0
 		throw Error("Navigation owner DLL could not be loaded")
 	Names := [
-		"ErgoptiEditor_Begin", "ErgoptiEditor_Poll",
-		"ErgoptiEditor_Decide", "ErgoptiEditor_Close",
-		"ErgoptiNav_Start", "ErgoptiNav_Stop",
-		"ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
-		"ErgoptiNav_SetSuspended", "ErgoptiNav_CanStop",
-		"ErgoptiNav_BeginTerminalCapture",
-		"ErgoptiNav_CommitTerminalCapture",
-		"ErgoptiNav_AbortTerminalCapture",
-		"ErgoptiNav_GetTerminalCapture",
+		"ErgoptiEditor_Begin", "ErgoptiEditor_Poll", "ErgoptiEditor_Decide", "ErgoptiEditor_Close",
+		"ErgoptiNav_Start", "ErgoptiNav_Stop", "ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
+		"ErgoptiNav_SetSuspended", "ErgoptiNav_CanStop", "ErgoptiNav_BeginTerminalCapture",
+		"ErgoptiNav_CommitTerminalCapture", "ErgoptiNav_AbortTerminalCapture", "ErgoptiNav_GetTerminalCapture",
 		"ErgoptiNav_StartHookTrace", "ErgoptiNav_ReadHookTrace", "ErgoptiNav_StopHookTrace",
-		"ErgoptiNav_RegisterTerminalRoutes", "ErgoptiNav_PeekTerminalRoute",
-		"ErgoptiNav_ListTerminalHeldRecipes", "ErgoptiNav_PreviewTerminalOutput",
-		"ErgoptiNav_PlanTerminalOutput", "ErgoptiNav_BeginTerminalOutputAttempt",
-		"ErgoptiNav_AcknowledgeTerminalOutput", "ErgoptiNav_ConsumeTerminalOutput",
-		"ErgoptiNav_CancelTerminalOutput",
-		"ErgoptiNav_BeginOwnerSwap",
-		"ErgoptiNav_CommitOwnerSwap", "ErgoptiNav_AbortOwnerSwap",
-		"ErgoptiNav_ClaimOwner",
-		"ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
-		"ErgoptiNav_BeginProfileSwap",
-		"ErgoptiNav_CommitProfileSwap",
-		"ErgoptiNav_AbortProfileSwap",
-		"ErgoptiNav_ProfilePendingMask",
-		"ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
-		"ErgoptiNav_GetLastOsError", "ErgoptiNav_TestDispatch"
-	]
+		"ErgoptiNav_RegisterTerminalRoutes", "ErgoptiNav_PeekTerminalRoute", "ErgoptiNav_ListTerminalHeldRecipes",
+		"ErgoptiNav_PreviewTerminalOutput", "ErgoptiNav_PlanTerminalOutput", "ErgoptiNav_BeginTerminalOutputAttempt",
+		"ErgoptiNav_AcknowledgeTerminalOutput", "ErgoptiNav_ConsumeTerminalOutput", "ErgoptiNav_CancelTerminalOutput",
+		"ErgoptiNav_SerializeTerminalOutputAttempt", "ErgoptiNav_BeginOwnerSwap", "ErgoptiNav_CommitOwnerSwap",
+		"ErgoptiNav_AbortOwnerSwap", "ErgoptiNav_ClaimOwner", "ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
+		"ErgoptiNav_BeginProfileSwap", "ErgoptiNav_CommitProfileSwap", "ErgoptiNav_AbortProfileSwap",
+		"ErgoptiNav_ProfilePendingMask", "ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
+		"ErgoptiNav_GetLastOsError", "ErgoptiNav_TestDispatch"]
 	Exports := Map()
 	try {
 		for Name in Names {
-			Address := DllCall("Kernel32\GetProcAddress", "Ptr", Module,
-				"AStr", Name, "Ptr")
-			if !Address
+			Address := DllCall("Kernel32\GetProcAddress", "Ptr", Module, "AStr", Name, "Ptr")
+			if !(Address is Integer) || Address <= 0
 				throw Error("Navigation owner DLL export is missing")
 			Exports[Name] := Address
 		}
+		if !OwnersCurrent()
+			throw Error("The original native loader owner was withdrawn.")
+		Detached := Exports.Clone()
 	} catch as Err {
 		DllCall("Kernel32\FreeLibrary", "Ptr", Module, "Int")
 		throw Err
 	}
-	_LLM_NavEventOwnerModule := Module
-	_LLM_NavEventOwnerExports := Exports
+	_LLM_NavEventOwnerModule := Module, _LLM_NavEventOwnerExports := Exports
+	IssuedModule := Module, IssuedExports := Exports, OriginalExports := Detached
 	return true
 }
 

@@ -75,6 +75,8 @@ local _scope_owner = nil
 local _enable_admission = nil
 local _enable_generation = 0
 local _runtime_app_epoch = 0
+local _runtime_responses = setmetatable({}, { __mode = "k" })
+local _runtime_response_ports = nil
 local _runtime_closed = false
 local _runtime_owner, _runtime_request = nil, nil
 local retire_runtime_request, stop_runtime_app
@@ -468,7 +470,7 @@ function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
 	if stop_runtime_app and not stop_runtime_app() then return false end
 	if _runtime_closed or _scope_owner then return false end
-	_runtime_owner = nil
+	_runtime_owner, _runtime_response_ports = nil, nil
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _runtime_closed or _scope_owner then return false end
 	_enable_generation = _enable_generation + 1
@@ -663,7 +665,7 @@ function M.predict(context, output_context, override)
 		return
 	end
 
-	local backend, target, model = M.resolve_backend()
+	local backend, target, model, runtime_response = M.resolve_backend()
 	if not backend then return end
 
 	local clean_context, trigger_chars = context_without_trigger(context,
@@ -781,6 +783,7 @@ function M.predict(context, output_context, override)
 		end
 		_inflight_backend = backend
 		backend.chat(target, model, messages, {
+			runtime_response = runtime_response,
 			stream = DisplaySettings.get("streaming") == true,
 			-- A batch asks once, at the builder's temperature. Sequential variants
 			-- each start from the user's own temperature and, when "raise the
@@ -1211,7 +1214,7 @@ function M.shift_tone(direction, cycle)
 		Logger.error(LOG, "Tone step refused: the built-in prompt '%s' is missing.", plan.profile_id)
 		return false
 	end
-	local backend, target, model = M.resolve_backend()
+	local backend, target, model, runtime_response = M.resolve_backend()
 	if not backend then return false end
 	local system_prompt = resolve_system_prompt(profile, {
 		min_words = Settings.get("min_words"),
@@ -1231,6 +1234,7 @@ function M.shift_tone(direction, cycle)
 	local generation = _tone_generation
 	local focus = current_focus()
 	local request_opts = {
+		runtime_response = runtime_response,
 		stream = false,
 		verify_local_model = verify_local_model == true,
 		temperature = Settings.get("temperature"),
@@ -1376,8 +1380,9 @@ end
 --- The request options of an offer's one-off request: chat mode, no streaming.
 --- @param max_tokens integer
 --- @return table
-local function offer_request_opts(max_tokens, verify_local_model)
+local function offer_request_opts(max_tokens, verify_local_model, runtime_response)
 	return {
+		runtime_response = runtime_response,
 		stream = false,
 		verify_local_model = verify_local_model == true,
 		temperature = Settings.get("temperature"),
@@ -1419,9 +1424,14 @@ local function offer_missing_model(failure, require_enabled)
 			_model_consent_owner = nil
 		end
 	end
-	local ok, handled = pcall(LocalModelOffer.handle, failure, { current = current, modal_observer = observer })
+	local function retired()
+		if _model_consent_owner == owner then _model_consent_owner = nil end
+	end
+	local ok, handled, downloading = pcall(LocalModelOffer.handle, failure, {
+		current = current, modal_observer = observer, on_complete = retired, on_retired = retired,
+	})
 	_modal_resync_owner = nil
-	if _model_consent_owner == owner then _model_consent_owner = nil end
+	if _model_consent_owner == owner and downloading ~= true then _model_consent_owner = nil end
 	if not ok then Logger.warn(LOG, "Missing-model offer failed: %s.", tostring(handled)) end
 	return ok and handled == true
 end
@@ -1435,7 +1445,7 @@ end
 local function request_screen_answers(spec, screen)
 	local config = spec.config
 	local answers = spec.answers
-	local backend, target, model = M.resolve_backend()
+	local backend, target, model, runtime_response = M.resolve_backend()
 	if not backend then
 		clear_offer()
 		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
@@ -1477,7 +1487,7 @@ local function request_screen_answers(spec, screen)
 			{ role = "user", content = Vision.answer_user_text(screen) },
 		}
 		_inflight_backend = backend
-		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens, true), nil, function(full_text, err)
+		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens, true, runtime_response), nil, function(full_text, err)
 			if _runtime_closed or _scope_owner then return end
 			if epoch ~= _request_epoch then
 				Logger.info(LOG, "Screen answer '%s' ignored: a newer action or an edit superseded it.", answer.id)
@@ -1784,7 +1794,7 @@ function M.translate_selection(value)
 		end
 		return false
 	end
-	local backend, backend_target, model = M.resolve_backend()
+	local backend, backend_target, model, runtime_response = M.resolve_backend()
 	if not backend then
 		Logger.info(LOG, "Translation refused (backend_not_ready).")
 		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
@@ -1804,7 +1814,7 @@ function M.translate_selection(value)
 		M.get_backend(), model, code, #selection)
 	send_paced(epoch, "Translation", function()
 		_inflight_backend = backend
-		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens), nil,
+		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
 			function(full_text, err) finish_translation(epoch, meta, config, full_text, err) end)
 	end, function()
 		_predicting = false
@@ -1880,7 +1890,7 @@ local function system1_transport(chat, config, sentence, ctx, on_done)
 		{ role = "system", content = Agent.system1_prompt(config, ctx) },
 		{ role = "user", content = sentence },
 	}
-	chat.module.chat(chat.target, chat.model, messages, offer_request_opts(config.system1.max_tokens, true), nil,
+	chat.module.chat(chat.target, chat.model, messages, offer_request_opts(config.system1.max_tokens, true, chat.runtime_response), nil,
 		function(full_text, err)
 			if err then on_done(nil, err) return end
 			on_done(Agent.parse_system1(config, Parser.strip_thinking(full_text or "")), nil)
@@ -1897,7 +1907,7 @@ local function send_system2(chat, payload, on_done)
 	chat.module.chat(chat.target, chat.model, {
 		{ role = "system", content = payload.system },
 		{ role = "user", content = payload.user },
-	}, offer_request_opts(payload.max_tokens, true), nil, on_done)
+	}, offer_request_opts(payload.max_tokens, true, chat.runtime_response), nil, on_done)
 end
 
 --- The System 2 transport of an offer the user asked for: its backend is the
@@ -1929,6 +1939,21 @@ local function agent_refused(what)
 	return false
 end
 
+
+--- Captures the original managed view before a model/origin reader can reenter.
+--- @param system string Existing agent system identity.
+--- @return table|nil chat
+--- @return string|nil reason
+local function owned_chat_target(system)
+	local receipt = M.capture_runtime_response()
+	local chat, reason = AgentSettings.chat_target(system)
+	if chat and chat.kind == "ollama" then
+		if not M.runtime_response_current(receipt, chat.target) then return nil, "runtime_source_changed" end
+		chat.runtime_response = receipt
+	end
+	return chat, reason
+end
+
 --- System 2's chat target and agent.json, or nil after telling the user why:
 --- off, no model, a provider without a stored key or that cannot chat all
 --- mean that no System 2 is configured.
@@ -1937,7 +1962,7 @@ end
 local function system2_chat(what)
 	local config = AgentSettings.config()
 	if not config then return nil end
-	local chat, reason = AgentSettings.chat_target("system2")
+	local chat, reason = owned_chat_target("system2")
 	if chat then return chat, config end
 	if reason == "off" or reason == "no_model" then
 		Logger.info(LOG, "%s refused: no System 2 is configured (%s).", what, reason)
@@ -2172,13 +2197,13 @@ end
 function M.set_agent_mode(mode)
 	if _runtime_closed or _scope_owner then return false end
 	if mode == "auto" then
-		local system1, reason1 = AgentSettings.chat_target("system1")
+		local system1, reason1 = owned_chat_target("system1")
 		if not system1 then
 			Logger.info(LOG, "Automatic agent refused: System 1 cannot answer (%s).", tostring(reason1))
 			show_notice(AGENT_KEYS.no_system1, "no_system1")
 			return false
 		end
-		local system2, reason2 = AgentSettings.chat_target("system2")
+		local system2, reason2 = owned_chat_target("system2")
 		if not system2 then
 			Logger.info(LOG, "Automatic agent refused: System 2 cannot answer (%s).", tostring(reason2))
 			show_notice(AGENT_KEYS.no_system2, "no_system2")
@@ -2366,8 +2391,8 @@ local function agent_pause_elapsed(generation, buffer, app)
 		Logger.debug(LOG, "Agent triage suppressed: secure field or excluded context.")
 		return
 	end
-	local system1, reason1 = AgentSettings.chat_target("system1")
-	local system2, reason2 = AgentSettings.chat_target("system2")
+	local system1, reason1 = owned_chat_target("system1")
+	local system2, reason2 = owned_chat_target("system2")
 	if not system1 or not system2 then
 		Logger.debug(LOG, "Agent triage skipped: System 1 (%s) or System 2 (%s) cannot answer.",
 			tostring(reason1 or "ready"), tostring(reason2 or "ready"))
@@ -2697,6 +2722,51 @@ function M.shutdown_runtime()
 	local runtime_closed = stop_runtime_app()
 	return probe_closed and download_closed and runtime_closed
 end
+
+--- Captures existing managed lifetime before origin/settings/native readers run.
+--- This creates no runtime owner and invokes no readiness or service observer.
+--- @return table|nil receipt Opaque request identity or explicit refusal.
+function M.capture_runtime_response()
+	if _runtime_closed or _scope_owner then return nil end
+	local owner, epoch = _runtime_owner, _runtime_app_epoch
+	local ports = _runtime_response_ports
+	local controller = owner and ports and ports.owner == owner and ports.controller
+	local capture, current = controller and ports.capture, controller and ports.current
+	local app
+	if owner then
+		if type(capture) ~= "function" or type(current) ~= "function" or owner.controller ~= controller
+			or controller.capture_response ~= capture or controller.response_current ~= current then return nil end
+		local ok, captured = pcall(capture, controller)
+		if not ok or type(captured) ~= "table" then return nil end
+		app = captured
+	end
+	if owner ~= _runtime_owner or epoch ~= _runtime_app_epoch or _runtime_closed or _scope_owner then return nil end
+	local receipt = {}
+	_runtime_responses[receipt] = { owner = owner, epoch = epoch, controller = controller,
+		capture = capture, current = current, app = app }
+	return receipt
+end
+
+--- Validates only the originating managed owner; external same-URL replacement is unobservable.
+--- @param receipt table Original opaque request receipt.
+--- @param origin string Requested service origin.
+--- @return boolean current Read-only observation, without runtime construction or effects.
+function M.runtime_response_current(receipt, origin)
+	local held = _runtime_responses[receipt]
+	if not held or held.owner ~= _runtime_owner or held.epoch ~= _runtime_app_epoch
+		or _runtime_closed or _scope_owner then return false end
+	if held.owner then
+		if held.owner.controller ~= held.controller or held.controller.capture_response ~= held.capture
+			or held.controller.response_current ~= held.current then return false end
+		local called, current = pcall(held.current, held.controller, held.app, origin)
+		if not called or current ~= true then return false end
+	end
+	return held.owner == _runtime_owner and held.epoch == _runtime_app_epoch
+		and (not held.owner or held.owner.controller == held.controller
+			and held.controller.capture_response == held.capture and held.controller.response_current == held.current)
+		and _runtime_responses[receipt] == held and not _runtime_closed and _scope_owner == nil
+end
+
 --- Reports retained runtime repair or app-service cleanup ownership.
 --- @return boolean pending
 function M.runtime_pending()
@@ -2758,6 +2828,9 @@ local function runtime_owner()
 	if ok and owner then
 		if _runtime_closed or _scope_owner then return nil, "runtime_cancelled" end
 		_runtime_owner = owner
+		local controller = owner.controller
+		_runtime_response_ports = { owner = owner, controller = controller,
+			capture = controller and controller.capture_response, current = controller and controller.response_current }
 		return owner
 	end
 	Logger.error(LOG, "Local Ollama runtime construction refused: %s.", tostring(ok and reason or owner))
@@ -3072,6 +3145,7 @@ end
 --- @param quiet boolean Do not log why the backend cannot answer.
 --- @return table|nil backend, any target, string|nil model
 local function backend_target(quiet)
+	local runtime_response = M.capture_runtime_response()
 	local function refuse(...)
 		if not quiet then Logger.warn(LOG, ...) end
 		return nil
@@ -3094,7 +3168,9 @@ local function backend_target(quiet)
 	local model = profiles and profiles.get_current_model()
 	if not ollama then return refuse("predict(): Ollama API not available.") end
 	if not model then return refuse("predict(): No model selected - run Ollama and refresh models.") end
-	return ollama, profiles.get_base_url() or HttpBridge.resolve_base_url() or "", model
+	local origin = profiles.get_base_url() or HttpBridge.resolve_base_url() or ""
+	if not M.runtime_response_current(runtime_response, origin) then return refuse("predict(): originating managed runtime changed.") end
+	return ollama, origin, model, runtime_response
 end
 
 --- The module, target and model a prediction is sent with, or nil when the
@@ -3166,7 +3242,7 @@ function M.download_model(model_tag, label, on_done)
 	local base_url = M.get_base_url()
 	local ok_download, Download = pcall(require, "modules.llm.model_download")
 	if not current() or not base_url or not ok_download or type(Download.start) ~= "function" then return false end
-	return Download.start(base_url, model_tag, label, function(succeeded, tag)
+	return (Download.start(base_url, model_tag, label, function(succeeded, tag)
 		if not current() then return end
 		if succeeded then
 			M.refresh_models()
@@ -3174,7 +3250,7 @@ function M.download_model(model_tag, label, on_done)
 		end
 		if _runtime_closed or _scope_owner then return end
 		if type(on_done) == "function" then on_done(succeeded, tag) end
-	end, current)
+	end, current))
 end
 
 --- Cancels a model pull owned by this engine.

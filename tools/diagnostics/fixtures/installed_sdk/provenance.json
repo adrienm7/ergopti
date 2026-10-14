@@ -1,0 +1,43 @@
+{
+	"schema": 1,
+	"kind": "frozen-independent-installed-sdk-software-inverses",
+	"fixtures": [
+		{
+			"path": "legacy_cli_before.cpp.txt",
+			"sha256": "2bcb6ab2eac56d7c0a051a08edee89492a0e6a8852c6d0e23c0bda8e36e077ef",
+			"bytes": 22919,
+			"mode": "100644",
+			"origin": "Original 65-output authenticated factory CLI before installed-capture dispatch.",
+			"source_snapshot": "LEGACY-CLI-FROZEN.cpp",
+			"policy": "Exact retained pre-fix bytes; never regenerated from the corrected implementation."
+		},
+		{
+			"path": "hid_stop_manager_before.hpp.txt",
+			"sha256": "bd4b44fb58a928cb8e2653b4178a110307b1cdb8430ea1639dc476a38acb25da",
+			"bytes": 15231,
+			"mode": "100644",
+			"origin": "Retained genuine three-way merged manager before exception-safe stop cleanup.",
+			"source_snapshot": "BEFORE-STOP-CORRECTION.hpp",
+			"policy": "Exact retained pre-fix bytes; never regenerated from the corrected implementation."
+		},
+		{
+			"path": "hid_startup_manager_before.hpp.txt",
+			"sha256": "fdbd7c235c4b8b541d2041d14110758d7cfcdcfab86da0a943f1cc715f1c057b",
+			"bytes": 15000,
+			"mode": "100644",
+			"origin": "Retained genuine merged manager before typed startup and failure revocation fixes.",
+			"source_snapshot": "PRE-STARTUP/iokit_hid_manager.hpp",
+			"policy": "Exact retained pre-fix bytes; never regenerated from the corrected implementation."
+		},
+		{
+			"path": "hid_startup_monitor_before.hpp.txt",
+			"sha256": "6292f01ef3bed48ee15a0d02f7837ae89e854778cb3e3a75e7d3fb69feac2189",
+			"bytes": 15744,
+			"mode": "100644",
+			"origin": "Retained genuine merged monitor before iterator validation and start validity reset fixes.",
+			"source_snapshot": "PRE-STARTUP/iokit_service_monitor.hpp",
+			"policy": "Exact retained pre-fix bytes; never regenerated from the corrected implementation."
+		}
+	],
+	"qualification": "Finite software controls only; no native IOKit, hardware, package, installation or signing qualification."
+}

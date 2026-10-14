@@ -102,7 +102,21 @@ class BuilderControls(unittest.TestCase):
             [Path(p).name for p in B.SWIFT_INPUTS],
         )
         self.assertEqual(len(B.SWIFT_INPUTS), 5)
-        self.assertEqual(len(B.HEADER_INPUTS), 6)
+        self.assertEqual(len(B.HEADER_INPUTS), 9)
+        self.assertEqual(
+            tuple(Path(path).name for path in B.HEADER_INPUTS[:6]),
+            (
+                "CPOSIXCompatibility.h",
+                "OwnedProgramCompatibility.h",
+                "LoopbackListenerCompatibility.h",
+                "OwnedImageAliasCompatibility.h",
+                "OwnedSuspendedImageCompatibility.h",
+                "OwnedListenerEventCompatibility.h",
+            ),
+        )
+        self.assertEqual(Path(B.HEADER_INPUTS[6]).name, "OwnedRuntimeSignatureCompatibility.h")
+        self.assertEqual(Path(B.HEADER_INPUTS[7]).name, "OwnedInstalledConfiguration.h")
+        self.assertEqual(Path(B.HEADER_INPUTS[8]).name, "OwnedChildReapingCompatibility.h")
         for original in B.SWIFT_INPUTS:
             self.assertEqual(
                 (build.root / Path(original).name).read_bytes(), (self.repo / original).read_bytes()

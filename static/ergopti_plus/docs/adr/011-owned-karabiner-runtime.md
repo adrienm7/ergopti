@@ -98,9 +98,11 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
   production path until the owned runtime passes native and real-Mac
   acceptance. New flags default to today's behaviour and use key names no older
   build ever wrote, so shared-mode generator output and boot stay identical.
-- VirtualHIDDevice version skew (only one version can be active system-wide) was
-  not part of the answers; the owned mode must surface it as an explicit named
-  state, and its resolution is still to be decided.
+- An incompatible VirtualHIDDevice (only one version can be active system-wide)
+  blocks owned mode in an explicit named unavailable state with an explanation.
+  The decided policy offers a driver-only update requiring explicit confirmation.
+  Detection, product wiring and authenticated signed DriverKit payload suppliers
+  remain unfinished, as do native validation and real-Mac acceptance.
 - Counts are exact only inside an admitted capture. Before approval, during
   stream loss or with the option off while another Karabiner holds the
   keyboards, the gaps are recorded explicitly and never reconstructed.

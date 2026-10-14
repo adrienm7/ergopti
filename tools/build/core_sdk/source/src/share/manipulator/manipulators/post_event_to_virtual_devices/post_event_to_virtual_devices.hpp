@@ -1,0 +1,615 @@
+#pragma once
+
+#include "../../types.hpp"
+#include "../base.hpp"
+#include "console_user_server_peer.hpp"
+#include "key_event_dispatcher.hpp"
+#include "keyboard_repeat_detector.hpp"
+#include "krbn_notification_center.hpp"
+#include "mouse_key_handler.hpp"
+#include "notification_message_manager.hpp"
+#include "queue.hpp"
+#include "types.hpp"
+#include <algorithm>
+#include <pqrs/karabiner/driverkit/virtual_hid_device_service.hpp>
+
+namespace krbn::core_service::daemon { class device_grabber; }
+
+namespace krbn::manipulator::manipulators::post_event_to_virtual_devices {
+class post_event_to_virtual_devices final : public base, public pqrs::dispatcher::extra::dispatcher_client {
+public:
+  post_event_to_virtual_devices(std::weak_ptr<console_user_server_peer> weak_console_user_server_peer,
+                                std::weak_ptr<notification_message_manager> weak_notification_message_manager)
+      : base(),
+        dispatcher_client(),
+        weak_console_user_server_peer_(weak_console_user_server_peer),
+        weak_notification_message_manager_(weak_notification_message_manager),
+        virtual_hid_keyboard_pressed_keys_manager_(std::make_shared<pressed_keys_manager>()),
+        keyboard_suppression_(std::make_shared<keyboard_suppression>()),
+        queue_(virtual_hid_keyboard_pressed_keys_manager_,
+               keyboard_suppression_) {
+    mouse_key_handler_ = std::make_unique<mouse_key_handler>(queue_);
+  }
+
+  ~post_event_to_virtual_devices() override {
+    detach_from_dispatcher([this] {
+      mouse_key_handler_ = nullptr;
+    });
+  }
+
+  bool already_manipulated(const event_queue::entry& front_input_event) override {
+    return false;
+  }
+
+  manipulate_result manipulate(event_queue::entry& front_input_event,
+                               const event_queue::queue& input_event_queue,
+                               std::shared_ptr<event_queue::queue> output_event_queue,
+                               absolute_time_point now) override {
+    if (output_event_queue) {
+      if (front_input_event.get_validity() == validity::invalid) {
+        return manipulate_result::passed;
+      }
+
+      // We have to synchronize the caps_lock state in the following variables when caps lock state is changed.
+      // - output_event_queue::modifier_flag_manager_
+      // - key_event_dispatcher_.pressed_modifier_flags_
+      if (front_input_event.get_event().get_type() == event_queue::event::type::caps_lock_state_changed) {
+        // We should synchronize the key_event_dispatcher_ state
+        // in order to send caps_lock key event properly when caps_lock is used as modifiers.mandatory.
+        //
+        // Example: caps_lock+f9 -> f10
+        //
+        // 1. caps_lock key_down
+        // 2. caps_lock key_up
+        // 3. caps_lock_state_changed(on)
+        // 4. f9 key_down
+        // 5. sticky_modifier caps_lock false (caps_lock off)
+        //    (from modifiers.mandatory)
+        //
+        // Without synchronization, the caps_lock event will not be sent at (5)
+        // because the caps lock state of key_event_dispatcher_ is off.
+        // We have to set the state on at (3).
+        //
+        // Note:
+        // We should not change the key_event_dispatcher_ state while modifier_flag_manager contains sticky caps_lock modifier.
+        // The modifiers.mandatory pushes sticky_modifier to modifier_flag_manager.
+        // While modifiers.mandatory controls modifier_flag_manager, key_event_dispatcher_ should not be updated by LED state.
+
+        if (output_event_queue->get_modifier_flag_manager().sticky_size(modifier_flag::caps_lock) == 0) {
+          if (auto state = front_input_event.get_event().get_integer_value()) {
+            if (*state) {
+              key_event_dispatcher_.insert_pressed_modifier_flag(modifier_flag::caps_lock);
+            } else {
+              key_event_dispatcher_.erase_pressed_modifier_flag(modifier_flag::caps_lock);
+            }
+          }
+        }
+      }
+
+      // Dispatch modifier key event only when front_input_event is key_down or modifier key.
+
+      bool dispatch_modifier_key_event = false;
+      bool dispatch_modifier_key_event_before = false;
+      bool front_input_event_modifier_key_event = false;
+
+      if (auto e = front_input_event.get_event().get_if<momentary_switch_event>()) {
+        if (e->modifier_flag()) {
+          front_input_event_modifier_key_event = true;
+        }
+      }
+
+      if (front_input_event_modifier_key_event) {
+        // front_input_event is modifier key event.
+        if (!front_input_event.get_lazy()) {
+          dispatch_modifier_key_event = true;
+          dispatch_modifier_key_event_before = false;
+        }
+
+      } else {
+        if (front_input_event.get_event_type() == event_type::key_down) {
+          dispatch_modifier_key_event = true;
+          dispatch_modifier_key_event_before = true;
+
+        } else if (front_input_event.get_event().get_type() == event_queue::event::type::pointing_motion) {
+          // We should not dispatch modifier key events while key repeating.
+          // (See comments in `handle_pointing_device_event_from_event_tap` for details.)
+          if (!queue_.get_keyboard_repeat_detector().is_repeating() &&
+              pressed_buttons_.empty() &&
+              !mouse_key_handler_->active()) {
+            dispatch_modifier_key_event = true;
+            dispatch_modifier_key_event_before = true;
+          }
+        }
+      }
+
+      if (dispatch_modifier_key_event &&
+          dispatch_modifier_key_event_before) {
+        key_event_dispatcher_.dispatch_modifier_key_event(output_event_queue->get_modifier_flag_manager(),
+                                                          queue_,
+                                                          front_input_event.get_event_time_stamp().get_time_stamp());
+      }
+
+      // Note: output_event_queue::modifier_flag_manager_ will be changed by push_back_entry.
+      output_event_queue->push_back_entry(front_input_event);
+      front_input_event.set_validity(validity::invalid);
+
+      update_sticky_modifiers_notification_message(*output_event_queue);
+
+      switch (front_input_event.get_event().get_type()) {
+        case event_queue::event::type::momentary_switch_event:
+          if (auto e = front_input_event.get_event().get_if<momentary_switch_event>()) {
+            if (e->valid()) {
+              if (e->pointing_button()) {
+                post_pointing_input_report(front_input_event,
+                                           output_event_queue);
+
+              } else if (!front_input_event_modifier_key_event) {
+                switch (front_input_event.get_event_type()) {
+                  case event_type::key_down: {
+                    const auto time_stamp = make_time_stamp_with_sleep_shortcut_delay_if_needed(
+                        *e,
+                        *output_event_queue,
+                        front_input_event.get_event_time_stamp().get_time_stamp());
+
+                    key_event_dispatcher_.dispatch_key_down_event(front_input_event.get_device_id(),
+                                                                  e->get_usage_pair(),
+                                                                  queue_,
+                                                                  time_stamp);
+                  } break;
+
+                  case event_type::key_up:
+                    key_event_dispatcher_.dispatch_key_up_event(e->get_usage_pair(),
+                                                                queue_,
+                                                                front_input_event.get_event_time_stamp().get_time_stamp());
+                    break;
+
+                  case event_type::single:
+                    break;
+                }
+              }
+            }
+          }
+          break;
+
+        case event_queue::event::type::pointing_motion:
+          post_pointing_input_report(front_input_event,
+                                     output_event_queue);
+          break;
+
+        case event_queue::event::type::shell_command:
+          if (auto shell_command = front_input_event.get_event().get_shell_command()) {
+            if (front_input_event.get_event_type() == event_type::key_down) {
+              queue_.push_back_shell_command_event(*shell_command,
+                                                   front_input_event.get_event_time_stamp().get_time_stamp());
+            }
+          }
+          break;
+
+        case event_queue::event::type::send_user_command:
+          if (auto user_command = front_input_event.get_event().get_user_command()) {
+            if (front_input_event.get_event_type() == event_type::key_down) {
+              queue_.push_back_send_user_command_event(*user_command,
+                                                       front_input_event.get_event_time_stamp().get_time_stamp());
+            }
+          }
+          break;
+
+        case event_queue::event::type::select_input_source:
+          if (auto input_source_specifiers = front_input_event.get_event().get_input_source_specifiers()) {
+            if (front_input_event.get_event_type() == event_type::key_down) {
+              queue_.push_back_select_input_source_event(*input_source_specifiers,
+                                                         front_input_event.get_event_time_stamp().get_time_stamp());
+            }
+          }
+          break;
+
+        case event_queue::event::type::set_notification_message:
+          if (auto message = front_input_event.get_event().get_if<notification_message>()) {
+            if (auto notification_message_manager = weak_notification_message_manager_.lock()) {
+              notification_message_manager->async_set_notification_message(*message);
+            }
+          }
+          break;
+
+        case event_queue::event::type::mouse_key:
+          if (auto mouse_key = front_input_event.get_event().get_mouse_key()) {
+            if (front_input_event.get_event_type() == event_type::key_down) {
+              mouse_key_handler_->push_back_mouse_key(front_input_event.get_device_id(),
+                                                      *mouse_key,
+                                                      output_event_queue,
+                                                      front_input_event.get_event_time_stamp().get_time_stamp());
+            } else if (front_input_event.get_event_type() == event_type::key_up) {
+              mouse_key_handler_->erase_mouse_key(front_input_event.get_device_id(),
+                                                  *mouse_key,
+                                                  output_event_queue,
+                                                  front_input_event.get_event_time_stamp().get_time_stamp());
+            }
+          }
+          break;
+
+        case event_queue::event::type::software_function:
+          if (auto e = front_input_event.get_event().get_if<software_function>()) {
+            if (front_input_event.get_event_type() == event_type::key_down) {
+              queue_.push_back_software_function_event(*e,
+                                                       front_input_event.get_event_time_stamp().get_time_stamp());
+            }
+          }
+          break;
+
+        case event_queue::event::type::stop_keyboard_repeat:
+          if (auto e = queue_.get_keyboard_repeat_detector().get_repeating_key()) {
+            key_event_dispatcher_.dispatch_key_up_event(e->get_usage_pair(),
+                                                        queue_,
+                                                        front_input_event.get_event_time_stamp().get_time_stamp());
+          }
+          break;
+
+        case event_queue::event::type::system_preferences_properties_changed:
+          if (auto properties = front_input_event.get_event().get_if<pqrs::osx::system_preferences::properties>()) {
+            mouse_key_handler_->set_system_preferences_properties(*properties);
+          }
+          break;
+
+        case event_queue::event::type::none:
+        case event_queue::event::type::set_variable:
+        case event_queue::event::type::sticky_modifier:
+        case event_queue::event::type::device_keys_and_pointing_buttons_are_released:
+        case event_queue::event::type::device_grabbed:
+        case event_queue::event::type::device_ungrabbed:
+        case event_queue::event::type::caps_lock_state_changed:
+        case event_queue::event::type::pointing_device_event_from_event_tap:
+        case event_queue::event::type::frontmost_application_changed:
+        case event_queue::event::type::input_source_changed:
+        case event_queue::event::type::virtual_hid_devices_state_changed:
+          // Do nothing
+          break;
+      }
+
+      if (dispatch_modifier_key_event &&
+          !dispatch_modifier_key_event_before) {
+        key_event_dispatcher_.dispatch_modifier_key_event(output_event_queue->get_modifier_flag_manager(),
+                                                          queue_,
+                                                          front_input_event.get_event_time_stamp().get_time_stamp());
+      }
+    }
+
+    return manipulate_result::passed;
+  }
+
+  bool active() const override {
+    return !queue_.empty();
+  }
+
+  bool needs_virtual_hid_pointing() const override {
+    return false;
+  }
+
+  void handle_device_keys_and_pointing_buttons_are_released_event(const event_queue::entry& front_input_event,
+                                                                  event_queue::queue& output_event_queue) override {
+    // modifier flags
+
+    key_event_dispatcher_.dispatch_modifier_key_event(output_event_queue.get_modifier_flag_manager(),
+                                                      queue_,
+                                                      front_input_event.get_event_time_stamp().get_time_stamp());
+
+    // We have to keep sticky modifiers state except the caps lock
+    // in order to keep the sticky modifiers state after all keys are released.
+    //
+    // About the exception of caps lock:
+    // The caps lock will be handled as "toggle" in above dispatch_modifier_key_event.
+    // In the following case, unless erasing stikcy modifiers,
+    // the caps lock sticky modifier will be erased at (3) and
+    // caps lock event is not sent at (4).
+    //
+    // (1) sticky_modifier caps_lock true
+    // (2) device_keys_and_pointing_buttons_are_released
+    //     - usage::caps_lock is sent to turn caps lock on.
+    // (3) sticky_modifier caps_lock false
+    // (4) Another key is pressed
+    //     - We need to send usage::caps_lock at here.
+
+    output_event_queue.get_modifier_flag_manager().erase_caps_lock_sticky_modifier_flags();
+
+    update_sticky_modifiers_notification_message(output_event_queue);
+
+    // pointing buttons
+
+    {
+      auto buttons = output_event_queue.get_pointing_button_manager().make_hid_report_buttons();
+      if (pressed_buttons_ != buttons) {
+        pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::pointing_input report;
+        report.buttons = buttons;
+        queue_.emplace_back_pointing_input(report,
+                                           event_type::key_up,
+                                           front_input_event.get_event_time_stamp().get_time_stamp());
+
+        // Save buttons for `handle_device_ungrabbed_event`.
+        pressed_buttons_ = buttons;
+      }
+    }
+
+    // mouse keys
+
+    mouse_key_handler_->erase_mouse_keys_by_device_id(front_input_event.get_device_id(),
+                                                      front_input_event.get_event_time_stamp().get_time_stamp());
+  }
+
+  void handle_device_ungrabbed_event(device_id device_id,
+                                     const event_queue::queue& output_event_queue,
+                                     absolute_time_point time_stamp) override {
+    // Release pressed keys
+
+    key_event_dispatcher_.dispatch_key_up_events_by_device_id(device_id,
+                                                              queue_,
+                                                              time_stamp);
+
+    // Release buttons
+    {
+      auto buttons = output_event_queue.get_pointing_button_manager().make_hid_report_buttons();
+      if (pressed_buttons_ != buttons) {
+        pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::pointing_input report;
+        report.buttons = buttons;
+        queue_.emplace_back_pointing_input(report,
+                                           event_type::key_up,
+                                           time_stamp);
+
+        pressed_buttons_ = buttons;
+      }
+    }
+
+    // Release modifiers
+
+    key_event_dispatcher_.dispatch_modifier_key_event(output_event_queue.get_modifier_flag_manager(),
+                                                      queue_,
+                                                      time_stamp);
+
+    // Release mouse_key_handler_
+
+    mouse_key_handler_->erase_mouse_keys_by_device_id(device_id,
+                                                      time_stamp);
+  }
+
+  void handle_pointing_device_event_from_event_tap(const event_queue::entry& front_input_event,
+                                                   event_queue::queue& output_event_queue) override {
+    // We should not dispatch modifier key events while key repeating.
+    //
+    // macOS does not ignore the modifier state change while key repeating.
+    // If you enabled `control-f -> right_arrow` configuration,
+    // apps will catch control-right_arrow event if release the lazy modifier here while right_arrow key is repeating.
+
+    // We should not dispatch modifier key events while mouse keys active.
+    //
+    // For example, we should not restore right_shift by physical mouse movement when we use "change right_shift+r to scroll",
+    // because the right_shift key_up event interrupt scroll event.
+
+    // We should not dispatch modifier key events while mouse buttons are pressed.
+    // If you enabled `option-f -> button1` configuration,
+    // apps will catch option-button1 event if release the lazy modifier here while button1 is pressed.
+
+    switch (front_input_event.get_event_type()) {
+      case event_type::key_down:
+      case event_type::single:
+        if (!queue_.get_keyboard_repeat_detector().is_repeating() &&
+            pressed_buttons_.empty() &&
+            !mouse_key_handler_->active()) {
+          key_event_dispatcher_.dispatch_modifier_key_event(output_event_queue.get_modifier_flag_manager(),
+                                                            queue_,
+                                                            front_input_event.get_event_time_stamp().get_time_stamp());
+        }
+        break;
+
+      case event_type::key_up:
+        break;
+    }
+  }
+
+  void set_validity(validity value) override {
+    // This manipulator is always valid.
+  }
+
+  void set_cgeventtap_fallback_enabled(bool value) {
+    keyboard_suppression_->set_expired_log_enabled(value);
+    queue_.set_cgeventtap_fallback_enabled(value);
+  }
+
+  void set_sleep_shortcut_delay(std::chrono::milliseconds value) {
+    sleep_shortcut_delay_ = value;
+  }
+
+  void async_post_events(std::weak_ptr<pqrs::karabiner::driverkit::virtual_hid_device_service::client> weak_virtual_hid_device_service_client) {
+    enqueue_to_dispatcher(
+        [this, weak_virtual_hid_device_service_client] {
+          queue_.async_post_events(weak_virtual_hid_device_service_client,
+                                   weak_console_user_server_peer_);
+        });
+  }
+
+  [[nodiscard]] pqrs::not_null_shared_ptr_t<pressed_keys_manager> get_virtual_hid_keyboard_pressed_keys_manager() const {
+    return virtual_hid_keyboard_pressed_keys_manager_;
+  }
+
+  [[nodiscard]] pqrs::not_null_shared_ptr_t<keyboard_suppression> get_keyboard_suppression() const {
+    return keyboard_suppression_;
+  }
+
+  void clear_virtual_hid_keyboard_pressed_keys() {
+    virtual_hid_keyboard_pressed_keys_manager_->clear();
+  }
+
+  void async_release_virtual_hid_keyboard_pressed_keys(std::weak_ptr<pqrs::karabiner::driverkit::virtual_hid_device_service::client> weak_virtual_hid_device_service_client) {
+    auto pressed_keys = virtual_hid_keyboard_pressed_keys_manager_->make_entries_and_clear();
+    if (pressed_keys.empty()) {
+      return;
+    }
+
+    enqueue_to_dispatcher(
+        [this, pressed_keys, weak_virtual_hid_device_service_client] {
+          auto time_stamp = pqrs::osx::chrono::mach_absolute_time_point();
+
+          for (const auto& e : pressed_keys) {
+            if (!e.valid() || e.pointing_button()) {
+              continue;
+            }
+
+            queue_.emplace_back_key_event(e.get_usage_pair(),
+                                          event_type::key_up,
+                                          time_stamp);
+          }
+
+          key_event_dispatcher_.clear();
+
+          queue_.async_post_events(weak_virtual_hid_device_service_client,
+                                   weak_console_user_server_peer_);
+        });
+  }
+
+  [[nodiscard]] const queue& get_queue() const {
+    return queue_;
+  }
+
+  void clear_queue() {
+    return queue_.clear();
+  }
+
+  [[nodiscard]] const key_event_dispatcher& get_key_event_dispatcher() const {
+    return key_event_dispatcher_;
+  }
+
+  [[nodiscard]] key_event_dispatcher& get_key_event_dispatcher() {
+    return key_event_dispatcher_;
+  }
+
+private:
+  friend class ::krbn::core_service::daemon::device_grabber;
+  void bind_owned_output_scope(std::function<bool()> current) {
+    queue_.bind_owned_output_scope(std::move(current));
+  }
+  [[nodiscard]] absolute_time_point make_time_stamp_with_sleep_shortcut_delay_if_needed(
+      const momentary_switch_event& event,
+      const event_queue::queue& output_event_queue,
+      absolute_time_point time_stamp) const {
+    const auto usage_pair = event.get_usage_pair();
+    const auto usage_page = usage_pair.get_usage_page();
+    const auto usage = usage_pair.get_usage();
+
+    //
+    // command+option+power or command+option+eject
+    //
+
+    const auto power_or_eject =
+        (usage_page == pqrs::hid::usage_page::keyboard_or_keypad &&
+         usage == pqrs::hid::usage::keyboard_or_keypad::keyboard_power) ||
+        (usage_page == pqrs::hid::usage_page::consumer &&
+         (usage == pqrs::hid::usage::consumer::power ||
+          usage == pqrs::hid::usage::consumer::eject));
+
+    if (power_or_eject) {
+      const auto& modifier_flag_manager = output_event_queue.get_modifier_flag_manager();
+      const auto option_pressed =
+          modifier_flag_manager.is_pressed(modifier_flag::left_option) ||
+          modifier_flag_manager.is_pressed(modifier_flag::right_option);
+      const auto command_pressed =
+          modifier_flag_manager.is_pressed(modifier_flag::left_command) ||
+          modifier_flag_manager.is_pressed(modifier_flag::right_command);
+
+      if (option_pressed && command_pressed) {
+        return make_time_stamp_with_sleep_shortcut_delay(time_stamp);
+      }
+    }
+
+    //
+    // escape at the login window
+    //
+
+    if (usage_page == pqrs::hid::usage_page::keyboard_or_keypad &&
+        usage == pqrs::hid::usage::keyboard_or_keypad::keyboard_escape) {
+      const auto& bundle_identifier =
+          output_event_queue.get_manipulator_environment().get_frontmost_application().get_bundle_identifier();
+
+      // Escape puts macOS to sleep at the login window, so delay its key-down event
+      // to prevent the following key-up event from waking macOS immediately.
+      if (bundle_identifier &&
+          *bundle_identifier == "com.apple.loginwindow") {
+        return make_time_stamp_with_sleep_shortcut_delay(time_stamp);
+      }
+    }
+
+    return time_stamp;
+  }
+
+  [[nodiscard]] absolute_time_point make_time_stamp_with_sleep_shortcut_delay(absolute_time_point time_stamp) const {
+    return time_stamp +
+           pqrs::osx::chrono::make_absolute_time_duration(sleep_shortcut_delay_);
+  }
+
+  void post_pointing_input_report(event_queue::entry& front_input_event,
+                                  std::shared_ptr<event_queue::queue> output_event_queue) {
+    pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::pointing_input report;
+    report.buttons = output_event_queue->get_pointing_button_manager().make_hid_report_buttons();
+
+    if (auto pointing_motion = front_input_event.get_event().get_pointing_motion()) {
+      report.x = pointing_motion->get_x();
+      report.y = pointing_motion->get_y();
+      report.vertical_wheel = pointing_motion->get_vertical_wheel();
+      report.horizontal_wheel = pointing_motion->get_horizontal_wheel();
+    }
+
+    queue_.emplace_back_pointing_input(report,
+                                       front_input_event.get_event_type(),
+                                       front_input_event.get_event_time_stamp().get_time_stamp());
+
+    // Save buttons for `handle_device_ungrabbed_event`.
+    pressed_buttons_ = report.buttons;
+  }
+
+  void update_sticky_modifiers_notification_message(const event_queue::queue& output_event_queue) {
+    if (auto notification_message_manager = weak_notification_message_manager_.lock()) {
+      auto c = output_event_queue.get_manipulator_environment().get_core_configuration();
+      if (c->get_selected_profile().get_virtual_hid_keyboard()->get_indicate_sticky_modifier_keys_state()) {
+        notification_message_manager->async_update_sticky_modifiers_message(output_event_queue.get_modifier_flag_manager());
+      } else {
+        notification_message_manager->async_clear_sticky_modifiers_message();
+      }
+    }
+  }
+
+  std::weak_ptr<console_user_server_peer> weak_console_user_server_peer_;
+  std::weak_ptr<notification_message_manager> weak_notification_message_manager_;
+
+  // Manages the list of keys that are currently pressed.
+  // This is needed for the following two reasons when enable_cgeventtap_fallback is enabled.
+  //
+  // - CGEventTap cannot receive key events while secure_event_input is enabled.
+  //   For example, if you press the return key in Terminal to run `sudo ls`,
+  //   the key_up event for the return key will not be received.
+  //   In that case, when a virtual device is being operated via the CGEventTap fallback,
+  //   unintended key repeat for the return key can occur.
+  //   To prevent this, all virtual-device keys must be released when secure_event_input becomes enabled,
+  //   which requires remembering which keys are currently pressed.
+  //
+  // - CGEventTap also receives key-repeat events. When processing via the CGEventTap fallback,
+  //   CGEventTap receives the following two kinds of key-repeat events:
+  //
+  //   1. Repeats of the original pre-remapping key events from the physical keyboard.
+  //   2. Repeats of the post-remapping key events from the virtual device.
+  //
+  //   The former must be blocked, while the latter must pass through.
+  //   Ideally we would pass through only repeats originating from the virtual device,
+  //   but CGEventTap does not provide enough hardware-origin information to distinguish them directly.
+  //   Therefore, we use the following approach: allow repeats only for keys that are currently pressed
+  //   on the virtual device, which requires remembering the pressed keys.
+  //
+  //   As a side effect of this approach, unmodified key events can repeat twice as fast because
+  //   identical events are generated by both the physical device and the virtual device.
+  //   This is unavoidable.
+  pqrs::not_null_shared_ptr_t<pressed_keys_manager> virtual_hid_keyboard_pressed_keys_manager_;
+
+  pqrs::not_null_shared_ptr_t<keyboard_suppression> keyboard_suppression_;
+
+  queue queue_;
+  std::chrono::milliseconds sleep_shortcut_delay_{500};
+  key_event_dispatcher key_event_dispatcher_;
+  std::unique_ptr<mouse_key_handler> mouse_key_handler_;
+  pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::buttons pressed_buttons_;
+};
+} // namespace krbn::manipulator::manipulators::post_event_to_virtual_devices

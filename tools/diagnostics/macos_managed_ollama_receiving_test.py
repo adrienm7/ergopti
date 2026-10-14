@@ -70,10 +70,14 @@ class StandaloneCompilerControls(unittest.TestCase):
                 "OwnedImageAliasCompatibility.h",
                 "OwnedSuspendedImageCompatibility.h",
                 "OwnedListenerEventCompatibility.h",
+                "OwnedRuntimeSignatureCompatibility.h",
+                "OwnedInstalledConfiguration.h",
+                "OwnedChildReapingCompatibility.h",
             ]:
                 relative = (
                     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name
                 )
+                self.assertTrue((module / name).is_file(), name)
                 original = (ROOT / relative).read_bytes()
                 self.assertEqual((module / name).read_bytes(), original)
                 self.assertEqual(
@@ -89,6 +93,9 @@ class StandaloneCompilerControls(unittest.TestCase):
                     "OwnedImageAliasCompatibility.h",
                     "OwnedSuspendedImageCompatibility.h",
                     "OwnedListenerEventCompatibility.h",
+                    "OwnedRuntimeSignatureCompatibility.h",
+                    "OwnedInstalledConfiguration.h",
+                    "OwnedChildReapingCompatibility.h",
                 },
             )
             self.assertIn(
@@ -106,6 +113,9 @@ class StandaloneCompilerControls(unittest.TestCase):
                 "OwnedImageAliasCompatibility.h",
                 "OwnedSuspendedImageCompatibility.h",
                 "OwnedListenerEventCompatibility.h",
+                "OwnedRuntimeSignatureCompatibility.h",
+                "OwnedInstalledConfiguration.h",
+                "OwnedChildReapingCompatibility.h",
             ):
                 original = (
                     ROOT
