@@ -269,6 +269,7 @@ function M.new(ports)
 			active = entry
 			local function complete()
 				if entry.constructing or active ~= entry or not entry.completed or not settled(entry) then return end
+				if active ~= entry then return end
 				active = nil
 				if entry.cancelled or generation ~= epoch then return end
 				local admitted_now = allowed()
