@@ -117,21 +117,20 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * _debounce_sec = 60s of a quiet-b
 -- =========================================
 
 --- Returns the mtime of a path as a number (epoch seconds), or nil on error.
---- Uses posix.stat() when available, falls back to a shell invocation.
+--- Uses a complete posix timespec when available, otherwise GNU date.
 --- @param path string Absolute or relative path.
 --- @return number|nil mtime in seconds, or nil.
 local function _mtime(path)
 	if posix and posix.stat then
 		local ok, st = pcall(posix.stat, path)
 		if ok and st and type(st) == "table" then
-			-- posix.stat returns { mtime = { sec = ..., nsec = ... } } on many builds,
-			-- or { mtime = number } on others. Normalise to a single number.
-			if type(st.mtime) == "table" and st.mtime.sec then
-				return tonumber(st.mtime.sec) + (tonumber(st.mtime.nsec) or 0) * 1e-9
-			elseif type(st.mtime) == "number" then
-				return st.mtime
-			elseif type(st.modification) == "number" then
-				return st.modification
+			-- Scalar receipts on luaposix builds contain only whole seconds.
+			-- A missing nanosecond field cannot certify subsecond precision either.
+			if type(st.mtime) == "table" then
+				local seconds, nanoseconds = tonumber(st.mtime.sec), tonumber(st.mtime.nsec)
+				if seconds and nanoseconds then
+					return seconds + nanoseconds * 1e-9
+				end
 			end
 		end
 	end

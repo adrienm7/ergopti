@@ -157,6 +157,105 @@ helpers.describe("file watchers native backend", function()
 end)
 
 
+-- ======================================================================
+-- Subsecond polling receipts (real files, fixed timestamps, no sleeps)
+-- ======================================================================
+
+helpers.describe("file_watchers subsecond polling", function()
+	local posix_ok, native_posix = pcall(require, "posix")
+	local epoch_seconds = 1700000000
+	local receipts = {
+		{ name = "scalar mtime", shape = function() return { mtime = epoch_seconds } end },
+		{ name = "scalar modification", shape = function() return { modification = epoch_seconds } end },
+		{ name = "incomplete timespec", shape = function() return { mtime = { sec = epoch_seconds } } end },
+		{ name = "complete timespec", precise = true,
+			shape = function(nanoseconds) return { mtime = { sec = epoch_seconds, nsec = nanoseconds } } end },
+	}
+	if posix_ok and type(native_posix.stat) == "function" then
+		receipts[#receipts + 1] = { name = "installed posix", native = true }
+	else
+		print("  [native posix integration unavailable; fixed-mtime receipt fixtures still run]")
+	end
+
+	for _, receipt in ipairs(receipts) do
+		helpers.it("file_watchers subsecond polling: detects same-second edits with " .. receipt.name, function()
+			local dir = make_temp_dir()
+			local basename = "collision's.toml"
+			local path = dir .. "/" .. basename
+			local quoted_path = "'" .. path:gsub("'", "'\\''") .. "'"
+			local held_popen = io.popen
+			local previous_watcher = package.loaded["infra.file_watchers"]
+			local previous_posix, previous_preload = package.loaded["posix"], package.preload["posix"]
+			local watcher, now_ms, fired, nanoseconds, precision_reads = nil, 0, 0, 100000000, 0
+			local function set_timestamp(fraction)
+				local timestamp = tostring(epoch_seconds) .. "." .. fraction
+				local result = os.execute("touch -m -d '@" .. timestamp .. "' " .. quoted_path)
+				helpers.assert_true(result == true or result == 0, "fixed file timestamp must be acknowledged")
+				local pipe = held_popen("date -r " .. quoted_path .. " +%s.%N", "r")
+				helpers.assert_true(pipe ~= nil, "read the actual kernel file timestamp independently")
+				local observed = pipe:read("*a")
+				local closed = pipe:close()
+				helpers.assert_true(closed == true or closed == 0, "timestamp reader must exit successfully")
+				helpers.assert_eq(observed, timestamp .. "\n", "real file must hold the exact prescribed timestamp")
+				nanoseconds = tonumber(fraction)
+			end
+			local ok, err = pcall(function()
+				helpers.assert_true(write_file(path), "create the real watched TOML")
+				set_timestamp("100000000")
+				if not receipt.native then
+					package.loaded["posix"] = {
+						stat = function(candidate)
+							if candidate == dir then return { type = "directory" } end
+							if candidate == path then return receipt.shape(nanoseconds) end
+						end,
+						dir = function(candidate)
+							helpers.assert_eq(candidate, dir, "scan only the owned fixture")
+							return { basename }
+						end,
+					}
+				end
+				io.popen = function(command, ...)
+					if command:find("date -r " .. quoted_path .. " ", 1, true) == 1 then
+						precision_reads = precision_reads + 1
+					end
+					return held_popen(command, ...)
+				end
+				watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				watcher.start({ hotstrings_dir = dir, now_ms = function() return now_ms end,
+					on_reload = function() fired = fired + 1 end })
+				helpers.assert_true(not watcher.has_inotify(), "exercise the real polling producer")
+				watcher.pump()
+				helpers.assert_eq(fired, 0, "unchanged baseline must not reload")
+				for index, fraction in ipairs({ "200000000", "300000000" }) do
+					set_timestamp(fraction)
+					watcher.pump()
+					helpers.assert_eq(fired, index - 1, "same-second edit must wait for debounce")
+					now_ms = now_ms + 600
+					watcher.pump()
+					helpers.assert_eq(fired, index, "each settled same-second edit must reload exactly once")
+					watcher.pump()
+					helpers.assert_eq(fired, index, "unchanged timestamp must not repeat a reload")
+				end
+				if receipt.precise then
+					helpers.assert_eq(precision_reads, 0, "complete native timespec retains its shell-free precision")
+				elseif not receipt.native then
+					helpers.assert_true(precision_reads > 0, "coarse receipts must reach the subsecond reader")
+				end
+			end)
+			local stopped, stop_error = true, nil
+			if watcher then stopped, stop_error = pcall(watcher.stop) end
+			io.popen = held_popen
+			package.loaded["infra.file_watchers"] = previous_watcher
+			package.loaded["posix"], package.preload["posix"] = previous_posix, previous_preload
+			local removed = os.execute("rm -rf '" .. dir:gsub("'", "'\\''") .. "'")
+			helpers.assert_true(ok, tostring(err))
+			helpers.assert_true(stopped, tostring(stop_error))
+			helpers.assert_true(removed == true or removed == 0, "owned fixture removal must be acknowledged")
+		end)
+	end
+end)
+
+
 --- Isolates the real libuv return-value interface, not a physical watch.
 local function activation_fixture(receipt)
 	local state = { handles = {}, starts = 0, stops = 0, closes = 0, warnings = {}, summaries = {} }
