@@ -4592,7 +4592,15 @@ The captured macOS magic-key choice now belongs to the exact live script-control
 Linux capture now requires the actual deferred answer queue acknowledgement before consuming the physical key. A committed pause, loss of capture eligibility or a newer admitted request fences stale replies; a refused newer timeout keeps the older queued choice eligible. Synchronous, refused and throwing answer queues do not publish preferences. Throwing initial timeout submission releases only its own candidate and preserves a reentrant successor. The 107 focused controls pass under Lua 5.4 and LuaJIT with unchanged original assertions and red old-source inverses; whole-source, native X11/Wayland, installation and physical acceptance remain separate gates. Windows-PC pause/capture acceptance remains explicitly deferred.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
-  background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
+  background Karabiner runtime (no Karabiner-Elements app). The existing
+  program-action diagnostic fixtures now use native Windows pipe readiness,
+  a retained child-process handle and explicit LF output for their disposable
+  Python helpers. All 34 original cases and 112 assertion lines are preserved;
+  Linux receiving passes with no skips. Windows qualification remains open:
+  run the same 34 cases with Python 3.12 or later on a real Windows runner;
+  the current Windows CI lane does not enroll these Python tests. This fixture
+  correction grants no Darwin consent or resolution of the lease incident.
+  Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
   are published (decision record, one accounting policy whose default `legacy`
   mode is byte-identical to dev.147, HID usages with aliases in

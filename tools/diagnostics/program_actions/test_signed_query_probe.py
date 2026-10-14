@@ -2,6 +2,7 @@
 """Independent protocol, provenance and real pipe controls; Darwin ABI remains CI-only."""
 
 import base64
+from contextlib import ExitStack, contextmanager
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import sys
 import tempfile
 import types
 import unittest
+from unittest.mock import patch
 
 from run_signed_query_probe import QueryProtocol, Refused, SignedQuery, verify_build_receipt
 
@@ -154,16 +156,145 @@ class ProtocolControls(unittest.TestCase):
             verify_build_receipt(json.dumps(packet).encode(), "a" * 40, hashes, "b" * 64, None, "2")
 
 
+class WindowsPipeSelector:
+    """Fixture-only native pipe readiness; production still reads and decodes every byte."""
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes
+        import msvcrt
+
+        self._ctypes = ctypes
+        self._get_handle = msvcrt.get_osfhandle
+        self._kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        self._peek = self._kernel.PeekNamedPipe
+        self._peek.argtypes = (
+            wintypes.HANDLE,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.LPVOID,
+        )
+        self._peek.restype = wintypes.BOOL
+        self._available_type = wintypes.DWORD
+        self._keys = {}
+        self._handles = {}
+
+    def register(self, stream, events, data):
+        import selectors
+
+        descriptor = stream.fileno()
+        if events != selectors.EVENT_READ or descriptor in self._keys:
+            raise ValueError("controlled pipe registration refused")
+        key = selectors.SelectorKey(stream, descriptor, events, data)
+        handle = self._get_handle(descriptor)
+        if handle == -1:
+            raise ValueError("controlled pipe handle refused")
+        self._keys[descriptor] = key
+        self._handles[descriptor] = handle
+        return key
+
+    def unregister(self, stream):
+        descriptor = stream.fileno()
+        key = self._keys.pop(descriptor)
+        del self._handles[descriptor]
+        return key
+
+    def select(self, timeout):
+        import selectors
+        import time
+
+        deadline = time.monotonic() + timeout
+        while True:
+            ready = []
+            for descriptor, key in self._keys.items():
+                handle = self._handles[descriptor]
+                if self._get_handle(descriptor) != handle:
+                    raise ValueError("controlled pipe handle changed")
+                available = self._available_type()
+                succeeded = self._peek(handle, None, 0, None, self._ctypes.byref(available), None)
+                if succeeded:
+                    if available.value > 0:
+                        ready.append((key, selectors.EVENT_READ))
+                else:
+                    error = self._ctypes.get_last_error()
+                    if error != 109:
+                        raise OSError(error, "controlled pipe observation refused")
+                    # Actual EOF makes the original os.read drain/unregister this stream.
+                    ready.append((key, selectors.EVENT_READ))
+            remaining = deadline - time.monotonic()
+            if ready or remaining <= 0:
+                return ready
+            time.sleep(min(0.001, remaining))
+
+    def get_map(self):
+        return self._keys
+
+    def close(self):
+        self._keys.clear()
+        self._handles.clear()
+
+
+@contextmanager
+def controlled_query_ports(helper, requests):
+    """Scope Windows primitives to this exact Python fixture; POSIX ports stay original."""
+    if os.name != "nt":
+        yield
+        return
+    import run_signed_query_probe as probe
+
+    original = probe.subprocess.Popen
+    expected = [
+        [str(helper), "--automation-query-worker", operation, nonce]
+        for operation, nonce in requests
+    ]
+
+    def launch(arguments, *args, **options):
+        if arguments not in expected:
+            raise AssertionError("controlled helper argv refused")
+        return original([sys.executable, *arguments], *args, **options)
+
+    with (
+        patch.object(probe.subprocess, "Popen", side_effect=launch),
+        patch.object(probe.selectors, "DefaultSelector", WindowsPipeSelector),
+    ):
+        yield
+
+
 class ControlledGroup:
     """Real portable direct-child WNOWAIT; inherited-group census is a controlled port."""
 
     def __init__(self, process, _native):
         self.process = process
+        self._windows_handle = getattr(process, "_handle", None) if os.name == "nt" else None
         self.reaped = False
         self.settles = 0
 
     def observe_exit(self):
         self.assert_unreaped()
+        if os.name == "nt":
+            import ctypes
+            from ctypes import wintypes
+
+            if (
+                self._windows_handle is None
+                or getattr(self.process, "_handle", None) is not self._windows_handle
+            ):
+                raise AssertionError("test original process handle changed")
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            wait = kernel.WaitForSingleObject
+            wait.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+            wait.restype = wintypes.DWORD
+            status = wait(int(self._windows_handle), 0)
+            if status == 0:
+                return status
+            if status == 258:
+                return None
+            if status == 0xFFFFFFFF:
+                error = ctypes.get_last_error()
+                raise OSError(error, "test process observation refused")
+            raise AssertionError("test unexpected process wait result")
         value = os.waitid(os.P_PID, self.process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
         return value if value and value.si_pid else None
 
@@ -187,7 +318,7 @@ class ControlledGroup:
 
 class PipeControls(unittest.TestCase):
     def run_helper(self, mode, cancel_held=False):
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as ports:
             helper = Path(directory) / "fixed-query-owner"
             helper.write_text(
                 "#!"
@@ -195,6 +326,8 @@ class PipeControls(unittest.TestCase):
                 + "\n"
                 + """
 import base64, json, sys
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(newline='\\n')
 print('Q1 HELD', flush=True)
 command = sys.stdin.readline()
 if command == 'ACTIVATE\\n':
@@ -209,6 +342,7 @@ else:
 """.replace("MODE", repr(mode))
             )
             helper.chmod(0o700)
+            ports.enter_context(controlled_query_ports(helper, (("discover", "7"),)))
             owner = SignedQuery(
                 helper, types.SimpleNamespace(OwnedProcessGroup=ControlledGroup), object()
             )
