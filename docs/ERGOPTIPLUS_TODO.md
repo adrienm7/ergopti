@@ -12,6 +12,35 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 14 Windows source custody before registration
+
+Source lookup/call, eligibility, actual KLE capture and borrowed recipe reads
+now retain their original private frame when withdrawn before default C
+registration. Each of five phases receives original-red/revised-green
+observed and exact children. Actual C query8/query8/Stop0 proves that no
+registration or hook was started. Settlement precedes epoch/worker teardown
+and preserves every original/foreign holder; no native qualification flag
+is enabled. Registered receiving passes 18 parent, 91 custody, 19 facade
+and six lifecycle cases, each exit0 without failure/skip. Counts overlap
+earlier receipts. Fixture cleanup uses acknowledged Stop instead of merely
+restoring public pointers; original assertions are preserved.
+
+Three module source controls, encoding, loop capture and conventions pass.
+Compiler controls exit 0/17/0; engine/native-Edit E2E passes 70/70. Full
+startup fails at fresh-config, native status6 / Win32126, also received on
+the preceding b329 source. This remains OPEN. The preceding frozen full JS
+attempt receives 407/425 PASS, 18 FAIL, natural exit1. Committing identical
+documentation during that run changed its HEAD-relative diff representation;
+fixed-base and exact-byte receiving preserve all failures. No whole-suite
+success follows from these targeted passes. Windows Snapshot16 admission
+and hosted XI2 LuaJIT receiving remain failed; hosted Lua units themselves
+receive 13,693/13,693, exit0. These do not qualify maintainer-native Linux.
+
+Genuine joined Stop10, complete cohort conversion, measured emitter policy,
+managed runtime/model receiving and the latest installed Diagnostics archive
+remain open. Physical Windows and native macOS/Linux remain UNRUN. No runtime
+or model was downloaded. Earlier source-bound receipts remain historical.
+
 ### October 14 Windows missing native publication receiving
 
 The missing-public-Unknown branch is now received against genuine default
