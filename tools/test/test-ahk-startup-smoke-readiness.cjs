@@ -29,6 +29,7 @@ async function observe(source, root, scenario) {
 	let initialNonce;
 	let initialFullSave;
 	let launchPid = 21000;
+	let forwarderReads = 0;
 	const ending = 'main().then(';
 	assert.equal(source.split(ending).length, 2, 'the actual startup main must have one invocation');
 	const executable = source.slice(0, source.indexOf(ending)) + '\nglobalThis.bootMain = main;\n';
@@ -44,12 +45,37 @@ async function observe(source, root, scenario) {
 			},
 			require(name) {
 				if (name === 'os') return { ...os, tmpdir: () => owned };
+				if (name === 'fs' && scenario === 'forwarder-failure') {
+					const forwarder = path.join(
+						root,
+						'static/ergopti_plus/windows/_generated/personal_shortcuts.ahk'
+					);
+					return {
+						...fs,
+						existsSync(file) {
+							return file === forwarder || fs.existsSync(file);
+						},
+						readFileSync(file, ...args) {
+							if (file === forwarder)
+								return Buffer.from(++forwarderReads === 1 ? 'initial' : 'changed');
+							return fs.readFileSync(file, ...args);
+						}
+					};
+				}
+				if (name === './lib/ahk-startup-diagnostics.cjs')
+					return require('./lib/ahk-startup-diagnostics.cjs');
 				if (name === './lib/ahk-startup-fixture.cjs')
 					return {
 						createStartupCodeFixture(container) {
+							if (scenario === 'setup-failure') throw new Error('inert setup failure');
 							const windows = path.join(container, 'static/ergopti_plus/windows');
 							fs.mkdirSync(path.join(windows, '_generated'), { recursive: true });
-							return { windows, close() {} };
+							return {
+								windows,
+								close() {
+									if (scenario === 'cleanup-failure') throw new Error('inert cleanup failure');
+								}
+							};
 						},
 						prepareStartupPersonalInclude(windows) {
 							fs.writeFileSync(path.join(windows, '_generated/personal_shortcuts.ahk'), 'inert');
@@ -93,7 +119,7 @@ async function observe(source, root, scenario) {
 							const warm = fixture === 'fresh-config' && initialReceipt !== undefined;
 							if (warm) warmCalls++;
 							const pid = ++launchPid;
-							const result = { pid, status: 0, stdout: '', stderr: '' };
+							const result = { pid, status: 0, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
 							if (warm && scenario === 'early-exit') return result;
 							if (warm && scenario === 'nonzero-exit') return { ...result, status: 7 };
 							if (!warm && scenario === 'first-early-exit') return result;
@@ -207,8 +233,18 @@ async function observe(source, root, scenario) {
 			}
 		});
 		vm.runInContext(executable, context, { filename: OWNER });
-		const status = await context.bootMain();
-		return { status, warmCalls, retiredMetricsCalls, diagnostics };
+		let status, failure;
+		try {
+			status = await context.bootMain();
+		} catch (error) {
+			status = 1;
+			failure = error.message;
+		}
+		const retained = fs
+			.readdirSync(owned)
+			.filter((name) => name.startsWith('ergopti-startup-diagnostics-'))
+			.map((name) => JSON.parse(fs.readFileSync(path.join(owned, name, 'receipt.json'), 'utf8')));
+		return { status, warmCalls, retiredMetricsCalls, diagnostics, retained, failure };
 	} finally {
 		assert.equal(
 			fs.realpathSync(owned),
@@ -216,6 +252,170 @@ async function observe(source, root, scenario) {
 			'the owned fixture root identity must remain unchanged'
 		);
 		fs.rmSync(owned, { recursive: true, maxRetries: 5, retryDelay: 100 });
+	}
+}
+
+/** Exercise the real diagnostic filesystem owner with closed, inert disk fixtures. */
+function checkStartupDiagnosticRetention() {
+	const owner = require('./lib/ahk-startup-diagnostics.cjs');
+	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-startup-retention-controls-'));
+	const anchor = fs.realpathSync(temporary);
+	let controls = 0;
+	try {
+		const source = path.join(temporary, 'source.txt');
+		fs.writeFileSync(source, 'owned source');
+		const nonce = 'a'.repeat(32);
+		const observed = Buffer.from([239, 187, 191, 0, 255, 13, 10]);
+		function packet(name, configure = () => {}) {
+			const probe = path.join(temporary, name);
+			fs.mkdirSync(path.join(probe, 'ergopti_plus/logs'), { recursive: true });
+			const log = path.join(probe, 'ergopti_plus/logs/ErgoptiPlus_20261014.log');
+			const completeLog = Buffer.from(
+				'\uFEFF' + Array.from({ length: 40 }, (_, index) => `line ${index}`).join('\r\n')
+			);
+			fs.writeFileSync(log, completeLog);
+			fs.writeFileSync(path.join(probe, 'config.toml'), 'private config must not be collected');
+			const receiver = owner.createStartupDiagnostics(temporary, 'local', { owner: source });
+			const result = {
+				pid: 21,
+				status: 7,
+				signal: null,
+				stdout: observed,
+				stderr: Buffer.from('inert failure')
+			};
+			configure({ probe, log, result });
+			receiver.capture(name, 'cold', probe, nonce, result);
+			const retained = receiver.finish(false, true, `${name}/verdict`);
+			const record = JSON.parse(fs.readFileSync(path.join(retained, 'receipt.json'), 'utf8'));
+			assert.equal(record.qualified, false);
+			assert.equal(record.descendant_retirement, 'unobserved');
+			assert.equal(record.transitive_source_closure, 'unreceived');
+			return { receiver, retained, record, completeLog };
+		}
+		const full = packet('full-log');
+		const logMember = full.record.invocations[0].members.find((row) =>
+			row.source_member?.startsWith('logs/')
+		);
+		assert.deepEqual(fs.readFileSync(path.join(full.retained, logMember.file)), full.completeLog);
+		controls++;
+		assert.deepEqual(fs.readFileSync(path.join(full.retained, '1-stdout.bin')), observed);
+		controls++;
+		assert.ok(!JSON.stringify(full.record).includes('private config must not be collected'));
+		assert.ok(
+			full.record.invocations[0].members.every((row) => row.source_member !== 'config.toml')
+		);
+		controls++;
+		assert.ok(full.record.invocations[0].missing.includes('ready.json'));
+		controls++;
+		assert.equal(full.record.invocations[0].status, 7);
+		controls++;
+		const timed = packet('timeout', ({ result }) => {
+			result.status = null;
+			result.signal = 'SIGTERM';
+			result.error = { code: 'ETIMEDOUT' };
+		});
+		assert.equal(timed.record.invocations[0].error_code, 'ETIMEDOUT');
+		assert.equal(timed.record.invocations[0].child_output_completeness, 'unknown');
+		controls++;
+		const missing = packet('missing-streams', ({ result }) => {
+			result.stdout = null;
+			result.stderr = null;
+		});
+		assert.ok(missing.record.invocations[0].missing.includes('stdout'));
+		assert.ok(!fs.existsSync(path.join(missing.retained, '1-stdout.bin')));
+		controls++;
+		assert.throws(() => full.receiver.finish(false, true, 'again'), /finalized twice/);
+		controls++;
+		assert.throws(
+			() => full.receiver.capture('full-log', 'cold', temporary, nonce, {}),
+			/already finalized/
+		);
+		controls++;
+		assert.throws(() => owner.createStartupDiagnostics('relative', 'local', {}), /absolute root/);
+		controls++;
+		assert.throws(
+			() => owner.createStartupDiagnostics(temporary, 'unknown', {}),
+			/context refused/
+		);
+		controls++;
+		const success = owner.createStartupDiagnostics(temporary, 'local', { owner: source });
+		const successfulDirectory = success.directory;
+		assert.equal(success.finish(true, true, 'ready'), null);
+		assert.equal(fs.existsSync(successfulDirectory), false);
+		controls++;
+		const cleanup = owner.createStartupDiagnostics(temporary, 'local', { owner: source });
+		assert.ok(cleanup.finish(true, false, 'cleanup'));
+		controls++;
+		assert.throws(
+			() =>
+				owner.createStartupDiagnostics(temporary, 'local', {
+					owner: path.join(temporary, 'absent')
+				}),
+			(error) => {
+				assert.equal(
+					JSON.parse(fs.readFileSync(path.join(error.retainedStartupDiagnostics, 'receipt.json')))
+						.capture_errors[0].stage,
+					'source-binding'
+				);
+				return error.code === 'ENOENT';
+			}
+		);
+		controls++;
+		const over = path.join(temporary, 'oversized');
+		const fd = fs.openSync(over, 'wx');
+		fs.writeSync(fd, Buffer.from('x'), 0, 1, owner.MAX_MEMBER_BYTES);
+		fs.closeSync(fd);
+		assert.throws(() => owner.readDiagnosticMember(over, temporary), /capture policy/);
+		controls++;
+		const link = path.join(temporary, 'linked');
+		fs.symlinkSync(path.join(temporary, 'full-log'), link, 'junction');
+		try {
+			assert.throws(
+				() => owner.readDiagnosticMember(path.join(link, 'config.toml'), temporary),
+				/links refused/
+			);
+		} finally {
+			fs.unlinkSync(link);
+		}
+		controls++;
+		assert.throws(() => owner.readDiagnosticMember(temporary, temporary));
+		controls++;
+		assert.throws(() => owner.readDiagnosticMember(source, path.join(temporary, 'full-log')));
+		controls++;
+		const many = path.join(temporary, 'many-logs');
+		fs.mkdirSync(path.join(many, 'ergopti_plus/logs'), { recursive: true });
+		for (let index = 0; index <= owner.MAX_LOG_MEMBERS; index++)
+			fs.writeFileSync(path.join(many, 'ergopti_plus/logs', `${index}.log`), 'x');
+		const refused = owner.createStartupDiagnostics(temporary, 'local', {});
+		assert.throws(
+			() =>
+				refused.capture('many-logs', 'cold', many, nonce, {
+					status: 1,
+					stdout: observed,
+					stderr: observed
+				}),
+			/log census/
+		);
+		const refusedPath = refused.finish(false, true, 'many-logs');
+		assert.equal(
+			JSON.parse(fs.readFileSync(path.join(refusedPath, 'receipt.json'))).capture_errors.length,
+			1
+		);
+		controls++;
+		const noCleanup = owner.createStartupDiagnostics(temporary, 'local', {});
+		const late = noCleanup.finish(false, true, 'forwarder-invariant');
+		assert.equal(
+			JSON.parse(fs.readFileSync(path.join(late, 'receipt.json'))).last_stage,
+			'forwarder-invariant'
+		);
+		controls++;
+		assert.equal(controls, 20);
+		console.log(
+			'[OK] Twenty real filesystem startup retention controls preserve bytes and reject unsafe or incomplete observations.'
+		);
+	} finally {
+		assert.equal(fs.realpathSync(temporary), anchor);
+		fs.rmSync(temporary, { recursive: true });
 	}
 }
 
@@ -341,6 +541,28 @@ function checkObserverStageRetention(root = ROOT) {
 }
 
 async function check(source, root = ROOT) {
+	checkStartupDiagnosticRetention();
+	const pipeline = require('./ci-pipeline.cjs').open(root);
+	const unit = pipeline.job('test-ahk');
+	const uploader = require('./ci-pipeline.cjs').step(unit, 'Publish AHK execution manifest');
+	assert.equal(require('./ci-pipeline.cjs').stepField(uploader, 'if'), 'always()');
+	assert.ok(
+		unit.indexOf(uploader) > unit.indexOf('name: Test fresh Git clone bootstrap and warm startup')
+	);
+	assert.ok(unit.indexOf(uploader) > unit.indexOf('name: Run the full-driver startup smoke'));
+	for (const member of [
+		'windows-ahk-execution-manifest.json',
+		'windows-ahk-suite.stdout.log',
+		'windows-ahk-suite.stderr.log',
+		'windows-qualification.json',
+		'windows-ahk-isolated-*.json',
+		'ergopti-ahk-menu-lifecycle-*/**',
+		'ergopti-snapshot16-*/**',
+		'ergopti-startup-diagnostics-*/**'
+	])
+		assert.ok(uploader.includes('${{ runner.temp }}/' + member));
+	assert.ok(uploader.includes('overwrite: true'));
+	assert.ok(uploader.includes('if-no-files-found: warn'));
 	checkObserverStageRetention(root);
 	const observations = [];
 	for (const scenario of [
@@ -376,6 +598,22 @@ async function check(source, root = ROOT) {
 	]) {
 		const result = await observe(source, root, scenario);
 		observations.push({ scenario, ...result });
+		assert.equal(result.retained.length, scenario === 'ready' ? 0 : 1);
+		if (scenario !== 'ready') {
+			const receipt = result.retained[0];
+			assert.equal(receipt.qualified, false);
+			assert.ok(receipt.invocations.length >= 1, 'failed startup retains actual invocation frames');
+			assert.equal(receipt.invocations[0].phase, 'cold');
+			assert.equal(
+				receipt.invocations.some((invocation) => invocation.phase === 'warm'),
+				result.warmCalls > 0,
+				'the actual warm invocation retains a separate frame'
+			);
+			for (const invocation of receipt.invocations) {
+				assert.ok(invocation.members.some((member) => member.file.endsWith('-stdout.bin')));
+				assert.ok(invocation.members.some((member) => member.file.endsWith('-stderr.bin')));
+			}
+		}
 		assert.equal(
 			result.status,
 			scenario === 'ready' ? 0 : 1,
@@ -405,6 +643,27 @@ async function check(source, root = ROOT) {
 				result.diagnostics.join('\n'),
 				/retired-metrics-config:.*retired Metrics full.save/
 			);
+	}
+	for (const scenario of ['setup-failure', 'cleanup-failure', 'forwarder-failure']) {
+		const observation = await observe(source, root, scenario);
+		assert.equal(observation.status, 1);
+		assert.equal(
+			observation.retained.length,
+			1,
+			'late and setup failures retain their staging directory'
+		);
+		assert.equal(observation.retained[0].qualified, false);
+		assert.equal(
+			observation.retained[0].invocations.length > 0,
+			scenario !== 'setup-failure',
+			'late failures retain frames; failed setup does not fabricate a native invocation'
+		);
+		assert.ok(
+			observation.failure?.includes(
+				scenario === 'forwarder-failure' ? 'personal-shortcuts' : scenario.split('-')[0]
+			),
+			'the original failure remains visible'
+		);
 	}
 	return observations;
 }
