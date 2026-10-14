@@ -743,15 +743,28 @@ _PT102_WithCase(Mode, Body) {
 			if !WritePersonalToml(_PTIOCR_Model("seed"))
 				throw Error("opening-source fixture failed to seed its private file")
 		if Mode == "metadata" {
-			RawSeed := Chr(0xFEFF) . FSReadUtf8Exact(Path)
+			; This vector deliberately receives BOM and CRLF preservation, while
+			; the neutral production writer emits LF. Normalize before inserting.
+			RawSeed := StrReplace(FSReadUtf8Exact(Path), "`r`n", "`n")
+			RawSeed := Chr(0xFEFF) . StrReplace(RawSeed, "`n", "`r`n")
+			AssertEqual(Chr(0xFEFF), SubStr(RawSeed, 1, 1), "the seed must own its BOM")
+			AssertTrue(InStr(RawSeed, "`r`n") > 0, "the seed must contain CRLF")
+			AssertEqual(0, InStr(StrReplace(RawSeed, "`r`n", ""), "`n"),
+				"the seed must not mix neutral LF with explicit CRLF")
 			RawSeed := StrReplace(RawSeed, "[_meta]`r`n",
 				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , &FileInsertions, 1)
-			; The neutral writer omits absent section overrides. Seed a real table
-			; before the first entry rather than replacing a nonexistent header.
+			; The neutral writer stores a scalar description. Move it into the new
+			; override table so the fixture cannot declare a table over that scalar.
+			RawSeed := StrReplace(RawSeed, 'alpha = "alpha"`r`n', "", , &DescriptionMoves, 1)
+			AssertEqual(1, DescriptionMoves, "the existing description must move exactly once")
 			RawSeed := StrReplace(RawSeed, "[[alpha]]`r`n",
-				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n[[alpha]]`r`n', , &SectionInsertions, 1)
+				'[_meta.sections.alpha]`r`ndescription = "alpha"`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n[[alpha]]`r`n', , &SectionInsertions, 1)
 			AssertEqual(1, FileInsertions, "opening-source fixture must seed its file overrides")
 			AssertEqual(1, SectionInsertions, "opening-source fixture must seed its section overrides")
+			SeedDocument := TOML_ParseDocument(RawSeed)
+			AssertEqual("alpha", SeedDocument["_meta"]["sections"]["alpha"]["description"])
+			AssertEqual("beta", SeedDocument["_meta"]["sections"]["beta"],
+				"the neighboring scalar description must stay intact")
 			if !FSWriteDurable(Path, RawSeed)
 				throw Error("opening-source fixture metadata publication refused")
 			SeedOverrides := _PersonalTomlCaptureOverrides(Path)

@@ -3094,12 +3094,18 @@ _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
 	_LLM_NavEventOwnerNativeEnsureLoaded()
 	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_Start"),
 		"UInt64", Hwnd, "UInt", WakeMessage, "Int")
-	if Status != 0 {
-		DllCall(_LLM_NavEventOwnerNativeExport(
-			"ErgoptiNav_Stop"), "Int")
-	}
-	_LLM_NavEventOwnerNativeRequireOk(Status,
+	; Read the original Win32 error before Stop resets native semantic state.
+	try _LLM_NavEventOwnerNativeRequireOk(Status,
 		"Navigation owner start")
+	catch as StartError {
+		try DllCall(_LLM_NavEventOwnerNativeExport(
+			"ErgoptiNav_Stop"), "Int")
+		catch as CleanupError {
+			StartError.NativeCleanupError := CleanupError
+			StartError.Message .= "; native stop cleanup failed: " . CleanupError.Message
+		}
+		throw StartError
+	}
 	if !LLM_NavEventOwner_RefreshTerminalRoutes()
 		throw Error("Terminal route metadata registration was not admitted at startup.")
 	return 1
