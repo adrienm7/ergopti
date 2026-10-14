@@ -169,9 +169,80 @@ _LNEO_StartErrorBeforeCleanupCase(Status, MissingStop) {
 			CallbackFree(Pointer)
 	}
 }
+/** Receive the original controlled callbacks in a fresh native issuance realm. */
+_LNEO_ReceiveStartErrorCase(Status, MissingStop) {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports
+	static Received := false
+	; A real DLL issuance cannot be replaced by a callback table later in the
+	; same process. Keep that production fence and isolate the original cases.
+	if EnvGet("ERGOPTI_START_CUSTODY_CHILD") == A_ScriptFullPath
+		&& InStr(A_ScriptName, ".ergopti_start_custody_child_") == 1
+		return _LNEO_StartErrorBeforeCleanupCase(Status, MissingStop)
+	if Received
+		return
+	ParentModule := _LLM_NavEventOwnerModule
+	ParentExports := _LLM_NavEventOwnerExports
+	TestsRoot := A_ScriptDir
+	CanonicalPath := TestsRoot . "\run_all.ahk"
+	Canonical := FileRead(CanonicalPath, "UTF-8")
+	Id := DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount . "_" . Random(1, 0x7FFFFFFF)
+	ChildName := ".ergopti_start_custody_child_" . Id . ".ahk"
+	ChildPath := TestsRoot . "\" . ChildName
+	ReceiptRoot := A_Temp . "\ergopti_start_custody_" . Id
+	DirCreate(ReceiptRoot)
+	TapPath := ReceiptRoot . "\child.tap"
+	OutPath := ReceiptRoot . "\child.stdout.log"
+	ErrPath := ReceiptRoot . "\child.stderr.log"
+	SavedChild := EnvGet("ERGOPTI_START_CUSTODY_CHILD")
+	SavedReceipt := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	AssertFalse(FileExist(ChildPath), "never replace an existing runner")
+	try {
+		; Preserve the entire canonical include graph, argument parser and watchdog.
+		FileAppend(Canonical, ChildPath, "UTF-8")
+		EnvSet("ERGOPTI_START_CUSTODY_CHILD", ChildPath)
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", TapPath)
+		Quote := Chr(34)
+		ChildCommand := Quote . A_AhkPath . Quote . " /ErrorStdOut=UTF-8 " . Quote . ChildPath . Quote
+			. " --only=native-start-error-custody: 1>" . Quote . OutPath . Quote
+			. " 2>" . Quote . ErrPath . Quote
+		Code := RunWait(Quote . A_ComSpec . Quote . " /D /C " . Quote . ChildCommand . Quote, TestsRoot, "Hide")
+		AssertEqual(0, Code, "all original custody assertions must pass in the child; captures: " . ReceiptRoot)
+		AssertTrue(FileExist(TapPath) && FileExist(OutPath) && FileExist(ErrPath))
+		AssertEqual(0, FileGetSize(ErrPath), "child startup/parse diagnostics must refuse receiving")
+		Tap := FileRead(TapPath, "UTF-8")
+		AssertTrue(RegExMatch(Tap, "m)^1\.\.3\r?$"), "the exact original three-case plan is required")
+		Names := [
+			"OS error survives actual adapter cleanup",
+			"non-OS refusal still runs cleanup without an OS read",
+			"cleanup lookup failure retains both errors"
+		]
+		for Index, Name in Names {
+			Expected := "native-start-error-custody: " . Name
+			AssertTrue(InStr(Tap, "RUNNING " . Index . "/3 - " . Expected . "`r`n"))
+			AssertTrue(InStr(Tap, "ok " . Index . " - " . Expected . "`r`n"))
+		}
+		AssertFalse(RegExMatch(Tap, "m)^not ok|# SKIP|FATAL STARTUP|WATCHDOG"))
+		AssertTrue(RegExMatch(Tap, "m)^# 3 passed, 0 failed\.\r?$"))
+		AssertEqual(ParentModule, _LLM_NavEventOwnerModule)
+		AssertTrue(ParentExports == _LLM_NavEventOwnerExports)
+		AssertEqual(Canonical, FileRead(CanonicalPath, "UTF-8"))
+		Received := true
+	} finally {
+		EnvSet("ERGOPTI_START_CUSTODY_CHILD", SavedChild)
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", SavedReceipt)
+		SplitPath(ChildPath, &ActualName, &ActualDirectory)
+		if ActualDirectory != TestsRoot || ActualName != ChildName
+			throw Error("Refuse custody child cleanup outside its exact owned path.")
+		if FileExist(ChildPath)
+			FileDelete(ChildPath)
+		; Keep complete raw streams and TAP after both success and refusal.
+		FileAppend("# native-start-error-custody captures: " . ReceiptRoot . "`n", "*")
+	}
+}
+
 Test("native-start-error-custody: OS error survives actual adapter cleanup",
-	_LNEO_StartErrorBeforeCleanupCase.Bind(6, false))
+	_LNEO_ReceiveStartErrorCase.Bind(6, false))
 Test("native-start-error-custody: non-OS refusal still runs cleanup without an OS read",
-	_LNEO_StartErrorBeforeCleanupCase.Bind(5, false))
+	_LNEO_ReceiveStartErrorCase.Bind(5, false))
 Test("native-start-error-custody: cleanup lookup failure retains both errors",
-	_LNEO_StartErrorBeforeCleanupCase.Bind(6, true))
+	_LNEO_ReceiveStartErrorCase.Bind(6, true))
