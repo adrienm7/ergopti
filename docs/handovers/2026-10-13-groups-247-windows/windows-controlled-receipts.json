@@ -1026,5 +1026,1007 @@
 				"exit": 0
 			}
 		]
+	},
+	"native_registration_retirement_followup": {
+		"source_commit": "52feb4552ccdb425626611ab8e4de5fad1562f04",
+		"adapter_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+		"metadata_tests_sha256": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+		"original_adapter_sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7",
+		"callback_causal_receipt": [
+			{
+				"flavor": "original",
+				"exit": 1,
+				"passed": 1,
+				"failed": 18,
+				"running": 19,
+				"skipped": 0,
+				"complete": true,
+				"accepted": true,
+				"scope": "Actual AHK include graph and controlled callback ports only; no genuine DLL issuance or physical qualification"
+			},
+			{
+				"flavor": "revised",
+				"exit": 0,
+				"passed": 19,
+				"failed": 0,
+				"running": 19,
+				"skipped": 0,
+				"complete": true,
+				"accepted": true,
+				"scope": "Actual AHK include graph and controlled callback ports only; no genuine DLL issuance or physical qualification"
+			}
+		],
+		"genuine_positive": {
+			"artifact": "native-retirement-v3-receiving/genuine-child-0b9776c6-2fd0-49c7-9338-7d49abdc70a4/receipts.json",
+			"children": [
+				{
+					"mode": "observed",
+					"flavor": "original",
+					"exit": 1,
+					"causal": true,
+					"raw_exact": true,
+					"events": [
+						"ErgoptiNav_ListTerminalHeldRecipes|8",
+						"ErgoptiNav_RegisterTerminalRoutes|0",
+						"ErgoptiNav_ListTerminalHeldRecipes|0",
+						"ErgoptiNav_Stop|0"
+					],
+					"native_or_physical_qualification": false
+				},
+				{
+					"mode": "observed",
+					"flavor": "revised",
+					"exit": 0,
+					"causal": true,
+					"raw_exact": true,
+					"events": [
+						"ErgoptiNav_ListTerminalHeldRecipes|8",
+						"ErgoptiNav_RegisterTerminalRoutes|0",
+						"ErgoptiNav_ListTerminalHeldRecipes|0",
+						"ErgoptiNav_Stop|0",
+						"ErgoptiNav_RegisterTerminalRoutes|0",
+						"ErgoptiNav_ListTerminalHeldRecipes|0",
+						"ErgoptiNav_Stop|0"
+					],
+					"native_or_physical_qualification": false
+				},
+				{
+					"mode": "exact",
+					"flavor": "original",
+					"exit": 1,
+					"causal": true,
+					"raw_exact": true,
+					"events": [],
+					"native_or_physical_qualification": false
+				},
+				{
+					"mode": "exact",
+					"flavor": "revised",
+					"exit": 0,
+					"causal": true,
+					"raw_exact": true,
+					"events": [],
+					"native_or_physical_qualification": false
+				}
+			]
+		},
+		"genuine_negative": {
+			"artifact": "native-retirement-v3-receiving/negative-parent-1b16fe5d-9152-4549-9ce3-21f527097499/receipts.json",
+			"cases": [
+				{
+					"case": "custom-true",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "custom-map",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "module-zero",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "module-load",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "exports-clone",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "exports-pointer",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"FOREIGN_TARGET|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "exports-facade",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "epoch",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "lower-counter",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "unknown-before-get",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				},
+				{
+					"case": "unknown-report",
+					"accepted": true,
+					"children": [
+						{
+							"mode": "observed",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "observed",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": [
+								"ErgoptiNav_ListTerminalHeldRecipes|8",
+								"ErgoptiNav_RegisterTerminalRoutes|0",
+								"ErgoptiNav_ListTerminalHeldRecipes|0",
+								"ErgoptiNav_Stop|0"
+							]
+						},
+						{
+							"mode": "exact",
+							"flavor": "original",
+							"exit": 1,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						},
+						{
+							"mode": "exact",
+							"flavor": "revised",
+							"exit": 0,
+							"causal": true,
+							"raw_exact": true,
+							"events": []
+						}
+					]
+				}
+			]
+		},
+		"actual_registered_selections": [
+			{
+				"receipt": "native-retirement-integrated-callback-v2",
+				"filter": "native-retirement-owner:",
+				"expected": 19,
+				"passed": 19,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-parent-v3",
+				"filter": "terminal-native-retirement:",
+				"expected": 12,
+				"passed": 12,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-registration",
+				"filter": "todo49-registration-custody",
+				"expected": 91,
+				"passed": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-model",
+				"filter": "todo49-model-build-custody",
+				"expected": 20,
+				"passed": 20,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-route",
+				"filter": "todo49-route-adapter",
+				"expected": 9,
+				"passed": 9,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-lifecycle",
+				"filter": "terminal-lifecycle-admission",
+				"expected": 6,
+				"passed": 6,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-stop-diagnostic",
+				"filter": "native-stop-diagnostics",
+				"expected": 1,
+				"passed": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-start-error",
+				"filter": "native-start-error-custody",
+				"expected": 3,
+				"passed": 3,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-packet",
+				"filter": "todo49-packet-receiving",
+				"expected": 212,
+				"passed": 212,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-natural",
+				"filter": "todo49-natural-custody",
+				"expected": 98,
+				"passed": 98,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-output-adapter",
+				"filter": "todo49-output-custody-adapter",
+				"expected": 12,
+				"passed": 12,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-output-consumer",
+				"filter": "todo49-output-consumer",
+				"expected": 11,
+				"passed": 11,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-authority",
+				"filter": "todo49-frozen-authority",
+				"expected": 123,
+				"passed": 123,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-retained-sendinput",
+				"filter": "todo49-explicit-sendinput",
+				"expected": 211,
+				"passed": 211,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-kle",
+				"filter": "kle-reset-observer",
+				"expected": 91,
+				"passed": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-layout",
+				"filter": "layout-registry-emulation",
+				"expected": 10,
+				"passed": 10,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "native-retirement-integrated-observer",
+				"filter": "todo49-observer-hints",
+				"expected": 7,
+				"passed": 7,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		],
+		"composed_gates": [
+			{
+				"gate": "compiler",
+				"accepted": true,
+				"case": "good",
+				"exit": 0,
+				"expected": 0,
+				"produced": true
+			},
+			{
+				"gate": "compiler",
+				"accepted": true,
+				"case": "bad",
+				"exit": 17,
+				"expected": 17,
+				"produced": false
+			},
+			{
+				"gate": "compiler",
+				"accepted": true,
+				"case": "entry",
+				"exit": 0,
+				"expected": 0,
+				"produced": true
+			},
+			{
+				"expected": 70,
+				"passed": 70,
+				"exit": 0,
+				"accepted": true,
+				"skipped": 0,
+				"scope": "Engine and owned native Edit controls; no physical input qualification",
+				"gate": "e2e",
+				"failed": 0
+			},
+			{
+				"gate": "test-ahk-full-startup-smoke.cjs",
+				"accepted": true,
+				"exit": 0
+			},
+			{
+				"gate": "test-ahk-encoding.cjs",
+				"accepted": true,
+				"exit": 0
+			},
+			{
+				"gate": "test-ahk-loop-capture.cjs",
+				"accepted": true,
+				"exit": 0
+			}
+		],
+		"final_module_specific_source_controls": [
+			{
+				"gate": "test-windows-terminal-output-custody-adapter",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-windows-hook-trace-source",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-no-pinned-source-reads",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "ae93db40a65363f1ac18fb33446983b32bf97ce9b9164cfe4d80e7ab251677a3",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			}
+		],
+		"source_consumer_transition": "All 32 original preregistration source inverses retained at the private factory/original dispatcher; eight new inverses added. Hook source gate retains exact 41 exports and all 27 original/additive inverses. Pinned source reads remain 380/380 through the existing fresh symbol resolver; no ratchet baseline changed.",
+		"failed_receiving_attempts_preserved": [
+			"genuine-child-d3e0450e-c988-40cf-bb41-62dc45b8b961: external-root launcher failed before any case executed",
+			"native-retirement-integrated-parent-v1: 0 PASS/12 FAIL, exit 1, invalid A_Pid before child launch",
+			"Concurrent convention scanner: ENOENT after an owned ephemeral child was removed; quiet serial rerun exits 0"
+		],
+		"full_js": {
+			"artifact": "full-js-native-retirement-v1",
+			"source_base": "de2a669f6c1bed4712d34ea7ee0395ac49816d5d",
+			"passed": 405,
+			"total": 425,
+			"failed": 20,
+			"exit": null,
+			"status": "FAILED_FOOTER_EXIT_UNCAPTURED",
+			"failures": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows terminal output custody adapter preserves exact native bindings and closed admission",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows hook tracing remains opt-in, isolated and bound to native source inputs",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"no new location-pinned source reads in AHK tests (ratchet)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"source_images_unchanged": true,
+			"source_images": {
+				"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+				"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "e0b3f6f3bc2ce38a29af436cad28b43d78bcf6c21c6b4b0b78923a74f9d3afc4"
+			},
+			"exit_audit": {
+				"attempt": "full-js-native-retirement-v1",
+				"source_images_unchanged": true,
+				"footer": {
+					"total": 425,
+					"passed": 405,
+					"failed": 20
+				},
+				"child_exit": null,
+				"wrapper_exit": 0,
+				"exit_file_bytes": 0,
+				"status": "FAILED_FOOTER_EXIT_UNCAPTURED",
+				"qualification": false,
+				"reason": "PowerShell 5.1 Start-Process -PassThru followed by WaitForExit did not retain ExitCode. The wrapper's zero cannot qualify the child. Keep the original source/exit files and failing footer unchanged.",
+				"subsequent_changes": "Two module-specific source consumers and the new pinned source read were corrected after this immutable attempt; their direct targeted receiving is separate. No updated whole-JS success is claimed."
+			},
+			"subsequent_source_controls": "Three related failures corrected and separately received with natural exits 0; no new whole-suite qualification inferred"
+		},
+		"incoming_source_identity": {
+			"before": "41d4c8f17141f589573a43d04ab4603bb3d063f4",
+			"incoming": "de2a669f6c1bed4712d34ea7ee0395ac49816d5d",
+			"changed_paths": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
+			],
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"owned_uncommitted_images": "UNCHANGED",
+			"incoming_linux_native_here": "UNRUN"
+		},
+		"incoming_macos_source_identity": {
+			"before": "de2a669f6c1bed4712d34ea7ee0395ac49816d5d",
+			"incoming": "d5ee362cb50f782bf53551aac3409cbfd136a453",
+			"changed_paths": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+				"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift",
+				"tools/build/core_sdk/operational_core_source.py",
+				"tools/build/core_sdk/receive_core_sdk.py",
+				"tools/build/core_sdk/run_core_sdk.py",
+				"tools/build/fixtures/owned_runtime_dispatcher_test.cpp",
+				"tools/build/fixtures/owned_runtime_queue_ports.hpp",
+				"tools/build/fixtures/owned_runtime_queue_test.cpp",
+				"tools/build/owned_runtime_product_build.py",
+				"tools/build/remap_runtime_build.py",
+				"tools/build/remap_runtime_queue_test.py",
+				"tools/build/remap_runtime_source.py",
+				"tools/build/vhd_driver_resource_build_test.py",
+				"tools/build/vhd_driver_resource_callback_test.py",
+				"tools/build/vhd_driver_resource_custody_test.py",
+				"tools/build/vhd_driver_resource_entry_query_test.py",
+				"tools/build/vhd_driver_resource_source_test.py",
+				"tools/build/vhd_driver_resource_sources_close_test.py"
+			],
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"owned_images": {
+				"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "B3291C2CC9F6F6FBBEDB239369EBDB54BA94EDD5074CE7B6266D604D006E9745",
+				"tools/test/test-windows-hook-trace-source.cjs": "4C6CD29992BDD2F1CB9A5BDFEA1C3E9C84FB24B097AB5A291D1BEAC933D28D57",
+				"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "AE93DB40A65363F1AC18FB33446983B32BF97CE9B9164CFE4D80E7AB251677A3",
+				"tools/test/test-windows-terminal-output-custody-adapter.cjs": "51CBA9025E700850D7101F937EF367464B9E2A977CF9196A90C763B634611E76"
+			},
+			"incoming_mac_build_receiving_here": "UNRUN"
+		},
+		"ci_preceding_published_source": {
+			"source": "41d4c8f17141f589573a43d04ab4603bb3d063f4",
+			"run": 38496233833,
+			"conclusion": "failure",
+			"windows_units": "Snapshot16 admission refused before the whole unit suite launches",
+			"windows_engine_e2e": "PASS hosted VM",
+			"core_js": "PASS hosted runner",
+			"linux_e2e": "FAIL during owned logger ENOSPC receiving; underlying cause OPEN, not a maintainer-native receipt",
+			"macos_managed_ollama": "FAIL amd64 and arm64; trust add deadline, removal exit 1 and restoration failure",
+			"release_publication": "SKIPPED"
+		},
+		"remaining": {
+			"full_windows_units": "FAILED_INCOMPLETE_WATCHDOG; previous frozen attempt is not superseded by selected passes",
+			"underlying_native_start_os_error_6": "OPEN",
+			"previous_full_js_startup_same_path_refusal": "OPEN; serial startup passes do not erase it",
+			"genuine_joined_stop10": "UNRUN",
+			"physical_windows": "UNRUN",
+			"native_macos_here": "UNRUN",
+			"native_linux_here": "UNRUN",
+			"missing_public_unknown_genuine_branch": "UNRUN; private-custody path reviewed, not independently executed here",
+			"source_builder_without_genuine_default_provenance": "OPEN",
+			"cohort_conversion_and_production_emitter": "OPEN",
+			"managed_windows_ai_runtime_model_receiving": "OPEN; no acquisition consent, no runtime/model downloaded",
+			"new_build_diagnostics_menu_archive": "OPEN; preserved resident e235 build and its source-bound archive"
+		}
 	}
 }
