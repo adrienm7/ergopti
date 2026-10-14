@@ -240,14 +240,23 @@ _LSO_NewestSweepWaitsForExactDebt() {
 	Fixture := _LSO_Fixture()
 	try {
 		AssertTrue(Fixture.Native.Rescan())
+		OldJob := Fixture.Native.Jobs["lmstudio"]
+		OldRecord := Fixture.Transport.Records["lmstudio"]
 		Fixture.Children[1].TerminateAllowed := false
 		AssertTrue(Fixture.Native.Rescan())
 		AssertEqual(1, Fixture.Requests.Length, "new search waits behind exact refused old child retirement")
 		AssertTrue(Fixture.Transport.HasPending("lmstudio"))
-		AssertEqual("waiting", Fixture.Native.Jobs["lmstudio"]["phase"])
+		AssertTrue(Fixture.Native.Jobs["lmstudio"] == OldJob, "unacknowledged retirement retains the old slot")
+		AssertEqual("cancelled", OldJob["phase"])
+		AssertTrue(Fixture.Transport.Records["lmstudio"] == OldRecord, "the exact old physical owner remains")
+		Successor := OldJob["successor"]
+		AssertTrue(Successor is Map, "the newest search must retain its own waiting job")
+		AssertFalse(Successor == OldJob)
+		AssertEqual("waiting", Successor["phase"])
 		Fixture.Children[1].TerminateAllowed := true
 		Fixture.Native.RetryPending()
 		AssertEqual(2, Fixture.Requests.Length, "only acknowledged old settlement permits a new request")
+		AssertTrue(Fixture.Native.Jobs["lmstudio"] == Successor, "acknowledged retirement promotes the exact waiting job")
 		Fixture.Requests[1]._OnDone(0, '{"data":[{"id":"obsolete"}]}', "")
 		AssertEqual(0, Fixture.Published.Length, "old native completion has no new logical publication authority")
 		Fixture.Complete(2, 200, '{"data":[{"id":"newest"},{"id":"first"},{"id":"newest"}]}')
