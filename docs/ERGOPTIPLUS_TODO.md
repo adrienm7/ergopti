@@ -12,6 +12,51 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 14 Windows authenticated registration retirement
+
+Uncertain default registration now retains private same-process native custody.
+Only an actual same-module Stop receipt can retire it before epoch/worker
+teardown; custom ACKs, a missing module and replaced exports cannot grant that
+authority. Original and foreign recipe/model holders remain intact. The fresh
+coverage remains unregistered, with cohort and transformed output flags false.
+
+Actual original callback receiving records one PASS/eighteen FAIL (exit 1);
+the corrected registered cohort records nineteen PASS (exit 0). Four genuine
+positive no-hook children and eleven negative scenarios with four distinct
+children each receive the original causal failure and corrected natural exit.
+Observed copies record real C query8/Register0/query0/Stop0; exact copies keep
+the production adapter uninstrumented. The actual registered parent receives
+twelve PASS (exit 0). Its first invalid process-ID attempt is retained as
+0/12, exit 1 before any child executes; it is not counted as receiving.
+
+Seventeen exact canonical selections pass without failure/skip, including
+the 667 terminal, 91 KLE, ten layout and seven observer-hint controls. These
+counts overlap prior receipts. Authenticated compiler controls receive
+0/17/0; E2E receives 70/70 and all nine isolated startup scenarios reach ready.
+Encoding, loop capture and the quiet serial convention gate pass. Frozen
+complete JS stdout records 405/425 PASS and 20 FAIL. Its
+PowerShell wrapper did not capture the child exit; status remains
+FAILED_FOOTER_EXIT_UNCAPTURED, with the empty exit file and original log retained.
+Three related source-consumer/pinned-read failures are corrected and received
+separately with exit 0: 32 original custody inverses plus eight new inverses,
+the exact 41 hook exports and 27 hook inverses, and unchanged 380/380 pinned
+reads. No whole-JS success or whole-unit watchdog completion is inferred.
+
+The incoming native XKB qualification commits are preserved by fast-forward
+with byte-identical Windows/shared source.
+[CI 38496233833](https://github.com/adrienm7/ergopti/actions/runs/38496233833)
+remains failed: Windows Snapshot16 admission, Linux logger E2E receiving and
+managed macOS trust/restoration fail; hosted Core JS and Windows engine E2E pass.
+CI/inventory/source seals and publication remain with their existing owner.
+
+Genuine joined Stop10, the missing-public-Unknown genuine branch, Source/Builder
+withdrawal without genuine default provenance, complete cohort conversion and
+production emitter policy remain open. Managed Windows runtime/model and the
+latest installed Diagnostics archive remain unreceived; no download was
+authorized or performed. The earlier e235 archive keeps its exact source binding.
+Physical Windows keyboard/display/UIA and maintainer-native macOS/Linux remain
+UNRUN; unavailable Linux is not qualified by hosted/container tests.
+
 ### October 14 Windows terminal lifecycle follow-up
 
 Stop now refuses an active terminal-route refresh before calling its physical
