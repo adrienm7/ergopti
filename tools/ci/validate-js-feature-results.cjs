@@ -77,7 +77,16 @@ function selectUnitJobs(plan, jobs, identity) {
 		const job = newest[0];
 		fail(
 			job.status === 'completed' && job.conclusion === 'success',
-			'latest Unit lot did not succeed'
+			'latest Unit lot did not succeed: ' +
+				JSON.stringify({
+					lot: name,
+					feature: row.feature,
+					suite: row.suite,
+					job_id: String(job.id),
+					run_attempt: String(latest),
+					status: typeof job.status === 'string' ? job.status.slice(0, 64) : null,
+					conclusion: typeof job.conclusion === 'string' ? job.conclusion.slice(0, 64) : null
+				})
 		);
 		const writers = Array.isArray(job.steps)
 			? job.steps.filter((step) => step.name === 'Run shared validation suite')
