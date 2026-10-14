@@ -119,6 +119,7 @@ local _running  = false
 -- One captured publisher and one in-flight source transaction belong to a start.
 local _capture_session, _capture_options, _capture_republisher = nil, nil, nil
 local _source_reconciliation = nil
+local _number_row = { retired = {}, suppressed = {}, mode = "native" }
 
 -- Every owned keyboard and observed pointer path. The first keyboard remains in
 -- _device for the public log/status contract, but it is never the whole state.
@@ -1100,6 +1101,404 @@ local function consumption_detail(ev, source, identity, char)
 	}
 end
 
+--- Internal Hook consumer of the actual receiving-row producer.
+--- The original Hook supplies event_current/owner_current/shift_codes closures,
+--- real installed broker/emitter, and commits native Compose only after delivery.
+--- Constructor/lifecycle insertion into Hook is still being composed privately.
+
+local function build_row_owners(rows, broker, emitter, owner_current, event_current, shift_codes, commit_action, release_action)
+	local ports = { edge = broker.edge, handoff = broker.handoff, view = broker.view,
+		current = broker.output_current, retired = broker.output_retired, debt = broker.has_debt }
+	local owners, closing, busy = {}, {}, false
+	local function binding_current()
+		return broker.edge == ports.edge and broker.handoff == ports.handoff and broker.view == ports.view
+			and broker.output_current == ports.current and broker.output_retired == ports.retired
+			and broker.has_debt == ports.debt and ports.debt() == false
+	end
+	local function admitted(event)
+		return owner_current() == true and binding_current() and event_current(event) == true
+	end
+	local function admitted_shift(record, event)
+		-- Rejoin retained Shift sources after the event/inventory observers.
+		return admitted(event) and type(record.shift_current) == "function" and record.shift_current() == true
+	end
+	local function receipt(value)
+		return type(value) == "table" and value.ok == true and type(value.native_writes) == "number"
+			and value.native_writes % 1 == 0 and value.native_writes >= 0 and value.native_writes <= 1
+	end
+	local function cleanup(record)
+		-- Retain custody before any observer, including a throwing/debt path.
+		closing[record] = true
+		-- Cleanup may outlive source admission; it targets only original owners.
+		if not binding_current() then
+			if ports.retired() == true then closing[record] = nil; return true end
+			return false
+		end
+		local settled = true
+		local before = ports.view()
+		if type(before) ~= "table" or type(before.owners) ~= "table" then return false end
+		if record.row_attempted and before.owners[record.owner] ~= nil then
+			local ack = ports.edge(record.owner, record.code, 0, emitter)
+			if not receipt(ack) then settled = false
+			elseif ack.native_writes == 1 then record.release_emitted = true end
+		end
+		if record.shift_attempted and before.owners[record.shift_owner] ~= nil then
+			local ack = ports.edge(record.shift_owner, 42, 0, emitter)
+			if not receipt(ack) then settled = false end
+		end
+		for index = #record.lifted, 1, -1 do
+			local lifted = record.lifted[index]
+			if lifted.state == "suspended" then
+				-- A retired input cannot authorize a new restored Shift down.
+				-- Keep the exact suspended broker owner and cleanup record.
+				if type(record.shift_current) ~= "function" or record.shift_current() ~= true then settled = false
+				else
+					lifted.state = "restoring"
+					local ack = ports.handoff(lifted.code, "restored", emitter)
+					if receipt(ack) then lifted.state = "restored" else settled = false end
+				end
+			elseif lifted.state ~= "restored" then settled = false end
+		end
+		local view = ports.view()
+		if type(view) ~= "table" or view.busy ~= false or view.debt ~= false or type(view.owners) ~= "table"
+			or view.owners[record.owner] ~= nil or view.owners[record.shift_owner] ~= nil then settled = false end
+		if settled and record.release_emitted and not record.release_committed then
+			record.release_committed = true
+			local called, acknowledged = pcall(release_action, record.code)
+			if not called or acknowledged ~= true then settled = false end
+		end
+		if settled or ports.retired() == true then closing[record] = nil; return true end
+		return false
+	end
+	local function event(key, ev, mode, position, physical_shift, prepared)
+		if busy then return false, "row-owner-busy" end
+		local value, record = ev.value, owners[key]
+		if value == 0 then
+			if not record then return false, "ordinary" end
+			if event_current(ev) ~= true then return false, "row-release-origin-refused" end
+			owners[key] = nil
+			busy = true
+			local called, closed = pcall(cleanup, record)
+			rows.retire(record.plan)
+			if called and closed == true and record.release_emitted and not record.release_committed then
+				record.release_committed = true
+				local released, ack = pcall(release_action, record.code)
+				closed = released and ack == true
+			end
+			busy = false
+			return called and closed == true, "retirement"
+		end
+		if not admitted(ev) then
+			if record then
+				owners[key] = nil; record.closed = true
+				pcall(cleanup, record); rows.retire(record.plan)
+			end
+			return false, "row-owner-unavailable"
+		end
+		if value ~= 1 and value ~= 2 then return false, "row-value-refused" end
+		if value == 2 and not record then return false, "ordinary" end
+		if record and record.closed then return false, "row-owner-retired" end
+		if record and value == 1 then
+			if prepared then rows.retire(prepared) end
+			return true, { status = "duplicate-owner", native_writes = 0 }
+		end
+		busy = true
+		local called, accepted, outcome = pcall(function()
+			if record and value == 2 then
+				local next_plan = prepared
+				local next_action = next_plan and rows.desired(next_plan)
+				if not next_action or next_action.code ~= record.code or not admitted(ev) then
+					if next_plan then rows.retire(next_plan) end
+					return false, "row-repeat-source-refused"
+				end
+				rows.retire(record.plan)
+				record.plan = next_plan
+			end
+			if not record then
+				local plan = prepared
+				if not plan or not admitted(ev) then return false, "ordinary" end
+				local desired = rows.desired(plan)
+				if not desired or desired.code ~= ev.code then rows.retire(plan); return false, "row-plan-refused" end
+				record = { plan = plan, owner = {}, shift_owner = {}, code = desired.code, lifted = {}, key = key, mode = mode, position = position }
+				owners[key] = record -- Reserve before any output callback can stop Hook.
+			end
+			local desired = rows.desired(record.plan)
+			if not desired or not admitted(ev) then return false, "row-source-refused" end
+			local held, shift_current = shift_codes()
+			record.shift_current = shift_current
+			if type(held) ~= "table" or type(shift_current) ~= "function" or shift_current() ~= true
+				or (physical_shift and #held == 0) or (not physical_shift and #held ~= 0) then
+				return false, "row-physical-shift-unqualified"
+			end
+			if not desired.shift then
+				for _, code in ipairs(held) do
+					if not admitted_shift(record, ev) then return false, "row-source-refused" end
+					local lifted = { code = code, state = "suspending" }
+					record.lifted[#record.lifted + 1] = lifted
+					if not receipt(ports.handoff(code, "suspended", emitter)) then return false, "row-prefix-unknown" end
+					lifted.state = "suspended"
+				end
+			elseif #held == 0 then
+				if not admitted_shift(record, ev) then return false, "row-source-refused" end
+				record.shift_attempted = true
+				if not receipt(ports.edge(record.shift_owner, 42, 1, emitter)) then return false, "row-prefix-unknown" end
+			end
+			local action = rows.observe(record.plan, desired.shift)
+			if not action or not admitted_shift(record, ev) then return false, "row-receiving-source-refused" end
+			record.row_attempted = true
+			local ack = ports.edge(record.owner, record.code, value, emitter)
+			if not receipt(ack) then return false, "row-prefix-unknown" end
+			-- The KEY/SYN acknowledgement is transport evidence, not desktop text.
+			local emitted = ack.native_writes == 1
+			if record.shift_attempted then
+				if not admitted_shift(record, ev) then return false, "row-restore-source-refused" end
+				if not receipt(ports.edge(record.shift_owner, 42, 0, emitter)) then return false, "row-restore-unknown" end
+				record.shift_attempted = nil
+			end
+			for index = #record.lifted, 1, -1 do
+				local lifted = record.lifted[index]
+				if not admitted_shift(record, ev) then return false, "row-restore-source-refused" end
+				lifted.state = "restoring"
+				if not receipt(ports.handoff(lifted.code, "restored", emitter)) then return false, "row-restore-unknown" end
+				lifted.state = "restored"
+			end
+			record.lifted = {}
+			if not admitted_shift(record, ev) or ports.current() ~= true then return false, "row-post-delivery-revoked" end
+			local committed, text, identity = commit_action(record.plan, action, ev.code, value, emitted)
+			if committed ~= true then return false, "row-compose-refused" end
+			if not admitted_shift(record, ev) or ports.current() ~= true then return false, "row-post-commit-revoked" end
+			return true, { status = emitted and "native-wire-acknowledged" or "ownership-only",
+				native_writes = ack.native_writes, text = text, identity = identity }
+		end)
+		if not called or accepted ~= true then
+			if record then
+				record.closed = true
+				owners[key] = nil
+				pcall(cleanup, record)
+				rows.retire(record.plan)
+			end
+		end
+		busy = false
+		return called and accepted == true, called and outcome or "row-delivery-unresolved"
+	end
+	local function retire_all()
+		local settled = true
+		for key, record in pairs(owners) do
+			owners[key] = nil
+			record.closed = true
+			local called, closed = pcall(cleanup, record)
+			rows.retire(record.plan)
+			if not called or closed ~= true then settled = false end
+		end
+		for record in pairs(closing) do
+			local called, closed = pcall(cleanup, record)
+			if called and closed == true then closing[record] = nil else settled = false end
+		end
+		return settled
+	end
+	return { event = event, retire = retire_all,
+		has = function(key) return owners[key] ~= nil end,
+		keys = function() local keys = {}; for key in pairs(owners) do keys[#keys + 1] = key end; return keys end }
+end
+
+
+--- Connected opt-in backend. Public policy/menu capability remains unchanged.
+--- No boolean/string native profile grants output: only the original issuer,
+--- same Probe connection, live map and native row selector can create a plan.
+function _number_row.binding(record)
+	if not record or _capture_session ~= record.session or _capture_options ~= record.options
+		or _broker ~= record.broker or _emit_raw ~= record.emitter or _input_output_owner ~= record.output
+		or _input_source_owners ~= record.sources or _input_source_observers ~= record.observers
+		or _origin_generation ~= record.origin or _source_reconciliation or not _input_exports_current()
+		or not _running or not _intercept or _capture_options.numberRowMode ~= record.mode
+		or package.loaded["adapters.xkb_capture"] ~= XkbCapture then return false end
+	local output = record.output
+	if not output or package.loaded["adapters.uinput_writer"] ~= output.writer
+		or ModifierBroker.for_channel ~= installed_output_broker then return false end
+	local broker, observer = installed_output_broker(output.writer)
+	if broker ~= record.broker or observer ~= output.binding or observer(record.broker) ~= true then return false end
+	for _, name in ipairs(INPUT_OUTPUT_PORT_NAMES) do if output.writer[name] ~= output.ports[name] then return false end end
+	return output.writer.capture_kernel_source == record.kernel_capture
+		and output.writer.kernel_source_ports == record.kernel_ports
+		and XkbCapture.capture_receiving_rows == record.capture_rows and XkbCapture.receiving_row_ports == record.row_ports
+		and package.loaded["modules.hotstrings.device_finder"] == record.finder
+		and rawget(record.finder, "physical_sources") == record.source_inventory
+end
+function _number_row.input_allowed(record, source)
+	if not _number_row.binding(record) or record.rows.input_allowed(source) ~= true then return false end
+	-- The original kernel inventory is used ONLY for exclusion/known canonical
+	-- naming. Its physical boolean is deliberately unread: a genuine virtual
+	-- Reader stream is eligible without becoming physical/Caps/OneShot evidence.
+	local rows = record.source_inventory({ source })
+	local row = type(rows) == "table" and getmetatable(rows) == nil and #rows == 1 and rawget(rows, 1) or nil
+	return type(row) == "table" and getmetatable(row) == nil and row.path == source
+		and type(row.name) == "string" and row.name ~= "" and row.name ~= record.writer_name
+		and type(row.sysfs) == "string" and row.sysfs ~= "" and _number_row.binding(record)
+		and record.rows.input_allowed(source) == true
+end
+function _number_row.event_current(record, ev, source)
+	if not _input_exports_current() or ev.remapped or ev.handoff
+		or _sync_dropped[source] or (ev.value ~= InputEvent.VALUE_UP and not _number_row.input_allowed(record, source)) then return false end
+	local origin, slot = _event_receipts[ev], keyboard_slot(source)
+	local view = origin and _input_reader_ports.event_view(origin)
+	return type(view) == "table" and view.source == source and view.slot == slot and origin ~= nil and _input_reader_ports.event_current(origin, ev, slot) == true
+		and _input_reader_ports.source_current(origin, record.sources[slot], record.observers[slot],
+			_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source) == true
+		and (ev.value == InputEvent.VALUE_UP or _number_row.binding(record))
+		and _input_reader_ports.event_current(origin, ev, slot) == true and _input_exports_current()
+end
+function _number_row.shift_codes(record)
+	local seen, codes, retained = {}, {}, {}
+	local function shift_current()
+		-- Original Reader observations are RAM-only. No inventory or native
+		-- callback follows these joins before the caller's output decision.
+		if not _input_exports_current() then return false end
+		for _, held in ipairs(retained) do
+			if _physical_down[held.stamp] ~= held.down or held.down.origin ~= held.origin
+				or held.down.source ~= held.source or held.down.code ~= held.code
+				or _modifier_down[held.key] ~= "shift" or _sync_dropped[held.source]
+				or record.sources[held.slot] ~= held.lease or record.observers[held.slot] ~= held.observer
+				or _input_reader_ports.source_current(held.origin, held.lease, held.observer,
+					_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current,
+					_input_reader_ports.retire_source) ~= true then return false end
+		end
+		return true
+	end
+	for _, entry in ipairs(_modifier_order) do
+		if _modifier_down[entry.key] == "shift" then
+			local stamp = entry.key
+			local down = _physical_down[stamp]
+			if not down then
+				local forwarded = _forwarded_down[entry.key]
+				if forwarded then stamp = source_key(forwarded.source, entry.code); down = _physical_down[stamp] end
+			end
+			if not down or not down.origin or _sync_dropped[down.source]
+				or _number_row.input_allowed(record, down.source) ~= true then return nil end
+			local slot = keyboard_slot(down.source)
+			local held = { stamp = stamp, key = entry.key, down = down, source = down.source, code = entry.code,
+				origin = down.origin, slot = slot, lease = record.sources[slot], observer = record.observers[slot] }
+			retained[#retained + 1] = held
+			if not shift_current() then return nil end
+			if not seen[entry.code] then seen[entry.code] = true; codes[#codes + 1] = entry.code end
+		end
+	end
+	if not _number_row.binding(record) or not shift_current() then return nil end
+	return codes, shift_current
+end
+function _number_row.retire()
+	local record = _number_row.active
+	_number_row.active = nil -- Revoke admission before original cleanup callbacks.
+	if record then
+		for _, key in ipairs(record.owners.keys()) do _number_row.suppressed[key] = true end
+		_number_row.retired[record] = true
+	end
+	local closed = true
+	for owned in pairs(_number_row.retired) do
+		-- Output settlement is independent of the now-revoked source/map.
+		local called, ack = pcall(owned.owners.retire)
+		if called and ack == true then
+			local target_called, target_closed = pcall(owned.rows.close)
+			if target_called and target_closed == true then _number_row.retired[owned] = nil else closed = false end
+		else closed = false end
+	end
+	return closed
+end
+function _number_row.construct()
+	if _number_row.mode == "native" or _number_row.active or next(_number_row.retired) ~= nil
+		or not _input_output_owner or not _running or not _intercept or not original_reader_load
+		or not _input_exports_current() or _source_reconciliation then return false end
+	local output, options = _input_output_owner, _capture_options
+	local writer = output.writer
+	local finder = require("modules.hotstrings.device_finder")
+	local source_inventory = rawget(finder, "physical_sources")
+	if type(source_inventory) ~= "function" then return false end
+	local writer_name = require("infra.device_names").VIRTUAL_KEYBOARD
+	if type(writer_name) ~= "string" or writer_name == "" then return false end
+	local kernel_capture, kernel_ports, capture_rows, row_ports = writer.capture_kernel_source, writer.kernel_source_ports,
+		XkbCapture.capture_receiving_rows, XkbCapture.receiving_row_ports
+	if type(kernel_capture) ~= "function" or type(kernel_ports) ~= "function" or type(capture_rows) ~= "function" or type(row_ports) ~= "function" then return false end
+	local record = { session = _capture_session, options = options, mode = _number_row.mode,
+		broker = _broker, emitter = _emit_raw, output = output, sources = _input_source_owners,
+		observers = _input_source_observers, origin = _origin_generation,
+		kernel_capture = kernel_capture, kernel_ports = kernel_ports, capture_rows = capture_rows, row_ports = row_ports,
+		finder = finder, source_inventory = source_inventory, writer_name = writer_name }
+	if not _number_row.binding(record) then return false end
+	local called, kernel = pcall(kernel_capture)
+	if not called or not kernel then return false end
+	local captured, token = pcall(capture_rows, kernel)
+	local rows = captured and token and row_ports(token) or nil
+	if not rows or not _number_row.binding(record) then
+		local ports = kernel_ports(kernel)
+		if ports and ports.close() ~= true then
+			_number_row.retired[record] = true
+			record.owners = { keys = function() return {} end, retire = function() return true end }
+			record.rows = { close = ports.close }
+		end
+		return false
+	end
+	record.rows = rows
+	-- event() stores the exact source/event only for this synchronous delivery.
+	record.owners = build_row_owners(rows, record.broker, record.emitter,
+		function() return _number_row.active == record and _number_row.binding(record) end,
+		function(ev) return record.event == ev and _number_row.event_current(record, ev, record.source) end,
+		function() return _number_row.shift_codes(record) end, rows.commit, function(code)
+			if rows.capture_current() ~= true then return true end -- Session retired: do not call a stale native pointer.
+			return rows.release(code)
+		end)
+	_number_row.active = record
+	return true
+end
+function _number_row.drive()
+	local record = _number_row.active
+	if not record then return end
+	local called, admitted = pcall(record.rows.drive)
+	if not called or admitted == false or not _number_row.binding(record) then
+		if _number_row.retire() then _number_row.construct() end -- Explicit native/source epoch replacement.
+	end
+end
+function _number_row.preview(ev, source)
+	local key = source_key(source, ev.code)
+	if _number_row.suppressed[key] then
+		if ev.value == InputEvent.VALUE_UP then _number_row.suppressed[key] = nil end
+		return { suppressed = true }
+	end
+	local record = _number_row.active
+	if not record or ev.remapped or ev.handoff then return nil end
+	if record.owners.has(key) and ev.value ~= InputEvent.VALUE_UP
+		and not _number_row.event_current(record, ev, source) then
+		_number_row.retire(); return { suppressed = true }
+	end
+	if record.owners.has(key) and ev.value == InputEvent.VALUE_UP then return { record = record, key = key, release = true } end
+	if ev.code < 2 or ev.code > 11 or ev.value == InputEvent.VALUE_UP
+		or (ev.value == InputEvent.VALUE_REPEAT and not record.owners.has(key)) or _consumed_down[key]
+		or _shortcut_modifier_held() or _altgr_held or not _number_row.event_current(record, ev, source) then return nil end
+	local plan = record.rows.prepare({ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, record.mode, ev.code - 1, _shift_held)
+	if not plan then return nil end
+	local preview = record.rows.preview(plan)
+	if not preview or not _number_row.event_current(record, ev, source) then record.rows.retire(plan); return nil end
+	return { record = record, key = key, plan = plan, text = preview.text, identity = preview.identity }
+end
+function _number_row.abandon(plan, ev, consumed)
+	if plan and plan.plan then
+		if consumed then return plan.record.rows.suppress(plan.plan, ev.code) end
+		return plan.record.rows.retire(plan.plan)
+	end
+end
+function _number_row.deliver(plan, ev, source)
+	if plan.suppressed then return true, nil, nil end
+	local record = plan.record
+	record.event, record.source = ev, source
+	local called, accepted, outcome = pcall(record.owners.event, plan.key, ev, record.mode, ev.code - 1, _shift_held, plan.plan)
+	record.event, record.source = nil, nil
+	if not called or accepted ~= true then
+		_number_row.abandon(plan, ev, false)
+		M.emergency_stop("native number-row source/output retirement refused")
+		return false
+	end
+	if type(outcome) == "table" then return true, outcome.text, outcome.identity end
+	return true, nil, nil
+end
+
 --- Dispatches the original post-remapper path without widening the LuaJIT closure.
 --- The event/source and all native capture, modifier, callback and IO guards stay live.
 local function _dispatch_post_remap(ev, source)
@@ -1140,7 +1539,9 @@ local function _dispatch_post_remap(ev, source)
 		or (ev.value == InputEvent.VALUE_UP and aggregate_before and not aggregate_after)
 		or (ev.value == InputEvent.VALUE_REPEAT and held_role ~= nil)
 	local char, identity, capture_err
-	if capture_transition then char, identity, capture_err = _capture(ev.code, ev.value) end
+	local row_plan = not is_modifier and _number_row.preview(ev, source) or nil
+	if row_plan then char, identity = row_plan.text, row_plan.identity
+	elseif capture_transition then char, identity, capture_err = _capture(ev.code, ev.value) end
 
 	if capture_err then
 		_xkb_failed("XKB capture failed (code=%d value=%d) — %s.", ev.code, ev.value, tostring(capture_err))
@@ -1157,6 +1558,7 @@ local function _dispatch_post_remap(ev, source)
 			ev.code, EvdevCodes.key_name(ev.code), char, ev.value) then
 			-- The callback already triggered the emergency stop; the grabbed
 			-- event must still reach the application before giving up on it.
+			_number_row.abandon(row_plan, ev, false)
 			_forward_raw(ev, source)
 			return
 		end
@@ -1197,6 +1599,7 @@ local function _dispatch_post_remap(ev, source)
 				-- A release owns the application's key state: it must go back
 				-- even when the metrics consumer just died, or the key sticks
 				-- down over there while nothing is held here.
+				_number_row.abandon(row_plan, ev, false)
 				_forward_raw(ev, source)
 				return
 			end
@@ -1236,11 +1639,15 @@ local function _dispatch_post_remap(ev, source)
 			consumption_detail(ev, source, identity, char))
 		local repeat_callback = consumed_repeat_callback(consume)
 		if not ok_consume then
+			_number_row.abandon(row_plan, ev, false)
 			-- A missing verdict is not a suppression: the event still belongs
 			-- to the application.
 			_forward_raw(ev, source)
 			return
 		elseif consume == true or repeat_callback ~= nil then
+			if _number_row.abandon(row_plan, ev, true) == false then
+				M.emergency_stop("native number-row consumed transition refused"); return
+			end
 			_consumed_down[consumed_key] = repeat_callback or true
 			-- A dead key consumed here (a tap key or the physical magic key on
 			-- a French ^ or a US-international ') would otherwise stay pending.
@@ -1253,7 +1660,11 @@ local function _dispatch_post_remap(ev, source)
 		end
 	end
 
-	if not _forward_raw(ev, source) then return end
+	if row_plan then
+		local delivered, row_text, row_identity = _number_row.deliver(row_plan, ev, source)
+		if not delivered then return end
+		char, identity = row_text, row_identity
+	elseif not _forward_raw(ev, source) then return end
 
 	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
@@ -1544,6 +1955,7 @@ local function _dispatch_event(ev, source)
 	-- the physical event was never consumed, and re-emitting would type it twice.
 	if ev.type == EVDEV_TYPE_SYN then
 		if ev.code == SYN_DROPPED then
+			if _number_row.retire() ~= true then M.emergency_stop("native number-row source desynchronised"); return end
 			if not _sync_dropped[source] then
 				_sync_dropped[source] = true
 				if _on_desync and not _call_callback(
@@ -1552,7 +1964,8 @@ local function _dispatch_event(ev, source)
 		elseif ev.code == SYN_REPORT and _sync_dropped[source] then
 			_sync_dropped[source] = nil
 			local synced, sync_err = _resynchronise(source)
-			if not synced then M.emergency_stop("evdev resynchronisation failed: " .. tostring(sync_err)) end
+			if not synced then M.emergency_stop("evdev resynchronisation failed: " .. tostring(sync_err))
+			else _number_row.construct() end
 		end
 		return
 	end
@@ -2025,6 +2438,7 @@ function M.pump()
 		end
 	end
 	if open_keyboards == 0 then
+		_number_row.retire()
 		Logger.warn(LOG, "Every keyboard source is closed — waiting for re-acquisition.")
 		_running = false
 		_reacquiring = true
@@ -2040,6 +2454,7 @@ function M.pump()
 		end
 	end
 
+	_number_row.drive() -- Same original pump/queue; no additional reader/timer.
 	_read_empty_sources(sources)
 	local drained = false
 	for _ = 1, EvdevReader.MAX_EVENTS_PER_DRAIN do
@@ -2306,6 +2721,7 @@ end
 --- @return boolean released
 --- @return string|nil detail
 _release_forwarded_sources = function(paths)
+	if _number_row.retire() ~= true then return false, "native number-row cleanup pending" end
 	local retiring = {}
 	for _, path in ipairs(paths) do retiring[path] = true end
 	local entries = {}
@@ -2828,6 +3244,7 @@ function M.check_device()
 		and _source_transaction_current(tx) or _publish_source_transaction(tx))
 	if not current then _retire_source_transaction(tx, "source reconciliation refused") end
 	if _source_reconciliation == tx then _source_reconciliation = nil end
+	if called and accepted == true then _number_row.construct() end
 	return current
 end
 
@@ -2899,6 +3316,11 @@ function M.start(opts)
 	-- retain their cold-construction originals and authenticate every returned receipt.
 	_input_reader_ports.capture_event = rawget(EvdevReader, "capture_event")
 	local options = type(opts) == "table" and opts or {}
+	if _number_row.retire() ~= true then return false end
+	_number_row.suppressed = {}
+	local row_mode = require("layout.number_row_policy").mode(rawget(options, "numberRowMode") or "native")
+	if not row_mode then return false end
+	_number_row.mode = row_mode
 	_capture_session, _capture_options = {}, options
 	local capture_session = _capture_session
 	_capture_republisher = rawget(options, "onCaptureReacquired")
@@ -3049,6 +3471,7 @@ function M.start(opts)
 	end)
 	if not called or accepted ~= true then _retire_source_transaction(tx, "startup source publication refused") end
 	if _source_reconciliation == tx then _source_reconciliation = nil end
+	if called and accepted == true then _number_row.construct() end
 	return called and accepted == true
 end
 
@@ -3090,6 +3513,7 @@ function M.set_layout(layout)
 end
 
 function M.stop()
+	if _number_row.retire() ~= true then M.emergency_stop("native number-row stop cleanup pending"); return false end
 	_capture_session = nil
 	if not _running and not _reacquiring then return end
 	if _release_remapped() == false then
@@ -3130,6 +3554,7 @@ end
 --- the descriptor is the kernel-guaranteed emergency ungrab.
 --- @param reason string|nil
 function M.emergency_stop(reason)
+	_number_row.retire() -- Unknown original row/output debt stays retained.
 	_capture_session = nil
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
@@ -3246,6 +3671,7 @@ function M.while_released(fn, opts)
 	end
 	local desynced = not _on_desync or _call_callback("input-desync callback", _on_desync)
 	observe("after", { ok = desynced and _running and err == nil })
+	if desynced and _running and err == nil then _number_row.construct() end
 	Logger.debug(LOG, "Keyboard taken back after a dialog.")
 	if err then error(err, 0) end
 	return (table.unpack or unpack)(results, 1, results.n)
@@ -3256,6 +3682,7 @@ end
 --- @param engine table|nil platform/remap/tap_hold_engine instance
 --- @param on_tap function|nil Runs a tap action and its canonical source binding.
 function M.set_remapper(engine, on_tap)
+	if _number_row.retire() ~= true then return false end
 	if _release_remapped() == false then return false end
 	for key in pairs(_remap_owned) do _remap_orphans[key] = true end
 	_remap_owned = {}
@@ -3267,11 +3694,13 @@ function M.set_remapper(engine, on_tap)
 		and _input_ports.capture_input_owner(engine) or nil
 	_armed_input, _live_input_context = nil, nil
 	_on_tap = type(on_tap) == "function" and on_tap or nil
+	_number_row.construct()
 	return true
 end
 
 --- Releases every key the tap-hold engine holds (pause, feature switch).
 function M.release_remapped()
+	if _number_row.retire() ~= true then return false end
 	return _release_remapped()
 end
 

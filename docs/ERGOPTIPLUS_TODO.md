@@ -13054,9 +13054,9 @@ and installed reception remain open.
   read-only receiving does not qualify physical keys, launcher CLI, installed
   application launch or the forced digit/symbol runtime owner.
 
-  Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
-  digit/symbol owners with joint current input/source/modifier/output provenance;
-  reconstruct/review lost runtime preparation. Never fall back from a refused
+  Remaining software: implement native-HKL forced-symbol and macOS forced
+  digit/symbol owners, and qualify the Linux connected owner with joint current
+  input/source/modifier/output provenance. Never fall back from a refused
   owner to a preview or flatten actions/dead states into text. Native
   qualification: migration and delivery/refusal for all ten keys, Shift, AltGr,
   Caps, navigation, repeats and dead states across supported HKL/KLE/XKB/TIS
@@ -13115,6 +13115,23 @@ is available, but its Common inventory enrollment remains owned by Root and
 pending. Current committed Git-generation, hosted native expected-failure
 receiving, forced output, installed acceptance and physical delivery remain
 unqualified. Item 107 stays partial.
+
+The coherent Linux backend now retains the original Reader, Writer, Probe and
+Capture issuers for row delivery, held-Shift handoff and retirement. The current
+item108 inverse and queue retirement remain intact. All 33 existing native-row
+unit cases remain unchanged; 19 owner cases produce 52 passes on both Lua ABIs,
+compared with 34 passes/18 expected missing-builder failures on the former Hook.
+Three additional whole-Hook intent cases bring each ABI to 55 passes: supported
+modes retain ordinary forwarding without receiving rights, while invalid intent
+refuses before acquisition and allows a valid restart. The original Reader owns the opaque leases; the
+controlled row/output ports do not establish device authority. The preserved
+V3 correction omission fails four fixed Shift cases on each ABI in the separate
+component replay.
+Runtime.xi is still undeclared, so connected admission refuses before receiving
+association; public physical/forced-row availability remains false. Coherent
+runtime generation/staging, whole connected native lifecycle, Writer/Xorg
+association, installation and physical delivery remain required. Full final
+source gates are pending; item107 stays partial.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
@@ -13226,6 +13243,12 @@ Historical pre-renewal receiving remains 59 passes/6 failures, separately
 retained. This qualifies native virtual-server maps and consumer plans; physical
 keyboard input, uinput output, native Wayland seats, Xorg device association and
 installed acceptance remain unqualified. Item 108 stays partial.
+
+The connected Linux receiving preparation preserves the existing inverse
+producer and native65 consumer assertions while joining original map, group,
+queue and output issuers. Its optional native dependency remains undeclared;
+this partial software adoption grants no physical editor-key delivery. Live
+retargeting, complete collisions, native and installed acceptance stay open.
 
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:
