@@ -129,9 +129,13 @@ _LAEN_DialogAsksNoName() {
 	for Key in ["api_prompt_provider", "api_prompt_url", "api_prompt_token", "api_prompt_model"]
 		Assert(InStr(Code, Key) > 0, "the dialog must still prompt " . Key)
 	AssertEqual(0, InStr(Code, "api_prompt_name"), "the dialog asks no name")
+	AssertContains(Code, 'InputFn := Options.Get("input", Ui_InputBox)',
+		"the prompt port must retain the actual native input default")
+	AssertContains(Code, 'if !HasMethod(InputFn, "Call")',
+		"the optional input port must reject non-callable values")
 	Asked := 0
 	Pos := 1
-	while (Pos := InStr(Code, "InputBox(", true, Pos)) {
+	while (Pos := InStr(Code, "InputFn.Call(", true, Pos)) {
 		Asked += 1
 		Pos += 1
 	}
