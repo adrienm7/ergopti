@@ -13248,6 +13248,19 @@ The original fifteen portable controls and their registered census remain
 unchanged. Fresh whole native qualification is required; the older `97444`
 native receiving remains historical evidence. Item 107 stays partial.
 
+The corrected integrated source `f716daa9c` is now qualified by manual run
+38512774080: 25 jobs succeed, none fail, and Windows/macOS/release are skipped.
+Common 426/0, Linux units 13693/0, E2E 193/0, native Xvfb 65/0, the original
+C3 prerequisite and LuaJIT ABI 29/cookies 3 pass. Packaging and all seventeen
+installation/startup scenarios pass. The native diagnostic artifact is
+authenticated against its official archive digest and committed source pins;
+included process-family and display retirement receipts close. This remains a
+child-local CONTROLLED runtime with no native epoch or input/output grant.
+The production Runtime.xi declaration, connected Writer/Xorg ownership and
+physical forced-row delivery remain unqualified. The previous failed run and
+its missing-evidence refusal remain retained. See the
+[delivery checkpoint](handovers/2026-10-14-group3-linux-delivery/README.md).
+
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
   Win/Super on Windows/Linux. Implemented: one ordinary editable conditional
