@@ -4,6 +4,17 @@
 
 ## Source and parser hazards
 
+### project-native-low-level-hook-process-context
+
+A valid LoadLibrary handle and passing hook-free SDK tests do not prove that
+`WH_KEYBOARD_LL` can install with that DLL as its module association: the
+standalone owner returned Start6 / Win32126 despite the correct resident module.
+The [low-level keyboard callback](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelkeyboardproc)
+executes in the installing process/thread, without injection. Preserve the
+process-context hook installation and receive real start/join through the
+opt-in lifecycle fixture after native loader or build changes; keep the DLL
+pinned until its actual hook thread has joined.
+
 ### feedback-ahk-source-encoding
 
 Every `.ahk` source file is UTF-8 with BOM and LF endings. Encoding drift can
@@ -96,6 +107,11 @@ Unit includes and compiler parsing do not execute the resident auto-execute
 thread. The full startup smoke must launch the real entry with isolated fresh
 and existing configs, pump deferred timers, require readiness, and reject ERROR
 logs after readiness.
+
+The isolated startup fixture still installs the real native keyboard owner:
+private code and configuration paths do not isolate desktop hooks. Receive it
+with one active Ergopti driver; another driver must not be assumed harmless
+because the fixture lives under `%TEMP%`.
 
 AHK v2's `Func` is a class, not the v1 string resolver: `Func("Callback")`
 raises `ValueError: Invalid base`. Return a local wrapper's `.Bind()` when the

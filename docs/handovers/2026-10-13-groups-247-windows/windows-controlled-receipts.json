@@ -2870,5 +2870,357 @@
 			"native_macos_here": "UNRUN",
 			"native_linux_here": "UNRUN"
 		}
+	},
+	"windows_menu_and_single_pilot_20261014": {
+		"source_sha": "f89c9fb603befe6240739521eb09b332d44e3120",
+		"scope": "Actual Windows software receiving; no physical or complete production qualification",
+		"windows_tree": "7673e33c3ad4454b8ad78e822209c20a21d985e9",
+		"shared_tree": "6b239dea3b27b8bec882497451956defd59bcf8b",
+		"rebase_windows_and_shared_byte_identical": true,
+		"selected": [
+			{
+				"filter": "llm native local owner:",
+				"expected": 4,
+				"passed": 4,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"filter": "llm-local-owner-backend-fixture",
+				"expected": 1,
+				"passed": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"filter": "Windows backend frame:",
+				"expected": 8,
+				"passed": 8,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"filter": "Windows profile parent:",
+				"expected": 7,
+				"passed": 7,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"filter": "actual model emitter declaration withdrawn=",
+				"expected": 2,
+				"passed": 2,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"filter": "actual model parent late withdrawal retires owned descendants",
+				"expected": 1,
+				"passed": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		],
+		"counts_overlap_existing_receiving": true,
+		"original_menu_constructor": {
+			"cases": 3,
+			"passed": 0,
+			"failed": 3,
+			"exit": 1,
+			"reason": "Genuine nested native Menu ownership failures"
+		},
+		"original_backend_fixture": {
+			"passed": 6,
+			"failed": 2,
+			"exit": 1,
+			"source_sha": "7a994538e4ec8754eaa7fad05e02a0e95ae4e4d2",
+			"reason": "Two original unassigned native handle reads"
+		},
+		"compiler": {
+			"valid_exit": 0,
+			"invalid_exit": 17,
+			"entry_exit": 0
+		},
+		"e2e": {
+			"passed": 70,
+			"failed": 0,
+			"skipped": 0,
+			"exit": 0,
+			"scope": "Engine and owned native Edit messages"
+		},
+		"source_controls": {
+			"format_exit": 0,
+			"encoding_exit": 0,
+			"loop_capture_exit": 0,
+			"conventions_exit": 0,
+			"pinned_reads_exit": 0,
+			"complete_menu_manifest_exit": 0,
+			"rebased_menu_manifest_exit": 0
+		},
+		"full_startup": {
+			"exit": 0,
+			"scope": "Complete official isolated source startup smoke",
+			"single_active_driver": true,
+			"earlier_126_cause": "See standalone native process-context receiving; official startup alone did not exercise that failure",
+			"earlier_126_reproduced_in_official_smoke": false
+		},
+		"explicit_user32": {
+			"exit": 0,
+			"no_optin_exit": 2,
+			"vectors": 2,
+			"native_calls": 2,
+			"natural_exit_receipt": true,
+			"source_plan": "injected",
+			"source_serializer": "injected",
+			"native_fifo_qualified": false,
+			"production_qualified": false,
+			"physical_qualified": false,
+			"backend_policy_changed": false
+		},
+		"local_build": {
+			"source_sha": "f89c9fb603befe6240739521eb09b332d44e3120",
+			"artifact": "ErgoptiPlus-f89c9fb603.exe",
+			"bytes": 11060736,
+			"sha256": "ed0911f9690b254af71f7a397af5790228310183da3d9ed90ee96aeedd63a18f",
+			"compiler_exit": 0,
+			"bundle_files": 325,
+			"installed_receiving": "UNRUN",
+			"release_qualified": false
+		},
+		"preceding_frozen_js": {
+			"source_sha": "7a994538e4ec8754eaa7fad05e02a0e95ae4e4d2",
+			"passed": 408,
+			"total": 425,
+			"failed": 17,
+			"exit": 1,
+			"natural_exit": true,
+			"source_images_unchanged": true,
+			"tracked_diff_unchanged": true
+		},
+		"personal_paths_preserved": true,
+		"unrelated_uia_worker_preserved": true,
+		"remaining": {
+			"complete_windows_units": "NOT_NEWLY_RECEIVED; prior incomplete attempts preserved",
+			"complete_current_js": "UNRUN; preceding frozen source failed",
+			"genuine_joined_stop10": "UNRUN",
+			"cohort_conversion_and_emitter_policy": "OPEN",
+			"managed_ai": "OPEN; no runtime/model acquisition",
+			"new_build_diagnostics": "UNRUN",
+			"physical_windows": "UNRUN",
+			"native_macos_here": "UNRUN",
+			"native_linux_here": "UNRUN; maintainer unavailable"
+		}
+	},
+	"windows_native_hook_process_context_20261014": {
+		"based_on_source_sha": "f89c9fb603befe6240739521eb09b332d44e3120",
+		"scope": "Windows native DLL reconstruction and actual hook lifecycle component receiving",
+		"source_fingerprint": "CC6AAB4F612F062B1900F93E4C0AFEFA62E35292C1287CD9EAC04C23D776E04A",
+		"dll_sha256": "C935F6FA5CC64D1C491AA19276CFD9EB42E18698EEF9F350F450D0372779B92A",
+		"source_sha256": "5dd9ad18dfb94bab8ba1c2ff64027748138e3e5d0cb1fb82ce2a6b3861ed90d0",
+		"original": {
+			"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+			"natural_exit": 1,
+			"start": 6,
+			"os_error": 126,
+			"single_active_test_driver": true
+		},
+		"direct_same_callback_api_comparison": {
+			"actual_dll_module": {
+				"installed": false,
+				"os_error": 126
+			},
+			"null_module": {
+				"installed": true,
+				"os_error": 0
+			},
+			"process_exe_module": {
+				"installed": true,
+				"os_error": 0
+			},
+			"hooks_remaining": 0,
+			"natural_exit": 0
+		},
+		"official_reconstruction": {
+			"update_exit": 0,
+			"verify_exit": 0,
+			"replay_matrices": 8,
+			"output_matrices": 11,
+			"trace_matrices": 6,
+			"hook_free_native_passed": 44,
+			"hook_free_native_failed": 0,
+			"exports": 41,
+			"architecture": "x64",
+			"aslr": true,
+			"dep": true,
+			"cfg": true,
+			"dynamic_compiler_runtime": false
+		},
+		"actual_clean_lifecycle": {
+			"natural_exit": 0,
+			"real_starts": 2,
+			"real_joins": 2,
+			"raw_stop": 0,
+			"default_ahk_decoder_return": 1,
+			"native_calls": "real"
+		},
+		"genuine_joined_diagnostic": {
+			"production_qualified": false,
+			"exit": 0,
+			"actual_teardown_os_error": 1404,
+			"full_retained_frame_custody_qualified": false,
+			"accepted": true,
+			"physical_qualified": false,
+			"official_dll_sha256": "C935F6FA5CC64D1C491AA19276CFD9EB42E18698EEF9F350F450D0372779B92A",
+			"official_source_fingerprint": "CC6AAB4F612F062B1900F93E4C0AFEFA62E35292C1287CD9EAC04C23D776E04A",
+			"module": "original issued loader",
+			"actual_raw_stop": 10,
+			"thread_witnesses": "signalled",
+			"actual_decoder_return": 1,
+			"method": "Release only the own fixture HHOOK, call original C Stop and original default AHK decoder in separate real cycles, independently witness each thread join"
+		},
+		"no_optin": {
+			"exit": 2,
+			"before_native_load": true
+		},
+		"source_controls": {
+			"source_images": {
+				"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c": "5dd9ad18dfb94bab8ba1c2ff64027748138e3e5d0cb1fb82ce2a6b3861ed90d0",
+				"static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json": "07cd6fb70199decdcf341aa0e2080cc8355b71b345296375523c3bf250a62fee",
+				"static/ergopti_plus/windows/tests/fixtures/nav_owner_lifecycle_receiving_fixture.ahk": "5a83fc117b02b40e0acbeaf45b6f1980110e3eff388cf8b6eea19aae50b47ec1"
+			},
+			"sources_unchanged": true,
+			"gates": [
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-ahk-encoding.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-ahk-loop-capture.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/lint/lint-conventions.js",
+						"--fail-on-violations"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-no-pinned-source-reads.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-windows-terminal-output-custody-adapter.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-windows-hook-trace-source.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				}
+			],
+			"physical_qualified": false,
+			"production_qualified": false,
+			"accepted": true
+		},
+		"qualification": {
+			"physical": false,
+			"native_fifo": false,
+			"full_retained_frame_custody": false,
+			"production_backend": false,
+			"cohort_complete": false,
+			"transformed_output_enabled": false
+		},
+		"remaining": {
+			"full_retained_frame_facade_retirement": "OPEN",
+			"complete_cohort_conversion": "OPEN SOFTWARE",
+			"measured_emission_policy": "OPEN SOFTWARE",
+			"managed_ai": "OPEN",
+			"new_compiled_build_and_diagnostics": "REQUIRED; prior build/archive predates this DLL",
+			"physical_windows": "UNRUN",
+			"native_macos": "UNRUN",
+			"native_linux": "UNRUN; maintainer unavailable"
+		},
+		"lifecycle_regression": {
+			"retained_frame_custody_qualified": false,
+			"fixture_sha256": "8DA2CA813195BC0D7EDF366D2C27DF6EDFD8F731AB4D355C22AD4915D9EEEFC9",
+			"fixture_unchanged": true,
+			"cases": [
+				{
+					"warnings": false,
+					"mode": "original",
+					"natural_exit": 1,
+					"accepted": true
+				},
+				{
+					"warnings": false,
+					"mode": "fixed",
+					"natural_exit": 0,
+					"accepted": true
+				}
+			],
+			"production_qualified": false,
+			"physical_qualified": false
+		},
+		"application_startup": {
+			"natural_node_exit": 0,
+			"scope": "Complete official isolated startup smoke on corrected C/DLL; no physical qualification",
+			"aggregation_scope_note": "The outer snapshot detects fixture-only scope cleanup during the isolated-copy smoke; that aggregate is not accepted. C, DLL and manifest remain unchanged, and the actual official startup command exits0. A frozen full JS receiving is still required."
+		},
+		"format_exit": 0,
+		"canonical_controls": {
+			"start_error": {
+				"passed": 3,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0
+			},
+			"retirement": {
+				"filter": "terminal-native-retirement:",
+				"expected": 18,
+				"passed": 18,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0,
+				"accepted": true,
+				"scope": "Original canonical runner; actual C registration and no-hook cleanup children",
+				"prior_wrapper_expected": 12,
+				"prior_wrapper_refused": true
+			}
+		}
 	}
 }

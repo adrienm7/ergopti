@@ -12,6 +12,64 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 14 native hook process-context correction
+
+The standalone original DLL reproduces Start6 / Win32126 with one active
+test driver. A direct API comparison isolates the DLL module association:
+the same low-level callback fails with that module but installs with the
+calling process context. The corrected native hook uses that process context;
+the resident owner still pins the DLL. The opt-in actual-DLL lifecycle fixture
+fails on the original build and receives two real start/join cycles on the fix.
+Run `tests/fixtures/nav_owner_lifecycle_receiving_fixture.ahk` with
+`--allow-native-nav-owner-lifecycle` only on an idle desktop with other input
+drivers stopped. Missing opt-in exits2 before native loading.
+
+Both official Windows reconstruction commands exit0: eight replay matrices,
+eleven output matrices, six trace matrices and 44/44 hook-free native cases.
+The hardened x64 DLL retains all 41 exports. Its SHA256 is
+`C935F6FA5CC64D1C491AA19276CFD9EB42E18698EEF9F350F450D0372779B92A`;
+the regenerated source/recipe fingerprint is
+`CC6AAB4F612F062B1900F93E4C0AFEFA62E35292C1287CD9EAC04C23D776E04A`.
+
+The rebuilt official DLL also receives genuine joined Stop10 / Win321404
+after the fixture releases only its own hook. An independent duplicate thread
+handle witnesses the real join. The unchanged default AHK decoder acknowledges
+that diagnostic join and preserves its error report, natural exit0. Complete
+retained-frame/facade retirement remains OPEN: this component receipt does not
+exercise that entire ownership path. Physical input, complete cohort conversion,
+measured production emission policy, managed AI and native macOS/Linux remain
+OPEN or UNRUN. The following f89 build and 7a Diagnostics archive predate this
+DLL correction; a new build and installed archive receiving are required.
+
+### October 14 Windows startup and explicit user32 receiving
+
+Published source `f89c9fb603befe6240739521eb09b332d44e3120` passes the
+complete official AHK startup smoke, exit0: fresh, reloaded, independent,
+suspended, extension, script-chord, retired-Metrics, neutral and older-release
+boots reach ready without an ERROR log. The preceding compiled test driver
+has exited normally; the unrelated UIA worker is preserved. The standalone
+native component still reproduces status6 / Win32126 with one active test
+driver with the original DLL; that failure is separate from the successful
+application smoke and is superseded by the component correction above.
+
+The explicitly authorized standalone user32 fixture receives literal `a` and
+one emoji in its own foreground Edit. Its natural receipt is exactly
+`code=0 vectors=2 native_calls=2`; missing opt-in exits2 before GUI/input.
+Source planning and serialization remain injected. Native FIFO, physical
+typing and production output qualification remain false. Personal paths and
+the unrelated UIA worker are unchanged.
+
+The official 325-file bundle and authenticated compiler produce
+`ErgoptiPlus-f89c9fb603.exe`, 11,060,736 bytes, compiler exit0, SHA256
+`ed0911f9690b254af71f7a397af5790228310183da3d9ed90ee96aeedd63a18f`.
+Build stamps are restored byte-identically. Installed receiving of this new
+menu/build and its own Diagnostics archive remain OPEN; the verified 7a
+archive below retains its original source identity. Complete Windows units
+and the complete JS composition are not newly qualified by these receipts.
+At that checkpoint, joined Stop10 remained unreceived. The component receipt
+above supersedes it; complete cohort conversion, measured emission policy,
+managed AI, physical Windows and native macOS/Linux remain OPEN or UNRUN.
+
 ### October 14 invocation-local Windows IA menu receiving
 
 Detached IA row construction now retains its own native Menu target instead
