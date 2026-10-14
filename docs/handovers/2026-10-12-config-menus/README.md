@@ -166,3 +166,13 @@ predecessor and passes 18/18 after restoration. Current run 38329427303 also
 executes all 18 subjects successfully. The historical selected gate and inverse
 are separate source contexts; installed restart remains unexecuted. Item 7's
 previous blanket statement that this comparison was still pending is corrected.
+
+## Refreshed cloud receiving, 2026-10-14
+
+The [current receiving](2026-10-14-RECEIVING.md) records the refreshed branch
+and Dev joins, empty-folder import correction, genuine Lua dependencies,
+current JS/Linux baseline failures and concrete native follow-ups. The inactive
+Personal archive remains inactive; no item is closed from source inspection
+or portable native-port doubles. Root's receiving and shared-helper ownership
+remain unchanged. Additional diagnostics still require the full unavailable
+`Texte collé.txt` attachment.

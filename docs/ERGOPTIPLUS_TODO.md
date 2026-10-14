@@ -3796,6 +3796,18 @@ remain required, separately from the local gates.
   chosen-folder writers and rerun preservation. Remaining acceptance includes
   the installed fresh/existing/moved-folder wizard and actual trigger/runtime
   restart on each OS; portable or historical CI alone does not complete it.
+  Refreshed cloud receiving (2026-10-14): an empty macOS folder now imports
+  the captured Finish destination and its sibling remap settings, with exact
+  source/view fences through read, decode, projection and deferred publication.
+  All 13 original import transaction cases remain; 15 additive controls pass.
+  The identical tests give original 14 PASS/14 FAIL and restored 28 PASS/0 FAIL.
+  Selected portable receiving passes 19,821 units in 1,604 modules and 101 E2E
+  cases with one explicit skip. Fresh Dev's Shortcuts successor separately
+  passes 95 owning cases. Installed custom/default-folder disagreement, source
+  changes in the same view, fresh/existing/moved-folder retries and actual
+  Cocoa Finish/runtime restart remain required; item 7 and 16/38 stay partial.
+  See the [refreshed receiving](handovers/2026-10-12-config-menus/2026-10-14-RECEIVING.md)
+  for setup corrections, independent causal controls and native scenarios.
   The macOS initial-page host now retains an initialization request for the
   exact window and configuration source when native timer construction/start
   refuses. Same-source reopening retries deferred admission; pending and active
@@ -6296,6 +6308,16 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+
+  Refreshed Linux receiving prerequisite (2026-10-14): the polling backend
+  now sends scalar/incomplete luaposix timestamps through the existing
+  nanosecond reader, preserving complete native timespecs. All 34 original
+  watcher cases and 63 assertion texts remain; five additive real-file controls
+  pass on Lua 5.4/LuaJIT. The selected complete gate passes 13,698 units and
+  193 E2E cases; hosted units report 13,697/zero FAIL in their different
+  dependency context. This fixes Hotstrings reload observation, not batch-writer
+  transaction qualification. Current Windows scopes/transactions, complete
+  warning receiving, package/install and installed startup remain required.
 
   Windows registry string fields and raw-image memo keys now compare complete,
   case-sensitive strings, including embedded NUL suffixes. Actual bounded
