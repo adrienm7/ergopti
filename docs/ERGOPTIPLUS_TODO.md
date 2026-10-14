@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-14. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
+Updated: 2026-10-15. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
 at `63cf3d005d371edb4e4093a906da276ced487182`, published and verified by the
 publication owner with [CI 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226).
 This checklist is the current handoff; older workflow task-status files are
@@ -11,6 +11,40 @@ Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+### October 15 genuine native retirement and explicit menu target receiving
+
+The official corrected DLL receives the original retained-registration family
+with an actual hook thread and genuine joined teardown diagnostics: one positive
+case, eleven foreign authority/refusal cases, missing public publication and
+five pre-registration source/build withdrawals. All eighteen distinct children
+exit0 with their original assertions intact. Foreign acknowledgements leave
+the independently observed thread alive; only the restored real default stop
+joins it and retires the exact references, preserving Win321404. Two final
+cases were initially held after the penultimate case refused at the one-pilot
+guard while another AHK process was active. That process was preserved; the
+last case had not run, and both later fresh attempts exit0. These controlled
+source fixtures do not qualify physical input, FIFO output or production policy.
+
+The frozen source `8f5b2f9d846ca1615330d4541aaf903acf43d14b` receives the
+complete JS command with 407/425 PASS, 18 FAIL, natural exit1 and unchanged
+source images, HEAD and tracked diff. Seventeen failures match the preceding
+snapshot's failing checks. The additional menu-parity failure is isolated to
+the source reader still requiring the old global target and five-argument
+emitter. Its corrected grammar requires the actual typed target parameter and
+native consumer. The complete private candidate passes, exit0, retaining every
+original inverse and adding four target/seven total inverse controls. After
+integration, the actual complete menu-parity command and six direct consumer
+commands each exit0, with all six code images, HEAD and tracked diff unchanged
+through receiving. These scoped commands do not supply a green complete JS suite.
+
+Native managed file/import and inert-launcher receiving passes 9/9, 7/7 and
+9/9 respectively, each exit0. This is not a real Ollama runtime/model/service
+receiving; no acquisition occurred. Complete Windows units and the newer full
+JS composition are not green. Complete cohort conversion, measured emission
+policy, live managed AI, the new compiled build/Diagnostics archive, physical
+Windows and native macOS/Linux remain OPEN or UNRUN. The following older
+checkpoints retain their original scope and source identity.
 
 ### October 14 native hook process-context correction
 

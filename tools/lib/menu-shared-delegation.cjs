@@ -393,6 +393,8 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 			'_llm_menu_fireinstalledtagsprobe',
 			'_llm_menu_modeldisplaytext',
 			'map',
+			'menu',
+			'typeerror',
 			'error'
 		]);
 		const arrayLiteralOpen = (at) =>
@@ -409,7 +411,8 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 			if (
 				i === helper.index ||
 				i === emit.index ||
-				(identifier(tokens[i], 'Map') && identifier(tokens[i - 1], 'is'))
+				((identifier(tokens[i], 'Map') || identifier(tokens[i], 'Menu')) &&
+					identifier(tokens[i - 1], 'is'))
 			)
 				continue;
 			// The native fallback Array and ternary values construct Maps directly.
@@ -547,7 +550,7 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 		body.take('return [' + parent + ']');
 		if (!body.done()) return false;
 		const signature = scriptTokens(
-			'id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset',
+			'TargetMenu, id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset',
 			'.ahk'
 		);
 		if (
@@ -557,7 +560,13 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 			return false;
 		const e = reader(emit.body);
 		e.line();
-		e.take('global _LLM_Menu, _LLM_Menu_Handle');
+		e.take('global _LLM_Menu');
+		e.line();
+		e.take('if !(TargetMenu is Menu)');
+		e.line();
+		e.take('throw TypeError(');
+		e.error();
+		e.take(')');
 		e.line();
 		e.take('switch id {');
 		let depth = 0;
@@ -607,9 +616,14 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 			if (
 				reserved.has(name.toLowerCase()) ||
 				stageNames.some((n) => n.toLowerCase() === name.toLowerCase()) ||
-				['id', 'disabled', 'llm_is_operational', 'has_health_dot', 'capturedwarningrows'].includes(
-					name.toLowerCase()
-				)
+				[
+					'targetmenu',
+					'id',
+					'disabled',
+					'llm_is_operational',
+					'has_health_dot',
+					'capturedwarningrows'
+				].includes(name.toLowerCase())
 			)
 				throw Error('Fresh model stage binding required');
 			stageNames.push(name);
@@ -658,7 +672,7 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 		);
 		stage.line();
 		stage.take(
-			'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_model_parent_ahk", ' +
+			'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_model_parent_ahk", ' +
 				returnedRows +
 				')'
 		);
