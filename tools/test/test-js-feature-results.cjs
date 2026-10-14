@@ -459,7 +459,7 @@ console.log(
 require('./fixtures/common-unit-admission-controls.cjs')
 	.run()
 	.then((count) => {
-		assert.equal(count, 45, 'complete source plan and actual Unit writer admission controls');
+		assert.equal(count, 54, 'complete source plan, Unit writer admission and refusal diagnostics');
 	})
 	.catch((error) => {
 		console.error(error);
