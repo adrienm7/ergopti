@@ -226,7 +226,7 @@ _LMDG_BackendFrameGreyingRoute(Emit, Helper) {
 	Call := _LMDG_Statement(Emit,
 		'm)^[ \t]*(BackendRows) := _LLM_Menu_BackendParentRows\(BackendMenu, BackendCaption, disabled, WarningRows\)', 3)
 	Consumer := _LMDG_Statement(Emit,
-		'm)^[ \t]*(MenuRenderer_AppendRows)\(_LLM_Menu_Handle, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows\)', 3)
+		'm)^[ \t]*(MenuRenderer_AppendRows)\(TargetMenu, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows\)', 3)
 	Getter := _LMDG_Statement(Helper,
 		'm)^[ \t]*(Getters) := Map\("llm_backend_parent_caption", \(\*\) => Caption,[ \t]*\n[ \t]*"llm_backend_parent_ready", \(\*\) => !Disabled,', 1)
 	Parent := _LMDG_Statement(Helper,
@@ -285,7 +285,7 @@ _LMDG_ModelParentGreyingRoute(Emit, Helper) {
 	Call := _LMDG_Statement(Emit,
 		'm)^[ \t]*(ModelRows) := _LLM_Menu_ModelParentRows\(ReceiveModel, model_menu, health_dot, model_shown, disabled\)', 3)
 	Consumer := _LMDG_Statement(Emit,
-		'm)^[ \t]*(MenuRenderer_AppendRows)\(_LLM_Menu_Handle, "llm_menu", "llm_model_parent_ahk", ModelRows\)', 3)
+		'm)^[ \t]*(MenuRenderer_AppendRows)\(TargetMenu, "llm_menu", "llm_model_parent_ahk", ModelRows\)', 3)
 	Getters := _LMDG_Statement(Helper,
 		'm)^[ \t]*(Getters) := Map\("llm_model_health_prefix", \(\*\) => HealthPrefix,[ \t]*\n'
 		. '[ \t]*"llm_model_current_caption", \(\*\) => ModelCaption,[ \t]*\n'

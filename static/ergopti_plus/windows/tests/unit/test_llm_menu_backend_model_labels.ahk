@@ -1361,7 +1361,7 @@ _LBMD_ModelParentActualEmissionCurrent(Withdrawn, ExistingChild) {
 		_LLM_Menu["last_health_status"] := "ok"
 		if Withdrawn
 			Root.Delete("llm_model_parent_ahk")
-		try _LLM_Menu_EmitRow("llm_model", false, true, true)
+		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_model", false, true, true)
 		catch
 			Failed := true
 		AssertEqual(Withdrawn, Failed)
@@ -1433,7 +1433,7 @@ _LBMD_ModelParentLateRefusalCurrent(ExistingChild) {
 		_LLM_Menu_Handle := Target
 		_DriverInputInitPending := true
 		Failed := false
-		try _LLM_Menu_EmitRow("llm_model", false, true, true)
+		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_model", false, true, true)
 		catch
 			Failed := true
 		_LLM_Menu.DeleteProp("Has")
@@ -1455,7 +1455,7 @@ _LBMD_ModelParentLateRefusalCurrent(ExistingChild) {
 		Assert(DllCall("GetMenuItemCount", "ptr", ExistingChild.Handle, "int") > 0,
 			"the preceding genuine detached picker remains intact")
 		Root["llm_model_parent_ahk"] := Declaration
-		_LLM_Menu_EmitRow("llm_model", false, true, true)
+		_LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_model", false, true, true)
 		AssertEqual(1, DllCall("GetMenuItemCount", "ptr", Target.Handle, "int"), "fresh actual receiver repair publishes the genuine picker")
 	} finally {
 		if Object.Prototype.HasOwnProp.Call(_LLM_Menu, "Has")

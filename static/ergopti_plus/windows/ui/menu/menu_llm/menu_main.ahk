@@ -89,16 +89,14 @@ _LLM_Menu_PreparedRootCurrent(Submenu, PublishAuthorizeFn) {
  * detached Menu and returns it — no publish, no root rebuild, no tray touch.
  * initMenu builds IA inline at boot through this; LLM_Menu_Build uses it for
  * staged replacements. One row-construction site: the two must never drift.
- * The global handle is pointed at the staged menu during construction (row
- * builders write through it) and restored before return, so the call has no
- * publish side effects.
+ * Each native row retains this invocation's detached target. Nested builds
+ * can publish a successor without redirecting the interrupted row or having
+ * their published handle restored away by the older builder.
  * @returns {Menu} Staged submenu with all rows.
  */
 LLM_Menu_BuildSubmenu() {
-	global _LLM_Menu, _LLM_Menu_Handle
-	SavedHandle := (IsSet(_LLM_Menu_Handle) && IsObject(_LLM_Menu_Handle)) ? _LLM_Menu_Handle : ""
+	global _LLM_Menu
 	StagedHandle := Menu()
-	_LLM_Menu_Handle := StagedHandle
 	try {
 	_tStaged := A_TickCount
 
@@ -162,20 +160,16 @@ LLM_Menu_BuildSubmenu() {
 			GroupDisabled[_row["id"]] := RowDisabled
 		} else {
 			DynamicHandlers[_row["id"]] := _LLM_Menu_EmitCapturedRow.Bind(
-				_row["id"], RowDisabled, _llm_is_operational, _MR_Get(_row, "health_dot", false), WarningRows)
+				StagedHandle, _row["id"], RowDisabled, _llm_is_operational, _MR_Get(_row, "health_dot", false), WarningRows)
 		}
 	}
 	MenuRenderer_Build("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders(),
 		"", Commands, StateGetters, StagedHandle, GroupDisabled)
-	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
+	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", StagedHandle.Handle, "int"))
 	} catch as e {
-		if IsObject(SavedHandle)
-			_LLM_Menu_Handle := SavedHandle
 		try StagedHandle.Delete()
 		throw e
 	}
-	if IsObject(SavedHandle)
-		_LLM_Menu_Handle := SavedHandle
 	return StagedHandle
 }
 
@@ -187,11 +181,10 @@ _LLM_Menu_StateGetters() {
 }
 
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.
-_LLM_Menu_EmitCapturedRow(Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
-	global _LLM_Menu_Handle
-	if !(TargetMenu is Menu) || TargetMenu != _LLM_Menu_Handle
+_LLM_Menu_EmitCapturedRow(Owner, Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
+	if !(Owner is Menu) || !(TargetMenu is Menu) || TargetMenu != Owner
 		throw Error("An LLM row cannot leave its detached native menu owner.")
-	_LLM_Menu_EmitRow(Id, Disabled, Operational, HealthDot, WarningRows)
+	_LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)
 }
 
 ; Child builders retain genuine native Menu identities; the manifest owns the parents.
@@ -406,8 +399,10 @@ _LLM_MenuLayout_Fallback() {
  *                                      carries the dot is the manifest's call, not this
  *                                      file's, so macOS cannot end up dotting another row.
  */
-_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {
-	global _LLM_Menu, _LLM_Menu_Handle
+_LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {
+	global _LLM_Menu
+	if !(TargetMenu is Menu)
+		throw TypeError("An LLM settings row requires its native target.")
 	switch id {
 	case "llm_backend":
 		WarningRows := IsSet(CapturedWarningRows) ? CapturedWarningRows : []
@@ -431,7 +426,7 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, Cap
 			BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)
 			if !(BackendRows is Array)
 				throw Error("Declared backend parent frame was withdrawn.")
-			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)
+			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)
 		} catch as Err {
 			BackendMenu.Delete()
 			MenuDispatcher_PruneMenu(BackendMenu)
@@ -468,7 +463,7 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, Cap
 			; thinking-model row below must agree with the same text.
 			model_shown := _LLM_Menu_ModelDisplayText()
 			ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)
-			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_model_parent_ahk", ModelRows)
+			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_model_parent_ahk", ModelRows)
 		} catch as Err {
 			try _LLM_Menu_ReleaseModelMenu(model_menu)
 			catch as CleanupError
@@ -480,7 +475,7 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, Cap
 			InfoRows := MenuRenderer_TemplateRows("llm_thinking_info", Map(), Map(), Map())
 			if !(InfoRows is Array)
 				throw Error("Declared thinking-model information was refused.")
-			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_thinking_info", InfoRows)
+			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_thinking_info", InfoRows)
 		}
 	case "llm_profile":
 		; Admit the actual boundary and whole frame before building the native child.
@@ -507,26 +502,26 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, Cap
 			ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)
 			if !(ProfileRows is Array) || ProfileRows.Length != 2
 				throw Error("Declared profile parent frame was withdrawn.")
-			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)
+			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)
 		} catch as Err {
 			ProfileMenu.Delete()
 			MenuDispatcher_PruneMenu(ProfileMenu)
 			throw Err
 		}
 	case "llm_trigger":
-		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_trigger",
+		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_trigger",
 			Map("llm_trigger", LLM_Menu_BuildTriggerMenu), disabled)
 			throw Error("Declared LLM group 'llm_trigger' was refused.")
 	case "llm_generation_settings":
-		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_generation_settings",
+		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_generation_settings",
 			Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu), disabled)
 			throw Error("Declared LLM group 'llm_generation_settings' was refused.")
 	case "llm_display":
-		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_display",
+		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_display",
 			Map("llm_display", LLM_Menu_BuildDisplayMenu), disabled)
 			throw Error("Declared LLM group 'llm_display' was refused.")
 	case "llm_navigation":
-		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_navigation",
+		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_navigation",
 			Map("llm_navigation", LLM_Menu_BuildNavMenu), disabled)
 			throw Error("Declared LLM group 'llm_navigation' was refused.")
 	default:
