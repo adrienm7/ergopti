@@ -86,7 +86,21 @@ function selectUnitJobs(plan, jobs, identity) {
 			writers.length === 1 &&
 				writers[0].status === 'completed' &&
 				writers[0].conclusion === 'success',
-			'missing or failed Unit writer'
+			'missing or failed Unit writer: ' +
+				JSON.stringify({
+					lot: name,
+					feature: row.feature,
+					suite: row.suite,
+					job_id: String(job.id),
+					run_attempt: String(latest),
+					writer_count: writers.length,
+					writers_truncated: writers.length > 3,
+					writers: writers.slice(0, 3).map((step) => ({
+						number: Number.isSafeInteger(step.number) ? step.number : null,
+						status: typeof step.status === 'string' ? step.status.slice(0, 64) : null,
+						conclusion: typeof step.conclusion === 'string' ? step.conclusion.slice(0, 64) : null
+					}))
+				})
 		);
 		selected[row.feature] = {
 			suite: row.suite,

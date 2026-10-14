@@ -82,6 +82,73 @@ async function run() {
 	const older = { ...structuredClone(jobs[0]), id: 99, run_attempt: 1, conclusion: 'failure' };
 	assert.equal(selectUnitJobs(plan, [...jobs, older], identity).menus.run_attempt, '2');
 	controls++;
+	// The refusal must identify the exact API observation, without copying arbitrary step text.
+	for (const mutate of [
+		(job) => {
+			delete job.steps;
+		},
+		(job) => {
+			job.steps = [];
+		},
+		(job) => {
+			job.steps[0].status = 'in_progress';
+		},
+		(job) => {
+			job.steps[0].conclusion = 'failure';
+		},
+		(job) => {
+			job.steps[0].conclusion = 'skipped';
+		},
+		(job) => {
+			job.steps.push(structuredClone(job.steps[0]));
+		},
+		(job) => {
+			job.steps = Array.from({ length: 4 }, () => structuredClone(job.steps[0]));
+		},
+		(job) => {
+			delete job.steps[0].status;
+		},
+		(job) => {
+			job.steps[0].conclusion = null;
+		}
+	]) {
+		const changed = structuredClone(jobs);
+		changed[0].steps[0].number = 17;
+		changed[0].steps.push({
+			name: 'Private unrelated step text',
+			status: 'completed',
+			conclusion: 'success'
+		});
+		mutate(changed[0]);
+		assert.throws(
+			() => selectUnitJobs(plan, changed, identity),
+			(error) => {
+				const prefix = 'Common Unit admission refused: missing or failed Unit writer: ';
+				assert.ok(error.message.startsWith(prefix));
+				const detail = JSON.parse(error.message.slice(prefix.length));
+				const writers =
+					changed[0].steps?.filter((step) => step.name === 'Run shared validation suite') || [];
+				assert.equal(detail.lot, changed[0].name);
+				assert.equal(detail.feature, 'menus');
+				assert.equal(detail.suite, 'js');
+				assert.equal(detail.job_id, '1');
+				assert.equal(detail.run_attempt, '2');
+				assert.equal(detail.writer_count, writers.length);
+				assert.equal(detail.writers_truncated, writers.length > 3);
+				assert.deepEqual(
+					detail.writers,
+					writers.slice(0, 3).map((step) => ({
+						number: 17,
+						status: typeof step.status === 'string' ? step.status : null,
+						conclusion: typeof step.conclusion === 'string' ? step.conclusion : null
+					}))
+				);
+				assert.ok(!error.message.includes('Private unrelated step text'));
+				return true;
+			}
+		);
+		controls++;
+	}
 	for (const mutate of [
 		(j) => {
 			j.pop();
