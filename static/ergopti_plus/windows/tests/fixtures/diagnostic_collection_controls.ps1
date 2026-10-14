@@ -15,10 +15,19 @@ $taskRuntimeVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($Runtime).Prod
 if($taskRuntimeVersion -cnotmatch '^[0-9]+[.][0-9]+[.][0-9]+$'){throw 'The fixture requires its actual runtime identity.'}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $env:PSModulePath="$env:SystemRoot/System32/WindowsPowerShell/v1.0/Modules;"+$env:PSModulePath
-foreach($taskCase in @('native','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout','resident-observed','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason','approved-name-failure','approved-name-image','produced-evidence-change','foreign-evidence-output','foreign-evidence-stage','first-evidence-publication-race','repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update')){
+foreach($taskCase in @('native','slow-native-setup','cancel','deadline','foreign-physical','missing-component','redaction-refusal','false-installed-origin','existing-partial','archive-limit','owner-observed','query-timeout','resident-observed','resident-private-field','resident-native-forgery','resident-stale','resident-future','resident-phase','resident-capacity','resident-fifo-census','resident-pass-reason','approved-name-failure','approved-name-image','produced-evidence-change','foreign-evidence-output','foreign-evidence-stage','first-evidence-publication-race','repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update')){
  $taskId='ergopti-diagnostic-'+[Guid]::NewGuid().ToString('N');$taskDirectory=Join-Path $taskRoot $taskId
  [IO.Directory]::CreateDirectory($taskDirectory)|Out-Null
  $taskRunWorker=$taskWorker;$taskRunContract=$taskContract
+ if($taskCase -eq 'slow-native-setup'){
+  $taskRunWorker=Join-Path $taskRoot 'slow-native-setup-control.ps1'
+  $taskSource=[IO.File]::ReadAllText($taskWorker)
+  $taskSeam='$taskNativeWatch = [Diagnostics.Stopwatch]::StartNew()'
+  if(([regex]::Matches($taskSource,[regex]::Escape($taskSeam)).Count) -ne 1){throw 'Slow setup control requires the exact native probe entry.'}
+  # Delay only the parent preparation; the real child and its actual UIA query remain unchanged.
+  $taskSource=$taskSource.Replace($taskSeam,$taskSeam+"`n"+'Start-Sleep -Milliseconds 9000')
+  [IO.File]::WriteAllText($taskRunWorker,$taskSource,[Text.UTF8Encoding]::new($false))
+ }
  if(@('deadline','archive-limit') -contains $taskCase){
   $taskObject=Get-Content -LiteralPath $taskContract -Raw -Encoding UTF8|ConvertFrom-Json
   if($taskCase -eq 'deadline'){$taskObject.deadline_ms=1}else{$taskObject.max_archive_bytes=1}
@@ -142,9 +151,9 @@ if ($Name -ceq 'progress.json' -and !(Test-Path -LiteralPath (Join-Path $taskRoo
  $taskInfo.UseShellExecute=$false;$taskInfo.CreateNoWindow=$true;$taskInfo.RedirectStandardOutput=$true;$taskInfo.RedirectStandardError=$true
  $taskProcess=[Diagnostics.Process]::Start($taskInfo);$taskRetainedHandle=$taskProcess.Handle
  $taskOutput=$taskProcess.StandardOutput.ReadToEndAsync();$taskErrors=$taskProcess.StandardError.ReadToEndAsync()
- $taskExited=$taskProcess.WaitForExit(20000)
+ $taskExited=$taskProcess.WaitForExit($(if($taskCase -eq 'slow-native-setup'){35000}else{20000}))
  if(!$taskExited){throw ('Collector control retained PID '+$taskProcess.Id+'; no competitor was launched.')}
- $taskRow=[ordered]@{case=$taskCase;scope=$(if($taskCase -eq 'query-timeout'){'injected_query_delay'}elseif(@('produced-evidence-change','first-evidence-publication-race','repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update') -contains $taskCase){'injected_evidence_change'}else{'actual_worker_control'});worker_sha256=(Get-FileHash -LiteralPath $taskRunWorker -Algorithm SHA256).Hash;exit_code=$taskProcess.ExitCode;stderr_bytes=$taskErrors.Result.Length;archive_created=(Test-Path -LiteralPath ($taskDirectory+'.zip'));path=$taskDirectory;results=@();checks=@()}
+ $taskRow=[ordered]@{case=$taskCase;scope=$(if($taskCase -eq 'query-timeout'){'injected_query_delay'}elseif($taskCase -eq 'slow-native-setup'){'injected_native_setup_delay'}elseif(@('produced-evidence-change','first-evidence-publication-race','repeated-evidence-successor','repeated-evidence-equal-successor','repeated-evidence-hardlink','exclusive-evidence-update') -contains $taskCase){'injected_evidence_change'}else{'actual_worker_control'});worker_sha256=(Get-FileHash -LiteralPath $taskRunWorker -Algorithm SHA256).Hash;exit_code=$taskProcess.ExitCode;stderr_bytes=$taskErrors.Result.Length;archive_created=(Test-Path -LiteralPath ($taskDirectory+'.zip'));path=$taskDirectory;results=@();checks=@()}
  if($taskRow.archive_created){
   $taskCommitted=$taskOutput.Result|ConvertFrom-Json
   if($taskCommitted.schema_version -ne 1 -or $taskCommitted.session_id -cne $taskId -or $taskCommitted.archive_committed -ne $true -or
@@ -215,7 +224,8 @@ foreach($taskProof in $taskProofs){
  if($taskById.cleanup.receipt.scope -cne 'owned_window_and_control_files' -or
   @($taskById.cleanup.receipt.operations_unfinished|Where-Object {$_.operation -ceq 'host_worker_retirement' -and $_.state -ceq 'awaiting_host_ack'}).Count -ne 1){throw 'A live worker claimed its own future host-tree retirement.'}
  if($taskById.physical_text.status -ceq 'PASS' -or $taskById.physical_display.status -ceq 'PASS'){throw 'Automated controls invented physical qualification.'}
- if($taskProof.case -eq 'native' -and ($taskById.native_uia.status -cne 'PASS' -or $taskById.native_render.status -cne 'PASS')){throw 'Actual native synthetic collection failed.'}
+ if(@('native','slow-native-setup') -contains $taskProof.case -and ($taskById.native_uia.status -cne 'PASS' -or $taskById.native_render.status -cne 'PASS')){throw ('Actual native synthetic collection failed: '+$taskProof.case)}
+ if($taskProof.case -eq 'slow-native-setup' -and $taskById.native_uia.duration_ms -lt 9000){throw 'The slow preparation control did not execute.'}
  if($taskProof.case -eq 'exclusive-evidence-update'){
   $taskExclusive=Get-Content -LiteralPath (Join-Path $taskProof.path 'exclusive-update-proof.json') -Raw -Encoding UTF8|ConvertFrom-Json
   if($taskExclusive.writer_refused -ne $true -or @(32,33) -notcontains $taskExclusive.error_code){throw 'A competing writer acquired the exclusive update stream.'}

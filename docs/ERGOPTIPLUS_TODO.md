@@ -12,6 +12,47 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 15 compiled collection failure and native query budget correction
+
+The official compiled build at `6818cd94eba5966c26308f8e8dd30d0b8514023e`
+contains the corrected C935 native DLL. Its executable is 11,060,736 bytes,
+SHA256 `6fce830991245e4beaeadf15112a7dcee41f19cd49c539a7a160b9fd6f9a4243`.
+Actual Diagnostics collection creates a reviewed 3,736-byte ZIP, SHA256
+`b3bedb9322f1e635cf31e756bc47c6288d1cc0412e42ace2a5b69f8b4819444b`.
+CRC, closed entry names, redaction and all six component identities pass.
+The archive retains four PASS, two native-synthetic FAIL, six functional UNRUN
+and two explicitly skipped physical checks. An independently retained worker
+handle observes natural exit0. That exit does not promote failed probe results.
+
+The UIA child had inherited a timeout clock started before assembly/window
+preparation. A controlled nine-second preparation delay reproduces the failure
+on the original worker, regression exit1. The corrected worker starts its
+eight-second query clock only after launching that child; the global deadline,
+cancellation and exact child retirement remain enforced. Actual delayed UIA
+and rendering pass on the correction, while the blocked-query control retains
+its expected FAIL. The complete actual PowerShell control fixture passes all
+31 cases, natural exit0, retaining all thirty original controls. Installed
+receiving of the corrected collector remains OPEN
+until a new exact-source build replaces the currently running 6818 build.
+
+At source 6818, all six formerly failing unit cases pass separately. Their
+complete selected families also pass through the canonical runner: 3, 22, 16,
+5, 42 and 3 cases, each exit0 without failures or skips. These 91 cases do not
+replace the previously incomplete whole suite. Current CI Windows units stop
+before launch on Root's existing buffered-snapshot source seal mismatch; no
+current full-suite success follows from that CI job. Complete input-cohort
+conversion, measured emission policy, live managed AI, physical Windows and
+native macOS/Linux remain OPEN or UNRUN.
+
+The newer complete JS attempt is FAILED_INCOMPLETE. Its complete menu-parity
+check passes, but the aggregate also launches the real AHK startup smoke. That
+test was reached while the installed test build remained active, violating the
+one-driver receiving precondition. The input-free suite controller was stopped
+to prevent further launches; the existing build and unrelated UIA worker were
+preserved. The startup child was subsequently absent, without an independently
+received exit status. Neither that startup attempt nor the interrupted aggregate
+supplies native or whole-suite qualification.
+
 ### October 15 genuine native retirement and explicit menu target receiving
 
 The official corrected DLL receives the original retained-registration family

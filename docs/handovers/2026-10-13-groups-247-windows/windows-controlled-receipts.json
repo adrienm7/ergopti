@@ -3641,5 +3641,359 @@
 		"current_complete_js": "NOT_RECEIVED_AFTER_READER_CORRECTION",
 		"full_windows_units": "PRECEDING_FAILED_OR_INCOMPLETE; not newly green",
 		"physical_or_production_qualification": false
+	},
+	"windows_collector_query_budget_20261015": {
+		"base_sha": "6818cd94eba5966c26308f8e8dd30d0b8514023e",
+		"installed_predecessor_collection": {
+			"schema_version": 1,
+			"source_sha": "6818cd94eba5966c26308f8e8dd30d0b8514023e",
+			"session_id": "ergopti-diagnostic-dcfe0be8917a4c4b9d4e6e1492681b1d",
+			"archive_name": "diagnostic-Windows-6818cd94eb-92681b1d.zip",
+			"bytes": 3736,
+			"sha256": "b3bedb9322f1e635cf31e756bc47c6288d1cc0412e42ace2a5b69f8b4819444b",
+			"scope": "Actual compiled Diagnostics collection; no functional or physical qualification",
+			"zip_crc": "PASS",
+			"entry_allowlist": "PASS",
+			"redaction_review": "PASS",
+			"component_hashes": "PASS",
+			"passed": 4,
+			"unrun": 6,
+			"skipped": 2,
+			"failed": 2,
+			"worker_retirement": {
+				"pid": 21484,
+				"session_id": "ergopti-diagnostic-dcfe0be8917a4c4b9d4e6e1492681b1d",
+				"observed_at": 1792017641.745457,
+				"opened_handle": true,
+				"wait_result": 0,
+				"exit_code": 0,
+				"completed_at": 1792017668.246632,
+				"natural_retirement": true
+			},
+			"physical_qualified": false,
+			"production_qualified": false
+		},
+		"cause": "The native probe clock included cold parent setup before launching the UIA query child.",
+		"correction": "Start an independent eight-second query clock after actual child creation. Keep the unchanged global deadline, cancellation and retained-child retirement.",
+		"collector_preimage_sha256": "620dff05035ea6c1637605b364a0a3251dff09db93b3f8b6ebe87cfc940585d4",
+		"collector_afterimage_sha256": "d387cd77c3dd56ec5da3debde35fa39b7d22b9bd16a32b14b3275e3170821447",
+		"original_regression": {
+			"command": "diagnostic_collection_controls.ps1, private exact-case selection: slow-native-setup",
+			"parent_setup_delay_ms": 9000,
+			"worker_exit": 0,
+			"regression_exit": 1,
+			"native_uia": "FAIL",
+			"native_render": "FAIL",
+			"scope": "Controlled preparation delay; original actual query/receiver and archive worker."
+		},
+		"fixed_targeted": {
+			"cases": ["slow-native-setup", "query-timeout"],
+			"natural_exit": 0,
+			"delayed_uia": "PASS",
+			"delayed_render": "PASS",
+			"blocked_query": "FAIL_EXPECTED",
+			"scope": "Actual PowerShell worker, controlled setup or child delay; not installed-binary or physical qualification."
+		},
+		"canonical_unit_families": [
+			{
+				"filter": "personal-toml-pre-rename-guard:",
+				"executed": 3,
+				"passed": 3,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0
+			},
+			{
+				"filter": "personal-opening-source:",
+				"executed": 22,
+				"passed": 22,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0
+			},
+			{
+				"filter": "local server composition:",
+				"executed": 16,
+				"passed": 16,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0
+			},
+			{
+				"filter": "api-entry-auto-name:",
+				"executed": 5,
+				"passed": 5,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0
+			},
+			{
+				"filter": "local-server-private-source",
+				"executed": 42,
+				"passed": 42,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0
+			},
+			{
+				"filter": "agent-apps-command",
+				"executed": 3,
+				"passed": 3,
+				"failed": 0,
+				"skipped": 0,
+				"natural_exit": 0
+			}
+		],
+		"ci_windows_units": {
+			"run": 38647316677,
+			"job": 116137688428,
+			"result": "FAILED_BEFORE_SUITE_LAUNCH",
+			"source": "static/ergopti_plus/_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk",
+			"actual_seal": "c2c26f6b4a8d3bd9c86153b17ffcc919a1ad47ec57c45043dfd5cd8ba2589ab1",
+			"expected_seal": "d049972c3566def451dedd9e9a34747e4a0dc7c3dcac600dabc419de02c84e97",
+			"root_owned_seal_unchanged": true
+		},
+		"installed_corrected_collector": "OPEN; requires a new exact-source build and actual Diagnostics collection",
+		"full_windows_units": "PRECEDING_FAILED_INCOMPLETE; selected families do not replace the whole suite",
+		"full_js": "PRECEDING_FAILED; no new whole-suite success",
+		"physical_qualified": false,
+		"production_qualified": false,
+		"native_macos": "UNRUN",
+		"native_linux": "UNRUN",
+		"complete_native_controls": {
+			"command": "powershell.exe -NoProfile -File static/ergopti_plus/windows/tests/fixtures/diagnostic_collection_controls.ps1 -Checkout <owned checkout> -Runtime <AutoHotkey 2.0.26 x64>",
+			"executed": 31,
+			"accepted": 31,
+			"natural_exit": 0,
+			"all_original_controls_preserved": true,
+			"controls_sha256": "7e597f56d3156570c1c93b3e25db647056b7f204293a3e1a8b6fca4986965837",
+			"cases": [
+				{
+					"case": "native",
+					"scope": "actual_worker_control",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "slow-native-setup",
+					"scope": "injected_native_setup_delay",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "cancel",
+					"scope": "actual_worker_control",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "deadline",
+					"scope": "actual_worker_control",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "foreign-physical",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "missing-component",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "redaction-refusal",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "false-installed-origin",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "existing-partial",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "archive-limit",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "owner-observed",
+					"scope": "actual_worker_control",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "query-timeout",
+					"scope": "injected_query_delay",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "resident-observed",
+					"scope": "actual_worker_control",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "resident-private-field",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "resident-native-forgery",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "resident-stale",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "resident-future",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "resident-phase",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "resident-capacity",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "resident-fifo-census",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "resident-pass-reason",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": true
+				},
+				{
+					"case": "approved-name-failure",
+					"scope": "actual_worker_control",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "approved-name-image",
+					"scope": "actual_worker_control",
+					"worker_exit": 0,
+					"archive_created": true
+				},
+				{
+					"case": "produced-evidence-change",
+					"scope": "injected_evidence_change",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "foreign-evidence-output",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "foreign-evidence-stage",
+					"scope": "actual_worker_control",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "first-evidence-publication-race",
+					"scope": "injected_evidence_change",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "repeated-evidence-successor",
+					"scope": "injected_evidence_change",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "repeated-evidence-equal-successor",
+					"scope": "injected_evidence_change",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "repeated-evidence-hardlink",
+					"scope": "injected_evidence_change",
+					"worker_exit": 1,
+					"archive_created": false
+				},
+				{
+					"case": "exclusive-evidence-update",
+					"scope": "injected_evidence_change",
+					"worker_exit": 0,
+					"archive_created": true
+				}
+			]
+		},
+		"scoped_gates": [
+			{
+				"gate": "diagnostic-ui",
+				"natural_exit": 0
+			},
+			{
+				"gate": "diagnostic-parity",
+				"natural_exit": 0
+			},
+			{
+				"gate": "diagnostic-redaction",
+				"natural_exit": 0
+			},
+			{
+				"gate": "conventions",
+				"natural_exit": 0
+			}
+		],
+		"current_full_js_attempt": {
+			"state": "FAILED_INCOMPLETE",
+			"raw_receipt_sha256": "a2457341a76bd081e2d8db9c1e9f63854a4fc5dcbd06c1339c0e9742d3d6c288",
+			"reason": "The aggregate reached real AHK startup while the compiled test driver was still active. Its input-free Node controller was explicitly stopped to prevent further launches.",
+			"controller_pid": 21128,
+			"controller_parent": 12004,
+			"controller_executable": "pinned Node22.22.2",
+			"controller_natural_exit": false,
+			"whole_suite_footer_received": false,
+			"raw_wrapper_natural_exit_field_qualified": false,
+			"startup_child_pid": 19616,
+			"startup_child_exit": "UNKNOWN; subsequently absent, no independent exit receipt",
+			"protected_compiled_pid": 10232,
+			"protected_uia_pid": 12748,
+			"protected_uia_created_filetime": 134363891045107000,
+			"protected_personal_paths_sha256": "CAD80BDC7DF564E5BA9CD1C06CF5BF2B90F9391A6935AD897071778F56A81428",
+			"source_images_unchanged": true,
+			"tracked_diff_unchanged": true,
+			"menu_parity_source_check": "PASS before interruption",
+			"physical_or_production_qualified": false
+		}
 	}
 }
