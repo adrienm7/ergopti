@@ -140,12 +140,8 @@ _LLM_Menu_EnableWrite(Request, Path, Updates) {
 				|| !_LLM_Menu_EnableSourceMatches(Request["source"], ReadSource.Call())
 			return false
 		Content := Built["content"]
-		Size := StrPut(Content, "UTF-8") - 1
 		; The shared renderer returns the complete image, including its BOM.
-		Bytes := Buffer(Size, 0)
-		Encoded := Buffer(Size + 1, 0)
-		StrPut(Content, Encoded, "UTF-8")
-		DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", Encoded.Ptr, "UPtr", Size)
+		Bytes := FSUtf8Bytes(Content)
 		Token := Flow.PrepareEnableHandoff(Request["source"], Map("path", Path, "bytes", Bytes))
 		if !(Token is Map)
 			return false

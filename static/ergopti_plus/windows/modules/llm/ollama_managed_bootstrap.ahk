@@ -402,7 +402,7 @@ class OllamaManagedBootstrap {
 	}
 
 	_Hash(Path) {
-		return CryptoSha256Bytes(FileRead(Path, "RAW"))
+		return CryptoSha256Bytes(FSReadBytesStrict(Path))
 	}
 
 	_Consent(Kind, Model := "") {
@@ -945,7 +945,7 @@ class OllamaManagedBootstrap {
 
 	_Ticket() {
 		Guid := Buffer(16, 0)
-		if DllCall("Ole32\CoCreateGuid", "Ptr", Guid.Ptr, "HRESULT") != 0
+		if PLC_CreateGuid(Guid.Ptr, "HRESULT") != 0
 			throw Error("Managed acquisition cannot allocate its unique ticket.")
 		Result := ""
 		loop Guid.Size

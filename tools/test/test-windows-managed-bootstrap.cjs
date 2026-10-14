@@ -40,22 +40,34 @@ assert.match(flow, /"cleanup_partial"/);
 assert.match(flow, /"retire_runtime"/);
 assert.match(flow, /LLM_OllamaListModels_Async/);
 assert.match(flow, /this\.Runtime\.ObserveReady\(\)/);
-assert.match(flow, /CryptoSha256Bytes\(FileRead\(Path, "RAW"\)\)/);
+assert.match(flow, /CryptoSha256Bytes\(FSReadBytesStrict\(Path\)\)/);
+const fileSystem = fs.readFileSync(path.join(root, 'adapters/file_system.ahk'), 'utf8');
+function assertStrictRawRead(source) {
+	assert.match(source, /FSReadBytesStrict\(Path\) \{\s+return FileRead\(Path, "RAW"\)\s+\}/);
+}
+assertStrictRawRead(fileSystem);
+const silentRead = fileSystem.replace('return FileRead(Path, "RAW")', 'return FSRead(Path)');
+assert.notEqual(silentRead, fileSystem, 'The refusal control must change the real raw reader.');
+assert.throws(() => assertStrictRawRead(silentRead), { code: 'ERR_ASSERTION' });
+const utf8Match = fileSystem.match(/\nFSUtf8Bytes\(Content\) \{[\s\S]*?\n\}\n/);
+assert.ok(utf8Match, 'Inspect the real adapter encoder, not an absent helper.');
+const utf8Source = utf8Match[0];
 const admission = fs.readFileSync(path.join(root, 'ui/menu/menu_llm/enable_admission.ahk'), 'utf8');
 // The production resolver preserves the injected writer's refusal contract.
 // The config renderer already returns the complete canonical UTF-8/BOM image;
 // copy exactly that image, excluding only StrPut's terminating NUL.
-function assertEnableWriterSource(source) {
+function assertEnableWriterSource(source, encoder = utf8Source) {
 	assert.match(source, /TOML_BuildConfigUpdatedContent\(Path, Updates\)/);
 	assert.match(
 		source,
 		/Writer := _LLM_Menu_EnablePort\(Request\["port"\], "writer", TOML_ConfigBatchWrite\)/
 	);
 	assert.match(source, /Written := Writer\.Call\(Path, Updates\)/);
-	assert.match(source, /Content := Built\["content"\]\s+Size := StrPut\(Content, "UTF-8"\) - 1/);
-	assert.match(source, /Bytes := Buffer\(Size, 0\)/);
+	assert.match(source, /Content := Built\["content"\][\s\S]*?Bytes := FSUtf8Bytes\(Content\)/);
+	assert.match(encoder, /Size := StrPut\(Content, "UTF-8"\) - 1/);
+	assert.match(encoder, /Bytes := Buffer\(Size, 0\)/);
 	assert.match(
-		source,
+		encoder,
 		/Encoded := Buffer\(Size \+ 1, 0\)\s+StrPut\(Content, Encoded, "UTF-8"\)\s+DllCall\("RtlMoveMemory", "Ptr", Bytes\.Ptr, "Ptr", Encoded\.Ptr, "UPtr", Size\)/
 	);
 	assert.match(
@@ -63,19 +75,21 @@ function assertEnableWriterSource(source) {
 		/PrepareEnableHandoff\(Request\["source"\], Map\("path", Path, "bytes", Bytes\)\)/
 	);
 	assert.doesNotMatch(source, /StrPut\(Chr\(0xFEFF\) \. (?:Built\["content"\]|Content)/);
+	assert.doesNotMatch(encoder, /StrPut\(Chr\(0xFEFF\) \. (?:Built\["content"\]|Content)/);
 	assert.doesNotMatch(source, /NumPut\("UChar", 0xEF|Bytes\.Ptr \+ 3|Buffer\(Size \+ 3/);
+	assert.doesNotMatch(encoder, /NumPut\("UChar", 0xEF|Bytes\.Ptr \+ 3|Buffer\(Size \+ 3/);
 }
 assertEnableWriterSource(admission);
 const originalEncoding = 'StrPut(Content, Encoded, "UTF-8")';
 const doubledEncoding = 'StrPut(Chr(0xFEFF) . Content, Encoded, "UTF-8")';
-const doubledBom = admission.replace(originalEncoding, doubledEncoding);
-assert.notEqual(doubledBom, admission, 'The counterfactual must change the actual encoding call.');
+const doubledBom = utf8Source.replace(originalEncoding, doubledEncoding);
+assert.notEqual(doubledBom, utf8Source, 'The counterfactual must change the actual encoding call.');
 assert.throws(
-	() => assertEnableWriterSource(doubledBom),
+	() => assertEnableWriterSource(admission, doubledBom),
 	{ code: 'ERR_ASSERTION' },
 	'A prepended second BOM cannot satisfy the complete source/image contract.'
 );
-assertEnableWriterSource(doubledBom.replace(doubledEncoding, originalEncoding));
+assertEnableWriterSource(admission, doubledBom.replace(doubledEncoding, originalEncoding));
 assert.match(admission, /PrepareEnableHandoff/);
 assert.match(admission, /FinishEnableHandoff/);
 for (const file of [

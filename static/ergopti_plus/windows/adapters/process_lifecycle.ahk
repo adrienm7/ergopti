@@ -412,3 +412,85 @@ global ADAPTER_PROCESS_LIFECYCLE := Map(
     "start",            PLC_Start,
     "stop",             PLC_Stop,
 )
+
+
+/** Reads the current process identity without acquiring a new process handle. */
+PLC_CurrentProcessIdentity() {
+	Times := Buffer(32, 0)
+	if !DllCall("GetProcessTimes", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "Ptr", Times,
+		"Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24, "Int")
+		throw OSError(A_LastError, "GetProcessTimes", "Diagnostic host identity could not be observed.")
+	return Map("pid", DllCall("GetCurrentProcessId", "UInt"),
+		"created_filetime", NumGet(Times, 0, "Int64"))
+}
+
+/** Observes the native wall clock without changing collection timing policy. */
+PLC_CurrentFiletime() {
+	Time := Buffer(8, 0)
+	DllCall("GetSystemTimeAsFileTime", "Ptr", Time)
+	return NumGet(Time, 0, "Int64")
+}
+
+/** Returns the original GUID status; callers retain their own refusal policy. */
+PLC_CreateGuid(Guid, ResultType := "Int") {
+	return DllCall("Ole32\CoCreateGuid", "Ptr", Guid, ResultType)
+}
+
+/** Queries only an already-loaded, started native module; never lazy-loads it. */
+_DiagSnapshot_ResidentNativeReads(Rows) {
+	global _VendorDir, _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerModule, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerQuarantined
+	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputUnknown, _HSE_TerminalOwner, _HSE_TerminalReplayPending
+	global _LLM_NavEventOwnerStopPending, _LLM_NavEventOwnerStartRollbackPending, _LLM_NavEventOwnerStartCancelled
+	global _LLM_NavEventOwnerLifecycleQuiesced, _LLM_NavEventOwnerShutdownFenced, _LLM_NavEventOwnerDrainActive
+	if !_LLM_NavEventOwnerStarted || !_LLM_NavEventOwnerModule || _LLM_NavEventOwnerStarting
+			|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerQuarantined || _LLM_NavEventOwnerPort is Map
+			|| _LLM_NavEventOwnerStopPending || _LLM_NavEventOwnerStartRollbackPending || _LLM_NavEventOwnerStartCancelled
+			|| _LLM_NavEventOwnerLifecycleQuiesced || _LLM_NavEventOwnerShutdownFenced || _LLM_NavEventOwnerDrainActive
+		return
+	Module := _LLM_NavEventOwnerModule
+	Path := Buffer(65536, 0)
+	Length := DllCall("GetModuleFileNameW", "Ptr", Module, "Ptr", Path, "UInt", 32768, "UInt")
+	if !Length || Length >= 32768 || StrGet(Path, Length, "UTF-16") != StrReplace(_VendorDir . "\ergopti_nav_owner.dll", "/", "\")
+		return
+	CanStopFn := DllCall("GetProcAddress", "Ptr", Module, "AStr", "ErgoptiNav_CanStop", "Ptr")
+	CaptureFn := DllCall("GetProcAddress", "Ptr", Module, "AStr", "ErgoptiNav_GetTerminalCapture", "Ptr")
+	if !CanStopFn || !CaptureFn
+		return
+	Row := Rows[4], Started := A_TickCount, CanStop := 0
+	Status := DllCall(CanStopFn, "UChar*", &CanStop, "Int")
+	Row["status"] := Status == 0 ? "PASS" : "FAIL", Row["scope"] := "native_readonly"
+	Row["reason"] := Status == 0 ? "native_aggregate_drain_observed" : "native_query_refused"
+	Row["duration_ms"] := TickElapsed(Started), Row["values"]["native_status"] := Status
+	Row["values"]["can_stop"] := Status == 0 ? CanStop : -1
+	if Status != 0
+		Row["errors"] := [Map("native_status", Status)]
+	Row["values"]["record_count"] := _LLM_TerminalOutputRecords.Count
+	Row["values"]["pending_count"] := 0, Row["values"]["unknown_count"] := IsObject(_LLM_TerminalOutputUnknown) ? 1 : 0
+	for _, Record in _LLM_TerminalOutputRecords {
+		Row["values"]["pending_count"] += Record["pending"] ? 1 : 0
+		Row["values"]["unknown_count"] += Record["unknown"] ? 1 : 0
+	}
+	Token := 0
+	if _HSE_TerminalOwner is Map && !(_HSE_TerminalOwner.Get("Port", 0) is Map)
+		Token := _HSE_TerminalOwner.Get("Id", 0)
+	else if _HSE_TerminalReplayPending is Map && !(_HSE_TerminalReplayPending.Get("Port", 0) is Map)
+		Token := _HSE_TerminalReplayPending.Get("Token", 0)
+	if !(Token is Integer) || Token <= 0
+		return
+	Row := Rows[3], Started := A_TickCount, Snapshot := Buffer(28, 0)
+	Status := DllCall(CaptureFn, "UInt64", Token, "Ptr", Snapshot, "Int")
+	Row["values"]["native_status"] := Status
+	Row["duration_ms"] := TickElapsed(Started), Row["scope"] := "native_readonly"
+	Row["reason"] := Status == 0 ? "native_capture_state_observed" : "native_capture_not_present"
+	Row["status"] := Status == 0 ? "PASS" : (Status == 8 ? "UNRUN" : "FAIL")
+	if Status != 0 && Status != 8
+		Row["errors"] := [Map("native_status", Status)]
+	if Status == 0 {
+		if NumGet(Snapshot, 0, "UInt64") != Token
+			throw Error("Native capture identity changed during its diagnostic read.")
+		Row["values"]["token"] := Token
+		for Index, Field in ["phase", "queued", "replayed", "last_os_error", "release_kind"]
+			Row["values"][Field] := NumGet(Snapshot, 8 + (Index - 1) * 4, "UInt")
+	}
+}
