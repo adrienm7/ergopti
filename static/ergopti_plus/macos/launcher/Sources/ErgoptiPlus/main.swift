@@ -89,6 +89,9 @@ func launcherChildEnvironment(
 	// identity from its own executable and Info.plist.
 	environment.removeValue(forKey: "__CFBundleIdentifier")
 	environment.removeValue(forKey: "XPC_SERVICE_NAME")
+	// Only the original Fresh issuer may add its private route after this ordinary
+	// inheritance boundary; inherited text cannot select the first native loader.
+	environment.removeValue(forKey: "ERGOPTI_INSTALLED_CAPTURE_CONTROL")
 	environment["ERGOPTI_LAUNCHER_PID"] = String(launcherPid)
 	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
 	environment.removeValue(forKey: kLoggerDatagramPortEnvironment)

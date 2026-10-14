@@ -94,7 +94,7 @@ def outputs():
     return result
 
 
-def executable(directory, source):
+def executable(directory, source, fixture="owned_runtime_queue_test.cpp"):
     share, ports = directory / "actual-source", directory / "modeled-ports"
     vendor_source = directory / "actual-vendor-source"
     share.mkdir(parents=True)
@@ -133,7 +133,7 @@ def executable(directory, source):
         str(OPTIONS.upstream / "vendor/vendor/include"),
         "-I",
         str(OPTIONS.vendor),
-        str(BUILD / "fixtures/owned_runtime_queue_test.cpp"),
+        str(BUILD / "fixtures" / fixture),
     ]
     if OPTIONS.blocks_root:
         command += [
@@ -232,6 +232,53 @@ class NativeQueueErrorBehavior(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stderr, "Unknown independent queue acquisition scenario\n")
+
+
+# Keep the original acquisition and error controls independently enrolled.
+DISPATCHER_SCENARIOS = (
+    "cut-healthy",
+    "cut-off-dispatcher",
+    "cut-wrong-dispatcher",
+    "cut-enqueue-refused",
+)
+
+
+class NativeDispatcherCutBehavior(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory(prefix="actual-owned-dispatcher-cut-")
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.binary = executable(
+            Path(cls.temporary.name), outputs(), "owned_runtime_dispatcher_test.cpp"
+        )
+
+    def test_independent_dispatcher_cut_scenarios(self):
+        for scenario in DISPATCHER_SCENARIOS:
+            with self.subTest(scenario=scenario):
+                result = subprocess.run(
+                    [str(self.binary), scenario],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, "")
+                self.assertEqual(
+                    result.stdout,
+                    "PASS actual vendor dispatcher cut "
+                    + scenario
+                    + "; modeled native ports only\n",
+                )
+
+    def test_unknown_dispatcher_cut_scenario_refuses(self):
+        result = subprocess.run(
+            [str(self.binary), "unknown-dispatcher-cut-case"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "Unknown independent dispatcher cut scenario\n")
 
 
 if __name__ == "__main__":
