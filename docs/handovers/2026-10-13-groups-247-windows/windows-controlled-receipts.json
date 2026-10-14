@@ -2028,5 +2028,172 @@
 			"managed_windows_ai_runtime_model_receiving": "OPEN; no acquisition consent, no runtime/model downloaded",
 			"new_build_diagnostics_menu_archive": "OPEN; preserved resident e235 build and its source-bound archive"
 		}
+	},
+	"missing_native_publication_followup": {
+		"source_commit": "f647fd9d7098ed5a552b9799f378a51b8c94ad80",
+		"status": "PASS_CONTROLLED_NATIVE_NO_HOOK",
+		"genuine_child_artifact": "native-retirement-v3-receiving/missing-publication-43d60fc3-904b-48e3-b1db-07fc20b38f77/receipts.json",
+		"genuine_children": [
+			{
+				"mode": "observed",
+				"flavor": "original",
+				"natural_exit": true,
+				"exit": 1,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [
+					"ErgoptiNav_ListTerminalHeldRecipes|8",
+					"ErgoptiNav_RegisterTerminalRoutes|0",
+					"ErgoptiNav_ListTerminalHeldRecipes|0",
+					"ErgoptiNav_Stop|0"
+				],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7",
+				"child_sha256": "4ad7c970e03d606595a1097994bb382bf30fe8449bf2119bed0984b8c42065c2",
+				"lexical_dllcall_sites_changed": 33,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+				"physical_or_joined_stop10_qualification": false
+			},
+			{
+				"mode": "observed",
+				"flavor": "revised",
+				"natural_exit": true,
+				"exit": 0,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [
+					"ErgoptiNav_ListTerminalHeldRecipes|8",
+					"ErgoptiNav_RegisterTerminalRoutes|0",
+					"ErgoptiNav_ListTerminalHeldRecipes|0",
+					"ErgoptiNav_Stop|0"
+				],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+				"child_sha256": "60b075dd67b286b6caa6fd8f5b28aff941b482400a38a984041b3ccacad11f75",
+				"lexical_dllcall_sites_changed": 35,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Raw real C receipts on lexical-observer copy; no Start/hook or synthetic status.",
+				"physical_or_joined_stop10_qualification": false
+			},
+			{
+				"mode": "exact",
+				"flavor": "original",
+				"natural_exit": true,
+				"exit": 1,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7",
+				"child_sha256": "ccfd4ca0a7c01b1e0a64567039db275910b3b1f1e1847decff170fcd7c035de9",
+				"lexical_dllcall_sites_changed": 0,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+				"physical_or_joined_stop10_qualification": false
+			},
+			{
+				"mode": "exact",
+				"flavor": "revised",
+				"natural_exit": true,
+				"exit": 0,
+				"exact_plan": true,
+				"running": 1,
+				"skipped": 0,
+				"causal": true,
+				"raw_exact": true,
+				"events": [],
+				"unchanged": true,
+				"accepted": true,
+				"source_sha256": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+				"child_sha256": "600b74facc96a0b44b1c6af116edb0f99b0bd27db2c670af95c12ef92df57f97",
+				"lexical_dllcall_sites_changed": 0,
+				"dll_sha256": "C2340521225628719FC84E1F2E89B468B27231098C3A8C25C8E0862C1E8FEB8E",
+				"source_fingerprint_sha256": "B7A261B3AF76204520F61E0AF19C8726D3CED64183692A0DF514A02394AD9036",
+				"scope": "Causal Unknown retirement on exact received production adapter; raw observation from separate child only.",
+				"physical_or_joined_stop10_qualification": false
+			}
+		],
+		"actual_registered_parent": {
+			"failed": 0,
+			"skipped": 0,
+			"running": 13,
+			"passed": 13,
+			"filter": "terminal-native-retirement:",
+			"tap": "D:\\Ergopti247Evidence\\continuation-20261013\\missing-publication-integrated-parent-v1.tap",
+			"expected": 13,
+			"exit": 0,
+			"accepted": true
+		},
+		"module_source_controls": [
+			{
+				"gate": "test-windows-terminal-output-custody-adapter",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "b936129c46c712a4db42b3b3a7e8d640b9caf79d433dd32f443b7d0ffcc1a65d",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-windows-hook-trace-source",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "b936129c46c712a4db42b3b3a7e8d640b9caf79d433dd32f443b7d0ffcc1a65d",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			},
+			{
+				"gate": "test-no-pinned-source-reads",
+				"exit": 0,
+				"natural_exit": true,
+				"unchanged": true,
+				"accepted": true,
+				"sources": {
+					"static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk": "b3291c2cc9f6f6fbbedb239369ebdb54ba94edd5074ce7b6266d604d006e9745",
+					"static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk": "b936129c46c712a4db42b3b3a7e8d640b9caf79d433dd32f443b7d0ffcc1a65d",
+					"tools/test/test-windows-terminal-output-custody-adapter.cjs": "d3974a0b4e8fb8f11398464dca0c61487404d29f6e5d60bd14c2a9911070c4d4",
+					"tools/test/test-windows-hook-trace-source.cjs": "4c6cd29992bdd2f1cb9a5bdfea1c3e9c84fb24b097ab5a291d1beac933d28d57"
+				},
+				"native_or_physical_qualification": false
+			}
+		],
+		"mechanism": "A missing public Unknown slot does not discard private genuine registration debt. A custom stopped Map is refused without teardown; the original module Stop0 retires the debt without reconstructing the public slot, while preserving original and foreign holder contents.",
+		"supersedes": "Only the missing_public_unknown_genuine_branch UNRUN entry in native_registration_retirement_followup; all earlier receipts remain historical.",
+		"full_windows_units": "FAILED_INCOMPLETE_WATCHDOG; selected receiving does not supersede the incomplete full attempt",
+		"whole_js": "FAILED_FOOTER_EXIT_UNCAPTURED on the earlier frozen attempt; module controls are separate",
+		"genuine_joined_stop10": "UNRUN",
+		"physical_windows": "UNRUN",
+		"native_macos_here": "UNRUN",
+		"native_linux_here": "UNRUN",
+		"downloads_performed": false,
+		"production_adapter_changed": false,
+		"native_dll_changed": false
 	}
 }

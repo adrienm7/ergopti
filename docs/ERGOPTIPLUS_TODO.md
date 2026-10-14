@@ -12,6 +12,25 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 14 Windows missing native publication receiving
+
+The missing-public-Unknown branch is now received against genuine default
+native registration, without starting a hook. Observed and uninstrumented
+children each reproduce the original causal failure (exit 1) and corrected
+success (exit 0). Actual C receipts remain query8/Register0/query0/Stop0.
+A custom stopped Map cannot acknowledge the retained private debt; genuine
+Stop0 retires it without reconstructing public publication or changing
+original/foreign holder contents. The registered parent receives 13/13,
+natural exit 0, zero failures/skips. Three module source controls also exit 0.
+
+Only this previously unreceived branch is closed. Production AHK and the
+official DLL/source manifest are unchanged. The full Windows unit watchdog
+and earlier complete JS failures remain open. Genuine joined Stop10,
+Source/Builder provenance, cohort conversion, measured emission policy,
+managed AI and the latest installed Diagnostics archive remain open.
+Physical Windows and native macOS/Linux remain UNRUN; no runtime/model
+was downloaded. Earlier receiving entries below retain their original scope.
+
 ### October 14 Windows authenticated registration retirement
 
 Uncertain default registration now retains private same-process native custody.
