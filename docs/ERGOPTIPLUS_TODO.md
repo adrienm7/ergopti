@@ -12845,6 +12845,16 @@ and installation qualification are still required.
   cases without breaking the original 26. These are software-owner controls,
   not native catalogue, TCC, invocation or process-retirement qualification.
 
+  Invocation completion now rejoins its original active reservation after both
+  physical and automation settlement observers. An invalidation-created successor
+  query remains pending and cannot be erased by the retired invocation. All93
+  original registered cases remain byte-exact; two independent public-owner
+  regressions give93 PASS/two FAIL before and95 PASS/zero FAIL after under the
+  genuine Lua5.4 runner with controlled Hammerspoon ports. Removing only the new
+  guard reproduces both failures. Stock LuaJIT refuses table.pack before loading
+  the subject; no LuaJIT success is claimed. Native discovery/invocation, service
+  retirement, final delivery gates and item106 completion remain open.
+
   The signed-role Lua transport now closes its reservation after the original
   ShellRunner acknowledges an already-settled handle with no native start attempt.
   Construction nil/throw cannot emit a retirement stream; an attempted leader

@@ -837,3 +837,43 @@ H.describe("Apple Shortcut resolved start failure ownership", function()
 		H.assert_eq(old_calls, 0); H.assert_eq(successor.cancels, 0)
 	end)
 end)
+
+H.describe("Independent invocation settlement successor custody", function()
+	for _, port in ipairs({ "isSettled", "automationSettled" }) do
+		H.it("invocation " .. port .. " observer cannot erase an invalidation-created successor", function()
+			local f, old_calls, successor_calls = fixture(), 0, 0
+			local initial = f.discover()
+			H.assert_true(f.owner.invoke(initial.choices[1].key, "keyboard", function() return true end,
+				function() old_calls = old_calls + 1 end))
+			f.reply(f.tasks[2], { f.rows[1] }); f.tasks[2].retire()
+			local old = f.invocations[1]
+			old.finish(true); H.assert_eq(old_calls, 0); H.assert_true(f.owner.pending())
+			local original, observed = old[port], false
+			local invalidated, accepted, start_reason, successor_value, successor_reason
+			old[port] = function()
+				if old.physical and old.service and not observed then
+					observed = true
+					invalidated = f.owner.invalidate()
+					accepted, start_reason = f.owner.discover(function(value, reason)
+						successor_calls = successor_calls + 1
+						successor_value, successor_reason = value, reason
+					end)
+				end
+				return original()
+			end
+			old.retire(true)
+			-- Assertions stay outside the settlement observer's protected call.
+			H.assert_true(observed); H.assert_true(invalidated); H.assert_true(accepted); H.assert_nil(start_reason)
+			H.assert_true(old.physical); H.assert_true(old.service)
+			H.assert_eq(#f.tasks, 3); H.assert_eq(old_calls, 0); H.assert_true(f.owner.pending())
+			local successor = f.tasks[3]
+			H.assert_eq(old.cancels, 1); H.assert_eq(successor.starts, 1); H.assert_eq(successor.cancels, 0)
+			old.retire(true); H.assert_true(f.owner.pending()); H.assert_eq(old_calls, 0)
+			assert_false(f.owner.discover(function() end)); H.assert_eq(#f.tasks, 3)
+			f.reply(successor); H.assert_eq(successor_calls, 0); successor.retire()
+			H.assert_eq(successor_calls, 1); H.assert_nil(successor_reason)
+			H.assert_eq(#successor_value.choices, 2); assert_false(f.owner.pending())
+			H.assert_eq(old_calls, 0); H.assert_eq(successor.cancels, 0)
+		end)
+	end
+end)
