@@ -376,7 +376,7 @@ _LBMS_ActualWarningAnchor() {
 	try {
 		WarningRows := [Map("label", t("menu.llm.warning_install_ollama"),
 			"action", _LLM_Menu_OnWarningInstallClick)]
-		_LLM_Menu_EmitCapturedRow("llm_backend", false, false, false,
+		_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false,
 			WarningRows, Destination, "LLM")
 		Labels := _LBMS_Labels(Destination)
 		AssertEqual(t("menu.llm.warning_install_ollama"), Labels[1],
@@ -520,18 +520,19 @@ _WBF_Withdrawal(Root) {
 
 _WBF_OriginalEntryRefusal(Root) {
 	global _LLM_Menu, _LLM_Menu_Handle
-	SavedMenu := _LLM_Menu, SavedHandle := _LLM_Menu_Handle
+	SavedMenu := _LLM_Menu, HadHandle := IsSet(_LLM_Menu_Handle)
+	SavedHandle := HadHandle ? _LLM_Menu_Handle : 0
 	Target := Menu(), Failure := ""
 	try {
 		_LLM_Menu := Map(), _LLM_Menu_Handle := Target
 		Root.Delete("llm_backend_parent_frame_ahk")
-		try _LLM_Menu_EmitRow("llm_backend", false, false)
+		try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_backend", false, false)
 		catch as Err
 			Failure := Err.Message
 		AssertEqual("Declared backend parent frame was refused.", Failure, "actual preexisting entry refuses frame before reading missing native backend state")
 		AssertEqual(0, TrayMenuItemCount(Target), "no partial detached backend or warning was exposed")
 	} finally {
-		_LLM_Menu := SavedMenu, _LLM_Menu_Handle := SavedHandle
+		_LLM_Menu := SavedMenu, _LLM_Menu_Handle := HadHandle ? SavedHandle : unset
 		try _CTC_ReleaseMenu(Target)
 		finally MenuDispatcher_PruneMenu(Target)
 	}
@@ -539,7 +540,9 @@ _WBF_OriginalEntryRefusal(Root) {
 
 _WBF_ActualBackendRoute(Root) {
 	global _LLM_Menu, _LLM_Menu_Handle
-	SavedMenu := _LBMS_Fixture(), SavedHandle := _LLM_Menu_Handle
+	HadHandle := IsSet(_LLM_Menu_Handle)
+	SavedHandle := HadHandle ? _LLM_Menu_Handle : 0
+	SavedMenu := _LBMS_Fixture()
 	try {
 		for Backend, Expected in Map("api", "API 🌐", "ollama", "Ollama 🦙") {
 			_LLM_Menu["backend"] := Backend
@@ -547,7 +550,7 @@ _WBF_ActualBackendRoute(Root) {
 				Target := Menu(), _LLM_Menu_Handle := Target
 				Warnings := Present ? MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map(), Map()) : []
 				try {
-					_LLM_Menu_EmitCapturedRow("llm_backend", false, false, false, Warnings, Target, "LLM")
+					_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false, Warnings, Target, "LLM")
 					Labels := _LBMS_Labels(Target)
 					AssertEqual(Present ? 2 : 1, Labels.Length)
 					AssertEqual(Expected, Labels[Labels.Length], "actual selected original catalogue datum reaches the declared parent")
@@ -563,7 +566,7 @@ _WBF_ActualBackendRoute(Root) {
 			}
 		}
 	} finally {
-		_LLM_Menu := SavedMenu, _LLM_Menu_Handle := SavedHandle
+		_LLM_Menu := SavedMenu, _LLM_Menu_Handle := HadHandle ? SavedHandle : unset
 	}
 }
 
@@ -590,7 +593,7 @@ _WBF_OriginalEntryParentAdmission(Root) {
 				AssertTrue(Root.Has("llm_backend_parent_frame_ahk"), "the complete genuine backend frame remains present")
 				AssertTrue(Root.Has("llm_install_warning_frame"), "the original warning source is present before the selected withdrawal")
 				Root.Delete(Withdrawn)
-				try _LLM_Menu_EmitRow("llm_backend", false, false)
+				try _LLM_Menu_EmitRow(_LLM_Menu_Handle, "llm_backend", false, false)
 				catch as Err
 					Failure := Err.Message
 				AssertEqual("Declared backend parent frame was refused.", Failure,
@@ -656,7 +659,7 @@ _WBF_CurrentCapturedWarningRefusal(Root) {
 			try {
 				_LLM_Menu := unset, _LLM_Menu_Handle := Target
 				Root.Delete(Key)
-				try _LLM_Menu_EmitCapturedRow("llm_backend", false, false, false, Warnings, Target, "LLM")
+				try _LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false, Warnings, Target, "LLM")
 				catch as Err
 					Failure := Err.Message
 				AssertEqual("Declared backend parent frame was refused.", Failure,
@@ -675,3 +678,112 @@ _WBF_CurrentCapturedWarningRefusal(Root) {
 
 Test("Windows backend frame: exact captured guarded warning survives list and native transport with late refusal", _WBF_WithState.Bind(_WBF_CurrentGuardedWarningTransport))
 Test("Windows backend frame: actual captured entry refuses warning ownership before missing native backend data", _WBF_WithState.Bind(_WBF_CurrentCapturedWarningRefusal))
+
+; Native targets remain local when actual configuration reads interrupt construction.
+
+_LBMS_ReadWithNestedConstruction(State, Owner, Key) {
+	global _LLM_Menu_Handle
+	if !State["entered"] && Key == State["key"] {
+		State["entered"] := true
+		Successor := LLM_Menu_BuildSubmenu()
+		State["successor"] := Successor
+		State["labels"] := _LBMS_Labels(Successor)
+		_LLM_Menu_Handle := Successor
+	}
+	return Map.Prototype.Get.Call(Owner, Key)
+}
+
+_LBMS_InterruptedBuilder(Key) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture(), HadHandle := IsSet(_LLM_Menu_Handle)
+	SavedHandle := HadHandle ? _LLM_Menu_Handle : 0
+	Before := Menu(), _LLM_Menu_Handle := Before
+	State := Map("entered", false, "key", Key), Candidate := 0, Failure := 0
+	OwnedOptions := _LLM_Menu
+	OwnedOptions.DefineProp("__Item", {Get: _LBMS_ReadWithNestedConstruction.Bind(State)})
+	try {
+		try Candidate := LLM_Menu_BuildSubmenu()
+		catch as Err
+			Failure := Err
+		AssertTrue(State["entered"], "the actual original builder must encounter the controlled state read")
+		AssertTrue(State.Has("successor"), "the nested actual constructor must complete its genuine Menu")
+		AssertTrue(!IsObject(Failure), IsObject(Failure) ? "interrupted original menu must finish: " . Failure.Message : "no constructor failure")
+		AssertTrue(Candidate is Menu, "the interrupted invocation returns its own genuine Menu")
+		AssertTrue(ObjPtr(Candidate) != ObjPtr(State["successor"]), "the nested and interrupted menus retain distinct native owners")
+		AssertTrue(_LBMS_Labels(Candidate).Length >= 10, "the interrupted menu keeps every actual row family")
+		AssertTrue(_LLM_Menu_Handle == State["successor"], "an older staging invocation cannot restore away the published successor")
+		ActualLabels := _LBMS_Labels(State["successor"])
+		AssertEqual(State["labels"].Length, ActualLabels.Length, "interrupted rows cannot append to their successor")
+		for Index, Label in State["labels"]
+			AssertEqual(Label, ActualLabels[Index], "the nested genuine native row order remains unchanged")
+	} finally {
+		OwnedOptions.DeleteProp("__Item")
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := HadHandle ? SavedHandle : unset
+		try Before.Delete()
+		finally MenuDispatcher_PruneMenu(Before)
+		if Candidate is Menu {
+			try _CTC_ReleaseMenu(Candidate)
+			finally MenuDispatcher_PruneMenu(Candidate)
+		}
+		if State.Has("successor") {
+			try _CTC_ReleaseMenu(State["successor"])
+			finally MenuDispatcher_PruneMenu(State["successor"])
+		}
+	}
+}
+Test("llm native local owner: enabled reentry preserves the published successor", _LBMS_InterruptedBuilder.Bind("enabled"))
+Test("llm native local owner: api_entry_id reentry preserves the published successor", _LBMS_InterruptedBuilder.Bind("api_entry_id"))
+Test("llm native local owner: profile_id reentry preserves the published successor", _LBMS_InterruptedBuilder.Bind("profile_id"))
+
+; Captured callbacks retain the same strict native identity refusal after reentry.
+
+_LBMS_CapturedTargetRefusal() {
+	Owner := Menu(), Foreign := Menu()
+	try {
+		Cases := [{Owner: Map(), Target: Owner}, {Owner: Owner, Target: Foreign},
+			{Owner: Owner, Target: Map()}]
+		for Subject in Cases {
+			Callback := _LLM_Menu_EmitCapturedRow.Bind(Subject.Owner, "llm_backend", false, false, false, [])
+			Failure := ""
+			try Callback.Call(Subject.Target, "LLM")
+			catch as Err
+				Failure := Err.Message
+			AssertEqual("An LLM row cannot leave its detached native menu owner.", Failure,
+				"a bound callback rejects an invalid owner or foreign native target before constructing a child")
+			AssertEqual(0, TrayMenuItemCount(Owner), "refusal cannot append a row to the captured owner")
+			AssertEqual(0, TrayMenuItemCount(Foreign), "refusal cannot append a row to the foreign native menu")
+		}
+	} finally {
+		try Owner.Delete()
+		finally MenuDispatcher_PruneMenu(Owner)
+		try Foreign.Delete()
+		finally MenuDispatcher_PruneMenu(Foreign)
+	}
+}
+Test("llm native local owner: bound callbacks reject invalid or foreign native targets", _LBMS_CapturedTargetRefusal)
+
+; Filtered receiving must not depend on an earlier test publishing a native handle.
+_LBMS_BackendHandleIsolation() {
+	global _LLM_Menu_Handle
+	HadHandle := IsSet(_LLM_Menu_Handle)
+	SavedHandle := HadHandle ? _LLM_Menu_Handle : 0
+	Sentinel := Menu()
+	try {
+		for Present in [false, true] {
+			_LLM_Menu_Handle := Present ? Sentinel : unset
+			for Callback in [_WBF_OriginalEntryRefusal, _WBF_ActualBackendRoute] {
+				_WBF_WithState(Callback)
+				if Present
+					AssertTrue(_LLM_Menu_Handle == Sentinel, "the original native handle survives actual backend receiving")
+				else
+					AssertFalse(IsSet(_LLM_Menu_Handle), "an absent native handle remains absent after actual backend receiving")
+			}
+		}
+	} finally {
+		_LLM_Menu_Handle := HadHandle ? SavedHandle : unset
+		try Sentinel.Delete()
+		finally MenuDispatcher_PruneMenu(Sentinel)
+	}
+}
+Test("Windows backend fixture: native handle presence and identity are restored (llm-local-owner-backend-fixture)", _LBMS_BackendHandleIsolation)

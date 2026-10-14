@@ -8236,10 +8236,9 @@ console.log(
 	// declaring a public ABI. The admitted warning receipt adds one optional port.
 	const frozenWarningLocator =
 		'_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {';
-	const reviewedWarningLocator = frozenWarningLocator.replace(
-		') {',
-		', CapturedWarningRows := unset) {'
-	);
+	const reviewedWarningLocator = frozenWarningLocator
+		.replace('(', '(TargetMenu, ')
+		.replace(') {', ', CapturedWarningRows := unset) {');
 	assert.equal(
 		expected.producer_edges.filter((edge) => edge.signatures.ahk === frozenWarningLocator).length,
 		2,
@@ -8251,7 +8250,7 @@ console.log(
 	);
 	assert(
 		authenticBody(warningOwnerSource, '.ahk', reviewedWarningLocator).trim().length > 0,
-		'the exact fifth optional admitted-warning port belongs to one actual constructor'
+		'one actual constructor retains the original state and warning ports with its explicit native target'
 	);
 	for (const [description, candidate] of [
 		[
@@ -11531,7 +11530,7 @@ console.log(
 	const handoff =
 		'ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)';
 	const consumer =
-		'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)';
+		'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)';
 	assert(contains(source, 'ProfileMenu := LLM_Menu_BuildProfileMenu()'));
 	assert(
 		contains(source, handoff),
@@ -11881,11 +11880,11 @@ console.log(
 		return actual.some((_, at) => expected.every((token, i) => actual[at + i] === token));
 	};
 	for (const statement of [
-		'_LLM_Menu_EmitRow(Id, Disabled, Operational, HealthDot, WarningRows)',
+		'_LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)',
 		'BackendCaption := _LLM_Menu_BackendRowLabel()',
 		'BackendMenu := LLM_Menu_BuildBackendMenu()',
 		'BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)',
-		'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)'
+		'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)'
 	]) {
 		assert(
 			contains(source, statement),

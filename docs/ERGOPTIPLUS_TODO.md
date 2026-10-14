@@ -12,6 +12,82 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 14 invocation-local Windows IA menu receiving
+
+Detached IA row construction now retains its own native Menu target instead
+of borrowing the published global handle. A nested enabled/API/profile read
+cannot redirect the interrupted rows or have its published successor restored
+away. All eight original native row/group consumers use the explicit target;
+captured callbacks still reject invalid or foreign Menu identities.
+
+Three controlled actual Menu constructions reproduce the original causal
+failure, exit1, then pass on the corrected constructor, exit0. The four new
+registered cases pass through the actual canonical runner, exit0 with no
+failure or skip. Existing unit assertions and native admission/inverse controls
+are preserved. A fifth regression receives the two backend fixtures with an
+absent or existing native handle: it fails before their isolation correction,
+then passes. Their filtered predecessor reproduces the same two unassigned
+reads (6/8); corrected receiving passes 8/8. Seven profile-parent, two model
+emitter and one late-retirement cases pass separately. These counts overlap
+existing coverage. Compiler controls exit 0/17/0; engine/native-Edit E2E passes
+70/70. Private full-module and relocated-runner attempts remain failed
+or incomplete; neither supplies a whole-suite success. Installed receiving of
+the corrected menu remains OPEN until the current test build is replaced.
+macOS and Linux already construct local row tables; their native acceptance
+remains OPEN, and no shared menu policy or qualification flag changes.
+
+On the corrected composition, the complete menu-manifest command, formatting,
+AHK encoding, loop-capture, strict conventions and pinned-source-read controls
+each exit0. The four constructor cases pass again after fixture integration.
+These scoped checks do not replace the failed or incomplete complete suites.
+
+The frozen published-source JS composition receives 408/425 PASS,
+17 FAIL, natural exit1, with every recorded source image and the
+tracked diff unchanged. This is source 7a994538e4, before the menu correction;
+it is neither a green gate nor full receiving of the newer composition.
+
+The official native link-map rebuild is byte-identical to the tracked DLL.
+Actual LoadLibrary/module queries and idle Stop0 retain the genuine module
+handle on both measured paths; SDK structure offsets are received from the
+official source and toolchain. These no-hook controls do not close native
+start status6 / Win32126. Joined Stop10, complete input-cohort conversion,
+measured emission policy and managed AI receiving remain OPEN. Physical
+Windows and native macOS/Linux remain UNRUN.
+
+### October 14 installed Windows diagnostics receiving
+
+The actual compiled development build at source
+`7a994538e4ec8754eaa7fad05e02a0e95ae4e4d2` receives its Diagnostics button
+through WebView2 on Windows 11, AutoHotkey2.0.26 x64. The official bundle
+contains 325 files; compiler exit0, personal paths restored byte-identically,
+and the unrelated resident UIA worker remains untouched. The executable is
+11,060,736 bytes, SHA256
+`04b9e6517a2db4271c9e793386f24f88e2563a8ac7244fd7d7c1df912f50f419`.
+
+The first collection creates a 7,955-byte ZIP, SHA256
+`d2dbaa13693ce4641d5bcc8244df9b28662ac786cfc31185d100ba4f96930935`.
+CRC, unique allowlisted entries, redaction and six exact component identities
+pass, verifier exit0. Results retain six automatic/native-synthetic PASS,
+six functional UNRUN and two explicitly skipped physical checks. Opening
+the output folder works. A separate cancellation produces its own preserved
+archive, with both physical reasons `cancelled_or_deadline`; its identity,
+CRC, redaction and component verification also exit0. Owned control files
+are retired and the collector worker is absent afterward. The archived
+cleanup receipt still describes host retirement as awaiting its host ACK;
+no independently captured worker exit is claimed. Neither archive qualifies
+production input, AI acquisition or physical devices. Close/reopen receiving
+from the earlier e235 build is not relabelled as a new-build receipt.
+
+A deferred inline IA submenu rebuild raises the actual error
+`An LLM row cannot leave its detached native menu owner.` after startup;
+its log and dialog are preserved. The later invocation-local correction is
+received above; installed acceptance of that correction remains OPEN.
+Fresh-config startup with IA active still fails with native status6 /
+Win32126. The installed build has IA disabled, but its snapshot records the
+native component as started. This does not close the fresh-config failure. The published source's CI run38521821449 is
+cancelled, not successful. Native macOS/Linux and physical Windows remain
+UNRUN. No runtime or model download follows from collection.
+
 ### October 14 Windows source custody before registration
 
 Source lookup/call, eligibility, actual KLE capture and borrowed recipe reads
