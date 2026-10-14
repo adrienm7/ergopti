@@ -43,6 +43,48 @@ const LOCALES_DIR = resolve(SHARED, 'data/locales');
 // every platform, so admitting the name changes nothing until one is written.
 const KNOWN_PLATFORMS = new Set(['ahk', 'hs', 'linux', 'both']);
 
+/** Index newline offsets once; repeated native token checks must not copy every prefix. */
+function sourcePositionLookup(source) {
+	const breaks = [];
+	for (let at = source.indexOf('\n'); at >= 0; at = source.indexOf('\n', at + 1)) breaks.push(at);
+	return (offset) => {
+		let low = 0,
+			high = breaks.length;
+		while (low < high) {
+			const middle = Math.floor((low + high) / 2);
+			if (breaks[middle] < offset) low = middle + 1;
+			else high = middle;
+		}
+		// Preserve lastIndexOf's zero-offset clamping, including an initial newline.
+		const previous = low ? breaks[low - 1] : offset === 0 && source[0] === '\n' ? 0 : -1;
+		return { line: low, column: offset - previous - 1 };
+	};
+}
+
+/** Require the actual native inspector to use indexed coordinates, not repeated prefix copies. */
+function assertIndexedSourceQueries(inspect) {
+	const assert = require('node:assert/strict');
+	const source = new String(
+		'; owner-coordinate work probe\n_PositionProbe() {\n\tvalue := "literal { }"\n\treturn value\n}\n'
+	);
+	let prefixes = 0;
+	source.slice = function (...args) {
+		if (args[0] === 0 && Number.isInteger(args[1]) && args[1] > 0) prefixes++;
+		return String.prototype.slice.apply(this, args);
+	};
+	const result = inspect(source);
+	assert.ok(
+		Array.isArray(result)
+			? result.length >= 10
+			: typeof result === 'string' && result.includes('_PositionProbe')
+	);
+	assert.equal(
+		prefixes,
+		0,
+		'actual native inspector must not copy a growing source prefix per token'
+	);
+}
+
 // Section sub-keys that are metadata, not nested sections.
 const SECTION_META_KEYS = new Set(['order', 'description_key', 'platforms', 'subsections']);
 
@@ -1603,16 +1645,18 @@ checkPrivacyTriggerControls();
 	);
 	function executableTokens(source) {
 		const lines = codeLines(source);
+		const positionAt = sourcePositionLookup(source);
 		return scriptTokens(source, '.ahk').filter((token) => {
 			if (token.kind === 'string') {
 				token.raw = source.slice(token.start, token.end);
 				return true;
 			}
-			const line = source.slice(0, token.start).split('\n').length - 1;
-			const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+			const { line, column } = positionAt(token.start);
 			return lines[line]?.slice(column, column + token.value.length) === token.value;
 		});
 	}
+	assertIndexedSourceQueries(executableTokens);
+
 	function matches(tokens, start, wanted) {
 		return wanted.every(
 			(token, offset) =>
@@ -7525,11 +7569,11 @@ console.log(
 	function hasBareCall(source, extension, method, section) {
 		const tokens = scriptTokens(source, extension);
 		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		const positionAt = nativeLines ? sourcePositionLookup(source) : null;
 		return tokens.some((token, index) => {
 			if (token.kind !== 'identifier') return false;
 			if (nativeLines) {
-				const line = source.slice(0, token.start).split('\n').length - 1;
-				const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+				const { line, column } = positionAt(token.start);
 				if (nativeLines[line]?.slice(column, column + token.value.length) !== token.value)
 					return false;
 			}
@@ -7591,6 +7635,7 @@ console.log(
 		);
 		const definitions = [];
 		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		const positionAt = nativeLines ? sourcePositionLookup(source) : null;
 		for (let start = 0; start < tokens.length; start++) {
 			const first = tokens[start];
 			if (source.slice(source.lastIndexOf('\n', first.start - 1) + 1, first.start).trim() !== '')
@@ -7604,16 +7649,14 @@ console.log(
 			)
 				continue;
 			if (nativeLines) {
-				const line = source.slice(0, first.start).split('\n').length - 1;
-				const column = first.start - source.lastIndexOf('\n', first.start - 1) - 1;
+				const { line, column } = positionAt(first.start);
 				if (nativeLines[line]?.slice(column, column + first.value.length) !== first.value) continue;
 				let depth = 1;
 				for (let index = start + signature.length; index < tokens.length; index++) {
 					if (tokens[index].kind !== 'symbol' || !['{', '}'].includes(tokens[index].value))
 						continue;
 					const brace = tokens[index];
-					const braceLine = source.slice(0, brace.start).split('\n').length - 1;
-					const braceColumn = brace.start - source.lastIndexOf('\n', brace.start - 1) - 1;
+					const { line: braceLine, column: braceColumn } = positionAt(brace.start);
 					if (nativeLines[braceLine]?.[braceColumn] !== brace.value) continue;
 					if (tokens[index].value === '{') depth++;
 					if (tokens[index].value === '}') depth--;
@@ -7763,12 +7806,12 @@ console.log(
 	function rootOwner(source, name) {
 		const tokens = scriptTokens(source, '.ahk');
 		const code = nativeCodeLines(source);
+		const positionAt = sourcePositionLookup(source);
 		let depth = 0;
 		const matches = [];
 		for (let index = 0; index < tokens.length; index++) {
 			const token = tokens[index];
-			const line = source.slice(0, token.start).split('\n').length - 1;
-			const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+			const { line, column } = positionAt(token.start);
 			if (code[line]?.slice(column, column + token.value.length) !== token.value) continue;
 			if (
 				!depth &&
@@ -7789,8 +7832,7 @@ console.log(
 						bodyDepth = 1;
 					while (end < tokens.length && bodyDepth) {
 						const brace = tokens[end];
-						const row = source.slice(0, brace.start).split('\n').length - 1;
-						const col = brace.start - source.lastIndexOf('\n', brace.start - 1) - 1;
+						const { line: row, column: col } = positionAt(brace.start);
 						if (brace.kind === 'symbol' && code[row]?.[col] === brace.value) {
 							if (brace.value === '{') bodyDepth++;
 							if (brace.value === '}') bodyDepth--;
@@ -7806,6 +7848,8 @@ console.log(
 		assert.equal(matches.length, 1, 'one actual root native owner definition');
 		return matches[0];
 	}
+	assertIndexedSourceQueries((source) => rootOwner(source, '_PositionProbe'));
+
 	function constructionOwned(source) {
 		const owned = rootOwner(source, '_SC_ExtensionRows');
 		return (
@@ -8114,11 +8158,11 @@ console.log(
 			return true;
 		const tokens = scriptTokens(source, extension);
 		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		const positionAt = nativeLines ? sourcePositionLookup(source) : null;
 		return tokens.some((token, index) => {
 			if (token.kind !== 'identifier') return false;
 			if (nativeLines) {
-				const line = source.slice(0, token.start).split('\n').length - 1;
-				const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+				const { line, column } = positionAt(token.start);
 				if (nativeLines[line]?.slice(column, column + token.value.length) !== token.value)
 					return false;
 			}
@@ -8167,6 +8211,7 @@ console.log(
 		const signature = scriptTokens(functionName, extension);
 		const definitions = [];
 		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		const positionAt = nativeLines ? sourcePositionLookup(source) : null;
 		for (let start = 0; start < tokens.length; start++) {
 			const first = tokens[start];
 			if (source.slice(source.lastIndexOf('\n', first.start - 1) + 1, first.start).trim() !== '')
@@ -8180,16 +8225,14 @@ console.log(
 			)
 				continue;
 			if (nativeLines) {
-				const line = source.slice(0, first.start).split('\n').length - 1;
-				const column = first.start - source.lastIndexOf('\n', first.start - 1) - 1;
+				const { line, column } = positionAt(first.start);
 				if (nativeLines[line]?.slice(column, column + first.value.length) !== first.value) continue;
 				let depth = 1;
 				for (let index = start + signature.length; index < tokens.length; index++) {
 					if (tokens[index].kind !== 'symbol' || !['{', '}'].includes(tokens[index].value))
 						continue;
 					const brace = tokens[index];
-					const braceLine = source.slice(0, brace.start).split('\n').length - 1;
-					const braceColumn = brace.start - source.lastIndexOf('\n', brace.start - 1) - 1;
+					const { line: braceLine, column: braceColumn } = positionAt(brace.start);
 					if (nativeLines[braceLine]?.[braceColumn] !== brace.value) continue;
 					if (tokens[index].value === '{') depth++;
 					if (tokens[index].value === '}') depth--;
@@ -14198,4 +14241,35 @@ console.log(
 			'malformed reasoned toggle must refuse'
 		);
 	}
+}
+
+// Coordinate indexing preserves the original UTF-16/LF interpretation without rereading source prefixes.
+{
+	const assert = require('node:assert/strict');
+	for (const source of [
+		'',
+		'\n',
+		'\n\n',
+		'\r\n',
+		'a\rb\n',
+		'\uFEFFabc\n😃 café\r\nlast',
+		';comment\nTarget() {\n\tText := "\n(\n{ }\n)"\n}\n'
+	]) {
+		const position = sourcePositionLookup(source);
+		for (let offset = 0; offset <= source.length; offset++)
+			assert.deepEqual(position(offset), {
+				line: source.slice(0, offset).split('\n').length - 1,
+				column: offset - source.lastIndexOf('\n', offset - 1) - 1
+			});
+	}
+	const source = new String('row\n'.repeat(1000));
+	let reads = 0;
+	source.indexOf = function (...args) {
+		reads++;
+		return String.prototype.indexOf.apply(this, args);
+	};
+	const position = sourcePositionLookup(source),
+		preparedReads = reads;
+	for (let offset = 0; offset <= source.length; offset++) position(offset);
+	assert.equal(reads, preparedReads, 'coordinate queries must not rescan the source');
 }
