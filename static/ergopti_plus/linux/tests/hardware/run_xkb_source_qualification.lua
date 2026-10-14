@@ -238,6 +238,38 @@ local function connection_lifetime_qualification(first_display, keymap)
  check(Probe.number_row_namespace_view(fresh)==nil,"native close revokes the fresh namespace issuer")
 end
 
+--- Joins the real inverse consumer across actual server group changes.
+--- This observes native maps and plans; it does not inject physical input.
+local function consumer_group_qualification(display)
+ local Layout = require("adapters.keyboard_layout")
+ layout(display, "us,fr")
+ group(1)
+ check(Layout.refresh(), "native inverse consumer publishes the selected French source")
+ local french = Layout.resolve("q")
+ check(french and french.keycode == 30, "real French consumer resolves q at evdev A")
+ local french_plan, _, french_receipt = Layout.plan("q")
+ check(french_plan and french_plan[1].keycode == 30 and french_receipt and Layout.plan_current(french_receipt),
+  "real French plan retains the originally published inverse")
+ group(0)
+ local us = Layout.resolve("q")
+ check(us and us.keycode == 16, "real US group renews q without capture reset or consumer refresh")
+ check(french_receipt and not Layout.plan_current(french_receipt), "US renewal keeps the old French plan revoked")
+ local us_plan, _, us_receipt = Layout.plan("q")
+ check(us_plan and us_plan[1].keycode == 16 and us_receipt and Layout.plan_current(us_receipt),
+  "real US plan belongs to the renewed inverse")
+ group(1)
+ local returned = Layout.resolve("q")
+ check(returned and returned.keycode == 30, "return to French renews the current inverse independently")
+ check(us_receipt and not Layout.plan_current(us_receipt), "return to French revokes the prior US plan")
+ check(french_receipt and not Layout.plan_current(french_receipt), "native group ABA never revives the initial French plan")
+ local fresh, _, fresh_receipt = Layout.plan("q")
+ check(fresh and fresh[1].keycode == 30 and fresh_receipt and Layout.plan_current(fresh_receipt),
+  "native group ABA permits only a distinct fresh French plan")
+ Capture.clear()
+ check(Layout.resolve("q") == nil, "original capture retirement refuses the real consumer")
+ check(fresh_receipt and not Layout.plan_current(fresh_receipt), "capture retirement keeps its exact last native plan revoked")
+end
+
 print("=== native X11 source qualification on an owned Xvfb server ===")
 local ok, err = xpcall(function()
 	local display = start()
@@ -321,6 +353,7 @@ local ok, err = xpcall(function()
 	check(unsupported == nil and wayland == "native-wayland-seat-unqualified", "a matching XWayland map alone never qualifies a native Wayland seat")
 	check(Capture.direct_sources({ 39 }) == nil, "the genuine native-seat limit stays inactive rather than assuming group0")
 	DisplayServer.refresh()
+	consumer_group_qualification(display)
 end, debug.traceback)
 if not ok then _failures = _failures + 1 io.stderr:write(tostring(err) .. "\n") end
 cleanup()
