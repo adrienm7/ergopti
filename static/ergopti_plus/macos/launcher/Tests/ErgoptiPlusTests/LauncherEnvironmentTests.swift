@@ -119,6 +119,21 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertNil(environment["ERGOPTI_LOG_TOKEN"])
 	}
 
+	/// Private bootstrap selection must come from the original Fresh issuer,
+	/// never an ancestor's empty or stale control route on ordinary/default boot.
+	func testOrdinaryChildRejectsInheritedInstalledCaptureRoute() {
+		for inheritedRoute in ["", "/tmp/stale-installed-capture/control", "foreign"] {
+			let environment = launcherChildEnvironment(
+				base: ["ERGOPTI_INSTALLED_CAPTURE_CONTROL": inheritedRoute,
+					"UNRELATED": "preserved", "LUA_PATH": "user-owned-path"],
+				launcherPid: 4242, launcherBundleId: "com.ergoptiplus.app"
+			)
+			XCTAssertNil(environment["ERGOPTI_INSTALLED_CAPTURE_CONTROL"])
+			XCTAssertEqual(environment["UNRELATED"], "preserved")
+			XCTAssertEqual(environment["LUA_PATH"], "user-owned-path")
+		}
+	}
+
 	/// Verifies an unavailable bundle identifier removes inherited stale state.
 	func testUnknownBundleIdentityCannotLeakAnInheritedMarker() {
 		for bundleId in [nil, ""] as [String?] {

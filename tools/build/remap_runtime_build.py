@@ -544,6 +544,8 @@ def _factory_span(factory, operation):
     if factory is _SOURCE_FACTORY:
         for name, stage in (
             ("current_staged_source", "staged_source"),
+            ("capture_virtual_hid_driver_payload", "staged_source"),
+            ("current_virtual_hid_driver_payload", "staged_source"),
             ("revalidate_owned_source", "pristine_source"),
             ("prepare_owned_source", "source_prepare"),
             ("prepare_sdk_owned_source", "source_prepare"),
@@ -1719,13 +1721,14 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "78705e866faa7f361e717083fba93c2f51c57e59033325f24dc1c58156639c27"
+PRODUCTION_SHA256 = "fc62979a9177ec775514f366df12f0865099e51f54fb11d01f8c93310c2a3141"
 
 
 @dataclass(frozen=True, slots=True)
 class ProductionFailure:
     code: str
     status: str = "refused"
+    resource_failure: BaseException | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1856,6 +1859,24 @@ class _ProductionSink(_SigningSink):
                 retained_current()
 
             source_current()
+            driver_payload = None
+            if record["source_profile"] == SDK_OWNED_SOURCE_PROFILE:
+                driver_payload = _factory_operation(
+                    factory, factory.capture_virtual_hid_driver_payload, image, deadline
+                )
+
+            def driver_payload_current():
+                source_current()
+                _REQUIRE(
+                    driver_payload is not None and driver_payload.image is image,
+                    "source_identity",
+                    "Original SDK payload image detached",
+                )
+                _factory_operation(
+                    factory, factory.current_virtual_hid_driver_payload, driver_payload, deadline
+                )
+                source_current()
+
             self.packaged = self.production_module._package_live(
                 self.source.root,
                 self.owner.path,
@@ -1869,6 +1890,11 @@ class _ProductionSink(_SigningSink):
                 retained_current,
                 deadline,
                 source_current=source_current,
+                staged_source=image if driver_payload is not None else None,
+                driver_payload=driver_payload,
+                driver_payload_current=driver_payload_current
+                if driver_payload is not None
+                else None,
             )
             source_current()
         except (
@@ -1876,7 +1902,12 @@ class _ProductionSink(_SigningSink):
             self.production_module.ProductBuildRefusal,
             OSError,
         ) as error:
-            self.packaged = ProductionFailure(getattr(error, "code", "production_packaging"))
+            self.packaged = ProductionFailure(
+                getattr(error, "code", "production_packaging"),
+                resource_failure=(
+                    error if getattr(error, "_resource_custody", None) is not None else None
+                ),
+            )
         finally:
             active = False
 
@@ -2825,7 +2856,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "4c60f6b348f78e523342ee2f70aa70bc766b80ed28291dc590a26bc03730cc8f"
+SOURCE_FACTORY_SHA256 = "9caa7c6b7a89fd1420452b59c4c5697a7a2aaaa9293498652f6b8a6628094c9d"
 _SOURCE_FACTORY = None
 
 
