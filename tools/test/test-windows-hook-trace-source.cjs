@@ -126,7 +126,7 @@ function checkSerializationBinding(source) {
 		'The bridge must serialize its authoritative retained attempt and exact caller outputs.'
 	);
 	const loader = source.adapter.match(
-		/_LLM_NavEventOwnerNativeEnsureLoaded\(\)\s*\{[\s\S]*?\bNames\s*:=\s*\[([^\]]+)\]/
+		/_LLM_NavEventOwnerNativeEnsureLoaded\([^\n]*\)\s*\{[\s\S]*?\bNames\s*:=\s*\[([^\]]+)\]/
 	);
 	assert(loader, 'The actual native loader export list must exist.');
 	const required = [...loader[1].matchAll(/"(Ergopti\w+)"/g)].map((match) => match[1]);
