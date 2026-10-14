@@ -82,6 +82,35 @@ async function run() {
 	const older = { ...structuredClone(jobs[0]), id: 99, run_attempt: 1, conclusion: 'failure' };
 	assert.equal(selectUnitJobs(plan, [...jobs, older], identity).menus.run_attempt, '2');
 	controls++;
+	// Retain the refused API status with the exact role and highest attempt.
+	for (const [status, conclusion] of [
+		['queued', null],
+		['in_progress', null],
+		['completed', 'failure'],
+		['unknown'.repeat(20), null]
+	]) {
+		const changed = structuredClone(jobs);
+		changed[0].status = status;
+		changed[0].conclusion = conclusion;
+		assert.throws(
+			() => selectUnitJobs(plan, changed, identity),
+			(error) => {
+				const prefix = 'Common Unit admission refused: latest Unit lot did not succeed: ';
+				assert.ok(error.message.startsWith(prefix));
+				assert.deepEqual(JSON.parse(error.message.slice(prefix.length)), {
+					lot: changed[0].name,
+					feature: 'menus',
+					suite: 'js',
+					job_id: '1',
+					run_attempt: '2',
+					status: status.slice(0, 64),
+					conclusion
+				});
+				return true;
+			}
+		);
+		controls++;
+	}
 	// The refusal must identify the exact API observation, without copying arbitrary step text.
 	for (const mutate of [
 		(job) => {
