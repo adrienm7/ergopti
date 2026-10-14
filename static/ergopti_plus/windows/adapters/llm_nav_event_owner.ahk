@@ -319,6 +319,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 	global _LLM_NavEventOwnerStartRollbackPending
 	global _LLM_NavEventOwnerActiveStartTicket
 	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerTerminalRouteRefreshing
 	global _LLM_NavEventOwnerRuntimeEpoch
 	global _LLM_NavEventOwnerPort
 	global _LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn
@@ -344,7 +345,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 			_LLM_NavEventOwnerStartCancelled := true
 			return false
 		}
-		if _LLM_NavEventOwnerStopping
+		if _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerTerminalRouteRefreshing
 			return false
 		_LLM_NavEventOwnerStopping := true
 		WasPending := _LLM_NavEventOwnerStopPending
@@ -2299,6 +2300,7 @@ _LLM_NavEventOwnerPublishCurrentProfileSurface(
  */
 LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 	global _LLM_NavEventOwnerTerminalRouteRefreshing
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
 	global _LLM_NavEventOwnerTerminalRouteGeneration
 	global _LLM_NavEventOwnerTerminalRouteRecipes
 	global _LLM_NavEventOwnerTerminalRouteCoverage
@@ -2306,6 +2308,7 @@ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 	PreviousCritical := Critical("On")
 	try {
 		if _LLM_NavEventOwnerTerminalRouteRefreshing
+				|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
 			return false
 		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
 			throw Error("Uncertain terminal registration retains its original native owner.")
