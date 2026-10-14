@@ -12,6 +12,51 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 14 Windows terminal lifecycle follow-up
+
+Stop now refuses an active terminal-route refresh before calling its physical
+port. Refresh refuses an active or pending Stop before resolving its source or
+registering routes. Starting cancellation still precedes the refresh refusal and
+performs its single rollback only after both nested callbacks unwind. The actual
+original adapter receives one PASS/five FAIL (exit 1); the corrected registered
+six-case cohort receives six PASS (exit 0). Five exact selections receive
+127 cases, each with natural exit 0 and zero failures/skips. These selections
+overlap earlier receiving and must not be added to a fabricated global total.
+
+Authenticated compiler controls receive valid/invalid/full-entry exits 0/17/0;
+engine/native-Edit E2E receives 70/70, and isolated full startup, encoding and
+loop-capture gates pass. The immutable complete JS attempt receives
+407/425 PASS, 18 FAIL, natural exit 1; status FAILED.
+Its extension-enabled startup refuses a pending full-save path and fails to
+acknowledge its existing generation before timeout. Serial current startup exits
+0; the exact original-adapter baseline exits 1. These observations do not erase the
+failed full-suite startup or resolve its cause. Every failure and both source
+images remain in the ledger. The previous complete Windows unit watchdog remains
+FAILED_INCOMPLETE_WATCHDOG.
+
+The subsequent rebase preserves the incoming action-editor integration and
+receives byte-identical Windows/shared inputs. Fresh lifecycle six, registration
+91, snapshot 17 and startup-ready five selections each exit 0 without failures
+or skips. They overlap earlier controls; the changed macOS/Linux source is not
+qualified by the preceding Windows or frozen JS receipts.
+
+[CI 38487450400](https://github.com/adrienm7/ergopti/actions/runs/38487450400)
+finishes with failure. Snapshot16 refuses source admission before Windows units
+launch. Windows engine E2E, hosted Core JS and Linux unit/E2E/package/install pass.
+Native macOS managed Ollama fails on both architectures: trust-settings add
+reaches its deadline and removal exits 1, retaining restoration failure. No
+source seal, native gate or publication policy is relaxed.
+
+Authenticated uncertain-registration retirement remains an unapplied private
+candidate. Cohort conversion, production output policy, Windows managed AI and
+installed-application receiving remain open. The runtime ZIP is pinned at
+2,069,313,829 bytes; a bounded public-directory probe exits 1 on HTTP 501 without
+accepting a runtime body. Extraction space on the actual C: managed root remains
+unqualified. No runtime or model was downloaded. The existing e235 Diagnostics
+archive retains its exact source binding; latest-build menu receiving is open.
+Physical Windows keyboard/display/UIA acceptance and native macOS/Linux receiving
+on the maintainer's machines remain separate and UNRUN here.
+
 ### October 14 Windows regression follow-up
 
 Eight atomic fixture corrections retain every original assertion while receiving
