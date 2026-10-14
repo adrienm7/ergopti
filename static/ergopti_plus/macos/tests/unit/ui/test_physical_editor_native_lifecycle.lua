@@ -318,6 +318,165 @@ local run_contract = function(helpers, load_host, load_builder)
    end)
   end
  end)
+ return fixture
 end
 
-run_contract(helpers,function()package.loaded['ui.physical_shortcuts']=nil;return require('ui.physical_shortcuts')end,function()package.loaded['ui.ui_builder']=nil;return require('ui.ui_builder')end)
+local capture_fixture=run_contract(helpers,function()package.loaded['ui.physical_shortcuts']=nil;return require('ui.physical_shortcuts')end,function()package.loaded['ui.ui_builder']=nil;return require('ui.ui_builder')end)
+
+-- Reuse the original controlled natives and actual Builder. The existing thirty
+-- lifecycle bodies/assertions above are unchanged; these use genuine shared ports.
+local function with_observer(body)
+ capture_fixture(function(_,c,options)
+  local Json=assert(loadfile(helpers.shared('lua/json.lua')))()
+  package.loaded['json']=Json
+  package.loaded['shortcuts.physical_slots']=assert(loadfile(helpers.shared('lua/shortcuts/physical_slots.lua')))()
+  package.loaded['shortcuts.physical_editor_window']=assert(loadfile(helpers.shared('lua/shortcuts/physical_editor_window.lua')))()
+  local file=assert(io.open(helpers.shared('data/keycodes/physical_keys.json'),'r'))
+  c.catalogue=file:read('*a');file:close();c.native_model=assert(Json.decode(c.catalogue))
+  c.receipt={};c.enrollments=0;c.cancellations=0;c.stops=0;c.available_calls=0;c.packets={};c.request_id=0
+  options.gestures={get_action_label=function(action)return action end,is_assignable=function(action)return action=='none'end,
+   get_action_parameter_spec=function()end,validate_action_parameter=function()return false end,split_action_parameter_key=function()end}
+  options.scope.capture_editor_inventory=function()return{assignments={},parameters={}},c.receipt end
+  options.scope.editor_source_current=function(receipt)return rawequal(receipt,c.receipt)end
+  options.scope.edit=function()error('Observation must not publish configuration')end
+  local observer={position_available=function()
+   c.available_calls=c.available_calls+1
+   if c.on_available then c.on_available()end
+   if c.available_mode=='throw'then error('controlled availability refusal')end
+   if c.available_mode=='false'then return false end
+   if c.available_mode=='string'then return'true'end
+   return not c.pending
+  end,capture_position=function(exact,receive)
+   c.enrollments=c.enrollments+1;c.exact,c.receive,c.token=exact,receive,{}
+   if exact()~=true then return nil end
+   c.pending,c.revoked=true,false
+   if c.on_enroll then c.on_enroll()end
+   return c.token
+  end,cancel_position=function(token)
+   c.cancellations=c.cancellations+1
+   helpers.assert_true(rawequal(token,c.token),'Retirement retains the original opaque table')
+   c.revoked=true
+   if c.cancel_mode=='throw'then error('controlled observer cancellation refusal')end
+   if c.cancel_mode=='false'or c.in_frame then return false end
+   c.pending=false;return true
+  end,stop=function()c.stops=c.stops+1;error('Page cancellation must never stop primary metrics')end}
+  c.observer=observer;package.loaded['modules.keylogger.physical_capture']=observer
+  local host;package.loaded['ui.physical_shortcuts']=nil;host=require('ui.physical_shortcuts')
+  c.host=host
+  c.open=function()
+   helpers.assert_true(host.open(options))
+   local view=c.views[#c.views]
+   view.evaluateJavaScript=function(self,script)
+    if script:sub(1,9)=='captured('then
+     c.packets[#c.packets+1]=assert(Json.decode(script:sub(10,-2)))
+     if c.on_captured then c.on_captured()end
+    end
+    return self
+   end
+   c.bridges[#c.bridges].callback({body={action='ready'}})
+  end
+  c.request=function()
+   c.request_id=c.request_id+1
+   c.bridges[#c.bridges].callback({body={action='capture_position',request={request_id=c.request_id}}})
+  end
+  c.dispatch=function(facts)
+   c.in_frame=true;local called,accepted=pcall(c.receive,facts);c.in_frame=false
+   return called and accepted==true
+  end
+  body(host,c,options)
+ end)
+end
+
+helpers.describe('Mac optional observational position composition',function()
+ helpers.it('(physical-editor-position) uses original loaded observer and stable registry without availability polling after enrollment',function()
+  with_observer(function(host,c)
+   c.open();c.request();helpers.assert_eq(c.enrollments,1);helpers.assert_true(type(c.token)=='table')
+   helpers.assert_eq(c.observer.position_available(),false,'Enrollment availability is not a native request currency poll')
+   helpers.assert_true(c.dispatch({native_code=38,mods={ctrl=true}}))
+   helpers.assert_eq(c.packets,{{action='captured',request_id=1,code='KeyJ',mods={ctrl=true}}})
+   helpers.assert_eq(c.dispatch({native_code=38,mods={ctrl=true}}),false,'The original shared editor refuses duplicate receipt')
+   helpers.assert_true(host.close());helpers.assert_eq(c.stops,0)
+  end)
+ end)
+ helpers.it('(physical-editor-position) refuses swapped twins malformed facts modifiers and unknown native codes by stable metadata',function()
+  with_observer(function(host,c)
+   c.open()
+   for _,facts in ipairs({{native_code=10,mods={}},{native_code=50,mods={}},{native_code=9999,mods={}},{native_code=72,mods={}},
+    {native_code=59,mods={}},{native_code=38,mods={fn=true}},{native_code=38,mods={'ctrl'}},
+    {native_code=38,mods=setmetatable({ctrl=true},{})},{native_code=38,mods={},device='private'},
+    setmetatable({native_code=38,mods={}},{})})do
+    c.request();helpers.assert_eq(c.enrollments,c.request_id)
+    helpers.assert_eq(c.dispatch(facts),false);helpers.assert_eq(#c.packets,0)
+    c.bridges[#c.bridges].callback({body={action='cancel_position'}})
+    helpers.assert_eq(c.pending,false)
+   end
+   helpers.assert_true(host.close());helpers.assert_eq(c.stops,0)
+  end)
+ end)
+ for _,kind in ipairs({'export','module','source'})do
+  helpers.it('(physical-editor-position) revokes original callback and retains original cancel through replacement: '..kind,function()
+   with_observer(function(host,c,options)
+    c.open();c.request();helpers.assert_eq(c.enrollments,1)
+    local foreign=0
+    if kind=='export'then c.observer.capture_position=function()foreign=foreign+1;return{}end
+    elseif kind=='module'then package.loaded['modules.keylogger.physical_capture']={cancel_position=function()foreign=foreign+1;return true end}
+    else c.receipt={}end
+    helpers.assert_eq(c.dispatch({native_code=38,mods={}}),false);helpers.assert_eq(#c.packets,0)
+    c.cancel_mode='false';helpers.assert_eq(host.close(),false);helpers.assert_eq(host.open(options),false)
+    helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,0);helpers.assert_eq(c.created,1)
+    c.cancel_mode=nil;helpers.assert_true(host.close());helpers.assert_true(c.cancellations>0)
+    helpers.assert_eq(foreign,0);helpers.assert_eq(c.stops,0)
+   end)
+  end)
+ end
+ helpers.it('(physical-editor-position) literal availability and original export recheck precede enrollment',function()
+  for _,mode in ipairs({'false','throw','string','replacement'})do
+   with_observer(function(host,c)
+    c.available_mode=mode
+    if mode=='replacement'then c.on_available=function()c.observer.capture_position=function()error('Foreign enrollment')end end end
+    c.open();c.request();helpers.assert_true(c.available_calls>0)
+    helpers.assert_eq(c.enrollments,0);helpers.assert_eq(#c.packets,0);helpers.assert_true(host.close())
+   end)
+  end
+ end)
+ for _,mode in ipairs({'false','throw'})do
+  helpers.it('(physical-editor-position) post-enrollment source refusal retains unreturned token debt for same-owner retry: '..mode,function()
+   with_observer(function(host,c,options)
+    c.open();c.cancel_mode=mode;c.on_enroll=function()c.receipt={}end;c.request()
+    helpers.assert_eq(c.enrollments,1);helpers.assert_true(c.cancellations>0)
+    helpers.assert_eq(host.close(),false);helpers.assert_eq(host.open(options),false)
+    helpers.assert_eq(c.created,1);helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,0)
+    helpers.assert_eq(c.dispatch({native_code=38,mods={}}),false);helpers.assert_eq(#c.packets,0)
+    c.cancel_mode=nil;helpers.assert_true(host.close());helpers.assert_eq(c.stops,0)
+    c.on_enroll=nil;c.open();helpers.assert_eq(c.created,2);helpers.assert_true(host.close())
+   end)
+  end)
+ end
+ helpers.it('(physical-editor-position) own callback-frame cancellation refuses native teardown until unwind retry',function()
+  with_observer(function(host,c,options)
+   c.open();c.request();helpers.assert_eq(c.enrollments,1)
+   local closed;c.on_captured=function()closed=host.close()end
+   helpers.assert_eq(c.dispatch({native_code=38,mods={}}),false);helpers.assert_eq(closed,false)
+   helpers.assert_eq(c.delete_calls,0);helpers.assert_eq(c.detach_calls,0)
+   helpers.assert_true(c.revoked);helpers.assert_true(host.close());helpers.assert_eq(c.stops,0)
+   c.on_captured=nil;c.open();helpers.assert_eq(c.created,2);helpers.assert_true(host.close())
+  end)
+ end)
+ helpers.it('(physical-editor-position) absent loaded observer remains optional without constructing the producer',function()
+  with_observer(function(host,c,options)
+   package.loaded['modules.keylogger.physical_capture']=nil
+   local saved=package.preload['modules.keylogger.physical_capture'];local required=0
+   package.preload['modules.keylogger.physical_capture']=function()required=required+1;error('Must not acquire producer')end
+   local called,detail=pcall(function()
+    package.loaded['ui.physical_shortcuts']=nil;c.host=require('ui.physical_shortcuts')
+    host=c.host
+    helpers.assert_true(host.open(options))
+    c.bridges[#c.bridges].callback({body={action='ready'}})
+    c.bridges[#c.bridges].callback({body={action='capture_position',request={request_id=1}}})
+    helpers.assert_eq(c.enrollments,0);helpers.assert_eq(required,0);helpers.assert_true(host.close())
+   end)
+   package.preload['modules.keylogger.physical_capture']=saved
+   if not called then error(detail,0)end
+  end)
+ end)
+end)

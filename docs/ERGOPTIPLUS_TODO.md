@@ -12119,6 +12119,18 @@ intact. The preceding joined Linux run retains its three failures from omitted
 fixture acknowledgements; no production refusal or timeout is relaxed. Native
 GUI, installed delivery and physical acceptance remain unqualified.
 
+The macOS host now consumes optional physical-position observations through
+the already loaded original capture owner. Exact observer exports, opaque request
+tokens and cancellation debt survive replacement and callback-frame retirement;
+closed native-code/modifier facts resolve only through stable catalogue metadata.
+All 30 previous host cases remain unchanged and ten independent observer cases
+are added. Controlled Lua 5.4 receiving gives the original 31 passes/nine failures
+and the consumer 40 passes/zero failures. Stock LuaJIT refuses the required
+table.pack capability before helpers or subjects execute. The genuine G5
+producer is now integrated and Source-identical to the reviewed prerequisite;
+real producer/GUI/input/output and installed qualification remain required. This
+optional capture path grants no public physical assignment or delivery.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
