@@ -721,3 +721,641 @@ _LNTR_LifecycleStartingRefreshCancellation() {
 }
 Test("terminal-lifecycle-admission: Starting cancellation survives an active nested refresh",
 	_LNTR_WithState.Bind(_LNTR_LifecycleStartingRefreshCancellation))
+
+; Observer withdrawal must refuse dispatch before invoking a replaced callable.
+; Controlled ports exercise admission and cleanup, without genuine DLL authority.
+_LNTR_V3_RestoreCall(Target, Had, Saved) {
+	if Had
+		Object.Prototype.DefineProp.Call(Target, "Call", Saved)
+	else if Object.Prototype.HasOwnProp.Call(Target, "Call")
+		Object.Prototype.DeleteProp.Call(Target, "Call")
+}
+
+_LNTR_V3_AfterSourceCallableWithdrawal(Target) {
+	_LNTR_WithState(Body)
+	Body() {
+		global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerTerminalRouteRefreshing
+		global _LLM_NavEventOwnerRuntimeEpoch
+		Native := _LNEO_Setup(), State := _LNTR_PortState(), ForeignCalls := 0
+		Had := Object.Prototype.HasOwnProp.Call(Target, "Call")
+		Saved := Had ? Object.Prototype.GetOwnPropDesc.Call(Target, "Call") : 0
+		try {
+			Epoch := _LLM_NavEventOwnerRuntimeEpoch
+			State.Port["terminal_route_source"] := Source
+			AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
+			AssertEqual(0, ForeignCalls, "withdrawn helper facade cannot run after the source observer")
+			AssertEqual(0, State.Calls.Length, "refusal precedes registration")
+			AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map, "original retention bypasses the foreign facade")
+			AssertFalse(_LLM_NavEventOwnerTerminalRouteRefreshing)
+			AssertEqual(Epoch, _LLM_NavEventOwnerRuntimeEpoch)
+		} finally {
+			_LNTR_V3_RestoreCall(Target, Had, Saved)
+			_LNEO_Teardown()
+		}
+		Source() {
+			Value := _LNTR_Source(State)
+			Object.Prototype.DefineProp.Call(Target, "Call", {Call: (*) => (ForeignCalls += 1, false)})
+			return Value
+		}
+	}
+}
+for Target in [_LLM_NavEventOwnerPortFn, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+	_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationRetain,
+	_LLM_NavEventOwnerTerminalRegistrationUnknown]
+	Test("native-retirement-owner: post-source facade refusal " . Target.Name,
+		_LNTR_V3_AfterSourceCallableWithdrawal.Bind(Target))
+
+_LNTR_V3_StopAckGetterThrows() {
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerStarted
+	Native := _LNEO_Setup(), Calls := 0, SavedStopping := _LLM_NavEventOwnerStopping
+	try {
+		Epoch := _LLM_NavEventOwnerRuntimeEpoch
+		Native.Port["stop"] := Stop
+		AssertFalse(LLM_NavEventOwner_Stop(), "ACK observer failure is diagnostic refusal, not an escaping exception")
+		AssertEqual(1, Calls)
+		AssertFalse(_LLM_NavEventOwnerStopping, "only the current stop latch must be released")
+		AssertTrue(_LLM_NavEventOwnerStarted && Native.Started)
+		AssertEqual(Epoch, _LLM_NavEventOwnerRuntimeEpoch)
+	} finally {
+		; Owned fake fixture cleanup, including the deliberately broken original branch.
+		_LLM_NavEventOwnerStopping := SavedStopping
+		Native.Port["stop"] := _LNEO_PortStop.Bind(Native)
+		_LNEO_Teardown()
+	}
+	Stop() {
+		Calls += 1
+		Value := Map()
+		Value.DefineProp("Get", {Call: (*) => ThrowAck()})
+		return Value
+	}
+	ThrowAck() {
+		throw Error("owned ACK getter failure")
+	}
+}
+Test("native-retirement-owner: throwing custom ACK observer releases only Stop latch", _LNTR_V3_StopAckGetterThrows)
+
+_LNTR_V3_BeforeConstructorFacade(Target) {
+	_LNTR_WithState(Body)
+	Body() {
+		global _LLM_NavEventOwnerTerminalRouteRefreshing
+		Native := _LNEO_Setup(), State := _LNTR_PortState(), ForeignCalls := 0, PrivilegedCalls := 0
+		Had := Object.Prototype.HasOwnProp.Call(Target, "Call")
+		Saved := Had ? Object.Prototype.GetOwnPropDesc.Call(Target, "Call") : 0
+		try {
+			Object.Prototype.DefineProp.Call(Target, "Call", {Call: Facade})
+			AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
+			AssertEqual(0, ForeignCalls, "constructor/capture facade must be refused before invocation")
+			AssertEqual(0, PrivilegedCalls, "an arbitrary Map cannot grant settle or native authority")
+			AssertEqual(0, State.Calls.Length, "callable refusal precedes registration")
+			AssertFalse(_LLM_NavEventOwnerTerminalRouteRefreshing)
+		} finally {
+			_LNTR_V3_RestoreCall(Target, Had, Saved)
+			_LNEO_Teardown()
+		}
+		Facade(*) {
+			ForeignCalls += 1
+			return Map("frame", Map(), "guard", (*) => true,
+				"native", Privileged, "settle", Privileged, "close", (*) => true)
+		}
+		Privileged(*) {
+			PrivilegedCalls += 1
+			return true
+		}
+	}
+}
+for Target in [_LLM_NavEventOwnerNativeEnsureLoaded, _LLM_NavEventOwnerTerminalRegistrationCapture]
+	Test("native-retirement-owner: pre-constructor facade refusal " . Target.Name,
+		_LNTR_V3_BeforeConstructorFacade.Bind(Target))
+
+_LNTR_V3_SourceCannotReissue() {
+	_LNTR_WithState(Body)
+	Body() {
+		global _LLM_NavEventOwnerTerminalRouteRefreshing
+		Native := _LNEO_Setup(), State := _LNTR_PortState(), SourceCalls := 0, Refusals := 0
+		try {
+			State.Port["terminal_route_source"] := Source
+			AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+			AssertEqual(1, SourceCalls)
+			AssertEqual(3, Refusals, "no supplied or duplicate constructor may replace the first scope")
+			AssertEqual(1, State.Calls.Length, "only the original custom registration is dispatched")
+			AssertFalse(_LLM_NavEventOwnerTerminalRouteRefreshing)
+		} finally _LNEO_Teardown()
+		Source() {
+			SourceCalls += 1
+			for Action in [Supplied, Duplicate, StopDuringRefresh] {
+				try Action.Call()
+				catch {
+					Refusals += 1
+					continue
+				}
+				throw Error("A source callback reissued private authority.")
+			}
+			return _LNTR_Source(State)
+		}
+		Supplied() {
+			return _LLM_NavEventOwnerNativeEnsureLoaded.Call("begin_frame", Map())
+		}
+		Duplicate() {
+			return _LLM_NavEventOwnerNativeEnsureLoaded.Call("begin_frame")
+		}
+		StopDuringRefresh() {
+			return _LLM_NavEventOwnerNativeEnsureLoaded.Call("begin_stop", 0)
+		}
+	}
+}
+Test("native-retirement-owner: source cannot replace its first issued scope", _LNTR_V3_SourceCannotReissue)
+
+_LNTR_V3_AfterRegistrationFacade(Target, Boundary) {
+	_LNTR_WithState(Body)
+	Body() {
+		global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerTerminalRouteRefreshing
+		Native := _LNEO_Setup(), State := _LNTR_PortState(), ForeignCalls := 0, ObserverCalls := 0
+		Had := Object.Prototype.HasOwnProp.Call(Target, "Call")
+		Saved := Had ? Object.Prototype.GetOwnPropDesc.Call(Target, "Call") : 0
+		try {
+			if Boundary == "register"
+				State.Port["register_terminal_routes"] := Register
+			else
+				State.Port["list_terminal_held_recipes"] := Held
+			AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(State.Port))
+			AssertEqual(1, ObserverCalls)
+			AssertEqual(0, ForeignCalls, "post-observer foreign helper cannot execute even in catch")
+			AssertEqual(1, State.Calls.Length)
+			AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map)
+			AssertFalse(_LLM_NavEventOwnerTerminalRouteRefreshing)
+		} finally {
+			_LNTR_V3_RestoreCall(Target, Had, Saved)
+			_LNEO_Teardown()
+		}
+		Withdraw() {
+			ObserverCalls += 1
+			Object.Prototype.DefineProp.Call(Target, "Call", {Call: (*) => (ForeignCalls += 1, false)})
+		}
+		Register(Owner, Generation, Layout, Bindings, Count) {
+			Result := _LNTR_Register(State, Owner, Generation, Layout, Bindings, Count)
+			Withdraw()
+			return Result
+		}
+		Held(Owner, Ids, Capacity) {
+			Result := _LNTR_Held(State, Owner, Ids, Capacity)
+			Withdraw()
+			return Result
+		}
+	}
+}
+for Boundary in ["register", "held"]
+	for Target in [_LLM_NavEventOwnerPortFn, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationRetain,
+		_LLM_NavEventOwnerTerminalRegistrationUnknown]
+		Test("native-retirement-owner: post-" . Boundary . " facade refusal " . Target.Name,
+			_LNTR_V3_AfterRegistrationFacade.Bind(Target, Boundary))
+
+; Genuine registration custody is received in distinct no-hook processes.
+; Private issuance stays outside the parent controlled-port fixtures.
+_LNTR_GenuineChildCase() {
+	global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerTerminalRouteRecipes
+	global _LLM_NavEventOwnerTerminalRouteModels, _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteGeneration, _LLM_NavEventOwnerTerminalRouteNextRecipe
+	global _LLM_NavEventOwnerTerminalRouteNextLayout, _LLM_NavEventOwnerRuntimeEpoch
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerStarting
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	State := {Caps: 0, HeldCalls: 0}, ForeignRecipes := 0
+	; Prove the graph's actual initial state; never reset private or public owners.
+	AssertFalse(_LLM_NavEventOwnerStarted || _LLM_NavEventOwnerStarting)
+	AssertEqual(0, _LLM_NavEventOwnerModule)
+	AssertEqual(0, _LLM_NavEventOwnerPort)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteGeneration)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteNextRecipe)
+	AssertEqual(1, _LLM_NavEventOwnerTerminalRouteNextLayout)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteModels.Count)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
+	_LNTR_LoadFixture("a")
+	AssertTrue(_LLM_NavEventOwnerNativeEnsureLoaded())
+	Module := _LLM_NavEventOwnerModule, Exports := _LLM_NavEventOwnerExports
+	AssertTrue(Module is Integer && Module > 0)
+	AssertTrue(Exports["ErgoptiNav_RegisterTerminalRoutes"] is Integer)
+	AssertTrue(Exports["ErgoptiNav_Stop"] is Integer)
+	Probe := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
+		_LLM_NavEventOwnerTerminalRouteOwner, Buffer(512, 0), 64)
+	AssertEqual(8, Probe["status"], "fresh real C has no terminal route owner before Register")
+	Port := Map("terminal_route_source", (*) => _LNTR_Source(State), "list_terminal_held_recipes", Held)
+	AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(Port))
+	AssertEqual(1, State.HeldCalls)
+	Frame := _LLM_NavEventOwnerTerminalRouteUnknown
+	AssertTrue(Frame is Map)
+	OriginalRecipes := Frame["recipes"], OriginalModels := Frame["models"]
+	OriginalRecipe := 0, OriginalModel := 0, GenuineAdmissions := 0
+	for Id, Admission in Frame["recipe_refs"] {
+		AssertTrue(Id is Integer && Id > 0, "retained admissions have actual positive recipe identities")
+		if !(Admission is Map)
+			continue
+		Recipe := Admission.Get("recipe", 0)
+		if !(Recipe is Map) || Recipe.Count == 0 || !IsObject(Recipe.Get("model", 0))
+			continue
+		GenuineAdmissions += 1
+		if !IsObject(OriginalRecipe)
+			OriginalRecipe := Admission, OriginalModel := Recipe["model"]
+	}
+	AssertTrue(GenuineAdmissions > 0 && OriginalRecipe is Map && IsObject(OriginalModel),
+		"capture an actual nonempty KLE admission instead of assuming a recipe index")
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes == ForeignRecipes)
+	ForeignImage := ForeignRecipes.Clone(), OriginalImage := OriginalRecipes.Clone()
+	ModelImage := OriginalModels.Clone()
+	AdmissionFields := Map(), RouteFields := Map(), RecipeFields := Map(), RecipeModels := Map()
+	for Id, Admission in OriginalImage {
+		AssertTrue(Admission is Map)
+		AdmissionFields[Id] := Admission.Clone()
+		RouteFields[Id] := Admission["route"].Clone()
+		Recipe := Admission["recipe"]
+		RecipeFields[Id] := Recipe is Map ? Recipe.Clone() : 0
+		RecipeModels[Id] := Recipe is Map ? Recipe.Get("model", 0) : 0
+	}
+	ModelFields := Map()
+	for Id, Identity in ModelImage
+		ModelFields[Id] := Identity.Clone()
+	Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+	NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe
+	NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
+	Epoch := _LLM_NavEventOwnerRuntimeEpoch
+	AssertTrue(LLM_NavEventOwner_Stop(), "the real default same-module Stop must complete")
+	; This is the intended baseline red, after real registration/query/Stop.
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown, "genuine retirement must release the exact Unknown")
+	AssertTrue(_LLM_NavEventOwnerModule == Module && _LLM_NavEventOwnerExports == Exports)
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes == ForeignRecipes)
+	AssertEqual(ForeignImage.Count, ForeignRecipes.Count)
+	for Id, Value in ForeignImage
+		AssertTrue(ForeignRecipes[Id] == Value, "foreign dictionary cells survive teardown")
+	AssertEqual(OriginalImage.Count, OriginalRecipes.Count)
+	for Id, Value in OriginalImage
+		AssertTrue(OriginalRecipes[Id] == Value, "original holders are detached, never cleared")
+	for Id, Admission in OriginalImage {
+		_LNTR_GenuineAssertMapImage(Admission, AdmissionFields[Id], "all original admission fields survive")
+		_LNTR_GenuineAssertMapImage(Admission["route"], RouteFields[Id], "all original route fields survive")
+		if RecipeFields[Id] is Map {
+			_LNTR_GenuineAssertMapImage(Admission["recipe"], RecipeFields[Id], "all original KLE recipe fields survive")
+			AssertTrue(Admission["recipe"].Get("model", 0) == RecipeModels[Id], "every KLE model reference survives")
+		}
+	}
+	AssertEqual(ModelImage.Count, OriginalModels.Count)
+	for Id, Value in ModelImage
+		AssertTrue(OriginalModels[Id] == Value, "original model identity cells survive teardown")
+	for Id, Identity in ModelImage
+		_LNTR_GenuineAssertMapImage(Identity, ModelFields[Id], "all original model identity fields survive")
+	AssertTrue(OriginalRecipe["recipe"]["model"] == OriginalModel)
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteModels == OriginalModels)
+	AssertEqual(Generation, _LLM_NavEventOwnerTerminalRouteGeneration)
+	AssertEqual(NextRecipe, _LLM_NavEventOwnerTerminalRouteNextRecipe)
+	AssertEqual(NextLayout, _LLM_NavEventOwnerTerminalRouteNextLayout)
+	AssertEqual(Epoch + 1, _LLM_NavEventOwnerRuntimeEpoch)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteCoverage["registered"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["cohort_complete"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["transformed_output_enabled"])
+	AssertFalse(_LLM_NavEventOwnerStarted || _LLM_NavEventOwnerStarting
+		|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending)
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Map("terminal_route_source", (*) => _LNTR_Source(State))))
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteGeneration > Generation)
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteNextRecipe > NextRecipe)
+	AssertTrue(LLM_NavEventOwner_Stop())
+	AssertFalse(_LLM_NavEventOwnerStarted || _LLM_NavEventOwnerStarting)
+	Held(Owner, BufferArg, Capacity) {
+		State.HeldCalls += 1
+		Reply := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, BufferArg, Capacity)
+		AssertEqual(0, Reply["status"], "actual C accepted the current default registration owner")
+		AssertEqual(0, Reply["count"], "no capture/hook/held debt was activated")
+		ForeignRecipes := _LLM_NavEventOwnerTerminalRouteRecipes.Clone()
+		_LLM_NavEventOwnerTerminalRouteRecipes := ForeignRecipes
+		throw Error("owned holder withdrawal after actual C registration/query0")
+	}
+}
+_LNTR_GenuineAssertMapImage(Actual, Image, Message) {
+	AssertTrue(Actual is Map && Image is Map, Message)
+	AssertEqual(Image.Count, Actual.Count, Message)
+	for Name, Value in Image {
+		AssertTrue(Actual.Has(Name), Message)
+		AssertEqual(Type(Value), Type(Actual[Name]), Message)
+		AssertTrue(Actual[Name] == Value, Message)
+	}
+}
+
+_LNTR_GenuineNegativeSetup() {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerStarting
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteUnknown
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteGeneration, _LLM_NavEventOwnerTerminalRouteNextRecipe
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerWakeFn, _LLM_NavEventOwnerServiceFn
+	global _LLM_NavEventOwnerServiceArmed, _LLM_NavEventOwnerRecords, KLE_Model
+	AssertEqual(0, _LLM_NavEventOwnerModule)
+	AssertEqual(0, _LLM_NavEventOwnerPort)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteGeneration)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteNextRecipe)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
+	AssertFalse(_LLM_NavEventOwnerStarted || _LLM_NavEventOwnerStarting)
+	State := {Caps: 0, SourceCalls: 0, HeldCalls: 0}, ForeignRecipes := 0
+	_LNTR_LoadFixture("a")
+	AssertTrue(_LLM_NavEventOwnerNativeEnsureLoaded())
+	AssertTrue(_LLM_NavEventOwnerModule is Integer && _LLM_NavEventOwnerModule > 0)
+	AssertEqual(8, _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
+		_LLM_NavEventOwnerTerminalRouteOwner, Buffer(512, 0), 64)["status"])
+	Port := Map("terminal_route_source", Source, "list_terminal_held_recipes", Held)
+	AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(Port))
+	AssertEqual(1, State.SourceCalls)
+	AssertEqual(1, State.HeldCalls)
+	Frame := _LLM_NavEventOwnerTerminalRouteUnknown
+	AssertTrue(Frame is Map && Frame["candidate"] is Map && Frame["candidate"]["routes"].Length > 0)
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes == ForeignRecipes)
+	ModelsFound := 0
+	for Id, Admission in Frame["recipe_refs"] {
+		AssertTrue(Id is Integer && Id > 0)
+		if Admission["recipe"] is Map && IsObject(Admission["recipe"].Get("model", 0)) {
+			AssertTrue(Admission["recipe"]["model"] == KLE_Model)
+			ModelsFound += 1
+		}
+	}
+	AssertTrue(ModelsFound > 0, "genuine source owns actual KLE model references")
+	return {Frame: Frame, Module: _LLM_NavEventOwnerModule, Exports: _LLM_NavEventOwnerExports,
+		Epoch: _LLM_NavEventOwnerRuntimeEpoch, NextRecipe: _LLM_NavEventOwnerTerminalRouteNextRecipe,
+		Recipes: _LLM_NavEventOwnerTerminalRouteRecipes, Models: _LLM_NavEventOwnerTerminalRouteModels,
+		Wake: _LLM_NavEventOwnerWakeFn, Service: _LLM_NavEventOwnerServiceFn,
+		Armed: _LLM_NavEventOwnerServiceArmed, Records: _LLM_NavEventOwnerRecords}
+	Source() {
+		State.SourceCalls += 1
+		Value := _LNTR_Source(State)
+		AssertTrue(Value is Map && ObjGetBase(Value) == Map.Prototype && Value["model"] == KLE_Model)
+		for Name in ObjOwnProps(Value)
+			throw Error("A source facade cannot establish genuine provenance.")
+		return Value
+	}
+	Held(Owner, BufferArg, Capacity) {
+		State.HeldCalls += 1
+		Reply := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, BufferArg, Capacity)
+		AssertEqual(0, Reply["status"], "actual C query confirms the default registration owner")
+		AssertEqual(0, Reply["count"])
+		ForeignRecipes := _LLM_NavEventOwnerTerminalRouteRecipes.Clone()
+		_LLM_NavEventOwnerTerminalRouteRecipes := ForeignRecipes
+		throw Error("owned genuine retained Frame after holder withdrawal")
+	}
+}
+
+_LNTR_GenuineNegativeNoTeardown(Context, AttemptPort, ExpectedEpoch, ExpectedNext, ExpectedUnknown) {
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerTerminalRouteNextRecipe
+	global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerTerminalRouteRecipes
+	global _LLM_NavEventOwnerTerminalRouteModels, _LLM_NavEventOwnerWakeFn, _LLM_NavEventOwnerServiceFn
+	global _LLM_NavEventOwnerServiceArmed, _LLM_NavEventOwnerRecords, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	AssertEqual(ExpectedEpoch, _LLM_NavEventOwnerRuntimeEpoch, "refusal preserves its current runtime lifetime")
+	AssertEqual(ExpectedNext, _LLM_NavEventOwnerTerminalRouteNextRecipe)
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown == ExpectedUnknown)
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes == Context.Recipes)
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteModels == Context.Models)
+	AssertTrue(_LLM_NavEventOwnerWakeFn == Context.Wake && _LLM_NavEventOwnerServiceFn == Context.Service)
+	AssertEqual(Context.Armed, _LLM_NavEventOwnerServiceArmed)
+	AssertTrue(_LLM_NavEventOwnerRecords == Context.Records && _LLM_NavEventOwnerPort == AttemptPort)
+	AssertFalse(_LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending)
+}
+
+_LNTR_GenuineNegativeCase(CaseName) {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerTerminalRouteNextRecipe
+	global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerTerminalRouteCoverage
+	Context := _LNTR_GenuineNegativeSetup()
+	SavedPointer := Context.Exports["ErgoptiNav_Stop"], CallbackPointer := 0
+	Foreign := Map("marker", "foreign Unknown", "model", Context.Frame["models"]), ForeignImage := Foreign.Clone()
+	FakeCalls := 0, GetterCalls := 0, ReportCalls := 0, Primary := 0, CleanupFailure := 0
+	HadLoggerCall := Object.Prototype.HasOwnProp.Call(LoggerError, "Call")
+	SavedLoggerCall := HadLoggerCall ? Object.Prototype.GetOwnPropDesc.Call(LoggerError, "Call") : 0
+	AttemptPort := 0, ExpectedEpoch := Context.Epoch, ExpectedNext := Context.NextRecipe
+	ExpectedUnknown := Context.Frame
+	try {
+		switch CaseName {
+			case "custom-true":
+				AttemptPort := Map("stop", FakeTrue), _LLM_NavEventOwnerPort := AttemptPort
+			case "custom-map":
+				AttemptPort := Map("stop", FakeMap), _LLM_NavEventOwnerPort := AttemptPort
+			case "module-zero", "module-load":
+				_LLM_NavEventOwnerModule := 0
+			case "exports-clone":
+				_LLM_NavEventOwnerExports := Context.Exports.Clone()
+			case "exports-pointer":
+				CallbackPointer := CallbackCreate(FakePointer, "F", 0)
+				Context.Exports["ErgoptiNav_Stop"] := CallbackPointer
+			case "exports-facade":
+				Object.Prototype.DefineProp.Call(Context.Exports, "Has", {Call: HasFacade})
+			case "epoch":
+				ExpectedEpoch := Context.Epoch + 1, _LLM_NavEventOwnerRuntimeEpoch := ExpectedEpoch
+			case "lower-counter":
+				ExpectedNext := Context.NextRecipe - 1, _LLM_NavEventOwnerTerminalRouteNextRecipe := ExpectedNext
+			case "unknown-before-get":
+				ExpectedUnknown := Foreign, _LLM_NavEventOwnerTerminalRouteUnknown := Foreign
+			case "unknown-report":
+				Object.Prototype.DefineProp.Call(LoggerError, "Call", {Call: ReportObserver})
+				AttemptPort := Map()
+				Object.Prototype.DefineProp.Call(AttemptPort, "Get", {Call: ReportFromGet})
+				_LLM_NavEventOwnerPort := AttemptPort, ExpectedUnknown := Foreign
+			default:
+				throw Error("Unknown genuine fault selector.")
+		}
+		if CaseName == "module-load" {
+			AssertThrows(AttemptLoad,
+				"resident loader withdrawal must refuse")
+			AssertEqual(0, _LLM_NavEventOwnerModule, "ordinary load must not rearm a withdrawn real issuance")
+		} else {
+			AssertFalse(LLM_NavEventOwner_Stop(), CaseName . ": retained genuine debt must refuse this authority")
+			if CaseName == "module-zero" {
+				AssertThrows(AttemptLoad,
+					"resident loader withdrawal must refuse")
+				AssertEqual(0, _LLM_NavEventOwnerModule)
+			}
+		}
+		if CaseName == "custom-true" || CaseName == "custom-map"
+			AssertEqual(1, FakeCalls)
+		else
+			AssertEqual(0, FakeCalls, "foreign pointer/Has facade must never execute")
+		if CaseName == "unknown-report"
+			AssertEqual(1, GetterCalls), AssertEqual(1, ReportCalls)
+		_LNTR_GenuineNegativeNoTeardown(Context, AttemptPort, ExpectedEpoch, ExpectedNext, ExpectedUnknown)
+		if ExpectedUnknown == Foreign {
+			AssertEqual(ForeignImage.Count, Foreign.Count)
+			for Key, Value in ForeignImage
+				AssertTrue(Foreign[Key] == Value, "foreign Unknown fields survive refusal")
+		}
+	} catch as Err {
+		Primary := Err
+	} finally {
+		; Restore only the explicit child-owned fault; no private static reset/API.
+		_LLM_NavEventOwnerModule := Context.Module
+		_LLM_NavEventOwnerExports := Context.Exports
+		Context.Exports["ErgoptiNav_Stop"] := SavedPointer
+		if Object.Prototype.HasOwnProp.Call(Context.Exports, "Has")
+			Object.Prototype.DeleteProp.Call(Context.Exports, "Has")
+		if HadLoggerCall
+			Object.Prototype.DefineProp.Call(LoggerError, "Call", SavedLoggerCall)
+		else if Object.Prototype.HasOwnProp.Call(LoggerError, "Call")
+			Object.Prototype.DeleteProp.Call(LoggerError, "Call")
+		_LLM_NavEventOwnerPort := 0
+		if CaseName == "epoch"
+			_LLM_NavEventOwnerRuntimeEpoch := Context.Epoch
+		if CaseName == "lower-counter"
+			_LLM_NavEventOwnerTerminalRouteNextRecipe := Context.NextRecipe
+		if CaseName == "unknown-before-get" || CaseName == "unknown-report"
+			_LLM_NavEventOwnerTerminalRouteUnknown := Context.Frame
+		try {
+			if !IsObject(Primary)
+				AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown == Context.Frame,
+					"restoration alone is not a retirement receipt")
+			AssertTrue(LLM_NavEventOwner_Stop(), "cleanup obtains its own actual same-module native Stop")
+		} catch as Err {
+			CleanupFailure := Err
+		}
+		if CallbackPointer
+			CallbackFree(CallbackPointer)
+	}
+	if IsObject(Primary)
+		throw Primary
+	if IsObject(CleanupFailure)
+		throw CleanupFailure
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown, "only actual cleanup Stop retires the retained Frame")
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteCoverage["registered"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["cohort_complete"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["transformed_output_enabled"])
+	FakeTrue() {
+		FakeCalls += 1
+		return 1
+	}
+	FakeMap() {
+		FakeCalls += 1
+		return Map("stopped", true)
+	}
+	FakePointer() {
+		FakeCalls += 1
+		return 0
+	}
+	HasFacade(*) {
+		FakeCalls += 1
+		return true
+	}
+	ReportObserver(*) {
+		ReportCalls += 1
+		_LLM_NavEventOwnerTerminalRouteUnknown := Foreign
+	}
+	ReportFromGet(*) {
+		GetterCalls += 1
+		try Func.Prototype.Call.Call(_LLM_NavEventOwnerReportNow, "owned pre-Stop report observer")
+		finally {
+			; The owned observer is one-shot; refusal diagnostics use normal logging.
+			if HadLoggerCall
+				Object.Prototype.DefineProp.Call(LoggerError, "Call", SavedLoggerCall)
+			else if Object.Prototype.HasOwnProp.Call(LoggerError, "Call")
+				Object.Prototype.DeleteProp.Call(LoggerError, "Call")
+		}
+		return 0
+	}
+	AttemptLoad() {
+		return _LLM_NavEventOwnerNativeEnsureLoaded.Call()
+	}
+}
+
+_LNTR_ReceiveActualChild(CaseName := "positive") {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _LLM_NavEventOwnerRuntimeEpoch
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	ParentModule := _LLM_NavEventOwnerModule, ParentExports := _LLM_NavEventOwnerExports
+	ParentEpoch := _LLM_NavEventOwnerRuntimeEpoch, ParentUnknown := _LLM_NavEventOwnerTerminalRouteUnknown
+	Kind := CaseName == "positive" ? "positive" : "negative"
+	SelectedName := Kind == "positive"
+		? "native-retirement-genuine-child: actual registration and full-owner retirement"
+		: "native-retirement-genuine-negative: " . CaseName
+	TestsRoot := A_ScriptDir
+	CanonicalPath := TestsRoot . "\run_all.ahk"
+	Canonical := FileRead(CanonicalPath, "UTF-8")
+	CanonicalInput := Canonical
+	; Resolve the unique production owner afresh so a module move or duplicate
+	; cannot turn the byte-preservation assertion into a cached source comparison.
+	AdapterPath := _DriverProductionFileForSymbol("_LLM_NavEventOwnerNativeEnsureLoaded")
+	AdapterInput := FileRead(AdapterPath, "UTF-8")
+	; Preserve original framework and include graph, including A_ScriptDir data.
+	if StrSplit(Canonical, "SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)").Length != 2
+		throw Error("The canonical child watchdog preimage changed.")
+	Canonical := StrReplace(Canonical, "SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)",
+		"; Owned native child: no forced exit is a receiving receipt.")
+	Id := DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount . "_" . Random(1, 0x7FFFFFFF)
+	ChildName := ".ergopti_native_retirement_child_" . Id . ".ahk"
+	ChildPath := TestsRoot . "\" . ChildName
+	ReceiptRoot := A_Temp . "\ergopti_native_retirement_" . Id
+	DirCreate(ReceiptRoot)
+	TapPath := ReceiptRoot . "\child.tap", OutPath := ReceiptRoot . "\child.log", ErrPath := ReceiptRoot . "\child.err"
+	SavedKind := EnvGet("ERGOPTI_NATIVE_RETIREMENT_CHILD_KIND")
+	SavedCase := EnvGet("ERGOPTI_GENUINE_NEGATIVE_CASE")
+	SavedReceipt := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	AssertFalse(FileExist(ChildPath), "never reuse or replace another task's runner")
+	try {
+		FileAppend(Canonical, ChildPath, "UTF-8")
+		EnvSet("ERGOPTI_NATIVE_RETIREMENT_CHILD_KIND", Kind)
+		EnvSet("ERGOPTI_GENUINE_NEGATIVE_CASE", CaseName)
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", TapPath)
+		; A hidden shell only redirects stdout/stderr and waits for the exact child.
+		; It performs no filesystem deletion/move or sibling process control.
+		Quote := Chr(34)
+		ChildCommand := Quote . A_AhkPath . Quote . " /ErrorStdOut=UTF-8 " . Quote . ChildPath . Quote
+			. " --only=" . Quote . SelectedName . Quote
+			. " 1>" . Quote . OutPath . Quote . " 2>" . Quote . ErrPath . Quote
+		Command := Quote . A_ComSpec . Quote . " /D /C " . Quote . ChildCommand . Quote
+		Code := RunWait(Command, TestsRoot, "Hide")
+		AssertEqual(0, Code, "the actual child must exit naturally without timeout or termination")
+		AssertTrue(FileExist(TapPath) && FileExist(ErrPath))
+		AssertEqual(0, FileGetSize(ErrPath), "startup/parse errors are refusals")
+		Tap := FileRead(TapPath, "UTF-8")
+		AssertTrue(RegExMatch(Tap, "m)^1\.\.1\r?$"))
+		AssertEqual(1, _LNTR_ReceiptMatches(Tap, "m)^RUNNING 1/1 - "))
+		AssertEqual(1, _LNTR_ReceiptMatches(Tap, "m)^ok 1 - "))
+		AssertEqual(0, _LNTR_ReceiptMatches(Tap, "m)^not ok|# SKIP|FATAL STARTUP|WATCHDOG"))
+		AssertTrue(InStr(Tap, "ok 1 - " . SelectedName . "`r`n")
+			|| InStr(Tap, "ok 1 - " . SelectedName . "`n"))
+		AssertTrue(RegExMatch(Tap, "m)^# 1 passed, 0 failed\.\r?$"))
+	} finally {
+		EnvSet("ERGOPTI_NATIVE_RETIREMENT_CHILD_KIND", SavedKind)
+		EnvSet("ERGOPTI_GENUINE_NEGATIVE_CASE", SavedCase)
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", SavedReceipt)
+		; ChildPath is constructed from the actual testsRoot and one owned basename.
+		SplitPath(ChildPath, &ActualName, &ActualDirectory)
+		if ActualDirectory != TestsRoot || ActualName != ChildName
+			throw Error("Refuse child cleanup outside the exact owned ephemeral runner.")
+		if FileExist(ChildPath)
+			FileDelete(ChildPath)
+	}
+	AssertEqual(ParentModule, _LLM_NavEventOwnerModule)
+	AssertTrue(ParentExports == _LLM_NavEventOwnerExports)
+	AssertEqual(ParentEpoch, _LLM_NavEventOwnerRuntimeEpoch)
+	AssertTrue(ParentUnknown == _LLM_NavEventOwnerTerminalRouteUnknown)
+	AssertEqual(CanonicalInput, FileRead(CanonicalPath, "UTF-8"), "canonical graph remains unchanged during receiving")
+	AssertEqual(AdapterInput, FileRead(AdapterPath, "UTF-8"), "actual adapter remains unchanged during receiving")
+}
+
+_LNTR_ReceiptMatches(Text, Pattern) {
+	Count := 0, Position := 1
+	while Found := RegExMatch(Text, Pattern, &Match, Position) {
+		Count += 1
+		Position := Found + Max(1, Match.Len(0))
+	}
+	return Count
+}
+
+; This registration is owned by the existing included metadata file. Fresh child
+; processes select only their child case; the parent never loads real native
+; issuance into its fake-port fixtures and never resets resident private statics.
+_LNTR_NativeRetirementChildKind := EnvGet("ERGOPTI_NATIVE_RETIREMENT_CHILD_KIND")
+if _LNTR_NativeRetirementChildKind == "positive" {
+	Test("native-retirement-genuine-child: actual registration and full-owner retirement", _LNTR_GenuineChildCase)
+} else if _LNTR_NativeRetirementChildKind == "negative" {
+	_LNTR_NativeRetirementChildCase := EnvGet("ERGOPTI_GENUINE_NEGATIVE_CASE")
+	Test("native-retirement-genuine-negative: " . _LNTR_NativeRetirementChildCase,
+		_LNTR_GenuineNegativeCase.Bind(_LNTR_NativeRetirementChildCase))
+} else {
+	Test("terminal-native-retirement: actual same-owner C Stop in a distinct child", _LNTR_ReceiveActualChild)
+	for CaseName in ["custom-true", "custom-map", "module-zero", "module-load", "exports-clone",
+		"exports-pointer", "exports-facade", "epoch", "lower-counter", "unknown-before-get", "unknown-report"]
+		Test("terminal-native-retirement: authority refusal in distinct child " . CaseName,
+			_LNTR_ReceiveActualChild.Bind(CaseName))
+}
