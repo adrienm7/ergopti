@@ -755,5 +755,276 @@
 		"native_macos": "UNRUN here; hosted CI observations remain separate",
 		"native_linux": "UNRUN here; maintainer Linux unavailable",
 		"managed_ai_receiving": "UNRUN; personal installation and servers preserved"
+	},
+	"terminal_lifecycle_followup": {
+		"date": "2026-10-14",
+		"integrated_source_sha": "6c407ed372ae8a3281ec24d422a4c8e2a84799bb",
+		"scope": "Actual Windows AutoHotkey controlled callbacks and engine/native-Edit E2E; no genuine registration-retirement, physical keyboard or installed-application qualification",
+		"selected": [
+			{
+				"receipt": "terminal-lifecycle-integrated",
+				"filter": "terminal-lifecycle-admission",
+				"passed": 6,
+				"expected": 6,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-registration-retained",
+				"filter": "todo49-registration-custody",
+				"passed": 91,
+				"expected": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-model-retained",
+				"filter": "todo49-model-build-custody",
+				"passed": 20,
+				"expected": 20,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-route-retained",
+				"filter": "todo49-route-adapter",
+				"passed": 9,
+				"expected": 9,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-lifecycle-stop-diagnostics-retained",
+				"filter": "native-stop-diagnostics",
+				"passed": 1,
+				"expected": 1,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		],
+		"selected_passed": 127,
+		"causal": [
+			{
+				"flavor": "original",
+				"exit": 1,
+				"passed": 1,
+				"failed": 5,
+				"running": 6,
+				"skipped": 0,
+				"accepted": true,
+				"scope": "Actual original test include graph and production adapter copies; controlled ports only, no native C lifetime or physical qualification"
+			},
+			{
+				"flavor": "revised",
+				"exit": 0,
+				"passed": 6,
+				"failed": 0,
+				"running": 6,
+				"skipped": 0,
+				"accepted": true,
+				"scope": "Actual original test include graph and production adapter copies; controlled ports only, no native C lifetime or physical qualification"
+			}
+		],
+		"composed_gates": [
+			{
+				"case": "good",
+				"gate": "compiler",
+				"produced": true,
+				"expected": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"case": "bad",
+				"gate": "compiler",
+				"produced": false,
+				"expected": 17,
+				"exit": 17,
+				"accepted": true
+			},
+			{
+				"case": "entry",
+				"gate": "compiler",
+				"produced": true,
+				"expected": 0,
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"accepted": true,
+				"expected": 70,
+				"passed": 70,
+				"exit": 0,
+				"gate": "e2e",
+				"failed": 0,
+				"skipped": 0,
+				"scope": "Engine and owned native Edit controls; no physical input qualification"
+			},
+			{
+				"gate": "test-ahk-full-startup-smoke.cjs",
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"gate": "test-ahk-encoding.cjs",
+				"exit": 0,
+				"accepted": true
+			},
+			{
+				"gate": "test-ahk-loop-capture.cjs",
+				"exit": 0,
+				"accepted": true
+			}
+		],
+		"complete_js": {
+			"command": "node tools/test/run-js-suite.cjs",
+			"selected": 425,
+			"failed": 18,
+			"exit": 1,
+			"status": "FAILED",
+			"frozen_source": {
+				"owned_images": [
+					{
+						"path": "static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk",
+						"sha256": "975b006a9b44cbcd5181038fb7b6f07c202b678f820d0df8bee121ea94cb00a7"
+					},
+					{
+						"path": "static/ergopti_plus/windows/tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk",
+						"sha256": "aff7f7e01be48e3530277890740f19e7e453d7c91f0c858d421e070ac5a86e60"
+					}
+				],
+				"scope": "Frozen current source plus two controlled terminal lifecycle edits; no physical qualification",
+				"head": "329bb4a2457c80634542d707b002294f9d13b3d2"
+			},
+			"owned_source_images_unchanged": true,
+			"agent_source_edits_during_attempt": false,
+			"failed_checks": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"full AHK startup smoke (real auto-execute to ready, isolated config)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"receipt": "full-js-terminal-lifecycle-v1.log",
+			"passed": 407
+		},
+		"startup_failure_followup": {
+			"full_js": "FAIL: extension-enabled timed out after ConfigIO pending-full-save path refusal and unacknowledged existing generation",
+			"serial_current": {
+				"receipt": "terminal-lifecycle-startup-after-js",
+				"exit": 0,
+				"complete_ready_receipt": true,
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			"exact_adapter_baseline": {
+				"receipt": "terminal-lifecycle-startup-baseline-329",
+				"exit": 1,
+				"complete_ready_receipt": false,
+				"stderr_sha256": "58eaf82cc6f713240c53bb09cf89555bde866ff9d706849e47d360438ff7f3ac"
+			},
+			"baseline_source": "329bb4a2457c80634542d707b002294f9d13b3d2",
+			"baseline_scope": "Canonical private startup code fixture with only the exact original production adapter substituted; no checkout or personal-state rewrite",
+			"baseline_same_refusal_observed": true,
+			"cause": "OPEN; the original adapter also reproduces the same path refusal and generation failure in an older-release fixture; neither this baseline failure nor serial current PASS erases the failed full-suite receiving"
+		},
+		"hosted_ci": {
+			"source": "329bb4a2457c80634542d707b002294f9d13b3d2",
+			"run": 38487450400,
+			"conclusion": "failure",
+			"windows_unit": "FAIL: Snapshot16 source admission refuses changed genuine snapshot sources before native unit launch",
+			"windows_e2e_engine": "PASS on hosted Windows runner; no physical-input qualification",
+			"core_js": "PASS on hosted runner; local complete JS outcome remains separate",
+			"linux_unit_e2e_package_install": "PASS on hosted Linux runners; maintainer native Linux remains unavailable",
+			"macos_managed_ollama": "FAIL on amd64 and arm64: actual trust-settings add deadline and removal exit 1; restoration failed",
+			"release_publish": "SKIPPED",
+			"ci_source_seals_or_policy_modified": false
+		},
+		"broad_windows_unit": "FAILED_INCOMPLETE_WATCHDOG; previous immutable full attempt and its unexecuted cases remain open",
+		"authenticated_unknown_retirement": "OPEN; private candidate remains UNRUN and unapplied",
+		"managed_ai_storage": {
+			"command": "node read-ollama-zip-inventory.cjs",
+			"exit": 1,
+			"status": "UNRECEIVED_HTTP_501",
+			"requested_scope": "Bounded ZIP central-directory metadata only; reject any full runtime response",
+			"pinned_archive_bytes": 2069313829,
+			"metadata_body_bytes_accepted": 0,
+			"runtime_downloaded": false,
+			"runtime_installed": false,
+			"model_downloaded": false,
+			"expanded_size_received": false,
+			"free_c_bytes_observed": 8655609856,
+			"free_d_bytes_observed": 32427393024,
+			"space_qualification": "OPEN: active installer root is actual LocalApplicationData on C; compressed size alone does not establish sufficient extraction space",
+			"full_runtime_consent": "NOT_REQUESTED_OR_RECEIVED"
+		},
+		"managed_ai_install_model_receiving": "OPEN; no runtime/model acquisition consent or native receiving",
+		"latest_preceding_build": "ErgoptiPlus-329bb4a245.exe; previous e235 Diagnostics archive remains bound to its original source",
+		"physical_windows": "UNRUN",
+		"native_macos_here": "UNRUN",
+		"native_linux_here": "UNRUN",
+		"rebase_native_source_identity": {
+			"received_head": "3d2be977ea6e7c9fd2a3ffa7910ac1b6e1a7efd7",
+			"rebased_head": "a9f76f421c9dca6484cd4a1ea68be4e43f77a991",
+			"incoming_head": "a07cec9b587cc427eadc94b6c4225d0b5b98dbb9",
+			"changed_paths": [],
+			"status": "BYTE_IDENTICAL_WINDOWS_AND_SHARED_INPUTS",
+			"new_mac_linux_receiving": "NOT_QUALIFIED_BY_PREVIOUS_WINDOWS_OR_JS_RECEIPTS"
+		},
+		"rebase_native_controls": [
+			{
+				"receipt": "terminal-lifecycle-rebased-a07",
+				"filter": "terminal-lifecycle-admission",
+				"expected": 6,
+				"passed": 6,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "terminal-registration-rebased-a07",
+				"filter": "todo49-registration-custody",
+				"expected": 91,
+				"passed": 91,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "snapshots-rebased-a07",
+				"filter": "windows91 snapshots:",
+				"expected": 17,
+				"passed": 17,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			},
+			{
+				"receipt": "startup-ready-rebased-a07",
+				"filter": "startup-command-ready-repaint",
+				"expected": 5,
+				"passed": 5,
+				"failed": 0,
+				"skipped": 0,
+				"exit": 0
+			}
+		]
 	}
 }

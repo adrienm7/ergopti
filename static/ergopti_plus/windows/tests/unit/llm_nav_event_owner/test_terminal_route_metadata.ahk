@@ -561,3 +561,163 @@ for _LNTR_ModelPhase in ["eligible", "capture"]
 			Test("terminal model build custody: " . _LNTR_ModelPhase . ":" . _LNTR_ModelMutation
 				. ":" . _LNTR_ModelOutcome . " (todo49-model-build-custody)",
 				_LNTR_ModelBuildCustody.Bind(_LNTR_ModelPhase, _LNTR_ModelMutation, _LNTR_ModelOutcome))
+
+_LNTR_LifecycleSource(State) {
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerTerminalRouteRefreshing
+	global _LLM_NavEventOwnerStartCancelled
+	State.SourceCalls += 1
+	if State.StopPhase == "source"
+		State.StopResult := LLM_NavEventOwner_Stop()
+	else if State.StopPhase == "starting" {
+		State.SawStarting := _LLM_NavEventOwnerStarting
+		State.SawRefreshing := _LLM_NavEventOwnerTerminalRouteRefreshing
+		State.StopResult := LLM_NavEventOwner_Stop()
+		State.SawCancellation := _LLM_NavEventOwnerStartCancelled
+		State.StopCallsDuringRefresh := State.Native.StopCalls
+	}
+	return _LNTR_Source(State)
+}
+
+_LNTR_LifecycleRegister(State, Owner, Generation, Layout, Bindings, Count) {
+	if State.StopPhase == "register"
+		State.StopResult := LLM_NavEventOwner_Stop()
+	return _LNTR_Register(State, Owner, Generation, Layout, Bindings, Count)
+}
+
+_LNTR_LifecycleHeld(State, Owner, Ids, Capacity) {
+	if State.StopPhase == "held"
+		State.StopResult := LLM_NavEventOwner_Stop()
+	return _LNTR_Held(State, Owner, Ids, Capacity)
+}
+
+_LNTR_LifecyclePort() {
+	State := _LNTR_PortState()
+	State.SourceCalls := 0
+	State.StopPhase := "none"
+	State.StopResult := "not_called"
+	State.Port["terminal_route_source"] := _LNTR_LifecycleSource.Bind(State)
+	State.Port["register_terminal_routes"] := _LNTR_LifecycleRegister.Bind(State)
+	State.Port["list_terminal_held_recipes"] := _LNTR_LifecycleHeld.Bind(State)
+	return State
+}
+
+_LNTR_LifecycleStopInsideRefresh(Phase) {
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerStarted
+	Native := _LNEO_Setup()
+	try {
+		State := _LNTR_LifecyclePort()
+		State.StopPhase := Phase
+		Epoch := _LLM_NavEventOwnerRuntimeEpoch
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+		AssertFalse(State.StopResult, Phase . ": Stop must refuse inside an active refresh")
+		AssertEqual(0, Native.StopCalls, "the refusal must precede the physical Stop port")
+		AssertTrue(Native.Started && _LLM_NavEventOwnerStarted)
+		AssertEqual(Epoch, _LLM_NavEventOwnerRuntimeEpoch, "refresh keeps the admitted runtime epoch")
+		AssertEqual(1, State.SourceCalls)
+		AssertEqual(1, State.Calls.Length, "ordinary registration must still complete once")
+		Coverage := LLM_NavEventOwner_TerminalRouteCoverage()
+		AssertFalse(Coverage["cohort_complete"] || Coverage["transformed_output_enabled"])
+	} finally _LNEO_Teardown()
+}
+Test("terminal-lifecycle-admission: source callback cannot Stop an active refresh",
+	_LNTR_WithState.Bind(_LNTR_LifecycleStopInsideRefresh.Bind("source")))
+Test("terminal-lifecycle-admission: registration callback cannot Stop an active refresh",
+	_LNTR_WithState.Bind(_LNTR_LifecycleStopInsideRefresh.Bind("register")))
+Test("terminal-lifecycle-admission: held query cannot Stop an active refresh",
+	_LNTR_WithState.Bind(_LNTR_LifecycleStopInsideRefresh.Bind("held")))
+
+_LNTR_LifecycleRefreshDuringStop(Native, State) {
+	global _LLM_NavEventOwnerStopping
+	AssertTrue(_LLM_NavEventOwnerStopping, "the injected physical Stop must observe admission")
+	Native.NestedRefresh := LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+	return _LNEO_PortStop(Native)
+}
+
+_LNTR_LifecycleRefreshInsideStop() {
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	Native := _LNEO_Setup()
+	try {
+		State := _LNTR_LifecyclePort()
+		Native.NestedRefresh := "not_called"
+		Native.Port["stop"] := _LNTR_LifecycleRefreshDuringStop.Bind(Native, State)
+		Epoch := _LLM_NavEventOwnerRuntimeEpoch
+		Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+		Coverage := _LLM_NavEventOwnerTerminalRouteCoverage
+		AssertTrue(LLM_NavEventOwner_Stop())
+		AssertFalse(Native.NestedRefresh, "refresh must refuse during physical Stop")
+		AssertEqual(0, State.SourceCalls, "no source callback may run after stop admission")
+		AssertEqual(0, State.Calls.Length, "no registration may run after stop admission")
+		AssertEqual(1, Native.StopCalls)
+		AssertEqual(Epoch + 1, _LLM_NavEventOwnerRuntimeEpoch)
+		AssertEqual(Generation, _LLM_NavEventOwnerTerminalRouteGeneration)
+		AssertTrue(Coverage == _LLM_NavEventOwnerTerminalRouteCoverage)
+	} finally {
+		Native.Port["stop"] := _LNEO_PortStop.Bind(Native)
+		_LNEO_Teardown()
+	}
+}
+Test("terminal-lifecycle-admission: refresh is refused inside the actual Stop port",
+	_LNTR_WithState.Bind(_LNTR_LifecycleRefreshInsideStop))
+
+_LNTR_LifecycleRefreshWhilePending() {
+	global _LLM_NavEventOwnerStopPending, _LLM_NavEventOwnerTerminalRouteGeneration
+	Native := _LNEO_Setup()
+	try {
+		State := _LNTR_LifecyclePort()
+		Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+		Native.StopMode := "pending"
+		AssertFalse(LLM_NavEventOwner_Stop())
+		AssertTrue(_LLM_NavEventOwnerStopPending)
+		AssertFalse(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+		AssertEqual(0, State.SourceCalls, "a draining runtime cannot inspect a successor source")
+		AssertEqual(0, State.Calls.Length)
+		AssertEqual(Generation, _LLM_NavEventOwnerTerminalRouteGeneration)
+		Native.StopMode := "accept"
+		AssertTrue(LLM_NavEventOwner_Stop())
+		AssertFalse(_LLM_NavEventOwnerStopPending)
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+		AssertEqual(1, State.SourceCalls, "an acknowledged retirement releases only this admission fence")
+		AssertEqual(1, State.Calls.Length)
+	} finally {
+		Native.StopMode := "accept"
+		_LNEO_Teardown()
+	}
+}
+Test("terminal-lifecycle-admission: pending Stop refuses refresh until acknowledgement",
+	_LNTR_WithState.Bind(_LNTR_LifecycleRefreshWhilePending))
+
+_LNTR_LifecycleStartWithRefresh(Native, State, Hwnd, WakeMessage) {
+	Result := _LNEO_PortStart(Native, Hwnd, WakeMessage)
+	Native.StartRefresh := LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+	return Result
+}
+
+_LNTR_LifecycleStartingRefreshCancellation() {
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStarted
+	global _LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerStartCancelled
+	global _LLM_NavEventOwnerActiveStartTicket, _LLM_NavEventOwnerStartRollbackPending
+	_LNEO_Teardown()
+	Native := _LNEO_NewNativeState()
+	try {
+		State := _LNTR_LifecyclePort()
+		State.StopPhase := "starting"
+		State.Native := Native
+		Native.StartRefresh := "not_called"
+		Native.Port["start"] := _LNTR_LifecycleStartWithRefresh.Bind(Native, State)
+		AssertFalse(LLM_NavEventOwner_EnsureStarted(Native.Port))
+		AssertTrue(State.SawStarting && State.SawRefreshing)
+		AssertFalse(State.StopResult)
+		AssertTrue(State.SawCancellation, "Starting cancellation must precede the refresh refusal")
+		AssertEqual(0, State.StopCallsDuringRefresh)
+		AssertTrue(Native.StartRefresh, "the outer refresh must unwind normally before rollback")
+		AssertEqual(1, Native.StartCalls.Length)
+		AssertEqual(1, Native.StopCalls, "rollback must Stop once after both nested calls unwind")
+		AssertFalse(Native.Started || _LLM_NavEventOwnerStarted || _LLM_NavEventOwnerStarting)
+		AssertFalse(_LLM_NavEventOwnerTerminalRouteRefreshing || _LLM_NavEventOwnerStartCancelled
+			|| _LLM_NavEventOwnerStartRollbackPending)
+		AssertEqual(0, _LLM_NavEventOwnerActiveStartTicket)
+	} finally _LNEO_Teardown()
+}
+Test("terminal-lifecycle-admission: Starting cancellation survives an active nested refresh",
+	_LNTR_WithState.Bind(_LNTR_LifecycleStartingRefreshCancellation))
