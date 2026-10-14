@@ -456,10 +456,12 @@ try {
 			$taskInfo.RedirectStandardOutput = $true
 			$taskInfo.RedirectStandardError = $true
 			$taskChild = [Diagnostics.Process]::Start($taskInfo)
+			# Cold assembly/window preparation must not spend the child query's own budget.
+			$taskQueryWatch = [Diagnostics.Stopwatch]::StartNew()
 			$taskChildHandle = $taskChild.Handle
 			$taskOutput = $taskChild.StandardOutput.ReadToEndAsync()
 			$taskErrors = $taskChild.StandardError.ReadToEndAsync()
-			while (!$taskChild.HasExited -and $taskNativeWatch.ElapsedMilliseconds -lt 8000 -and !(Test-CollectionCancelled)) {
+			while (!$taskChild.HasExited -and $taskQueryWatch.ElapsedMilliseconds -lt 8000 -and !(Test-CollectionCancelled)) {
 				[Windows.Forms.Application]::DoEvents()
 				Start-Sleep -Milliseconds 10
 			}
