@@ -3,6 +3,7 @@
 """Independent closed diagnostic vectors; no native consent or catalogue claim."""
 
 import base64
+from contextlib import ExitStack
 import json
 from pathlib import Path
 import sys
@@ -164,11 +165,12 @@ class PermissionObservationControls(unittest.TestCase):
         self.assertIs(PermissionQuery.cancel, SignedQuery.cancel)
 
     def test_actual_controlled_pipe_preserves_capture_and_retirement(self):
-        from test_signed_query_probe import ControlledGroup
+        from test_signed_query_probe import ControlledGroup, controlled_query_ports
 
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as ports:
             helper = Path(directory) / "owned-metadata-fixture"
             script = "#!" + sys.executable + "\nimport base64,json,sys\n"
+            script += "if sys.platform == 'win32': sys.stdout.reconfigure(newline='\\n')\n"
             script += "print('Q1 HELD',flush=True)\ncommand=sys.stdin.readline()\n"
             script += "assert sys.argv[1:] == ['--automation-query-worker','permission-observation','19']\n"
             script += "if command == 'ACTIVATE\\n':\n"
@@ -178,6 +180,7 @@ class PermissionObservationControls(unittest.TestCase):
             script += "else:\n    print('Q1 RETIRED 15',flush=True)\n"
             helper.write_text(script)
             helper.chmod(0o700)
+            ports.enter_context(controlled_query_ports(helper, (("permission-observation", "19"),)))
             query = PermissionQuery(
                 helper, types.SimpleNamespace(OwnedProcessGroup=ControlledGroup), object()
             )
@@ -334,7 +337,7 @@ class PermissionMainAdmissionControls(unittest.TestCase):
         import io
         import os
         import run_signed_query_probe as probe
-        from test_signed_query_probe import ControlledGroup
+        from test_signed_query_probe import ControlledGroup, controlled_query_ports
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -371,7 +374,11 @@ class PermissionMainAdmissionControls(unittest.TestCase):
             helper = app / "Contents/MacOS/ErgoptiAutomationQuery"
             helper.parent.mkdir(parents=True)
             script = (
-                "#!" + sys.executable + "\nimport base64,json,sys\nprint('Q1 HELD',flush=True)\n"
+                "#!"
+                + sys.executable
+                + "\nimport base64,json,sys\n"
+                + "if sys.platform == 'win32': sys.stdout.reconfigure(newline='\\n')\n"
+                + "print('Q1 HELD',flush=True)\n"
             )
             script += "command=sys.stdin.readline()\nif command == 'ACTIVATE\\n':\n"
             script += (
@@ -454,6 +461,9 @@ class PermissionMainAdmissionControls(unittest.TestCase):
                 patch.object(
                     probe, "load_permission_query", wraps=probe.load_permission_query
                 ) as load,
+                controlled_query_ports(
+                    helper, (("discover", "1"), ("permission-observation", "3"))
+                ),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
                 result = probe.main()
