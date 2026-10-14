@@ -23,6 +23,7 @@ _LNTR_WithState(Fn) {
 		_LLM_NavEventOwnerTerminalRouteModels, _LLM_NavEventOwnerTerminalRouteCoverage,
 		_LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteOwner,
 		_LLM_NavEventOwnerTerminalRouteUnknown]
+	Primary := 0, CleanupFailure := 0
 	try {
 		_LLM_NavEventOwnerTerminalRouteGeneration := 0
 		_LLM_NavEventOwnerTerminalRouteNextRecipe := 0
@@ -33,7 +34,24 @@ _LNTR_WithState(Fn) {
 		_LLM_NavEventOwnerTerminalRouteUnknown := 0
 		_LNTR_LoadFixture("a")
 		Fn()
+	} catch as Err {
+		Primary := Err
+		throw Err
 	} finally {
+		; Public fixture restoration cannot release a private source lease. Stop
+		; through the original protocol before returning the borrowed globals.
+		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown) {
+			try {
+				AssertTrue(LLM_NavEventOwner_Stop(), "owned metadata fixture cleanup must acknowledge Stop")
+				AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
+			} catch as Err {
+				CleanupFailure := Err
+				if IsObject(Primary) {
+					Primary.MetadataCleanupError := Err
+					Primary.Message .= "; metadata fixture cleanup failed: " . Err.Message
+				}
+			}
+		}
 		KLE_Model := Saved[1], KLE_Id := Saved[2], KLE_KeyCodes := Saved[3]
 		KLE_LevelIndex := Saved[4], KLE_State := Saved[5]
 		_LLM_NavEventOwnerTerminalRouteGeneration := Saved[6]
@@ -45,6 +63,8 @@ _LNTR_WithState(Fn) {
 		_LLM_NavEventOwnerTerminalRouteRefreshing := Saved[12]
 		_LLM_NavEventOwnerTerminalRouteOwner := Saved[13]
 		_LLM_NavEventOwnerTerminalRouteUnknown := Saved[14]
+		if IsObject(CleanupFailure) && !IsObject(Primary)
+			throw CleanupFailure
 	}
 }
 
@@ -1166,7 +1186,137 @@ _LNTR_GenuineMissingPublicationCase() {
 	}
 }
 
+; Genuine module custody before default registration; no hook or output.
+_LNTR_GenuinePreRegistrationWithdrawalCase(Phase) {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteUnknown
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteCoverage, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerTerminalRouteRefreshing
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerStarting, KLE_Model
+	AssertTrue(Phase == "source-get" || Phase == "source" || Phase == "builder"
+		|| Phase == "builder-capture" || Phase == "builder-recipe")
+	AssertEqual(0, _LLM_NavEventOwnerModule)
+	AssertEqual(0, _LLM_NavEventOwnerPort)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteGeneration)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
+	AssertFalse(_LLM_NavEventOwnerStarted || _LLM_NavEventOwnerStarting)
+	OriginalRecipes := _LLM_NavEventOwnerTerminalRouteRecipes
+	OriginalModels := _LLM_NavEventOwnerTerminalRouteModels
+	Epoch := _LLM_NavEventOwnerRuntimeEpoch
+	_LNTR_LoadFixture("a")
+	AssertTrue(_LLM_NavEventOwnerNativeEnsureLoaded())
+	Module := _LLM_NavEventOwnerModule, Exports := _LLM_NavEventOwnerExports
+	AssertEqual(8, _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
+		_LLM_NavEventOwnerTerminalRouteOwner, Buffer(512, 0), 64)["status"])
+	State := {Caps: 0}, SourceCalls := 0, BuilderCalls := 0, LookupCalls := 0
+	CaptureCalls := 0, RecipeCalls := 0, ForeignRecipes := 0
+	ActualCapture := KeylayoutEmulation_CaptureReplayRoute
+	Port := Map("terminal_route_source", Source)
+	if Phase == "source-get"
+		Port.DefineProp("Get", {Call: SourceGet})
+	Primary := 0, CleanupError := 0, Stopped := false
+	try {
+		AssertThrows(LLM_NavEventOwner_RefreshTerminalRoutes.Bind(Port))
+		AssertEqual(Phase == "source-get" ? 1 : 0, LookupCalls)
+		AssertEqual(Phase == "source-get" ? 0 : 1, SourceCalls)
+		AssertEqual(InStr(Phase, "builder") == 1 ? 1 : 0, BuilderCalls)
+		AssertEqual(Phase == "builder-capture" || Phase == "builder-recipe" ? 1 : 0, CaptureCalls)
+		AssertEqual(Phase == "builder-recipe" ? 1 : 0, RecipeCalls)
+		Frame := _LLM_NavEventOwnerTerminalRouteUnknown
+		AssertTrue(Frame is Map, "the original source/build frame remains retained")
+		AssertFalse(Frame["native_attempted"], "no default registration boundary was entered")
+		AssertTrue(Frame["recipes"] == OriginalRecipes && Frame["models"] == OriginalModels)
+		AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes == ForeignRecipes)
+		AssertFalse(_LLM_NavEventOwnerTerminalRouteRefreshing)
+		AssertEqual(Epoch, _LLM_NavEventOwnerRuntimeEpoch)
+		AssertEqual(8, _LLM_NavEventOwnerNativeListTerminalHeldRecipes(
+			_LLM_NavEventOwnerTerminalRouteOwner, Buffer(512, 0), 64)["status"],
+			"real C still has no registration owner after the source/build refusal")
+		RecipeImage := OriginalRecipes.Clone(), ModelImage := OriginalModels.Clone()
+		ForeignImage := ForeignRecipes.Clone(), ModelFields := Map()
+		for Id, Identity in OriginalModels
+			ModelFields[Id] := Identity.Clone()
+		Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+		NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe
+		NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
+	} catch as Err {
+		Primary := Err
+	} finally {
+		try Stopped := LLM_NavEventOwner_Stop()
+		catch as Err {
+			CleanupError := Err
+		}
+	}
+	if IsObject(Primary)
+		throw Primary
+	if IsObject(CleanupError)
+		throw CleanupError
+	AssertTrue(Stopped, "actual default Stop acknowledges the child-owned cleanup")
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown,
+		"pre-registration cleanup must release retained publication")
+	AssertEqual(Epoch + 1, _LLM_NavEventOwnerRuntimeEpoch)
+	AssertEqual(Generation, _LLM_NavEventOwnerTerminalRouteGeneration)
+	AssertEqual(NextRecipe, _LLM_NavEventOwnerTerminalRouteNextRecipe)
+	AssertEqual(NextLayout, _LLM_NavEventOwnerTerminalRouteNextLayout)
+	AssertTrue(_LLM_NavEventOwnerModule == Module && _LLM_NavEventOwnerExports == Exports)
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes == ForeignRecipes)
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteModels == OriginalModels)
+	_LNTR_GenuineAssertMapImage(OriginalRecipes, RecipeImage, "original recipe holder cells survive")
+	_LNTR_GenuineAssertMapImage(OriginalModels, ModelImage, "original model holder cells survive")
+	_LNTR_GenuineAssertMapImage(ForeignRecipes, ForeignImage, "foreign recipe holder cells survive")
+	for Id, Identity in OriginalModels
+		_LNTR_GenuineAssertMapImage(Identity, ModelFields[Id], "partial builder model fields survive")
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteCoverage["registered"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["cohort_complete"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["transformed_output_enabled"])
+	AssertFalse(_LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending)
+	Source() {
+		SourceCalls += 1
+		Value := _LNTR_Source(State)
+		if Phase == "source"
+			Withdraw()
+		Value["eligible"] := Eligible
+		if Phase == "builder-capture" || Phase == "builder-recipe"
+			Value["capture"] := Capture
+		return Value
+	}
+	SourceGet(*) {
+		LookupCalls += 1
+		Withdraw()
+	}
+	Eligible(*) {
+		BuilderCalls += 1
+		if Phase == "builder"
+			Withdraw()
+		return true
+	}
+	Capture(Args*) {
+		CaptureCalls += 1
+		Value := ActualCapture.Call(Args*)
+		AssertTrue(Value is Map && Value.Get("model", 0) == KLE_Model,
+			"the original production capture issues the actual KLE recipe")
+		if Phase == "builder-capture"
+			Withdraw()
+		Value.DefineProp("__Item", {Get: RecipeGet})
+		return Value
+	}
+	RecipeGet(*) {
+		RecipeCalls += 1
+		Withdraw()
+	}
+	Withdraw() {
+		ForeignRecipes := _LLM_NavEventOwnerTerminalRouteRecipes.Clone()
+		_LLM_NavEventOwnerTerminalRouteRecipes := ForeignRecipes
+		throw Error("owned " . Phase . " withdrawal before any default C registration")
+	}
+}
+
 _LNTR_GenuineNegativeCase(CaseName) {
+	if SubStr(CaseName, 1, 7) == "prereg-"
+		return _LNTR_GenuinePreRegistrationWithdrawalCase(SubStr(CaseName, 8))
 	if CaseName == "missing-publication"
 		return _LNTR_GenuineMissingPublicationCase()
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _LLM_NavEventOwnerPort
@@ -1406,7 +1556,8 @@ if _LNTR_NativeRetirementChildKind == "positive" {
 } else {
 	Test("terminal-native-retirement: actual same-owner C Stop in a distinct child", _LNTR_ReceiveActualChild)
 	for CaseName in ["custom-true", "custom-map", "module-zero", "module-load", "exports-clone",
-		"exports-pointer", "exports-facade", "epoch", "lower-counter", "unknown-before-get", "unknown-report", "missing-publication"]
+		"exports-pointer", "exports-facade", "epoch", "lower-counter", "unknown-before-get", "unknown-report", "missing-publication",
+		"prereg-source-get", "prereg-source", "prereg-builder", "prereg-builder-capture", "prereg-builder-recipe"]
 		Test("terminal-native-retirement: authority refusal in distinct child " . CaseName,
 			_LNTR_ReceiveActualChild.Bind(CaseName))
 }

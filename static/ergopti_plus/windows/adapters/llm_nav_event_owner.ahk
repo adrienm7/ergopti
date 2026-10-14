@@ -448,7 +448,8 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false, ForceLifecycleReset := fal
 				if !StopScope["accept"].Call()
 					throw Error("Genuine retained registration requires an actual native stop receipt.")
 				GuardScope()
-				StopScope["settle"].Call()
+				if !StopScope["settle"].Call()
+					throw Error("The retained terminal source could not be retired.")
 			} catch as Err {
 				_LLM_NavEventOwnerReport(_LLM_NavEventOwnerStopExceptionDetail(Err))
 				return false
@@ -2364,6 +2365,7 @@ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 
 	RetainUnknown() {
 		; Retention is mandatory cleanup, not native admission. Skip foreign own.Call.
+		Func.Prototype.Call.Call(OriginalLoader, "retain_frame", Frame)
 		Func.Prototype.Call.Call(OriginalUnknown, Frame)
 	}
 
@@ -3778,6 +3780,27 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			&& State.Exports == IssuedExports && EpochCurrent(State.Epoch) && CountersCurrent(State)
 	}
 
+	RequiresNativeReceipt(State) {
+		return State.Genuine || State.Module > 0 || IssuedModule > 0
+	}
+
+	FrameCustodyCurrent(State) {
+		if !IsObject(State)
+			return false
+		; Unissued controlled ports own no C lifetime. Their validated Stop ACK
+		; retires local references even after a source invalidated its old epoch.
+		if !RequiresNativeReceipt(State)
+			return State.Module is Integer && State.Module == 0
+				&& State.Exports is Integer && State.Exports == 0
+		if !EpochCurrent(State.Epoch) || !CountersCurrent(State)
+			return false
+		if State.Genuine
+			return FrameNativeCurrent(State)
+		return State.Module is Integer && State.Module >= 0
+			&& (State.Module == 0 ? State.Exports is Integer && State.Exports == 0
+				: ExportsCurrent() && State.Module == IssuedModule && State.Exports == IssuedExports)
+	}
+
 	ScopeCurrent(Operations) {
 		if !PlainMap(Operations) || !Scopes.Has(Operations)
 			return false
@@ -3807,10 +3830,12 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
 			if !OwnersCurrent() || !PlainMap(Frame) || !EpochCurrent(_LLM_NavEventOwnerRuntimeEpoch)
 				throw Error("The original registration capture is invalid.")
+			CapturedNative := ExportsCurrent()
 			State := {Frame: Frame, Epoch: _LLM_NavEventOwnerRuntimeEpoch,
 				Recipes: Frame["recipes"], Models: Frame["models"], Mode: "unselected",
-				Genuine: false, Completed: false, Raw: "unobserved", Closed: false, Operations: 0,
-				Module: 0, Exports: 0, Generation: 0, NextRecipe: 0, NextLayout: 1}
+				Genuine: false, Uncertain: false, Completed: false, Raw: "unobserved", Closed: false, Operations: 0,
+				Module: CapturedNative ? IssuedModule : 0, Exports: CapturedNative ? IssuedExports : 0,
+				Generation: Frame["generation"], NextRecipe: Frame["next_recipe"], NextLayout: Frame["next_layout"]}
 			Operations := Map("frame", Frame, "guard", GuardFrame, "custom", CustomRegistration,
 				"native", NativeRegistration, "complete", CompleteFrame, "close", CloseFrame)
 			Image := Operations.Clone()
@@ -3887,7 +3912,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 				throw Error("The original registration scope cannot close twice.")
 			State.Closed := true
 			; Failed publication is still custody: absence of global Unknown is no ACK.
-			if State.Genuine && !State.Completed && !KnownRefusal()
+			if !State.Completed && (State.Uncertain || (State.Genuine && !KnownRefusal()))
 				RetainedFrame := State
 			ActiveFrame := 0
 			Scopes.Delete(State.Operations)
@@ -3904,7 +3929,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			Epoch: _LLM_NavEventOwnerRuntimeEpoch, Mode: "unselected",
 			Called: false, Raw: "unobserved", Genuine: false, Module: 0, Exports: 0,
 			Closed: false, Operations: 0, State: RetainedFrame}
-		if IsObject(RetainedFrame) && RetainedFrame.Genuine && Snapshot is Integer && Snapshot == 0 {
+		if IsObject(RetainedFrame) && Snapshot is Integer && Snapshot == 0 {
 			; The real Frame remains private even if its public publication failed.
 			Ticket.Frame := RetainedFrame.Frame, Ticket.Missing := true
 		}
@@ -3946,9 +3971,9 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			if IssuedModule && !ExportsCurrent()
 				throw Error("The issued native stop export image was withdrawn.")
 			Ticket.Genuine := ExportsCurrent()
-			if IsObject(Ticket.State) && Ticket.State.Genuine
+			if IsObject(Ticket.State)
 					&& (RetainedFrame != Ticket.State || Ticket.State.Frame != Ticket.Frame
-						|| !FrameNativeCurrent(Ticket.State))
+						|| !FrameCustodyCurrent(Ticket.State))
 				throw Error("The retained native registration lifetime changed.")
 			if Ticket.Genuine {
 				Ticket.Module := IssuedModule, Ticket.Exports := IssuedExports
@@ -3977,24 +4002,24 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			if !A_IsCritical || !_LLM_NavEventOwnerStopping || _LLM_NavEventOwnerTerminalRouteRefreshing
 				return false
 			State := Ticket.State
-			if !IsObject(State) || !State.Genuine
-				return true
-			return ReceiptCurrent() && RetainedFrame == State && State.Frame == Ticket.Frame
-				&& UnknownCurrent() && FrameNativeCurrent(State)
+			if !IsObject(State)
+				return !IsObject(Ticket.Frame) && UnknownCurrent() && EpochCurrent(Ticket.Epoch)
+			return RetainedFrame == State && State.Frame == Ticket.Frame
+				&& UnknownCurrent() && FrameCustodyCurrent(State) && EpochCurrent(Ticket.Epoch)
+				&& (!RequiresNativeReceipt(State) || ReceiptCurrent())
 		}
 
 		SettleStop() {
 			GuardStop()
-			if !ReceiptCurrent()
+			if !AcceptTeardown()
 				return false
+			State := Ticket.State
+			if !IsObject(State)
+				return true
 			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
 				"generation", 0, "layout_id", 0, "registered", 0,
 				"cohort_complete", false, "transformed_output_enabled", false,
 				"unconverted", ["native terminal owner retired"])
-			State := Ticket.State
-			if !IsObject(State) || RetainedFrame != State || State.Frame != Ticket.Frame
-					|| !UnknownCurrent() || !FrameNativeCurrent(State)
-				return false
 			if _LLM_NavEventOwnerTerminalRouteRecipes == State.Recipes
 				_LLM_NavEventOwnerTerminalRouteRecipes := Map()
 			if _LLM_NavEventOwnerTerminalRouteModels == State.Models
@@ -4013,6 +4038,14 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			Scopes.Delete(Ticket.Operations)
 			Ticket.Operations := 0, Ticket.Frame := 0, Ticket.State := 0
 		}
+	}
+
+	; Retention grants no native authority and survives a withdrawn callable.
+	if Request == "retain_frame" {
+		if !IsObject(ActiveFrame) || ActiveFrame.Closed || ActiveFrame.Frame != Payload
+			return false
+		ActiveFrame.Uncertain := true
+		return true
 	}
 
 	; Cleanup uses only an issued scope identity and its private original closure.
