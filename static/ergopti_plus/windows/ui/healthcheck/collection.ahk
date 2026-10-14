@@ -35,12 +35,12 @@ class DiagnosticCollectionWindows {
 		this.ContractPath := _SharedDir . "\modules\diagnostics\collection.json"
 		if FileGetSize(this.ContractPath) > 262144
 			throw Error("Diagnostic collection contract exceeded its bound.")
-		this.Contract := JsonParse(FileRead(this.ContractPath, "UTF-8"))
+		this.Contract := JsonParse(FSReadStrict(this.ContractPath))
 		if this.Contract.Get("schema_version", 0) != 1
 			throw Error("Unsupported diagnostic collection contract.")
 		this.Worker := _VendorDir . "\ergopti_diagnostics.ps1"
 		Id := Buffer(16, 0)
-		if DllCall("Ole32\CoCreateGuid", "Ptr", Id, "Int") != 0
+		if PLC_CreateGuid(Id) != 0
 			throw Error("Diagnostic session identity allocation failed.")
 		Hex := ""
 		loop Id.Size
@@ -113,10 +113,7 @@ class DiagnosticCollectionWindows {
 		if StrPut(Text, "UTF-8") - 1 > this.Contract["max_output_bytes"]
 			throw Error("Diagnostic control payload exceeded its contract.")
 		Path := this.Directory . "\" . Name
-		File := FileOpen(Path . ".tmp", "w", "UTF-8-RAW")
-		try File.Write(Text . "`n")
-		finally File.Close()
-		FileMove(Path . ".tmp", Path, true)
+		FSWriteUtf8ReplaceStrict(Path, Text . "`n")
 	}
 
 	Tick(*) {
@@ -141,7 +138,7 @@ class DiagnosticCollectionWindows {
 			try {
 				if FileGetSize(Path) > this.Contract["max_output_bytes"]
 					throw Error("Diagnostic progress payload exceeded its contract.")
-				Raw := FileRead(Path, "UTF-8")
+				Raw := FSReadStrict(Path)
 				Reading := false
 				Value := JsonParse(Raw)
 				if !(Value is Map) || Value.Get("session_id", "") != this.Id || Value.Get("schema_version", 0) != 1
@@ -239,7 +236,7 @@ class DiagnosticCollectionWindows {
 					&& Ack.Get("bytes", 0) <= this.Contract["max_archive_bytes"] && RegExMatch(Ack.Get("sha256", ""), "^[0-9a-f]{64}$")
 					&& FileExist(this.Archive) && FileGetSize(this.Archive) == Ack["bytes"]
 				if Committed
-					Committed := CryptoSha256Bytes(FileRead(this.Archive, "RAW")) == Ack["sha256"]
+					Committed := CryptoSha256Bytes(FSReadBytesStrict(this.Archive)) == Ack["sha256"]
 				if Committed
 					this.ArchiveDigest := Ack["sha256"]
 			} catch as Err {
@@ -256,7 +253,7 @@ class DiagnosticCollectionWindows {
 			try {
 				if FileGetSize(Path) > this.Contract["max_output_bytes"]
 					throw Error("Diagnostic archive error exceeded its bound.")
-				Failure := JsonParse(FileRead(Path, "UTF-8"))
+				Failure := JsonParse(FSReadStrict(Path))
 				if Failure is Map && Failure.Get("session_id", "") == this.Id && Failure.Get("reason", "") == "archive_creation_failed"
 					this.Result["partial_retained"] := Failure.Get("partial_retained", false) == true
 			} catch as Err {
@@ -315,7 +312,7 @@ class DiagnosticCollectionWindows {
 		if !FileExist(this.Archive)
 			return false
 		if FileGetSize(this.Archive) > this.Contract["max_archive_bytes"]
-				|| CryptoSha256Bytes(FileRead(this.Archive, "RAW")) != this.ArchiveDigest {
+				|| CryptoSha256Bytes(FSReadBytesStrict(this.Archive)) != this.ArchiveDigest {
 			LoggerError("DiagnosticsCollection", "Diagnostic archive changed after committed collection.")
 			return false
 		}
