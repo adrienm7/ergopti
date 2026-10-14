@@ -1117,7 +1117,58 @@ _LNTR_GenuineNegativeNoTeardown(Context, AttemptPort, ExpectedEpoch, ExpectedNex
 	AssertFalse(_LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending)
 }
 
+; Private no-hook receiving: absence of the public frame is never a stop ACK.
+_LNTR_GenuineMissingPublicationCase() {
+	global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerTerminalRouteModels, _LLM_NavEventOwnerTerminalRouteRecipes
+	global _LLM_NavEventOwnerTerminalRouteCoverage, _LLM_NavEventOwnerRuntimeEpoch
+	Context := _LNTR_GenuineNegativeSetup()
+	OriginalRecipes := Context.Frame["recipes"], OriginalModels := Context.Frame["models"]
+	RecipeImage := OriginalRecipes.Clone(), ModelImage := OriginalModels.Clone()
+	ForeignImage := Context.Recipes.Clone()
+	FakeCalls := 0, Primary := 0, CleanupError := 0
+	Port := Map("stop", FakeStop)
+	try {
+		_LLM_NavEventOwnerTerminalRouteUnknown := 0
+		_LLM_NavEventOwnerPort := Port
+		AssertFalse(LLM_NavEventOwner_Stop(), "missing publication still requires a genuine native stop")
+		AssertEqual(1, FakeCalls, "the custom protocol runs but cannot discharge private native debt")
+		_LNTR_GenuineNegativeNoTeardown(Context, Port, Context.Epoch, Context.NextRecipe, 0)
+	} catch as Err {
+		Primary := Err
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		try {
+			if !IsObject(Primary)
+				AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown, "cleanup must not reconstruct public authority")
+			AssertTrue(LLM_NavEventOwner_Stop(), "the actual default same-module stop retires private custody")
+		} catch as Err {
+			CleanupError := Err
+		}
+	}
+	if IsObject(Primary)
+		throw Primary
+	if IsObject(CleanupError)
+		throw CleanupError
+	AssertEqual(Context.Epoch + 1, _LLM_NavEventOwnerRuntimeEpoch)
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteModels == OriginalModels, "real stop detaches the original model holder")
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes == Context.Recipes, "foreign recipe holder remains current")
+	_LNTR_GenuineAssertMapImage(OriginalRecipes, RecipeImage, "original recipe cells remain untouched")
+	_LNTR_GenuineAssertMapImage(OriginalModels, ModelImage, "original model cells remain untouched")
+	_LNTR_GenuineAssertMapImage(Context.Recipes, ForeignImage, "foreign recipe cells remain untouched")
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteCoverage["registered"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["cohort_complete"])
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteCoverage["transformed_output_enabled"])
+	FakeStop() {
+		FakeCalls += 1
+		return Map("stopped", true)
+	}
+}
+
 _LNTR_GenuineNegativeCase(CaseName) {
+	if CaseName == "missing-publication"
+		return _LNTR_GenuineMissingPublicationCase()
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _LLM_NavEventOwnerPort
 	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerTerminalRouteNextRecipe
 	global _LLM_NavEventOwnerTerminalRouteUnknown, _LLM_NavEventOwnerTerminalRouteCoverage
@@ -1355,7 +1406,7 @@ if _LNTR_NativeRetirementChildKind == "positive" {
 } else {
 	Test("terminal-native-retirement: actual same-owner C Stop in a distinct child", _LNTR_ReceiveActualChild)
 	for CaseName in ["custom-true", "custom-map", "module-zero", "module-load", "exports-clone",
-		"exports-pointer", "exports-facade", "epoch", "lower-counter", "unknown-before-get", "unknown-report"]
+		"exports-pointer", "exports-facade", "epoch", "lower-counter", "unknown-before-get", "unknown-report", "missing-publication"]
 		Test("terminal-native-retirement: authority refusal in distinct child " . CaseName,
 			_LNTR_ReceiveActualChild.Bind(CaseName))
 }
