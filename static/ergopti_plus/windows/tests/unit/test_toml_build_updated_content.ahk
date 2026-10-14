@@ -532,8 +532,15 @@ _TBUI_ConfigDocumentVectors() {
 _TBUI_ConfigDocumentVector(Vector) {
 	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
 	Expected := Chr(0xFEFF) . Vector.Expected
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+			"the native boot owner must admit the independent current fixture")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source),
+			"current-schema admission preserves every independent source byte")
 		Cached := ParseTomlFile(Path)
 		Candidate := TOML_BuildConfigUpdatedContent(Path, Vector.Updates)
 		AssertEqual("ok", Candidate["status"], Vector.Id)
@@ -573,8 +580,15 @@ _TBUI_ConfigSourceMutationRefuses() {
 	for BuildOnly in [true, false] {
 		Path := _TBUI_NewPath(), Original := Chr(0xFEFF) . 'layout.ergopti_base = false`n'
 		Foreign := Chr(0xFEFF) . 'layout.ergopti_base = false`nfuture.source = "concurrent"`n'
+		Original := _CMJFixtureCurrentSource(Original)
+		Foreign := _CMJFixtureCurrentSource(Foreign)
 		try {
 			AssertTrue(FSWriteCreateDurable(Path, Original) == 1)
+			AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+				"the native boot owner must admit the independent current fixture")
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+			AssertTrue(FSUtf8ExactMatches(Path, Original),
+				"current-schema admission preserves every independent source byte")
 			Value := _TBUI_SourceMutatingBoolean(Path, Foreign)
 			Updates := [{ Section: "layout", Key: "ergopti_base", Value: Value }]
 			if BuildOnly
@@ -606,8 +620,14 @@ Test("toml config document writer: duplicate semantic sources refuse", _TBUI_Con
 _TBUI_ConfigNoOpRetainsOwnedComments() {
 	Path := _TBUI_NewPath()
 	Source := Chr(0xFEFF) . '# user heading`n[layout] # layout owner`nergopti_base = true # owned preference`nfuture = "001" # future record`n'
+	Source := _CMJFixtureCurrentSource(Source)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+			"the native boot owner must admit the independent current fixture")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source),
+			"current-schema admission preserves every independent source byte")
 		Updates := [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(true) }]
 		Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
 		AssertEqual("ok", Candidate["status"])
@@ -622,8 +642,15 @@ _TBUI_ConfigExplicitNamespaceReplacement() {
 	Path := _TBUI_NewPath()
 	Source := Chr(0xFEFF) . '# source anchor`nhotstrings.modules.magickey = true`n[future]`nold = "001" # retained`n'
 	Expected := Chr(0xFEFF) . '# source anchor`n[future]`nold = "001" # retained`n[hotstrings.modules.magickey]`nenabled = false`n'
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+			"the native boot owner must admit the independent current fixture")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source),
+			"current-schema admission preserves every independent source byte")
 		Updates := [{ Section: "hotstrings.modules.magickey", Key: "enabled", Value: TOML_Bool(false) }]
 		Prefixes := ["hotstrings.modules.magickey"]
 		AssertEqual("error", TOML_BuildConfigUpdatedContent(Path, Updates)["status"], "an ordinary save retains the obsolete scalar")
@@ -642,8 +669,15 @@ _TBUI_ConfigGatewayUsesSemanticWriter() {
 	HadPath := IsSet(ConfigurationFile), PreviousPath := HadPath ? ConfigurationFile : ""
 	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . 'layout.ergopti_base = true`nfuture.version = "001" # retained`n'
 	Expected := Chr(0xFEFF) . 'layout.ergopti_base = false`nfuture.version = "001" # retained`n'
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+			"the native boot owner must admit the independent current fixture")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source),
+			"current-schema admission preserves every independent source byte")
 		ConfigurationFile := Path
 		Updates := [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }]
 		AssertTrue(ConfigCommitUpdates(Path, Updates, "semantic config gateway fixture", 0, (*) => 0),
@@ -699,7 +733,8 @@ _TBUI_ConfigInlineFullSaveAdmission(Path) {
 	}
 }
 _TBUI_ConfigInlineFullSaveAdmissionProbe() {
-	_FMS_WithSource("config_writer_inline_admission", '_meta.schema_version = 11`n[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
+	_FMS_WithSource("config_writer_inline_admission",
+		_CMJFixtureCurrentSource('[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n'),
 		_TBUI_ConfigInlineFullSaveAdmission)
 }
 Test("toml config document writer: native full-save probe retains strict refusal and observes exact semantic no-op", _TBUI_ConfigInlineFullSaveAdmissionProbe)
@@ -713,8 +748,15 @@ _TBUI_ConfigNewSiblingRetainsNativeReadability() {
 		Source := Chr(0xFEFF) . "[" . Parent . ".first]`nenabled = false # keep first`n"
 			. '[private]`nfuture = "keep" # exact neighbor`n'
 		Expected := Source . "[" . Parent . ".second]`nenabled = true`n"
+		Source := _CMJFixtureCurrentSource(Source)
+		Expected := _CMJFixtureCurrentSource(Expected)
 		try {
 			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+				"the native boot owner must admit the independent current fixture")
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+			AssertTrue(FSUtf8ExactMatches(Path, Source),
+				"current-schema admission preserves every independent source byte")
 			Cached := ParseTomlFile(Path)
 			Updates := [{ Section: Parent . ".second", Key: "enabled", Value: TOML_Bool(true) }]
 			Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
@@ -743,8 +785,15 @@ _TBUI_ConfigNewNamespaceRetainsNativeReadability() {
 		for Prefix in ["", '[private]`nfuture = "keep" # retained`n'] {
 			Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Prefix
 			Expected := Source . "[" . Section . "]`nenabled = false`n"
+			Source := _CMJFixtureCurrentSource(Source)
+			Expected := _CMJFixtureCurrentSource(Expected)
 			try {
 				AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+				AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+					"the native boot owner must admit the independent current fixture")
+				AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+				AssertTrue(FSUtf8ExactMatches(Path, Source),
+					"current-schema admission preserves every independent source byte")
 				Updates := [{ Section: Section, Key: "enabled", Value: TOML_Bool(false) }]
 				Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
 				AssertEqual("ok", Candidate["status"])
@@ -770,8 +819,15 @@ _TBUI_ConfigReplacedNamespaceRetainsNativeReadability() {
 		Path := _TBUI_NewPath()
 		Source := Chr(0xFEFF) . "# source anchor`n" . OwnedSource . '[private]`nfuture = "keep" # retained`n'
 		Expected := Chr(0xFEFF) . '# source anchor`n[private]`nfuture = "keep" # retained`n[script]`nlog_level = "ERROR"`n'
+		Source := _CMJFixtureCurrentSource(Source)
+		Expected := _CMJFixtureCurrentSource(Expected)
 		try {
 			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+				"the native boot owner must admit the independent current fixture")
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+			AssertTrue(FSUtf8ExactMatches(Path, Source),
+				"current-schema admission preserves every independent source byte")
 			Updates := [{ Section: "script", Key: "log_level", Value: "ERROR" }]
 			Prefixes := ["script"]
 			Candidate := TOML_BuildConfigUpdatedContent(Path, Updates, Prefixes)
@@ -865,8 +921,15 @@ _TBUI_ConfigInlineSpanVectors() {
 _TBUI_ConfigInlineSpanVector(Vector) {
 	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
 	Expected := Chr(0xFEFF) . Vector.Expected
+	Source := _CMJFixtureCurrentSource(Source)
+	Expected := _CMJFixtureCurrentSource(Expected)
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"],
+			"the native boot owner must admit the independent current fixture")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source),
+			"current-schema admission preserves every independent source byte")
 		FileSetTime("20000101000000", Path, "M")
 		BeforeTime := FileGetTime(Path, "M")
 		Cached := ParseTomlFile(Path)
@@ -1307,3 +1370,37 @@ _TBUI_CommentEmbeddedNulBoundary() {
 }
 Test("toml canonical lexer: comment search retains the physical LF beyond embedded NUL",
 	_TBUI_CommentEmbeddedNulBoundary)
+
+
+; A current stamp and readonly preparation do not replace the actual boot owner.
+_TBUI_CurrentFixtureRequiresRealBootAdmission() {
+	Path := _TBUI_NewPath()
+	Source := _CMJFixtureCurrentSource(Chr(0xFEFF) . 'layout.ergopti_base = true`nfuture.value = "001" # retained`n')
+	Expected := _CMJFixtureCurrentSource(Chr(0xFEFF) . 'layout.ergopti_base = false`nfuture.value = "001" # retained`n')
+	Updates := [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }]
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		Prepared := ConfigSchemaPrepareSource(Path)
+		AssertTrue(Prepared is Map, "the real source preparation must produce its readonly receipt")
+		AssertEqual("current", Prepared["status"])
+		AssertEqual(1, Prepared["read_only"])
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "readonly source preparation grants no write admission")
+		AssertFalse(TOML_ConfigBatchWrite(Path, Updates), "even a current stamp cannot bypass real boot")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		Stages := 0
+		Loop Files, Path . ".*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		AssertTrue(TOML_ConfigBatchWrite(Path, Updates) == 1)
+		AssertTrue(FSUtf8ExactMatches(Path, Expected), "only the actual admitted publisher changes the owned leaf")
+		Stages := 0
+		Loop Files, Path . ".*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages, "acknowledged publication must retire every owned stage")
+	} finally FSDelete(Path)
+}
+Test("toml config document writer: current source preparation requires real boot admission",
+	_TBUI_CurrentFixtureRequiresRealBootAdmission)

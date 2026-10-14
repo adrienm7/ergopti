@@ -640,6 +640,12 @@ _LSP_Creation(World) {
 	for Entry in _LLM_Menu["api_entries"]
 		Entry["Provider"] := "openai"
 	World.ApiImage := StrReplace(World.ApiImage, '"Provider":"lmstudio"', '"Provider":"openai"')
+	; A generic OpenAI row at the canonical URL is a valid local-server alias.
+	; Proved absence needs a nonmatching path in both RAM and durable source.
+	_LLM_Menu["api_entries"][1]["BaseUrl"] := "http://127.0.0.1:1234/independent"
+	World.ApiImage := StrReplace(World.ApiImage, '"BaseUrl":"http://127.0.0.1:1234/v1"',
+		'"BaseUrl":"http://127.0.0.1:1234/independent"', , &ChangedUrls, 1)
+	AssertEqual(1, ChangedUrls, "the independent durable row must match its RAM premise")
 	AssertTrue(FSWriteDurable(World.ApiPath, World.ApiImage))
 	World.Capture()
 	AssertFalse(World.Owner.Entry("lmstudio"))
