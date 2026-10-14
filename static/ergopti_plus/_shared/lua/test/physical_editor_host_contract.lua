@@ -30,7 +30,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 		local old=epoch;eq(backend.on_message({action='close'},{},{app_name='physical_shortcuts',epoch=old}),true,'Linux exact epoch closes')
 		eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'Linux successor opens after native close')
 		backend.on_window_closed(old);eq(backend.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=epoch}),true,'Old native close cannot clear successor')
-		old=epoch;backend.on_window_closed(old);epoch=0;eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'GTK close also retires session')
+		old=epoch;epoch=0;backend.on_window_closed(old);eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'GTK close also retires session')
 	else
 		-- Macro host controlled ports. These are tables, not native userdata qualification.
 		local callback,picker,lastjs,backend

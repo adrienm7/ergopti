@@ -267,7 +267,7 @@ local run_contract = function(helpers,load_manager,load_host)
       package.loaded['modules.gestures.manager']={}
       package.loaded['shortcuts.physical_editor_window']={new=function(options)
        local closed=false
-       return{retire=function()closed=true;retired=retired+1 end,receive=function()if closed or options.page_current()~=true then return false end;received=received+1;return true end}
+       return{retire=function()closed=true;retired=retired+1;return true end,receive=function()if closed or options.page_current()~=true then return false end;received=received+1;return true end}
       end}
       local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
       local options={scope={capture_editor_inventory=function()end,editor_source_current=function()end,edit=function()end,physical_delivery_available=function()return true end},is_paused=function()return false end}
@@ -291,7 +291,7 @@ local run_contract = function(helpers,load_manager,load_host)
      package.loaded['shortcuts.physical_slots']={new=function()return{candidates=function()return{}end}end}
      package.loaded['infra.paths']={shared=function()return helpers.driver_root() .. '/../_shared/data/keycodes/physical_keys.json'end}
      package.loaded['modules.gestures.manager']={}
-     package.loaded['shortcuts.physical_editor_window']={new=function(options)return{retire=function()end,receive=function()helpers.assert_eq(options.page_current(),true);received=received+1;return true end}end}
+     package.loaded['shortcuts.physical_editor_window']={new=function(options)return{retire=function()return true end,receive=function()helpers.assert_eq(options.page_current(),true);received=received+1;return true end}end}
      local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
      local options={scope={capture_editor_inventory=function()end,editor_source_current=function()end,edit=function()end,physical_delivery_available=function()return true end},is_paused=function()return false end}
      c.present=function()

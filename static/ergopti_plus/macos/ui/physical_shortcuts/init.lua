@@ -44,6 +44,11 @@ local function close(candidate)
 	if active ~= candidate or candidate.closing or candidate.constructing then return false end
 	candidate.closing = true
 	candidate.cancelled = true
+	if candidate.retire_observation and candidate.retire_observation() ~= true then
+		candidate.closing = false
+		Logger.error("ui.physical_shortcuts", "Physical position cancellation refused; exact owner retained.")
+		return false
+	end
 	if candidate.window then
 		local retired, acknowledged = pcall(candidate.window.retire)
 		if not retired or acknowledged ~= true then
@@ -95,9 +100,52 @@ function M.open(options)
 			reason=not available and I18n.get("physical_shortcuts.position_unavailable") or nil}
 	end
 	local scope, gestures = options.scope, options.gestures
+	-- An optional observer must already belong to the running capture owner.
+	-- Requiring it here would create a dormant producer instead of observing one.
+	local Capture = package.loaded["modules.keylogger.physical_capture"]
+	local capture_position, cancel_position, position_available
+	if type(Capture) == "table" then
+		capture_position, cancel_position, position_available = rawget(Capture, "capture_position"),
+			rawget(Capture, "cancel_position"), rawget(Capture, "position_available")
+	end
 	local candidate = { constructing = true, webview = nil, closing = false }
 	active = candidate
 	local function current() return active == candidate and not candidate.closing and not candidate.cancelled end
+	local function observation_current()
+		return current() and not candidate.constructing and candidate.webview ~= nil
+			and type(Capture) == "table" and rawequal(package.loaded["modules.keylogger.physical_capture"], Capture)
+			and type(capture_position) == "function" and rawget(Capture, "capture_position") == capture_position
+			and type(cancel_position) == "function" and rawget(Capture, "cancel_position") == cancel_position
+			and type(position_available) == "function" and rawget(Capture, "position_available") == position_available
+	end
+	local function retire_observation()
+		if candidate.position == nil then return true end
+		if candidate.position_retiring then return false end
+		local token = candidate.position
+		candidate.position_retiring = true
+		local called, retired = pcall(cancel_position, token)
+		candidate.position_retiring = false
+		if not called or retired ~= true or not rawequal(candidate.position, token) then return false end
+		candidate.position = nil
+		return true
+	end
+	candidate.retire_observation = retire_observation
+	local function available_position()
+		if not observation_current() then return false end
+		local called, available = pcall(position_available)
+		return called and available == true and observation_current()
+	end
+	local function stable_position(facts)
+		if type(facts) ~= "table" or getmetatable(facts) ~= nil or type(facts.native_code) ~= "number"
+			or type(facts.mods) ~= "table" or getmetatable(facts.mods) ~= nil then return false end
+		for field in pairs(facts) do if field ~= "native_code" and field ~= "mods" then return false end end
+		for name, held in pairs(facts.mods) do
+			if type(name) ~= "string" or type(held) ~= "boolean" then return false end
+		end
+		local code = model.code_for(facts.native_code, "hs")
+		local slot = code and model.encode(code, facts.mods)
+		return slot ~= nil and model.stable_native_code(slot, "hs") == facts.native_code and model.key_group(slot) ~= "media"
+	end
 	local function send(name,packet)
 		if not current() or candidate.webview == nil then return false end
 		local called, accepted = pcall(function() return candidate.webview:evaluateJavaScript(name.."("..Json.encode(packet)..")") end)
@@ -106,6 +154,26 @@ function M.open(options)
 	local window_constructed, window = pcall(function()
 		return Window.new({model=model,catalogue=gestures,parameter_section="gestures.action_parameters",
 			positions=positions,translate=I18n.get,label=gestures.get_action_label,page_current=current,send=send,
+				position_field="hs",position_available=available_position,
+				capture_position=function(guard, receive)
+					if not observation_current() or retire_observation() ~= true or not available_position() then return nil end
+					-- Availability is false during an enrolled request. Its original
+					-- producer retains native session/baseline authority; this joins page/source.
+					local function exact() return observation_current() and guard() == true and observation_current() end
+					local called, token = pcall(capture_position, exact, function(facts)
+						return exact() and stable_position(facts) and exact() and receive(facts) == true and exact()
+					end)
+					if not called or type(token) ~= "table" then return nil end
+					candidate.position = token
+					if not exact() then retire_observation(); return nil end
+					return token
+				end,
+				cancel_position=function(token)
+					if candidate.position ~= nil and not rawequal(token, candidate.position) then return false end
+					if candidate.position ~= nil then return retire_observation() end
+					local called, retired = pcall(cancel_position, token)
+					return called and retired == true
+				end,
 			capture=scope.capture_editor_inventory,current=scope.editor_source_current,
 			commit=function(rows,receipt) return scope.edit(rows,receipt) end,
 			close=function() return close(candidate) end,
