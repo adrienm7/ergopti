@@ -3222,5 +3222,424 @@
 				"prior_wrapper_refused": true
 			}
 		}
+	},
+	"windows_genuine_joined_retirement_20261015": {
+		"source_sha": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+		"scope": "Actual official DLL, real owned hook threads, original retained-frame fixture assertions; supplied source planning, no physical/FIFO/production qualification",
+		"cases": [
+			{
+				"case_name": "actual-registration-frame",
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"actual_positive_retained_frame_domain_stop": true,
+				"original_metadata_assertions_preserved": true,
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"natural_exit": 0,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "custom-true",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "custom-map",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "module-zero",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "module-load",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "exports-clone",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "exports-pointer",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "exports-facade",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "epoch",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "lower-counter",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "unknown-before-get",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"original_metadata_assertions_preserved": true,
+				"case_name": "unknown-report",
+				"natural_exit": 0,
+				"case_specific_adversarial_native_refusal": true,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"case_specific_native_withdrawal_cleanup": true,
+				"original_metadata_assertions_preserved": true,
+				"case_name": "missing-publication",
+				"natural_exit": 0,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"case_specific_native_withdrawal_cleanup": true,
+				"original_metadata_assertions_preserved": true,
+				"case_name": "prereg-source-get",
+				"natural_exit": 0,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"case_specific_native_withdrawal_cleanup": true,
+				"original_metadata_assertions_preserved": true,
+				"case_name": "prereg-source",
+				"natural_exit": 0,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"parallel_js_state": "still running; actual native startup phase completed; source remains frozen",
+				"case_specific_native_withdrawal_cleanup": true,
+				"original_metadata_assertions_preserved": true,
+				"case_name": "prereg-builder",
+				"natural_exit": 0,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"parallel_js_state": "completed unchanged",
+				"case_specific_native_withdrawal_cleanup": true,
+				"original_metadata_assertions_preserved": true,
+				"case_name": "prereg-builder-capture",
+				"natural_exit": 0,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			},
+			{
+				"fifo_qualified": false,
+				"physical_qualified": false,
+				"accepted": true,
+				"official_dll_sha256": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"source_commit": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+				"parallel_js_state": "completed unchanged",
+				"case_specific_native_withdrawal_cleanup": true,
+				"original_metadata_assertions_preserved": true,
+				"case_name": "prereg-builder-recipe",
+				"natural_exit": 0,
+				"adversarial_facade_qualification": false,
+				"production_qualified": false
+			}
+		],
+		"passed": 18,
+		"failed": 0,
+		"skipped": 0,
+		"each_natural_exit": 0,
+		"earlier_one_pilot_guard": {
+			"case": "prereg-builder-capture",
+			"refused_before_native_start": true,
+			"other_process_preserved": true,
+			"fresh_attempts_used": true
+		},
+		"managed_native_file_boundaries": {
+			"bootstrap": {
+				"passed": 9,
+				"exit": 0
+			},
+			"model_import": {
+				"passed": 7,
+				"exit": 0
+			},
+			"inert_launcher": {
+				"passed": 9,
+				"exit": 0
+			},
+			"live_runtime_or_model_qualified": false
+		},
+		"physical_qualified": false,
+		"native_fifo_qualified": false,
+		"production_qualified": false,
+		"complete_cohort_conversion": "OPEN SOFTWARE",
+		"live_managed_ai": "OPEN",
+		"native_macos": "UNRUN",
+		"native_linux": "UNRUN; maintainer unavailable"
+	},
+	"windows_explicit_menu_target_reader_20261015": {
+		"frozen_source_sha": "8f5b2f9d846ca1615330d4541aaf903acf43d14b",
+		"frozen_full_js": {
+			"total": 425,
+			"passed": 407,
+			"failed": 18,
+			"natural_exit": 1,
+			"head_unchanged": true,
+			"tracked_diff_unchanged": true,
+			"source_images_unchanged": true,
+			"preceding_failed_check_names": [
+				"Windows navigation executes every portable production C case",
+				"Windows captured-event route core executes independent event vectors",
+				"Windows canonical output planner executes independent custody matrices",
+				"Windows bounded hook trace core retains exact ownership and loss receipts",
+				"Windows ordered-pair cohort receiving retains original publisher and retirement",
+				"macOS native PAC and WPAD qualification requires all twelve original cases",
+				"macOS archive qualification requires exact native cases and compiler inputs",
+				"Signed native query CI publisher retains compiler and nested-signature provenance",
+				"domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+				"Linux install.sh leaves a working first install (sandboxed real run)",
+				"macOS native launcher CI (release build + XCTest + success-only aggregate)",
+				"Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+				"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+				"Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+				"managed Ollama portable admission and operation retirement",
+				"managed Ollama catalogue preserves native source and publication admission",
+				"action picker edits a text, a key or a shortcut and validates it as the drivers do"
+			],
+			"new_failed_check": "the whole menu tree agrees across the three drivers, submenus included (I3 — no empty submenu, no orphaned header, no unread getter)"
+		},
+		"original_focused_parity_exit": 1,
+		"private_complete_candidate": {
+			"scope": "Complete menu-parity test code with private proposed source-reader/test afterimages loaded at original module paths; no checkout source changed",
+			"natural_node_exit": 0,
+			"original_inputs_unchanged": true,
+			"original_inverses_preserved": true,
+			"added_target_inverses": 4,
+			"added_class_inverses": 3,
+			"candidate_images": {
+				"tools/lib/menu-shared-delegation.cjs": "47207ae45935050927dbc0f80805f89e90674edb6cc7d8c2cb7864aa0af49b08",
+				"tools/test/test-menu-parity.cjs": "d18deedd8c93eb8d0cd0717d3146d764c8408a582d797db14c19ac4b6af2ac01"
+			},
+			"physical_qualified": false
+		},
+		"actual_integrated_menu_receiving": {
+			"gates": [
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-menu-parity.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-menu-shared-delegation.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-menu-action-handler-bijection.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-menu-category-coverage.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-menu-manifest-keys-have-readers.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-menu-reset-terminology.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				},
+				{
+					"command": [
+						"D:\\Ergopti247Evidence\\continuation-20261013\\tools\\node-v22.22.2-win-x64\\node.exe",
+						"tools/test/test-menu-manifest.cjs"
+					],
+					"natural_exit": true,
+					"exit": 0,
+					"accepted": true
+				}
+			],
+			"head_unchanged_during_each_command": true,
+			"tracked_diff_unchanged_during_each_command": true,
+			"source_images": {
+				"static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c": "5dd9ad18dfb94bab8ba1c2ff64027748138e3e5d0cb1fb82ce2a6b3861ed90d0",
+				"static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll": "c935f6fa5cc64d1c491aa19276cfd9eb42e18698eef9f350f450d0372779b92a",
+				"static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json": "07cd6fb70199decdcf341aa0e2080cc8355b71b345296375523c3bf250a62fee",
+				"static/ergopti_plus/windows/tests/fixtures/nav_owner_lifecycle_receiving_fixture.ahk": "8da2ca813195bc0d7edf366d2c27df6edfd8f731ab4d355c22ad4915d9eeefc9",
+				"tools/lib/menu-shared-delegation.cjs": "47207ae45935050927dbc0f80805f89e90674edb6cc7d8c2cb7864aa0af49b08",
+				"tools/test/test-menu-parity.cjs": "d18deedd8c93eb8d0cd0717d3146d764c8408a582d797db14c19ac4b6af2ac01"
+			},
+			"original_inverses_preserved": true,
+			"added_target_inverses": 4,
+			"added_class_inverses": 3
+		},
+		"current_complete_js": "NOT_RECEIVED_AFTER_READER_CORRECTION",
+		"full_windows_units": "PRECEDING_FAILED_OR_INCOMPLETE; not newly green",
+		"physical_or_production_qualification": false
 	}
 }

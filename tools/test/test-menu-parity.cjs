@@ -2809,7 +2809,7 @@ const {
 	const handoff =
 		'ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)';
 	const append =
-		'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_model_parent_ahk", ModelRows)';
+		'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_model_parent_ahk", ModelRows)';
 	const helper =
 		'_LLM_Menu_ModelParentRows(Receive, NativeChild, HealthPrefix, ModelCaption, Disabled) {';
 	const controls = [
@@ -2873,7 +2873,23 @@ const {
 			'actual helper disconnected'
 		],
 		[append, append.replace('ModelRows)', '[])'), 'returned rows discarded'],
-		[append, append.replace('_LLM_Menu_Handle', 'ForeignMenu'), 'foreign native target'],
+		[append, append.replace('TargetMenu', 'ForeignMenu'), 'foreign native target'],
+		[
+			append,
+			append.replace('TargetMenu', '_LLM_Menu_Handle'),
+			'published handle replaces the captured target'
+		],
+		[
+			append,
+			'TargetMenu := Foreign\n\t\t\t' + append,
+			'explicit target rebound before native publication'
+		],
+		['if !(TargetMenu is Menu)', 'if false', 'native target type admission withdrawn'],
+		[
+			'_LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {',
+			'_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {',
+			'explicit native target parameter withdrawn'
+		],
 		[append, append.replace('"llm_model_parent_ahk"', '"foreign_parent"'), 'foreign native frame'],
 		[append, 'ModelRows := []\n\t\t\t' + append, 'returned row array replaced'],
 		[append, 'ModelRows[1] := Foreign\n\t\t\t' + append, 'actual returned parent replaced'],
@@ -3102,6 +3118,9 @@ const {
 		'Unused := Foreign.Map()\n',
 		'Map := Foreign\n',
 		'Map["Call"] := Foreign\n',
+		'Menu := Foreign\n',
+		'Menu["Call"] := Foreign\n',
+		'TypeError := Foreign\n',
 		'Unused := Foreign[MenuRenderer_GroupReceiver]\n'
 	]) {
 		assert.equal(
