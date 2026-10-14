@@ -1,0 +1,1124 @@
+{
+  "status": "PRIVATE_STAGED_ESSENTIAL_EVIDENCE_PENDING_PARENT_REVIEW",
+  "selection_sha256": "c9fd1bded7af90fec46e0c9ce4ff0d40b2f9f4f1ea7b4cbb34f67ae146b7721a",
+  "payload_files": 139,
+  "payload_bytes": 922275,
+  "members": [
+    {
+      "member": "HANDOVER.md",
+      "section": "current-draft",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-essential-save-capsule-private-20261013-v2-final-linux/HANDOVER.md",
+      "bytes": 9191,
+      "sha256": "2ece0f3b812a591d7da3573c7ce3dd009ea65ac4e6e76c547d5e713591807500",
+      "kind": "regular_file"
+    },
+    {
+      "member": "PLAN.md",
+      "section": "current-draft",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-essential-save-capsule-private-20261013-v2-final-linux/PLAN.md",
+      "bytes": 2787,
+      "sha256": "62ebe695b08e35ae14e7ee3052d653913a87b8cfa68e4a6ab8ea2ffc6b756d28",
+      "kind": "regular_file"
+    },
+    {
+      "member": "RECONSTRUCTION.md",
+      "section": "current-draft",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-essential-save-capsule-private-20261013-v2-final-linux/RECONSTRUCTION.md",
+      "bytes": 2077,
+      "sha256": "ac235f95c08f28aa20c5b33454aec9637e7e7cf9cdbe0e99cffeaeb6232441db",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/independent-data/data/keycodes/physical_keys.json.raw",
+      "section": "ahk/independent-data",
+      "source_origin": "/workspace/ergopti/static/ergopti_plus/_shared/data/keycodes/physical_keys.json",
+      "bytes": 37595,
+      "sha256": "8dbb2201375e641dfee074555697e9fb02a858a9b7f65a62d9bf9337fb9195b9",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/independent-data/tests/corpus/shortcuts/physical_slots.json.raw",
+      "section": "ahk/independent-data",
+      "source_origin": "/workspace/ergopti/static/ergopti_plus/_shared/tests/corpus/shortcuts/physical_slots.json",
+      "bytes": 4712,
+      "sha256": "7884b9275e4ebf6ffd7865c06edcdbcc289ade8e7d5a03c3e61f945939d17ff4",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/POLICY-DATUM.md.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/POLICY-DATUM.md",
+      "bytes": 1357,
+      "sha256": "de66048f442f579fe2b6f12e93882796a53abb9e30e1ee2dfd3795562555c51e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/README.md.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/README.md",
+      "bytes": 6510,
+      "sha256": "3f992250d4393b4eef80d3069f3a192e839e638cc41ac18e69d1057b70f6e09e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/SEAL.json.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/SEAL.json",
+      "bytes": 1175,
+      "sha256": "38a1a591140ac0fd0f706b2ba339c8535183e3cb6447d4ae96361ca6a030814d",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/component.ahk.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/component.ahk",
+      "bytes": 9841,
+      "sha256": "07446eea6c193eabaf74c4c6d5d95f42c845bd86421f377b0c50d7bf65fc3147",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/loader-controls.ahk.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/loader-controls.ahk",
+      "bytes": 755,
+      "sha256": "89a7c6d428be1de35355bdd9132b51bf4e80cdbea713c8b3f76b26978cc82afe",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/manifest.json.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/manifest.json",
+      "bytes": 1798,
+      "sha256": "ed1b77c8a9bca1e6a6ee94927b951febc8d915ec40f6e83baa6cf8ceed04dcb9",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/original/shared/config_binding_identity.ahk.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/original/shared/config_binding_identity.ahk",
+      "bytes": 7717,
+      "sha256": "c281683470e6005cd9337ce57f459e931675fca782289115d1a563a4946970fb",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/original/windows/infra/json.ahk.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/original/windows/infra/json.ahk",
+      "bytes": 15658,
+      "sha256": "9f9a8f79da6f04f22cad9f912295b9dda43f686848cc7a57616f42941f54e6b0",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/original/windows/infra/number.ahk.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/original/windows/infra/number.ahk",
+      "bytes": 1644,
+      "sha256": "ea810c92a4e7cb4c92b6f356339d6fda8b8d0e2d9bef0c12482ee28080a2271e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/metadata/physical_slots.ahk.raw",
+      "section": "ahk/metadata",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-proposal-20261013/physical_slots.ahk",
+      "bytes": 10114,
+      "sha256": "074275bb414e69b459e7ae27b41bc8544e130564eb8f7c944c19454888de1448",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/model-source-review/REPORT.md.raw",
+      "section": "ahk/model-source-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-independent-source-20261013/REPORT.md",
+      "bytes": 5510,
+      "sha256": "dd4bd861373a853f7c678e73888a4e92f2d2236a0bbf89ce400c4bd8f3e4484c",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/model-source-review/SEAL.json.raw",
+      "section": "ahk/model-source-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-independent-source-20261013/SEAL.json",
+      "bytes": 199,
+      "sha256": "7a245a5d3bb2615482e6fcafc2ef0a12c7a44aca5ae75a4d830cafccf3ecdec6",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/model-source-review/review.json.raw",
+      "section": "ahk/model-source-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-ahk-physical-slots-independent-source-20261013/review.json",
+      "bytes": 2793,
+      "sha256": "5d230f5a665bd6f79d40bbf06df3391f7d56b59733d4328cce8cf75278c23b10",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3-review/SEAL.sha256.raw",
+      "section": "ahk/policy-v3-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-drift-v3-independent-20261013/SEAL.sha256",
+      "bytes": 154,
+      "sha256": "6ffd353d5241289eda2d8098c0d2cd6eb9c6dafbce972c68478fd9337a2c1b98",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3-review/report.md.raw",
+      "section": "ahk/policy-v3-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-drift-v3-independent-20261013/report.md",
+      "bytes": 4832,
+      "sha256": "4fc425aa5476a48fc9f3aa12377aef1f591bdb77127668f44c4f5ee5db64b775",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3-review/review.json.raw",
+      "section": "ahk/policy-v3-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-drift-v3-independent-20261013/review.json",
+      "bytes": 1585,
+      "sha256": "11ab979c459ad48d753b3384f890ada5643669ebb16ce7bb81ea7886bb454640",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/DESIGN.md.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/DESIGN.md",
+      "bytes": 2550,
+      "sha256": "abad93ea4c6adc9f5650b50883c60ebe45afed7534001412ad36ac5220a640bc",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/ENROLLMENT.md.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/ENROLLMENT.md",
+      "bytes": 3913,
+      "sha256": "587f0e91ce95efa33d18efe19771be30a23457dd813117097e4d135116fac888",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/INPUTS.sha256.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/INPUTS.sha256",
+      "bytes": 1698,
+      "sha256": "ae75385722f3db56912cb24b8a3a3d6951a629b7f85a7f46bf23604dff30353f",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/README.md.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/README.md",
+      "bytes": 6912,
+      "sha256": "8dcb3cc8da40f778c70113375a36c5eb5b9396a27893621b824eb52112bae015",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/SEAL.sha256.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/SEAL.sha256",
+      "bytes": 1093,
+      "sha256": "cd8d7efc15f748a50ed1914a5232b85bff871f994a146a10ed03029e0e5ff886",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/component.cjs.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/component.cjs",
+      "bytes": 1108,
+      "sha256": "2c56bac8c1afa54d071077ca5dd2207add18a1d585160d6e34a0182fa27ab046",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/original/physical_slots.lua.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/original/physical_slots.lua",
+      "bytes": 13241,
+      "sha256": "492391006b14b95280743f6a56966b45e0cf64dfb54cb2edb6f7cc7e5dae55eb",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/physical-slot-policy-binding-controls-v2.cjs.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/physical-slot-policy-binding-controls-v2.cjs",
+      "bytes": 2986,
+      "sha256": "0d6e2a7cef3d8f5443a94eff8794e1706667d4585307942f49d6c2f6d2b4c698",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/physical-slot-policy-binding-controls-v3.cjs.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/physical-slot-policy-binding-controls-v3.cjs",
+      "bytes": 1377,
+      "sha256": "ef3b85a9493b606fb8b44ccac91f551e04c29a0535f03544bedc1816d3c7dc2e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/physical-slot-policy-binding-controls.cjs.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/physical-slot-policy-binding-controls.cjs",
+      "bytes": 3289,
+      "sha256": "892a92e449ef98c4ce21d02760235ce7eb2f973acf658eef95b61c28183bce4b",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/physical-slot-policy-binding.cjs.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/physical-slot-policy-binding.cjs",
+      "bytes": 19743,
+      "sha256": "468a47881a9182df594ef1d0d900c3a6ebc48b86e1e073dc264be656b9050330",
+      "kind": "regular_file"
+    },
+    {
+      "member": "ahk/policy-v3/script-source.cjs.raw",
+      "section": "ahk/policy-v3",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-physical-slots-policy-datum-source-v3-20261013/script-source.cjs",
+      "bytes": 2832,
+      "sha256": "72e918f94f2f023320b2fa670f53f154c2c0024733f3c9794181b618215a5478",
+      "kind": "regular_file"
+    },
+    {
+      "member": "current-linux-status-reference/terminal.json.raw",
+      "section": "current-linux-status-reference",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/linux-editor-positive-native-fixture-final-source-v4/linux/terminal.json",
+      "bytes": 273,
+      "sha256": "07ce29e916cebef87d8e76d6462e5387cd8b4a7dd50aee837b3e50a5d5728895",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer-review/REPORT.md.raw",
+      "section": "mac40/consumer-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-independent-20261013/REPORT.md",
+      "bytes": 1005,
+      "sha256": "b477ed2511515391a226f1d0b9b4dc786842b652821863c715542bf7cf39451a",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer-review/SEAL.json.raw",
+      "section": "mac40/consumer-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-independent-20261013/SEAL.json",
+      "bytes": 171,
+      "sha256": "4363b14aec8779f1b05d28b0656e22d427f29106be81fb7f5f07376fb6ae4b19",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer-review/review.json.raw",
+      "section": "mac40/consumer-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-independent-20261013/review.json",
+      "bytes": 9569,
+      "sha256": "871762cfeb7ad01b902a3180fc31bb75771c5ffeae08cbbcbb016a298042c219",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/EXPECTED-FAILURES.md.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/EXPECTED-FAILURES.md",
+      "bytes": 2132,
+      "sha256": "5e7c0695970b7414300d59ea43ef115552e95b737191fd22249fed62e098e9aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/README.md.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/README.md",
+      "bytes": 6964,
+      "sha256": "26b5dde8ae88ad3704bf48602fe6dc691e3cbc55529b31cf0971f9e94f002e9e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/SHA256SUMS.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/SHA256SUMS",
+      "bytes": 1149,
+      "sha256": "c7bddfba57ff74f0b17aac5d5d9cbd357be2961751c8cdd41b21c562fce165da",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/SOURCE-PINS.sha256.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/SOURCE-PINS.sha256",
+      "bytes": 2537,
+      "sha256": "32771e5ea1ca6400b17d6b74bccdeecce81385cb579aa5d23147d6b1e856e28e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/fixture.patch.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/fixture.patch",
+      "bytes": 10195,
+      "sha256": "c062f2e2df453afe177180224f3682addb424c8ff134005d55f47a4dfa58bfd4",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/host.patch.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/host.patch",
+      "bytes": 5457,
+      "sha256": "32dd699860ec55290ad5b50f5222fece7cec77a98e1c347113cee98077cae8d5",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/preimages/static/ergopti_plus/macos/tests/unit/ui/test_physical_editor_native_lifecycle.lua.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/preimages/static/ergopti_plus/macos/tests/unit/ui/test_physical_editor_native_lifecycle.lua",
+      "bytes": 19376,
+      "sha256": "580fcd1012bba7d6a17ae351a11d10a8baa17cc897fa3fbe4476ec9a8ac4cb21",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/preimages/static/ergopti_plus/macos/ui/physical_shortcuts/init.lua.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/preimages/static/ergopti_plus/macos/ui/physical_shortcuts/init.lua",
+      "bytes": 8426,
+      "sha256": "9c974543bdb508b8e6ca3176f9feb2163ce79bf07adf336124c1535680ccd24c",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/proposal.patch.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/proposal.patch",
+      "bytes": 15652,
+      "sha256": "6df3e6cb5dcbe34c75761d6bfd8db4210aa08ceb98a7d2d00fa41d1088557760",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/consumer/receipt.json.raw",
+      "section": "mac40/consumer",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013/receipt.json",
+      "bytes": 1935,
+      "sha256": "7ab987fa910a3e6ab11084317877fe649e53e52fdb1821247a55d8721e4fff03",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/original30-names/manifest.lua.raw",
+      "section": "mac40/original30-names",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-editor-retirement-v3-replay-source-20261013-v2/manifest.lua",
+      "bytes": 6584,
+      "sha256": "cb6ee08d03ce624aeed508ff04cc2596ad8433833e347c01d7a39a7ed6e19a62",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/published-dependency-reference/PUBLISHED-DEPS.sha256.raw",
+      "section": "mac40/published-dependency-reference",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013-published-dependencies/PUBLISHED-DEPS.sha256",
+      "bytes": 631,
+      "sha256": "e652af0fbb2642ca2815aa0a5048b1fd53be10fe5fe0240191f06f75ac77b1ae",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/published-dependency-reference/REPORT.md.raw",
+      "section": "mac40/published-dependency-reference",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013-published-dependencies/REPORT.md",
+      "bytes": 1604,
+      "sha256": "0defde9a570b385e099158b4b135d0a3bbe210c63a01470c250638e9a2c30f99",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/published-dependency-reference/SHA256SUMS.raw",
+      "section": "mac40/published-dependency-reference",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-56dd-source-20261013-published-dependencies/SHA256SUMS",
+      "bytes": 164,
+      "sha256": "4138fb3b6b46c1a66d2da58a16267170a90ce8a26e3e8a4b3d265fb7f162909f",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/dependencies-after.exit.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/dependencies-after.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/dependencies-after.stderr.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/dependencies-after.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/dependencies-after.stdout.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/dependencies-after.stdout",
+      "bytes": 6091,
+      "sha256": "2ca6f3a8c52065c99f375fcd81bfd4b24c33ecfc0896a3d9929f0952288debad",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/dependencies-before.exit.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/dependencies-before.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/dependencies-before.stderr.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/dependencies-before.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/dependencies-before.stdout.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/dependencies-before.stdout",
+      "bytes": 6091,
+      "sha256": "2ca6f3a8c52065c99f375fcd81bfd4b24c33ecfc0896a3d9929f0952288debad",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/finalization.txt.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/finalization.txt",
+      "bytes": 240,
+      "sha256": "9baa1645af760161076accbe9caa6d1ab01516ce67ac4979c5bba85fbccd4faa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/lua-init-preflight.exit.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/lua-init-preflight.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/lua-init-preflight.stderr.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/lua-init-preflight.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/lua-init-preflight.stdout.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/lua-init-preflight.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/luajit-capability-preflight.exit.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/luajit-capability-preflight.exit",
+      "bytes": 2,
+      "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/luajit-capability-preflight.stderr.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/luajit-capability-preflight.stderr",
+      "bytes": 122,
+      "sha256": "e06e326bf55e48239adf057c832275b0beff49176f5a789756ddf0ec9d6983f2",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/luajit-capability-preflight.stdout.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/luajit-capability-preflight.stdout",
+      "bytes": 128,
+      "sha256": "2737c2fa478b1ffb239ca38e7b34bdfcb043bc4b69ed339af9f6bc3453c5737f",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/packet-after.exit.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/packet-after.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/packet-after.stderr.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/packet-after.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/packet-after.stdout.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/packet-after.stdout",
+      "bytes": 260,
+      "sha256": "5d0aaa7d4fb133432e5de4c847b98c38bd4023026cbfcb3632a666e2e9482c70",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/packet-before.exit.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/packet-before.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/packet-before.stderr.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/packet-before.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results-luajit/packet-before.stdout.raw",
+      "section": "mac40/raw/results-luajit",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results-luajit/packet-before.stdout",
+      "bytes": 260,
+      "sha256": "5d0aaa7d4fb133432e5de4c847b98c38bd4023026cbfcb3632a666e2e9482c70",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/dependencies-after.exit.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/dependencies-after.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/dependencies-after.stderr.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/dependencies-after.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/dependencies-after.stdout.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/dependencies-after.stdout",
+      "bytes": 6091,
+      "sha256": "2ca6f3a8c52065c99f375fcd81bfd4b24c33ecfc0896a3d9929f0952288debad",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/dependencies-before.exit.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/dependencies-before.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/dependencies-before.stderr.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/dependencies-before.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/dependencies-before.stdout.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/dependencies-before.stdout",
+      "bytes": 6091,
+      "sha256": "2ca6f3a8c52065c99f375fcd81bfd4b24c33ecfc0896a3d9929f0952288debad",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/finalization.txt.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/finalization.txt",
+      "bytes": 228,
+      "sha256": "51abade5de2aa2e91e6fffff2aceca06a690806d187ab609d4c506d23b80efb4",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua-init-preflight.exit.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua-init-preflight.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua-init-preflight.stderr.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua-init-preflight.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua-init-preflight.stdout.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua-init-preflight.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua5.4-consumer.exit.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua5.4-consumer.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua5.4-consumer.stderr.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua5.4-consumer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua5.4-consumer.stdout.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua5.4-consumer.stdout",
+      "bytes": 8848,
+      "sha256": "b78931606b868c0c3b54966b1560e1ea50b6749bebcfeaca811013689ed4fcc8",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua5.4-old.exit.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua5.4-old.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua5.4-old.stderr.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua5.4-old.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/lua5.4-old.stdout.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/lua5.4-old.stdout",
+      "bytes": 11563,
+      "sha256": "b71236822f06f933b221f1dba5324bd11cee0c448499c37a363d7ab287c01dce",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/packet-after.exit.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/packet-after.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/packet-after.stderr.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/packet-after.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/packet-after.stdout.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/packet-after.stdout",
+      "bytes": 260,
+      "sha256": "5d0aaa7d4fb133432e5de4c847b98c38bd4023026cbfcb3632a666e2e9482c70",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/packet-before.exit.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/packet-before.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/packet-before.stderr.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/packet-before.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/raw/results/packet-before.stdout.raw",
+      "section": "mac40/raw/results",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/results/packet-before.stdout",
+      "bytes": 260,
+      "sha256": "5d0aaa7d4fb133432e5de4c847b98c38bd4023026cbfcb3632a666e2e9482c70",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiver-source-review/SEAL.sha256.raw",
+      "section": "mac40/receiver-source-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-independent-20261013/SEAL.sha256",
+      "bytes": 154,
+      "sha256": "c71d58073220d4a0a0b70fc811efe6aed7509c44cd895317eb4295df76e81c2b",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiver-source-review/report.md.raw",
+      "section": "mac40/receiver-source-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-independent-20261013/report.md",
+      "bytes": 5772,
+      "sha256": "04518922f06db165f071c01dffd99da4c7cf457b1a30bbee39c3d1a2cb7ef1cc",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiver-source-review/review.json.raw",
+      "section": "mac40/receiver-source-review",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-independent-20261013/review.json",
+      "bytes": 1767,
+      "sha256": "88cb7144f70ffe4d432d0fba6d085840bec00f177588fb7902d21e72484a06b0",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/README.md.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/README.md",
+      "bytes": 2444,
+      "sha256": "6c0549776e7e5600a49c171519b2cd0895809d4a0eb4a418c9b4b1d439768751",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/SEAL.json.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/SEAL.json",
+      "bytes": 1106,
+      "sha256": "4ab5510685cdb6e04e3500d3325442dbc02d9ca2a6f1d36e1b18ce66372ec622",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/SHA256SUMS.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/SHA256SUMS",
+      "bytes": 942,
+      "sha256": "f55eb140f795e67f4fe3e030cd0bd7e15ea24d28620a9be4e3425f3afec89fd2",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/actual-parent-received.json.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/actual-parent-received.json",
+      "bytes": 2103,
+      "sha256": "fc631d81724df91b865113f0650a7c22bdb7db400db0a6dea23520405ecdfc79",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/canonical-dependencies.sha256.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/canonical-dependencies.sha256",
+      "bytes": 3933,
+      "sha256": "51510b42bd26ed6cf8681e81930be3314092f40adb120a2db124ef9ed5bd2fe3",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/commands-lua54.sh.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/commands-lua54.sh",
+      "bytes": 5198,
+      "sha256": "7ed5e74a38b3a19db15214dd1ed2af0e4a5873e486774e0bbf909ae7d271666b",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/commands-luajit-preflight.sh.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/commands-luajit-preflight.sh",
+      "bytes": 5321,
+      "sha256": "6b6fb12c1eac0d3972460f43010a241c64e4980e0219e8dfc904f38fd5fef99b",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/independent-oracle.json.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/independent-oracle.json",
+      "bytes": 6283,
+      "sha256": "a039557ad210c153bbf1762dfd44c88e1af3dcf581db2b2c2a16da2fa3f196d7",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/luajit-capability-preflight.lua.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/luajit-capability-preflight.lua",
+      "bytes": 816,
+      "sha256": "186df1964a1220ccac7bbb52c2fe44d2c9a82cea99a0d334289c49b469aee39c",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/manifest.lua.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/manifest.lua",
+      "bytes": 5745,
+      "sha256": "14fc211f0f6496dd6525f0e3d9a069718471664352121ff98378978ab79e43a2",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/receipt.json.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/receipt.json",
+      "bytes": 1177,
+      "sha256": "d221c5b9007b60c45c9b6387d38678fc8b2322708bf118555ae603340f5bd4c0",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/replay.lua.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/replay.lua",
+      "bytes": 4959,
+      "sha256": "4f20efd2411232cc7aed7f9b1a52216e86895005cefb53498e9bb5c29ba9fa88",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/runtime.sha256.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/runtime.sha256",
+      "bytes": 519,
+      "sha256": "5896853cb0b361a665d96aa82b4e4d939855aca74c42a382b647e183b47499f9",
+      "kind": "regular_file"
+    },
+    {
+      "member": "mac40/receiving/upstream-pins.sha256.raw",
+      "section": "mac40/receiving",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/group3-mac-position-capture-consumer-40-replay-source-20261013-v1/upstream-pins.sha256",
+      "bytes": 5669,
+      "sha256": "aa0cc722d77394440b4b25c20d7a26d41bfd0039603da790d6e0b6bf6f21d58f",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/REPORT.md.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/REPORT.md",
+      "bytes": 4468,
+      "sha256": "57d9c6e382611e7e209e6ac72cb57df4910b57b2556cdb39c37fa6933acd2ce4",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/SEAL.json.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/SEAL.json",
+      "bytes": 1068,
+      "sha256": "dbfcd97037b6ddee1751970571c26111b0de00c0082f0f4cc8f12c9cec4d7af3",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/SOURCE-PROTOCOL.md.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/SOURCE-PROTOCOL.md",
+      "bytes": 7355,
+      "sha256": "c32723023d6152ed83ab1786a322f17f9c5cf5f54ae142b866ad93424e51be0e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/control-plan.json.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/control-plan.json",
+      "bytes": 1491,
+      "sha256": "2eb4eb765408415f638d5ae7fc9bcf023df49e0136c1da4ac053c6878479bc98",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/opaque-reader-controls.lua.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/opaque-reader-controls.lua",
+      "bytes": 3906,
+      "sha256": "b007f7e955e405857069542c655a6b39e2bf37354697e692abe0000423263f68",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/opaque-row-owner-controls.lua.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/opaque-row-owner-controls.lua",
+      "bytes": 5243,
+      "sha256": "84615abbff039837a55d9fd9a081bd2a3680c67c54f80dab68865cb1a706dbd8",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/review.json.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/review.json",
+      "bytes": 3005,
+      "sha256": "d9a00650d1f5b3e1e1069861932f2a9bd2cc710d3b53c0d3d6bc418ca32eb75d",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/original-reader-controls/source-preservation.json.raw",
+      "section": "number-row/original-reader-controls",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/number-row-linux-v3-shift-review-private/source-preservation.json",
+      "bytes": 4479,
+      "sha256": "6f29108a6693ca318060688f10288a662773394421359b042ade7cf5092e3cd0",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/README.md.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/README.md",
+      "bytes": 1158,
+      "sha256": "3e379df3417ee89630d5b9035242a4d3c0c13d8ee9e8337ce0a9099d1b61cb09",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/SEAL.json.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/SEAL.json",
+      "bytes": 2353,
+      "sha256": "b3cfc9e4db054787288df5181236505bffd54968578ac9c743d4c59edab4448c",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/composition-proof.json.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/composition-proof.json",
+      "bytes": 2934,
+      "sha256": "dc682292024a0dfb5a6183051b06339bbd4fcb792f2d1c85cbe84c621937b97a",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/current108-to-union-capture.patch.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/current108-to-union-capture.patch",
+      "bytes": 11742,
+      "sha256": "a8c5126573a98ed877ff3dd917e0ca8a574aeb630314bade5784cc271cad6812",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/literal-removal-inverse.json.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/literal-removal-inverse.json",
+      "bytes": 3454,
+      "sha256": "137eb18e9d011f66f56a485556df9ef041249ff16f46c7549ef5a76885b4c6ca",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/producer-addition.lua.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/producer-addition.lua",
+      "bytes": 3107,
+      "sha256": "100c9bb517a180aadc1a5cfff6ec461933ecfaeaeff555e7ed4f354a383f0a0e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/receipt.json.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/receipt.json",
+      "bytes": 1394,
+      "sha256": "d29030ff06d794175dee5baa072540cf9ce7539803630b71f329376c2a4ad9d3",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/union108/v4-to-union.patch.raw",
+      "section": "number-row/union108",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-v4-item108-source-union-private-v1/v4-to-union.patch",
+      "bytes": 3519,
+      "sha256": "2239da30884b353543d39d4e1bc98d3791d0fa5b8db4012db037f307bd3cde01",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/README.md.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/README.md",
+      "bytes": 1672,
+      "sha256": "ee7397ae3a10432888e73a48723cf46e271e236bf5fc8fd981edb5cb84f09525",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/SEAL.json.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/SEAL.json",
+      "bytes": 2359,
+      "sha256": "680c2a8acb1294f5feddf64184e1114fb90a69b3f42f59d4426bce49e4412e24",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/controlled-row-owner-preservation.json.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/controlled-row-owner-preservation.json",
+      "bytes": 386,
+      "sha256": "3c43ae6fdd8858f2a4df931e97cd76ba17e7a819bad09e9371624b8f259de87c",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/controlled-row-owner-regressions.lua.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/controlled-row-owner-regressions.lua",
+      "bytes": 7442,
+      "sha256": "368293bbb7bf0c4a059d735d9c7d1d458d189732c783521b2a24d0213ca76d3d",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/inverse.patch.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/inverse.patch",
+      "bytes": 7586,
+      "sha256": "7950c99037307ceeda06e7efc5d077e27561959404416654c2d900563910021e",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/literal-removal-inverses.json.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/literal-removal-inverses.json",
+      "bytes": 6733,
+      "sha256": "b0df2a4a816dc198b5860ff4913da4f15de0986ad084a3102ffbcdc5dbf7f047",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/preimages/static/ergopti_plus/linux/adapters/keyboard_hook.lua.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/preimages/static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+      "bytes": 182968,
+      "sha256": "930d454f2ee3f086aab74b5f2d4b2a045bd24cdb97dd9b1fa123e44c8160395c",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/preimages/static/ergopti_plus/linux/adapters/uinput_writer.lua.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/preimages/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "bytes": 50927,
+      "sha256": "3a3ca91188a879fb7e4f2739c71ecb199f75f692da778993606a2081a6a128e0",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/preimages/static/ergopti_plus/linux/adapters/xkb_capture.lua.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/preimages/static/ergopti_plus/linux/adapters/xkb_capture.lua",
+      "bytes": 76881,
+      "sha256": "9819be78383529c6ac76493f64853440376fac8e08cca06825bd333c73bd9dc2",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/preimages/static/ergopti_plus/linux/adapters/xkb_source_probe.lua.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/preimages/static/ergopti_plus/linux/adapters/xkb_source_probe.lua",
+      "bytes": 84216,
+      "sha256": "ef40b9fdea5b5e5ee609e5fa810fcdb9a79eef373252c64a7d7e8954256871bc",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/receipt.json.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/receipt.json",
+      "bytes": 588,
+      "sha256": "1940a419fca204efd2cfb2dc8ffa37e30e25a6d941f8dc0dc25a1e22b9aecfc0",
+      "kind": "regular_file"
+    },
+    {
+      "member": "number-row/v4/v3-to-v4.patch.raw",
+      "section": "number-row/v4",
+      "source_origin": "/workspace/.ergopti-cloud/continuation-2026-10-13/number-row-linux-four-adapter-connected-private-v4-shift-currency/v3-to-v4.patch",
+      "bytes": 7586,
+      "sha256": "233b6491df973ad088653982b06dcd175216dc889ab9d4b9b66f52b21bf454c0",
+      "kind": "regular_file"
+    },
+    {
+      "member": "public-reference/capsule-manifest.json.raw.raw",
+      "section": "public-reference",
+      "source_origin": "/workspace/ergopti/docs/handovers/2026-10-12-group3-current-preparations/capsule-manifest.json.raw",
+      "bytes": 46248,
+      "sha256": "f5af65014c03452120d7bb9468c68d903441cb32529b91bf120833289dec88a1",
+      "kind": "regular_file"
+    },
+    {
+      "member": "root-g1-reference/review.json.raw",
+      "section": "root-g1-reference",
+      "source_origin": "/workspace/.ergopti-cloud/reviews/snapshot16-current612-warning-provenance-source-only-v1/review.json",
+      "bytes": 2970,
+      "sha256": "e936bf9400b8a6c6b202db6e4f88211c3381a1baba6b2512cefe860cfe0debff",
+      "kind": "regular_file"
+    }
+  ],
+  "archive_scope": "ordinary relative files only; inactive bytes",
+  "canonical_or_subject_mutations": false,
+  "public_saved": false,
+  "native_or_adoption_qualification": false
+}
