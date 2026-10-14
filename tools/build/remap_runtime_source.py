@@ -1298,3 +1298,84 @@ def expected_generated_outputs(image):
     )
     _, generated = _staged_generator_outputs(image)
     return tuple(sorted(generated.items()))
+
+
+VIRTUAL_HID_DRIVER_RESOURCES = (
+    (
+        "vendor/Karabiner-DriverKit-VirtualHIDDevice/dist/Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg",
+        "Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg",
+        "d73d6d9428f0f80b87b8a8ba8a1031f2cbc3bc1fa6b74842d1f1b764b2916fc9",
+        2089117,
+    ),
+    (
+        "vendor/Karabiner-DriverKit-VirtualHIDDevice/files/LaunchDaemons/org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon.plist",
+        "org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon.plist",
+        "4431ec6b5d220004bfa947cb9c069de34365b5ec4f5fd0cf674a74c8e7923659",
+        653,
+    ),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class StagedVirtualHIDDriverPayload:
+    """Fixed resource bytes within one genuine current SDK source image; no install grant."""
+
+    image: StagedSource
+    files: tuple[SealedInput, ...]
+    resources: tuple[tuple[str, bytes], ...]
+
+
+def capture_virtual_hid_driver_payload(image, absolute_deadline):
+    """Select only authenticated vendor package/plist members of the actual staged source."""
+    current_staged_source(image, absolute_deadline)
+    require(bool(image.projection.sdk_dependencies), "source_changed", "SDK payload source absent")
+    members = {row.path: row for row in image.files}
+    files, resources = [], []
+    for relative, name, expected, size in VIRTUAL_HID_DRIVER_RESOURCES:
+        row = members.get(relative)
+        require(
+            type(row) is SealedInput
+            and len(row.data) == size
+            and hashlib.sha256(row.data).hexdigest() == expected
+            and not row.identity[3] & 0o111,
+            "source_changed",
+            "Fixed VirtualHID vendor resource differs",
+        )
+        files.append(row)
+        resources.append((name, row.data))
+    payload = StagedVirtualHIDDriverPayload(image, tuple(files), tuple(resources))
+    current_virtual_hid_driver_payload(payload, absolute_deadline)
+    return payload
+
+
+def current_virtual_hid_driver_payload(payload, absolute_deadline):
+    """Retain the exact source image and its original resource member identities."""
+    require(
+        type(payload) is StagedVirtualHIDDriverPayload, "source_changed", "Payload issuer differs"
+    )
+    current_staged_source(payload.image, absolute_deadline)
+    require(
+        bool(payload.image.projection.sdk_dependencies), "source_changed", "SDK payload revoked"
+    )
+    members = {row.path: row for row in payload.image.files}
+    require(
+        type(payload.files) is tuple and len(payload.files) == 2,
+        "source_changed",
+        "Payload resource roster differs",
+    )
+    expected_resources = []
+    for row, (relative, name, expected, size) in zip(payload.files, VIRTUAL_HID_DRIVER_RESOURCES):
+        require(
+            type(row) is SealedInput
+            and row is members.get(relative)
+            and len(row.data) == size
+            and hashlib.sha256(row.data).hexdigest() == expected
+            and not row.identity[3] & 0o111,
+            "source_changed",
+            "Original payload member changed",
+        )
+        expected_resources.append((name, row.data))
+    require(
+        payload.resources == tuple(expected_resources), "source_changed", "Payload bytes detached"
+    )
+    deadline(absolute_deadline)
