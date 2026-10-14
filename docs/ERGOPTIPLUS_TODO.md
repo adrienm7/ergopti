@@ -13235,8 +13235,18 @@ component replay.
 Runtime.xi is still undeclared, so connected admission refuses before receiving
 association; public physical/forced-row availability remains false. Coherent
 runtime generation/staging, whole connected native lifecycle, Writer/Xorg
-association, installation and physical delivery remain required. Full final
-source gates are pending; item107 stays partial.
+association, installation and physical delivery remain required. Integrated
+source `92452b949` passes hosted Common 426/0, Linux units 13693/0 and E2E 193/0,
+including the genuine Xvfb 65/0 source cohort. Manual run 38507668185 ends
+FAILURE: the later LuaJIT XI2 diagnostic requires historical Probe `97444`
+while the integrated Probe is `ef40b9`, and refuses before native execution
+or creation of its evidence directory. Package/install jobs are skipped.
+The exact diagnostic input recipe now names the current Probe; its strict
+equality, original C3 prerequisite, ABI 29/cookies 3 expectations, full-family
+retirement, deadlines and controlled-runtime/no-input authority remain unchanged.
+The original fifteen portable controls and their registered census remain
+unchanged. Fresh whole native qualification is required; the older `97444`
+native receiving remains historical evidence. Item 107 stays partial.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
