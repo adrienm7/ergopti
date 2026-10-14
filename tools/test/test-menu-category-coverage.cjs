@@ -40,6 +40,7 @@ const path = require('path');
 const assert = require('node:assert/strict');
 const {
 	delegatedMenuSources,
+	menuTemplatePublicationReader,
 	publishesMenuTemplate
 } = require('../lib/menu-shared-delegation.cjs');
 
@@ -627,14 +628,22 @@ function reachedInertTemplateRows(nativeSources, extension, definitions, platfor
 				)
 			: null;
 	const constructionRoots = new Set(construction?.presentWhen.length ? construction.sections : []);
+	// The scan owns each reader and refreshes it if a caller changes that source.
+	const publicationReaders = new Map();
+	const publication = (native, section) => {
+		const source = native.src;
+		let reader = publicationReaders.get(native);
+		if (!reader || reader.source !== source) {
+			reader = { source, matches: menuTemplatePublicationReader(source, extension) };
+			publicationReaders.set(native, reader);
+		}
+		return reader.matches(section);
+	};
 	for (const [root, declaration] of Object.entries(definitions)) {
 		if (
 			!Array.isArray(declaration) ||
 			(!constructionRoots.has(root) &&
-				!nativeSources.some(
-					(native) =>
-						native.src.includes(root) && publishesMenuTemplate(native.src, extension, root)
-				))
+				!nativeSources.some((native) => native.src.includes(root) && publication(native, root)))
 		)
 			continue;
 		const graph = Object.create(null);
@@ -685,7 +694,7 @@ function reachedInertTemplateRows(nativeSources, extension, definitions, platfor
 							construction.captionGetters.includes(row.caption_getter)) ||
 						nativeSources.some(
 							(native) =>
-								publishesMenuTemplate(native.src, extension, root) &&
+								publication(native, root) &&
 								nativeCaptionBinding(native.src, extension, root, row.caption_getter)
 						))
 				)
@@ -1749,6 +1758,137 @@ for (const [key, list] of Object.entries(manifest)) {
 		cell[p] = { shown: shown.length, missing: missing.map((r) => r.id) };
 	}
 	rows.push({ key, cell });
+}
+
+// Repeated section queries must retain one invocation-owned producer analysis.
+{
+	const producer =
+		'ManifestMenu.template_rows("first", {}, {}, {})\n' +
+		'ManifestMenu.template_rows("second", {}, {}, {})';
+	let producerParses = 0;
+	let producerSource = producer;
+	const isolated = { exports: {} };
+	const helper = fs.readFileSync(path.join(ROOT, 'tools/lib/menu-shared-delegation.cjs'), 'utf8');
+	new Function('require', 'module', helper)((name) => {
+		if (name === './script-source.cjs')
+			return {
+				...require('../lib/script-source.cjs'),
+				scriptTokens(source, extension) {
+					if (source === producerSource) producerParses++;
+					return scriptTokens(source, extension);
+				}
+			};
+		return name.startsWith('.') ? require(path.join(ROOT, 'tools/lib', name)) : require(name);
+	}, isolated);
+	const makeReader = isolated.exports.menuTemplatePublicationReader;
+	assert.equal(typeof makeReader, 'function', 'The genuine invocation-owned publisher must exist');
+	const query = makeReader(producer, '.lua');
+	assert.equal(producerParses, 0, 'An unused producer must not be analyzed');
+	for (const section of ['first', 'second', 'foreign', 'first'])
+		assert.equal(query(section), section !== 'foreign', 'Every section retains its own admission');
+	assert.equal(producerParses, 1, 'Analyze one complete producer once across section queries');
+	assert.equal(makeReader(producer, '.lua')('first'), true);
+	assert.equal(producerParses, 2, 'A new scan must own fresh producer analysis');
+
+	const first = { type: 'label', id: 'first_heading', i18n: 'fixture.first' };
+	const second = { type: 'label', id: 'second_heading', i18n: 'fixture.second' };
+	let sourceReads = 0;
+	const native = {
+		rel: 'actual-source-switch.lua',
+		get src() {
+			return ++sourceReads <= 2
+				? 'ManifestMenu.template_rows("first", {}, {}, {})'
+				: 'ManifestMenu.template_rows("second", {}, {}, {})';
+		}
+	};
+	const reached = reachedInertTemplateRows(
+		[native],
+		'.lua',
+		{ first: [first], second: [second] },
+		'hs'
+	);
+	assert.equal(reached.has(first), true, 'The first genuine publication remains reached');
+	assert.equal(reached.has(second), true, 'Changed producer source cannot reuse an earlier reader');
+	assert.equal(reached.size, 2, 'Only the two declared inert identities are credited');
+
+	// Execute the genuine complete traversal with its real validators and counted publisher.
+	const traverse = new Function(
+		'path',
+		'SP',
+		'EXT',
+		'PLATFORMS',
+		'shortcutConstructionReaderEvidence',
+		'validateChildTemplates',
+		'inertTemplateRow',
+		'visible',
+		'nativeCaptionBinding',
+		'menuTemplatePublicationReader',
+		'publishesMenuTemplate',
+		'return (' + reachedInertTemplateRows.toString() + ');'
+	)(
+		path,
+		SP,
+		EXT,
+		PLATFORMS,
+		shortcutConstructionReaderEvidence,
+		validateChildTemplates,
+		inertTemplateRow,
+		visible,
+		nativeCaptionBinding,
+		isolated.exports.menuTemplatePublicationReader,
+		isolated.exports.publishesMenuTemplate
+	);
+	const captionSource =
+		'ManifestMenu.template_rows("frame", {}, { actual_value = function() return "real" end }, {})';
+	const captions = ['one', 'two', 'three'].map((id) => ({
+		type: 'label',
+		id: 'caption_' + id,
+		i18n: 'fixture.format',
+		caption_getter: 'actual_value'
+	}));
+	const graph = { frame: [{ type: 'include', section: 'detail' }], detail: captions };
+	const format = (key) => (key === 'fixture.format' ? 'Value: %s' : undefined);
+	producerSource = captionSource;
+	producerParses = 0;
+	const captionRows = traverse(
+		[{ rel: 'actual-caption.lua', src: captionSource }],
+		'.lua',
+		graph,
+		'hs',
+		format
+	);
+	assert.deepEqual(
+		[...captionRows],
+		captions,
+		'Every genuine caption keeps its publication and binding'
+	);
+	assert.equal(producerParses, 1, 'The hot caption path must reuse the same producer analysis');
+
+	const encodedSource = captionSource.replace('"frame"', '"f\\rame"');
+	assert.equal(
+		encodedSource.includes('frame'),
+		false,
+		'The adversarial spelling cannot satisfy a new substring prefilter'
+	);
+	let spellingReads = 0;
+	const spellingPort = {
+		rel: 'actual-caption-spelling.lua',
+		get src() {
+			return ++spellingReads === 3 ? encodedSource : captionSource;
+		}
+	};
+	const spellingRows = traverse(
+		[spellingPort],
+		'.lua',
+		{ frame: graph.frame, detail: [captions[0]] },
+		'hs',
+		format
+	);
+	assert.deepEqual(
+		[...spellingRows],
+		[captions[0]],
+		'The caption path must preserve its original source-read order and lack of substring prefilter'
+	);
 }
 
 const pad = (s, n) => String(s).padEnd(n);

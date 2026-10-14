@@ -281,39 +281,52 @@ function combineMenuVisibility(platforms, previous, incoming) {
 	);
 }
 
+/**
+ * Owns reusable lexical evidence for one immutable source within one scan.
+ * @param {string} source Complete native producer source.
+ * @param {string} extension Native source language.
+ * @returns {Function} Section query preserving all original publication predicates.
+ */
+function menuTemplatePublicationReader(source, extension) {
+	let tokens;
+	return (section) => {
+		if (extension === '.lua' && section === 'personal_info_editor_frame')
+			return require('./menu-native-personal-info-binding.cjs').retainedPersonalInfoProjection(
+				source
+			);
+		if (
+			extension === '.lua' &&
+			section === 'llm_download_shortcut_frame' &&
+			require('./menu-native-download-binding.cjs').retainedNativeDownloadProjection(source)
+		)
+			return true;
+		tokens ??= scriptTokens(source, extension);
+		return tokens.some((token, i) => {
+			if (token.kind !== 'identifier' || tokens[i - 1]?.value === 'function') return false;
+			const lua =
+				extension === '.lua' &&
+				token.value === 'template_rows' &&
+				tokens[i - 1]?.value === '.' &&
+				tokens[i - 2]?.value === 'ManifestMenu' &&
+				!['function', '.', ':'].includes(tokens[i - 3]?.value);
+			const ahk =
+				extension === '.ahk' &&
+				token.value === 'MenuRenderer_TemplateRows' &&
+				!['.', ':'].includes(tokens[i - 1]?.value);
+			return (
+				(lua || ahk) &&
+				tokens[i + 1]?.value === '(' &&
+				tokens[i + 2]?.kind === 'string' &&
+				tokens[i + 2]?.value === section &&
+				[',', ')'].includes(tokens[i + 3]?.value)
+			);
+		});
+	};
+}
+
 /** Credits executable native template calls, never comments, strings or declarations. */
 function publishesMenuTemplate(source, extension, section) {
-	if (extension === '.lua' && section === 'personal_info_editor_frame')
-		return require('./menu-native-personal-info-binding.cjs').retainedPersonalInfoProjection(
-			source
-		);
-	if (
-		extension === '.lua' &&
-		section === 'llm_download_shortcut_frame' &&
-		require('./menu-native-download-binding.cjs').retainedNativeDownloadProjection(source)
-	)
-		return true;
-	const tokens = scriptTokens(source, extension);
-	return tokens.some((token, i) => {
-		if (token.kind !== 'identifier' || tokens[i - 1]?.value === 'function') return false;
-		const lua =
-			extension === '.lua' &&
-			token.value === 'template_rows' &&
-			tokens[i - 1]?.value === '.' &&
-			tokens[i - 2]?.value === 'ManifestMenu' &&
-			!['function', '.', ':'].includes(tokens[i - 3]?.value);
-		const ahk =
-			extension === '.ahk' &&
-			token.value === 'MenuRenderer_TemplateRows' &&
-			!['.', ':'].includes(tokens[i - 1]?.value);
-		return (
-			(lua || ahk) &&
-			tokens[i + 1]?.value === '(' &&
-			tokens[i + 2]?.kind === 'string' &&
-			tokens[i + 2]?.value === section &&
-			[',', ')'].includes(tokens[i + 3]?.value)
-		);
-	});
+	return menuTemplatePublicationReader(source, extension)(section);
 }
 
 /** Follows the real model receiver into its returned parent and native consumer. */
@@ -801,6 +814,7 @@ function publishesSelectedMenuGroup(source, extension, section, definition, proo
 module.exports = {
 	delegatedMenuSources,
 	combineMenuVisibility,
+	menuTemplatePublicationReader,
 	publishesMenuTemplate,
 	publishesSelectedMenuGroup
 };
