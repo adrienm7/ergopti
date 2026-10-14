@@ -33,6 +33,9 @@
 local M = {}
 local NumberRow = require("layout.number_row_native")
 local number_row_receipts = setmetatable({}, { __mode = "k" })
+local receiving_rows = setmetatable({}, { __mode = "k" })
+local original_receiving_rows = nil
+local receiving_native_backends = setmetatable({}, { __mode = "k" })
 
 local Logger = require("logger.shim")
 local Keysym = require("infra.keysym")
@@ -161,6 +164,9 @@ local function current_locale()
 end
 
 local function destroy(session)
+	for _, record in pairs(receiving_rows) do
+		if record.session == session then pcall(record.retire) end
+	end
 	if session and _backend and type(_backend.destroy) == "function" then
 		pcall(_backend.destroy, session)
 	end
@@ -619,6 +625,7 @@ local function bind_ffi_backend()
 		return table_out
 	end
 
+	receiving_native_backends[backend] = true
 	_backend = backend
 	Logger.debug(LOG, "libxkbcommon capture backend bound.")
 	return true
@@ -1455,4 +1462,197 @@ end
 M.EVDEV_TO_XKB_OFFSET = EVDEV_TO_XKB_OFFSET
 
 original_process = M.process
+--- Internal actual-consumer fragment for adapters/xkb_capture.lua.
+--- Called with the original backend/session and original Probe target inspector.
+--- Reuses backend.number_row_levels and central NumberRow; no duplicated layouts.
+
+local function build_receiving_rows(target, backend, session, capture_current, NumberRow)
+	local enumerate, validate, select = backend.number_row_levels, NumberRow.levels, NumberRow.select
+	local plans = setmetatable({}, { __mode = "k" })
+	local busy = false
+	local function current()
+		return capture_current() == true and target.current() == true
+			and backend.number_row_levels == enumerate and NumberRow.levels == validate and NumberRow.select == select
+	end
+	local function snapshot(codes)
+		if not current() then return nil end
+		return target.inspect(session.identity, session.groups, function(scope, scoped_current)
+			if not current() or scoped_current() ~= true then return nil end
+			local rows = enumerate({ keymap = scope.keymap, state = scope.state }, codes, scope.group)
+			local levels = rows and validate("linux", rows, codes)
+			if not levels or scoped_current() ~= true or not current() then return nil end
+			return { levels = levels, caps = scope.caps, group = scope.group, locked = scope.locked,
+				depressed = scope.depressed, latched = scope.latched, shift_mask = scope.shift_mask,
+				device = scope.device, attachment = scope.attachment, raw_map = scope.raw_map }
+		end)
+	end
+	local function matching(a, b)
+		return a and b and a.caps == b.caps and a.group == b.group and a.locked == b.locked
+			and a.shift_mask == b.shift_mask and a.device == b.device and a.attachment == b.attachment
+			and a.raw_map == b.raw_map
+	end
+	local function prepare(codes, mode, position, physical_shift)
+		if busy or not current() then return nil end
+		busy = true
+		local called, facts = pcall(snapshot, codes)
+		local action = called and facts and select(facts.levels, mode, position, facts.caps, physical_shift) or nil
+		-- Shortcut/latched modifiers are outside this finite row transaction.
+		if not action or facts.latched ~= 0 or (facts.depressed ~= 0 and facts.depressed ~= facts.shift_mask)
+			or not current() then busy = false; return nil end
+		local token = {}
+		local copied_codes = {}; for index, code in ipairs(codes) do copied_codes[index] = code end
+		plans[token] = { facts = facts, codes = copied_codes, mode = mode, position = position,
+			physical_shift = physical_shift, action = { code = action.code, shift = action.shift,
+				text = action.text, native_action = { keysym = action.native_action.keysym, dead = action.native_action.dead } } }
+		busy = false
+		return token
+	end
+	local function observe(token, receiving_shift)
+		local record = plans[token]
+		if busy or not record or record.retired or type(receiving_shift) ~= "boolean" or not current() then return nil end
+		busy = true
+		local called, facts = pcall(snapshot, record.codes)
+		local wanted = receiving_shift and record.facts.shift_mask or 0
+		local action = called and facts and select(facts.levels, record.mode, record.position,
+			facts.caps, record.physical_shift) or nil
+		local valid = matching(record.facts, facts) and facts.latched == 0 and facts.depressed == wanted
+			and action and action.code == record.action.code and action.shift == record.action.shift
+			and action.native_action.keysym == record.action.native_action.keysym
+			and action.native_action.dead == record.action.native_action.dead and current()
+		busy = false
+		if not valid then return nil end
+		-- Detached action parameters are data, not a caller-created authorization.
+		return { code = record.action.code, shift = record.action.shift, text = record.action.text,
+			native_action = { keysym = record.action.native_action.keysym, dead = record.action.native_action.dead } }
+	end
+	local function desired(token)
+		local record = plans[token]
+		if not record or record.retired or not current() then return nil end
+		return { code = record.action.code, shift = record.action.shift,
+			physical_shift = record.physical_shift }
+	end
+	local function retire(token)
+		local record = plans[token]
+		if not record then return false end
+		record.retired = true
+		return true -- Pure plan revocation; target/Writer lifetimes retire separately.
+	end
+	return { prepare = prepare, observe = observe, desired = desired, retire = retire, current = current }
+end
+
+--- Internal Capture commit half, used only by the actual Hook row-owner consumer.
+--- All arguments below are private originals captured with the same session.
+--- A native key symbol stays a Compose input; it is never flattened into text.
+
+local function build_row_commit(rows, backend, session, capture_current, physical_epoch)
+	local feed, status, text, reset = backend.compose_feed, backend.compose_status, backend.compose_utf8, backend.compose_reset
+	local update, identity = backend.update_key, backend.sym_utf8
+	local function current()
+		return capture_current() == true and backend.compose_feed == feed and backend.compose_status == status
+			and backend.compose_utf8 == text and backend.compose_reset == reset
+			and backend.update_key == update and backend.sym_utf8 == identity
+	end
+	local function commit(plan, action, code, value, emitted)
+		if not current() or type(emitted) ~= "boolean" or (value ~= 1 and value ~= 2) then return false end
+		local owned = rows.desired(plan)
+		if not owned or owned.code ~= code or type(action) ~= "table" or type(action.native_action) ~= "table" then return false end
+		local observed = rows.observe(plan, owned.physical_shift)
+		if not observed or observed.native_action.keysym ~= action.native_action.keysym
+			or observed.native_action.dead ~= action.native_action.dead or not current() then return false end
+		physical_epoch() -- Original Capture epoch; no native process/physical proof.
+		local sym = observed.native_action.keysym
+		local direct = observed.text ~= "" and observed.text or nil
+		local result
+		if emitted then
+			feed(session, sym)
+			if not current() then return false end
+			local phase = status(session)
+			if not current() then return false end
+			result = direct
+			if phase == "composing" then result = nil
+			elseif phase == "composed" then
+				result = text(session); if not current() then return false end; reset(session)
+			elseif phase == "cancelled" then reset(session)
+			elseif phase ~= "nothing" then return false end
+		end
+		if not current() then return false end
+		if value == 1 and emitted then update(session, code + 8, 1) end
+		if not current() then return false end
+		local native_identity = identity(session, sym)
+		if not current() then return false end
+		return true, result, native_identity
+	end
+	local function release(code)
+		if not current() then return false end
+		physical_epoch()
+		update(session, code + 8, 0)
+		return current()
+	end
+	return { commit = commit, release = release }
+end
+
+--- Native receiving context, created from the actual original session and Probe.
+function M.capture_receiving_rows(writer)
+	if M.capture_receiving_rows ~= original_receiving_rows or not _session or not _backend
+		or _backend.desktop_proof ~= true or receiving_native_backends[_backend] ~= true
+		or type(_backend.number_row_levels) ~= "function" then return nil end
+	local Probe = require("adapters.xkb_source_probe")
+	local probe_capture, probe_ports = Probe.capture_receiving_source, Probe.receiving_source_ports
+	if type(probe_capture) ~= "function" or type(probe_ports) ~= "function" then return nil end
+	local session, backend, generation = _session, _backend, _capture_generation
+	local retired, constructing, target = false, true, nil
+	local function current()
+		return not retired and M.capture_receiving_rows == original_receiving_rows
+			and _session == session and _backend == backend and _capture_generation == generation
+			and package.loaded["adapters.xkb_source_probe"] == Probe
+			and Probe.capture_receiving_source == probe_capture and Probe.receiving_source_ports == probe_ports
+	end
+	local token, record = {}, { session = session }
+	record.retire = function()
+		retired = true
+		if constructing then return false end
+		return not target or target.retire() == true
+	end
+	receiving_rows[token] = record -- Reserve before Probe construction / Logger callbacks.
+	local called, capability = pcall(probe_capture, writer)
+	if called and capability then target = probe_ports(capability) end
+	constructing = false
+	if not called or not target or not current() then record.retire(); return nil end
+	local rows = build_receiving_rows(target, backend, session, current, NumberRow)
+	local commit = build_row_commit(rows, backend, session, current, function() _physical_probe_epoch = _physical_probe_epoch + 1 end)
+	record.rows, record.commit, record.target, record.capture_current = rows, commit, target, current
+	record.preview = function(plan)
+		local desired = rows.desired(plan)
+		if not desired or not current() then return nil end
+		-- No Compose feed before the output ACK. A pending sequence/dead action
+		-- has no speculative text; the consumer still receives native identity.
+		local action = rows.observe(plan, desired.physical_shift)
+		if not action or not current() then return nil end
+		local identity = backend.sym_utf8(session, action.native_action.keysym)
+		if not current() then return nil end
+		local phase = backend.compose_status(session)
+		if not current() then return nil end
+		local text = phase == "nothing" and not action.native_action.dead and action.text ~= "" and action.text or nil
+		return { text = text, identity = identity }
+	end
+	record.suppress = function(plan, code)
+		if not rows.desired(plan) or not current() then return false end
+		_physical_probe_epoch = _physical_probe_epoch + 1
+		backend.update_key(session, code + 8, 1)
+		rows.retire(plan)
+		return current()
+	end
+	return token
+end
+function M.receiving_row_ports(token)
+	local record = receiving_rows[token]
+	if not record or not record.rows then return nil end
+	return { prepare = record.rows.prepare, desired = record.rows.desired, observe = record.rows.observe,
+		retire = record.rows.retire, current = function() return receiving_rows[token] == record and record.rows.current() end,
+		capture_current = record.capture_current, input_allowed = record.target.input_allowed,
+		drive = record.target.drive, close = record.retire, commit = record.commit.commit, release = record.commit.release,
+		preview = record.preview, suppress = record.suppress }
+end
+original_receiving_rows = M.capture_receiving_rows
+
 return M
