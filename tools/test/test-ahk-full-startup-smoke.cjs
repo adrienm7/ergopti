@@ -37,6 +37,7 @@ const {
 	createStartupCodeFixture,
 	prepareStartupPersonalInclude
 } = require('./lib/ahk-startup-fixture.cjs');
+const { createStartupDiagnostics } = require('./lib/ahk-startup-diagnostics.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
@@ -309,8 +310,12 @@ function logTail(configRoot) {
 		.map((name) => path.join(logs, name));
 	return files
 		.map((file) => {
-			const lines = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/).slice(-12);
-			return `${path.basename(file)}:\n${lines.join('\n')}`;
+			const lines = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/);
+			const omitted =
+				lines.length > 12
+					? `${lines.length - 12} earlier lines omitted from this console preview; inspect the startup diagnostic receipt for capture completeness.\n`
+					: '';
+			return `${path.basename(file)}:\n${omitted}${lines.slice(-12).join('\n')}`;
 		})
 		.join('\n');
 }
@@ -331,14 +336,42 @@ async function main() {
 	}
 	if (!fs.existsSync(ENTRY)) return fail(`entry point missing: ${ENTRY}`);
 
-	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-full-startup-'));
 	const productionForwarder = path.join(WINDOWS, '_generated/personal_shortcuts.ahk');
-	const originalForwarder = fs.existsSync(productionForwarder)
-		? fs.readFileSync(productionForwarder)
-		: null;
-	const code = createStartupCodeFixture(path.join(scratch, 'code'), WINDOWS);
-	const wrapper = path.join(code.windows, `.ergopti_startup_smoke_${process.pid}.ahk`);
+	const official = process.env.GITHUB_ACTIONS === 'true';
+	if (official && !process.env.RUNNER_TEMP)
+		throw new Error('Official startup diagnostics require RUNNER_TEMP.');
+	const diagnostics = createStartupDiagnostics(
+		process.env.RUNNER_TEMP || os.tmpdir(),
+		official ? 'github' : 'local',
+		{
+			owner: path.join(__dirname, 'test-ahk-full-startup-smoke.cjs'),
+			fixture_helper: path.join(__dirname, 'lib/ahk-startup-fixture.cjs'),
+			entry: ENTRY,
+			observer: path.join(WINDOWS, 'tests/fixtures/startup_full_save_observer.ahk'),
+			interpreter: ahk
+		},
+		official
+			? {
+					source_sha: process.env.GITHUB_SHA,
+					run_id: process.env.GITHUB_RUN_ID,
+					run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+					job: process.env.GITHUB_JOB
+				}
+			: null
+	);
+	let scratch, code, wrapper, originalForwarder;
+	let forwarderObserved = false;
+	let passed = false;
+	let cleanupComplete = false;
+	let stage = 'setup';
 	try {
+		scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-full-startup-'));
+		originalForwarder = fs.existsSync(productionForwarder)
+			? fs.readFileSync(productionForwarder)
+			: null;
+		forwarderObserved = true;
+		code = createStartupCodeFixture(path.join(scratch, 'code'), WINDOWS);
+		wrapper = path.join(code.windows, `.ergopti_startup_smoke_${process.pid}.ahk`);
 		// The private entry preserves relative includes without sharing writable
 		// generated code. Its identity cannot replace the maintainer's live driver.
 		fs.writeFileSync(
@@ -386,6 +419,7 @@ async function main() {
 			...Object.keys(CHORD_CONFIGS),
 			...Object.keys(SEEDED_CONFIGS)
 		]) {
+			stage = `${fixture}/setup`;
 			const configRoot = path.join(scratch, fixture);
 			fs.mkdirSync(configRoot, { recursive: true });
 			if (fixture === 'retired-metrics-config') {
@@ -434,7 +468,6 @@ async function main() {
 			const nonce = crypto.randomBytes(16).toString('hex');
 			const result = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
 				cwd: code.windows,
-				encoding: 'utf8',
 				timeout: 120000,
 				env: {
 					...process.env,
@@ -444,6 +477,12 @@ async function main() {
 					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : ''
 				}
 			});
+			stage = `${fixture}/cold-verdict`;
+			if (result.error || result.status !== 0)
+				console.error(
+					`Startup child failed before diagnostic receiving: ${fixture}; exit=${result.status}; error=${result.error?.code || 'none'}.`
+				);
+			diagnostics.capture(fixture, 'cold', configRoot, nonce, result);
 			if (result.error)
 				return fail(
 					`${fixture}: ${result.error.message}\n${(result.stdout || '').slice(-5000)}\n${logTail(configRoot)}`
@@ -506,7 +545,6 @@ async function main() {
 				const warmNonce = crypto.randomBytes(16).toString('hex');
 				const second = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
 					cwd: code.windows,
-					encoding: 'utf8',
 					timeout: 120000,
 					env: {
 						...process.env,
@@ -515,6 +553,12 @@ async function main() {
 						ERGOPTI_STARTUP_SMOKE_NONCE: warmNonce
 					}
 				});
+				stage = `${fixture}/warm-verdict`;
+				if (second.error || second.status !== 0)
+					console.error(
+						`Startup child failed before diagnostic receiving: ${fixture}/warm; exit=${second.status}; error=${second.error?.code || 'none'}.`
+					);
+				diagnostics.capture(fixture, 'warm', configRoot, warmNonce, second);
 				if (second.error || second.status !== 0) {
 					const output = `${second.stdout || ''}${second.stderr || ''}`.trim();
 					const logs = logTail(configRoot);
@@ -535,26 +579,59 @@ async function main() {
 				'script-chord, retired-Metrics, neutral-defaults and older-release boots reached ready with no error logged ' +
 				'and every script chord registered.\x1b[0m'
 		);
+		passed = true;
 		return 0;
 	} finally {
-		code.close();
-		fs.rmSync(wrapper, { force: true });
-		await new Promise((resolve) => setImmediate(resolve));
-		await fs.promises.rm(scratch, {
-			recursive: true,
-			force: true,
-			maxRetries: 12,
-			retryDelay: 100
-		});
-		const currentForwarder = fs.existsSync(productionForwarder)
-			? fs.readFileSync(productionForwarder)
-			: null;
-		if (
-			originalForwarder === null
-				? currentForwarder !== null
-				: !originalForwarder.equals(currentForwarder || Buffer.alloc(0))
-		)
-			throw new Error('The startup smoke modified the production personal-shortcuts include.');
+		const verdictStage = stage;
+		let cleanupFailed = false;
+		try {
+			stage = 'cleanup';
+			// A setup failure has no acquired close handle; retain its partial tree.
+			if (code) {
+				code.close();
+				fs.rmSync(wrapper, { force: true });
+				await new Promise((resolve) => setImmediate(resolve));
+				await fs.promises.rm(scratch, {
+					recursive: true,
+					force: true,
+					maxRetries: 12,
+					retryDelay: 100
+				});
+			}
+			stage = 'forwarder-invariant';
+			if (forwarderObserved) {
+				const currentForwarder = fs.existsSync(productionForwarder)
+					? fs.readFileSync(productionForwarder)
+					: null;
+				if (
+					originalForwarder === null
+						? currentForwarder !== null
+						: !originalForwarder.equals(currentForwarder || Buffer.alloc(0))
+				)
+					throw new Error('The startup smoke modified the production personal-shortcuts include.');
+			}
+			cleanupComplete = Boolean(code) || !scratch;
+		} catch (error) {
+			cleanupFailed = true;
+			throw error;
+		} finally {
+			let retained;
+			try {
+				retained = diagnostics.finish(
+					passed,
+					cleanupComplete,
+					cleanupFailed ? stage : verdictStage
+				);
+			} catch (error) {
+				console.error('Startup diagnostic retention is unavailable or incomplete.');
+				if (passed && cleanupComplete) throw error;
+			}
+			if (retained) {
+				console.error('Startup diagnostic observations retained: ' + retained);
+				if (passed && cleanupComplete)
+					throw new Error('Startup diagnostic source or capture receiving is incomplete.');
+			}
+		}
 	}
 }
 
@@ -563,6 +640,12 @@ main().then(
 		process.exitCode = code;
 	},
 	(error) => {
+		if (error.retainedStartupDiagnostics)
+			console.error(
+				'Startup diagnostic observations retained: ' + error.retainedStartupDiagnostics
+			);
+		if (error.startupDiagnosticsUnavailable)
+			console.error('Startup diagnostic retention is unavailable or incomplete.');
 		console.error(error);
 		process.exitCode = 1;
 	}

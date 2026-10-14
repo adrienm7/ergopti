@@ -446,22 +446,6 @@ jobs:
               Write-Host "No AHK results file to annotate."
           }
 
-      - name: Publish AHK execution manifest
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: windows-ahk-execution-manifest
-          path: |
-            ${{ runner.temp }}/windows-ahk-execution-manifest.json
-            ${{ runner.temp }}/windows-ahk-suite.stdout.log
-            ${{ runner.temp }}/windows-ahk-suite.stderr.log
-            ${{ runner.temp }}/windows-qualification.json
-            ${{ runner.temp }}/windows-ahk-isolated-*.json
-            ${{ runner.temp }}/ergopti-ahk-menu-lifecycle-*/**
-            ${{ runner.temp }}/ergopti-snapshot16-*/**
-          if-no-files-found: warn
-
       - name: Check for AHK compiler warnings
         shell: pwsh
         timeout-minutes: 5
@@ -514,6 +498,23 @@ jobs:
           $env:ERGOPTI_AHK_EXE = $ahk
           node tools/test/test-ahk-fresh-clone-startup.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish AHK execution manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: windows-ahk-execution-manifest
+          path: |
+            ${{ runner.temp }}/windows-ahk-execution-manifest.json
+            ${{ runner.temp }}/windows-ahk-suite.stdout.log
+            ${{ runner.temp }}/windows-ahk-suite.stderr.log
+            ${{ runner.temp }}/windows-qualification.json
+            ${{ runner.temp }}/windows-ahk-isolated-*.json
+            ${{ runner.temp }}/ergopti-ahk-menu-lifecycle-*/**
+            ${{ runner.temp }}/ergopti-snapshot16-*/**
+            ${{ runner.temp }}/ergopti-startup-diagnostics-*/**
+          if-no-files-found: warn
 
   e2e-ahk:
     name: 'E2E tests'
