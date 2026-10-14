@@ -2279,9 +2279,8 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	DWORD exit_os_error = 0;
 	int32_t exit_status = ERGOPTI_NAV_STATUS_OK;
 	bool stop_requested = false;
-	HINSTANCE module = g_nav_module != NULL
-		? g_nav_module
-		: GetModuleHandleW(NULL);
+	/* Low-level callbacks stay in this process; the resident owner pins this DLL. */
+	HINSTANCE module = NULL;
 
 	(void)parameter;
 	EnterCriticalSection(&g_nav_state.lock);
