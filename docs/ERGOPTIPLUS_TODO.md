@@ -13143,6 +13143,25 @@ a final CI verdict. Current helpers require table.pack, so the new cases remain
 unexecuted under LuaJIT without a shim. Native discovery, invocation, permissions
 and installed reception remain open.
 
+Integrated source `3f59f730a680ba4d8a509267b6b50d192789e317` receives
+[manual macOS run 38535172383](https://github.com/adrienm7/ergopti/actions/runs/38535172383):
+Common 426/0, simulated units 19,808/0 (including all 95 Shortcuts adapter
+cases), and simulated E2E 101/0 with one original skip. The whole run fails:
+archive Automation and both managed-Ollama trust/restoration jobs refuse;
+packaging and installation are skipped, and release publication is skipped.
+These native failures are retained for their owners. Shortcuts native catalogue,
+permission, invocation and cancellation acceptance remain unqualified. The
+metadata-only owner lock is released after all nineteen jobs terminate.
+
+A separately reviewed opt-in refusal-phase diagnostic is saved as inactive
+source preparation. All original JXA/Python cases remain; controlled Node40/0
+and Python discovery56/0 pass. The original legacy trace does not distinguish
+a throwing call expression from a throwing post-call descriptor read, and the
+new closed annotation supplies no native status or permission grant. Removing
+only its optional-write containment reproduces an interrupted original refusal.
+Canonical adoption requires the two Root-owned census/source-hash spans; current
+workflows do not enable the new opt-in and its native receiving is unrun.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
@@ -13321,6 +13340,30 @@ The production Runtime.xi declaration, connected Writer/Xorg ownership and
 physical forced-row delivery remain unqualified. The previous failed run and
 its missing-evidence refusal remain retained. See the
 [delivery checkpoint](handovers/2026-10-14-group3-linux-delivery/README.md).
+
+Current135 NumberRow source receiving is prepared privately against genuine
+published supplier `70d88b885d45ae616b69f33b9826f76fb1be9493`. The exact finite
+source join preserves the historical99 recipe, original53 and51 controls,
+producer/tests, sole final-byte omission and seven TIS closures. Actual
+current135 controls pass15/0; historical53 pass separately and original
+composition51 pass. The unsupported Node24 run and first negative-fixture
+allocation error remain retained. Independent source review clears only the
+four private controllers; final source-admission envelope and Root-owned
+workflow/registration pins remain pending. Native actors remain unrun after
+the hosted ancestry refusal; actual full-history receiving must not waive it.
+
+The proposed XI2 runtime generator renders seven outputs with six changes
+matching the frozen postimages. A genuine local component attempt refuses at
+the unchanged process-family admission before compilation: prctl succeeds,
+but the actual process/thread children entry is absent. Declared-runtime
+C3/ABI29/cookies3 positive receiving is unrun. Catalogue/generated source
+handback is received from G6; the finite guard and two workflow dependency
+tokens remain with Root. This does not grant connected input, output, an
+epoch, installed acceptance or physical forced-row availability.
+
+Recoverable inactive patches, independent source reviews and real command
+receipts are preserved in [the source-receiving followup](handovers/2026-10-14-group3-source-receiving-followup/README.md).
+No item is removed; all native/installed/physical requirements remain.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
