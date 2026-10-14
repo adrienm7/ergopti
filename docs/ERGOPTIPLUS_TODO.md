@@ -13217,6 +13217,16 @@ is preserved separately. No capture reset, modifier clearing or output grant
 is added. Hosted native group changes, editor-key retargeting, collision and
 installed/physical acceptance remain required; item 108 stays partial.
 
+The registered native X11/XKB fixture preserves all 53 original checks and adds
+12 consumer observations after their original state prerequisites. Actual
+receiving on an owned Xvfb server passes 65/65 on the current source. French/US
+group changes renew the inverse without capture reset or manual consumer
+refresh; prior plans remain revoked across observed ABA and capture retirement.
+Historical pre-renewal receiving remains 59 passes/6 failures, separately
+retained. This qualifies native virtual-server maps and consumer plans; physical
+keyboard input, uinput output, native Wayland seats, Xorg device association and
+installed acceptance remain unqualified. Item 108 stays partial.
+
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:
   generated AHK/Lua/Swift composers, translated bare captions and live retitles
