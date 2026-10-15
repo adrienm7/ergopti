@@ -1045,3 +1045,44 @@ keep = true
 		end, true)
 	end)
 end)
+
+helpers.describe("native Manager collision claim source", function()
+	helpers.it("captures actual enabled key reservations and revokes after native disable or file replacement", function()
+		local Manager, _, _, path = manager('[tap_hold]\nenabled = true\ninherit_defaults = true\n')
+		local ok, why = pcall(function()
+			local frame = assert(Manager.capture_collision_inventory()); helpers.assert_true(frame.current())
+			local caps = false
+			for _, claim in ipairs(frame.claims) do
+				if claim.binding == "tap_hold__caps_lock" then caps = claim.codes[1] == 58 end
+			end
+			helpers.assert_true(caps); helpers.assert_eq(frame.codes.caps_lock, 58)
+			helpers.assert_true(Manager.set_enabled(false)); helpers.assert_eq(frame.current(), false)
+			local disabled = assert(Manager.capture_collision_inventory()); helpers.assert_eq(#disabled.claims, 0)
+			helpers.assert_true(Manager.set_enabled(true)); helpers.assert_eq(disabled.current(), false)
+			local current = assert(Manager.capture_collision_inventory())
+			write(path, '[tap_hold]\nenabled = false\ninherit_defaults = false\n')
+			helpers.assert_eq(current.current(), false); helpers.assert_nil(Manager.capture_collision_inventory())
+		end)
+		Manager._reset_for_test(); os.remove(path); if not ok then error(why, 0) end
+	end)
+	helpers.it("pausing the genuine Manager cannot publish an empty complete claim inventory", function()
+		local Manager, _, _, path = manager('[tap_hold]\nenabled = true\ninherit_defaults = true\n')
+		local ok, why = pcall(function()
+			local frame = assert(Manager.capture_collision_inventory()); Manager.set_paused(true)
+			helpers.assert_eq(frame.current(), false); helpers.assert_nil(Manager.capture_collision_inventory())
+			Manager.set_paused(false); helpers.assert_eq(frame.current(), false)
+		end)
+		Manager._reset_for_test(); os.remove(path); if not ok then error(why, 0) end
+	end)
+end)
+
+helpers.describe("original Engine native passthrough is not a tap-hold claim", function()
+	helpers.it("a native tap with no hold produces no collision reservation", function()
+		local Manager, _, _, path = manager('[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.tab]\ntap_action = ""\nhold_modifier = ""\nhold_layer = ""\n')
+		local ok, why = pcall(function()
+			local frame = assert(Manager.capture_collision_inventory())
+			helpers.assert_eq(#frame.claims, 0); helpers.assert_true(frame.current())
+		end)
+		Manager._reset_for_test(); os.remove(path); if not ok then error(why, 0) end
+	end)
+end)

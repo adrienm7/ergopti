@@ -1076,3 +1076,193 @@ helpers.describe("Linux merged shortcut acquisition custody", function()
 		end)
 	end)
 end)
+
+--- Real configuration/claim owners; only the native map observation is modeled.
+local function with_collision_scope(source, tap_config, body)
+	with_scope(function(scope, owners, controls, path)
+		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+		local Manager, tap_path, hook
+		local ok, why = pcall(function()
+			tap_path = os.tmpname()
+			Sandbox.write_bytes(tap_path, require("tests.support.tap_hold_fixture").with_preset(tap_config))
+			hook = { calls = 0 }
+			function hook.set_remapper(engine) hook.calls = hook.calls + 1; hook.engine = engine; return true end
+			function hook.key_text() return nil end
+			function hook.held_modifiers() return {} end
+			function hook.held_text_modifier_codes() return {} end
+			function hook.held_shortcut_modifier_codes() return {} end
+			Manager = require("platform.remap.tap_hold_manager")
+			helpers.assert_true(Manager.init({ keyboard_hook = hook, execute_action = function() error("no action during collision validation") end,
+				action_names = owners.gestures.get_executable_action_names, on_text_injected = function() error("no output during validation") end,
+				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }))
+			controls.source_reads, controls.intentional_hook_changes = 0, 0
+			-- This fixture acknowledges initial readiness solely to reach preflight.
+			-- Restore the genuine false getter before any existing outcome assertion.
+			local native_delivery = owners.keyboard.physical_delivery_available
+			helpers.assert_eq(native_delivery(), false)
+			local edit = scope.edit
+			scope.edit = function(rows, receipt)
+				controls.delivery_available = true
+				owners.keyboard.physical_delivery_available = function() return controls.delivery_available end
+				local called, accepted, reason = pcall(edit, rows, receipt)
+				owners.keyboard.physical_delivery_available = native_delivery
+				if not called then error(accepted, 0) end
+				return accepted, reason
+			end
+			local tokens = setmetatable({}, { __mode = "k" })
+			package.loaded["adapters.xkb_capture"] = {
+				chord_sources = function(requests)
+					controls.source_reads = controls.source_reads + 1
+					local token, rows = {}, {}
+					local identities = { [15] = "tab", [36] = "j", [37] = "k", [41] = "grave", [58] = "caps_lock" }
+					for _, request in ipairs(requests) do
+						for _, caps in ipairs({ false, true }) do
+							rows[#rows + 1] = { code = request.code, mods = request.mods, caps = caps,
+								identity = identities[request.code], dead = false }
+						end
+					end
+					tokens[token] = rows; return token
+				end,
+				chord_source_view = function(token) return tokens[token] and { generation = 7, chords = tokens[token] } or nil end,
+				chord_source_current = function(token)
+					if controls.on_source then controls.on_source() end
+					return tokens[token] ~= nil and not controls.source_refused
+				end,
+			}
+			local before = hook.calls
+			body(scope, owners, controls, path, Manager)
+			helpers.assert_eq(hook.calls, before + controls.intentional_hook_changes, "validation adds no native ownership change beyond the controlled fault injection")
+		end)
+		if Manager then Manager._reset_for_test() end
+		if tap_path then os.remove(tap_path) end
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(why, 0) end
+	end, source)
+end
+local COLLISION_BASE = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmagic_editor = "none"\n'
+local NO_TAP_HOLDS = '[tap_hold]\nenabled = false\ninherit_defaults = false\n'
+helpers.describe("Linux physical edit four-owner collision preflight", function()
+	for _, case in ipairs({
+		{ name = "ordinary logical binding", source = COLLISION_BASE .. 'ctrl_j = "copy"\n', key = "physical_ctrl_KeyJ", tap = NO_TAP_HOLDS },
+		{ name = "ordinary native None reservation", source = COLLISION_BASE .. 'ctrl_j = "none"\n', key = "physical_ctrl_KeyJ", tap = NO_TAP_HOLDS },
+		{ name = "plain tap key", source = COLLISION_BASE .. '[shortcuts.tap_keys]\nnumber_row_left = "copy"\n', key = "physical_none_Backquote", tap = NO_TAP_HOLDS },
+		{ name = "ordered combination", source = COLLISION_BASE .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n', key = "physical_none_Tab", tap = NO_TAP_HOLDS },
+		{ name = "simultaneous combination", source = COLLISION_BASE .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n', key = "physical_none_Tab", chord = "tab_then_caps_lock", tap = NO_TAP_HOLDS },
+		{ name = "native tap-hold prefix", source = COLLISION_BASE, key = "physical_none_Tab", tap = '[tap_hold]\nenabled = true\ninherit_defaults = true\n' },
+	}) do
+		helpers.it("refuses " .. case.name .. " before any write or native ownership change", function()
+			with_collision_scope(case.source, case.tap, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				if case.chord then helpers.assert_eq(owners.combinations.get_chord(case.chord), "copy", "actual canonical simultaneous owner must claim this fixture") end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = case.key, value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
+				helpers.assert_eq(Sandbox.read_bytes(path), before); helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(#controls.executed, 0); helpers.assert_eq(controls.pair_changes, 0)
+				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+			end)
+		end)
+	end
+	helpers.it("four-family preflight with no known collision does not grant native delivery", function()
+		with_collision_scope(COLLISION_BASE .. 'ctrl_j = "copy"\n', NO_TAP_HOLDS, function(scope, _, controls, path)
+			local before = Sandbox.read_bytes(path)
+			-- The partial native model withdraws readiness at the source observation.
+			controls.on_source = function() controls.delivery_available = false end
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_ctrl_KeyK", value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			helpers.assert_eq(controls.source_reads, 1); helpers.assert_eq(Sandbox.read_bytes(path), before)
+			helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		end)
+	end)
+	for _, boundary in ipairs({ "source", "tap owner", "paused Manager", "held owner" }) do
+		helpers.it("refuses " .. boundary .. " revocation during the original map observation", function()
+			with_collision_scope(COLLISION_BASE .. 'ctrl_j = "copy"\n', NO_TAP_HOLDS, function(scope, owners, controls, path, Manager)
+				local once, token, original = false, {}, owners.taps.capture_collision_inventory
+				controls.on_source = function()
+					if once then return end; once = true
+					if boundary == "source" then Sandbox.write_bytes(path, COLLISION_BASE)
+					elseif boundary == "tap owner" then owners.taps.capture_collision_inventory = function() return nil end
+					elseif boundary == "paused Manager" then
+						Manager.set_paused(true); controls.intentional_hook_changes = controls.intentional_hook_changes + 1
+					else owners.keyboard.acquire_configuration(token) end
+				end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_ctrl_KeyJ", value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+				helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+				owners.taps.capture_collision_inventory = original
+				if boundary == "held owner" then helpers.assert_true(owners.keyboard.release_configuration(token)) end
+				if boundary == "paused Manager" then Manager.set_paused(false); controls.intentional_hook_changes = controls.intentional_hook_changes + 1 end
+			end)
+		end)
+	end
+	helpers.it("the shared policy preserves None and ordered claim identity without granting readiness", function()
+		local policy = require("shortcuts.physical_conflicts")
+		local request = { slot = "physical_none_CapsLock", code = 58, action = "none", mods = {}, aliases = {} }
+		local claims = { { kind = "prefix", binding = "combination__caps_lock_then_tab", codes = { 58, 15 } } }
+		helpers.assert_eq(policy.conflicts(request, claims), false)
+		request.action = "copy"
+		local conflict, binding = policy.conflicts(request, claims)
+		helpers.assert_true(conflict); helpers.assert_eq(binding, "combination__caps_lock_then_tab")
+		request.code = 36; helpers.assert_eq(policy.conflicts(request, claims), false)
+	end)
+end)
+
+helpers.describe("partial collision domains remain unavailable", function()
+	helpers.it("modified native-prefix overlap remains unknown instead of a guessed collision", function()
+		with_collision_scope(COLLISION_BASE, '[tap_hold]\nenabled = true\ninherit_defaults = true\n', function(scope, _, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_ctrl_CapsLock", value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			helpers.assert_eq(Sandbox.read_bytes(path), before); helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(controls.runtime_calls, 0)
+		end)
+	end)
+end)
+
+helpers.describe("conditional Magic Editor yields during collision preflight", function()
+	for _, case in ipairs({
+		{ name = "default active Magic Editor yields to a new explicit physical source without granting delivery", stored = nil },
+		{ name = "custom Magic Editor action also yields to a new explicit physical source", stored = "copy" },
+	}) do
+		helpers.it(case.name, function()
+			local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\n'
+				.. (case.stored and 'magic_editor = "copy"\n' or '')
+			with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
+				local names = { "modules.hotstrings.magic_key_source", "modules.hotstrings.magic_key" }
+				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+				local ok, why = pcall(function()
+					local facts = { generation = 7, status = "ready", candidates = {
+						{ code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false },
+					} }
+					-- Native facts are modeled; both the actual keyboard consumer and
+					-- shared conditional priority policy execute without replacement.
+					package.loaded[names[1]] = { editor_source = function() return facts end,
+						known_codes = function() return { KeyJ = true } end }
+					package.loaded[names[2]] = { get = function() return "★" end }
+					local before = Sandbox.read_bytes(path)
+					local decision = owners.keyboard.magic_editor_decision({ master = true, paused = false, inhibited = false })
+					helpers.assert_true(decision.active); helpers.assert_eq(decision.source.native_code, 36)
+					helpers.assert_eq(decision.action, case.stored or Manifest.default_for("shortcuts.keyboard.magic_editor"))
+					local policy = require("shortcuts.magic_editor")
+					local projected = policy.resolve({ default_action = Manifest.default_for(policy.PATH), stored_action = case.stored,
+						is_action = owners.gestures.is_assignable, trigger = "★", source = facts, known_codes = { KeyJ = true },
+						explicit_claims = { ["evdev:36"] = { action = "copy", binding_id = "keyboard__physical_super_KeyJ" } },
+						configuration_generation = 1, admission = { master = true, paused = false, inhibited = false } })
+					helpers.assert_eq(projected.active, false); helpers.assert_eq(projected.reason, "explicit_assignment")
+					-- The conditional recommendation yields; only the independent
+					-- modeled capability revocation prevents a new publication.
+					controls.on_source = function() controls.delivery_available = false end
+					local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_super_KeyJ", value = "copy", intent = "keyboard_assignment" } })
+					helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable", "yielding conditional recommendation is not a personal collision")
+					helpers.assert_eq(Sandbox.read_bytes(path), before); helpers.assert_eq(#controls.backups, 0)
+					helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
+					helpers.assert_eq(#controls.executed, 0); helpers.assert_eq(controls.pair_changes, 0)
+					helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+				end)
+				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+				if not ok then error(why, 0) end
+			end)
+		end)
+	end
+end)

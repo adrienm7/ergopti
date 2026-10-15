@@ -12613,6 +12613,23 @@ producer is now integrated and Source-identical to the reviewed prerequisite;
 real producer/GUI/input/output and installed qualification remain required. This
 optional capture path grants no public physical assignment or delivery.
 
+A Linux physical-edit preflight joins four claim families before
+configuration acquisition: personal keyboard bindings, plain tap keys,
+ordered/simultaneous combinations and TapHold input prefixes. Shared pure
+matching preserves native None/removal and refuses known collisions or stale
+configuration/source/owner receipts without writes or native ownership changes.
+Both Lua ABIs pass 519/0 across six existing modules (491 preceding cases
+plus 28 additions); all original assertions remain intact. Strict unavailable
+capability refuses before observers, and parameter-only edits keep the original
+typed publisher. Sixteen causal children preserve three preceding-code failures
+and the post-observer revocation guard before the corrected cases pass. The
+first complete selected run's thirteen Linux unit failures remain recorded;
+the corrected complete rerun now passes 13,725/0 across 521 modules and all
+193 E2E cases. Final Common, native packaging and installation remain separate.
+This is controlled software receiving with modeled map ports. Public delivery stays false: Script/Navigation/hotstring/other
+consumers, cross-device source/modifier/output and real dead-key joins remain
+open, as do Windows/macOS, native/installed and physical qualification.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -12650,6 +12667,17 @@ optional capture path grants no public physical assignment or delivery.
   physical observation. No foreign replacement can settle its original token;
   refusal retries retain that exact capability. This does not grant a physical J
   identity, star migration, collision admission or native output authority.
+
+  The Linux four-family collision preflight also protects this
+  editor's active physical-assignment path before its configuration transaction.
+  Known personal reservations refuse; None/removal preserves native intent
+  rather than acquiring another output. Controlled original and additive cases
+  pass 519/0 across six modules on both Lua ABIs. The corrected preflight
+  preserves the original strict capability ordering and parameter-only publisher;
+  the complete rerun passes 13,725 unit cases and all 193 E2E cases. Final
+  Common/native receiving remains separate. No chosen-key output, star-setting migration or
+  public physical delivery is enabled; other input owners, native output,
+  three-OS integration and installed/device acceptance remain unfinished.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -13720,6 +13748,20 @@ producer and native65 consumer assertions while joining original map, group,
 queue and output issuers. Its optional native dependency remains undeclared;
 this partial software adoption grants no physical editor-key delivery. Live
 retargeting, complete collisions, native and installed acceptance stay open.
+
+The Linux collision preflight preserves conditional-editor
+priority: default and custom Magic Editor recommendations yield to a personal
+physical source instead of becoming hard reservations. The unchanged genuine
+shared policy is exercised by two real-policy regressions; V1 fails both and
+the successor passes them on both Lua ABIs, while personal logical/None
+collision controls remain. All 519 focused cases pass, including 491 preceding
+cases and 28 additions across six existing modules. The readiness-order and
+parameter-only regressions are causally checked without relaxing the original
+post-observer revocation guard. The complete corrected rerun passes 13,725/0
+unit cases and 193/193 E2E cases; final Common/native receiving stays separate.
+This partial four-family inventory grants no public
+delivery and does not complete Script/Navigation/hotstring/other consumers or
+native input/output joins, Windows/macOS or installed/physical qualification.
 
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:

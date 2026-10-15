@@ -291,3 +291,31 @@ helpers.describe("Tap-key configuration admission", function()
 		end)
 	end
 end)
+
+helpers.describe("tap-key collision claim source", function()
+	helpers.it("captures only assigned plain taps and revokes after real publication", function()
+		local taps, log = fresh({ number_row_left = "send_text" })
+		local ok, why = pcall(function()
+			local frame = taps.capture_collision_inventory()
+			helpers.assert_true(type(frame) == "table"); helpers.assert_true(frame.current())
+			helpers.assert_eq(#frame.claims, 1); helpers.assert_eq(frame.claims[1].code, 41)
+			helpers.assert_eq(frame.claims[1].mods, {}); helpers.assert_eq(frame.claims[1].binding, "tap_key__number_row_left")
+			helpers.assert_true(taps.set_action("number_row_left", "none"))
+			helpers.assert_eq(frame.current(), false); helpers.assert_eq(frame.sealed(), false)
+			helpers.assert_eq(#taps.capture_collision_inventory().claims, 0)
+		end)
+		log.restore(); if not ok then error(why, 0) end
+	end)
+	helpers.it("refuses a held configuration owner and observes disable after capture", function()
+		local taps, log = fresh({ number_row_left = "send_text" })
+		local ok, why = pcall(function()
+			local frame = assert(taps.capture_collision_inventory()); log.active = false
+			helpers.assert_eq(frame.current(), false)
+			log.active = true
+			local token = {}; helpers.assert_true(taps.acquire_configuration(token))
+			helpers.assert_nil(taps.capture_collision_inventory()); helpers.assert_eq(frame.current(), false)
+			helpers.assert_true(taps.release_configuration(token)); helpers.assert_eq(frame.current(), false)
+		end)
+		log.restore(); if not ok then error(why, 0) end
+	end)
+end)
