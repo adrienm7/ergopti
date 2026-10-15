@@ -1,0 +1,162 @@
+{
+  "state": "FINITE_SOURCE_CLEAR",
+  "scope": "Seven exact sealed private relay code/test postimages and eight connected-worker/enrollment subjects; source composition only, no canonical adoption or runtime qualification.",
+  "relay_manifest": {
+    "path": "/workspace/ergopti-group5-work/vhd-daemon-report-relay-private-20261015/SEALED-SOURCE-ONLY/MANIFEST.json",
+    "sha256": "aa19de891816e7d90697fc0878fe3c0ec5151d402ced6718d94ea88e7b3434c2",
+    "census_sha256": "01b666eba17162827182600a9cfb7ae754bbd5195f71433aa38f9b71397b9b24",
+    "subjects": 28,
+    "patch_sha256": "a2d0cce396d38aaf21477d30f42c6a0d0436154f135697193b34299067d75f55"
+  },
+  "connected_manifest": {
+    "path": "/workspace/ergopti-group5-work/vhd-daemon-report-worker-private-20261015/CONNECTED-SOURCE-MANIFEST.json",
+    "sha256": "0222f331b910dd355a53a4f84e3b0823a0ca5ba0b74e02a3042d700a4d927a3f",
+    "subjects": 8
+  },
+  "relay_postimages": [
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+      "mode": "100644",
+      "pre_sha256": null,
+      "post_sha256": "2156aaf593207609e5812f27292e0fc86572d90eb842e87dc3fbdfe0d50e5483",
+      "post_bytes": 25135
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+      "mode": "100644",
+      "pre_sha256": null,
+      "post_sha256": "57bfc0cb5eb8adde6894b6ec55f1a235a4c95cf6ce6b1bd1c51d0772b89dc567",
+      "post_bytes": 15865
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+      "mode": "100644",
+      "pre_sha256": null,
+      "post_sha256": "7fd7faa1c7d6f0367dc8a0b374d81b76702caf860addeffd7e1834fa8f7801cf",
+      "post_bytes": 12990
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+      "mode": "100644",
+      "pre_sha256": "99ecabdc6fba25df9c85a4a4b5d7019dd584174b57a493fb55a56dd4573b2804",
+      "post_sha256": "34c9a0c4898c5706a271fcb239e597e1c3ce8e5fe0907bfdc38470ae1feceb09",
+      "post_bytes": 57148
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+      "mode": "100644",
+      "pre_sha256": null,
+      "post_sha256": "fdd555bb145de3a39675cd74d81d4608165622450d04ff0ef689fc4f402e4c4e",
+      "post_bytes": 6909
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+      "mode": "100644",
+      "pre_sha256": "e032b6c651457e8df0ac3fad3bb917e13c09149157294177e9a66e7c1e10d95f",
+      "post_sha256": "e732aaa5a92fbc42f71fe95a35c4dc5177266635e850f3ccf568912b0baded96",
+      "post_bytes": 5127
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+      "mode": "100644",
+      "pre_sha256": "f0607aa707ad19ba8f783ab52b548f88fae16d8a5a7c7861fd6ceb00bde2626d",
+      "post_sha256": "84aff1a2ba6913e498c54bdd2d3942794d60f7f976763a821709f33baf847fa2",
+      "post_bytes": 1088
+    }
+  ],
+  "connected_subjects": [
+    {
+      "path": "OwnedVirtualHIDDaemonReportWorker.swift",
+      "bytes": 6574,
+      "sha256": "374ea3e82fd04cbf1e7251048a171126ca460760243f6b09e8e4f8c25c9bff5f"
+    },
+    {
+      "path": "OwnedVirtualHIDDaemonReportWorkerTests.swift",
+      "bytes": 1884,
+      "sha256": "a327cc77f259e37e6b50ed77ed6911363c9b7abd18b8db56115801c84f7bae5a"
+    },
+    {
+      "path": "InstallerMain.before.swift",
+      "bytes": 1220,
+      "sha256": "3ef17872340f01377baebc690f379a7467df6c2f32baa395420824cc54cfbfe6"
+    },
+    {
+      "path": "InstallerMain.after.swift",
+      "bytes": 1395,
+      "sha256": "9c8c79b590a736899f7eafeb99090be22adc1608c9a991b6f903d4e3ee829b9c"
+    },
+    {
+      "path": "owned_runtime_product_build.before.py",
+      "bytes": 65478,
+      "sha256": "dc14141df1630b7d43e0b443a7bf6eb76b76902bda7818710367f76139288f12"
+    },
+    {
+      "path": "owned_runtime_product_build.after.py",
+      "bytes": 65799,
+      "sha256": "e3e9e61674bb69e9245218da4491ab804ddd9cc5d50d40ea47b3d747db129966"
+    },
+    {
+      "path": "WORKER-CONNECTION-BEFORE-CODE.json",
+      "bytes": 1136,
+      "sha256": "38b530caf170f0e4147e7f5be989e11daa4c46c3947c3516dfa96c8226b1a50f"
+    },
+    {
+      "path": "SDK-RELAY-ENROLLMENT-BEFORE-CODE.json",
+      "bytes": 413,
+      "sha256": "a46915e89cc2a045feea2bb7f755d85592ccd2910c91ffa8a020eb7dd33d6635"
+    }
+  ],
+  "authentication": {
+    "all_28_plus_8_size_hashes": true,
+    "declared_seven_modes_100644": true,
+    "actual_c5ed_main_PRE_and_four_absences_readonly_Git": true,
+    "seven_full_forward_and_inverse_in_memory": true,
+    "original_Main_entire_byte_inverse": true,
+    "original_InstallerMain_entire_byte_inverse_SDK_guard": true,
+    "builder_entire_byte_inverse_only_seven_SDK_roster_append_lines": true,
+    "original_builder_all_40_nested_function_class_AST_nodes_equal": true,
+    "standalone_worker_dea3_source_retained_and_closed_encoded_category_block_whole": true,
+    "original_three_worker_test_source_bytewhole": true
+  },
+  "corrected_draft_findings": [
+    "All actual new C declarations remain within extern C.",
+    "Stage holds original nested parent descriptors and exact named ancestor links, checks the exact final leaf/held identity after digest before unlink, and rechecks remaining parent/ancestry after own namespace effect.",
+    "Full static CMS/source/tree checks precede first removal. Actual self csops kernel valid/not-killed CDHash and birth plus independent original executable witness support only same-original negative cleanup after recorded self-unlinks; no cached leaf becomes forward authority.",
+    "Actual same-origin accept remains possible after local stop for initial op2; observe1 cannot send once withdrawn.",
+    "Pre-start source revocation now marks refusal, and poll attempts checked original closure instead of pending forever."
+  ],
+  "connected_order": [
+    "Actual Root Request is received before independent Stage capture. Initial withdrawal does not acquire Observer.",
+    "Actual observer acquisition and negative callback pump are retained; pump joins before any Root transport retirement. Failed join returns75 and does not acknowledge debt closure.",
+    "Closed historical/refusal/debt DATA is sent before Root retirement; exact same-origin Retirement must match captured Stage, whose original independent publisher/witness/nodes must retire before exit0/77.",
+    "Unknown partial stage, stream close, pump frame or source debt returns75; timeout issues negative stop and does not mint cleanup acknowledgment.",
+    "Main historical output requires exact nonce/source/helper CDHashes, native original helper exit0 and own checked resource/route retirement. EOF, script return, process presence and timeout do not substitute."
+  ],
+  "historical_semantics": "Five named booleans describe only the passive observer connection at the sampled time. Remote erase_client/IOKit cleanup remains unobserved; no live currentness, ABI/client capability, installed readiness, HID, install/update or startup grant. Root1-4, B/Choice tickets and ordinary startup defaults are untouched.",
+  "official_self_api": {
+    "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+    "provenance_sha256": "0ff549069c725b77697a5974061266ebad64b5d61c543120de8c668996c2fdb7",
+    "source_facts": [
+      "CS_OPS_STATUS0 returns32-bit flags; CS_VALID1 and CS_KILLED0x01000000 are authentic definitions.",
+      "CS_OPS_CDHASH5 returns20 bytes from actual retained executing p_textvp/p_textoff, using pid0 for self; MACF errors remain refusals.",
+      "No mark/invalidation/entitlement operation is called."
+    ]
+  },
+  "remaining_dependency_holds": [
+    "Authentic target Darwin SDK sys/codesign.h and kern/cs_blobs.h exports/linkage have not been received. Their absence explicitly returns ENOTSUP; Main preflight refuses before administrator staging. This is an unresolved compiler supplier, not native-only completion.",
+    "Actual signed helper/resource source composition, compiled SDK helper and Main, Security/Swift/C/kernel receiving and administrator/stage namespace behavior remain unexecuted here.",
+    "Thirteen relay XCTest methods and three worker XCTest methods are source only, not executed native cases."
+  ],
+  "reviewer_execution": {
+    "candidate_import": false,
+    "target_tests": false,
+    "compiler_native_kernel_admin": false,
+    "canonical_index_refs_writes": false,
+    "source_hash_JSON_AST_and_readonly_Git_checks_only": true
+  },
+  "preserved_prior_review": {
+    "path": "/workspace/ergopti-group5-work/vhd-daemon-report-relay-independent-negative-freeze-20261015/DRAFT-SOURCE-REVIEW.json",
+    "sha256": "39567768e5206b2e8b20e7422691e836a1f45315292221652b922659dd8420df",
+    "status": "Immutable prior draft HOLD; current finite source corrections do not rewrite it."
+  }
+}

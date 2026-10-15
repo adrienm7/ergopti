@@ -1,0 +1,46 @@
+{
+  "scope": "Exact fifteen-source forward/inverse on a small private preimage view; no canonical/native/compiler execution",
+  "commands": [
+    {
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "--whitespace=error",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-combined-private-20261015/SOURCE.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "--whitespace=error",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-combined-private-20261015/SOURCE.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "--reverse",
+        "--check",
+        "--whitespace=error",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-combined-private-20261015/SOURCE.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "--reverse",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-combined-private-20261015/SOURCE.patch"
+      ],
+      "exit": 0
+    }
+  ],
+  "postimages_exact": 15,
+  "inverse_exact": 15
+}

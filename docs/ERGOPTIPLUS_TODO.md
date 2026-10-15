@@ -4688,6 +4688,15 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
   with an explanation and offer a driver-only update requiring explicit
   confirmation. About 30-40 agent-days plus maintainer hardware time.
 
+  A passive VirtualHID daemon-report proposal is preserved in
+  `docs/handovers/2026-10-15-group5-daemon-report/`. Its 15 prepared
+  production/test paths have independent source review and exact forward/inverse
+  evidence, but remain unapplied. The 28 authored XCTest methods have not run;
+  real SDK compilation, current source approval/shared-file handoff, ARM64 and
+  Intel execution, and privileged endpoint/retirement receiving remain required.
+  Historical five-Boolean data grants no numeric ABI, READY, installation or
+  remote-cleanup authority and does not establish the lease incident's cause.
+
   The diagnostic producer, CLI baseline admission and current Python reader
   now agree on baseline version 2, retaining keyboard type per device and HID
   usage page per key. Live readers require complete version-2 coverage;
