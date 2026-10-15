@@ -1,0 +1,66 @@
+{
+	"schema_version": 1,
+	"positive": [
+		{
+			"id": "media.play_pause",
+			"page": 12,
+			"usage": 205,
+			"system": "PLAY",
+			"evdev": 164,
+			"label": "sg_actions.track_play"
+		},
+		{
+			"id": "media.next_track",
+			"page": 12,
+			"usage": 181,
+			"system": "NEXT",
+			"evdev": 163,
+			"label": "sg_actions.track_next"
+		},
+		{
+			"id": "media.previous_track",
+			"page": 12,
+			"usage": 182,
+			"system": "PREVIOUS",
+			"evdev": 165,
+			"label": "sg_actions.track_prev"
+		},
+		{
+			"id": "media.brightness_up",
+			"page": 12,
+			"usage": 111,
+			"system": "BRIGHTNESS_UP",
+			"evdev": 225,
+			"label": "sg_actions.brightness_up"
+		},
+		{
+			"id": "media.brightness_down",
+			"page": 12,
+			"usage": 112,
+			"system": "BRIGHTNESS_DOWN",
+			"evdev": 224,
+			"label": "sg_actions.brightness_down"
+		}
+	],
+	"negative_hid": [
+		[12, 226],
+		[12, 233],
+		[12, 234],
+		[12, 176],
+		[7, 205],
+		[255, 4],
+		[65281, 32],
+		[8, 1]
+	],
+	"press_expected": {
+		"media.play_pause": 2,
+		"media.next_track": 1
+	},
+	"hold_expected": {
+		"sum_ms": 351,
+		"count": 2,
+		"max_ms": 201,
+		"tap_count": 1,
+		"hold_count": 1
+	}
+}

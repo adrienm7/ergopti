@@ -1,0 +1,10 @@
+{
+  "coexistence-source-custody.tar.gz": {
+    "sha256": "56321da8b691683199e290c653f0ffeb5a26ce4a07334eed89332d46fa8ac7f9",
+    "bytes": 5454699
+  },
+  "RECEIPT.json": {
+    "sha256": "055849fe8d95c73f8d3b6247fcf51d765866cd6a2949ea4f938c839d17e0533f",
+    "bytes": 2863
+  }
+}

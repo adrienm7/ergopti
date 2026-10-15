@@ -1,0 +1,63 @@
+{
+  "archive": "coexistence-source-custody.tar.gz",
+  "sha256": "56321da8b691683199e290c653f0ffeb5a26ce4a07334eed89332d46fa8ac7f9",
+  "bytes": 5454699,
+  "archive_members": 251,
+  "indexed_original_bodies": 365,
+  "unique_content_blobs": 243,
+  "distinct_final_paths": 40,
+  "stream_readback": "ALL_MEMBERS_BYTE_MODE_KIND_EXACT",
+  "original_source_recut": "ALL_EXACT",
+  "execution": "PACKAGING_ONLY_NO_APPLICATION_EXECUTION",
+  "limits": {
+    "status": "INERT_SOURCE_CUSTODY_HANDOFF_NO_PRODUCT_ADOPTION",
+    "source_paths": {
+      "reviewed_coexistence_composition": 37,
+      "separate_root_proof_proposal": 2,
+      "separate_guardian_proposal": 1,
+      "distinct_total": 40
+    },
+    "order": [
+      "original34",
+      "integration31",
+      "cold2",
+      "proof2 independent Root-owned proposal",
+      "guardian1 independent Root-owned proposal"
+    ],
+    "reviews": [
+      [
+        "coexist-layout-proof-independent-payload-20261015/REVIEW.json",
+        "1d5ed09eb558d06e9a280004226dbd13f5daa891a1525f4a8a626a378eaec742"
+      ],
+      [
+        "owned-coexistence-choice-independent-payload-20261015/REVIEW.json",
+        "2d40c19abb136950ea3edd6434e719cb491beefa8454e9e2f8e88b8756008090"
+      ],
+      [
+        "coexist-integration-cold-independent-source-20261015/REVIEW.json",
+        "1d23f1cfdbc6188615ff9ff66b5c0abc7f2e840fa3c37c1e2c3c8364eb343c1b"
+      ],
+      [
+        "menu-preference-coexistence-guardian-independent-payload-20261015/REVIEW.json",
+        "a5a313f4c5e691cb0b0a44adf132b3e402887112ddd0625d6e154cec7d1a266d"
+      ]
+    ],
+    "proof2": {
+      "source_manifest": "b6a699b36fffcfa7a84e2e74f2b7fbbdf043003461e5e4b7816aba7e9fd8d669",
+      "independent_review": "SOURCE_CLEAR_FINITE_1d5ed09e_NOT_WHOLE_PARITY_GREEN",
+      "natural_full_parity": "AUTHOR_REPORTED_TERMINAL_EXIT_1",
+      "observed_failure": "old historical/recovery matrix at test-menu-parity.cjs:8210: actual0 expected1; original Layout4894 passes",
+      "successor": "NOT_INCLUDED_UNTIL_SEALED; matrix join remains incomplete"
+    },
+    "execution": "No tests/native/compiler/installer run by this packaging task. Saved source/model receipts retain original scopes/counts; no summed execution credit.",
+    "not_granted": [
+      "Root helper or guardian adoption",
+      "native/AppleDouble/CMS/ABI/READY qualification",
+      "active stock stop authority; Cloud247 mutator absent",
+      "Root current source/profile admission",
+      "Linux consumer or supplier admission"
+    ],
+    "public_base": "538df2395a09cf1b88a0f3975403b8065ae6fa74; exact PRE bodies included; proof and guardian PREs are explicit separate current-source prerequisites, not falsely claimed public538",
+    "privacy": "Only declared source bodies, controlled fixture receipts and reviews; no full VIEW, Git checkout, user environment, tokens or personal logs."
+  }
+}

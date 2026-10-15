@@ -1,0 +1,41 @@
+{
+	"_description": "Closed metrics identities for consumer keys without macOS virtual keycodes. These source mappings do not admit native input, enable an observer or assign keyboard geometry. Existing volume keys keep their historical numeric identities.",
+	"schema_version": 1,
+	"keys": [
+		{
+			"id": "media.play_pause",
+			"label_key": "sg_actions.track_play",
+			"hid": { "page": 12, "usage": 205 },
+			"macos_system": "PLAY",
+			"linux_evdev": 164
+		},
+		{
+			"id": "media.next_track",
+			"label_key": "sg_actions.track_next",
+			"hid": { "page": 12, "usage": 181 },
+			"macos_system": "NEXT",
+			"linux_evdev": 163
+		},
+		{
+			"id": "media.previous_track",
+			"label_key": "sg_actions.track_prev",
+			"hid": { "page": 12, "usage": 182 },
+			"macos_system": "PREVIOUS",
+			"linux_evdev": 165
+		},
+		{
+			"id": "media.brightness_up",
+			"label_key": "sg_actions.brightness_up",
+			"hid": { "page": 12, "usage": 111 },
+			"macos_system": "BRIGHTNESS_UP",
+			"linux_evdev": 225
+		},
+		{
+			"id": "media.brightness_down",
+			"label_key": "sg_actions.brightness_down",
+			"hid": { "page": 12, "usage": 112 },
+			"macos_system": "BRIGHTNESS_DOWN",
+			"linux_evdev": 224
+		}
+	]
+}

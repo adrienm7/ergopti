@@ -29,7 +29,7 @@ end
 --- capture.
 --- Explicit holds ports enable matching; legacy diagnostic callers remain press-only.
 --- Production capture always supplies convert, interval context and exact-true release emit.
----@param dependencies table admit, context, keycode and emit; batch_limit; optional holds and baseline_ready ports.
+---@param dependencies table admit, context, keycode and emit; batch_limit; optional holds, media and baseline_ready ports.
 ---@return table receiver
 function M.new(dependencies)
 	local ports = {}
@@ -53,6 +53,19 @@ function M.new(dependencies)
 			assert(type(dependencies.holds[name]) == "function", "Missing physical hold port: " .. name)
 			hold_ports[name] = dependencies.holds[name]
 		end
+	end
+	local media_ports
+	if dependencies.media ~= nil then
+		assert(type(dependencies.media) == "table", "Invalid semantic media capability")
+		media_ports = {}
+		for _, name in ipairs({ "resolve", "is_known", "emit" }) do
+			assert(type(dependencies.media[name]) == "function", "Missing semantic media port: " .. name)
+			media_ports[name] = dependencies.media[name]
+		end
+		local emit_release = rawget(dependencies.media, "emit_release")
+		assert((emit_release == nil or type(emit_release) == "function")
+			and (hold_ports == nil or type(emit_release) == "function"), "Missing semantic media release port")
+		media_ports.emit_release = emit_release
 	end
 	local uncounted = {}
 	local receiver = {}
@@ -270,6 +283,17 @@ function M.new(dependencies)
 					else
 						assert(type(reason) == "string" and reason ~= "", "Uncounted physical usage has no reason")
 					end
+					local media_id
+					if keycode == nil and media_ports then
+						media_id = media_ports.resolve(element.page, element.usage, keyboard_type, element.device)
+						assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
+						if media_id ~= nil then
+							assert(type(media_id) == "string" and media_id:match("^media%.[a-z][a-z_]+$")
+								and media_ports.is_known(media_id) == true,
+								"Invalid semantic media identity")
+							assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
+						end
+					end
 					local context = ports.context(element.timestamp, element.device)
 					assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
 					assert(type(context) == "table" and type(context.allowed) == "boolean",
@@ -280,7 +304,7 @@ function M.new(dependencies)
 								page = element.page, usage = element.usage, keyboard_type = keyboard_type,
 								keycode = keycode, held = element.held }
 						end
-						if keycode == nil then
+						if keycode == nil and media_id == nil then
 							pending_uncounted[#pending_uncounted + 1] = { page = element.page, usage = element.usage,
 								keyboard_type = keyboard_type, reason = reason }
 						else
@@ -288,8 +312,8 @@ function M.new(dependencies)
 								and type(context.timestamp) == "string" and context.timestamp ~= "",
 								"Physical event context is incomplete")
 							local press = { capture = owner.capture, device = element.device,
-								keycode = keycode, app = context.app, timestamp = context.timestamp }
-							pending[#pending + 1] = { entry = press, kind = "press" }
+								keycode = keycode, media_id = media_id, app = context.app, timestamp = context.timestamp }
+							pending[#pending + 1] = { entry = press, kind = "press", media = media_id ~= nil }
 							if hold_ports then
 								local observed_ns = hold_ports.convert(element.timestamp)
 								assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
@@ -297,7 +321,7 @@ function M.new(dependencies)
 								local device = held[element.device] or {}
 								assert(not device[element.cookie], "Physical hold already owns the element")
 								device[element.cookie] = { capture = press.capture, device = press.device, keycode = press.keycode,
-									app = press.app, timestamp = press.timestamp, ticks = element.timestamp, observed_ns = observed_ns }
+									media_id = media_id, app = press.app, timestamp = press.timestamp, ticks = element.timestamp, observed_ns = observed_ns }
 								held[element.device] = device
 							end
 						end
@@ -315,8 +339,8 @@ function M.new(dependencies)
 						assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
 						assert(type(context) == "table" and type(context.allowed) == "boolean", "Physical hold interval is unavailable")
 						if context.allowed then
-							pending[#pending + 1] = { kind = "release", entry = { capture = press.capture,
-								device = press.device, keycode = press.keycode, app = press.app, timestamp = press.timestamp,
+							pending[#pending + 1] = { kind = "release", media = press.media_id ~= nil, entry = { capture = press.capture,
+								device = press.device, keycode = press.keycode, media_id = press.media_id, app = press.app, timestamp = press.timestamp,
 								hold_ms = Release.duration((released_ns - press.observed_ns) // 1000000) } }
 						end
 					end
@@ -324,7 +348,9 @@ function M.new(dependencies)
 			end
 			for _, event in ipairs(pending) do
 				assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
-				local emit = event.kind == "press" and ports.emit or hold_ports.emit
+				local emit
+				if event.media then emit = event.kind == "press" and media_ports.emit or media_ports.emit_release
+				else emit = event.kind == "press" and ports.emit or hold_ports.emit end
 				local accepted = emit(event.entry)
 				assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
 				assert(accepted == true, "Physical sink refused the " .. event.kind)

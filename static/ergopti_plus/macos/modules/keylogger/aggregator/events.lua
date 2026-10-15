@@ -415,6 +415,16 @@ local MANIFEST_STAT_FIELDS = {
 function M.walk_system_event(entry)
 	if not C.require_init("walk_system_event") then return end
 	C.ensure_batch()
+	if entry.action == "physical_media_press" then
+		require("keylogger.media_store").replay(C.media_policy(), S.agg_batch, { entry }, C.HOLD_THRESHOLD_MS)
+		local ctx = C.get_app_ctx(entry.app)
+		-- Break only the physical channel; logical text continuity is separate.
+		if ctx.physical then Physical.advance_streak(nil, ctx.physical, nil) end
+		return
+	elseif entry.action == "physical_media_release" then
+		require("keylogger.media_store").replay(C.media_policy(), S.agg_batch, { entry }, C.HOLD_THRESHOLD_MS)
+		return
+	end
 	if entry.action == "physical_press" then
 		Physical.walk_press(entry, C, S)
 		return

@@ -411,3 +411,38 @@ helpers.describe("Sql.flush — distribution JSON survives successive ticks (HS-
 		end
 	end)
 end)
+
+
+helpers.describe("Sql.flush: semantic media retains exact refusal debt", function()
+	local function media_batch()
+		S.initialized = true; S.device_id = "media-owner"; Core.reset_batch()
+		S.agg_batch.media_ngram = {}
+		S.agg_batch.media_hold = {}
+		S.agg_batch.media_ngram["press"] = { date = "2026-10-13", app = "media-editor", media_id = "media.play_pause", count = 2 }
+		S.agg_batch.media_hold["hold"] = { date = "2026-10-13", app = "media-editor", media_id = "media.play_pause",
+			sum_ms = 535, count = 3, max_ms = 300, tap_count = 2, hold_count = 1 }
+	end
+	helpers.it("refuses success and retains only an unacknowledged media delta", function()
+		media_batch()
+		make_fake_db(function(sql) return sql:find("INSERT INTO agg_app_day_media_hold", 1, true) ~= nil end)
+		helpers.assert_eq(Sql.flush(), false)
+		helpers.assert_nil(S.agg_batch.media_ngram.press)
+		helpers.assert_eq(S.agg_batch.media_hold.hold.sum_ms, 535)
+		helpers.assert_eq(S.agg_batch.media_hold.hold.count, 3)
+		make_fake_db(function() return false end)
+		helpers.assert_true(Sql.flush())
+		helpers.assert_nil(S.agg_batch.media_hold.hold)
+	end)
+	helpers.it("writes unpositioned media separately and preserves numeric volume deltas", function()
+		media_batch()
+		S.agg_batch.kc_ngram["mute"] = { date = "2026-10-13", app = "media-editor", keycode = 74, count = 9 }
+		local statements = {}
+		make_fake_db(function(sql) statements[#statements + 1] = sql; return false end)
+		helpers.assert_true(Sql.flush())
+		local text = table.concat(statements, "\n")
+		helpers.assert_true(text:find("INSERT INTO ngram_media_keys", 1, true) ~= nil)
+		helpers.assert_true(text:find("INSERT INTO agg_app_day_media_hold", 1, true) ~= nil)
+		helpers.assert_true(text:find("INSERT INTO ngram_keycodes", 1, true) ~= nil)
+		helpers.assert_nil(S.agg_batch.kc_ngram.mute)
+	end)
+end)

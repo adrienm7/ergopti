@@ -38,6 +38,7 @@ local SqliteCommand = require("modules.keylogger.sqlite_command")
 local TextCipher    = require("modules.keylogger.text_cipher")
 local EventIdPolicy = require("sqlite.event_id_policy")
 local Json          = require("json")
+local MediaStore    = require("keylogger.media_store")
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -62,6 +63,12 @@ local _available = nil
 
 -- Whether the schema has been bootstrapped for the current db_path.
 local _bootstrapped = false
+
+-- Source-admitted media policy is separate from native capture admission.
+local _media_policy = nil
+-- A failed terminal observation may follow COMMIT. Retain its exact pipe owner
+-- and block replacement rather than replaying caller-owned events ambiguously.
+local _media_terminal_debt = nil
 
 
 -- =========================================
@@ -98,7 +105,7 @@ end
 --- Runs a SQL statement against the database via the sqlite3 CLI.
 --- @param sql string Complete SQL statement(s) to execute.
 --- @return boolean True on success.
-local function _exec(sql)
+local function _exec(sql, media_owned)
 	if not _db_path or not _available then return false end
 
 	-- The script carries the characters the user typed, so it travels on stdin.
@@ -118,9 +125,27 @@ local function _exec(sql)
 		Logger.error(LOG, "Cannot spawn the sqlite3 CLI.")
 		return false
 	end
-	local output = pipe:read("*a")
-	pipe:close()
+	local output
+	if media_owned then
+		local read_ok, body = pcall(pipe.read, pipe, "*a")
+		local close_ok, closed = pcall(pipe.close, pipe)
+		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+			_media_terminal_debt = { pipe = pipe, close_acknowledged = close_ok and closed == true }
+			_db_path = nil
+			Logger.error(LOG, "Semantic media terminal observation failed; exact owner and pending events remain unresolved.")
+			return false
+		end
+		output = body
+	else
+		output = pipe:read("*a")
+		pipe:close()
+	end
 	local accepted, err_out, receipt_error = SqliteCommand.read_exit_receipt(output)
+	if media_owned and ((not accepted and (receipt_error == "missing SQLite exit receipt"
+		or receipt_error == "invalid SQLite exit receipt")) or (accepted and err_out ~= "")) then
+		_media_terminal_debt = { pipe = pipe, close_acknowledged = true }
+		_db_path = nil
+	end
 
 	if err_out ~= "" then
 		-- These statements select nothing, and stderr is merged into stdout, so
@@ -229,6 +254,33 @@ local function _read_schema()
 	return content
 end
 
+--- Reads packaged media data through the existing classified native file port.
+local function _read_media_resource(relative)
+	local path = require("infra.paths").shared(relative)
+	if type(path) ~= "string" then return nil end
+	local body, status = require("adapters.file_system").read_with_status(path)
+	if status ~= "ok" or type(body) ~= "string" then
+		Logger.error(LOG, "Cannot read packaged semantic media resource.")
+		return nil
+	end
+	return body
+end
+
+--- Admits only the committed five-key policy and additive schema before writes.
+local function _ensure_media_schema()
+	local schema = _read_media_resource("data/db/media_schema.sql")
+	local catalogue = _read_media_resource("data/keycodes/metrics_media_keys.json")
+	if schema == nil or catalogue == nil then return false end
+	local ok, policy = pcall(function() return MediaStore.policy(Json.decode(catalogue)) end)
+	if not ok then
+		Logger.error(LOG, "Semantic media catalogue admission refused.")
+		return false
+	end
+	if not _exec("BEGIN IMMEDIATE;\n" .. schema .. "\nCOMMIT;", true) then return false end
+	_media_policy = policy
+	return true
+end
+
 --- Upgrades databases created before Linux was accepted by devices.os.
 --- The raw event tables deliberately have no foreign keys, but registration
 --- must still succeed so the database remains portable across all three OSes.
@@ -277,6 +329,10 @@ end
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
 --- @return boolean True on success.
 function M.open_db(db_path)
+	if _media_terminal_debt ~= nil then
+		Logger.error(LOG, "Cannot reopen SQLite while semantic media terminal ownership is unresolved.")
+		return false
+	end
 	if type(db_path) ~= "string" or db_path == "" then
 		Logger.error(LOG, "open_db(): db_path must be a non-empty string.")
 		return false
@@ -325,12 +381,23 @@ function M.open_db(db_path)
 		return false
 	end
 
+	if not _ensure_media_schema() then
+		_media_policy = nil
+		_db_path = nil
+		return false
+	end
+
 	Logger.debug(LOG, "SQLite database open: %s", _db_path)
 	return true
 end
 
 --- Closes the database connection (no-op for CLI-based backend, but cleans up state).
 function M.close_db()
+	if _media_terminal_debt ~= nil then
+		Logger.error(LOG, "Semantic media terminal cleanup remains unresolved; ambiguous pipe close is not retried.")
+		return false
+	end
+	_media_policy = nil
 	_db_path = nil
 	_bootstrapped = false
 	Logger.debug(LOG, "SQLite database closed.")
@@ -386,6 +453,62 @@ COMMIT;
 	local accepted = _exec(sql)
 	if accepted then Logger.debug(LOG, "Device registered.") end
 	return accepted
+end
+
+--- Stores already admitted semantic media entries in one native transaction.
+--- This port grants no native capture authority and never mutates pending input.
+--- @param device_id string Persisted collector partition, not a fabricated source device.
+--- @param events table Caller-owned admitted media press/release entries.
+--- @param threshold_ms integer Shared inclusive tap threshold.
+--- @return boolean committed Exact terminal COMMIT and pipe-close acknowledgement.
+function M.insert_media_events(device_id, events, threshold_ms)
+	if not M.is_available() or _media_policy == nil or _media_terminal_debt ~= nil then return false end
+	local ok, plan = pcall(function()
+		assert(type(events) == "table" and #events > 0, "Media batch requires events")
+		local captured = {}
+		for key in pairs(events) do
+			assert(type(key) == "number" and key % 1 == 0 and key >= 1 and key <= #events, "Media batch must be dense")
+		end
+		for index = 1, #events do
+			local source = events[index]
+			assert(type(source) == "table", "Media event is missing")
+			local event = {}
+			for key, value in pairs(source) do event[key] = value end
+			captured[index] = event
+			MediaStore.raw_sql(device_id, index, event, Json.encode)
+		end
+		local batch = { media_ngram = {}, media_hold = {} }
+		MediaStore.replay(_media_policy, batch, captured, threshold_ms)
+		local derived = {}
+		for _, row in pairs(batch.media_ngram) do derived[#derived + 1] = MediaStore.press_sql(device_id, row) end
+		for _, row in pairs(batch.media_hold) do derived[#derived + 1] = MediaStore.hold_sql(device_id, row) end
+		return { events = captured, derived = derived }
+	end)
+	if not ok then
+		Logger.error(LOG, "Semantic media input admission refused.")
+		return false
+	end
+	local first_id = _reserve_event_ids(#plan.events)
+	if not first_id then return false end
+	local statements = {}
+	for index, event in ipairs(plan.events) do
+		statements[#statements + 1] = MediaStore.raw_sql(device_id, first_id + index - 1, event, Json.encode)
+	end
+	for _, sql in ipairs(plan.derived) do statements[#statements + 1] = sql end
+	statements[#statements + 1] = "UPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='rev';"
+	return _exec("BEGIN IMMEDIATE;\n" .. table.concat(statements, "\n") .. "\nCOMMIT;", true)
+end
+
+--- Rebuilds only one collector's semantic projections under the shared SQL lock.
+--- @param device_id string Exact collector partition.
+--- @param threshold_ms integer Shared inclusive tap threshold.
+--- @return boolean committed
+function M.rebuild_media(device_id, threshold_ms)
+	if not M.is_available() or _media_policy == nil or _media_terminal_debt ~= nil then return false end
+	local ok, sql = pcall(MediaStore.rebuild_sql, device_id, threshold_ms)
+	if not ok then return false end
+	return _exec("BEGIN IMMEDIATE;\n" .. sql
+		.. "\nUPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='rev';\nCOMMIT;", true)
 end
 
 --- Inserts a batch of keystroke events into the events_typing table.

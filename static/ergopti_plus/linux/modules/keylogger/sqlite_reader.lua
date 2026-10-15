@@ -12,9 +12,13 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Utils = require("keylogger.utils")
+local MediaStore = require("keylogger.media_store")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keylogger.sqlite_reader"
+
+-- An ambiguous media pipe close is never retried or replaced by another query.
+local _media_read_debt = nil
 
 local EMPTY_NGRAMS = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc", "sc_kb" }
 
@@ -47,7 +51,8 @@ local function valid_date(value)
 end
 
 --- Executes a read-only JSON query through sqlite3.
-local function read_rows(sqlite_path, sql)
+local function read_rows(sqlite_path, sql, media_owned)
+	if media_owned and _media_read_debt ~= nil then return {}, false end
 	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {}, false end
 	-- Same rule as the writer: the script goes on stdin, never through a file in
 	-- a world-writable directory.
@@ -57,8 +62,24 @@ local function read_rows(sqlite_path, sql)
 	if not cmd then return {}, false end
 	local pipe = io.popen(cmd, "r")
 	if not pipe then return {}, false end
-	local output = pipe:read("*a")
-	pipe:close()
+	local output
+	if media_owned then
+		local read_ok, result = pcall(pipe.read, pipe, "*a")
+		local close_ok, closed = pcall(pipe.close, pipe)
+		if not close_ok or closed ~= true then
+			_media_read_debt = pipe
+			Logger.warn(LOG, "Semantic media read cleanup failed; exact pipe retained without retry.")
+			return {}, false
+		end
+		if not read_ok or type(result) ~= "string" then
+			Logger.warn(LOG, "Semantic media read failed after acknowledged pipe retirement.")
+			return {}, false
+		end
+		output = result
+	else
+		output = pipe:read("*a")
+		pipe:close()
+	end
 	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
 	if not accepted then
 		Logger.warn(LOG, "SQLite read refused: %s.", reason)
@@ -102,6 +123,7 @@ local function new_entry()
 		hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0,
 		hs_suggested = 0, llm_suggested = 0, hs_input_chars = 0,
 		llm_input_chars = 0, app_time_ms = 0, category = "Unknown",
+		media_keys = {}, media_hold = {},
 		hourly = {}, hourly_min5 = {}, time_buckets = {}, credited_buckets = {},
 		hs_input_time_buckets = {}, hs_input_credited_buckets = {},
 		llm_input_time_buckets = {}, llm_input_credited_buckets = {},
@@ -132,8 +154,8 @@ function M.read_manifest(sqlite_path, start_date, end_date, apps)
 	local complete = true
 	-- A partial projection remains a useful first return, but must never become
 	-- a successful revision cache entry. Track every CLI pass independently.
-	local function query(sql)
-		local rows, accepted = read_rows(sqlite_path, sql)
+	local function query(sql, media_owned)
+		local rows, accepted = read_rows(sqlite_path, sql, media_owned)
 		if not accepted then complete = false end
 		return rows
 	end
@@ -217,6 +239,21 @@ FROM agg_app_day_ergo%s GROUP BY date, app;
 		entry.auto_repeat_count = row.ar_count or 0
 		entry.focus_to_first_key_sum_ms = row.focus_sum or 0
 		entry.focus_to_first_key_count = row.focus_count or 0
+	end
+
+	for _, row in ipairs(query(string.format([[
+SELECT date, app, media_id, SUM(c) AS c
+FROM ngram_media_keys%s GROUP BY date, app, media_id;
+]], where), true)) do
+		get_entry(manifest, row.date, row.app).media_keys[row.media_id] = MediaStore.project_press(row)
+	end
+
+	for _, row in ipairs(query(string.format([[
+SELECT date, app, media_id, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
+       MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count, SUM(hold_count) AS hold_count
+FROM agg_app_day_media_hold%s GROUP BY date, app, media_id;
+]], where), true)) do
+		get_entry(manifest, row.date, row.app).media_hold[row.media_id] = MediaStore.project_hold(row)
 	end
 
 	for _, row in ipairs(query(string.format([[

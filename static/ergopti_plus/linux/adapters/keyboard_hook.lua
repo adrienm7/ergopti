@@ -108,6 +108,8 @@ local _on_char      = nil   -- function(char_string, evdev_scancode)
 local _on_key       = nil   -- function(key_name_string, { mods = held_modifiers() } | shortcut detail)
 local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil, evdev_value)
 local _on_hold      = nil   -- function(evdev_scancode, held_ms)
+local _on_hold_admission = nil -- function() -> opaque token or nil
+local _hold_admission_session = nil
 local _on_desync    = nil   -- function() invalidates text derived before SYN_DROPPED
 
 -- Cached foreground window context (updated via refreshContext).
@@ -240,6 +242,20 @@ local _modifier_order = {}
 -- When each key went down, by evdev code. Cleared on release, so a key still
 -- held when a flush lands is simply not reported until it comes up.
 local _pressed_at = {}
+local _hold_owners = {}
+local _legacy_hold_owner = {}
+
+local function hold_owner()
+	if not rawequal(_hold_admission_session, _capture_session) then return nil, nil end
+	if _on_hold_admission == nil then return _legacy_hold_owner, nil end
+	local callback = _on_hold_admission
+	local ok, token = pcall(callback)
+	if ok and rawequal(callback, _on_hold_admission)
+		and type(token) == "table" and getmetatable(token) == nil then
+		return token, callback
+	end
+	return nil, nil
+end
 
 -- Beyond this, a "hold" is not a hold. A release can arrive after a suspend, a
 -- lost descriptor or a lid close, and a single reading of several hours would
@@ -478,6 +494,7 @@ local function _reset_modifier_state()
 	_altgr_held, _meta_held = false, false
 	_consumed_down = {}
 	_pressed_at = {}
+	_hold_owners = {}
 end
 
 --- True while a modifier that starts a SHORTCUT is held.
@@ -993,7 +1010,10 @@ local function _resynchronise(source)
 			if capture_err then return false, tostring(capture_err) end
 		end
 		_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN, role)
-		_pressed_at[key] = Monotonic.now_ms()
+		-- Reconciliation saw an already-held key, not a fresh admitted DOWN.
+		_pressed_at[key] = _on_hold_admission == nil and Monotonic.now_ms() or nil
+		_hold_owners[key] = _on_hold_admission == nil
+			and { token = _legacy_hold_owner, callback = nil } or nil
 		if consumed[key] then _consumed_down[key] = true end
 	end
 	if leds[LED_CAPSL] == true then
@@ -1585,12 +1605,17 @@ local function _dispatch_post_remap(ev, source)
 	-- held is the difference between the two things it can mean, and
 	-- agg_app_day_kc_hold was empty because nothing measured it.
 	if ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
-		_pressed_at[source_key(source, ev.code)] = Monotonic.now_ms()
+		local key = source_key(source, ev.code)
+		local token, callback = hold_owner()
+		_pressed_at[key] = token and Monotonic.now_ms() or nil
+		_hold_owners[key] = token and { token = token, callback = callback } or nil
 	elseif ev.value == InputEvent.VALUE_UP and ev.code > 0 then
 		local pressed_key = source_key(source, ev.code)
-		local down_at = _pressed_at[pressed_key]
-		_pressed_at[pressed_key] = nil
-		if down_at and _on_hold then
+		local down_at, owner = _pressed_at[pressed_key], _hold_owners[pressed_key]
+		_pressed_at[pressed_key], _hold_owners[pressed_key] = nil, nil
+		local token, callback = hold_owner()
+		if down_at and owner and rawequal(owner.token, token)
+			and rawequal(owner.callback, callback) and _on_hold then
 			-- Clamped, because a release can arrive after a suspend, a lost
 			-- descriptor or a lid close, and one such reading would dominate every
 			-- average it entered for the rest of the day.
@@ -2742,6 +2767,7 @@ _release_forwarded_sources = function(paths)
 	for key, entry in pairs(_physical_down) do
 		if retiring[entry.source] then
 			_physical_down[key], _consumed_down[key], _pressed_at[key] = nil, nil, nil
+			_hold_owners[key] = nil
 		end
 	end
 	return true
@@ -3280,7 +3306,10 @@ function M.can_capture(intercept, emit_raw)
 end
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onConsume?, onDesync?, onEmitRaw?, device?, pinned? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onHold?, onHoldAdmission?, onConsume?, onDesync?, onEmitRaw?, device?, pinned? }
+---              onHold function     Receives an admitted physical scancode and held milliseconds.
+---              onHoldAdmission function Returns the current opaque plain-table policy token or nil.
+---                                  Absence preserves legacy callers; refusal affects metrics only.
 ---              intercept boolean   Grab the device. Default false.
 ---              layout    string    Physical family for metrics: "qwerty" or
 ---                                  "azerty". Text always follows live XKB.
@@ -3316,6 +3345,8 @@ function M.start(opts)
 	-- retain their cold-construction originals and authenticate every returned receipt.
 	_input_reader_ports.capture_event = rawget(EvdevReader, "capture_event")
 	local options = type(opts) == "table" and opts or {}
+	local admission = options.onHoldAdmission
+	if admission ~= nil and type(admission) ~= "function" then return false end
 	if _number_row.retire() ~= true then return false end
 	_number_row.suppressed = {}
 	local row_mode = require("layout.number_row_policy").mode(rawget(options, "numberRowMode") or "native")
@@ -3471,7 +3502,12 @@ function M.start(opts)
 	end)
 	if not called or accepted ~= true then _retire_source_transaction(tx, "startup source publication refused") end
 	if _source_reconciliation == tx then _source_reconciliation = nil end
-	if called and accepted == true then _number_row.construct() end
+	if called and accepted == true then
+		_number_row.construct()
+		if not _running or not rawequal(_capture_session, capture_session) then return false end
+		_on_hold_admission = admission
+		_hold_admission_session = capture_session
+	end
 	return called and accepted == true
 end
 
@@ -3798,6 +3834,8 @@ function M._test_drive(events, callbacks, intercept)
 	_on_key      = cb.onKey
 	_on_physical = cb.onPhysical
 	_on_hold     = cb.onHold
+	_on_hold_admission = cb.onHoldAdmission
+	_hold_admission_session = _capture_session
 	_on_consume  = cb.onConsume
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw

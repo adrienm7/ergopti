@@ -636,6 +636,7 @@ end
 ---
 --- @param opts table|nil { available = boolean } — false to model a machine
 ---        with no sqlite3, which is the common case in CI.
+---        media_commit=false models media transaction refusal only; it executes no SQL.
 --- @return table
 function M.sqlite_writer(opts)
 	opts = opts or {}
@@ -648,6 +649,7 @@ function M.sqlite_writer(opts)
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
 		titles = {}, layouts = {}, kc_hold = {}, system_days = {},
 		categories = {},
+		media_events = {}, media_rebuilds = {}, media_projections = {},
 		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
 	}
 
@@ -750,6 +752,84 @@ function M.sqlite_writer(opts)
 		fake.categories[#fake.categories + 1] = {
 			device_id = device_id, app = app_name, category = category, score = score,
 		}
+		return true
+	end
+
+	-- These are in-memory transaction outcomes, never SQLite/native receipts.
+	local media_history, media_store, media_policy = {}, nil, nil
+	local function media_ready()
+		if not available or type(fake.path) ~= "string" or fake.path == "" or opts.media_commit == false then return false end
+		if media_policy then return true end
+		local ok, store, policy = pcall(function()
+			local shared = require("keylogger.media_store")
+			local json = require("json")
+			local path = require("tests.helpers").driver_root() .. "/../_shared/data/keycodes/metrics_media_keys.json"
+			local file = assert(io.open(path, "rb"))
+			local read, body = pcall(file.read, file, "*a")
+			local closed, acknowledged = pcall(file.close, file)
+			assert(read and type(body) == "string" and closed and acknowledged)
+			return shared, shared.policy(json.decode(body))
+		end)
+		if not ok then return false end
+		media_store, media_policy = store, policy
+		return true
+	end
+	local function copy(value)
+		if type(value) ~= "table" then return value end
+		local out = {}; for key, child in pairs(value) do out[key] = copy(child) end
+		return out
+	end
+	local function publish_media(device_id, events, batch)
+		local path = fake.path
+		media_history[path] = media_history[path] or {}
+		media_history[path][device_id] = { events = events, batch = batch }
+		fake.media_projections[path] = fake.media_projections[path] or {}
+		fake.media_projections[path][device_id] = copy(batch)
+		fake.revision = fake.revision + 1
+	end
+	function fake.insert_media_events(device_id, events, threshold_ms)
+		if not media_ready() then return false end
+		local previous = media_history[fake.path] and media_history[fake.path][device_id]
+		local ok, captured, batch = pcall(function()
+			assert(type(events) == "table" and #events > 0)
+			for key in pairs(events) do assert(type(key) == "number" and key % 1 == 0 and key >= 1 and key <= #events) end
+			local rows = {}
+			for index = 1, #events do
+				assert(type(events[index]) == "table")
+				local row = {}; for key, value in pairs(events[index]) do row[key] = value end
+				rows[index] = row
+				media_store.raw_sql(device_id, index, row, require("json").encode)
+			end
+			local aggregate = previous and copy(previous.batch) or { media_ngram = {}, media_hold = {} }
+			media_store.replay(media_policy, aggregate, rows, threshold_ms)
+			return rows, aggregate
+		end)
+		if not ok then return false end
+		local history = previous and copy(previous.events) or {}
+		for _, row in ipairs(captured) do
+			-- Persist only the same scalar vocabulary used by raw media metadata.
+			local saved = {}
+			for _, key in ipairs({ "action", "timestamp", "capture", "device", "app", "media_id" }) do saved[key] = row[key] end
+			if row.action == "physical_media_release" then saved.hold_ms = row.hold_ms end
+			history[#history + 1] = saved
+			fake.media_events[#fake.media_events + 1] = { device_id = device_id, path = fake.path, row = copy(saved) }
+		end
+		publish_media(device_id, history, batch)
+		return true
+	end
+	function fake.rebuild_media(device_id, threshold_ms)
+		if not media_ready() then return false end
+		local previous = media_history[fake.path] and media_history[fake.path][device_id]
+		local events = previous and previous.events or {}
+		local ok, batch = pcall(function()
+			media_store.rebuild_sql(device_id, threshold_ms)
+			local aggregate = { media_ngram = {}, media_hold = {} }
+			media_store.replay(media_policy, aggregate, events, threshold_ms)
+			return aggregate
+		end)
+		if not ok then return false end
+		publish_media(device_id, events, batch)
+		fake.media_rebuilds[#fake.media_rebuilds + 1] = { path = fake.path, device_id = device_id, threshold_ms = threshold_ms }
 		return true
 	end
 

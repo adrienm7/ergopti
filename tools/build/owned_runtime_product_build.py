@@ -60,6 +60,58 @@ SOURCE_PATHS = tuple(
         )
     )
 )
+# A closed report build adds only inert read-only protocol/transport ownership.
+# It does not enroll Main/UI, publication, activation or a driver payload.
+REPORT_SWIFT_SOURCES = tuple(
+    SWIFT + "OwnedVirtualHIDDaemonReport" + name + ".swift"
+    for name in (
+        "Protocol",
+        "Observer",
+        "RequestChannel",
+        "StageOwner",
+        "Worker",
+        "Clock",
+        "Reference",
+    )
+)
+REPORT_C_SOURCES = (
+    LAUNCHER + "CPOSIXCompatibility/CPOSIXCompatibility.c",
+    LAUNCHER + "CPOSIXCompatibility/OwnedProgramCompatibility.c",
+    LAUNCHER + "CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+)
+REPORT_HEADERS = tuple(
+    LAUNCHER + "CPOSIXCompatibility/include/" + name
+    for name in (
+        "CPOSIXCompatibility.h",
+        "OwnedProgramCompatibility.h",
+        "OwnedChildReapingCompatibility.h",
+        "OwnedInstalledConfiguration.h",
+        "LoopbackListenerCompatibility.h",
+        "OwnedImageAliasCompatibility.h",
+        "OwnedSuspendedImageCompatibility.h",
+        "OwnedListenerEventCompatibility.h",
+        "OwnedRuntimeSignatureCompatibility.h",
+        "OwnedVHDReportSocketIdentity.h",
+    )
+)
+REPORT_SOURCE_PATHS = tuple(
+    dict.fromkeys(SOURCE_PATHS + REPORT_SWIFT_SOURCES + REPORT_C_SOURCES + REPORT_HEADERS)
+)
+
+
+def product_source_paths(*, daemon_report=False):
+    require(type(daemon_report) is bool, "unknown native product profile")
+    return REPORT_SOURCE_PATHS if daemon_report else SOURCE_PATHS
+
+
+def report_module_map(repository):
+    """Only the original captured umbrella, never caller module declarations."""
+    header = str(Path(repository) / REPORT_HEADERS[0])
+    require(not any(c in header for c in ("\n", "\r", "\0")), "invalid report module path")
+    escaped = header.replace("\\", "\\\\").replace('"', '\\"')
+    return ('module CPOSIXCompatibility { header "' + escaped + '" export * }\n').encode("utf-8")
+
+
 LUA_ARCHIVE_SHA256 = "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30"
 NATIVE_BACKEND = "tools/diagnostics/hs274_native_build.py"
 NATIVE_BACKEND_SHA256 = "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6"
@@ -148,7 +200,7 @@ class HeldSource:
 
 
 def capture_source(repository, relative):
-    require(relative in SOURCE_PATHS + (NATIVE_BACKEND,), "unknown product source")
+    require(relative in REPORT_SOURCE_PATHS + (NATIVE_BACKEND,), "unknown product source")
     repository = Path(repository)
     require(
         repository.is_absolute() and repository.resolve(strict=True) == repository,
@@ -201,8 +253,9 @@ def capture_source(repository, relative):
         raise
 
 
-def compile_commands(repository, work, sdk, lua_headers):
+def compile_commands(repository, work, sdk, lua_headers, *, daemon_report=False):
     """Return the fixed roster; callers cannot supply source names or options."""
+    product_source_paths(daemon_report=daemon_report)
     repository, work, sdk, lua_headers = map(Path, (repository, work, sdk, lua_headers))
     require(
         all(
@@ -242,7 +295,34 @@ def compile_commands(repository, work, sdk, lua_headers):
                 ],
             )
         )
-        for role, sources in (("installer", HELPER_SOURCES), ("validator", VALIDATOR_SOURCES)):
+        report_objects = []
+        if daemon_report:
+            for relative in REPORT_C_SOURCES:
+                stem = Path(relative).stem
+                native_report_object = work / (stem + "_" + architecture + ".o")
+                report_objects.append(str(native_report_object))
+                result.append(
+                    (
+                        "report_" + stem + "_" + architecture,
+                        [
+                            "/usr/bin/xcrun",
+                            "clang",
+                            "-arch",
+                            architecture,
+                            "-isysroot",
+                            str(sdk),
+                            "-mmacosx-version-min=13.0",
+                            "-I",
+                            str(repository / (LAUNCHER + "CPOSIXCompatibility/include")),
+                            "-c",
+                            str(repository / relative),
+                            "-o",
+                            str(native_report_object),
+                        ],
+                    )
+                )
+        helper_sources = HELPER_SOURCES + REPORT_SWIFT_SOURCES if daemon_report else HELPER_SOURCES
+        for role, sources in (("installer", helper_sources), ("validator", VALIDATOR_SOURCES)):
             command = [
                 "/usr/bin/xcrun",
                 "swiftc",
@@ -253,9 +333,21 @@ def compile_commands(repository, work, sdk, lua_headers):
                 str(sdk),
             ]
             command += ["-import-objc-header", str(repository / SIGNATURE_HEADER)]
+            if daemon_report and role == "installer":
+                command += [
+                    "-D",
+                    "ERGOPTI_DAEMON_REPORT",
+                    "-D",
+                    "SWIFT_PACKAGE",
+                    "-I",
+                    str(repository / (LAUNCHER + "CPOSIXCompatibility/include")),
+                    "-Xcc",
+                    "-fmodule-map-file=" + str(work / "report.modulemap"),
+                ]
             command += [str(repository / source) for source in sources]
             if role == "installer":
                 command.append(str(native_object))
+                command += report_objects
             command += ["-o", str(work / (role + "_" + architecture))]
             result.append((role + "_" + architecture, command))
         result.append(
@@ -455,7 +547,7 @@ def _acquire_hammerspoon_headers(owner, backend, deadline):
     return root, _current_hammerspoon_headers(root)
 
 
-def compile_native_parts(repository, owner, lua_build_work, deadline):
+def compile_native_parts(repository, owner, lua_build_work, deadline, *, daemon_report=False):
     """Compile both exact architectures inside the original live build budget.
 
     This function must run within the original compilation guardian. It never
@@ -479,7 +571,10 @@ def compile_native_parts(repository, owner, lua_build_work, deadline):
         and owner.stat().st_uid == os.getuid(),
         "native owner custody refused",
     )
+    selected_sources = product_source_paths(daemon_report=daemon_report)
     sources = []
+    module_source = None
+    module_descriptor = -1
     try:
         backend_source = capture_source(repository, NATIVE_BACKEND)
         sources.append(backend_source)
@@ -494,7 +589,7 @@ def compile_native_parts(repository, owner, lua_build_work, deadline):
         backend = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = backend
         exec(compile(backend_source.data, str(backend_source.path), "exec"), backend.__dict__)
-        for relative in SOURCE_PATHS:
+        for relative in selected_sources:
             sources.append(capture_source(repository, relative))
         before = source_receipt(sources)
         header_input = _lua_headers(lua_build_work)
@@ -516,12 +611,35 @@ def compile_native_parts(repository, owner, lua_build_work, deadline):
         sdk = Path(sdk_output[:-1].decode("utf-8", "strict")).resolve(strict=True)
         work = owner / "native_production_parts"
         work.mkdir(mode=0o700)
-        commands = compile_commands(repository, work, sdk, headers)
+        # The generated Clang module is held and re-read with all compiled sources.
+        commands = compile_commands(repository, work, sdk, headers, daemon_report=daemon_report)
+        module_path = work / "report.modulemap"
+        if daemon_report:
+            module_bytes = report_module_map(repository)
+            _write_exclusive(module_path, module_bytes, 0o600, deadline)
+            module_descriptor = os.open(module_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+            # Retain the raw FD before fstat; failure still reaches its checked close.
+            module_source = HeldSource(
+                module_path,
+                module_descriptor,
+                identity(os.fstat(module_descriptor)),
+                module_bytes,
+                "generated-report-module-not-git",
+            )
+            module_descriptor = -1  # Ownership transferred to this same HeldSource.
+            module_source.current()
+
+        def module_current():
+            if module_source is not None:
+                module_source.current()
+            return True
+
         for name, arguments in commands:
             require(
                 source_receipt(sources) == before
                 and _lua_headers(lua_build_work) == header_input
                 and _current_hammerspoon_headers(headers) == hammerspoon_stamp
+                and module_current()
                 and time.monotonic() < deadline,
                 "native compilation input or budget changed",
             )
@@ -531,7 +649,8 @@ def compile_native_parts(repository, owner, lua_build_work, deadline):
                 require(
                     source_receipt(sources) == before
                     and _lua_headers(lua_build_work) == header_input
-                    and _current_hammerspoon_headers(headers) == hammerspoon_stamp,
+                    and _current_hammerspoon_headers(headers) == hammerspoon_stamp
+                    and module_current(),
                     "source changed during native child",
                 )
         for role, suffix in (("installer", ""), ("validator", ""), ("module", ".so")):
@@ -550,11 +669,19 @@ def compile_native_parts(repository, owner, lua_build_work, deadline):
                 owner,
                 deadline,
             )
-        require(source_receipt(sources) == before, "final native source changed")
+        require(
+            source_receipt(sources) == before and module_current(), "final native source changed"
+        )
         return work, before
     finally:
-        for held in sources:
-            held.close()
+        try:
+            if module_source is not None:
+                module_source.close()
+            elif module_descriptor >= 0:
+                os.close(module_descriptor)
+        finally:
+            for held in sources:
+                held.close()
 
 
 INSTALLER_ID = "com.ergoptiplus.app.runtime-installer"
@@ -1040,6 +1167,7 @@ def _package_live(
     staged_source=None,
     driver_payload=None,
     driver_payload_current=None,
+    daemon_report=False,
 ):
     """Fixed continuation of the original signed scope; never install or start.
 
@@ -1051,6 +1179,7 @@ def _package_live(
     """
     import plistlib
 
+    selected_sources = product_source_paths(daemon_report=daemon_report)
     require(
         sys.platform == "darwin" and os.getuid() != 0 and os.getuid() == os.geteuid(),
         "production packaging requires an unprivileged native Darwin owner",
@@ -1090,6 +1219,7 @@ def _package_live(
             original_claim_current()
             source_current()
 
+    require(not daemon_report or not sdk, "report profile cannot acquire SDK payload scope")
     if source_current is not None:
         source_current()
     if sdk:
@@ -1121,7 +1251,9 @@ def _package_live(
         and keychain.stat().st_uid == os.getuid(),
         "signing credential custody refused",
     )
-    work, receipts = compile_native_parts(repository, owner, lua_build, deadline)
+    work, receipts = compile_native_parts(
+        repository, owner, lua_build, deadline, daemon_report=daemon_report
+    )
     claim_current()
 
     def snapshot(root, budget):
@@ -1148,7 +1280,7 @@ def _package_live(
     backend_source = capture_source(repository, NATIVE_BACKEND)
     held_sources = []
     try:
-        for path in SOURCE_PATHS:
+        for path in selected_sources:
             held_sources.append(capture_source(repository, path))
         require(
             source_receipt((backend_source, *held_sources)) == receipts,
