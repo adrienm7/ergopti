@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "インポートする項目を選ぶには「はい」を選択してください。",
 	"onboarding.checklist.summary": "インポートする項目：{2} 件中 {1} 件を選択",
 	"onboarding.checklist.tap_hold": "タップ: {1} · 長押し: {2}",
+	"onboarding.config_folder.hint": "個人用ファイルはこのフォルダーから読み込まれます。{1} を使うには、この欄を空にしてください。",
 	"onboarding.done.body": "設定を保存しました。スクリプトを今すぐ再読み込みします。",
 	"onboarding.done.restart_required": "設定を保存しました。次回スクリプトを起動したときに反映されます。",
 	"onboarding.done.title": "セットアップ完了！",

@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "选择“是”即可挑选要导入的项目。",
 	"onboarding.checklist.summary": "要导入的项目：已选择 {1} 项，共 {2} 项",
 	"onboarding.checklist.tap_hold": "轻按：{1} · 长按：{2}",
+	"onboarding.config_folder.hint": "个人文件从此文件夹加载。留空将使用：{1}",
 	"onboarding.done.body": "配置已保存。脚本现在将重新加载。",
 	"onboarding.done.restart_required": "配置已保存。将在下次启动脚本时生效。",
 	"onboarding.done.title": "设置完成！",

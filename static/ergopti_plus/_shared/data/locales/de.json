@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Antworten Sie mit Ja, um auszuwählen, was importiert wird.",
 	"onboarding.checklist.summary": "Zu importierende Elemente: {1} von {2} ausgewählt",
 	"onboarding.checklist.tap_hold": "Antippen: {1} · Halten: {2}",
+	"onboarding.config_folder.hint": "Persönliche Dateien werden aus diesem Ordner geladen. Lassen Sie das Feld leer, um folgenden Ordner zu verwenden: {1}",
 	"onboarding.done.body": "Konfiguration gespeichert. Das Skript wird jetzt neu geladen.",
 	"onboarding.done.restart_required": "Konfiguration gespeichert. Sie wird beim nächsten Start des Skripts wirksam.",
 	"onboarding.done.title": "Einrichtung abgeschlossen!",

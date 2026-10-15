@@ -484,3 +484,32 @@ helpers.describe("onboarding active initialization reservation", function()
 		end, true)
 	end)
 end)
+
+
+helpers.describe("onboarding empty-folder destination delivery", function()
+	for _, vector in ipairs({
+		{ path = "/virtual/captured/hammerspoon/config.toml", target = "/virtual/captured/" },
+		{ path = "/virtual/direct/config.toml", target = "/virtual/direct/" },
+		{ path = "/virtual/myhammerspoon/config.toml", target = "/virtual/myhammerspoon/" },
+		{ path = "/hammerspoon/config.toml", target = "/" },
+	}) do
+		helpers.it("(onboarding-empty-folder) ready names the captured destination " .. vector.target, function()
+			with_delivery(function(_, state, _, errors, evaluations, open)
+				open(vector.path)
+				state.receiver({ body = { action = "ready" } })
+				state.fire_timer(1)
+				helpers.assert_eq(#errors, 0)
+				helpers.assert_eq(#evaluations, 1)
+				helpers.assert_true(evaluations[1].code:find("window.initData(", 1, true) ~= nil)
+				helpers.assert_eq(state.payload.empty_config_dir, vector.target,
+					"clearing the macOS field retains the captured source rather than a live menu getter")
+				helpers.assert_eq(state.payload.default_config_dir, "/virtual/default")
+				helpers.assert_eq(state.payload.config_dir, "/virtual/current",
+					"the existing displayed-choice contract is preserved")
+				helpers.assert_eq(state.read_paths[#state.read_paths], vector.path,
+					"the advertised empty destination belongs to the configuration actually read")
+				helpers.assert_eq(state.scheduler.activeCount(), 0)
+			end, true)
+		end)
+	end
+end)

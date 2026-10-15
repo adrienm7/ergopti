@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Responda Sí para elegir qué importar.",
 	"onboarding.checklist.summary": "Elementos que importar: {1} de {2} seleccionados",
 	"onboarding.checklist.tap_hold": "pulsar: {1} · mantener: {2}",
+	"onboarding.config_folder.hint": "Los archivos personales se cargan desde esta carpeta. Deja el campo vacío para usar: {1}",
 	"onboarding.done.body": "Configuración guardada. El script se recargará ahora.",
 	"onboarding.done.restart_required": "Configuración guardada. Se aplicará la próxima vez que se inicie el script.",
 	"onboarding.done.title": "¡Configuración completada!",

@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Svara Ja för att välja vad som ska importeras.",
 	"onboarding.checklist.summary": "Objekt att importera: {1} av {2} valda",
 	"onboarding.checklist.tap_hold": "tryck: {1} · håll: {2}",
+	"onboarding.config_folder.hint": "Personliga filer läses in från den här mappen. Lämna fältet tomt för att använda: {1}",
 	"onboarding.done.body": "Konfigurationen sparad. Skriptet laddas om nu.",
 	"onboarding.done.restart_required": "Konfigurationen sparad. Den börjar gälla nästa gång skriptet startar.",
 	"onboarding.done.title": "Installationen är klar!",
