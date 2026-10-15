@@ -4875,6 +4875,17 @@ The complete 41-case current test prefix and frozen 47 additive controls pass
 event-port controls, not native or physical acceptance. Private-window policy
 transitions remain a separate unfinished software join.
 
+The secure-context prerequisite now supplies the keylogger's exact pure
+settlement callback to the context tracker. AX focus, application/bootstrap
+and resynchronization writers settle an effective exclusion before holds can
+be included again; a refused settlement retains admission debt. The secure
+filter setter and excluded modifier events use that same owner. Three-argument
+observer clients retain their existing initialization contract; supplied
+callbacks are validated and remain part of the exact reinitialization identity.
+The previous 88 case bodies and frozen 11 secure controls remain unchanged;
+three additive callable API controls complete the focused 102-case selection.
+Native AX, physical input and private-window policy completion remain pending.
+
 WP3 bounded system-authentication setter receiving now cancels a complete
 held-modifier interval when its effective policy becomes excluded. Disabled
 filtering preserves included durations. A refused settlement retains a private
