@@ -13762,6 +13762,18 @@ only its optional-write containment reproduces an interrupted original refusal.
 Canonical adoption requires the two Root-owned census/source-hash spans; current
 workflows do not enable the new opt-in and its native receiving is unrun.
 
+The Windows managed-network fixture now separately reports closed startup and
+constructor stages plus at most four exception kinds/HRESULTs. This addresses the
+seven native startup failures received on 073800ed, whose original service fact
+exposed only fixture_boundary/other/0x80131501. It does not repair or explain the
+underlying native failure. Optional CLR observation cannot discard the original
+exception chain or change the original failed-state/cleanup path. All 323 parent
+assertion sites and 40 registrations remain, with two additive AHK cases. Eight
+actual pure PowerShell 7 controls pass with causal withdrawals; Windows
+PowerShell 5, the two new AHK cases and native fixture receiving remain unrun.
+The active manual run 38738856943 is pinned to 677cef50 and predates this
+fixture-only successor. Item 106 remains partial.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
