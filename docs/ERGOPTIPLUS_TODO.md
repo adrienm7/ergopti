@@ -12582,6 +12582,15 @@ compiled or enrolled by production and cannot complete item91.
   work: genuine hotkey precedence, recent-chevron timing and emitted layout/dead
   states. Raw layout previews cannot replace actual picker/runtime ownership.
 
+  The existing enrolled Layout Manager test now adds the missing positive
+  selection-to-completion case: real owned TOML/WAL publication and detached
+  loading remain pending until the genuine scope-supplied success callback
+  commits the receipt. Original bytes, assertions and registration stay intact;
+  resident runtime/cache isolation and original backup are checked. This is
+  additive source-reviewed coverage, not a production fix or an executed native
+  successor. The new case is Windows UNRUN until the next grouped CI; the
+  earlier073800ed run cannot qualify it. Installed and device work remains open.
+
 - [~] **97.** Replace the fixed accent/direct-symbol submenu with shared
   user-owned entries, empty by default with + Add. Support a catalogue action or
   arbitrary character assigned to a physical key/modifier chord on any layout,
