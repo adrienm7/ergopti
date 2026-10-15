@@ -12797,6 +12797,18 @@ FAIL; both unchanged checks later pass focused replay with original budgets,
 without establishing the first failure causes or a full-suite PASS. Broad native
 and installed qualification remains required at the integration checkpoint.
 
+Configured Linux Navigation inputs now join the existing collision inventory
+through exact registry, vocabulary and user-file observations from the original
+load. A reachable quiescent bare engine reserves those inputs, including None;
+modified overlap, nonempty wrappers, stale source and active state refuse before
+publication. Both Lua ABIs receive original Nav15/0 and Scope110/0, then candidate
+Nav28/0 and Scope113/0 with every original assertion retained. Six old-production
+counterexamples fail their intended accepted/refused checks. Earlier wrapper
+API and new-fixture write-return errors are preserved and corrected. See
+[the Linux Nav handoff](handovers/2026-10-15-group3-linux-nav/README.md).
+Other-owner completeness, native/source/modifier/output and physical joins remain
+open; no public delivery or native installation is enabled.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -12858,6 +12870,12 @@ The same integrated Linux chain from item 97 now passes through package,
 17 installations and its verdict on d60ad231a. Chosen-output ownership,
 acknowledged star migration, other consumers and Windows/macOS receiving remain
 unfinished; no public physical mapping is enabled and item 98 remains partial.
+
+Item 97's configured Navigation reservations also protect physical star-setting
+edits through the unchanged shared preflight. The actual original map/source/base
+association is retained; a missing observation is never treated as an empty map.
+This does not retire the old star setting, enable physical output or complete
+migration and other-owner qualification. Item 98 remains partial.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -13989,6 +14007,12 @@ and restoration 60/0. These are portable software controls; native TIS/GUI and
 final composed qualification remain open. See
 [the retargeting handoff](handovers/2026-10-15-group3-magic-retarget/README.md).
 Item 108 remains partial; no physical availability is enabled.
+
+The Linux physical-edit preflight now includes configured reachable Navigation
+positions and their original source currency, including Navigation None. Default
+and personal editor priority, shared None semantics and unavailable modified
+collisions remain unchanged. Focused receiving is recorded under item 97;
+public delivery, complete other-owner and native joins remain open.
 
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:

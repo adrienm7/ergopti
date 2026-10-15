@@ -1078,14 +1078,32 @@ helpers.describe("Linux merged shortcut acquisition custody", function()
 end)
 
 --- Real configuration/claim owners; only the native map observation is modeled.
-local function with_collision_scope(source, tap_config, body)
+local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
 		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-		local Manager, tap_path, hook
+		local Manager, tap_path, hook, navigation_dir, navigation_made
 		local ok, why = pcall(function()
-			tap_path = os.tmpname()
+			if navigation_text ~= nil then
+				navigation_dir = os.tmpname()
+				assert(os.remove(navigation_dir))
+				local made = os.execute("mkdir " .. require("text_utils").shell_quote(navigation_dir))
+				assert(made == true or made == 0)
+				navigation_made = true
+				tap_path = navigation_dir .. "/tap_hold.toml"
+				controls.navigation_path = navigation_dir .. "/layers.toml"
+				local handle = assert(io.open(controls.navigation_path, "wb"))
+				local wrote, result = pcall(handle.write, handle, navigation_text)
+				local closed, acknowledged = pcall(handle.close, handle)
+				assert(wrote and result ~= nil and result ~= false); assert(closed and acknowledged == true)
+				local verification = assert(io.open(controls.navigation_path, "rb"))
+				local read_ok, bytes = pcall(verification.read, verification, "*a")
+				local close_ok, verified_closed = pcall(verification.close, verification)
+				assert(read_ok and bytes == navigation_text); assert(close_ok and verified_closed == true)
+			else
+				tap_path = os.tmpname()
+			end
 			Sandbox.write_bytes(tap_path, require("tests.support.tap_hold_fixture").with_preset(tap_config))
 			hook = { calls = 0 }
 			function hook.set_remapper(engine) hook.calls = hook.calls + 1; hook.engine = engine; return true end
@@ -1136,7 +1154,18 @@ local function with_collision_scope(source, tap_config, body)
 			helpers.assert_eq(hook.calls, before + controls.intentional_hook_changes, "validation adds no native ownership change beyond the controlled fault injection")
 		end)
 		if Manager then Manager._reset_for_test() end
-		if tap_path then os.remove(tap_path) end
+		if tap_path then
+			local removed, detail = os.remove(tap_path)
+			if navigation_made and removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Tap fixture cleanup refused: " .. tostring(detail) end
+		end
+		if navigation_made then
+			local removed, detail = os.remove(navigation_dir .. "/layers.toml")
+			if removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused: " .. tostring(detail) end
+			local removed = os.execute("rmdir " .. require("text_utils").shell_quote(navigation_dir))
+			if removed ~= true and removed ~= 0 then
+				ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused"
+			end
+		end
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(why, 0) end
 	end, source)
@@ -1389,4 +1418,56 @@ helpers.describe("physical preflight joins the original Magic Key replacement", 
 			end)
 		end)
 	end
+end)
+
+
+helpers.describe("Linux configured Navigation physical collision preflight", function()
+	local NAV_NONE = '[_meta]\nschema_version = 1\n[layers.nav.all]\nKeyJ = "none"\n'
+	local TAP_NAV = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\n'
+		.. 'tap_action = "enter"\nhold_modifier = ""\nhold_layer = "nav"\ntime_activation_seconds = 0.2\n'
+
+	local function unchanged(owners, controls, path, before)
+		helpers.assert_eq(Sandbox.read_bytes(path), before)
+		helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
+		helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+	end
+
+	helpers.it("(nav-configured-reservation) actual preflight refuses reachable Navigation None before configuration acquisition", function()
+		with_collision_scope(COLLISION_BASE, TAP_NAV, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
+			unchanged(owners, controls, path, before)
+		end, NAV_NONE)
+	end)
+
+	helpers.it("(nav-configured-reservation) unknown modified Navigation overlap remains unavailable before any write", function()
+		with_collision_scope(COLLISION_BASE, TAP_NAV, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_shift_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			unchanged(owners, controls, path, before)
+		end, NAV_NONE)
+	end)
+
+	helpers.it("(nav-configured-reservation) real changed layer bytes cannot borrow the installed Manager baseline at preflight", function()
+		with_collision_scope(COLLISION_BASE, TAP_NAV, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local handle = assert(io.open(controls.navigation_path, "wb"))
+			local wrote, result = pcall(handle.write, handle, "[broken")
+			local closed, acknowledged = pcall(handle.close, handle)
+			helpers.assert_true(wrote and result ~= nil and result ~= false); helpers.assert_true(closed and acknowledged == true)
+			local verification = assert(io.open(controls.navigation_path, "rb"))
+			local read_ok, bytes = pcall(verification.read, verification, "*a")
+			local close_ok, verified_closed = pcall(verification.close, verification)
+			helpers.assert_true(read_ok and bytes == "[broken"); helpers.assert_true(close_ok and verified_closed == true)
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+			unchanged(owners, controls, path, before)
+		end, NAV_NONE)
+	end)
 end)
