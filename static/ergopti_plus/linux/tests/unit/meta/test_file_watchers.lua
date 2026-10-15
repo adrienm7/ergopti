@@ -1536,7 +1536,15 @@ helpers.describe("file_watchers Personal topology", function()
 	helpers.it("(linux-watch-root-anchor) native refused anchor preserves healthy coverage and retries admission", function()
 		session("native", function(s)
 			local path = s.file(s.personal .. "/rules.toml")
-			s.start_refused = s.root; s.start()
+			s.start_refused = s.root
+			local logger, warnings = require("logger.shim"), {}
+			local held_warn = logger.warn
+			logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
+			local called, detail = pcall(s.start)
+			logger.warn = held_warn
+			helpers.assert_true(called, tostring(detail))
+			helpers.assert_eq(#warnings, 1, "the refused parent admission must expose its native failure")
+			helpers.assert_true(warnings[1]:find("controlled native activation refusal", 1, true) ~= nil, "preserve the actual native activation reason")
 			helpers.assert_eq(s.active(s.personal), 1, "parent activation refusal cannot discard an admitted healthy root")
 			helpers.assert_eq(s.active(path), 1, "parent activation refusal cannot discard existing file coverage")
 			s.file(path); s.settle(1); s.settle(0)

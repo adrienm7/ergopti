@@ -651,8 +651,11 @@ local function _ensure_personal_anchor(epoch)
 	local attributes = _personal_metadata(parent)
 	if not attributes or attributes.kind ~= "directory" then return false end
 	if _personal_anchor and _personal_anchor.path == parent and _same_personal_binding(_personal_anchor, attributes) then return true end
-	local entry = _new_personal_entry(parent, attributes, epoch, name)
-	if not entry then return false end
+	local entry, detail = _new_personal_entry(parent, attributes, epoch, name)
+	if not entry then
+		Logger.warn(LOG, "Personal parent watcher admission refused for '%s': %s.", parent, tostring(detail))
+		return false
+	end
 	if epoch ~= _personal_epoch then _retire_personal(entry); return false end
 	local previous = _personal_anchor
 	_personal_anchor = entry
