@@ -227,6 +227,29 @@ function M.new(options)
 		if receipt.guard() ~= true then return nil end
 		return receipt
 	end
+	--- Captures every ordered/third-slot claim from this installed source owner.
+	function owner.capture_collision_inventory()
+		if not rawequal(instance, owner) then return nil end
+		local source = owner.capture_edit_source()
+		if not source then return nil end
+		local captured, revision = state, generation
+		local entries = owner.configuration_entries()
+		local claims = {}
+		for _, entry in ipairs(entries) do
+			if state.enabled and (state.taps[entry.id] ~= "none" or state.holds[entry.id] ~= "none"
+				or state.chord_enabled and owner.get_chord(entry.id) ~= "none") then
+				claims[#claims + 1] = { binding = "combination__" .. entry.id, first = entry.first, second = entry.second }
+			end
+		end
+		local function current()
+			return rawequal(instance, owner) and state == captured and generation == revision
+				and source.guard() == true and rawequal(instance, owner) and state == captured and generation == revision
+		end
+		if not current() then return nil end
+		return { claims = claims, path = source.path, content = source.content, status = source.status, current = current,
+			sealed = function() return rawequal(instance, owner) and state == captured and generation == revision
+				and not busy and lease == nil and delivery_fence == nil end }
+	end
 	function owner.engine_options(thresholds)
 		local configured = { keys = clone(key_ids), taps = clone(state.taps), holds = clone(state.holds), thresholds = clone(thresholds),
 			chords = state.chord_enabled and clone(state.chords) or nil, chord_settings = state.chord_settings and clone(state.chord_settings) or nil, capture_chord = owner.capture_chord,
@@ -448,7 +471,7 @@ function M.install(options)
 	return true
 end
 for _, name in ipairs({"get_action","get_hold","get_chord","chord_pair","chord_settings","configuration_entries","is_enabled","capture_edit_source","has_bindings","configuration_domain","capture_action","engine_options",
-	"capture_runtime","capture_chord","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","configuration_pending","owns_configuration","validate_slot","acquire_configuration","release_configuration","configuration_snapshot","configuration_source","configuration_source_matches","configuration_candidate","apply_configuration"}) do
+	"capture_runtime","capture_chord","capture_collision_inventory","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","configuration_pending","owns_configuration","validate_slot","acquire_configuration","release_configuration","configuration_snapshot","configuration_source","configuration_source_matches","configuration_candidate","apply_configuration"}) do
 	M[name] = function(...)
 		if not instance then return name == "get_action" and "none" or nil end
 		return instance[name](...)

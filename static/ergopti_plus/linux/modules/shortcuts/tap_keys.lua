@@ -445,4 +445,49 @@ end
 
 BindingPublication.register("tap", "modules.shortcuts.tap_keys", M, M.published_binding_catalogue)
 
+
+--- Captures the actual plain-tap claims and their canonical source/runtime epoch.
+function M.capture_collision_inventory()
+	load_assignments()
+	if _configuration_owner ~= nil then return nil end
+	local Routes = require("infra.config_paths")
+	local route, read, factory = Routes.config, TomlWriter.read_classified, M.capture_collision_inventory
+	local path = route("config.toml")
+	local bytes, status = read(path)
+	if status ~= "ok" and status ~= "absent" then return nil end
+	local expected = M.configuration_candidate(TomlCodec.decode(bytes or "")).assignments
+	local actual, keys, epoch, active = _assignments, _keys, _dispatch_generation, _is_active
+	local key_source = {}; for index, key in ipairs(keys) do key_source[index] = { row = key, id = key.id, code = key.linux } end
+	local function runtime()
+		if not rawequal(package.loaded["modules.shortcuts.tap_keys"], M) or _configuration_owner ~= nil
+			or _dispatch_generation ~= epoch or not rawequal(_assignments, actual) or not rawequal(_keys, keys)
+			or _is_active ~= active or not rawequal(package.loaded["infra.config_paths"], Routes)
+			or Routes.config ~= route or TomlWriter.read_classified ~= read or M.capture_collision_inventory ~= factory then return false end
+		if #keys ~= #key_source then return false end
+		for index, key in ipairs(keys) do
+			local saved = key_source[index]
+			if not saved or not rawequal(saved.row, key) or saved.id ~= key.id or saved.code ~= key.linux then return false end
+		end
+		for key, value in pairs(actual) do if expected[key] ~= value then return false end end
+		for key, value in pairs(expected) do if actual[key] ~= value then return false end end
+		return true
+	end
+	local enabled = active() == true
+	local function current()
+		if not runtime() or route("config.toml") ~= path or (active() == true) ~= enabled then return false end
+		local content, classification = read(path)
+		return content == bytes and classification == status and route("config.toml") == path
+			and (active() == true) == enabled and runtime()
+	end
+	if not current() then return nil end
+	local claims = {}
+	for _, key in ipairs(keys) do
+		if enabled and actual[key.id] ~= "none" then
+			claims[#claims + 1] = { kind = "chord", binding = M.binding_id(key.id), code = key.linux, mods = {} }
+		end
+	end
+	if not current() then return nil end
+	return { claims = claims, path = path, content = bytes, status = status, current = current, sealed = runtime }
+end
+
 return M
