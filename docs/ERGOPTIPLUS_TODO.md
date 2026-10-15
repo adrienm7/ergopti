@@ -12830,6 +12830,16 @@ All original assertions remain: both Lua ABIs give original-parent47/0,
 published44/3, corrected47/0, withdrawn44/3 and restored47/0. No production
 source guard is relaxed; final joined hosted receiving remains required.
 
+Configured Linux wrap symbols now join physical-shortcut collision preflight
+through their genuine Shortcuts Manager. Original acknowledged catalogue/config
+reads, exact live preferences and a mutation generation reserve possible plain
+or Shift consumers; Ctrl/Alt/Super and the separate Script AltGr namespace stay
+disjoint. No PRIMARY polling, selection or native delivery is inferred. Both
+Lua ABIs pass36 owner and121 complete shortcut-scope cases; the focused
+original consumer5/3 becomes8/0,
+with malformed-source refusal retained. LLM prediction and full source/input/
+output ownership remain open, and public physical delivery stays unavailable.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
