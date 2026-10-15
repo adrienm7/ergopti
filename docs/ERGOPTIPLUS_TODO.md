@@ -4833,6 +4833,16 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
 
 The minimal native lease-silence receiving topic derives from Dev `a2b1fb4be16ff88b9bab755841d744960512b89e`. Its additive DEBUG control uses real outer/inner processes with a fixed no-effect CLI and scripted guardian authority. The source-bound manual ARM/Intel receiver retains the direct Swift child status separately from the PTY and output-capture statuses. Forty-nine portable receiving controls passed on the retained helper packet. Its original 26 transcript assertions plus 14 frozen direct-status cases and one double-LF refusal now run as 41 lasting normal-suite controls; the separate eight source/host controls remain supplemental. All 41 lasting controls and the four strict CI inventories pass. The exact published logger fixture prerequisite `e47c88c23999973b6cd936cfed3db40e2a1cf3a5` is received unchanged so the original covering suite selects its configured sink. Actual native compilation/execution and current package acceptance remain unexecuted. The independent manual-only ARM/Intel CI job is enrolled under explicitly handed-off workflow custody, preserving every existing job, budget, package/install control and release condition. This neither proves the user watchdog exit73 cause nor grants physical input, installed-runtime or shipping authority.
 
+WP3 pause bookkeeping now retires observed modifier releases during pause and
+settles remaining held keys through the existing suppression owner on resume.
+A completed paused press/release pair cannot swallow the next active press;
+left/right modifiers remain independent even with identical aggregate flags.
+The complete 41-case current test prefix and frozen 47 additive controls pass
+88/0; original production gives 50/38, and omitting either correction restores
+29 or 11 failures. Five adjacent focused suites pass 68/0. These are portable
+event-port controls, not native or physical acceptance. Private-window policy
+transitions remain a separate unfinished software join.
+
 WP3 bounded system-authentication setter receiving now cancels a complete
 held-modifier interval when its effective policy becomes excluded. Disabled
 filtering preserves included durations. A refused settlement retains a private
