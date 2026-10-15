@@ -629,10 +629,20 @@ local function start_magic(action)
 			return _lifecycle_epoch == epoch and _lifecycle_paused ~= true
 				and (_started and _delivery_enabled or _start_attempt ~= nil)
 		end,
-		execute = function(action_id, binding)
-			if _editing or _started ~= true or _delivery_enabled ~= true or _lifecycle_paused == true then return false end
-			local ok, handled = Logger.callback(LOG, "Conditional configurable shortcut",
-				action_catalogue().execute_single, action_id, binding)
+		execute = function(action_id, binding, delivery_current)
+			local function parent_current()
+				return not _editing and _started == true and _delivery_enabled == true
+					and _lifecycle_paused ~= true and _lifecycle_epoch == epoch
+			end
+			if not parent_current() then return false end
+			local execute = action_catalogue().execute_single
+			local ok, handled = Logger.callback(LOG, "Conditional configurable shortcut", function()
+				if not parent_current() then return false end
+				if delivery_current ~= nil and (type(delivery_current) ~= "function"
+					or delivery_current() ~= true) then return false end
+				if not parent_current() then return false end
+				return execute(action_id, binding)
+			end)
 			return ok and handled == true
 		end,
 	})
